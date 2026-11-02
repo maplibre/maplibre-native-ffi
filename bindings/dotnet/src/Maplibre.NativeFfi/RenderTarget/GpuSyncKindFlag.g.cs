@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A bit for each <c>GpuSyncKind</c>.
+/// A GPU sync kind, as a bit in a set.
 /// </summary>
 /// <remarks>
 /// See <c>mln_gpu_sync_kind_flag</c> in the <see

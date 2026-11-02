@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for source feature queries.
+/// Options for a source feature query.
 /// </summary>
 /// <remarks>
 /// See <c>mln_source_feature_query_options</c> in the <see
@@ -12,8 +12,8 @@ namespace Maplibre.NativeFfi;
 public sealed record SourceFeatureQueryOptions
 {
     /// <summary>
-    /// Optional source-layer IDs. Required by vector sources; ignored by
-    /// GeoJSON.
+    /// The source layers to query. A vector source finds features only in the
+    /// source layers named here.
     /// </summary>
     public ImmutableArray<string>? SourceLayerIds
     {
@@ -23,7 +23,8 @@ public sealed record SourceFeatureQueryOptions
     internal ValueArray<string>? SourceLayerIdsStorage { get; init; }
 
     /// <summary>
-    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+    /// A [filter](https://maplibre.org/maplibre-style-spec/expressions/) that
+    /// each feature must match. Empty matches every feature.
     /// </summary>
     public string Filter { get; init; } = "";
 }

@@ -1,16 +1,8 @@
 /**
  * @file maplibre_native_c.h
- * Public C API for low-level MapLibre Native bindings.
- *
- * Graphics-thread-affine functions validate the caller thread and return
- * MLN_STATUS_WRONG_THREAD for mismatches. Functions without an explicit
- * graphics-thread requirement may be called from any thread.
- *
- * Status-returning functions report a synchronous failure's message through
- * their last parameter, a nullable mln_diagnostic*. Asynchronous native
- * failures are reported through completions or repeated event streams.
- *
- * This header targets C23.
+ * The MapLibre Native C API. Every declaration follows the
+ * [API
+ * guidelines](https://maplibre.org/maplibre-native-ffi/development/guidelines/#api).
  */
 
 #ifndef MAPLIBRE_NATIVE_C_H

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Geographic bounds in degrees.
+/// A rectangle of coordinates, from its southwest to its northeast corner.
 /// </summary>
 /// <remarks>
 /// See <c>mln_lat_lng_bounds</c> in the <see

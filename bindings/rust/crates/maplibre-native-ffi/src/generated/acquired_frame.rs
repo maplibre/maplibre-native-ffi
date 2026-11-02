@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A rendered frame that a render session lends until its release.
+    /// A rendered frame that the caller holds to read or show.
     ///
     /// See `mln_acquired_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -15,8 +15,11 @@ native_owner! {
 }
 
 impl AcquiredFrameHandle {
-    /// Consumes an acquired frame without consumer GPU synchronization, so it
-    /// quarantines the frame's slot of the texture ring.
+    /// Gives up an acquired frame without saying when your GPU stops reading
+    /// it.
+    ///
+    /// Because your GPU may still read the frame's texture, the session never
+    /// renders into that texture again.
     ///
     /// See `mln_acquired_frame_discard` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -29,10 +32,14 @@ impl AcquiredFrameHandle {
         })
     }
 
-    /// Copies common metadata for an acquired frame.
+    /// Reads the frame result of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_result` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     pub fn get_result(&self) -> Result<RenderFrameResult> {
         let mut call = self.inner.call();
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
@@ -43,10 +50,20 @@ impl AcquiredFrameHandle {
         Ok(unsafe { from_native(out_result) }?)
     }
 
-    /// Releases an acquired frame after the host's GPU work that reads it.
+    /// Gives an acquired frame back to the session once you're done reading it.
+    ///
+    /// `consumer_completion` says when your GPU work that reads the texture
+    /// finishes. Null means that the work has already finished. The session
+    /// waits for that point before it renders into the texture again.
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when
+    ///   `RenderSessionCapabilities::consumer_sync_kinds` lacks the kind of
+    ///   `consumer_completion`.
     pub fn release(
         self,
         consumer_completion: Option<&GpuSync>,
@@ -65,10 +82,15 @@ impl AcquiredFrameHandle {
 /// getters lend values that stay valid until then, and its owner can't
 /// be consumed while it lives.
 ///
-/// Begins an allocation-free scope that borrows an acquired frame.
+/// Keeps an acquired frame's texture and sync objects in place while you use
+/// them.
 ///
 /// See `mln_acquired_frame_view_begin` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+///
+/// # Errors
+///
+/// - `Status::TargetLost` when the session lost its target.
 pub struct AcquiredFrameView<'a> {
     owner: &'a AcquiredFrameHandle,
     _scope: crate::call::ViewScope,
@@ -79,10 +101,15 @@ impl std::fmt::Debug for AcquiredFrameView<'_> {
     }
 }
 impl AcquiredFrameHandle {
-    /// Begins an allocation-free scope that borrows an acquired frame.
+    /// Keeps an acquired frame's texture and sync objects in place while you
+    /// use them.
     ///
     /// See `mln_acquired_frame_view_begin` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     pub fn view(&self) -> Result<AcquiredFrameView<'_>> {
         // SAFETY: these are this handle type's view scope functions.
         let scope = unsafe {
@@ -99,10 +126,14 @@ impl AcquiredFrameHandle {
     }
 }
 impl AcquiredFrameView<'_> {
-    /// Copies Metal-native metadata from an acquired frame.
+    /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     #[cfg(any(
         target_os = "ios",
         target_os = "macos",
@@ -119,10 +150,14 @@ impl AcquiredFrameView<'_> {
         Ok(Lent::new(unsafe { from_native(out_frame) }?))
     }
 
-    /// Copies OpenGL-native metadata from an acquired frame.
+    /// Gets the OpenGL texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_open_gl_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     pub fn get_open_gl_texture(&self) -> Result<Lent<'_, OpenGlTextureFrame>> {
         let mut call = self.owner.inner.call();
         let mut out_frame: sys::mln_open_gl_texture_frame = unsafe { std::mem::zeroed() };
@@ -133,10 +168,14 @@ impl AcquiredFrameView<'_> {
         Ok(Lent::new(unsafe { from_native(out_frame) }?))
     }
 
-    /// Copies the producer synchronization for an acquired texture frame.
+    /// Reads what to wait for before you read an acquired frame's texture.
     ///
     /// See `mln_acquired_frame_get_producer_sync` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     pub fn get_producer_sync(&self) -> Result<Lent<'_, GpuSync>> {
         let mut call = self.owner.inner.call();
         let mut out_sync: sys::mln_gpu_sync = unsafe { std::mem::zeroed() };
@@ -147,10 +186,14 @@ impl AcquiredFrameView<'_> {
         Ok(Lent::new(unsafe { from_native(out_sync) }?))
     }
 
-    /// Copies Vulkan-native metadata from an acquired frame.
+    /// Gets the Vulkan image of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_vulkan_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     #[cfg(any(
         target_os = "android",
         target_os = "freebsd",
@@ -168,10 +211,14 @@ impl AcquiredFrameView<'_> {
         Ok(Lent::new(unsafe { from_native(out_frame) }?))
     }
 
-    /// Copies WebGPU-native metadata from an acquired frame.
+    /// Gets the WebGPU texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_web_gpu_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session lost its target.
     #[cfg(target_os = "emscripten")]
     pub fn get_web_gpu_texture(&self) -> Result<Lent<'_, WebGpuTextureFrame>> {
         let mut call = self.owner.inner.call();

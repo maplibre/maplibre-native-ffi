@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A render session, which renders one map to one render target.
+/// A render session draws a map into a surface or a texture.
 /// </summary>
 /// <remarks>
 /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
@@ -94,12 +94,17 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Irreversibly ends session work and destroys the session's graphics
-    /// objects where that is safe.
+    /// Stops the session right away, without running its pending graphics work.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_abandon</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>Use it when the target's graphics objects are going away and a
+    /// detach can't finish first. Pending work completes with
+    /// <c>Status.TargetLost</c>, and pending frame requests finish with
+    /// <c>RenderResult.TargetNotReady</c>. Once the call returns, the library
+    /// no longer uses your graphics objects, and you can attach another session
+    /// to the map. Dispose the session afterward.</para>
+    /// <para>See <c>mln_render_session_abandon</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
     public RenderAbandonResult Abandon()
     {
@@ -113,12 +118,21 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Acquires the oldest rendered frame that is not already acquired. The
-    /// frame owns its slot until release. The call is nonblocking.
+    /// Takes a rendered frame from the session's texture ring, if one is ready.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_acquire_frame</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>It takes the oldest frame that you haven't acquired. The session
+    /// can render over a frame before you acquire it. While you hold a frame in
+    /// every texture of the ring, new frames wait until you release one.</para>
+    /// <para>See <c>mln_render_session_acquire_frame</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session lacks
+    /// <c>RenderSessionCapabilityFlag.FrameAcquisition</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when the session has
+    /// failed.</description></item>
+    /// </list>
     /// </remarks>
     public AcquiredFrameHandle? AcquireFrame()
     {
@@ -135,16 +149,19 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Ends every frame demand that has not started with
-    /// <c>RenderResult.NoUpdate</c> and completes after earlier driver work has
-    /// finished. A running demand finishes its attempt and ends any wait for a
-    /// map update or a free slot. After completion, a new frame demand is
-    /// required to render again, except that a pending still image submits its
-    /// next demand itself; see <c>MapHandle.RequestStillImageAsync()</c>.
+    /// Ends the session's pending frame requests and waits for its earlier
+    /// work.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_barrier</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>Frame requests that haven't started, including those that wait for
+    /// a map update, finish with <c>RenderResult.NoUpdate</c>.</para>
+    /// <para>See <c>mln_render_session_barrier</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the barrier runs.</description></item>
+    /// </list>
     /// </remarks>
     public Task BarrierAsync()
     {
@@ -159,11 +176,17 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts asynchronous renderer-data clearing.
+    /// Clears the data that the session's renderer holds, such as loaded tiles,
+    /// and draws the map again.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_clear_data</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>See <c>mln_render_session_clear_data</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the work runs.</description></item>
+    /// </list>
     /// </remarks>
     public Task ClearDataAsync()
     {
@@ -178,11 +201,20 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts normal graphics-owner teardown and map detachment.
+    /// Detaches the session from its map and frees its graphics objects.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_detach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>Release every acquired frame first. Pending frame requests finish
+    /// with <c>RenderResult.TargetNotReady</c>. Once the detach completes, the
+    /// library no longer uses your graphics objects, and you can attach another
+    /// session to the map. Dispose the session afterward.</para>
+    /// <para>See <c>mln_render_session_detach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the detach runs.</description></item>
+    /// </list>
     /// </remarks>
     public Task DetachAsync()
     {
@@ -197,12 +229,18 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Consumes a session in any state and retires it, then runs completion, if
-    /// given, once the host may destroy the target's graphics objects.
+    /// Releases the session in any state.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_dispose</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>An attached session driven by <c>RenderDriverKind.CoreWorker</c>
+    /// detaches first unless you hold one of its frames. Any other session is
+    /// abandoned as <c>RenderSessionHandle.Abandon()</c> does. To free the
+    /// graphics objects of a session driven by
+    /// <c>RenderDriverKind.CallerGraphicsThread</c>, detach it before you
+    /// dispose it. Once the disposal completes, the library no longer uses your
+    /// graphics objects.</para>
+    /// <para>See <c>mln_render_session_dispose</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
     public Task CloseAsync()
     {
@@ -225,7 +263,7 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Drains every currently queued terminal frame result.
+    /// Takes the frame results that the session has queued.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_drain_frame_results</c> in the <see
@@ -262,11 +300,16 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts asynchronous renderer diagnostic-log emission.
+    /// Logs debugging information about the session's renderer.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_dump_debug_logs</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>See <c>mln_render_session_dump_debug_logs</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the work runs.</description></item>
+    /// </list>
     /// </remarks>
     public Task DumpDebugLogsAsync()
     {
@@ -281,7 +324,7 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Returns the immutable capabilities fixed during attachment.
+    /// Reads what the session supports.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_get_capabilities</c> in the <see
@@ -301,11 +344,20 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Reports the session's first terminal failure from any native thread.
+    /// Reports the error that made the session fail.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_get_failure</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>The call fails with that error, and succeeds while the session
+    /// hasn't failed.</para>
+    /// <para>See <c>mln_render_session_get_failure</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session failed
+    /// because it lost its target.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the session failed for
+    /// another reason.</description></item>
+    /// </list>
     /// </remarks>
     public void GetFailure()
     {
@@ -314,7 +366,7 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Copies the latest render-session snapshot from any native thread.
+    /// Reads the session's current state.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_get_snapshot</c> in the <see
@@ -332,11 +384,20 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts a feature-extension query against the latest driver state.
+    /// Reads a value that a source computes for one of its features.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_query_feature_extensions</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
+    /// <para>A clustered GeoJSON source answers the <c>supercluster</c>
+    /// extension for a cluster feature. Its <c>extensionField</c> is
+    /// <c>children</c> for the cluster's child features, <c>leaves</c> for the
+    /// points in the cluster, or <c>expansion-zoom</c> for the zoom level where
+    /// the cluster splits. For <c>leaves</c>, <c>arguments</c> can set
+    /// <c>limit</c> and <c>offset</c>. Without <c>limit</c>, the result has up
+    /// to 10 points and ignores <c>offset</c>. The result is JSON: a GeoJSON
+    /// feature collection, a number, or null when the source has no
+    /// answer.</para>
+    /// <para>See <c>mln_render_session_query_feature_extensions</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// </remarks>
     public Task<string> QueryFeatureExtensionsAsync(
         string sourceId,
@@ -370,13 +431,13 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts a rendered-feature query against the last frame that the session
-    /// rendered, so render after a camera or style change for a result that
-    /// matches it.
+    /// Finds the features that the session drew in an area of the screen.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_query_rendered_features</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
+    /// <para>The query reads the last frame that the session rendered. A
+    /// feature that several layers draw appears once for each layer.</para>
+    /// <para>See <c>mln_render_session_query_rendered_features</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// </remarks>
     public Task<RenderedFeature[]> QueryRenderedFeaturesAsync(
         RenderedQueryGeometry geometry,
@@ -408,12 +469,14 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts a source-feature query against the tiles that the source loaded
-    /// for rendering, which it loads only while a visible layer uses it.
+    /// Finds the features of the source named <c>sourceId</c>.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_query_source_features</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
+    /// <para>The query covers only the tiles that the source has loaded for the
+    /// current view. A source loads tiles only while a visible layer uses
+    /// it.</para>
+    /// <para>See <c>mln_render_session_query_source_features</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// </remarks>
     public Task<SourceFeature[]> QuerySourceFeaturesAsync(
         string sourceId,
@@ -444,12 +507,20 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Reads back the latest frame of the session's owned texture as
-    /// premultiplied RGBA8.
+    /// Reads the pixels of the last frame that the session rendered.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_read_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>See <c>mln_render_session_read_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session's
+    /// capabilities lack
+    /// <c>RenderSessionCapabilityFlag.Readback</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when the session hasn't
+    /// rendered a frame since it attached, resized, or changed its
+    /// target.</description></item>
+    /// </list>
     /// </remarks>
     public Task<TextureReadbackResult> ReadTextureAsync()
     {
@@ -472,11 +543,16 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts best-effort release of renderer caches.
+    /// Frees memory that the session's renderer can rebuild, such as caches.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_reduce_memory_use</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>See <c>mln_render_session_reduce_memory_use</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the work runs.</description></item>
+    /// </list>
     /// </remarks>
     public Task ReduceMemoryUseAsync()
     {
@@ -491,12 +567,26 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts releasing the session's surface or borrowed texture ring while
-    /// keeping its renderer.
+    /// Lets go of the session's surface or textures, and keeps the rest of the
+    /// session.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_release_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>Use it when the platform takes a surface away, such as when your
+    /// app goes to the background. Release every acquired frame first. Until
+    /// you give the session a new target, frame requests finish with
+    /// <c>RenderResult.TargetNotReady</c>. Once the release completes, you can
+    /// destroy the old target.</para>
+    /// <para>See <c>mln_render_session_release_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session renders
+    /// into a ring that it created.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the target is a WebGL
+    /// canvas.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the release runs.</description></item>
+    /// </list>
     /// </remarks>
     public Task ReleaseTargetAsync()
     {
@@ -511,13 +601,21 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Requests a frame without waiting. Every accepted demand produces one
-    /// terminal result record. Caller-driver sessions require service on the
-    /// graphics thread. Core-worker sessions need no host service.
+    /// Asks the session to render a frame.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_request_frame</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>Call it once the attach completes. Every request finishes with one
+    /// frame result that carries its token, and
+    /// <c>RenderSessionHandle.DrainFrameResults()</c> takes it. A request
+    /// without <c>FrameDemandFlag.Force</c> replaces each pending request with
+    /// the same flags.</para>
+    /// <para>See <c>mln_render_session_request_frame</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> when the session has
+    /// failed.</description></item>
+    /// </list>
     /// </remarks>
     public void RequestFrame(FrameDemand demand)
     {
@@ -527,16 +625,22 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered logical resize of the driver and the map. The driver
-    /// applies the extent in order with its other work, and later driver work
-    /// does not wait for the map. The completion runs after both have applied
-    /// it and the map has published its snapshot. Frames render once a map
-    /// update matches the applied extent; static and tile maps publish that
-    /// update for their next still image.
+    /// Resizes the session's target and its map.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_resize</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para><c>extent</c> must keep the session's scale factor. To change the
+    /// scale factor, give the session a new target or attach a new session.
+    /// Release every acquired frame first.</para>
+    /// <para>See <c>mln_render_session_resize</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session renders
+    /// into a borrowed ring. Give it new textures of the new size
+    /// instead.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session loses its
+    /// target before the resize applies.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> ResizeAsync(LogicalExtent extent)
     {
@@ -552,13 +656,14 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Services every queued item for a caller-graphics-thread driver. The
-    /// first successful service call fixes the session's graphics-thread
-    /// identity; later calls from another native thread return
-    /// <c>Status.WrongThread</c>. The target context must be current.
-    /// Core-worker sessions return <c>Status.InvalidState</c>.
+    /// Runs the session's ready graphics work on your graphics thread.
     /// </summary>
     /// <remarks>
+    /// <para>Use it with <c>RenderDriverKind.CallerGraphicsThread</c>, and call
+    /// it from the same thread every time. Call it each time
+    /// <c>RenderSessionAttachOptions.DriverWorkWake</c> is called, even while
+    /// you request no frames, and until a detach completes. It returns once no
+    /// work is ready.</para>
     /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
     /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
     /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics
@@ -573,13 +678,23 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered replacement of every texture of a caller-owned Metal
-    /// ring.
+    /// Replaces the Metal textures that a borrowed ring renders into.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_metal_borrowed_texture_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>Use it to resize the ring, or to give the session textures again
+    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
+    /// acquired frame first. The new ring must have as many textures as the old
+    /// one, and the same device and command queue. Once the replacement
+    /// completes, the session no longer uses the old textures.</para>
+    /// <para>See <c>mln_render_session_set_metal_borrowed_texture_target</c> in
+    /// the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the new textures have
+    /// a different pixel format than the old ones. Attach a new session to
+    /// change it.</description></item>
+    /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
@@ -600,11 +715,15 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered Metal surface replacement.
+    /// Replaces the Metal layer that the session renders to.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_metal_surface_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// <para>Use it to give the session a layer again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, or to move it to
+    /// another layer. The new layer must use the same device. Once the
+    /// replacement completes, the session no longer uses the old layer.</para>
+    /// <para>See <c>mln_render_session_set_metal_surface_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
@@ -625,13 +744,17 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered replacement of every texture of a caller-owned OpenGL
-    /// ring.
+    /// Replaces the OpenGL textures that a borrowed ring renders into.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_open_gl_borrowed_texture_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>Use it to resize the ring, or to give the session textures again
+    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
+    /// acquired frame first. The new ring must have as many textures as the old
+    /// one, and the same context. Once the replacement completes, the session
+    /// no longer uses the old textures.</para>
+    /// <para>See <c>mln_render_session_set_open_gl_borrowed_texture_target</c>
+    /// in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// </remarks>
     public Task SetOpenGlBorrowedTextureTargetAsync(OpenGlBorrowedTextureDescriptor descriptor)
     {
@@ -648,11 +771,17 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered OpenGL surface replacement.
+    /// Replaces the OpenGL surface that the session presents to.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_open_gl_surface_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// <para>Use it to give the session a surface again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, or to move it to
+    /// another surface. The new surface must use the same context. Once the
+    /// replacement completes, the session no longer uses the old
+    /// surface.</para>
+    /// <para>See <c>mln_render_session_set_open_gl_surface_target</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
     /// </remarks>
     public Task SetOpenGlSurfaceTargetAsync(OpenGlSurfaceDescriptor descriptor)
     {
@@ -669,13 +798,23 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered replacement of every image of a caller-owned Vulkan
-    /// ring.
+    /// Replaces the Vulkan images that a borrowed ring renders into.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_vulkan_borrowed_texture_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>Use it to resize the ring, or to give the session images again
+    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
+    /// acquired frame first. The new ring must have as many images as the old
+    /// one, and the same context. Once the replacement completes, the session
+    /// no longer uses the old images.</para>
+    /// <para>See <c>mln_render_session_set_vulkan_borrowed_texture_target</c>
+    /// in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the new ring has a
+    /// different <c>format</c>, <c>final_layout</c>, or <c>owner</c> than the
+    /// old one. Attach a new session to change them.</description></item>
+    /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
@@ -696,11 +835,23 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Starts an ordered Vulkan surface replacement.
+    /// Replaces the Vulkan surface that the session presents to.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_set_vulkan_surface_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// <para>Use it to give the session a surface again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, or to move it to
+    /// another surface. The new surface must use the same context. Once the
+    /// replacement completes, the session no longer uses the old
+    /// surface.</para>
+    /// <para>See <c>mln_render_session_set_vulkan_surface_target</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the new surface needs
+    /// a different color format or pre-rotation support than the old one.
+    /// Attach a new session instead.</description></item>
+    /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]

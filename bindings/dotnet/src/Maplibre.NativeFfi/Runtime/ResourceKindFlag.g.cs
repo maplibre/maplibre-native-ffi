@@ -2,9 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The resource kinds that a route or rule matches, one bit per
-/// <c>ResourceKind</c> value. Registration rejects unknown bits.
-/// <c>ResourceKindFlag.All</c>, like zero, selects every resource kind.
+/// A resource kind, as a bit in a set.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_kind_flag</c> in the <see

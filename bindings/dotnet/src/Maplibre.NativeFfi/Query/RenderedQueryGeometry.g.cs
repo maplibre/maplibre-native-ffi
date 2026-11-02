@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Rendered feature query geometry descriptor.
+/// The screen area that a rendered feature query covers.
 /// </summary>
 /// <remarks>
 /// See <c>mln_rendered_query_geometry</c> in the <see

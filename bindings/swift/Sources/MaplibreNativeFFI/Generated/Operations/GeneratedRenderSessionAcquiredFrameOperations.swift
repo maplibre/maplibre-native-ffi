@@ -4,8 +4,10 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
-  /// Consumes an acquired frame without consumer GPU synchronization, so it
-  /// quarantines the frame's slot of the texture ring.
+  /// Gives up an acquired frame without saying when your GPU stops reading it.
+  ///
+  /// Because your GPU may still read the frame's texture, the session never
+  /// renders into that texture again.
   ///
   /// See `mln_acquired_frame_discard` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -16,10 +18,14 @@ public extension AcquiredFrameHandle {
     ) }
   }
 
-  /// Copies the producer synchronization for an acquired texture frame.
+  /// Reads what to wait for before you read an acquired frame's texture.
   ///
   /// See `mln_acquired_frame_get_producer_sync` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session lost its target.
   func withProducerSync<Result>(_ body: (GpuSyncView) throws -> Result) throws
     -> Result
   {
@@ -41,10 +47,14 @@ public extension AcquiredFrameHandle {
     ) { raw, scope in try body(GpuSyncView(GpuSync(raw: raw), scope: scope)) }
   }
 
-  /// Copies common metadata for an acquired frame.
+  /// Reads the frame result of an acquired frame.
   ///
   /// See `mln_acquired_frame_get_result` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session lost its target.
   func getResult() throws -> RenderFrameResult {
     var value0 = mln_render_frame_result()
     value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
@@ -59,10 +69,19 @@ public extension AcquiredFrameHandle {
 }
 
 public extension AcquiredFrameHandle {
-  /// Releases an acquired frame after the host's GPU work that reads it.
+  /// Gives an acquired frame back to the session once you're done reading it.
+  ///
+  /// `consumerCompletion` says when your GPU work that reads the texture
+  /// finishes. Null means that the work has already finished. The session waits
+  /// for that point before it renders into the texture again.
   ///
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when `RenderSessionCapabilities.consumerSyncKinds`
+  ///   lacks the kind of `consumerCompletion`.
   func release(consumerCompletion: GpuSync?) throws {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }

@@ -3,17 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Backend synchronization copied by frame access and release calls.
+/// A point in GPU work that the other side waits for before using a texture.
 /// </summary>
 /// <remarks>
 /// See <c>mln_gpu_sync</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Handle">
-/// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-/// descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
-/// </param>
-/// <param name="Value">
-/// Counter value of a timeline kind. Zero for other kinds.
+/// The object to wait on, for the kinds that name one.
 /// </param>
 public readonly partial record struct GpuSync(GpuSyncKind Kind, ulong Handle, ulong Value);

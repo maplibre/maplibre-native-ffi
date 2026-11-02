@@ -201,7 +201,7 @@ class SwiftEmitterTests(unittest.TestCase):
         )
         self.assertIn(
             "`MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, "
-            "or `GesturePhase.cancel` ended the transitions",
+            "or a gesture's `GesturePhase.cancel` stopped the change",
             summary,
         )
         self.assertNotIn("mln_map_cancel_transitions", summary)

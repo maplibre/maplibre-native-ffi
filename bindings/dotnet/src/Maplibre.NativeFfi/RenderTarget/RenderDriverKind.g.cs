@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Execution placement for one render session.
+/// The thread that runs a render session's graphics work.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_driver_kind</c> in the <see
@@ -11,14 +11,13 @@ namespace Maplibre.NativeFfi;
 public enum RenderDriverKind : uint
 {
     /// <summary>
-    /// Native code initializes, services, and tears down transferable graphics
-    /// state on a library-owned thread.
+    /// A library thread.
     /// </summary>
     CoreWorker = 1,
 
     /// <summary>
-    /// The host services driver work on the thread or realm where its graphics
-    /// context is current.
+    /// Your thread, when it calls
+    /// <c>RenderSessionHandle.ServiceDriverWork()</c>.
     /// </summary>
     CallerGraphicsThread = 2,
 }

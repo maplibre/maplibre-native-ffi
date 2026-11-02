@@ -1,17 +1,6 @@
 /**
  * @file maplibre_native_c/base.h
- * Public C API declarations for base ABI types, status values, and handles.
- *
- * Handles are opaque 64-bit ids. Each handle remains distinguishable from
- * every later handle after release. A release or disposal ends a handle once
- * the call accepts it. Passing a released handle reports
- * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
- * handle, a handle of another type, or a value this library never issued,
- * reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no effect, and
- * its diagnostic names the case. Handle values are safe to copy, compare, hash,
- * and move between threads, and carry no ownership on their own.
- *
- * Hosts pass handles back as issued, without decoding or synthesizing them.
+ * Statuses, diagnostics, handles, and other types that every header uses.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_BASE_H
@@ -48,61 +37,56 @@
 extern "C" {
 #endif
 
-/**
- * Status values returned by status-returning functions.
- *
- * A few host callbacks run while native code holds a lock that a call into
- * this API can take again: the log handler's callback, queue wake, and
- * release_user_data, and the callbacks of an mln_queue_lock. Inside those
- * callbacks, every status-returning function returns MLN_STATUS_INVALID_STATE
- * without running, and its diagnostic names the callback. Each other callback
- * states which calls it may make.
- */
+/** The result of a call or of asynchronous work. */
 typedef enum mln_status : int32_t {
   MLN_STATUS_OK = 0,
-  /** A pointer, size field, mask, or handle argument was invalid. */
+  /** An argument is invalid, such as malformed JSON or a value out of range. */
   MLN_STATUS_INVALID_ARGUMENT = -1,
-  /** The object is valid but not currently in a state that permits the call. */
+  /**
+   * The call doesn't fit the current state, such as removing a source that a
+   * layer still uses.
+   */
   MLN_STATUS_INVALID_STATE = -2,
-  /** The handle is thread-affine and the call came from the wrong thread. */
+  /** The call came from a thread that can't make it. */
   MLN_STATUS_WRONG_THREAD = -3,
-  /** The entry point or requested behavior is unavailable in this build. */
+  /** The platform, the build, or the render target lacks the feature. */
   MLN_STATUS_UNSUPPORTED = -4,
-  /** Native code failed; the diagnostic describes the error. */
+  /**
+   * The library or the platform hit an error, such as a failed graphics driver
+   * call.
+   */
   MLN_STATUS_NATIVE_ERROR = -5,
-  /** The operation reached its terminal cancelled disposition. */
+  /**
+   * The work stopped before it finished, such as when its handle was
+   * released.
+   */
   MLN_STATUS_CANCELLED = -6,
-  /** A conflicting driver call or lifecycle transition is in flight. */
+  /** Another call is still using the same object. */
   MLN_STATUS_BUSY = -7,
-  /** The render target or graphics receiver was irreversibly lost. */
+  /** The render target can't be drawn to anymore. */
   MLN_STATUS_TARGET_LOST = -8,
-  /** A nonblocking drain or acquisition has nothing to return yet. */
+  /** There is nothing to return yet, such as when no new frame is ready. */
   MLN_STATUS_NOT_READY = -9,
-  /** A call named an ID with no live object behind it. */
+  /** Nothing has the given ID. */
   MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
 
-/** Capacity of mln_diagnostic.message, including the terminating null byte. */
+/** The size of mln_diagnostic's message in bytes, with its terminator. */
 #define MLN_DIAGNOSTIC_MESSAGE_CAPACITY 4096
 
 /**
- * The diagnostic message of one status-returning call.
+ * A message that explains why a call failed.
  *
- * Every status-returning function takes a nullable mln_diagnostic* as its last
- * parameter, out_diagnostic. The caller sets size to sizeof(mln_diagnostic).
- * The function writes message as null-terminated UTF-8, truncated to fit. The
- * message is empty when the function returns MLN_STATUS_OK or
- * MLN_STATUS_NOT_READY, and describes the failure otherwise. It writes no more
- * than size bytes of the struct. A null out_diagnostic discards the message.
- *
- * Asynchronous failures carry their diagnostic in the completion instead.
+ * Lifetimes:
+ * A function writes a NUL-terminated message, or an empty one when it
+ * succeeds. Pass null as `out_diagnostic` to skip the message.
  */
 typedef struct mln_diagnostic {
   uint32_t size;
   char message[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } mln_diagnostic;
 
-/** Render backend support flags reported by this native library build. */
+/** A render backend, as a bit in a set. */
 typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
   MLN_RENDER_BACKEND_FLAG_METAL = 1u << 0u,
   MLN_RENDER_BACKEND_FLAG_VULKAN = 1u << 1u,
@@ -113,85 +97,78 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
 /** A set of mln_render_backend_flag bits. */
 typedef uint32_t mln_render_backend_flags;
 
-/**
- * The null handle, for every handle type.
- *
- * This value names no object of any type. Status-returning functions reject
- * it. Void release functions accept it as a no-op. Output handle parameters
- * that create or acquire ownership require `*out_handle` to equal it on entry.
- */
+/** The handle that names no object. */
 #define MLN_HANDLE_NULL ((uint64_t)0)
 
-/** A runtime: the native scheduler thread and event store for its maps. */
+/** A runtime owns maps and the network and cache settings that they share. */
 typedef uint64_t mln_runtime MLN_BINDING(
   "kind=handle;release=mln_runtime_release;"
   "dispose=mln_runtime_dispose"
 );
-/** A map, which holds map state independent of any render target. */
+/** A map, with its style and camera. */
 typedef uint64_t mln_map MLN_BINDING(
   "kind=handle;release=mln_map_release;parent=mln_runtime;"
   "dispose=mln_map_dispose"
 );
-/** Prepared GeoJSON data that sources retain independently of its handle. */
+/** GeoJSON data, parsed and ready to add to a GeoJSON source. */
 typedef uint64_t mln_geo_json_source_data MLN_BINDING(
   "kind=handle;release=mln_geo_json_source_data_release;"
   "dispose=mln_geo_json_source_data_release"
 );
-/** A parsed style expression, immutable and independent of any map. */
+/** A parsed style expression. */
 typedef uint64_t mln_style_expression MLN_BINDING(
   "kind=handle;release=mln_style_expression_release;"
   "dispose=mln_style_expression_release"
 );
-/** A GPU device that native code creates for texture render targets. */
+/** A GPU device that the library creates to render maps into textures. */
 typedef uint64_t mln_graphics_device MLN_BINDING(
   "kind=handle;release=mln_graphics_device_release;"
   "dispose=mln_graphics_device_release"
 );
-/** A standalone projection of one map view. */
+/** A camera view for converting between screen points and coordinates. */
 typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_release;"
   "dispose=mln_map_projection_release"
 );
-/** A resource request that a resource provider handles. */
+/** A resource load that a resource provider answers. */
 typedef uint64_t mln_resource_request MLN_BINDING(
   "kind=handle;release=mln_resource_request_release;"
   "dispose=mln_resource_request_release"
 );
-/** A resource URL transform that waits for its host's answer. */
+/** A URL rewrite that a resource transform answers with the URL to load. */
 typedef uint64_t mln_resource_transform_request MLN_BINDING(
   "kind=handle;release=mln_resource_transform_request_release;"
   "dispose=mln_resource_transform_request_release"
 );
-/** A render session, which renders one map to one render target. */
+/** A render session draws a map into a surface or a texture. */
 typedef uint64_t mln_render_session MLN_BINDING(
   "kind=handle;release=mln_render_session_dispose;parent=mln_map;"
   "abandon=mln_render_session_abandon;dispose=mln_render_session_dispose"
 );
-/** A rendered frame that a render session lends until its release. */
+/** A rendered frame that the caller holds to read or show. */
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"
   "discard=mln_acquired_frame_discard;"
   "view_begin=mln_acquired_frame_view_begin;"
   "view_end=mln_acquired_frame_view_end"
 );
-/** An owned batch of frame results from one drain. */
+/** The frame results that mln_render_session_drain_frame_results() took. */
 typedef uint64_t mln_render_frame_batch MLN_BINDING(
   "kind=handle;release=mln_render_frame_batch_release;"
   "dispose=mln_render_frame_batch_release"
 );
-/** A host-owned queue that holds callback calls until its host dispatches. */
+/** A queue that holds callback calls until the caller dispatches them. */
 typedef uint64_t mln_delivery_queue MLN_BINDING(
   "kind=handle;release=mln_delivery_queue_release;"
   "dispose=mln_delivery_queue_release"
 );
 
 /**
- * Borrowed data. The data pointer may be null only when size is zero.
+ * A range of bytes, such as UTF-8 text.
  *
- * Each parameter documents whether its view contains UTF-8 text, serialized
- * data, or arbitrary bytes. The view carries no ownership. A view that the
- * host passes in needs no trailing NUL byte, and text that native lends to the
- * host has one after its bytes.
+ * Lifetimes:
+ * `data` can be null when `size` is 0. Text ends at `size` and needs no NUL
+ * terminator.
  */
 typedef struct mln_buffer_view {
   const void* data;
@@ -199,38 +176,27 @@ typedef struct mln_buffer_view {
 } mln_buffer_view;
 
 /**
- * Releases the user_data of a callback registration.
+ * Frees the `user_data` of a callback registration.
  *
- * Each registration struct's release_user_data member states when native code
- * calls it. A null release_user_data leaves user_data with the caller. Every
- * callback the C API invokes returns normally, and must not throw, panic,
- * longjmp, or otherwise unwind through the C API.
- *
- * Threads:
- * Each registration struct's release_user_data member names the thread that
- * runs it.
+ * Lifetimes:
+ * Native calls it once, after the last call to the registration's callback.
+ * When the function that takes the registration fails, native never calls it,
+ * and the caller still owns `user_data`.
  */
 typedef void (*mln_user_data_release)(void* user_data);
 
-/**
- * The C ABI contract version these headers declare.
- *
- * A host compares it with mln_c_version() to detect a library built from
- * headers of another ABI version.
- */
+/** The API epoch of these headers. */
 #define MLN_C_VERSION 0u
 
 /**
- * Reports the C ABI contract version. The value is 0 while the ABI is unstable,
- * and will increment on each SemVer major release.
+ * Returns the API epoch of the library.
+ *
+ * Headers and a library with different epochs aren't compatible. Compare the
+ * result with MLN_C_VERSION.
  */
 MLN_API uint32_t mln_c_version(void) MLN_NOEXCEPT;
 
-/**
- * Reports the render backends available in this native library build.
- *
- * The return value is a mask of mln_render_backend_flag values.
- */
+/** Returns the render backends that this build of the library draws with. */
 MLN_API mln_render_backend_flags
 mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
 
@@ -239,10 +205,9 @@ mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
 #ifndef MLN_BINDGEN
 
 /**
- * Returns a view of a null-terminated string, excluding the null byte.
+ * Makes a buffer view of a NUL-terminated string, without the terminator.
  *
- * The view borrows text, so text must outlive it. A null text returns an empty
- * view.
+ * A null `text` gives an empty view.
  */
 static inline mln_buffer_view mln_buffer_view_from_cstr(const char* text) {
   // Counts instead of calling strlen() so the headers stay freestanding.
@@ -257,12 +222,10 @@ static inline mln_buffer_view mln_buffer_view_from_cstr(const char* text) {
 }
 
 /**
- * Returns a const type pointer to element index of a borrowed array whose
- * elements lie stride bytes apart.
+ * Points at item `index` of an array whose items are `stride` bytes apart.
  *
- * Use it to step through an array whose view reports its own stride, such as
- * mln_event_batch_view.events by mln_event_batch_view.event_size, rather than
- * indexing by sizeof(type).
+ * Use it to read arrays whose item size native reports, such as a completion's
+ * `value`, because a newer library can return larger items.
  */
 #define MLN_STRIDED_AT(type, items, stride, index) \
   ((const type*)((const unsigned char*)(items) +   \

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Optional animation controls for camera transitions.
+/// How a camera change animates.
 /// </summary>
 /// <remarks>
 /// See <c>mln_animation_options</c> in the <see
@@ -11,34 +11,24 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record AnimationOptions
 {
-    /// <summary>
-    /// Duration in milliseconds. Must be finite, non-negative, and short enough
-    /// to represent as a duration.
-    /// </summary>
     public double? DurationMs { get; init; }
 
     /// <summary>
-    /// Average fly velocity in screenfuls per second. Must be positive and
-    /// finite; absent selects 1.2. A flight whose derived duration is too long
-    /// to represent fails its completion with <c>Status.NativeError</c>. An
-    /// explicit duration overrides velocity.
+    /// The average speed of a fly animation, in screens per second.
+    /// <c>duration_ms</c> overrides it.
     /// </summary>
     public double? Velocity { get; init; }
 
     /// <summary>
-    /// Peak zoom for flyTo transitions.
+    /// The zoom level at the peak of a fly animation.
     /// </summary>
     public double? MinZoom { get; init; }
     public UnitBezier? Easing { get; init; }
 
     /// <summary>
-    /// Caller-chosen identity of the command that these options animate, which
-    /// <c>MapHandle.CancelCameraTransitionAsync()</c> matches.
+    /// An ID that <c>MapHandle.CancelCameraTransitionAsync()</c> cancels the
+    /// change by. Several changes can share one.
     /// </summary>
     public ulong? TransitionId { get; init; }
-
-    /// <summary>
-    /// Reports the end of the command's transitions. Disabled by default.
-    /// </summary>
     public CameraTransitionHandler EndHandler { get; init; }
 }

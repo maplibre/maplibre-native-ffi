@@ -3,23 +3,16 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for custom vector sources. The callback may run on any native worker
-/// thread, concurrently with runtime and map calls.
+/// The callbacks and options of a custom vector source.
 /// </summary>
 /// <remarks>
-/// See <c>mln_custom_vector_source_options</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+/// <para>Zoom levels are whole numbers from 0 to 32.</para>
+/// <para>See <c>mln_custom_vector_source_options</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
 /// </remarks>
 public sealed record CustomVectorSourceOptions
 {
-    /// <summary>
-    /// Tile fetch callback.
-    /// </summary>
     public required CustomSourceFetchTileCallback FetchTile { get; init; }
-
-    /// <summary>
-    /// Optional best-effort tile cancel callback.
-    /// </summary>
     public CustomSourceCancelTileCallback? CancelTile { get; init; }
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }

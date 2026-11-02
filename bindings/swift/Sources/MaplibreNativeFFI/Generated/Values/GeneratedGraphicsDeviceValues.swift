@@ -3,17 +3,15 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Options for creating a graphics device.
+/// Options for `GraphicsDeviceHandle.create()`.
 ///
 /// See `mln_graphics_device_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
 public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
-  /// The adapter to create the device on, as a position in the graphics API's
-  /// own list of adapters, from zero. Without it, the backend picks its default
-  /// adapter.
+  /// The GPU to use, as an index into the platform's list of GPUs.
   public var adapterIndex: UInt32?
-  /// Whether the device's texture sessions take turns rendering in one EGL
-  /// context instead of each creating its own. Absent selects false.
+  /// Whether the device's texture sessions take turns in one OpenGL context
+  /// instead of having one each. Only an EGL device reads it.
   public var singleContext: Bool?
   public init(adapterIndex: UInt32? = nil, singleContext: Bool? = nil) {
     self.adapterIndex = adapterIndex
@@ -43,13 +41,11 @@ public struct GraphicsDeviceOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Attachment options for a graphics device texture target.
+/// The texture that `MapHandle.attachGraphicsDeviceTexture()` draws into.
 ///
 /// See `mln_graphics_device_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
 public struct GraphicsDeviceTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
   public init(extent: LogicalExtent) {
     self.extent = extent

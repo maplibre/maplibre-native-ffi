@@ -3,17 +3,18 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A style expression type.
+/// The type of a style expression's result.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_expression_type</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="ItemKind">
-/// For an array, its items' kind; ignored for any other kind.
+/// The type of each item when <c>kind</c> is
+/// <c>StyleExpressionTypeKind.Array</c>. It can't be an array itself.
 /// </param>
 /// <param name="ItemCount">
-/// For an array, its fixed length, or zero for any length.
+/// The length of an array, or 0 for any length.
 /// </param>
 public readonly partial record struct StyleExpressionType(
     StyleExpressionTypeKind Kind,

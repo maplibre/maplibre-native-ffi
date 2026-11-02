@@ -3,13 +3,15 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Host lock on the graphics queue that a session shares with its host, copied
-/// by a successful attach. The callback runs on the session's graphics thread
-/// or on the thread that abandons the session.
+/// Your lock on a Vulkan queue that you and a render session both submit to.
 /// </summary>
 /// <remarks>
-/// See <c>mln_queue_lock</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// <para>The session holds the lock only while it submits or presents to the
+/// queue. Set both <c>lock</c> and <c>unlock</c>, or neither when you don't
+/// submit to the queue yourself.</para>
+/// <para>It can run on a library thread, and it can't call the library.</para>
+/// <para>See <c>mln_queue_lock</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct QueueLock(QueueLockCallback? Lock, QueueLockCallback? Unlock)
 {

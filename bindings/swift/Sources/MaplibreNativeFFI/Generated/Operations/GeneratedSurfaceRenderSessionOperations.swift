@@ -5,7 +5,13 @@ import Foundation
 
 public extension RenderSessionHandle {
   #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
-    /// Starts an ordered Metal surface replacement.
+    /// Replaces the Metal layer that the session renders to.
+    ///
+    /// Use it to give the session a layer again after
+    /// `RenderSessionHandle.releaseTarget()`, or to move it to another layer.
+    /// The
+    /// new layer must use the same device. Once the replacement completes, the
+    /// session no longer uses the old layer.
     ///
     /// See `mln_render_session_set_metal_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -23,7 +29,12 @@ public extension RenderSessionHandle {
     }
   #endif
 
-  /// Starts an ordered OpenGL surface replacement.
+  /// Replaces the OpenGL surface that the session presents to.
+  ///
+  /// Use it to give the session a surface again after
+  /// `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
+  /// The new surface must use the same context. Once the replacement completes,
+  /// the session no longer uses the old surface.
   ///
   /// See `mln_render_session_set_open_gl_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -41,10 +52,23 @@ public extension RenderSessionHandle {
   }
 
   #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-    /// Starts an ordered Vulkan surface replacement.
+    /// Replaces the Vulkan surface that the session presents to.
+    ///
+    /// Use it to give the session a surface again after
+    /// `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
+    /// The new surface must use the same context. Once the replacement
+    /// completes,
+    /// the session no longer uses the old surface.
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` when the new surface needs a different color
+    /// format
+    ///   or pre-rotation support than the old one. Attach a new session
+    /// instead.
     func setVulkanSurfaceTarget(
       descriptor bindingArg0: VulkanSurfaceDescriptor
     ) async throws {

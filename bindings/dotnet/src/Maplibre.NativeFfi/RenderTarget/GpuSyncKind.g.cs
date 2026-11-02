@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Synchronization payload kind for acquired texture frames.
+/// How one side waits for the other's GPU work on a shared texture.
 /// </summary>
 /// <remarks>
 /// See <c>mln_gpu_sync_kind</c> in the <see
@@ -11,58 +11,41 @@ namespace Maplibre.NativeFfi;
 public enum GpuSyncKind : uint
 {
     /// <summary>
-    /// The host needs no synchronization object. The work completed before the
-    /// frame became acquirable or before the release call.
+    /// The work has already finished, so there is nothing to wait for.
     /// </summary>
     CpuComplete = 0,
 
     /// <summary>
-    /// GLsync in the shared EGL or WGL context's share group, used only by a
-    /// caller-graphics-thread driver. handle is nonzero.
+    /// <c>handle</c> is a <c>GLsync</c> in the session's share group.
     /// </summary>
     OpenGlFence = 1,
 
     /// <summary>
-    /// The host needs no synchronization object. The work was submitted, before
-    /// the frame became acquirable or before the release call, to the queue
-    /// that the session and the host share, which orders it before any work
-    /// submitted there afterwards.
+    /// The work was submitted to the queue that both sides share, so work
+    /// submitted to that queue later runs after it.
     /// </summary>
     QueueOrder = 2,
 
     /// <summary>
-    /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
-    /// device, and the counter value that the work signals. handle is nonzero.
-    /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
-    /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+    /// <c>handle</c> is a <c>VkSemaphore</c>. Wait until it reaches
+    /// <c>value</c>.
     /// </summary>
     VulkanTimelineSemaphore = 3,
 
     /// <summary>
-    /// A Linux sync file descriptor, which handle holds as an int64_t bit
-    /// pattern. -1 is a fence that has already signaled. Vulkan supports it
-    /// once the device enables VK_KHR_external_semaphore_fd, and EGL where the
-    /// display has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+    /// <c>handle</c> is a sync file descriptor.
     /// </summary>
     SyncFd = 4,
 
     /// <summary>
-    /// <c>id&lt;MTLSharedEvent&gt;</c> / <c>MTL::SharedEvent*</c>, and the
-    /// value that the work signals. handle is nonzero. Metal supports it, as
-    /// does EGL on ANGLE where the display has
-    /// EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK once the
-    /// device enables VK_EXT_metal_objects and the timelineSemaphore feature.
+    /// <c>handle</c> is an <c>MTLSharedEvent</c>. Wait until it reaches
+    /// <c>value</c>.
     /// </summary>
     MetalSharedEvent = 5,
 
     /// <summary>
-    /// An NT HANDLE to a shared ID3D12Fence, and the value that the work
-    /// signals. handle is nonzero. Vulkan supports it once the device enables
-    /// VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
-    /// the driver shares timeline semaphores as D3D12 fences. WGL supports it
-    /// for borrowed textures, where the context imports D3D12 fences through
-    /// GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
-    /// device of the context's adapter.
+    /// <c>handle</c> is a shared Windows handle to an <c>ID3D12Fence</c>. Wait
+    /// until it reaches <c>value</c>.
     /// </summary>
     D3d12Fence = 6,
 }

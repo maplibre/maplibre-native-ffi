@@ -4,8 +4,10 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Begins a command group, which holds this map's render updates until the
-  /// group ends.
+  /// Holds back the map's changes from rendering until
+  /// `MapHandle.endCommandGroup()`, so they show in the same frame.
+  ///
+  /// Groups nest, and the changes render when the outermost group ends.
   ///
   /// See `mln_map_begin_command_group` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -20,7 +22,10 @@ public extension MapHandle {
     }
   }
 
-  /// Consumes a map handle without observing its asynchronous retirement.
+  /// Releases the map in any state, and finishes in the background.
+  ///
+  /// Use it from destructors and finalizers. Otherwise, use
+  /// `MapHandle.close()`.
   ///
   /// See `mln_map_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -28,8 +33,7 @@ public extension MapHandle {
     try nativeClose { raw, diagnostic in mln_map_dispose(raw, diagnostic) }
   }
 
-  /// Ends the innermost command group that `MapHandle.beginCommandGroup()`
-  /// began.
+  /// Ends the group that `MapHandle.beginCommandGroup()` began.
   ///
   /// See `mln_map_end_command_group` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -44,7 +48,9 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered read of per-feature state from this map.
+  /// Reads the state of a feature, as a JSON object.
+  ///
+  /// The object is empty when the feature has no state.
   ///
   /// See `mln_map_get_feature_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -61,7 +67,9 @@ public extension MapHandle {
     ) }
   }
 
-  /// Starts an ordered copy of the last successfully parsed style document.
+  /// Reads the JSON of the style that the map loaded.
+  ///
+  /// The JSON doesn't include the changes made to the style since it loaded.
   ///
   /// See `mln_map_get_loaded_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -75,7 +83,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies the map's latest published snapshot.
+  /// Copies the map's state.
+  ///
+  /// The copy doesn't wait for pending commands. To read the camera after they
+  /// apply, use `MapHandle.getCamera()`.
   ///
   /// See `mln_map_get_snapshot` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -89,7 +100,9 @@ public extension MapHandle {
     ) } result: { MapSnapshot(raw: value0) }
   }
 
-  /// Starts an ordered copy of the last requested style URL.
+  /// Reads the URL of the map's style.
+  ///
+  /// The URL is empty when the style came from `MapHandle.setStyleJson()`.
   ///
   /// See `mln_map_get_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -103,7 +116,9 @@ public extension MapHandle {
     ) }
   }
 
-  /// Releases a map asynchronously.
+  /// Releases the map.
+  ///
+  /// Detach the map's render session first.
   ///
   /// See `mln_map_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -120,7 +135,7 @@ public extension MapHandle {
     ) }
   }
 
-  /// Removes per-feature state from this map.
+  /// Removes the feature state that `selector` selects.
   ///
   /// See `mln_map_remove_feature_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -140,7 +155,7 @@ public extension MapHandle {
     }
   }
 
-  /// Requests a repaint for a continuous map.
+  /// Renders a new frame of a continuous map, even when nothing changed.
   ///
   /// See `mln_map_request_repaint` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -155,10 +170,19 @@ public extension MapHandle {
     }
   }
 
-  /// Requests one still image for a static or tile map, which renders itself.
+  /// Renders a still image of a static or tile map.
+  ///
+  /// The map's render session draws the image once every resource that the
+  /// image needs has loaded.
   ///
   /// See `mln_map_request_still_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.cancelled` when the map is released before the image is done.
+  /// - `Status.nativeError` when the style or a resource that the image needs
+  ///   fails to load.
   func requestStillImage() async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_map_request_still_image(
@@ -169,7 +193,11 @@ public extension MapHandle {
     }
   }
 
-  /// Submits the sole post-creation logical extent update.
+  /// Sets the map's size.
+  ///
+  /// `extent` must keep the scale factor that the map was created with. A map
+  /// with a render session takes its size from the session, so resize the
+  /// session with `RenderSessionHandle.resize()` instead.
   ///
   /// See `mln_map_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -185,7 +213,7 @@ public extension MapHandle {
     ) }
   }
 
-  /// Selects which map-originated event types this map queues.
+  /// Selects the events that the map reports.
   ///
   /// See `mln_map_set_event_mask` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -203,7 +231,10 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a copied per-feature-state command.
+  /// Merges `state` into the state of a feature.
+  ///
+  /// `state` is a JSON object. Its keys replace the same keys in the feature's
+  /// state, and the other keys stay.
   ///
   /// See `mln_map_set_feature_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -223,12 +254,16 @@ public extension MapHandle {
     }
   }
 
-  /// Queues an inline style JSON command. A committed command means the map
-  /// applied the JSON, not that the style loaded: style loading events report
-  /// the resource and parse results that follow.
+  /// Loads the map's style from `json`.
+  ///
+  /// The style's sources, sprites, and glyphs load in the background.
   ///
   /// See `mln_map_set_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.nativeError` when `json` isn't a valid style.
   @discardableResult
   func setStyleJson(_ bindingArg0: String) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -241,9 +276,11 @@ public extension MapHandle {
     }
   }
 
-  /// Queues a style URL command. A committed command means the map accepted the
-  /// URL, not that the style loaded: style loading events report the network,
-  /// decode, and parse results that follow.
+  /// Loads the map's style from `url`.
+  ///
+  /// The style loads in the background, and `RuntimeEventType.mapStyleLoaded`
+  /// or `RuntimeEventType.mapLoadingFailed` reports how the load ends. Sources,
+  /// layers, and images added before the style loads are lost when it loads.
   ///
   /// See `mln_map_set_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

@@ -8,10 +8,14 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * Copies Metal-native metadata from an acquired frame.
+ * Gets the Metal texture of an acquired frame.
  *
  * See `mln_acquired_frame_get_metal_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.TARGET_LOST` when the session lost its target.
  */
 public fun <T> AcquiredFrameHandle.withMetalTexture(block: (MetalTextureFrame) -> T): T =
   nativeCall(this, binding) {
@@ -26,10 +30,15 @@ public fun <T> AcquiredFrameHandle.withMetalTexture(block: (MetalTextureFrame) -
   }
 
 /**
- * Starts attachment of a ring of caller-owned Metal textures.
+ * Creates a session that renders the map into a ring of your Metal textures.
  *
  * See `mln_map_attach_metal_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.METAL`, or
+ *   when the target supports none of the `producer_sync_kinds` in `options`.
  */
 public fun MapHandle.attachMetalBorrowedTexture(
   descriptor: MetalBorrowedTextureDescriptor,
@@ -56,10 +65,15 @@ public fun MapHandle.attachMetalBorrowedTexture(
   }
 
 /**
- * Starts attachment of a session-owned Metal texture ring.
+ * Creates a session that renders the map into a ring of new Metal textures.
  *
  * See `mln_map_attach_metal_owned_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.METAL`, or
+ *   when the target supports none of the `producer_sync_kinds` in `options`.
  */
 public fun MapHandle.attachMetalOwnedTexture(
   descriptor: MetalOwnedTextureDescriptor,
@@ -86,10 +100,14 @@ public fun MapHandle.attachMetalOwnedTexture(
   }
 
 /**
- * Starts attachment of a Metal surface target.
+ * Creates a session that renders the map to a Metal layer.
  *
  * See `mln_map_attach_metal_surface` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.METAL`.
  */
 public fun MapHandle.attachMetalSurface(
   descriptor: MetalSurfaceDescriptor,
@@ -116,10 +134,20 @@ public fun MapHandle.attachMetalSurface(
   }
 
 /**
- * Starts an ordered replacement of every texture of a caller-owned Metal ring.
+ * Replaces the Metal textures that a borrowed ring renders into.
+ *
+ * Use it to resize the ring, or to give the session textures again after
+ * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. The new ring must have
+ * as many textures as the old one, and the same device and command queue. Once the replacement
+ * completes, the session no longer uses the old textures.
  *
  * See `mln_render_session_set_metal_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when the new textures have a different pixel format than the old ones.
+ *   Attach a new session to change it.
  */
 public fun RenderSessionHandle.setMetalBorrowedTextureTarget(
   descriptor: MetalBorrowedTextureDescriptor,
@@ -136,7 +164,11 @@ public fun RenderSessionHandle.setMetalBorrowedTextureTarget(
   }
 
 /**
- * Starts an ordered Metal surface replacement.
+ * Replaces the Metal layer that the session renders to.
+ *
+ * Use it to give the session a layer again after `RenderSessionHandle.releaseTarget()`, or to move
+ * it to another layer. The new layer must use the same device. Once the replacement completes, the
+ * session no longer uses the old layer.
  *
  * See `mln_render_session_set_metal_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

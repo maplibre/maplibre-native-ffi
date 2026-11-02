@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Inline TileJSON metadata of a tile source.
+/// The tiles of a source, as the style lists them.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_tile_info</c> in the <see
@@ -24,24 +24,13 @@ public readonly partial record struct StyleSourceTileInfo
         this.Scheme = Scheme;
     }
 
-    /// <summary>
-    /// Tile URL templates in TileJSON order.
-    /// </summary>
     public ImmutableArray<string> TileUrls
     {
         get => TileUrlsStorage.AsImmutable();
         init => TileUrlsStorage = ValueArray.From(value);
     }
     internal ValueArray<string> TileUrlsStorage { get; init; }
-
-    /// <summary>
-    /// Lowest zoom level the TileJSON provides tiles for.
-    /// </summary>
     public double MinZoom { get; init; }
-
-    /// <summary>
-    /// Highest zoom level the TileJSON provides tiles for.
-    /// </summary>
     public double MaxZoom { get; init; }
     public StyleTileScheme Scheme { get; init; }
 }

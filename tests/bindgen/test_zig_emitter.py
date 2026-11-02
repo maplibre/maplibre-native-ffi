@@ -195,7 +195,7 @@ void mln_query_release(mln_query query);
         )
         self.assertIn(
             "`Map.cancelTransitions()`, `Map.cancelCameraTransition()`, or "
-            "`GesturePhase.cancel` ended the transitions",
+            "a gesture's `GesturePhase.cancel` stopped the change",
             summary,
         )
         self.assertNotIn("mln_map_cancel_transitions", summary)

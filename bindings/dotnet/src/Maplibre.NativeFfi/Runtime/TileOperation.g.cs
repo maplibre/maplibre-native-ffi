@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Tile operations reported by tile observer events.
+/// A step in loading a tile.
 /// </summary>
 /// <remarks>
 /// See <c>mln_tile_operation</c> in the <see

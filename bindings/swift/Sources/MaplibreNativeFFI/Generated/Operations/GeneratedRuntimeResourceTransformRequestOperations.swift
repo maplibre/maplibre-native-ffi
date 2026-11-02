@@ -4,8 +4,9 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension ResourceTransformRequestHandle {
-  /// Answers a resource transform request with a replacement URL and consumes
-  /// its handle.
+  /// Answers a resource transform request with the URL to load instead.
+  ///
+  /// `url` must not be empty.
   ///
   /// See `mln_resource_transform_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -24,7 +25,7 @@ public extension ResourceTransformRequestHandle {
 }
 
 public extension ResourceTransformRequestHandle {
-  /// Releases a resource transform request without answering it.
+  /// Releases a resource transform request.
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

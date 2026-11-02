@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Screen-space box in logical map pixels.
+/// A rectangle of the screen, from its <c>min</c> corner to its <c>max</c>
+/// corner.
 /// </summary>
 /// <remarks>
 /// See <c>mln_screen_box</c> in the <see

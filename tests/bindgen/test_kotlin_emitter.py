@@ -354,11 +354,9 @@ class KotlinLayoutTests(unittest.TestCase):
 
     def test_docs_name_the_binding_symbols_of_c_declarations(self):
         values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
-        self.assertIn(
-            "`MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or\n"
-            "     * `GesturePhase.CANCEL` ended the transitions",
-            values,
-        )
+        self.assertIn("`MapHandle.cancelTransitions()`", values)
+        self.assertIn("`MapHandle.cancelCameraTransition()`", values)
+        self.assertIn("`GesturePhase.CANCEL` stopped", values)
         self.assertNotIn("`mln_map_cancel_transitions()`", values)
 
     def test_split_registrations_take_a_form_per_target(self):

@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Log event categories emitted by MapLibre Native.
+/// The part of the library that logged a message.
 /// </summary>
 /// <remarks>
 /// See <c>mln_log_event</c> in the <see

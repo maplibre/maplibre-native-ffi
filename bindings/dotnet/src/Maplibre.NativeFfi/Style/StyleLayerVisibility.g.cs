@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Layer visibility values used by the visibility setter and layer info.
+/// Whether a layer shows.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_layer_visibility</c> in the <see

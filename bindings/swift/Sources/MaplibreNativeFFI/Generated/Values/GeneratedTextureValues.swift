@@ -3,12 +3,12 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// One caller-owned Metal texture of a borrowed texture ring.
+/// A Metal texture of a borrowed ring.
 ///
 /// See `mln_metal_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
-  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+  /// Your MTLTexture.
   public var texture: NativePointer
   public init(texture: NativePointer) {
     self.texture = texture
@@ -28,26 +28,27 @@ public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
   }
 }
 
-/// Metal attachment options for a borrowed texture target.
+/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
+/// and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+///
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The textures must all have that size, one device,
+/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
+///
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. physical_width and physical_height give
-  /// the texture's size. A scale_factor that differs from the map's is accepted
-  /// and logged as a warning.
   public var extent: LogicalExtent
-  /// Physical texture width in device pixels. Required.
   public var physicalWidth: UInt32
-  /// Physical texture height in device pixels. Required.
   public var physicalHeight: UInt32
-  /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [MetalBorrowedTexture]
-  /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on the textures' device that
-  /// the session submits its work to, retained by the session. Optional; null
-  /// makes the session create its own queue. `GpuSyncKind.queueOrder` orders
-  /// frames on this queue. A replacement names the queue the session attached
-  /// with.
+  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
+  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
   public var commandQueue: NativePointer
   public init(
     extent: LogicalExtent,
@@ -95,24 +96,20 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Metal attachment options for an owned texture target.
+/// A ring of Metal textures that the session creates, for
+/// `MapHandle.attachMetalOwnedTexture()`.
 ///
 /// See `mln_metal_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
-  /// Metal backend context. device is required.
+  /// Names the MTLDevice that creates the textures.
   public var context: MetalContextDescriptor
-  /// Backend-native MTLPixelFormat value of the ring's textures: either
-  /// MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. Required. Readback
-  /// returns RGBA8 for either format.
+  /// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
+  /// MTLPixelFormatBGRA8Unorm.
   public var pixelFormat: UInt64
-  /// `id<MTLCommandQueue>` / `MTL::CommandQueue*` on context.device that the
-  /// session submits its work to, retained by the session. Optional; null makes
-  /// the session create its own queue. `GpuSyncKind.queueOrder` orders frames
-  /// on this queue.
+  /// Your MTLCommandQueue on the same device, or null for a queue of the
+  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
   public var commandQueue: NativePointer
   public init(
     extent: LogicalExtent,
@@ -147,29 +144,24 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Metal frame acquired from a texture ring.
+/// The Metal texture of an acquired frame.
 ///
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalTextureFrame: Equatable, Hashable, Sendable {
-  /// Session generation that produced this frame.
   public var generation: UInt64
-  /// Physical Metal texture width in device pixels.
   public var width: UInt32
-  /// Physical Metal texture height in device pixels.
   public var height: UInt32
-  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque identity of this frame.
   public var frameId: UInt64
-  /// Ring slot that holds this frame. For a borrowed target, the index of its
-  /// texture in the descriptor's textures array.
+  /// The texture's index in the ring. For a borrowed ring, it indexes the
+  /// descriptor's `textures`.
   public var slot: UInt32
-  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
+  /// The MTLTexture.
   public var texture: NativePointer
-  /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
+  /// The texture's MTLDevice.
   public var device: NativePointer
-  /// Backend-native pixel format value. Metal uses MTLPixelFormat.
+  /// The texture's MTLPixelFormat.
   public var pixelFormat: UInt64
   public init(
     generation: UInt64 = 0,
@@ -209,12 +201,12 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   }
 }
 
-/// One caller-owned OpenGL texture of a borrowed texture ring.
+/// An OpenGL texture of a borrowed ring.
 ///
 /// See `mln_open_gl_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
-  /// Borrowed OpenGL texture object name. Required.
+  /// Your texture name.
   public var texture: UInt32
   public init(texture: UInt32) {
     self.texture = texture
@@ -231,25 +223,29 @@ public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL attachment options for a borrowed texture target.
+/// A ring of your OpenGL textures, for
+/// `MapHandle.attachOpenGlBorrowedTexture()` and
+/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+///
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The context must use
+/// `OpenGlContextOwnership.shared`. Each texture must be in your context's
+/// share group, with storage of that size.
+///
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
 ///
 /// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. physical_width and physical_height give
-  /// the texture's size. A scale_factor that differs from the map's is accepted
-  /// and logged as a warning.
   public var extent: LogicalExtent
-  /// Physical texture width in device pixels. Required.
   public var physicalWidth: UInt32
-  /// Physical texture height in device pixels. Required.
   public var physicalHeight: UInt32
-  /// Borrowed OpenGL context provider data. The textures must belong to this
-  /// context or a context in the same share group.
   public var context: OpenGlContextDescriptor
-  /// The ring's textures, one per slot, in slot order. Required.
   public var textures: [OpenGlBorrowedTexture]
-  /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
+  /// The textures' target. It must be GL_TEXTURE_2D.
   public var target: UInt32
   public init(
     extent: LogicalExtent,
@@ -299,18 +295,13 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL attachment options for an owned texture target.
+/// A ring of OpenGL textures that the session creates, for
+/// `MapHandle.attachOpenGlOwnedTexture()`.
 ///
 /// See `mln_open_gl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
-  /// Borrowed OpenGL context provider data. Shared ownership creates a context
-  /// whose texture frames the host can acquire. Dedicated EGL, WGL, or
-  /// transferred WebGL ownership creates a private core-worker context for CPU
-  /// readback.
   public var context: OpenGlContextDescriptor
   public init(extent: LogicalExtent, context: OpenGlContextDescriptor) {
     self.extent = extent
@@ -336,34 +327,26 @@ public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL frame acquired from a texture ring.
+/// The OpenGL texture of an acquired frame.
 ///
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
-  /// Session generation that produced this frame.
   public var generation: UInt64
-  /// Physical OpenGL texture width in device pixels.
   public var width: UInt32
-  /// Physical OpenGL texture height in device pixels.
   public var height: UInt32
-  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque identity of this frame.
   public var frameId: UInt64
-  /// Ring slot that holds this frame. For a borrowed target, the index of its
-  /// texture in the descriptor's textures array.
+  /// The texture's index in the ring. For a borrowed ring, it indexes the
+  /// descriptor's `textures`.
   public var slot: UInt32
-  /// Borrowed OpenGL texture object name. Valid until frame release.
   public var texture: UInt32
-  /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
   public var target: UInt32
-  /// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
-  /// whose format the host chose.
+  /// The texture's internal format, or 0 for a borrowed ring.
   public var internalFormat: UInt32
-  /// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
+  /// The texture's pixel format, or 0 for a borrowed ring.
   public var format: UInt32
-  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
+  /// The texture's pixel type, or 0 for a borrowed ring.
   public var type: UInt32
   public init(
     generation: UInt64 = 0,
@@ -406,18 +389,15 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
   }
 }
 
-/// CPU image readback metadata for a texture target frame.
+/// The layout of the pixels that `RenderSessionHandle.readTexture()` reads.
 ///
 /// See `mln_texture_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureImageInfo: Equatable, Hashable, Sendable {
-  /// Physical image width in device pixels.
   public var width: UInt32
-  /// Physical image height in device pixels.
   public var height: UInt32
-  /// Bytes per image row.
+  /// The bytes from the start of one row to the start of the next.
   public var stride: UInt32
-  /// Required output buffer byte length.
   public var byteLength: Int
   public init(
     width: UInt32 = 0,
@@ -439,12 +419,13 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Texture readback.
+/// The pixels that `RenderSessionHandle.readTexture()` reads.
 ///
 /// See `mln_texture_readback_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureReadbackResult: Equatable, Hashable, Sendable {
-  /// Pixel bytes.
+  /// Premultiplied RGBA pixels with 8 bits per channel, in rows from top to
+  /// bottom.
   public var data: Data
   public var info: TextureImageInfo
   public init(data: Data = Data(), info: TextureImageInfo = .init()) {
@@ -461,15 +442,14 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
   }
 }
 
-/// One caller-owned Vulkan image of a borrowed texture ring.
+/// A Vulkan image of a borrowed ring.
 ///
 /// See `mln_vulkan_borrowed_texture` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
-  /// Borrowed VkImage. Required.
+  /// Your VkImage.
   public var image: UInt64
-  /// Borrowed VkImageView for image. Required. The view must be a 2D color view
-  /// that matches image and the descriptor's format.
+  /// A 2D VkImageView of `image` with one mip level and one layer.
   public var imageView: UInt64
   public init(image: UInt64, imageView: UInt64) {
     self.image = image
@@ -489,36 +469,30 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
   }
 }
 
-/// Vulkan attachment options for a borrowed texture target.
+/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`
+/// and `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+///
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the images'
+/// size in pixels. Each image must have that size, `format`, and
+/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
+///
+/// The session uses the images until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. physical_width and physical_height give
-  /// the texture's size. A scale_factor that differs from the map's is accepted
-  /// and logged as a warning.
   public var extent: LogicalExtent
-  /// Physical image width in device pixels. Required.
   public var physicalWidth: UInt32
-  /// Physical image height in device pixels. Required.
   public var physicalHeight: UInt32
-  /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
-  /// The ring's images, one per slot, in slot order. Required.
   public var textures: [VulkanBorrowedTexture]
-  /// Backend-native VkFormat value of every image. Required, so
-  /// VK_FORMAT_UNDEFINED is invalid.
+  /// The images' VkFormat.
   public var format: UInt32
-  /// Backend-native VkImageLayout value left after rendering succeeds, such as
-  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-  /// VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
-  /// takes the image in any layout and the host returns no layout.
+  /// The VkImageLayout that each frame leaves its image in.
   public var finalLayout: UInt32
-  /// The queue family that owns each image while the host holds its frame.
-  /// Unless it is the graphics queue's family, the session releases a frame's
-  /// image to it in final_layout, before the frame's producer synchronization,
-  /// and, since a render clears the image, takes it back without a transfer. A
-  /// replacement keeps the owner the session attached with.
   public var owner: VulkanImageOwner
   public init(
     extent: LogicalExtent,
@@ -575,7 +549,10 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// The queue family that holds a borrowed Vulkan image between frames.
+/// The queue family that a borrowed image goes to after each frame.
+///
+/// With `VulkanImageOwner.external` or `VulkanImageOwner.foreign`, acquire the
+/// image on your side before you read it. You don't need to release it back.
 ///
 /// See `mln_vulkan_image_owner` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -587,13 +564,11 @@ public struct VulkanImageOwner: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The context's graphics queue family keeps the image.
+  /// The image stays with the queue family of `graphics_queue_family_index`.
   public static let graphicsQueue: VulkanImageOwner = .init(rawValue: 0)
-  /// VK_QUEUE_FAMILY_EXTERNAL: another Vulkan instance or API that shares the
-  /// image's memory.
+  /// Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
   public static let external: VulkanImageOwner = .init(rawValue: 1)
-  /// VK_QUEUE_FAMILY_FOREIGN_EXT, such as a compositor. The device must enable
-  /// VK_EXT_queue_family_foreign.
+  /// Each frame releases the image to VK_QUEUE_FAMILY_FOREIGN_EXT.
   public static let foreign: VulkanImageOwner = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
@@ -605,15 +580,16 @@ public struct VulkanImageOwner: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Vulkan attachment options for an owned texture target.
+/// A ring of Vulkan images that the session creates, for
+/// `MapHandle.attachVulkanOwnedTexture()`.
+///
+/// Each frame leaves its image in the layout that `VulkanTextureFrame.layout`
+/// reports, owned by the queue family of `graphics_queue_family_index`.
 ///
 /// See `mln_vulkan_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent. Required. A scale_factor that differs from the
-  /// map's is accepted and logged as a warning.
   public var extent: LogicalExtent
-  /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
   public init(extent: LogicalExtent, context: VulkanContextDescriptor) {
     self.extent = extent
@@ -634,35 +610,28 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Vulkan frame acquired from a texture ring.
+/// The Vulkan image of an acquired frame.
 ///
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
-  /// Session generation that produced this frame.
   public var generation: UInt64
-  /// Physical Vulkan image width in device pixels.
   public var width: UInt32
-  /// Physical Vulkan image height in device pixels.
   public var height: UInt32
-  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
-  /// Opaque identity of this frame.
   public var frameId: UInt64
-  /// Ring slot that holds this frame. For a borrowed target, the index of its
-  /// image in the descriptor's textures array.
+  /// The image's index in the ring. For a borrowed ring, it indexes the
+  /// descriptor's `textures`.
   public var slot: UInt32
-  /// Borrowed VkImage bit pattern. Valid until frame release.
+  /// The VkImage.
   public var image: UInt64
-  /// Borrowed VkImageView bit pattern. Valid until frame release.
+  /// The VkImageView.
   public var imageView: UInt64
-  /// Borrowed VkDevice. Valid until frame release.
+  /// The image's VkDevice.
   public var device: NativePointer
-  /// Backend-native VkFormat value.
+  /// The image's VkFormat.
   public var format: UInt32
-  /// Backend-native VkImageLayout value that the image is in:
-  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
-  /// descriptor's final_layout for a borrowed one.
+  /// The VkImageLayout that the frame left the image in.
   public var layout: UInt32
   public init(
     generation: UInt64 = 0,

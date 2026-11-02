@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Screen-space point in logical map pixels, from the top-left of the viewport
-/// with y growing downward.
+/// A point on the screen, in logical pixels from the map's top-left corner.
 /// </summary>
 /// <remarks>
 /// See <c>mln_screen_point</c> in the <see

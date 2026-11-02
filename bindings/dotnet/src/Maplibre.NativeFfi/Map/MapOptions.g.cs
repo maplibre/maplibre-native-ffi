@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options used when creating a map.
+/// Options for <c>RuntimeHandle.CreateMap()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_options</c> in the <see
@@ -12,27 +12,25 @@ namespace Maplibre.NativeFfi;
 public sealed record MapOptions
 {
     /// <summary>
-    /// Initial logical extent. Required. Width and height must be nonzero, and
-    /// scale_factor must be finite and positive. scale_factor is fixed for the
-    /// map's lifetime.
+    /// The map's first size. Its scale factor stays fixed for the map's life.
     /// </summary>
     public required LogicalExtent InitialExtent { get; init; }
     public MapMode MapMode { get; init; }
 
     /// <summary>
-    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-    /// encodings.
+    /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
+    /// encoding. Without it, such tiles fail to load.
     /// </summary>
     public bool FastPforEnabled { get; init; }
 
     /// <summary>
-    /// Map-originated event types this map queues.
+    /// The events that the map reports. Without it, the map reports them all.
     /// </summary>
     public RuntimeEventFlag? EventMask { get; init; }
 
     /// <summary>
-    /// Whether each source keeps tiles that leave the view, so the map can show
-    /// them again without loading them. Absent selects true.
+    /// Whether the map keeps tiles in memory after they leave the view, so they
+    /// show again without loading. Without it, the map keeps them.
     /// </summary>
     public bool? TileCacheEnabled { get; init; }
 }

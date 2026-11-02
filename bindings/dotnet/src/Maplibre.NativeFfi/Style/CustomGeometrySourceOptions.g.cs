@@ -3,29 +3,43 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for custom geometry sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// The callbacks and options of a custom geometry source.
 /// </summary>
 /// <remarks>
-/// See <c>mln_custom_geometry_source_options</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+/// <para>Zoom levels are whole numbers from 0 to 32.</para>
+/// <para>See <c>mln_custom_geometry_source_options</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
 /// </remarks>
 public sealed record CustomGeometrySourceOptions
 {
-    /// <summary>
-    /// Tile fetch callback.
-    /// </summary>
     public required CustomSourceFetchTileCallback FetchTile { get; init; }
-
-    /// <summary>
-    /// Optional best-effort tile cancel callback.
-    /// </summary>
     public CustomSourceCancelTileCallback? CancelTile { get; init; }
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }
+
+    /// <summary>
+    /// How far, in pixels, simplified geometry can stray from the original.
+    /// </summary>
     public double? Tolerance { get; init; }
+
+    /// <summary>
+    /// The width of a tile in pixels, a power of two no larger than 8192.
+    /// </summary>
     public uint? TileSize { get; init; }
+
+    /// <summary>
+    /// The width in pixels of the margin around a tile that holds geometry from
+    /// beyond its edges.
+    /// </summary>
     public uint? Buffer { get; init; }
+
+    /// <summary>
+    /// Whether to cut geometry at the outer edge of a tile's margin.
+    /// </summary>
     public bool? Clip { get; init; }
+
+    /// <summary>
+    /// Whether to wrap geometry that crosses the antimeridian.
+    /// </summary>
     public bool? Wrap { get; init; }
 }

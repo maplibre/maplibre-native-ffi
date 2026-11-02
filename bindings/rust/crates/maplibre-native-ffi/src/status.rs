@@ -1,30 +1,33 @@
 // Generated from C headers by tools/bindgen. Do not edit.
-/// Status values returned by status-returning functions.
+/// The result of a call or of asynchronous work.
 ///
 /// See `mln_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Status {
     Ok,
-    /// A pointer, size field, mask, or handle argument was invalid.
+    /// An argument is invalid, such as malformed JSON or a value out of range.
     InvalidArgument,
-    /// The object is valid but not currently in a state that permits the call.
+    /// The call doesn't fit the current state, such as removing a source that a
+    /// layer still uses.
     InvalidState,
-    /// The handle is thread-affine and the call came from the wrong thread.
+    /// The call came from a thread that can't make it.
     WrongThread,
-    /// The entry point or requested behavior is unavailable in this build.
+    /// The platform, the build, or the render target lacks the feature.
     Unsupported,
-    /// Native code failed; the diagnostic describes the error.
+    /// The library or the platform hit an error, such as a failed graphics
+    /// driver call.
     NativeError,
-    /// The operation reached its terminal cancelled disposition.
+    /// The work stopped before it finished, such as when its handle was
+    /// released.
     Cancelled,
-    /// A conflicting driver call or lifecycle transition is in flight.
+    /// Another call is still using the same object.
     Busy,
-    /// The render target or graphics receiver was irreversibly lost.
+    /// The render target can't be drawn to anymore.
     TargetLost,
-    /// A nonblocking drain or acquisition has nothing to return yet.
+    /// There is nothing to return yet, such as when no new frame is ready.
     NotReady,
-    /// A call named an ID with no live object behind it.
+    /// Nothing has the given ID.
     NotFound,
     Unknown(i32),
 }

@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Clears the process-global log callback.
+    /// Sends log messages to the platform's log again, instead of a callback.
     /// </summary>
     /// <remarks>
     /// See <c>mln_log_clear_callback</c> in the <see
@@ -21,12 +21,13 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Controls which log severities MapLibre Native may dispatch
-    /// asynchronously.
+    /// Selects the severities that the library logs on a background thread.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_log_set_async_severity_mask</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
+    /// <para>The library logs other severities on the thread that logged them.
+    /// <c>mask</c> applies to every runtime in the process.</para>
+    /// <para>See <c>mln_log_set_async_severity_mask</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.</para>
     /// </remarks>
     public static void SetLogAsyncSeverityMask(LogSeverityFlag mask)
     {
@@ -35,15 +36,16 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Installs a process-global MapLibre Native log callback. The callback
-    /// runs synchronously on the thread that emits the record, or on a MapLibre
-    /// background thread for a severity that
-    /// <c>MaplibreNative.SetLogAsyncSeverityMask()</c> dispatches
-    /// asynchronously.
+    /// Sends the log messages of every runtime in the process to a callback.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_log_set_callback</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
+    /// <para>The callback replaces the one set before.</para>
+    /// <para>Runs on the thread that logged the message, or on a background
+    /// thread for the severities that
+    /// <c>MaplibreNative.SetLogAsyncSeverityMask()</c> selects. The callback
+    /// can't call the library.</para>
+    /// <para>See <c>mln_log_set_callback</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.</para>
     /// </remarks>
     public static void SetLogCallback(LogHandler handler)
     {

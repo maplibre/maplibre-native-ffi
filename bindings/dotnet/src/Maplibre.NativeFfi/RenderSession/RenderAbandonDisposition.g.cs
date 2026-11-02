@@ -2,7 +2,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// What abandon did with a session's graphics resources.
+/// What <c>RenderSessionHandle.Abandon()</c> did with a session's graphics
+/// objects.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_abandon_disposition</c> in the <see
@@ -10,13 +11,11 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public enum RenderAbandonDisposition : uint
 {
-    /// <summary>
-    /// Abandon destroyed every graphics resource, or none remained.
-    /// </summary>
     Clean = 0,
 
     /// <summary>
-    /// Abandon kept graphics resources that it could not safely destroy.
+    /// It kept some objects that it couldn't destroy safely. They stay
+    /// allocated until the process exits.
     /// </summary>
     Quarantined = 1,
 }

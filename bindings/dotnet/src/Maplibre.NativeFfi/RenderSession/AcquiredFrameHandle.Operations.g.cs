@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A rendered frame that a render session lends until its release.
+/// A rendered frame that the caller holds to read or show.
 /// </summary>
 /// <remarks>
 /// See <c>mln_acquired_frame</c> in the <see
@@ -53,12 +53,14 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     public override string ToString() => state.ToString();
 
     /// <summary>
-    /// Consumes an acquired frame without consumer GPU synchronization, so it
-    /// quarantines the frame's slot of the texture ring.
+    /// Gives up an acquired frame without saying when your GPU stops reading
+    /// it.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_discard</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>Because your GPU may still read the frame's texture, the session
+    /// never renders into that texture again.</para>
+    /// <para>See <c>mln_acquired_frame_discard</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void Discard()
     {
@@ -66,11 +68,16 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Copies Metal-native metadata from an acquired frame.
+    /// Gets the Metal texture of an acquired frame.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_get_metal_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>See <c>mln_acquired_frame_get_metal_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session lost its
+    /// target.</description></item>
+    /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
@@ -99,11 +106,16 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Copies OpenGL-native metadata from an acquired frame.
+    /// Gets the OpenGL texture of an acquired frame.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_get_open_gl_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>See <c>mln_acquired_frame_get_open_gl_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session lost its
+    /// target.</description></item>
+    /// </list>
     /// </remarks>
     public void WithOpenGlTexture(Action<OpenGlTextureFrameView> callback)
     {
@@ -131,11 +143,16 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Copies the producer synchronization for an acquired texture frame.
+    /// Reads what to wait for before you read an acquired frame's texture.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_get_producer_sync</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>See <c>mln_acquired_frame_get_producer_sync</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session lost its
+    /// target.</description></item>
+    /// </list>
     /// </remarks>
     public void WithProducerSync(Action<GpuSyncView> callback)
     {
@@ -158,11 +175,16 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Copies common metadata for an acquired frame.
+    /// Reads the frame result of an acquired frame.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_get_result</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>See <c>mln_acquired_frame_get_result</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session lost its
+    /// target.</description></item>
+    /// </list>
     /// </remarks>
     public RenderFrameResult GetResult()
     {
@@ -176,11 +198,16 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Copies Vulkan-native metadata from an acquired frame.
+    /// Gets the Vulkan image of an acquired frame.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_get_vulkan_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// <para>See <c>mln_acquired_frame_get_vulkan_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session lost its
+    /// target.</description></item>
+    /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
     [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
@@ -212,11 +239,21 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Releases an acquired frame after the host's GPU work that reads it.
+    /// Gives an acquired frame back to the session once you're done reading it.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_acquired_frame_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para><c>consumerCompletion</c> says when your GPU work that reads the
+    /// texture finishes. Null means that the work has already finished. The
+    /// session waits for that point before it renders into the texture
+    /// again.</para>
+    /// <para>See <c>mln_acquired_frame_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when
+    /// <c>RenderSessionCapabilities.ConsumerSyncKinds</c> lacks the kind of
+    /// <c>consumerCompletion</c>.</description></item>
+    /// </list>
     /// </remarks>
     public void Release(GpuSync? consumerCompletion)
     {

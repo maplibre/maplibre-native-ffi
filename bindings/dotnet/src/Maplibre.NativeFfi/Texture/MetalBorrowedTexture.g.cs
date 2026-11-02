@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One caller-owned Metal texture of a borrowed texture ring.
+/// A Metal texture of a borrowed ring.
 /// </summary>
 /// <remarks>
 /// See <c>mln_metal_borrowed_texture</c> in the <see
@@ -18,7 +18,7 @@ public readonly partial record struct MetalBorrowedTexture
     }
 
     /// <summary>
-    /// Borrowed <c>id&lt;MTLTexture&gt;</c> / <c>MTL::Texture*</c>. Required.
+    /// Your MTLTexture.
     /// </summary>
     public required NativePointer Texture { get; init; }
 }

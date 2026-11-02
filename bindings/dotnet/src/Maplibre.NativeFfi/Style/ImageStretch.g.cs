@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One stretchable interval along an image axis, in image pixels.
+/// A range of image pixels, from <c>from</c> to <c>to</c>, that stretches to
+/// fit text.
 /// </summary>
 /// <remarks>
 /// See <c>mln_image_stretch</c> in the <see

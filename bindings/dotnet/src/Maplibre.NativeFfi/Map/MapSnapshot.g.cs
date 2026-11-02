@@ -3,32 +3,20 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Immutable map state copied from the latest published generation.
+/// A map's state, as <c>MapHandle.GetSnapshot()</c> reads it.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_snapshot</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="DebugOptions">
-/// Debug overlays that the map draws.
+/// <param name="Generation">
+/// Grows with each change to the map's state.
 /// </param>
 /// <param name="FullyLoaded">
-/// True once every requested style and tile resource finished loading.
-/// </param>
-/// <param name="GestureInProgress">
-/// True while the map is inside a gesture.
-/// </param>
-/// <param name="TransitionInProgress">
-/// True while a camera command with a duration is still animating.
+/// Whether the style and every resource that the view needs have loaded.
 /// </param>
 /// <param name="LatestRenderUpdateGeneration">
-/// Generation of the latest render update the map published. A rendered frame
-/// at or past it draws map state that includes every command this snapshot
-/// observes, though animations and resource loads finish in later frames.
-/// </param>
-/// <param name="View">
-/// The map's camera, extent, projection mode, and viewport options.
-/// <c>MapProjectionHandle.Create()</c> converts coordinates for this view.
+/// Counts the render updates that the map has made for its render session.
 /// </param>
 public readonly partial record struct MapSnapshot(
     MapDebugFlag DebugOptions,

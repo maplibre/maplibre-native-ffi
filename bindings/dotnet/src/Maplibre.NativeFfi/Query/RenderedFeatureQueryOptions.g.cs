@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for rendered feature queries.
+/// Options for a rendered feature query.
 /// </summary>
 /// <remarks>
 /// See <c>mln_rendered_feature_query_options</c> in the <see
@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record RenderedFeatureQueryOptions
 {
     /// <summary>
-    /// Optional style layer IDs. When absent, all rendered layers are queried.
+    /// The layers to query. Without them, the query covers every layer.
     /// </summary>
     public ImmutableArray<string>? LayerIds
     {
@@ -22,7 +22,8 @@ public sealed record RenderedFeatureQueryOptions
     internal ValueArray<string>? LayerIdsStorage { get; init; }
 
     /// <summary>
-    /// UTF-8 MapLibre style-spec filter JSON, or empty for no filter.
+    /// A [filter](https://maplibre.org/maplibre-style-spec/expressions/) that
+    /// each feature must match. Empty matches every feature.
     /// </summary>
     public string Filter { get; init; } = "";
 }

@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A resource request that a resource provider handles.
+    /// A resource load that a resource provider answers.
     ///
     /// See `mln_resource_request` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -14,10 +14,14 @@ native_owner! {
 }
 
 impl ResourceRequestHandle {
-    /// Completes a C API resource provider request and consumes its handle.
+    /// Answers a resource request.
     ///
     /// See `mln_resource_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the library cancelled the request.
     pub fn complete(
         self,
         response: &ResourceResponse<'_>,
@@ -31,8 +35,7 @@ impl ResourceRequestHandle {
         })
     }
 
-    /// Reports whether MapLibre has cancelled a C API resource provider
-    /// request.
+    /// Reads whether the library cancelled a resource request.
     ///
     /// See `mln_resource_request_is_cancelled` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -45,11 +48,14 @@ impl ResourceRequestHandle {
         Ok(out_cancelled)
     }
 
-    /// Hands an outstanding provider request to the built-in network loader and
-    /// consumes its handle.
+    /// Hands a resource request back to the library to load as usual.
     ///
     /// See `mln_resource_request_pass_through` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the library cancelled the request.
     pub fn pass_through(self) -> std::result::Result<(), (Self, Error)> {
         self.consume(|handle| {
             let mut call = Call::new(handle);
@@ -59,7 +65,7 @@ impl ResourceRequestHandle {
         })
     }
 
-    /// Releases the provider's resource request handle without answering it.
+    /// Releases a resource request.
     ///
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -71,11 +77,11 @@ impl ResourceRequestHandle {
         })
     }
 
-    /// Registers a callback that runs when MapLibre cancels a C API resource
-    /// provider request. The callback runs on the thread that discards the
-    /// request, never a host thread: the runtime's native scheduler thread when
-    /// a committed map or runtime command discards it, such as a style change
-    /// or map destruction, and a MapLibre worker thread otherwise.
+    /// Calls a callback when the library cancels a resource request.
+    ///
+    /// The callback never runs after the request is answered. A request takes
+    /// one cancel callback. When the library has already cancelled the request,
+    /// the call reports that instead and the callback never runs.
     ///
     /// See `mln_resource_request_set_cancel_callback` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A runtime: the native scheduler thread and event store for its maps.
+    /// A runtime owns maps and the network and cache settings that they share.
     ///
     /// See `mln_runtime` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -14,7 +14,7 @@ native_owner! {
 }
 
 impl RuntimeHandle {
-    /// Stops event delivery and retires the previous handler.
+    /// Stops sending the events of the runtime and its maps to a callback.
     ///
     /// See `mln_runtime_clear_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -25,7 +25,7 @@ impl RuntimeHandle {
         })
     }
 
-    /// Clears the runtime-scoped outgoing HTTP header transform.
+    /// Stops adding headers to the runtime's HTTP requests.
     ///
     /// See `mln_runtime_clear_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -36,7 +36,8 @@ impl RuntimeHandle {
         })
     }
 
-    /// Clears the runtime-scoped network resource provider.
+    /// Removes the runtime's resource provider, so the library loads every
+    /// request itself.
     ///
     /// See `mln_runtime_clear_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -47,7 +48,7 @@ impl RuntimeHandle {
         })
     }
 
-    /// Clears the runtime-scoped URL transform for network resources.
+    /// Stops rewriting the URLs of the runtime's network requests.
     ///
     /// See `mln_runtime_clear_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -59,6 +60,10 @@ impl RuntimeHandle {
     }
 
     /// Creates a runtime.
+    ///
+    /// A runtime holds maps and the resource loading, cache, and offline
+    /// regions that they share. In a browser, create runtimes on a Web Worker,
+    /// not on the main thread.
     ///
     /// See `mln_runtime_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -73,7 +78,7 @@ impl RuntimeHandle {
         Ok(RuntimeHandle::adopt(out_runtime)?)
     }
 
-    /// Starts creation of a map on the runtime.
+    /// Creates a map on `runtime`.
     ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -96,7 +101,12 @@ impl RuntimeHandle {
         Ok((MapHandle::adopt(out_map)?, future))
     }
 
-    /// Starts creating an offline region.
+    /// Creates an offline region in the runtime's cache file.
+    ///
+    /// `metadata` holds any bytes to store with the region, such as its name.
+    /// The region doesn't download until
+    /// `RuntimeHandle::set_offline_region_download_state()` makes its download
+    /// active.
     ///
     /// See `mln_runtime_create_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -124,10 +134,14 @@ impl RuntimeHandle {
         )
     }
 
-    /// Deletes an offline region.
+    /// Deletes the offline region `region_id` from the runtime's cache file.
     ///
     /// See `mln_runtime_delete_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the cache file has no region `region_id`.
     pub fn delete_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
         let call = self.inner.call();
         call.complete(
@@ -143,7 +157,9 @@ impl RuntimeHandle {
         )
     }
 
-    /// Consumes a runtime handle without observing its asynchronous retirement.
+    /// Releases a runtime in any state, without waiting.
+    ///
+    /// The runtime finishes its teardown after its maps are released.
     ///
     /// See `mln_runtime_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -156,7 +172,7 @@ impl RuntimeHandle {
         })
     }
 
-    /// Reports which runtime-scoped event types this runtime queues.
+    /// Reads the runtime's event mask.
     ///
     /// See `mln_runtime_get_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -169,7 +185,9 @@ impl RuntimeHandle {
         Ok(RuntimeEventFlag::from_bits_retain(out_mask))
     }
 
-    /// Starts getting one offline region by ID.
+    /// Reads the offline region `region_id`.
+    ///
+    /// The result is null when the cache file has no region with that ID.
     ///
     /// See `mln_runtime_get_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -186,10 +204,14 @@ impl RuntimeHandle {
         )
     }
 
-    /// Starts getting the current download status for an offline region.
+    /// Reads the download progress of the offline region `region_id`.
     ///
     /// See `mln_runtime_get_offline_region_status` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the cache file has no region `region_id`.
     pub fn get_offline_region_status(
         &self,
         region_id: i64,
@@ -208,10 +230,17 @@ impl RuntimeHandle {
         )
     }
 
-    /// Invalidates cached resources for an offline region.
+    /// Makes maps check each resource of the offline region `region_id` with
+    /// the server before they use it.
+    ///
+    /// The region keeps its resources.
     ///
     /// See `mln_runtime_invalidate_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the cache file has no region `region_id`.
     pub fn invalidate_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
         let call = self.inner.call();
         call.complete(
@@ -227,7 +256,7 @@ impl RuntimeHandle {
         )
     }
 
-    /// Starts listing the offline regions in the runtime database.
+    /// Lists the offline regions in the runtime's cache file.
     ///
     /// See `mln_runtime_list_offline_regions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -241,10 +270,20 @@ impl RuntimeHandle {
         )
     }
 
-    /// Starts merging offline regions from another MapLibre offline database.
+    /// Copies the offline regions of another cache file into the runtime's
+    /// cache file.
+    ///
+    /// A region whose definition and metadata match one that the runtime's file
+    /// already has isn't copied again. The result lists the runtime's copy of
+    /// each region in the other file.
     ///
     /// See `mln_runtime_merge_offline_regions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `side_database_path` isn't a readable
+    ///   database file.
     pub fn merge_offline_regions(
         &self,
         side_database_path: &str,
@@ -264,7 +303,9 @@ impl RuntimeHandle {
         )
     }
 
-    /// Starts release of a runtime after checking its children.
+    /// Releases a runtime.
+    ///
+    /// Release the runtime's maps first.
     ///
     /// See `mln_runtime_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -280,7 +321,7 @@ impl RuntimeHandle {
         })
     }
 
-    /// Starts a MapLibre ambient cache maintenance operation for this runtime.
+    /// Runs an action on the runtime's ambient cache.
     ///
     /// See `mln_runtime_run_ambient_cache_operation` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -302,9 +343,9 @@ impl RuntimeHandle {
         )
     }
 
-    /// Selects how runtime and map events reach the host. Map events arrive on
-    /// the runtime's native scheduler thread, and offline events may arrive on
-    /// a MapLibre worker thread.
+    /// Sends the events of the runtime and its maps to a callback.
+    ///
+    /// The callback replaces the one set before.
     ///
     /// See `mln_runtime_set_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -319,7 +360,10 @@ impl RuntimeHandle {
         })
     }
 
-    /// Selects which runtime-scoped event types this runtime queues.
+    /// Selects the runtime's own events that reach the event callback.
+    ///
+    /// Each map selects its events with `MapHandle::set_event_mask()` instead.
+    /// A runtime starts with every event selected.
     ///
     /// See `mln_runtime_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -331,11 +375,21 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
-    /// The callback runs synchronously on a MapLibre worker or network thread.
+    /// Adds headers to the runtime's HTTP requests.
+    ///
+    /// The transform replaces the one set before. In a browser or on
+    /// OpenHarmony, serve the requests with
+    /// `RuntimeHandle::set_resource_provider()` instead.
+    ///
+    /// Runs on a library thread.
     ///
     /// See `mln_runtime_set_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when the library runs in a browser or on
+    ///   OpenHarmony.
     pub fn set_http_header_transform(
         &self,
         transform: HttpHeaderTransform,
@@ -352,7 +406,10 @@ impl RuntimeHandle {
         })
     }
 
-    /// Starts a change to this runtime's maximum ambient cache size.
+    /// Limits the size of the runtime's ambient cache.
+    ///
+    /// `size` is in bytes. Offline regions count toward it, but the library
+    /// evicts only ambient cache resources to stay within it.
     ///
     /// See `mln_runtime_set_maximum_ambient_cache_size` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -371,10 +428,16 @@ impl RuntimeHandle {
         )
     }
 
-    /// Sets an offline region's native download state.
+    /// Starts or pauses the download of the offline region `region_id`.
+    ///
+    /// A download stops when the runtime closes.
     ///
     /// See `mln_runtime_set_offline_region_download_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the cache file has no region `region_id`.
     pub fn set_offline_region_download_state(
         &self,
         region_id: i64,
@@ -395,10 +458,15 @@ impl RuntimeHandle {
         )
     }
 
-    /// Enables or disables runtime events for an offline region.
+    /// Sets whether the runtime reports the download progress of the offline
+    /// region `region_id` as events.
     ///
     /// See `mln_runtime_set_offline_region_observed` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the cache file has no region `region_id`.
     pub fn set_offline_region_observed(
         &self,
         region_id: i64,
@@ -419,8 +487,12 @@ impl RuntimeHandle {
         )
     }
 
-    /// Registers or replaces a runtime-scoped network resource provider. The
-    /// callback runs synchronously on a MapLibre thread.
+    /// Serves the runtime's network requests through a callback.
+    ///
+    /// The provider receives the network requests that its routes match, and
+    /// the library loads the rest as usual. A provider can serve URL schemes
+    /// that the library can't load itself. The provider replaces the one set
+    /// before.
     ///
     /// See `mln_runtime_set_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -435,8 +507,9 @@ impl RuntimeHandle {
         })
     }
 
-    /// Registers or updates a runtime-scoped URL transform for network
-    /// resources. The callback runs on a MapLibre network thread.
+    /// Rewrites the URLs of the runtime's network requests through a callback.
+    ///
+    /// The transform replaces the one set before.
     ///
     /// See `mln_runtime_set_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -451,10 +524,14 @@ impl RuntimeHandle {
         })
     }
 
-    /// Starts updating opaque binary metadata for an offline region.
+    /// Replaces the metadata of the offline region `region_id`.
     ///
     /// See `mln_runtime_update_offline_region_metadata` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the cache file has no region `region_id`.
     pub fn update_offline_region_metadata(
         &self,
         region_id: i64,
@@ -489,7 +566,7 @@ impl RuntimeHandle {
     }
 }
 impl RuntimeHandleDiscarding<'_> {
-    /// Stops event delivery and retires the previous handler.
+    /// Stops sending the events of the runtime and its maps to a callback.
     ///
     /// See `mln_runtime_clear_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -500,7 +577,7 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Clears the runtime-scoped outgoing HTTP header transform.
+    /// Stops adding headers to the runtime's HTTP requests.
     ///
     /// See `mln_runtime_clear_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -511,7 +588,8 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Clears the runtime-scoped network resource provider.
+    /// Removes the runtime's resource provider, so the library loads every
+    /// request itself.
     ///
     /// See `mln_runtime_clear_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -522,7 +600,7 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Clears the runtime-scoped URL transform for network resources.
+    /// Stops rewriting the URLs of the runtime's network requests.
     ///
     /// See `mln_runtime_clear_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -533,9 +611,9 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Selects how runtime and map events reach the host. Map events arrive on
-    /// the runtime's native scheduler thread, and offline events may arrive on
-    /// a MapLibre worker thread.
+    /// Sends the events of the runtime and its maps to a callback.
+    ///
+    /// The callback replaces the one set before.
     ///
     /// See `mln_runtime_set_event_handler` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -547,11 +625,21 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
-    /// The callback runs synchronously on a MapLibre worker or network thread.
+    /// Adds headers to the runtime's HTTP requests.
+    ///
+    /// The transform replaces the one set before. In a browser or on
+    /// OpenHarmony, serve the requests with
+    /// `RuntimeHandle::set_resource_provider()` instead.
+    ///
+    /// Runs on a library thread.
     ///
     /// See `mln_runtime_set_http_header_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when the library runs in a browser or on
+    ///   OpenHarmony.
     pub fn set_http_header_transform(&self, transform: HttpHeaderTransform) -> Result<()> {
         let mut call = self.0.inner.call();
         let transform = call.reference(&transform)?;
@@ -565,8 +653,12 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Registers or replaces a runtime-scoped network resource provider. The
-    /// callback runs synchronously on a MapLibre thread.
+    /// Serves the runtime's network requests through a callback.
+    ///
+    /// The provider receives the network requests that its routes match, and
+    /// the library loads the rest as usual. A provider can serve URL schemes
+    /// that the library can't load itself. The provider replaces the one set
+    /// before.
     ///
     /// See `mln_runtime_set_resource_provider` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -578,8 +670,9 @@ impl RuntimeHandleDiscarding<'_> {
         })
     }
 
-    /// Registers or updates a runtime-scoped URL transform for network
-    /// resources. The callback runs on a MapLibre network thread.
+    /// Rewrites the URLs of the runtime's network requests through a callback.
+    ///
+    /// The transform replaces the one set before.
     ///
     /// See `mln_runtime_set_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

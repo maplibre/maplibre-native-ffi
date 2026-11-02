@@ -12,9 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record StyleExpressionOptions
 {
     /// <summary>
-    /// The type that the expression must produce. A string type coerces the
-    /// result to a string, as a string layer property does; every other type
-    /// asserts it. Without it, the expression keeps the type it infers.
+    /// The type that the result must have.
     /// </summary>
     public StyleExpressionType? ExpectedType { get; init; }
 }

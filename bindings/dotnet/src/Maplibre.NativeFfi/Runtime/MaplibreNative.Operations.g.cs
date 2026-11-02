@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Reads MapLibre Native's process-global network status.
+    /// Reads whether the library may use the network.
     /// </summary>
     /// <remarks>
     /// See <c>mln_network_get_status</c> in the <see
@@ -23,11 +23,15 @@ public static unsafe partial class MaplibreNative
     }
 
     /// <summary>
-    /// Sets MapLibre Native's process-global network status.
+    /// Tells the library whether it may use the network.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_network_set_status</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// <para>While the status is <c>NetworkStatus.Offline</c>, the library
+    /// starts no network requests. The requests that wait start when the status
+    /// returns to <c>NetworkStatus.Online</c>. The status starts as online and
+    /// applies to every runtime in the process.</para>
+    /// <para>See <c>mln_network_set_status</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
     public static void SetNetworkStatus(NetworkStatus status)
     {

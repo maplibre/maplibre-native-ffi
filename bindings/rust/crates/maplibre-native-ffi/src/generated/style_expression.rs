@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A parsed style expression, immutable and independent of any map.
+    /// A parsed style expression.
     ///
     /// See `mln_style_expression` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -14,10 +14,17 @@ native_owner! {
 }
 
 impl StyleExpressionHandle {
-    /// Parses a style expression.
+    /// Parses a style
+    /// \[expression\](https://maplibre.org/maplibre-style-spec/expressions/) to
+    /// evaluate without a map.
     ///
     /// See `mln_style_expression_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `expression` isn't a valid expression,
+    ///   or its result can't have the expected type.
     pub fn create(
         expression: &str,
         options: Option<&StyleExpressionOptions>,
@@ -38,10 +45,17 @@ impl StyleExpressionHandle {
         Ok(StyleExpressionHandle::adopt(out_expression)?)
     }
 
-    /// Evaluates a parsed expression and writes its result as UTF-8 JSON.
+    /// Evaluates a style expression and writes its result as JSON.
+    ///
+    /// A number in the result that isn't finite becomes null.
     ///
     /// See `mln_style_expression_evaluate` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the expression fails to evaluate, such
+    ///   as when it reads an input that `inputs` doesn't set.
     pub fn evaluate(&self, inputs: Option<&StyleExpressionInputs<'_>>) -> Result<String> {
         let mut call = self.inner.call();
         let mut out_json = Vec::new();
@@ -61,7 +75,7 @@ impl StyleExpressionHandle {
         Ok(convert::utf8(out_json)?)
     }
 
-    /// Copies what a parsed expression depends on.
+    /// Reads what a style expression's result depends on.
     ///
     /// See `mln_style_expression_get_info` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -75,7 +89,7 @@ impl StyleExpressionHandle {
         Ok(unsafe { from_native(out_info) }?)
     }
 
-    /// Releases a style expression.
+    /// Releases a parsed style expression.
     ///
     /// See `mln_style_expression_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

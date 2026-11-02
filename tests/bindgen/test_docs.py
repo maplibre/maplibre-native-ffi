@@ -9,7 +9,7 @@ from support import parse
 from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.docs import Doc
-from tools.bindgen.model import ModelError
+from tools.bindgen.names import camel
 from tools.bindgen.schema import validate
 
 
@@ -39,6 +39,48 @@ mln_status mln_tick_set_callback(
   const mln_tick_handler* handler, mln_diagnostic* out_diagnostic
 );
 """
+
+# A command whose comment has every part that bindings copy, and one that they
+# leave in C.
+REMOVE = """
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
+void mln_map_release(mln_map map);
+/**
+ * Removes a source from the map's style.
+ *
+ * `source_id` names the source, and `completion` reports the outcome. The
+ * removal waits for the frame.
+ *
+ * - `source_id` may be
+ *   long.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when `source_id` is empty.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when the style has no source named
+ *   `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when `source_id` is empty.
+ * - MLN_STATUS_INVALID_STATE when `completion` is reused.
+ *
+ * Lifetimes:
+ * `source_id` stays valid until the call returns.
+ */
+BIND("execution=command")
+mln_status mln_map_remove_source(
+  mln_map map, unsigned source_id, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+);
+"""
+
+
+def remove_doc() -> Doc:
+    api = parse(REMOVE, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",))
+    validate(api)
+    doc = compile_api(api).doc("mln_map_remove_source")
+    assert doc is not None
+    return doc
 
 
 class SummaryTests(unittest.TestCase):
@@ -147,7 +189,9 @@ class ThreadsTests(unittest.TestCase):
             self.assertEqual(bound.doc(name).threads, threads, name)
         self.assertEqual(
             docs.line_comment(bound.doc("mln_tick_handler"), verbatim),
-            "/// Tick callback state. The callback runs on a worker thread.\n"
+            "/// Tick callback state.\n"
+            "///\n"
+            "/// The callback runs on a worker thread.\n"
             "///\n"
             "/// See `mln_tick_handler` in the\n"
             f"/// [C API reference]({docs.REFERENCE}api_8h.html).\n",
@@ -159,15 +203,106 @@ class ThreadsTests(unittest.TestCase):
         )
         queued = docs.Resolver({}, threads="Runs on the registering thread.")
         self.assertIn(
-            "Tick callback state. Runs on the registering thread.",
+            "/// Tick callback state.\n///\n/// Runs on the registering thread.\n",
             docs.line_comment(doc, queued),
         )
         self.assertNotIn("worker", docs.line_comment(doc, queued))
 
-    def test_a_documented_callback_must_state_its_threads(self):
-        api = parse(TICK.replace("Threads:", "Notes:"))
-        with self.assertRaisesRegex(ModelError, "mln_tick_callback: .*Threads:"):
-            validate(api)
+
+class BodyTests(unittest.TestCase):
+    def test_reads_paragraphs_lists_and_error_items_but_not_lifetimes(self):
+        doc = remove_doc()
+        self.assertEqual(
+            doc.paragraphs,
+            (
+                (
+                    "`source_id` names the source, and `completion` reports the "
+                    "outcome. The removal waits for the frame."
+                ),
+                ("`source_id` may be long.",),
+            ),
+        )
+        # The item for success is not an error.
+        self.assertEqual(
+            doc.returns, ("`MLN_STATUS_INVALID_ARGUMENT` when `source_id` is empty.",)
+        )
+        self.assertEqual(
+            doc.completes[0],
+            "`MLN_STATUS_NOT_FOUND` when the style has no source named `source_id`.",
+        )
+        self.assertNotIn("stays valid", repr(doc))
+
+    def test_hides_the_parameters_that_a_binding_takes_over(self):
+        doc = remove_doc()
+        self.assertEqual(doc.parameters, ("map", "source_id"))
+        self.assertEqual(set(doc.hidden), {"completion", "out_diagnostic"})
+        api = parse(TICK)
+        validate(api)
+        callback = compile_api(api).doc("mln_tick_callback")
+        assert callback is not None
+        self.assertEqual(callback.hidden, ("context",))
+
+
+class ErrorsTests(unittest.TestCase):
+    symbols = docs.Resolver(
+        {
+            "MLN_STATUS_INVALID_ARGUMENT": "Status.InvalidArgument",
+            "MLN_STATUS_NOT_FOUND": "Status.NotFound",
+            "MLN_STATUS_INVALID_STATE": "Status.InvalidState",
+        },
+        parameter=camel,
+    )
+
+    def test_copies_the_comment_in_the_binding_s_terms(self):
+        # The sentence and the error that name the completion leave, as does
+        # the lifetime, and a repeated error appears once.
+        self.assertEqual(
+            docs.line_comment(remove_doc(), self.symbols, errors="# Errors"),
+            "/// Removes a source from the map's style.\n"
+            "///\n"
+            "/// The removal waits for the frame.\n"
+            "///\n"
+            "/// - `sourceId` may be long.\n"
+            "///\n"
+            "/// See `mln_map_remove_source` in the\n"
+            f"/// [C API reference]({docs.REFERENCE}api_8h.html).\n"
+            "///\n"
+            "/// # Errors\n"
+            "///\n"
+            "/// - `Status.InvalidArgument` when `sourceId` is empty.\n"
+            "/// - `Status.NotFound` when the style has no source named `sourceId`.\n",
+        )
+
+    def test_a_form_that_discards_its_completion_omits_its_errors(self):
+        comment = docs.line_comment(docs.discarding(remove_doc()), self.symbols)
+        self.assertIn("/// Errors:\n///\n/// - `Status.InvalidArgument`", comment)
+        self.assertNotIn("NotFound", comment)
+
+    def test_xml_lists_errors_in_the_remarks(self):
+        comment = docs.xml_comment(remove_doc(), self.symbols)
+        remarks = ElementTree.fromstring(
+            "<doc>"
+            + " ".join(line.removeprefix("/// ") for line in comment.splitlines())
+            + "</doc>"
+        ).find("remarks")
+        assert remarks is not None
+        self.assertEqual(remarks.findall("para")[-1].text, "Errors:")
+        self.assertEqual(
+            [
+                item.findtext("description/c")
+                for item in remarks.findall("list")[-1].findall("item")
+            ],
+            ["Status.InvalidArgument", "Status.NotFound"],
+        )
+
+    def test_go_lists_errors_as_plain_text(self):
+        comment = docs.go_comment(remove_doc(), self.symbols, "RemoveSource")
+        self.assertIn(
+            "// Errors:\n"
+            "//   - Status.InvalidArgument when sourceId is empty.\n"
+            "//   - Status.NotFound when the style has no source named sourceId.\n",
+            comment,
+        )
 
 
 class ReferenceTests(unittest.TestCase):
@@ -195,6 +330,14 @@ class RenderTests(unittest.TestCase):
         paragraphs = remarks.findall("para")
         self.assertEqual(paragraphs[0].find("c").text, "y")
         self.assertEqual(paragraphs[1].find("see").get("href"), doc.url)
+
+    def test_block_comment_neither_closes_nor_nests_a_comment(self):
+        doc = Doc("mln_glob", "Matches `*.tiles/**` and `a*/b`.")
+        body = (
+            docs.block_comment(doc, verbatim).removeprefix("/**").removesuffix("*/\n")
+        )
+        self.assertNotIn("/*", body)
+        self.assertNotIn("*/", body)
 
     def test_xml_param_documents_a_positional_property(self):
         param = docs.xml_param(self.doc, verbatim, "Range", "    ")

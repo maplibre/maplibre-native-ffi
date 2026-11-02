@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Render-session lifecycle visible in snapshots.
+/// Where a render session is in its life.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_session_state</c> in the <see
@@ -14,16 +14,6 @@ public enum RenderSessionState : uint
     Attached = 2,
     Detaching = 3,
     Detached = 4,
-
-    /// <summary>
-    /// Native rendering or driver work failed and the session can no longer
-    /// render. This does not imply target or device loss. Read the first
-    /// failure with <c>RenderSessionHandle.GetFailure()</c>. The map also
-    /// reports it as <c>RuntimeEventType.MapRenderError</c>; a failed attach
-    /// reports it through its completion instead. Snapshots, frame-result
-    /// drains, acquired-frame release, abandon, and dispose remain available.
-    /// Dispose this session before attaching a replacement.
-    /// </summary>
     Failed = 5,
     Abandoned = 6,
 }

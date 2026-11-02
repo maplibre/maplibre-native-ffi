@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A resource URL transform that waits for its host's answer.
+    /// A URL rewrite that a resource transform answers with the URL to load.
     ///
     /// See `mln_resource_transform_request` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -14,8 +14,9 @@ native_owner! {
 }
 
 impl ResourceTransformRequestHandle {
-    /// Answers a resource transform request with a replacement URL and consumes
-    /// its handle.
+    /// Answers a resource transform request with the URL to load instead.
+    ///
+    /// `url` must not be empty.
     ///
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -29,7 +30,7 @@ impl ResourceTransformRequestHandle {
         })
     }
 
-    /// Releases a resource transform request without answering it.
+    /// Releases a resource transform request.
     ///
     /// See `mln_resource_transform_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

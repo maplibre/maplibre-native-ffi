@@ -3,7 +3,8 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Computes the physical device-pixel size of a logical extent.
+/// Computes the size in pixels of a target with a logical size and scale
+/// factor.
 ///
 /// See `mln_logical_extent_physical_size` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -22,7 +23,7 @@ public func logicalExtentPhysicalSize(_ bindingArg0: LogicalExtent) throws
   } result: { (value0, value1) }
 }
 
-/// Returns OpenGL context providers supported by this build.
+/// Reports the OpenGL context platforms that this build of the library has.
 ///
 /// See `mln_open_gl_supported_context_provider_mask` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Tagged offline region definition.
+/// The area, zoom range, and style that an offline region covers.
 /// </summary>
 /// <remarks>
 /// See <c>mln_offline_region_definition</c> in the <see

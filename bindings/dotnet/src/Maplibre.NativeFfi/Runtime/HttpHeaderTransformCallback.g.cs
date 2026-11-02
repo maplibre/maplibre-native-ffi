@@ -3,10 +3,12 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Adds end-to-end headers to one outgoing HTTP request attempt. The callback
-/// runs synchronously on a MapLibre worker or network thread.
+/// Sets the headers of an HTTP request before the library sends it.
 /// </summary>
 /// <remarks>
+/// <para><c>url</c> is the request's URL after any resource transform. The
+/// request waits for the callback, so return quickly.</para>
+/// <para>Runs on a library thread.</para>
 /// <para>Returning succeeds. Throwing a <c>MaplibreException</c> whose status
 /// is not <c>Status.Ok</c> fails the call with that status. Any other exception
 /// fails it with <c>Status.NativeError</c> and is reported to

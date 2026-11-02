@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Region data delivered by an offline completion.
+/// An offline region in the runtime's cache file.
 /// </summary>
 /// <remarks>
 /// See <c>mln_offline_region_info</c> in the <see
@@ -25,10 +25,6 @@ public readonly partial record struct OfflineRegionInfo
 
     public long Id { get; init; }
     public required OfflineRegionDefinition Definition { get; init; }
-
-    /// <summary>
-    /// Metadata bytes.
-    /// </summary>
     public ImmutableArray<byte> Metadata
     {
         get => MetadataStorage.AsImmutable();

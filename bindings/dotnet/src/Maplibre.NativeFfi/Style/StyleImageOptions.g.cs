@@ -3,7 +3,9 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for runtime style images.
+/// Options for a style image, as the
+/// [sprite](https://maplibre.org/maplibre-style-spec/sprite/) spec describes
+/// them.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_image_options</c> in the <see
@@ -12,7 +14,7 @@ namespace Maplibre.NativeFfi;
 public sealed record StyleImageOptions
 {
     /// <summary>
-    /// Horizontally stretchable intervals.
+    /// The ranges of columns that stretch, in increasing order without overlap.
     /// </summary>
     public ImmutableArray<ImageStretch>? StretchX
     {
@@ -22,7 +24,7 @@ public sealed record StyleImageOptions
     internal ValueArray<ImageStretch>? StretchXStorage { get; init; }
 
     /// <summary>
-    /// Vertically stretchable intervals.
+    /// The ranges of rows that stretch, in increasing order without overlap.
     /// </summary>
     public ImmutableArray<ImageStretch>? StretchY
     {
@@ -30,34 +32,16 @@ public sealed record StyleImageOptions
         init => StretchYStorage = ValueArray.FromOptional(value);
     }
     internal ValueArray<ImageStretch>? StretchYStorage { get; init; }
-
-    /// <summary>
-    /// Content box used when icon-text-fit applies.
-    /// </summary>
     public ImageContent? Content { get; init; }
-
-    /// <summary>
-    /// Absent selects STRETCH_OR_SHRINK.
-    /// </summary>
     public StyleImageTextFit? TextFitWidth { get; init; }
-
-    /// <summary>
-    /// Absent selects STRETCH_OR_SHRINK.
-    /// </summary>
     public StyleImageTextFit? TextFitHeight { get; init; }
-
-    /// <summary>
-    /// Sprite pixel ratio. Absent selects 1.
-    /// </summary>
     public float? PixelRatio { get; init; }
-
-    /// <summary>
-    /// Whether the image is a signed distance field icon. Absent selects false.
-    /// </summary>
     public bool? Sdf { get; init; }
 
     /// <summary>
-    /// Keeps the image once no loaded tile uses it. Absent selects false.
+    /// Keeps the image after no layer uses it. Without this, the map can remove
+    /// an image that it asked for through
+    /// <c>RuntimeEventType.MapStyleImageMissing</c>.
     /// </summary>
     public bool? KeepUnused { get; init; }
 }

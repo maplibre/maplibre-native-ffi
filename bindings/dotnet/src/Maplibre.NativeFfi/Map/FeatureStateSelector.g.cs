@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Feature-state source, feature, and key selector.
+/// The features whose state to set, read, or remove.
 /// </summary>
 /// <remarks>
 /// See <c>mln_feature_state_selector</c> in the <see
@@ -11,27 +11,23 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record FeatureStateSelector
 {
-    /// <summary>
-    /// Source ID. Required.
-    /// </summary>
     public required string SourceId { get; init; }
 
     /// <summary>
-    /// Source layer ID, or empty for none. Required for vector-source
-    /// disambiguation.
+    /// The source layer, for a vector source. Empty for other sources.
     /// </summary>
     public string SourceLayerId { get; init; } = "";
 
     /// <summary>
-    /// Optional feature ID. Required by set and get, optional for remove. A
-    /// numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-    /// id 7. Its field bit tells an absent ID from the empty ID "".
+    /// The feature's ID. Setting or reading state needs it. Without it,
+    /// <c>MapHandle.RemoveFeatureStateAsync()</c> removes the state of every
+    /// feature in the source layer.
     /// </summary>
     public string? FeatureId { get; init; }
 
     /// <summary>
-    /// State key, or empty to select every key. Used only by remove, and
-    /// requires feature_id.
+    /// The one key that <c>MapHandle.RemoveFeatureStateAsync()</c> removes. It
+    /// needs <c>feature_id</c>. Empty removes every key.
     /// </summary>
     public string StateKey { get; init; } = "";
 }

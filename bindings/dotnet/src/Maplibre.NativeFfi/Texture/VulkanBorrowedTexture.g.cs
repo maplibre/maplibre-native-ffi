@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One caller-owned Vulkan image of a borrowed texture ring.
+/// A Vulkan image of a borrowed ring.
 /// </summary>
 /// <remarks>
 /// See <c>mln_vulkan_borrowed_texture</c> in the <see
@@ -19,13 +19,12 @@ public readonly partial record struct VulkanBorrowedTexture
     }
 
     /// <summary>
-    /// Borrowed VkImage. Required.
+    /// Your VkImage.
     /// </summary>
     public required ulong Image { get; init; }
 
     /// <summary>
-    /// Borrowed VkImageView for image. Required. The view must be a 2D color
-    /// view that matches image and the descriptor's format.
+    /// A 2D VkImageView of <c>image</c> with one mip level and one layer.
     /// </summary>
     public required ulong ImageView { get; init; }
 }

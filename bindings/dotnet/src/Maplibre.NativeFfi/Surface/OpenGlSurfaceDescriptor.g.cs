@@ -3,11 +3,15 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL attachment options for a native surface.
+/// An OpenGL surface to present to, for <c>MapHandle.AttachOpenGlSurface()</c>
+/// and <c>RenderSessionHandle.SetOpenGlSurfaceTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_open_gl_surface_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+/// <para>The session uses the surface until a replacement or release of the
+/// target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.</para>
+/// <para>See <c>mln_open_gl_surface_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct OpenGlSurfaceDescriptor
 {
@@ -23,21 +27,11 @@ public readonly partial record struct OpenGlSurfaceDescriptor
         this.Surface = Surface;
     }
 
-    /// <summary>
-    /// Logical surface extent. Required. A scale_factor that differs from the
-    /// map's is accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Borrowed OpenGL context provider data.
-    /// </summary>
     public required OpenGlContextDescriptor Context { get; init; }
 
     /// <summary>
-    /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
-    /// EGL, both required. Null for WebGL, whose context carries its canvas
-    /// binding.
+    /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
     /// </summary>
     public NativePointer Surface { get; init; }
 }

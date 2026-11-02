@@ -179,6 +179,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{camel(name)}"
             for name in ("generation", "render_update_generation")
         },
+        parameter=camel,
         # Native queues each call, and the isolate that registered the callback
         # dispatches the queue from a receive port.
         threads=(
@@ -225,7 +226,9 @@ def _lower(api: Api | BoundApi):
                 methods[owner + "Discarding"].append(discarded)
             if plan.receiver and plan.completion and plan.completion.optional:
                 _, disposed = lower_function(plan, local_values, dispose=True)
-                methods[owner].append(doc(bound, plan.name, "  ") + disposed)
+                methods[owner].append(
+                    doc(bound, plan.name, "  ", discard=True) + disposed
+                )
             generated.append(plan.name)
             if owner != "Globals" and plan.registrations and not plan.owned_outputs:
                 root_owners.add(owner)

@@ -717,7 +717,7 @@ def method_code(
         else ""
     )
     return (
-        doc(value_types.bound, function.name, "    ")
+        doc(value_types.bound, function.name, "    ", discard=discard)
         + safety_doc
         + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}({', '.join(body.signature)}){returns} {{\n"
         + "\n".join("        " + line for line in lines)

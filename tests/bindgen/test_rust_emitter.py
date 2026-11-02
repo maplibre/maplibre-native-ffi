@@ -188,11 +188,9 @@ class RustEmitterTests(unittest.TestCase):
         values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
-        self.assertIn(
-            "    /// `MapHandle::cancel_transitions()`,\n"
-            "    /// `MapHandle::cancel_camera_transition()`, or `GesturePhase::Cancel` ended\n",
-            values,
-        )
+        self.assertIn("`MapHandle::cancel_transitions()`", values)
+        self.assertIn("`MapHandle::cancel_camera_transition()`", values)
+        self.assertIn("`GesturePhase::Cancel` stopped", values)
         self.assertNotIn("`mln_map_cancel_transitions()`", values)
 
     def test_a_status_callback_separates_conversion_from_host_failure(self):

@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// A map, which holds map state independent of any render target.
+    /// A map, with its style and camera.
     ///
     /// See `mln_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -14,11 +14,15 @@ native_owner! {
 }
 
 impl MapHandle {
-    /// Adds a custom geometry source. The callback may run on any native worker
-    /// thread, concurrently with runtime and map calls.
+    /// Adds a source whose GeoJSON tiles come from callbacks.
     ///
     /// See `mln_map_add_custom_geometry_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
@@ -38,11 +42,15 @@ impl MapHandle {
         })
     }
 
-    /// Adds a custom vector source. The callback may run on any native worker
-    /// thread, concurrently with runtime and map calls.
+    /// Adds a source whose vector tiles come from callbacks.
     ///
     /// See `mln_map_add_custom_vector_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_custom_vector_source(
         &self,
         source_id: &str,
@@ -62,10 +70,18 @@ impl MapHandle {
         })
     }
 
-    /// Adds a GeoJSON source with prepared inline data.
+    /// Adds a GeoJSON source with prepared data.
+    ///
+    /// The source uses the options that `data` was prepared with. `data` can be
+    /// released once this function returns.
     ///
     /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_geo_json_source_data(
         &self,
         source_id: &str,
@@ -79,10 +95,15 @@ impl MapHandle {
         })
     }
 
-    /// Adds a GeoJSON source with URL data.
+    /// Adds a GeoJSON source that loads its data from `url`.
     ///
     /// See `mln_map_add_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_geo_json_source_url(
         &self,
         source_id: &str,
@@ -105,10 +126,17 @@ impl MapHandle {
         })
     }
 
-    /// Adds an image source with inline image pixels.
+    /// Adds an image source that shows `image`.
+    ///
+    /// `coordinates` are the image's four corners, clockwise from the top left.
     ///
     /// See `mln_map_add_image_source_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_image_source_image(
         &self,
         source_id: &str,
@@ -133,10 +161,17 @@ impl MapHandle {
         })
     }
 
-    /// Adds an image source that loads its image from a URL.
+    /// Adds an image source that loads its image from `url`.
+    ///
+    /// `coordinates` are the image's four corners, clockwise from the top left.
     ///
     /// See `mln_map_add_image_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_image_source_url(
         &self,
         source_id: &str,
@@ -161,10 +196,22 @@ impl MapHandle {
         })
     }
 
-    /// Adds one style layer from a full style-spec layer JSON object.
+    /// Adds a layer to the map's style.
+    ///
+    /// `layer_json` is a
+    /// \[layer\](https://maplibre.org/maplibre-style-spec/layers/) object. The
+    /// layer goes below the layer named `before_layer_id`, or above every layer
+    /// when `before_layer_id` is empty.
     ///
     /// See `mln_map_add_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no layer named
+    ///   `before_layer_id`, or no source with the ID that the layer uses.
+    /// - `Status::InvalidArgument` when the style already has a layer with the
+    ///   new layer's ID.
     pub fn add_style_layer_json(
         &self,
         layer_json: &str,
@@ -184,10 +231,18 @@ impl MapHandle {
         })
     }
 
-    /// Adds one style source from a style-spec source JSON object.
+    /// Adds a source to the map's style.
+    ///
+    /// `source_json` is a
+    /// \[source\](https://maplibre.org/maplibre-style-spec/sources/) object.
     ///
     /// See `mln_map_add_style_source_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the style already has a source named
+    ///   `source_id`.
     pub fn add_style_source_json(
         &self,
         source_id: &str,
@@ -207,7 +262,14 @@ impl MapHandle {
         })
     }
 
-    /// Submits one atomic relative camera update.
+    /// Moves the camera relative to where it is, as a gesture does.
+    ///
+    /// `delta` can pan the map's content by an offset on the screen, scale the
+    /// zoom, and add to the bearing and pitch. An anchor keeps one screen point
+    /// in place while the scale, bearing, or pitch changes. An anchor needs one
+    /// of those changes, and combines with an offset only when the delta has no
+    /// animation. The function finishes when the map applies the delta, before
+    /// an animation ends.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -222,10 +284,17 @@ impl MapHandle {
         })
     }
 
-    /// Starts attachment of a texture target that renders on a graphics device.
+    /// Attaches a render session that draws the map into a texture on `device`.
+    ///
+    /// `options` must select `RenderDriverKind::CoreWorker`. Read the frames
+    /// back with `RenderSessionHandle::read_texture()`.
     ///
     /// See `mln_map_attach_graphics_device_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the map already has a render session.
     pub fn attach_graphics_device_texture(
         &self,
         device: &GraphicsDeviceHandle,
@@ -254,10 +323,17 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a ring of caller-owned Metal textures.
+    /// Creates a session that renders the map into a ring of your Metal
+    /// textures.
     ///
     /// See `mln_map_attach_metal_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::METAL`, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -292,10 +368,17 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a session-owned Metal texture ring.
+    /// Creates a session that renders the map into a ring of new Metal
+    /// textures.
     ///
     /// See `mln_map_attach_metal_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::METAL`, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -330,10 +413,15 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a Metal surface target.
+    /// Creates a session that renders the map to a Metal layer.
     ///
     /// See `mln_map_attach_metal_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::METAL`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -368,10 +456,19 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a ring of caller-owned OpenGL textures.
+    /// Creates a session that renders the map into a ring of your OpenGL
+    /// textures.
+    ///
+    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
     ///
     /// See `mln_map_attach_open_gl_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `open_gl_supported_context_provider_mask()`
+    ///   lacks the context's platform, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -400,10 +497,24 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a session-owned OpenGL texture ring.
+    /// Creates a session that renders the map into a ring of new OpenGL
+    /// textures.
+    ///
+    /// With `OpenGlContextOwnership::Shared`, the session needs
+    /// `RenderDriverKind::CallerGraphicsThread`, and the textures are in your
+    /// context's share group. With `OpenGlContextOwnership::Dedicated`, the
+    /// session needs `RenderDriverKind::CoreWorker` and renders in a context of
+    /// its own. You can't acquire its frames, but
+    /// `RenderSessionHandle::read_texture()` reads them.
     ///
     /// See `mln_map_attach_open_gl_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `open_gl_supported_context_provider_mask()`
+    ///   lacks the context's platform, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -432,10 +543,19 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of an OpenGL surface target.
+    /// Creates a session that renders the map to an OpenGL surface.
+    ///
+    /// The session needs `RenderDriverKind::CoreWorker` for a transferred WebGL
+    /// canvas, and `RenderDriverKind::CallerGraphicsThread` for any other
+    /// context.
     ///
     /// See `mln_map_attach_open_gl_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `open_gl_supported_context_provider_mask()`
+    ///   lacks the context's platform.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -464,10 +584,17 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a ring of caller-owned Vulkan images.
+    /// Creates a session that renders the map into a ring of your Vulkan
+    /// images.
     ///
     /// See `mln_map_attach_vulkan_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::VULKAN`, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -503,10 +630,16 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a session-owned Vulkan texture ring.
+    /// Creates a session that renders the map into a ring of new Vulkan images.
     ///
     /// See `mln_map_attach_vulkan_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::VULKAN`, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -542,10 +675,15 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a Vulkan surface target.
+    /// Creates a session that renders the map to a Vulkan surface.
     ///
     /// See `mln_map_attach_vulkan_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::VULKAN`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -581,10 +719,19 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a ring of caller-owned WebGPU textures.
+    /// Creates a session that renders the map into a ring of your WebGPU
+    /// textures.
+    ///
+    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
     ///
     /// See `mln_map_attach_web_gpu_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::WEB_GPU`, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -614,10 +761,19 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a session-owned WebGPU texture ring.
+    /// Creates a session that renders the map into a ring of new WebGPU
+    /// textures.
+    ///
+    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
     ///
     /// See `mln_map_attach_web_gpu_owned_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::WEB_GPU`, or when the target supports none of the
+    ///   `producer_sync_kinds` in `options`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -647,10 +803,17 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Starts attachment of a WebGPU surface target.
+    /// Creates a session that renders the map to a WebGPU surface.
+    ///
+    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
     ///
     /// See `mln_map_attach_web_gpu_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::WEB_GPU`.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -680,8 +843,10 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Begins a command group, which holds this map's render updates until the
-    /// group ends.
+    /// Holds back the map's changes from rendering until
+    /// `MapHandle::end_command_group()`, so they show in the same frame.
+    ///
+    /// Groups nest, and the changes render when the outermost group ends.
     ///
     /// See `mln_map_begin_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -692,7 +857,12 @@ impl MapHandle {
         })
     }
 
-    /// Starts an ordered query for a camera that fits a GeoJSON geometry.
+    /// Computes a camera that fits a GeoJSON geometry in the map's view.
+    ///
+    /// `geometry` is a GeoJSON geometry object with at least one coordinate,
+    /// not a feature. The camera keeps the map's bearing and pitch unless
+    /// `fit_options` sets them, and its zoom stays within the map's zoom
+    /// limits.
     ///
     /// See `mln_map_camera_for_geometry` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -718,7 +888,10 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered query for a camera that fits geographic bounds.
+    /// Computes a camera that fits `bounds` in the map's view.
+    ///
+    /// The camera keeps the map's bearing and pitch unless `fit_options` sets
+    /// them, and its zoom stays within the map's zoom limits.
     ///
     /// See `mln_map_camera_for_lat_lng_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -744,7 +917,11 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered query for a camera that fits geographic coordinates.
+    /// Computes a camera that fits `coordinates` in the map's view.
+    ///
+    /// `coordinates` must not be empty. The camera keeps the map's bearing and
+    /// pitch unless `fit_options` sets them, and its zoom stays within the
+    /// map's zoom limits.
     ///
     /// See `mln_map_camera_for_lat_lngs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -772,8 +949,11 @@ impl MapHandle {
         )
     }
 
-    /// Cancels the camera transitions of the commands whose animation carried
-    /// transition_id, and leaves every other transition running.
+    /// Stops the running camera animations whose animation options set
+    /// `transition_id`.
+    ///
+    /// Other animations keep running. The end handler of each stopped animation
+    /// reports `CameraTransitionOutcome::Cancelled`.
     ///
     /// See `mln_map_cancel_camera_transition` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -787,7 +967,10 @@ impl MapHandle {
         })
     }
 
-    /// Cancels the camera transitions running when this command commits.
+    /// Stops every running camera animation where it is.
+    ///
+    /// The end handler of each stopped animation reports
+    /// `CameraTransitionOutcome::Cancelled`.
     ///
     /// See `mln_map_cancel_transitions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -798,7 +981,10 @@ impl MapHandle {
         })
     }
 
-    /// Consumes a map handle without observing its asynchronous retirement.
+    /// Releases the map in any state, and finishes in the background.
+    ///
+    /// Use it from destructors and finalizers. Otherwise, use
+    /// `MapHandle::release()`.
     ///
     /// See `mln_map_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -809,7 +995,7 @@ impl MapHandle {
         })
     }
 
-    /// Submits an ordered debug-log command.
+    /// Logs debugging information about the map's style and sources.
     ///
     /// See `mln_map_dump_debug_logs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -820,8 +1006,7 @@ impl MapHandle {
         })
     }
 
-    /// Ends the innermost command group that `MapHandle::begin_command_group()`
-    /// began.
+    /// Ends the group that `MapHandle::begin_command_group()` began.
     ///
     /// See `mln_map_end_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -832,7 +1017,10 @@ impl MapHandle {
         })
     }
 
-    /// Starts an ordered camera read.
+    /// Reads the map's camera.
+    ///
+    /// The query reads the camera after the map applies the commands sent
+    /// before it.
     ///
     /// See `mln_map_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -846,7 +1034,9 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered read of per-feature state from this map.
+    /// Reads the state of a feature, as a JSON object.
+    ///
+    /// The object is empty when the feature has no state.
     ///
     /// See `mln_map_get_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -864,7 +1054,7 @@ impl MapHandle {
         )
     }
 
-    /// Queries the global-state JSON object, including style defaults.
+    /// Reads the global state of the map's style as a JSON object.
     ///
     /// See `mln_map_get_global_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -878,10 +1068,17 @@ impl MapHandle {
         )
     }
 
-    /// Copies image source coordinates.
+    /// Reads the corners of an image source's image, clockwise from the top
+    /// left.
     ///
     /// See `mln_map_get_image_source_coordinates` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't an
+    ///   image source.
     pub fn get_image_source_coordinates(
         &self,
         source_id: &str,
@@ -901,7 +1098,9 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered copy of the last successfully parsed style document.
+    /// Reads the JSON of the style that the map loaded.
+    ///
+    /// The JSON doesn't include the changes made to the style since it loaded.
     ///
     /// See `mln_map_get_loaded_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -915,7 +1114,10 @@ impl MapHandle {
         )
     }
 
-    /// Copies the map's latest published snapshot.
+    /// Copies the map's state.
+    ///
+    /// The copy doesn't wait for pending commands. To read the camera after
+    /// they apply, use `MapHandle::get_camera()`.
     ///
     /// See `mln_map_get_snapshot` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -929,7 +1131,9 @@ impl MapHandle {
         Ok(unsafe { from_native(out_snapshot) }?)
     }
 
-    /// Copies one complete runtime style image.
+    /// Reads an image of the map's style.
+    ///
+    /// Completes with no value when the style has no image named `image_id`.
     ///
     /// See `mln_map_get_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -944,7 +1148,9 @@ impl MapHandle {
         )
     }
 
-    /// Copies the complete metadata of one style layer.
+    /// Reads a layer of the map's style.
+    ///
+    /// Completes with no value when the style has no layer named `layer_id`.
     ///
     /// See `mln_map_get_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -959,7 +1165,10 @@ impl MapHandle {
         )
     }
 
-    /// Serializes one style layer as a full style-spec layer JSON object.
+    /// Reads a layer of the map's style as a
+    /// \[layer\](https://maplibre.org/maplibre-style-spec/layers/) object.
+    ///
+    /// Completes with no value when the style has no layer named `layer_id`.
     ///
     /// See `mln_map_get_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -974,10 +1183,16 @@ impl MapHandle {
         )
     }
 
-    /// Serializes one layer property as a style-spec JSON value.
+    /// Reads a property of a layer in the map's style.
+    ///
+    /// Completes with no value when the layer doesn't set the property.
     ///
     /// See `mln_map_get_style_layer_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no layer named `layer_id`.
     pub fn get_style_layer_property(
         &self,
         layer_id: &str,
@@ -1000,7 +1215,9 @@ impl MapHandle {
         )
     }
 
-    /// Serializes one style light property as a style-spec JSON value.
+    /// Reads a property of the light of the map's style.
+    ///
+    /// Completes with no value when the light doesn't set the property.
     ///
     /// See `mln_map_get_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1023,7 +1240,9 @@ impl MapHandle {
         )
     }
 
-    /// Copies the complete metadata of one style source.
+    /// Reads a source of the map's style.
+    ///
+    /// Completes with no value when the style has no source named `source_id`.
     ///
     /// See `mln_map_get_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1041,7 +1260,7 @@ impl MapHandle {
         )
     }
 
-    /// Reads the style's global transition options.
+    /// Reads the default transition of the map's style.
     ///
     /// See `mln_map_get_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1055,7 +1274,9 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered copy of the last requested style URL.
+    /// Reads the URL of the map's style.
+    ///
+    /// The URL is empty when the style came from `MapHandle::set_style_json()`.
     ///
     /// See `mln_map_get_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1069,10 +1290,17 @@ impl MapHandle {
         )
     }
 
-    /// Invalidates custom geometry source data inside one geographic region.
+    /// Makes a custom geometry source ask again for the tiles in `bounds` that
+    /// the map still needs.
     ///
     /// See `mln_map_invalidate_custom_geometry_source_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom geometry source.
     pub fn invalidate_custom_geometry_source_region(
         &self,
         source_id: &str,
@@ -1092,10 +1320,17 @@ impl MapHandle {
         })
     }
 
-    /// Invalidates custom geometry source data for one canonical tile.
+    /// Makes a custom geometry source ask for a tile again when the map needs
+    /// it.
     ///
     /// See `mln_map_invalidate_custom_geometry_source_tile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom geometry source.
     pub fn invalidate_custom_geometry_source_tile(
         &self,
         source_id: &str,
@@ -1115,10 +1350,16 @@ impl MapHandle {
         })
     }
 
-    /// Invalidates custom vector source data for one canonical tile.
+    /// Makes a custom vector source ask for a tile again when the map needs it.
     ///
     /// See `mln_map_invalidate_custom_vector_source_tile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom vector source.
     pub fn invalidate_custom_vector_source_tile(
         &self,
         source_id: &str,
@@ -1138,7 +1379,10 @@ impl MapHandle {
         })
     }
 
-    /// Starts an ordered wrapped-bounds query for a copied camera.
+    /// Computes the area that the map would show with `camera`.
+    ///
+    /// Camera fields that `camera` doesn't set come from the map's camera. The
+    /// longitudes stay between -180 and 180.
     ///
     /// See `mln_map_lat_lng_bounds_for_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1156,7 +1400,12 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered unwrapped-bounds query for a copied camera.
+    /// Computes the area that the map would show with `camera`, without
+    /// wrapping longitudes.
+    ///
+    /// Camera fields that `camera` doesn't set come from the map's camera. The
+    /// longitudes can fall outside -180 to 180, so a view across the
+    /// antimeridian gives one continuous range.
     ///
     /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1179,7 +1428,7 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered query of every style layer in style order.
+    /// Lists the layers of the map's style, from bottom to top.
     ///
     /// See `mln_map_list_style_layers` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1193,7 +1442,7 @@ impl MapHandle {
         )
     }
 
-    /// Lists every style source in style order.
+    /// Lists the sources of the map's style.
     ///
     /// See `mln_map_list_style_sources` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1207,10 +1456,16 @@ impl MapHandle {
         )
     }
 
-    /// Moves one style layer before another layer or to the top.
+    /// Moves a layer of the map's style below the layer named
+    /// `before_layer_id`, or above every layer when `before_layer_id` is empty.
     ///
     /// See `mln_map_move_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no layer named `layer_id` or
+    ///   `before_layer_id`.
     pub fn move_style_layer(
         &self,
         layer_id: &str,
@@ -1230,7 +1485,9 @@ impl MapHandle {
         })
     }
 
-    /// Releases a map asynchronously.
+    /// Releases the map.
+    ///
+    /// Detach the map's render session first.
     ///
     /// See `mln_map_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1246,7 +1503,7 @@ impl MapHandle {
         })
     }
 
-    /// Removes per-feature state from this map.
+    /// Removes the feature state that `selector` selects.
     ///
     /// See `mln_map_remove_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1261,10 +1518,14 @@ impl MapHandle {
         })
     }
 
-    /// Removes one runtime style image by ID.
+    /// Removes an image from the map's style.
     ///
     /// See `mln_map_remove_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no image named `image_id`.
     pub fn remove_style_image(&self, image_id: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let image_id = call.input(&image_id)?;
@@ -1273,10 +1534,14 @@ impl MapHandle {
         })
     }
 
-    /// Removes one style layer by ID.
+    /// Removes a layer from the map's style.
     ///
     /// See `mln_map_remove_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no layer named `layer_id`.
     pub fn remove_style_layer(&self, layer_id: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
@@ -1285,10 +1550,15 @@ impl MapHandle {
         })
     }
 
-    /// Removes one style source by ID.
+    /// Removes a source from the map's style.
     ///
     /// See `mln_map_remove_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidState` when a layer still uses the source.
     pub fn remove_style_source(&self, source_id: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -1297,7 +1567,7 @@ impl MapHandle {
         })
     }
 
-    /// Requests a repaint for a continuous map.
+    /// Renders a new frame of a continuous map, even when nothing changed.
     ///
     /// See `mln_map_request_repaint` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1308,10 +1578,19 @@ impl MapHandle {
         })
     }
 
-    /// Requests one still image for a static or tile map, which renders itself.
+    /// Renders a still image of a static or tile map.
+    ///
+    /// The map's render session draws the image once every resource that the
+    /// image needs has loaded.
     ///
     /// See `mln_map_request_still_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Cancelled` when the map is released before the image is done.
+    /// - `Status::NativeError` when the style or a resource that the image
+    ///   needs fails to load.
     pub fn request_still_image(&self) -> Result<NativeFuture<()>> {
         let call = self.inner.call();
         call.complete(
@@ -1322,7 +1601,11 @@ impl MapHandle {
         )
     }
 
-    /// Submits the sole post-creation logical extent update.
+    /// Sets the map's size.
+    ///
+    /// `extent` must keep the scale factor that the map was created with. A map
+    /// with a render session takes its size from the session, so resize the
+    /// session with `RenderSessionHandle::resize()` instead.
     ///
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1334,7 +1617,10 @@ impl MapHandle {
         })
     }
 
-    /// Submits a copied camera-constraint command.
+    /// Limits the camera's center to an area, and its zoom and pitch to ranges.
+    ///
+    /// Limits that `options` doesn't set keep their current values. When the
+    /// camera is outside the new limits, it moves inside them.
     ///
     /// See `mln_map_set_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1346,10 +1632,19 @@ impl MapHandle {
         })
     }
 
-    /// Sets custom geometry source data for one canonical tile.
+    /// Sets the data of a tile in a custom geometry source.
+    ///
+    /// `data` is a GeoJSON feature collection. The source ignores data for a
+    /// tile that it hasn't asked for, or has since cancelled.
     ///
     /// See `mln_map_set_custom_geometry_source_tile_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom geometry source.
     pub fn set_custom_geometry_source_tile_data(
         &self,
         source_id: &str,
@@ -1372,10 +1667,16 @@ impl MapHandle {
         })
     }
 
-    /// Reports a custom geometry source error for one canonical tile.
+    /// Reports that a tile of a custom geometry source failed to load.
     ///
     /// See `mln_map_set_custom_geometry_source_tile_error` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom geometry source.
     pub fn set_custom_geometry_source_tile_error(
         &self,
         source_id: &str,
@@ -1398,10 +1699,19 @@ impl MapHandle {
         })
     }
 
-    /// Sets custom vector source data for one canonical tile.
+    /// Sets the data of a tile in a custom vector source.
+    ///
+    /// `data` is the tile, encoded as `encoding`. The source ignores data for a
+    /// tile that it hasn't asked for, or has since cancelled.
     ///
     /// See `mln_map_set_custom_vector_source_tile_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom vector source.
     pub fn set_custom_vector_source_tile_data(
         &self,
         source_id: &str,
@@ -1426,10 +1736,16 @@ impl MapHandle {
         })
     }
 
-    /// Reports a custom vector source error for one canonical tile.
+    /// Reports that a tile of a custom vector source failed to load.
     ///
     /// See `mln_map_set_custom_vector_source_tile_error` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom vector source.
     pub fn set_custom_vector_source_tile_error(
         &self,
         source_id: &str,
@@ -1452,7 +1768,9 @@ impl MapHandle {
         })
     }
 
-    /// Submits a debug-overlay command.
+    /// Draws debugging overlays, such as tile borders, on the map.
+    ///
+    /// `options` replaces the overlays set before.
     ///
     /// See `mln_map_set_debug_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1466,7 +1784,7 @@ impl MapHandle {
         })
     }
 
-    /// Selects which map-originated event types this map queues.
+    /// Selects the events that the map reports.
     ///
     /// See `mln_map_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1480,7 +1798,10 @@ impl MapHandle {
         })
     }
 
-    /// Submits a copied per-feature-state command.
+    /// Merges `state` into the state of a feature.
+    ///
+    /// `state` is a JSON object. Its keys replace the same keys in the
+    /// feature's state, and the other keys stay.
     ///
     /// See `mln_map_set_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1497,7 +1818,10 @@ impl MapHandle {
         })
     }
 
-    /// Submits a copied free-camera command.
+    /// Places the camera at a position and orientation in space.
+    ///
+    /// The map adjusts them to a camera that it can show, and stops running
+    /// camera animations.
     ///
     /// See `mln_map_set_free_camera_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1512,10 +1836,19 @@ impl MapHandle {
         })
     }
 
-    /// Updates one GeoJSON source with prepared inline data.
+    /// Replaces the data of a GeoJSON source.
+    ///
+    /// `data` must have been prepared with the same options as the source. It
+    /// can be released once this function returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   GeoJSON source, or `data` was prepared with other options.
     pub fn set_geo_json_source_data(
         &self,
         source_id: &str,
@@ -1529,10 +1862,20 @@ impl MapHandle {
         })
     }
 
-    /// Overrides one GeoJSON source's synchronous tiling at runtime.
+    /// Sets whether a GeoJSON source builds its tiles synchronously.
+    ///
+    /// This works like the synchronous tiling option of `GeoJsonSourceOptions`,
+    /// but `enabled` can't turn off synchronous tiling that the source's
+    /// options turned on.
     ///
     /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   GeoJSON source.
     pub fn set_geo_json_source_synchronous_tiling(
         &self,
         source_id: &str,
@@ -1551,10 +1894,16 @@ impl MapHandle {
         })
     }
 
-    /// Updates one GeoJSON source to load data from a URL.
+    /// Makes a GeoJSON source load its data from `url`.
     ///
     /// See `mln_map_set_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   GeoJSON source.
     pub fn set_geo_json_source_url(
         &self,
         source_id: &str,
@@ -1568,10 +1917,17 @@ impl MapHandle {
         })
     }
 
-    /// Submits a global-state JSON value. JSON null restores the style default.
+    /// Sets a value that the style's `global-state`
+    /// \[expressions\](https://maplibre.org/maplibre-style-spec/expressions/)
+    /// read.
     ///
     /// See `mln_map_set_global_state_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the style or one of its sources or sprites
+    ///   is still loading.
     pub fn set_global_state_property(
         &self,
         property_name: &str,
@@ -1591,10 +1947,18 @@ impl MapHandle {
         })
     }
 
-    /// Updates image source coordinates.
+    /// Moves the image of an image source.
+    ///
+    /// `coordinates` are the image's four corners, clockwise from the top left.
     ///
     /// See `mln_map_set_image_source_coordinates` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't an
+    ///   image source.
     pub fn set_image_source_coordinates(
         &self,
         source_id: &str,
@@ -1616,10 +1980,16 @@ impl MapHandle {
         })
     }
 
-    /// Updates an image source with inline image pixels.
+    /// Replaces the image of an image source.
     ///
     /// See `mln_map_set_image_source_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't an
+    ///   image source.
     pub fn set_image_source_image(
         &self,
         source_id: &str,
@@ -1633,10 +2003,16 @@ impl MapHandle {
         })
     }
 
-    /// Updates an image source to load its image from a URL.
+    /// Makes an image source load its image from `url`.
     ///
     /// See `mln_map_set_image_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't an
+    ///   image source.
     pub fn set_image_source_url(
         &self,
         source_id: &str,
@@ -1650,7 +2026,10 @@ impl MapHandle {
         })
     }
 
-    /// Submits axonometric rendering options.
+    /// Sets whether the map draws in perspective or axonometric projection, and
+    /// how much it skews the view.
+    ///
+    /// Settings that `mode` doesn't set keep their current values.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1665,7 +2044,7 @@ impl MapHandle {
         })
     }
 
-    /// Submits a rendering-stats visibility command.
+    /// Shows or hides an overlay of rendering statistics on the map.
     ///
     /// See `mln_map_set_rendering_stats_view_enabled` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1679,7 +2058,8 @@ impl MapHandle {
         })
     }
 
-    /// Sets one runtime style image.
+    /// Adds an image to the map's style, or replaces the image named
+    /// `image_id`.
     ///
     /// See `mln_map_set_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1698,12 +2078,16 @@ impl MapHandle {
         })
     }
 
-    /// Queues an inline style JSON command. A committed command means the map
-    /// applied the JSON, not that the style loaded: style loading events report
-    /// the resource and parse results that follow.
+    /// Loads the map's style from `json`.
+    ///
+    /// The style's sources, sprites, and glyphs load in the background.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NativeError` when `json` isn't a valid style.
     pub fn set_style_json(&self, json: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let json = call.input(&json)?;
@@ -1712,10 +2096,20 @@ impl MapHandle {
         })
     }
 
-    /// Sets one layer property using its MapLibre style-spec property name.
+    /// Sets a property of a layer in the map's style.
+    ///
+    /// `property_name` is one of the layer's layout or paint
+    /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/), or
+    /// `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
+    /// `value` resets any of these but `source` and `source-layer` to its
+    /// default.
     ///
     /// See `mln_map_set_style_layer_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no layer named `layer_id`.
     pub fn set_style_layer_property(
         &self,
         layer_id: &str,
@@ -1738,7 +2132,8 @@ impl MapHandle {
         })
     }
 
-    /// Sets the style light from a style-spec light JSON object.
+    /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/)
+    /// of the map's style.
     ///
     /// See `mln_map_set_style_light_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1753,8 +2148,7 @@ impl MapHandle {
         })
     }
 
-    /// Sets one style light property using its MapLibre style-spec property
-    /// name.
+    /// Sets a property of the light of the map's style.
     ///
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1777,11 +2171,17 @@ impl MapHandle {
         })
     }
 
-    /// Sets whether one style source stores fetched tiles in the persistent
+    /// Sets whether a source is volatile.
+    ///
+    /// The map doesn't store the tiles of a volatile source in the persistent
     /// cache.
     ///
     /// See `mln_map_set_style_source_volatile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
     pub fn set_style_source_volatile(
         &self,
         source_id: &str,
@@ -1800,7 +2200,7 @@ impl MapHandle {
         })
     }
 
-    /// Sets the style's global transition options.
+    /// Sets the default transition of the map's style.
     ///
     /// See `mln_map_set_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1815,9 +2215,12 @@ impl MapHandle {
         })
     }
 
-    /// Queues a style URL command. A committed command means the map accepted
-    /// the URL, not that the style loaded: style loading events report the
-    /// network, decode, and parse results that follow.
+    /// Loads the map's style from `url`.
+    ///
+    /// The style loads in the background, and
+    /// `RuntimeEventType::MapStyleLoaded` or
+    /// `RuntimeEventType::MapLoadingFailed` reports how the load ends. Sources,
+    /// layers, and images added before the style loads are lost when it loads.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1829,7 +2232,9 @@ impl MapHandle {
         })
     }
 
-    /// Submits a copied tile-options command.
+    /// Sets how the map chooses which tiles to load, and at what detail.
+    ///
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_tile_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1844,7 +2249,9 @@ impl MapHandle {
         })
     }
 
-    /// Submits a copied viewport-options command.
+    /// Sets how the map orients and constrains its view.
+    ///
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_viewport_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1859,7 +2266,13 @@ impl MapHandle {
         })
     }
 
-    /// Submits one atomic camera update.
+    /// Moves the camera, at once or with an animation.
+    ///
+    /// Camera fields that `update` doesn't set keep their values, and the
+    /// update stops any running animation of the fields it sets. The function
+    /// finishes when the map applies the update, before an animation ends. To
+    /// learn when an animation ends, set an `CameraTransitionHandler` in its
+    /// animation options.
     ///
     /// See `mln_map_update_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1882,8 +2295,7 @@ impl MapHandle {
     }
 }
 impl MapHandleDiscarding<'_> {
-    /// Adds a custom geometry source. The callback may run on any native worker
-    /// thread, concurrently with runtime and map calls.
+    /// Adds a source whose GeoJSON tiles come from callbacks.
     ///
     /// See `mln_map_add_custom_geometry_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1906,8 +2318,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds a custom vector source. The callback may run on any native worker
-    /// thread, concurrently with runtime and map calls.
+    /// Adds a source whose vector tiles come from callbacks.
     ///
     /// See `mln_map_add_custom_vector_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1930,7 +2341,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds a GeoJSON source with prepared inline data.
+    /// Adds a GeoJSON source with prepared data.
+    ///
+    /// The source uses the options that `data` was prepared with. `data` can be
+    /// released once this function returns.
     ///
     /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1947,7 +2361,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds a GeoJSON source with URL data.
+    /// Adds a GeoJSON source that loads its data from `url`.
     ///
     /// See `mln_map_add_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1973,7 +2387,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds an image source with inline image pixels.
+    /// Adds an image source that shows `image`.
+    ///
+    /// `coordinates` are the image's four corners, clockwise from the top left.
     ///
     /// See `mln_map_add_image_source_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2001,7 +2417,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds an image source that loads its image from a URL.
+    /// Adds an image source that loads its image from `url`.
+    ///
+    /// `coordinates` are the image's four corners, clockwise from the top left.
     ///
     /// See `mln_map_add_image_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2029,7 +2447,12 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds one style layer from a full style-spec layer JSON object.
+    /// Adds a layer to the map's style.
+    ///
+    /// `layer_json` is a
+    /// \[layer\](https://maplibre.org/maplibre-style-spec/layers/) object. The
+    /// layer goes below the layer named `before_layer_id`, or above every layer
+    /// when `before_layer_id` is empty.
     ///
     /// See `mln_map_add_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2048,7 +2471,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds one style source from a style-spec source JSON object.
+    /// Adds a source to the map's style.
+    ///
+    /// `source_json` is a
+    /// \[source\](https://maplibre.org/maplibre-style-spec/sources/) object.
     ///
     /// See `mln_map_add_style_source_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2067,7 +2493,14 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits one atomic relative camera update.
+    /// Moves the camera relative to where it is, as a gesture does.
+    ///
+    /// `delta` can pan the map's content by an offset on the screen, scale the
+    /// zoom, and add to the bearing and pitch. An anchor keeps one screen point
+    /// in place while the scale, bearing, or pitch changes. An anchor needs one
+    /// of those changes, and combines with an offset only when the delta has no
+    /// animation. The function finishes when the map applies the delta, before
+    /// an animation ends.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2079,8 +2512,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Begins a command group, which holds this map's render updates until the
-    /// group ends.
+    /// Holds back the map's changes from rendering until
+    /// `MapHandle::end_command_group()`, so they show in the same frame.
+    ///
+    /// Groups nest, and the changes render when the outermost group ends.
     ///
     /// See `mln_map_begin_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2091,8 +2526,11 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Cancels the camera transitions of the commands whose animation carried
-    /// transition_id, and leaves every other transition running.
+    /// Stops the running camera animations whose animation options set
+    /// `transition_id`.
+    ///
+    /// Other animations keep running. The end handler of each stopped animation
+    /// reports `CameraTransitionOutcome::Cancelled`.
     ///
     /// See `mln_map_cancel_camera_transition` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2103,7 +2541,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Cancels the camera transitions running when this command commits.
+    /// Stops every running camera animation where it is.
+    ///
+    /// The end handler of each stopped animation reports
+    /// `CameraTransitionOutcome::Cancelled`.
     ///
     /// See `mln_map_cancel_transitions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2114,7 +2555,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits an ordered debug-log command.
+    /// Logs debugging information about the map's style and sources.
     ///
     /// See `mln_map_dump_debug_logs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2125,8 +2566,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Ends the innermost command group that `MapHandle::begin_command_group()`
-    /// began.
+    /// Ends the group that `MapHandle::begin_command_group()` began.
     ///
     /// See `mln_map_end_command_group` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2137,7 +2577,8 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Invalidates custom geometry source data inside one geographic region.
+    /// Makes a custom geometry source ask again for the tiles in `bounds` that
+    /// the map still needs.
     ///
     /// See `mln_map_invalidate_custom_geometry_source_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2160,7 +2601,8 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Invalidates custom geometry source data for one canonical tile.
+    /// Makes a custom geometry source ask for a tile again when the map needs
+    /// it.
     ///
     /// See `mln_map_invalidate_custom_geometry_source_tile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2183,7 +2625,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Invalidates custom vector source data for one canonical tile.
+    /// Makes a custom vector source ask for a tile again when the map needs it.
     ///
     /// See `mln_map_invalidate_custom_vector_source_tile` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2206,7 +2648,8 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Moves one style layer before another layer or to the top.
+    /// Moves a layer of the map's style below the layer named
+    /// `before_layer_id`, or above every layer when `before_layer_id` is empty.
     ///
     /// See `mln_map_move_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2225,7 +2668,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Removes per-feature state from this map.
+    /// Removes the feature state that `selector` selects.
     ///
     /// See `mln_map_remove_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2237,7 +2680,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Removes one runtime style image by ID.
+    /// Removes an image from the map's style.
     ///
     /// See `mln_map_remove_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2249,7 +2692,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Removes one style layer by ID.
+    /// Removes a layer from the map's style.
     ///
     /// See `mln_map_remove_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2261,7 +2704,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Removes one style source by ID.
+    /// Removes a source from the map's style.
     ///
     /// See `mln_map_remove_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2273,7 +2716,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Requests a repaint for a continuous map.
+    /// Renders a new frame of a continuous map, even when nothing changed.
     ///
     /// See `mln_map_request_repaint` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2284,7 +2727,11 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits the sole post-creation logical extent update.
+    /// Sets the map's size.
+    ///
+    /// `extent` must keep the scale factor that the map was created with. A map
+    /// with a render session takes its size from the session, so resize the
+    /// session with `RenderSessionHandle::resize()` instead.
     ///
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2296,7 +2743,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a copied camera-constraint command.
+    /// Limits the camera's center to an area, and its zoom and pitch to ranges.
+    ///
+    /// Limits that `options` doesn't set keep their current values. When the
+    /// camera is outside the new limits, it moves inside them.
     ///
     /// See `mln_map_set_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2308,7 +2758,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets custom geometry source data for one canonical tile.
+    /// Sets the data of a tile in a custom geometry source.
+    ///
+    /// `data` is a GeoJSON feature collection. The source ignores data for a
+    /// tile that it hasn't asked for, or has since cancelled.
     ///
     /// See `mln_map_set_custom_geometry_source_tile_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2334,7 +2787,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Reports a custom geometry source error for one canonical tile.
+    /// Reports that a tile of a custom geometry source failed to load.
     ///
     /// See `mln_map_set_custom_geometry_source_tile_error` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2360,7 +2813,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets custom vector source data for one canonical tile.
+    /// Sets the data of a tile in a custom vector source.
+    ///
+    /// `data` is the tile, encoded as `encoding`. The source ignores data for a
+    /// tile that it hasn't asked for, or has since cancelled.
     ///
     /// See `mln_map_set_custom_vector_source_tile_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2388,7 +2844,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Reports a custom vector source error for one canonical tile.
+    /// Reports that a tile of a custom vector source failed to load.
     ///
     /// See `mln_map_set_custom_vector_source_tile_error` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2414,7 +2870,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a debug-overlay command.
+    /// Draws debugging overlays, such as tile borders, on the map.
+    ///
+    /// `options` replaces the overlays set before.
     ///
     /// See `mln_map_set_debug_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2425,7 +2883,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Selects which map-originated event types this map queues.
+    /// Selects the events that the map reports.
     ///
     /// See `mln_map_set_event_mask` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2436,7 +2894,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a copied per-feature-state command.
+    /// Merges `state` into the state of a feature.
+    ///
+    /// `state` is a JSON object. Its keys replace the same keys in the
+    /// feature's state, and the other keys stay.
     ///
     /// See `mln_map_set_feature_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2453,7 +2914,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a copied free-camera command.
+    /// Places the camera at a position and orientation in space.
+    ///
+    /// The map adjusts them to a camera that it can show, and stops running
+    /// camera animations.
     ///
     /// See `mln_map_set_free_camera_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2465,7 +2929,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Updates one GeoJSON source with prepared inline data.
+    /// Replaces the data of a GeoJSON source.
+    ///
+    /// `data` must have been prepared with the same options as the source. It
+    /// can be released once this function returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2482,7 +2949,11 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Overrides one GeoJSON source's synchronous tiling at runtime.
+    /// Sets whether a GeoJSON source builds its tiles synchronously.
+    ///
+    /// This works like the synchronous tiling option of `GeoJsonSourceOptions`,
+    /// but `enabled` can't turn off synchronous tiling that the source's
+    /// options turned on.
     ///
     /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2504,7 +2975,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Updates one GeoJSON source to load data from a URL.
+    /// Makes a GeoJSON source load its data from `url`.
     ///
     /// See `mln_map_set_geo_json_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2517,7 +2988,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a global-state JSON value. JSON null restores the style default.
+    /// Sets a value that the style's `global-state`
+    /// \[expressions\](https://maplibre.org/maplibre-style-spec/expressions/)
+    /// read.
     ///
     /// See `mln_map_set_global_state_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2536,7 +3009,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Updates image source coordinates.
+    /// Moves the image of an image source.
+    ///
+    /// `coordinates` are the image's four corners, clockwise from the top left.
     ///
     /// See `mln_map_set_image_source_coordinates` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2561,7 +3036,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Updates an image source with inline image pixels.
+    /// Replaces the image of an image source.
     ///
     /// See `mln_map_set_image_source_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2578,7 +3053,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Updates an image source to load its image from a URL.
+    /// Makes an image source load its image from `url`.
     ///
     /// See `mln_map_set_image_source_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2591,7 +3066,10 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits axonometric rendering options.
+    /// Sets whether the map draws in perspective or axonometric projection, and
+    /// how much it skews the view.
+    ///
+    /// Settings that `mode` doesn't set keep their current values.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2603,7 +3081,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a rendering-stats visibility command.
+    /// Shows or hides an overlay of rendering statistics on the map.
     ///
     /// See `mln_map_set_rendering_stats_view_enabled` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2614,7 +3092,8 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets one runtime style image.
+    /// Adds an image to the map's style, or replaces the image named
+    /// `image_id`.
     ///
     /// See `mln_map_set_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2633,9 +3112,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Queues an inline style JSON command. A committed command means the map
-    /// applied the JSON, not that the style loaded: style loading events report
-    /// the resource and parse results that follow.
+    /// Loads the map's style from `json`.
+    ///
+    /// The style's sources, sprites, and glyphs load in the background.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2647,7 +3126,13 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets one layer property using its MapLibre style-spec property name.
+    /// Sets a property of a layer in the map's style.
+    ///
+    /// `property_name` is one of the layer's layout or paint
+    /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/), or
+    /// `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
+    /// `value` resets any of these but `source` and `source-layer` to its
+    /// default.
     ///
     /// See `mln_map_set_style_layer_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2673,7 +3158,8 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets the style light from a style-spec light JSON object.
+    /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/)
+    /// of the map's style.
     ///
     /// See `mln_map_set_style_light_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2685,8 +3171,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets one style light property using its MapLibre style-spec property
-    /// name.
+    /// Sets a property of the light of the map's style.
     ///
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2705,7 +3190,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets whether one style source stores fetched tiles in the persistent
+    /// Sets whether a source is volatile.
+    ///
+    /// The map doesn't store the tiles of a volatile source in the persistent
     /// cache.
     ///
     /// See `mln_map_set_style_source_volatile` in the
@@ -2724,7 +3211,7 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets the style's global transition options.
+    /// Sets the default transition of the map's style.
     ///
     /// See `mln_map_set_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2736,9 +3223,12 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Queues a style URL command. A committed command means the map accepted
-    /// the URL, not that the style loaded: style loading events report the
-    /// network, decode, and parse results that follow.
+    /// Loads the map's style from `url`.
+    ///
+    /// The style loads in the background, and
+    /// `RuntimeEventType::MapStyleLoaded` or
+    /// `RuntimeEventType::MapLoadingFailed` reports how the load ends. Sources,
+    /// layers, and images added before the style loads are lost when it loads.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2750,7 +3240,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a copied tile-options command.
+    /// Sets how the map chooses which tiles to load, and at what detail.
+    ///
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_tile_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2762,7 +3254,9 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits a copied viewport-options command.
+    /// Sets how the map orients and constrains its view.
+    ///
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_viewport_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2774,7 +3268,13 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Submits one atomic camera update.
+    /// Moves the camera, at once or with an animation.
+    ///
+    /// Camera fields that `update` doesn't set keep their values, and the
+    /// update stops any running animation of the fields it sets. The function
+    /// finishes when the map applies the update, before an animation ends. To
+    /// learn when an animation ends, set an `CameraTransitionHandler` in its
+    /// animation options.
     ///
     /// See `mln_map_update_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

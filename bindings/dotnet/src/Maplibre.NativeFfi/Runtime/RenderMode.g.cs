@@ -2,7 +2,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Render modes reported by render observer events and frame results.
+/// Whether a frame drew the map complete, or lacked resources that are still
+/// loading.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_mode</c> in the <see

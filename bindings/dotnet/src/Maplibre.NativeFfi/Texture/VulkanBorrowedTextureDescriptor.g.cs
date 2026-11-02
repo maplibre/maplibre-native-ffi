@@ -3,11 +3,21 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Vulkan attachment options for a borrowed texture target.
+/// A ring of your Vulkan images, for
+/// <c>MapHandle.AttachVulkanBorrowedTexture()</c> and
+/// <c>RenderSessionHandle.SetVulkanBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_vulkan_borrowed_texture_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// <para><c>extent</c> sets the map's size and the session's scale factor, so
+/// give it the map's scale factor. <c>physical_width</c> and
+/// <c>physical_height</c> give the images' size in pixels. Each image must have
+/// that size, <c>format</c>, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and
+/// belong to the context's device.</para>
+/// <para>The session uses the images until a replacement or release of the
+/// target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.</para>
+/// <para>See <c>mln_vulkan_borrowed_texture_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct VulkanBorrowedTextureDescriptor
 {
@@ -33,31 +43,10 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor
         this.Owner = Owner;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. physical_width and physical_height
-    /// give the texture's size. A scale_factor that differs from the map's is
-    /// accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Physical image width in device pixels. Required.
-    /// </summary>
     public required uint PhysicalWidth { get; init; }
-
-    /// <summary>
-    /// Physical image height in device pixels. Required.
-    /// </summary>
     public required uint PhysicalHeight { get; init; }
-
-    /// <summary>
-    /// Borrowed Vulkan context. All handles are required.
-    /// </summary>
     public required VulkanContextDescriptor Context { get; init; }
-
-    /// <summary>
-    /// The ring's images, one per slot, in slot order. Required.
-    /// </summary>
     public required ImmutableArray<VulkanBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
@@ -66,26 +55,13 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor
     internal ValueArray<VulkanBorrowedTexture> TexturesStorage { get; init; }
 
     /// <summary>
-    /// Backend-native VkFormat value of every image. Required, so
-    /// VK_FORMAT_UNDEFINED is invalid.
+    /// The images' VkFormat.
     /// </summary>
     public required uint Format { get; init; }
 
     /// <summary>
-    /// Backend-native VkImageLayout value left after rendering succeeds, such
-    /// as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL. Required, so
-    /// VK_IMAGE_LAYOUT_UNDEFINED is invalid. A render clears its image, so it
-    /// takes the image in any layout and the host returns no layout.
+    /// The VkImageLayout that each frame leaves its image in.
     /// </summary>
     public required uint FinalLayout { get; init; }
-
-    /// <summary>
-    /// The queue family that owns each image while the host holds its frame.
-    /// Unless it is the graphics queue's family, the session releases a frame's
-    /// image to it in final_layout, before the frame's producer
-    /// synchronization, and, since a render clears the image, takes it back
-    /// without a transfer. A replacement keeps the owner the session attached
-    /// with.
-    /// </summary>
     public VulkanImageOwner Owner { get; init; }
 }

@@ -171,8 +171,11 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
     _native: _native._AcquiredFrameHandle
 
     def discard(self) -> None:
-        """Consumes an acquired frame without consumer GPU synchronization, so
-        it quarantines the frame's slot of the texture ring.
+        """Gives up an acquired frame without saying when your GPU stops reading
+        it.
+
+        Because your GPU may still read the frame's texture, the session
+        never renders into that texture again.
 
         See `mln_acquired_frame_discard` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -180,12 +183,16 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return self._native.discard()
 
     def metal_texture(self) -> AbstractContextManager[MetalTextureFrame]:
-        """Copies Metal-native metadata from an acquired frame.
+        """Gets the Metal texture of an acquired frame.
+
+        Native resources remain valid only inside the `with` block.
 
         See `mln_acquired_frame_get_metal_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only inside the `with` block.
+        Errors:
+
+        - `Status.TARGET_LOST` when the session lost its target.
         """
         return _view(
             self,
@@ -194,12 +201,16 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def open_gl_texture(self) -> AbstractContextManager[OpenGlTextureFrame]:
-        """Copies OpenGL-native metadata from an acquired frame.
+        """Gets the OpenGL texture of an acquired frame.
+
+        Native resources remain valid only inside the `with` block.
 
         See `mln_acquired_frame_get_open_gl_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only inside the `with` block.
+        Errors:
+
+        - `Status.TARGET_LOST` when the session lost its target.
         """
         return _view(
             self,
@@ -208,12 +219,16 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def producer_sync(self) -> AbstractContextManager[GpuSync]:
-        """Copies the producer synchronization for an acquired texture frame.
+        """Reads what to wait for before you read an acquired frame's texture.
+
+        Native resources remain valid only inside the `with` block.
 
         See `mln_acquired_frame_get_producer_sync` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 
-        Native resources remain valid only inside the `with` block.
+        Errors:
+
+        - `Status.TARGET_LOST` when the session lost its target.
         """
         return _view(
             self,
@@ -222,20 +237,28 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def get_result(self) -> RenderFrameResult:
-        """Copies common metadata for an acquired frame.
+        """Reads the frame result of an acquired frame.
 
         See `mln_acquired_frame_get_result` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session lost its target.
         """
         return RenderFrameResult._from_native(self._native.get_result())
 
     def vulkan_texture(self) -> AbstractContextManager[VulkanTextureFrame]:
-        """Copies Vulkan-native metadata from an acquired frame.
+        """Gets the Vulkan image of an acquired frame.
+
+        Native resources remain valid only inside the `with` block.
 
         See `mln_acquired_frame_get_vulkan_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
-        Native resources remain valid only inside the `with` block.
+        Errors:
+
+        - `Status.TARGET_LOST` when the session lost its target.
         """
         return _view(
             self,
@@ -244,10 +267,21 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def close(self, consumer_completion: GpuSync | None = None) -> None:
-        """Releases an acquired frame after the host's GPU work that reads it.
+        """Gives an acquired frame back to the session once you're done reading
+        it.
+
+        `consumer_completion` says when your GPU work that reads the texture
+        finishes. Null means that the work has already finished. The session
+        waits for that point before it renders into the texture again.
 
         See `mln_acquired_frame_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when
+          `RenderSessionCapabilities.consumer_sync_kinds` lacks the kind of
+          `consumer_completion`.
         """
         return self._native.close(consumer_completion)
 
@@ -259,10 +293,20 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
     def create(
         cls, data: Any, options: GeoJsonSourceOptions | None = None
     ) -> GeoJsonSourceDataHandle:
-        """Prepares GeoJSON source data for installation on a map.
+        """Prepares GeoJSON data for GeoJSON sources.
+
+        `data` is a GeoJSON feature collection, feature, or geometry.
+        Preparing it can be slow, but adding the result to a source is quick,
+        and several sources can share it.
 
         See `mln_geo_json_source_data_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `data` isn't valid GeoJSON, or when
+          `options` turns on clustering and `data` isn't a feature collection
+          of points.
         """
         return _adopt_value(
             _native._GeoJsonSourceDataHandle.create(data, options),
@@ -271,7 +315,9 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
         )
 
     def close(self) -> None:
-        """Releases prepared GeoJSON source data.
+        """Releases prepared GeoJSON data.
+
+        Sources that use the data keep it.
 
         See `mln_geo_json_source_data_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -286,10 +332,19 @@ class _GraphicsDeviceHandleOperations(GeneratedOperations):
     def create(
         cls, options: GraphicsDeviceOptions | None = None
     ) -> GraphicsDeviceHandle:
-        """Creates a graphics device for this build's render backend.
+        """Creates a GPU device for rendering maps into textures.
+
+        Render sessions on several maps can share one device.
 
         See `mln_graphics_device_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when this build's render backend can't create
+          a device.
+        - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the
+          platform can't create the device.
         """
         return _adopt_value(
             _native._GraphicsDeviceHandle.create(options), "GraphicsDeviceHandle", None
@@ -297,6 +352,8 @@ class _GraphicsDeviceHandleOperations(GeneratedOperations):
 
     def close(self) -> None:
         """Releases a graphics device.
+
+        Render sessions on the device keep working until they detach.
 
         See `mln_graphics_device_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
@@ -310,42 +367,63 @@ class _MapHandleOperations(GeneratedOperations):
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom geometry source. The callback runs on the binding's
-        dispatcher thread, after native queues the call.
+        """Adds a source whose GeoJSON tiles come from callbacks.
 
         See `mln_map_add_custom_geometry_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_custom_geometry_source(source_id, options)
 
     def add_custom_vector_source(
         self, source_id: str, options: CustomVectorSourceOptions
     ) -> Future[CommandCompletion]:
-        """Adds a custom vector source. The callback runs on the binding's
-        dispatcher thread, after native queues the call.
+        """Adds a source whose vector tiles come from callbacks.
 
         See `mln_map_add_custom_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_custom_vector_source(source_id, options)
 
     def add_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
-        """Adds a GeoJSON source with prepared inline data.
+        """Adds a GeoJSON source with prepared data.
+
+        The source uses the options that `data` was prepared with. `data` can
+        be released once this function returns.
 
         See `mln_map_add_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_geo_json_source_data(source_id, data._native)
 
     def add_geo_json_source_url(
         self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> Future[CommandCompletion]:
-        """Adds a GeoJSON source with URL data.
+        """Adds a GeoJSON source that loads its data from `url`.
 
         See `mln_map_add_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_geo_json_source_url(source_id, url, options)
 
@@ -355,45 +433,88 @@ class _MapHandleOperations(GeneratedOperations):
         coordinates: Sequence[LatLng],
         image: PremultipliedRgba8Image,
     ) -> Future[CommandCompletion]:
-        """Adds an image source with inline image pixels.
+        """Adds an image source that shows `image`.
+
+        `coordinates` are the image's four corners, clockwise from the top
+        left.
 
         See `mln_map_add_image_source_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_image_source_image(source_id, coordinates, image)
 
     def add_image_source_url(
         self, source_id: str, coordinates: Sequence[LatLng], url: str
     ) -> Future[CommandCompletion]:
-        """Adds an image source that loads its image from a URL.
+        """Adds an image source that loads its image from `url`.
+
+        `coordinates` are the image's four corners, clockwise from the top
+        left.
 
         See `mln_map_add_image_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_image_source_url(source_id, coordinates, url)
 
     def add_style_layer_json(
         self, layer_json: Any, before_layer_id: str
     ) -> Future[CommandCompletion]:
-        """Adds one style layer from a full style-spec layer JSON object.
+        """Adds a layer to the map's style.
+
+        `layer_json` is a
+        \\[layer\\](https://maplibre.org/maplibre-style-spec/layers/) object.
+        The layer goes below the layer named `before_layer_id`, or above
+        every layer when `before_layer_id` is empty.
 
         See `mln_map_add_style_layer_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no layer named
+          `before_layer_id`, or no source with the ID that the layer uses.
+        - `Status.INVALID_ARGUMENT` when the style already has a layer with
+          the new layer's ID.
         """
         return self._native.add_style_layer_json(layer_json, before_layer_id)
 
     def add_style_source_json(
         self, source_id: str, source_json: Any
     ) -> Future[CommandCompletion]:
-        """Adds one style source from a style-spec source JSON object.
+        """Adds a source to the map's style.
+
+        `source_json` is a
+        \\[source\\](https://maplibre.org/maplibre-style-spec/sources/) object.
 
         See `mln_map_add_style_source_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the style already has a source named
+          `source_id`.
         """
         return self._native.add_style_source_json(source_id, source_json)
 
     def apply_camera_delta(self, delta: CameraDelta) -> Future[CommandCompletion]:
-        """Submits one atomic relative camera update.
+        """Moves the camera relative to where it is, as a gesture does.
+
+        `delta` can pan the map's content by an offset on the screen, scale
+        the zoom, and add to the bearing and pitch. An anchor keeps one
+        screen point in place while the scale, bearing, or pitch changes. An
+        anchor needs one of those changes, and combines with an offset only
+        when the delta has no animation. The function finishes when the map
+        applies the delta, before an animation ends.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -406,11 +527,18 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: GraphicsDeviceTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachGraphicsDeviceTextureResult:
-        """Starts attachment of a texture target that renders on a graphics
-        device.
+        """Attaches a render session that draws the map into a texture on
+        `device`.
+
+        `options` must select `RenderDriverKind.CORE_WORKER`. Read the frames
+        back with `RenderSessionHandle.read_texture()`.
 
         See `mln_map_attach_graphics_device_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the map already has a render session.
         """
         raw = self._native.attach_graphics_device_texture(
             device._native, descriptor, options
@@ -425,10 +553,17 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: MetalBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachMetalBorrowedTextureResult:
-        """Starts attachment of a ring of caller-owned Metal textures.
+        """Creates a session that renders the map into a ring of your Metal
+        textures.
 
         See `mln_map_attach_metal_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.METAL`, or when the target supports none of the
+          `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_metal_borrowed_texture(descriptor, options)
         return MapAttachMetalBorrowedTextureResult(
@@ -441,10 +576,17 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: MetalOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachMetalOwnedTextureResult:
-        """Starts attachment of a session-owned Metal texture ring.
+        """Creates a session that renders the map into a ring of new Metal
+        textures.
 
         See `mln_map_attach_metal_owned_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.METAL`, or when the target supports none of the
+          `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_metal_owned_texture(descriptor, options)
         return MapAttachMetalOwnedTextureResult(
@@ -455,10 +597,15 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachMetalSurfaceResult:
-        """Starts attachment of a Metal surface target.
+        """Creates a session that renders the map to a Metal layer.
 
         See `mln_map_attach_metal_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.METAL`.
         """
         raw = self._native.attach_metal_surface(descriptor, options)
         return MapAttachMetalSurfaceResult(
@@ -471,10 +618,20 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: OpenGlBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachOpenGlBorrowedTextureResult:
-        """Starts attachment of a ring of caller-owned OpenGL textures.
+        """Creates a session that renders the map into a ring of your OpenGL
+        textures.
+
+        The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.
 
         See `mln_map_attach_open_gl_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when
+          `open_gl_supported_context_provider_mask()` lacks the context's
+          platform, or when the target supports none of the
+          `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_open_gl_borrowed_texture(descriptor, options)
         return MapAttachOpenGlBorrowedTextureResult(
@@ -487,10 +644,25 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: OpenGlOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachOpenGlOwnedTextureResult:
-        """Starts attachment of a session-owned OpenGL texture ring.
+        """Creates a session that renders the map into a ring of new OpenGL
+        textures.
+
+        With `OpenGlContextOwnership.SHARED`, the session needs
+        `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and the textures are in
+        your context's share group. With `OpenGlContextOwnership.DEDICATED`,
+        the session needs `RenderDriverKind.CORE_WORKER` and renders in a
+        context of its own. You can't acquire its frames, but
+        `RenderSessionHandle.read_texture()` reads them.
 
         See `mln_map_attach_open_gl_owned_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when
+          `open_gl_supported_context_provider_mask()` lacks the context's
+          platform, or when the target supports none of the
+          `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_open_gl_owned_texture(descriptor, options)
         return MapAttachOpenGlOwnedTextureResult(
@@ -501,10 +673,20 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_open_gl_surface(
         self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachOpenGlSurfaceResult:
-        """Starts attachment of an OpenGL surface target.
+        """Creates a session that renders the map to an OpenGL surface.
+
+        The session needs `RenderDriverKind.CORE_WORKER` for a transferred
+        WebGL canvas, and `RenderDriverKind.CALLER_GRAPHICS_THREAD` for any
+        other context.
 
         See `mln_map_attach_open_gl_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when
+          `open_gl_supported_context_provider_mask()` lacks the context's
+          platform.
         """
         raw = self._native.attach_open_gl_surface(descriptor, options)
         return MapAttachOpenGlSurfaceResult(
@@ -517,10 +699,17 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: VulkanBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachVulkanBorrowedTextureResult:
-        """Starts attachment of a ring of caller-owned Vulkan images.
+        """Creates a session that renders the map into a ring of your Vulkan
+        images.
 
         See `mln_map_attach_vulkan_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.VULKAN`, or when the target supports none of the
+          `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_vulkan_borrowed_texture(descriptor, options)
         return MapAttachVulkanBorrowedTextureResult(
@@ -533,10 +722,17 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: VulkanOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> MapAttachVulkanOwnedTextureResult:
-        """Starts attachment of a session-owned Vulkan texture ring.
+        """Creates a session that renders the map into a ring of new Vulkan
+        images.
 
         See `mln_map_attach_vulkan_owned_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.VULKAN`, or when the target supports none of the
+          `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_vulkan_owned_texture(descriptor, options)
         return MapAttachVulkanOwnedTextureResult(
@@ -547,10 +743,15 @@ class _MapHandleOperations(GeneratedOperations):
     def attach_vulkan_surface(
         self, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachVulkanSurfaceResult:
-        """Starts attachment of a Vulkan surface target.
+        """Creates a session that renders the map to a Vulkan surface.
 
         See `mln_map_attach_vulkan_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.VULKAN`.
         """
         raw = self._native.attach_vulkan_surface(descriptor, options)
         return MapAttachVulkanSurfaceResult(
@@ -559,8 +760,10 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def begin_command_group(self) -> Future[CommandCompletion]:
-        """Begins a command group, which holds this map's render updates until
-        the group ends.
+        """Holds back the map's changes from rendering until
+        `MapHandle.end_command_group()`, so they show in the same frame.
+
+        Groups nest, and the changes render when the outermost group ends.
 
         See `mln_map_begin_command_group` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -570,7 +773,12 @@ class _MapHandleOperations(GeneratedOperations):
     def camera_for_geometry(
         self, geometry: Any, fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
-        """Starts an ordered query for a camera that fits a GeoJSON geometry.
+        """Computes a camera that fits a GeoJSON geometry in the map's view.
+
+        `geometry` is a GeoJSON geometry object with at least one coordinate,
+        not a feature. The camera keeps the map's bearing and pitch unless
+        `fit_options` sets them, and its zoom stays within the map's zoom
+        limits.
 
         See `mln_map_camera_for_geometry` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -583,7 +791,10 @@ class _MapHandleOperations(GeneratedOperations):
     def camera_for_lat_lng_bounds(
         self, bounds: LatLngBounds, fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
-        """Starts an ordered query for a camera that fits geographic bounds.
+        """Computes a camera that fits `bounds` in the map's view.
+
+        The camera keeps the map's bearing and pitch unless `fit_options`
+        sets them, and its zoom stays within the map's zoom limits.
 
         See `mln_map_camera_for_lat_lng_bounds` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -596,8 +807,11 @@ class _MapHandleOperations(GeneratedOperations):
     def camera_for_lat_lngs(
         self, coordinates: Sequence[LatLng], fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
-        """Starts an ordered query for a camera that fits geographic
-        coordinates.
+        """Computes a camera that fits `coordinates` in the map's view.
+
+        `coordinates` must not be empty. The camera keeps the map's bearing
+        and pitch unless `fit_options` sets them, and its zoom stays within
+        the map's zoom limits.
 
         See `mln_map_camera_for_lat_lngs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -608,8 +822,11 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def cancel_camera_transition(self, transition_id: int) -> Future[CommandCompletion]:
-        """Cancels the camera transitions of the commands whose animation
-        carried transition_id, and leaves every other transition running.
+        """Stops the running camera animations whose animation options set
+        `transition_id`.
+
+        Other animations keep running. The end handler of each stopped
+        animation reports `CameraTransitionOutcome.CANCELLED`.
 
         See `mln_map_cancel_camera_transition` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -617,7 +834,10 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.cancel_camera_transition(transition_id)
 
     def cancel_transitions(self) -> Future[CommandCompletion]:
-        """Cancels the camera transitions running when this command commits.
+        """Stops every running camera animation where it is.
+
+        The end handler of each stopped animation reports
+        `CameraTransitionOutcome.CANCELLED`.
 
         See `mln_map_cancel_transitions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -625,7 +845,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.cancel_transitions()
 
     def dump_debug_logs(self) -> Future[CommandCompletion]:
-        """Submits an ordered debug-log command.
+        """Logs debugging information about the map's style and sources.
 
         See `mln_map_dump_debug_logs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -633,8 +853,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.dump_debug_logs()
 
     def end_command_group(self) -> Future[CommandCompletion]:
-        """Ends the innermost command group that
-        `MapHandle.begin_command_group()` began.
+        """Ends the group that `MapHandle.begin_command_group()` began.
 
         See `mln_map_end_command_group` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -642,7 +861,10 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.end_command_group()
 
     def get_camera(self) -> Future[CameraQueryResult]:
-        """Starts an ordered camera read.
+        """Reads the map's camera.
+
+        The query reads the camera after the map applies the commands sent
+        before it.
 
         See `mln_map_get_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -653,7 +875,9 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def get_feature_state(self, selector: FeatureStateSelector) -> Future[Any]:
-        """Starts an ordered read of per-feature state from this map.
+        """Reads the state of a feature, as a JSON object.
+
+        The object is empty when the feature has no state.
 
         See `mln_map_get_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -661,7 +885,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.get_feature_state(selector)
 
     def get_global_state(self) -> Future[Any]:
-        """Queries the global-state JSON object, including style defaults.
+        """Reads the global state of the map's style as a JSON object.
 
         See `mln_map_get_global_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -671,10 +895,17 @@ class _MapHandleOperations(GeneratedOperations):
     def get_image_source_coordinates(
         self, source_id: str
     ) -> Future[tuple[LatLng, ...]]:
-        """Copies image source coordinates.
+        """Reads the corners of an image source's image, clockwise from the top
+        left.
 
         See `mln_map_get_image_source_coordinates` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't
+          an image source.
         """
         return map_future(
             self._native.get_image_source_coordinates(source_id),
@@ -682,8 +913,10 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def get_loaded_style_json(self) -> Future[Any]:
-        """Starts an ordered copy of the last successfully parsed style
-        document.
+        """Reads the JSON of the style that the map loaded.
+
+        The JSON doesn't include the changes made to the style since it
+        loaded.
 
         See `mln_map_get_loaded_style_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -691,7 +924,10 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.get_loaded_style_json()
 
     def get_snapshot(self) -> MapSnapshot:
-        """Copies the map's latest published snapshot.
+        """Copies the map's state.
+
+        The copy doesn't wait for pending commands. To read the camera after
+        they apply, use `MapHandle.get_camera()`.
 
         See `mln_map_get_snapshot` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -699,7 +935,9 @@ class _MapHandleOperations(GeneratedOperations):
         return MapSnapshot._from_native(self._native.get_snapshot())
 
     def get_style_image(self, image_id: str) -> Future[StyleImageInfo | None]:
-        """Copies one complete runtime style image.
+        """Reads an image of the map's style.
+
+        Completes with no value when the style has no image named `image_id`.
 
         See `mln_map_get_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -710,7 +948,9 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def get_style_layer(self, layer_id: str) -> Future[StyleLayerInfo | None]:
-        """Copies the complete metadata of one style layer.
+        """Reads a layer of the map's style.
+
+        Completes with no value when the style has no layer named `layer_id`.
 
         See `mln_map_get_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -721,7 +961,10 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def get_style_layer_json(self, layer_id: str) -> Future[Any]:
-        """Serializes one style layer as a full style-spec layer JSON object.
+        """Reads a layer of the map's style as a
+        \\[layer\\](https://maplibre.org/maplibre-style-spec/layers/) object.
+
+        Completes with no value when the style has no layer named `layer_id`.
 
         See `mln_map_get_style_layer_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -731,15 +974,23 @@ class _MapHandleOperations(GeneratedOperations):
     def get_style_layer_property(
         self, layer_id: str, property_name: str
     ) -> Future[Any]:
-        """Serializes one layer property as a style-spec JSON value.
+        """Reads a property of a layer in the map's style.
+
+        Completes with no value when the layer doesn't set the property.
 
         See `mln_map_get_style_layer_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no layer named `layer_id`.
         """
         return self._native.get_style_layer_property(layer_id, property_name)
 
     def get_style_light_property(self, property_name: str) -> Future[Any]:
-        """Serializes one style light property as a style-spec JSON value.
+        """Reads a property of the light of the map's style.
+
+        Completes with no value when the light doesn't set the property.
 
         See `mln_map_get_style_light_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -747,7 +998,10 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.get_style_light_property(property_name)
 
     def get_style_source(self, source_id: str) -> Future[StyleSourceInfo | None]:
-        """Copies the complete metadata of one style source.
+        """Reads a source of the map's style.
+
+        Completes with no value when the style has no source named
+        `source_id`.
 
         See `mln_map_get_style_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -758,7 +1012,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def get_style_transition_options(self) -> Future[StyleTransitionOptions]:
-        """Reads the style's global transition options.
+        """Reads the default transition of the map's style.
 
         See `mln_map_get_style_transition_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -769,7 +1023,10 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def get_style_url(self) -> Future[str]:
-        """Starts an ordered copy of the last requested style URL.
+        """Reads the URL of the map's style.
+
+        The URL is empty when the style came from
+        `MapHandle.set_style_json()`.
 
         See `mln_map_get_style_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -779,37 +1036,61 @@ class _MapHandleOperations(GeneratedOperations):
     def invalidate_custom_geometry_source_region(
         self, source_id: str, bounds: LatLngBounds
     ) -> Future[CommandCompletion]:
-        """Invalidates custom geometry source data inside one geographic region.
+        """Makes a custom geometry source ask again for the tiles in `bounds`
+        that the map still needs.
 
         See `mln_map_invalidate_custom_geometry_source_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom geometry source.
         """
         return self._native.invalidate_custom_geometry_source_region(source_id, bounds)
 
     def invalidate_custom_geometry_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> Future[CommandCompletion]:
-        """Invalidates custom geometry source data for one canonical tile.
+        """Makes a custom geometry source ask for a tile again when the map
+        needs it.
 
         See `mln_map_invalidate_custom_geometry_source_tile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom geometry source.
         """
         return self._native.invalidate_custom_geometry_source_tile(source_id, tile_id)
 
     def invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> Future[CommandCompletion]:
-        """Invalidates custom vector source data for one canonical tile.
+        """Makes a custom vector source ask for a tile again when the map needs
+        it.
 
         See `mln_map_invalidate_custom_vector_source_tile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom vector source.
         """
         return self._native.invalidate_custom_vector_source_tile(source_id, tile_id)
 
     def lat_lng_bounds_for_camera(
         self, camera: CameraOptions | None = None
     ) -> Future[LatLngBounds]:
-        """Starts an ordered wrapped-bounds query for a copied camera.
+        """Computes the area that the map would show with `camera`.
+
+        Camera fields that `camera` doesn't set come from the map's camera.
+        The longitudes stay between -180 and 180.
 
         See `mln_map_lat_lng_bounds_for_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -822,7 +1103,12 @@ class _MapHandleOperations(GeneratedOperations):
     def lat_lng_bounds_for_camera_unwrapped(
         self, camera: CameraOptions | None = None
     ) -> Future[LatLngBounds]:
-        """Starts an ordered unwrapped-bounds query for a copied camera.
+        """Computes the area that the map would show with `camera`, without
+        wrapping longitudes.
+
+        Camera fields that `camera` doesn't set come from the map's camera.
+        The longitudes can fall outside -180 to 180, so a view across the
+        antimeridian gives one continuous range.
 
         See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -833,7 +1119,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def list_style_layers(self) -> Future[tuple[StyleLayerInfo, ...]]:
-        """Starts an ordered query of every style layer in style order.
+        """Lists the layers of the map's style, from bottom to top.
 
         See `mln_map_list_style_layers` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -844,7 +1130,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def list_style_sources(self) -> Future[tuple[StyleSourceInfo, ...]]:
-        """Lists every style source in style order.
+        """Lists the sources of the map's style.
 
         See `mln_map_list_style_sources` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -857,15 +1143,24 @@ class _MapHandleOperations(GeneratedOperations):
     def move_style_layer(
         self, layer_id: str, before_layer_id: str
     ) -> Future[CommandCompletion]:
-        """Moves one style layer before another layer or to the top.
+        """Moves a layer of the map's style below the layer named
+        `before_layer_id`, or above every layer when `before_layer_id` is
+        empty.
 
         See `mln_map_move_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no layer named `layer_id` or
+          `before_layer_id`.
         """
         return self._native.move_style_layer(layer_id, before_layer_id)
 
     def close(self) -> Future[None]:
-        """Releases a map asynchronously.
+        """Releases the map.
+
+        Detach the map's render session first.
 
         See `mln_map_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -875,7 +1170,7 @@ class _MapHandleOperations(GeneratedOperations):
     def remove_feature_state(
         self, selector: FeatureStateSelector
     ) -> Future[CommandCompletion]:
-        """Removes per-feature state from this map.
+        """Removes the feature state that `selector` selects.
 
         See `mln_map_remove_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -883,31 +1178,44 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.remove_feature_state(selector)
 
     def remove_style_image(self, image_id: str) -> Future[CommandCompletion]:
-        """Removes one runtime style image by ID.
+        """Removes an image from the map's style.
 
         See `mln_map_remove_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no image named `image_id`.
         """
         return self._native.remove_style_image(image_id)
 
     def remove_style_layer(self, layer_id: str) -> Future[CommandCompletion]:
-        """Removes one style layer by ID.
+        """Removes a layer from the map's style.
 
         See `mln_map_remove_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no layer named `layer_id`.
         """
         return self._native.remove_style_layer(layer_id)
 
     def remove_style_source(self, source_id: str) -> Future[CommandCompletion]:
-        """Removes one style source by ID.
+        """Removes a source from the map's style.
 
         See `mln_map_remove_style_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_STATE` when a layer still uses the source.
         """
         return self._native.remove_style_source(source_id)
 
     def request_repaint(self) -> Future[CommandCompletion]:
-        """Requests a repaint for a continuous map.
+        """Renders a new frame of a continuous map, even when nothing changed.
 
         See `mln_map_request_repaint` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -915,16 +1223,29 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.request_repaint()
 
     def request_still_image(self) -> Future[None]:
-        """Requests one still image for a static or tile map, which renders
-        itself.
+        """Renders a still image of a static or tile map.
+
+        The map's render session draws the image once every resource that the
+        image needs has loaded.
 
         See `mln_map_request_still_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.CANCELLED` when the map is released before the image is
+          done.
+        - `Status.NATIVE_ERROR` when the style or a resource that the image
+          needs fails to load.
         """
         return self._native.request_still_image()
 
     def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
-        """Submits the sole post-creation logical extent update.
+        """Sets the map's size.
+
+        `extent` must keep the scale factor that the map was created with. A
+        map with a render session takes its size from the session, so resize
+        the session with `RenderSessionHandle.resize()` instead.
 
         See `mln_map_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -934,7 +1255,11 @@ class _MapHandleOperations(GeneratedOperations):
     def set_bounds(
         self, options: BoundOptions | None = None
     ) -> Future[CommandCompletion]:
-        """Submits a copied camera-constraint command.
+        """Limits the camera's center to an area, and its zoom and pitch to
+        ranges.
+
+        Limits that `options` doesn't set keep their current values. When the
+        camera is outside the new limits, it moves inside them.
 
         See `mln_map_set_bounds` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -944,10 +1269,19 @@ class _MapHandleOperations(GeneratedOperations):
     def set_custom_geometry_source_tile_data(
         self, source_id: str, tile_id: CanonicalTileId, data: Any
     ) -> Future[CommandCompletion]:
-        """Sets custom geometry source data for one canonical tile.
+        """Sets the data of a tile in a custom geometry source.
+
+        `data` is a GeoJSON feature collection. The source ignores data for a
+        tile that it hasn't asked for, or has since cancelled.
 
         See `mln_map_set_custom_geometry_source_tile_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom geometry source.
         """
         return self._native.set_custom_geometry_source_tile_data(
             source_id, tile_id, data
@@ -956,10 +1290,16 @@ class _MapHandleOperations(GeneratedOperations):
     def set_custom_geometry_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> Future[CommandCompletion]:
-        """Reports a custom geometry source error for one canonical tile.
+        """Reports that a tile of a custom geometry source failed to load.
 
         See `mln_map_set_custom_geometry_source_tile_error` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom geometry source.
         """
         return self._native.set_custom_geometry_source_tile_error(
             source_id, tile_id, message
@@ -972,10 +1312,19 @@ class _MapHandleOperations(GeneratedOperations):
         encoding: StyleVectorTileEncoding,
         data: Buffer,
     ) -> Future[CommandCompletion]:
-        """Sets custom vector source data for one canonical tile.
+        """Sets the data of a tile in a custom vector source.
+
+        `data` is the tile, encoded as `encoding`. The source ignores data
+        for a tile that it hasn't asked for, or has since cancelled.
 
         See `mln_map_set_custom_vector_source_tile_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom vector source.
         """
         return self._native.set_custom_vector_source_tile_data(
             source_id, tile_id, encoding, data
@@ -984,17 +1333,25 @@ class _MapHandleOperations(GeneratedOperations):
     def set_custom_vector_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> Future[CommandCompletion]:
-        """Reports a custom vector source error for one canonical tile.
+        """Reports that a tile of a custom vector source failed to load.
 
         See `mln_map_set_custom_vector_source_tile_error` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom vector source.
         """
         return self._native.set_custom_vector_source_tile_error(
             source_id, tile_id, message
         )
 
     def set_debug_options(self, options: MapDebugFlag) -> Future[CommandCompletion]:
-        """Submits a debug-overlay command.
+        """Draws debugging overlays, such as tile borders, on the map.
+
+        `options` replaces the overlays set before.
 
         See `mln_map_set_debug_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1002,7 +1359,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_debug_options(options)
 
     def set_event_mask(self, mask: RuntimeEventFlag) -> Future[CommandCompletion]:
-        """Selects which map-originated event types this map queues.
+        """Selects the events that the map reports.
 
         See `mln_map_set_event_mask` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1012,7 +1369,10 @@ class _MapHandleOperations(GeneratedOperations):
     def set_feature_state(
         self, selector: FeatureStateSelector, state: Any
     ) -> Future[CommandCompletion]:
-        """Submits a copied per-feature-state command.
+        """Merges `state` into the state of a feature.
+
+        `state` is a JSON object. Its keys replace the same keys in the
+        feature's state, and the other keys stay.
 
         See `mln_map_set_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1022,7 +1382,10 @@ class _MapHandleOperations(GeneratedOperations):
     def set_free_camera_options(
         self, options: FreeCameraOptions | None = None
     ) -> Future[CommandCompletion]:
-        """Submits a copied free-camera command.
+        """Places the camera at a position and orientation in space.
+
+        The map adjusts them to a camera that it can show, and stops running
+        camera animations.
 
         See `mln_map_set_free_camera_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1032,76 +1395,131 @@ class _MapHandleOperations(GeneratedOperations):
     def set_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
-        """Updates one GeoJSON source with prepared inline data.
+        """Replaces the data of a GeoJSON source.
+
+        `data` must have been prepared with the same options as the source.
+        It can be released once this function returns.
 
         See `mln_map_set_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          GeoJSON source, or `data` was prepared with other options.
         """
         return self._native.set_geo_json_source_data(source_id, data._native)
 
     def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool
     ) -> Future[CommandCompletion]:
-        """Overrides one GeoJSON source's synchronous tiling at runtime.
+        """Sets whether a GeoJSON source builds its tiles synchronously.
+
+        This works like the synchronous tiling option of
+        `GeoJsonSourceOptions`, but `enabled` can't turn off synchronous
+        tiling that the source's options turned on.
 
         See `mln_map_set_geo_json_source_synchronous_tiling` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          GeoJSON source.
         """
         return self._native.set_geo_json_source_synchronous_tiling(source_id, enabled)
 
     def set_geo_json_source_url(
         self, source_id: str, url: str
     ) -> Future[CommandCompletion]:
-        """Updates one GeoJSON source to load data from a URL.
+        """Makes a GeoJSON source load its data from `url`.
 
         See `mln_map_set_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          GeoJSON source.
         """
         return self._native.set_geo_json_source_url(source_id, url)
 
     def set_global_state_property(
         self, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
-        """Submits a global-state JSON value. JSON null restores the style
-        default.
+        """Sets a value that the style's `global-state`
+        \\[expressions\\](https://maplibre.org/maplibre-style-spec/expressions/)
+        read.
 
         See `mln_map_set_global_state_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the style or one of its sources or
+          sprites is still loading.
         """
         return self._native.set_global_state_property(property_name, value)
 
     def set_image_source_coordinates(
         self, source_id: str, coordinates: Sequence[LatLng]
     ) -> Future[CommandCompletion]:
-        """Updates image source coordinates.
+        """Moves the image of an image source.
+
+        `coordinates` are the image's four corners, clockwise from the top
+        left.
 
         See `mln_map_set_image_source_coordinates` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't
+          an image source.
         """
         return self._native.set_image_source_coordinates(source_id, coordinates)
 
     def set_image_source_image(
         self, source_id: str, image: PremultipliedRgba8Image
     ) -> Future[CommandCompletion]:
-        """Updates an image source with inline image pixels.
+        """Replaces the image of an image source.
 
         See `mln_map_set_image_source_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't
+          an image source.
         """
         return self._native.set_image_source_image(source_id, image)
 
     def set_image_source_url(
         self, source_id: str, url: str
     ) -> Future[CommandCompletion]:
-        """Updates an image source to load its image from a URL.
+        """Makes an image source load its image from `url`.
 
         See `mln_map_set_image_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't
+          an image source.
         """
         return self._native.set_image_source_url(source_id, url)
 
     def set_projection_mode(self, mode: ProjectionMode) -> Future[CommandCompletion]:
-        """Submits axonometric rendering options.
+        """Sets whether the map draws in perspective or axonometric projection,
+        and how much it skews the view.
+
+        Settings that `mode` doesn't set keep their current values.
 
         See `mln_map_set_projection_mode` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1111,7 +1529,7 @@ class _MapHandleOperations(GeneratedOperations):
     def set_rendering_stats_view_enabled(
         self, enabled: bool
     ) -> Future[CommandCompletion]:
-        """Submits a rendering-stats visibility command.
+        """Shows or hides an overlay of rendering statistics on the map.
 
         See `mln_map_set_rendering_stats_view_enabled` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1124,7 +1542,8 @@ class _MapHandleOperations(GeneratedOperations):
         image: PremultipliedRgba8Image,
         options: StyleImageOptions | None = None,
     ) -> Future[CommandCompletion]:
-        """Sets one runtime style image.
+        """Adds an image to the map's style, or replaces the image named
+        `image_id`.
 
         See `mln_map_set_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1132,27 +1551,43 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_style_image(image_id, image, options)
 
     def set_style_json(self, json: Any) -> Future[CommandCompletion]:
-        """Queues an inline style JSON command. A committed command means the
-        map applied the JSON, not that the style loaded: style loading events
-        report the resource and parse results that follow.
+        """Loads the map's style from `json`.
+
+        The style's sources, sprites, and glyphs load in the background.
 
         See `mln_map_set_style_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NATIVE_ERROR` when `json` isn't a valid style.
         """
         return self._native.set_style_json(json)
 
     def set_style_layer_property(
         self, layer_id: str, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
-        """Sets one layer property using its MapLibre style-spec property name.
+        """Sets a property of a layer in the map's style.
+
+        `property_name` is one of the layer's layout or paint
+        \\[properties\\](https://maplibre.org/maplibre-style-spec/layers/), or
+        `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
+        `value` resets any of these but `source` and `source-layer` to its
+        default.
 
         See `mln_map_set_style_layer_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no layer named `layer_id`.
         """
         return self._native.set_style_layer_property(layer_id, property_name, value)
 
     def set_style_light_json(self, light_json: Any) -> Future[CommandCompletion]:
-        """Sets the style light from a style-spec light JSON object.
+        """Replaces the
+        \\[light\\](https://maplibre.org/maplibre-style-spec/light/) of the
+        map's style.
 
         See `mln_map_set_style_light_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1162,8 +1597,7 @@ class _MapHandleOperations(GeneratedOperations):
     def set_style_light_property(
         self, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
-        """Sets one style light property using its MapLibre style-spec property
-        name.
+        """Sets a property of the light of the map's style.
 
         See `mln_map_set_style_light_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1173,18 +1607,24 @@ class _MapHandleOperations(GeneratedOperations):
     def set_style_source_volatile(
         self, source_id: str, is_volatile: bool
     ) -> Future[CommandCompletion]:
-        """Sets whether one style source stores fetched tiles in the persistent
-        cache.
+        """Sets whether a source is volatile.
+
+        The map doesn't store the tiles of a volatile source in the
+        persistent cache.
 
         See `mln_map_set_style_source_volatile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
         """
         return self._native.set_style_source_volatile(source_id, is_volatile)
 
     def set_style_transition_options(
         self, options: StyleTransitionOptions | None = None
     ) -> Future[CommandCompletion]:
-        """Sets the style's global transition options.
+        """Sets the default transition of the map's style.
 
         See `mln_map_set_style_transition_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1192,9 +1632,13 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_style_transition_options(options)
 
     def set_style_url(self, url: str) -> Future[CommandCompletion]:
-        """Queues a style URL command. A committed command means the map
-        accepted the URL, not that the style loaded: style loading events
-        report the network, decode, and parse results that follow.
+        """Loads the map's style from `url`.
+
+        The style loads in the background, and
+        `RuntimeEventType.MAP_STYLE_LOADED` or
+        `RuntimeEventType.MAP_LOADING_FAILED` reports how the load ends.
+        Sources, layers, and images added before the style loads are lost
+        when it loads.
 
         See `mln_map_set_style_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1204,7 +1648,9 @@ class _MapHandleOperations(GeneratedOperations):
     def set_tile_options(
         self, options: MapTileOptions | None = None
     ) -> Future[CommandCompletion]:
-        """Submits a copied tile-options command.
+        """Sets how the map chooses which tiles to load, and at what detail.
+
+        Settings that `options` doesn't set keep their current values.
 
         See `mln_map_set_tile_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1214,7 +1660,9 @@ class _MapHandleOperations(GeneratedOperations):
     def set_viewport_options(
         self, options: MapViewportOptions | None = None
     ) -> Future[CommandCompletion]:
-        """Submits a copied viewport-options command.
+        """Sets how the map orients and constrains its view.
+
+        Settings that `options` doesn't set keep their current values.
 
         See `mln_map_set_viewport_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1222,7 +1670,13 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_viewport_options(options)
 
     def update_camera(self, update: CameraUpdate) -> Future[CommandCompletion]:
-        """Submits one atomic camera update.
+        """Moves the camera, at once or with an animation.
+
+        Camera fields that `update` doesn't set keep their values, and the
+        update stops any running animation of the fields it sets. The
+        function finishes when the map applies the update, before an
+        animation ends. To learn when an animation ends, set an
+        `CameraTransitionHandler` in its animation options.
 
         See `mln_map_update_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1239,8 +1693,11 @@ class _MapProjectionHandleOperations(GeneratedOperations):
 
     @classmethod
     def create(cls, view: MapView) -> MapProjectionHandle:
-        """Creates a standalone projection of a view, such as the view of a
-        rendered frame or of a map snapshot.
+        """Creates a projection that converts coordinates for one view of a map.
+
+        Create it from the `view` of an `MapSnapshot` or an
+        `RenderFrameResult`. The projection doesn't follow the map, so create
+        a new one after the map's camera or size changes.
 
         See `mln_map_projection_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1250,7 +1707,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         )
 
     def get_camera(self) -> CameraOptions:
-        """Copies the projection camera.
+        """Reads the projection's camera.
 
         See `mln_map_projection_get_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1258,7 +1715,9 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return CameraOptions._from_native(self._native.get_camera())
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Converts a screen point to a geographic coordinate.
+        """Finds the coordinate at a screen point.
+
+        The longitude stays between -180 and 180.
 
         See `mln_map_projection_lat_lng_for_pixel` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1266,7 +1725,11 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return LatLng._from_native(self._native.lat_lng_for_pixel(point))
 
     def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> LatLng:
-        """Converts a screen point to an unwrapped geographic coordinate.
+        """Finds the coordinate at a screen point, without wrapping its
+        longitude.
+
+        The longitude can fall outside -180 to 180, to show which copy of the
+        world the point is in.
 
         See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1274,7 +1737,8 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return LatLng._from_native(self._native.lat_lng_for_pixel_unwrapped(point))
 
     def lat_lngs_for_pixels(self, points: Sequence[ScreenPoint]) -> tuple[LatLng, ...]:
-        """Converts screen points to geographic coordinates.
+        """Finds the coordinates at several screen points, as
+        `MapProjectionHandle.lat_lng_for_pixel()` does.
 
         See `mln_map_projection_lat_lngs_for_pixels` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1287,7 +1751,8 @@ class _MapProjectionHandleOperations(GeneratedOperations):
     def lat_lngs_for_pixels_unwrapped(
         self, points: Sequence[ScreenPoint]
     ) -> tuple[LatLng, ...]:
-        """Converts screen points to unwrapped geographic coordinates.
+        """Finds the coordinates at several screen points, as
+        `MapProjectionHandle.lat_lng_for_pixel_unwrapped()` does.
 
         See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1298,8 +1763,10 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         )
 
     def meters_per_pixel_at_latitude(self, latitude: float) -> float:
-        """Reads the ground distance covered by one logical map pixel at a
-        latitude for the helper camera zoom.
+        """Computes how many meters one screen pixel covers at `latitude`, at
+        the projection's zoom.
+
+        The result ignores the camera's pitch.
 
         See `mln_map_projection_meters_per_pixel_at_latitude` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1307,7 +1774,9 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return self._native.meters_per_pixel_at_latitude(latitude)
 
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
-        """Converts a geographic coordinate to a screen point.
+        """Finds the screen point of a coordinate.
+
+        The point is in the copy of the world nearest the camera's center.
 
         See `mln_map_projection_pixel_for_lat_lng` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1317,7 +1786,8 @@ class _MapProjectionHandleOperations(GeneratedOperations):
     def pixels_for_lat_lngs(
         self, coordinates: Sequence[LatLng]
     ) -> tuple[ScreenPoint, ...]:
-        """Converts geographic coordinates to screen points.
+        """Finds the screen points of several coordinates, as
+        `MapProjectionHandle.pixel_for_lat_lng()` does.
 
         See `mln_map_projection_pixels_for_lat_lngs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1328,7 +1798,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         )
 
     def close(self) -> None:
-        """Releases a standalone projection.
+        """Releases a projection.
 
         See `mln_map_projection_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1336,7 +1806,9 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         return self._native.close()
 
     def set_camera(self, camera: CameraOptions | None = None) -> None:
-        """Applies a camera update to a standalone projection.
+        """Moves the projection's camera, without changing the map.
+
+        Camera fields that `camera` doesn't set keep their values.
 
         See `mln_map_projection_set_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1348,8 +1820,15 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     _native: _native._RenderSessionHandle
 
     def abandon(self) -> RenderAbandonResult:
-        """Irreversibly ends session work and destroys the session's graphics
-        objects where that is safe.
+        """Stops the session right away, without running its pending graphics
+        work.
+
+        Use it when the target's graphics objects are going away and a detach
+        can't finish first. Pending work completes with `Status.TARGET_LOST`,
+        and pending frame requests finish with
+        `RenderResult.TARGET_NOT_READY`. Once the call returns, the library
+        no longer uses your graphics objects, and you can attach another
+        session to the map. Dispose the session afterward.
 
         See `mln_render_session_abandon` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1357,11 +1836,21 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return RenderAbandonResult._from_native(self._native.abandon())
 
     def acquire_frame(self) -> AcquiredFrameHandle | None:
-        """Acquires the oldest rendered frame that is not already acquired. The
-        frame owns its slot until release. The call is nonblocking.
+        """Takes a rendered frame from the session's texture ring, if one is
+        ready.
+
+        It takes the oldest frame that you haven't acquired. The session can
+        render over a frame before you acquire it. While you hold a frame in
+        every texture of the ring, new frames wait until you release one.
 
         See `mln_render_session_acquire_frame` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the session lacks
+          `RenderSessionCapabilityFlag.FRAME_ACQUISITION`.
+        - `Status.INVALID_STATE` when the session has failed.
         """
         return _maybe(
             lambda raw: _adopt_value(raw, "AcquiredFrameHandle", self),
@@ -1369,37 +1858,64 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         )
 
     def barrier(self) -> Future[None]:
-        """Ends every frame demand that has not started with
-        `RenderResult.NO_UPDATE` and completes after earlier driver work has
-        finished. A running demand finishes its attempt and ends any wait for
-        a map update or a free slot. After completion, a new frame demand is
-        required to render again, except that a pending still image submits
-        its next demand itself; see `MapHandle.request_still_image()`.
+        """Ends the session's pending frame requests and waits for its earlier
+        work.
+
+        Frame requests that haven't started, including those that wait for a
+        map update, finish with `RenderResult.NO_UPDATE`.
 
         See `mln_render_session_barrier` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session loses its target before the
+          barrier runs.
         """
         return self._native.barrier()
 
     def clear_data(self) -> Future[None]:
-        """Starts asynchronous renderer-data clearing.
+        """Clears the data that the session's renderer holds, such as loaded
+        tiles, and draws the map again.
 
         See `mln_render_session_clear_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session loses its target before the
+          work runs.
         """
         return self._native.clear_data()
 
     def detach(self) -> Future[None]:
-        """Starts normal graphics-owner teardown and map detachment.
+        """Detaches the session from its map and frees its graphics objects.
+
+        Release every acquired frame first. Pending frame requests finish
+        with `RenderResult.TARGET_NOT_READY`. Once the detach completes, the
+        library no longer uses your graphics objects, and you can attach
+        another session to the map. Dispose the session afterward.
 
         See `mln_render_session_detach` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session loses its target before the
+          detach runs.
         """
         return self._native.detach()
 
     def close(self) -> Future[None]:
-        """Consumes a session in any state and retires it, then runs completion,
-        if given, once the host may destroy the target's graphics objects.
+        """Releases the session in any state.
+
+        An attached session driven by `RenderDriverKind.CORE_WORKER` detaches
+        first unless you hold one of its frames. Any other session is
+        abandoned as `RenderSessionHandle.abandon()` does. To free the
+        graphics objects of a session driven by
+        `RenderDriverKind.CALLER_GRAPHICS_THREAD`, detach it before you
+        dispose it. Once the disposal completes, the library no longer uses
+        your graphics objects.
 
         See `mln_render_session_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1407,7 +1923,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.close()
 
     def drain_frame_results(self) -> tuple[RenderFrameResult, ...]:
-        """Drains every currently queued terminal frame result.
+        """Takes the frame results that the session has queued.
 
         See `mln_render_session_drain_frame_results` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1418,15 +1934,20 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         )
 
     def dump_debug_logs(self) -> Future[None]:
-        """Starts asynchronous renderer diagnostic-log emission.
+        """Logs debugging information about the session's renderer.
 
         See `mln_render_session_dump_debug_logs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session loses its target before the
+          work runs.
         """
         return self._native.dump_debug_logs()
 
     def get_capabilities(self) -> RenderSessionCapabilities:
-        """Returns the immutable capabilities fixed during attachment.
+        """Reads what the session supports.
 
         See `mln_render_session_get_capabilities` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1434,15 +1955,24 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return RenderSessionCapabilities._from_native(self._native.get_capabilities())
 
     def get_failure(self) -> None:
-        """Reports the session's first terminal failure from any native thread.
+        """Reports the error that made the session fail.
+
+        The call fails with that error, and succeeds while the session hasn't
+        failed.
 
         See `mln_render_session_get_failure` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session failed because it lost its
+          target.
+        - `Status.NATIVE_ERROR` when the session failed for another reason.
         """
         return self._native.get_failure()
 
     def get_snapshot(self) -> RenderSessionSnapshot:
-        """Copies the latest render-session snapshot from any native thread.
+        """Reads the session's current state.
 
         See `mln_render_session_get_snapshot` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1457,7 +1987,16 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         extension_field: str,
         arguments: Any,
     ) -> Future[Any]:
-        """Starts a feature-extension query against the latest driver state.
+        """Reads a value that a source computes for one of its features.
+
+        A clustered GeoJSON source answers the `supercluster` extension for a
+        cluster feature. Its `extension_field` is `children` for the
+        cluster's child features, `leaves` for the points in the cluster, or
+        `expansion-zoom` for the zoom level where the cluster splits. For
+        `leaves`, `arguments` can set `limit` and `offset`. Without `limit`,
+        the result has up to 10 points and ignores `offset`. The result is
+        JSON: a GeoJSON feature collection, a number, or null when the source
+        has no answer.
 
         See `mln_render_session_query_feature_extensions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -1471,9 +2010,10 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         geometry: RenderedQueryGeometry,
         options: RenderedFeatureQueryOptions | None = None,
     ) -> Future[tuple[RenderedFeature, ...]]:
-        """Starts a rendered-feature query against the last frame that the
-        session rendered, so render after a camera or style change for a
-        result that matches it.
+        """Finds the features that the session drew in an area of the screen.
+
+        The query reads the last frame that the session rendered. A feature
+        that several layers draw appears once for each layer.
 
         See `mln_render_session_query_rendered_features` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -1486,8 +2026,10 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def query_source_features(
         self, source_id: str, options: SourceFeatureQueryOptions | None = None
     ) -> Future[tuple[SourceFeature, ...]]:
-        """Starts a source-feature query against the tiles that the source
-        loaded for rendering, which it loads only while a visible layer uses
+        """Finds the features of the source named `source_id`.
+
+        The query covers only the tiles that the source has loaded for the
+        current view. A source loads tiles only while a visible layer uses
         it.
 
         See `mln_render_session_query_source_features` in the
@@ -1499,11 +2041,17 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         )
 
     def read_texture(self) -> Future[TextureReadbackResult]:
-        """Reads back the latest frame of the session's owned texture as
-        premultiplied RGBA8.
+        """Reads the pixels of the last frame that the session rendered.
 
         See `mln_render_session_read_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the session's capabilities lack
+          `RenderSessionCapabilityFlag.READBACK`.
+        - `Status.INVALID_STATE` when the session hasn't rendered a frame
+          since it attached, resized, or changed its target.
         """
         return map_future(
             self._native.read_texture(),
@@ -1511,51 +2059,86 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         )
 
     def reduce_memory_use(self) -> Future[None]:
-        """Starts best-effort release of renderer caches.
+        """Frees memory that the session's renderer can rebuild, such as caches.
 
         See `mln_render_session_reduce_memory_use` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session loses its target before the
+          work runs.
         """
         return self._native.reduce_memory_use()
 
     def release_target(self) -> Future[None]:
-        """Starts releasing the session's surface or borrowed texture ring while
-        keeping its renderer.
+        """Lets go of the session's surface or textures, and keeps the rest of
+        the session.
+
+        Use it when the platform takes a surface away, such as when your app
+        goes to the background. Release every acquired frame first. Until you
+        give the session a new target, frame requests finish with
+        `RenderResult.TARGET_NOT_READY`. Once the release completes, you can
+        destroy the old target.
 
         See `mln_render_session_release_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the session renders into a ring that it
+          created.
+        - `Status.UNSUPPORTED` when the target is a WebGL canvas.
+        - `Status.TARGET_LOST` when the session loses its target before the
+          release runs.
         """
         return self._native.release_target()
 
     def request_frame(self, demand: FrameDemand) -> None:
-        """Requests a frame without waiting. Every accepted demand produces one
-        terminal result record. Caller-driver sessions require service on the
-        graphics thread. Core-worker sessions need no host service.
+        """Asks the session to render a frame.
+
+        Call it once the attach completes. Every request finishes with one
+        frame result that carries its token, and
+        `RenderSessionHandle.drain_frame_results()` takes it. A request
+        without `FrameDemandFlag.FORCE` replaces each pending request with
+        the same flags.
 
         See `mln_render_session_request_frame` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the session has failed.
         """
         return self._native.request_frame(demand)
 
     def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
-        """Starts an ordered logical resize of the driver and the map. The
-        driver applies the extent in order with its other work, and later
-        driver work does not wait for the map. The completion runs after both
-        have applied it and the map has published its snapshot. Frames render
-        once a map update matches the applied extent; static and tile maps
-        publish that update for their next still image.
+        """Resizes the session's target and its map.
+
+        `extent` must keep the session's scale factor. To change the scale
+        factor, give the session a new target or attach a new session.
+        Release every acquired frame first.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the session renders into a borrowed ring.
+          Give it new textures of the new size instead.
+        - `Status.TARGET_LOST` when the session loses its target before the
+          resize applies.
         """
         return self._native.resize(extent)
 
     def service_driver_work(self) -> None:
-        """Services every queued item for a caller-graphics-thread driver. The
-        first successful service call fixes the session's graphics-thread
-        identity; later calls from another native thread return
-        `Status.WRONG_THREAD`. The target context must be current.
-        Core-worker sessions return `Status.INVALID_STATE`.
+        """Runs the session's ready graphics work on your graphics thread.
+
+        Use it with `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and call it
+        from the same thread every time. Call it each time
+        `RenderSessionAttachOptions.driver_work_wake` is called, even while
+        you request no frames, and until a detach completes. It returns once
+        no work is ready.
 
         See `mln_render_session_service_driver_work` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1565,18 +2148,33 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_metal_borrowed_texture_target(
         self, descriptor: MetalBorrowedTextureDescriptor
     ) -> Future[None]:
-        """Starts an ordered replacement of every texture of a caller-owned
-        Metal ring.
+        """Replaces the Metal textures that a borrowed ring renders into.
+
+        Use it to resize the ring, or to give the session textures again
+        after `RenderSessionHandle.release_target()`. Release every acquired
+        frame first. The new ring must have as many textures as the old one,
+        and the same device and command queue. Once the replacement
+        completes, the session no longer uses the old textures.
 
         See `mln_render_session_set_metal_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the new textures have a different pixel
+          format than the old ones. Attach a new session to change it.
         """
         return self._native.set_metal_borrowed_texture_target(descriptor)
 
     def set_metal_surface_target(
         self, descriptor: MetalSurfaceDescriptor
     ) -> Future[None]:
-        """Starts an ordered Metal surface replacement.
+        """Replaces the Metal layer that the session renders to.
+
+        Use it to give the session a layer again after
+        `RenderSessionHandle.release_target()`, or to move it to another
+        layer. The new layer must use the same device. Once the replacement
+        completes, the session no longer uses the old layer.
 
         See `mln_render_session_set_metal_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -1586,8 +2184,13 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_open_gl_borrowed_texture_target(
         self, descriptor: OpenGlBorrowedTextureDescriptor
     ) -> Future[None]:
-        """Starts an ordered replacement of every texture of a caller-owned
-        OpenGL ring.
+        """Replaces the OpenGL textures that a borrowed ring renders into.
+
+        Use it to resize the ring, or to give the session textures again
+        after `RenderSessionHandle.release_target()`. Release every acquired
+        frame first. The new ring must have as many textures as the old one,
+        and the same context. Once the replacement completes, the session no
+        longer uses the old textures.
 
         See `mln_render_session_set_open_gl_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1597,7 +2200,12 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_open_gl_surface_target(
         self, descriptor: OpenGlSurfaceDescriptor
     ) -> Future[None]:
-        """Starts an ordered OpenGL surface replacement.
+        """Replaces the OpenGL surface that the session presents to.
+
+        Use it to give the session a surface again after
+        `RenderSessionHandle.release_target()`, or to move it to another
+        surface. The new surface must use the same context. Once the
+        replacement completes, the session no longer uses the old surface.
 
         See `mln_render_session_set_open_gl_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -1607,21 +2215,43 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_vulkan_borrowed_texture_target(
         self, descriptor: VulkanBorrowedTextureDescriptor
     ) -> Future[None]:
-        """Starts an ordered replacement of every image of a caller-owned Vulkan
-        ring.
+        """Replaces the Vulkan images that a borrowed ring renders into.
+
+        Use it to resize the ring, or to give the session images again after
+        `RenderSessionHandle.release_target()`. Release every acquired frame
+        first. The new ring must have as many images as the old one, and the
+        same context. Once the replacement completes, the session no longer
+        uses the old images.
 
         See `mln_render_session_set_vulkan_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the new ring has a different `format`,
+          `final_layout`, or `owner` than the old one. Attach a new session
+          to change them.
         """
         return self._native.set_vulkan_borrowed_texture_target(descriptor)
 
     def set_vulkan_surface_target(
         self, descriptor: VulkanSurfaceDescriptor
     ) -> Future[None]:
-        """Starts an ordered Vulkan surface replacement.
+        """Replaces the Vulkan surface that the session presents to.
+
+        Use it to give the session a surface again after
+        `RenderSessionHandle.release_target()`, or to move it to another
+        surface. The new surface must use the same context. Once the
+        replacement completes, the session no longer uses the old surface.
 
         See `mln_render_session_set_vulkan_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the new surface needs a different color
+          format or pre-rotation support than the old one. Attach a new
+          session instead.
         """
         return self._native.set_vulkan_surface_target(descriptor)
 
@@ -1634,16 +2264,19 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     _native: _native._ResourceRequestHandle
 
     def complete(self, response: ResourceResponse) -> None:
-        """Completes a C API resource provider request and consumes its handle.
+        """Answers a resource request.
 
         See `mln_resource_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the library cancelled the request.
         """
         return self._native.complete(response)
 
     def is_cancelled(self) -> bool:
-        """Reports whether MapLibre has cancelled a C API resource provider
-        request.
+        """Reads whether the library cancelled a resource request.
 
         See `mln_resource_request_is_cancelled` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1651,16 +2284,19 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         return self._native.is_cancelled()
 
     def pass_through(self) -> None:
-        """Hands an outstanding provider request to the built-in network loader
-        and consumes its handle.
+        """Hands a resource request back to the library to load as usual.
 
         See `mln_resource_request_pass_through` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the library cancelled the request.
         """
         return self._native.pass_through()
 
     def close(self) -> None:
-        """Releases the provider's resource request handle without answering it.
+        """Releases a resource request.
 
         See `mln_resource_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1668,9 +2304,11 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         return self._native.close()
 
     def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:
-        """Registers a callback that runs when MapLibre cancels a C API resource
-        provider request. The callback runs on the binding's dispatcher
-        thread, after native queues the call.
+        """Calls a callback when the library cancels a resource request.
+
+        The callback never runs after the request is answered. A request
+        takes one cancel callback. When the library has already cancelled the
+        request, the call reports that instead and the callback never runs.
 
         See `mln_resource_request_set_cancel_callback` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1682,8 +2320,9 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
     _native: _native._ResourceTransformRequestHandle
 
     def complete(self, url: str) -> None:
-        """Answers a resource transform request with a replacement URL and
-        consumes its handle.
+        """Answers a resource transform request with the URL to load instead.
+
+        `url` must not be empty.
 
         See `mln_resource_transform_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1691,7 +2330,7 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
         return self._native.complete(url)
 
     def close(self) -> None:
-        """Releases a resource transform request without answering it.
+        """Releases a resource transform request.
 
         See `mln_resource_transform_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1703,7 +2342,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
     _native: _native._RuntimeHandle
 
     def clear_event_handler(self) -> Future[CommandCompletion]:
-        """Stops event delivery and retires the previous handler.
+        """Stops sending the events of the runtime and its maps to a callback.
 
         See `mln_runtime_clear_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1711,7 +2350,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.clear_event_handler()
 
     def clear_http_header_transform(self) -> Future[CommandCompletion]:
-        """Clears the runtime-scoped outgoing HTTP header transform.
+        """Stops adding headers to the runtime's HTTP requests.
 
         See `mln_runtime_clear_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1719,7 +2358,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.clear_http_header_transform()
 
     def clear_resource_provider(self) -> Future[CommandCompletion]:
-        """Clears the runtime-scoped network resource provider.
+        """Removes the runtime's resource provider, so the library loads every
+        request itself.
 
         See `mln_runtime_clear_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1727,7 +2367,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.clear_resource_provider()
 
     def clear_resource_transform(self) -> Future[CommandCompletion]:
-        """Clears the runtime-scoped URL transform for network resources.
+        """Stops rewriting the URLs of the runtime's network requests.
 
         See `mln_runtime_clear_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1738,6 +2378,10 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def create(cls, options: RuntimeOptions | None = None) -> RuntimeHandle:
         """Creates a runtime.
 
+        A runtime holds maps and the resource loading, cache, and offline
+        regions that they share. In a browser, create runtimes on a Web
+        Worker, not on the main thread.
+
         See `mln_runtime_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
@@ -1746,7 +2390,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def create_map(self, options: MapOptions) -> RuntimeCreateMapResult:
-        """Starts creation of a map on the runtime.
+        """Creates a map on `runtime`.
 
         See `mln_runtime_create_map` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1759,7 +2403,12 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: Buffer
     ) -> Future[OfflineRegionInfo]:
-        """Starts creating an offline region.
+        """Creates an offline region in the runtime's cache file.
+
+        `metadata` holds any bytes to store with the region, such as its
+        name. The region doesn't download until
+        `RuntimeHandle.set_offline_region_download_state()` makes its
+        download active.
 
         See `mln_runtime_create_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1770,15 +2419,19 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def delete_offline_region(self, region_id: int) -> Future[None]:
-        """Deletes an offline region.
+        """Deletes the offline region `region_id` from the runtime's cache file.
 
         See `mln_runtime_delete_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
         return self._native.delete_offline_region(region_id)
 
     def get_event_mask(self) -> RuntimeEventFlag:
-        """Reports which runtime-scoped event types this runtime queues.
+        """Reads the runtime's event mask.
 
         See `mln_runtime_get_event_mask` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1786,7 +2439,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return RuntimeEventFlag(self._native.get_event_mask())
 
     def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
-        """Starts getting one offline region by ID.
+        """Reads the offline region `region_id`.
+
+        The result is null when the cache file has no region with that ID.
 
         See `mln_runtime_get_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1797,10 +2452,14 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def get_offline_region_status(self, region_id: int) -> Future[OfflineRegionStatus]:
-        """Starts getting the current download status for an offline region.
+        """Reads the download progress of the offline region `region_id`.
 
         See `mln_runtime_get_offline_region_status` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
         return map_future(
             self._native.get_offline_region_status(region_id),
@@ -1808,15 +2467,22 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def invalidate_offline_region(self, region_id: int) -> Future[None]:
-        """Invalidates cached resources for an offline region.
+        """Makes maps check each resource of the offline region `region_id` with
+        the server before they use it.
+
+        The region keeps its resources.
 
         See `mln_runtime_invalidate_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
         return self._native.invalidate_offline_region(region_id)
 
     def list_offline_regions(self) -> Future[tuple[OfflineRegionInfo, ...]]:
-        """Starts listing the offline regions in the runtime database.
+        """Lists the offline regions in the runtime's cache file.
 
         See `mln_runtime_list_offline_regions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1829,11 +2495,20 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def merge_offline_regions(
         self, side_database_path: str
     ) -> Future[tuple[OfflineRegionInfo, ...]]:
-        """Starts merging offline regions from another MapLibre offline
-        database.
+        """Copies the offline regions of another cache file into the runtime's
+        cache file.
+
+        A region whose definition and metadata match one that the runtime's
+        file already has isn't copied again. The result lists the runtime's
+        copy of each region in the other file.
 
         See `mln_runtime_merge_offline_regions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `side_database_path` isn't a
+          readable database file.
         """
         return map_future(
             self._native.merge_offline_regions(side_database_path),
@@ -1841,7 +2516,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def close(self) -> Future[None]:
-        """Starts release of a runtime after checking its children.
+        """Releases a runtime.
+
+        Release the runtime's maps first.
 
         See `mln_runtime_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1851,8 +2528,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
     ) -> Future[None]:
-        """Starts a MapLibre ambient cache maintenance operation for this
-        runtime.
+        """Runs an action on the runtime's ambient cache.
 
         See `mln_runtime_run_ambient_cache_operation` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1862,8 +2538,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_event_handler(
         self, handler: RuntimeEventHandler
     ) -> Future[CommandCompletion]:
-        """Selects how runtime and map events reach the host. The callback runs
-        on the binding's dispatcher thread, after native queues the call.
+        """Sends the events of the runtime and its maps to a callback.
+
+        The callback replaces the one set before.
 
         See `mln_runtime_set_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1871,7 +2548,10 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.set_event_handler(handler)
 
     def set_event_mask(self, mask: RuntimeEventFlag) -> None:
-        """Selects which runtime-scoped event types this runtime queues.
+        """Selects the runtime's own events that reach the event callback.
+
+        Each map selects its events with `MapHandle.set_event_mask()`
+        instead. A runtime starts with every event selected.
 
         See `mln_runtime_set_event_mask` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1881,17 +2561,30 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_http_header_transform(
         self, transform: HttpHeaderTransform
     ) -> Future[CommandCompletion]:
-        """Registers or replaces the runtime-scoped outgoing HTTP header
-        transform. The callback runs on the binding's dispatcher thread,
-        after native queues the call.
+        """Adds headers to the runtime's HTTP requests.
+
+        The transform replaces the one set before. In a browser or on
+        OpenHarmony, serve the requests with
+        `RuntimeHandle.set_resource_provider()` instead.
+
+        The callback runs on the binding's dispatcher thread, after native
+        queues the call.
 
         See `mln_runtime_set_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the library runs in a browser or on
+          OpenHarmony.
         """
         return self._native.set_http_header_transform(transform)
 
     def set_maximum_ambient_cache_size(self, size: int) -> Future[None]:
-        """Starts a change to this runtime's maximum ambient cache size.
+        """Limits the size of the runtime's ambient cache.
+
+        `size` is in bytes. Offline regions count toward it, but the library
+        evicts only ambient cache resources to stay within it.
 
         See `mln_runtime_set_maximum_ambient_cache_size` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1901,29 +2594,43 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_offline_region_download_state(
         self, region_id: int, state: OfflineRegionDownloadState
     ) -> Future[None]:
-        """Sets an offline region's native download state.
+        """Starts or pauses the download of the offline region `region_id`.
+
+        A download stops when the runtime closes.
 
         See `mln_runtime_set_offline_region_download_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
         return self._native.set_offline_region_download_state(region_id, state)
 
     def set_offline_region_observed(
         self, region_id: int, observed: bool
     ) -> Future[None]:
-        """Enables or disables runtime events for an offline region.
+        """Sets whether the runtime reports the download progress of the offline
+        region `region_id` as events.
 
         See `mln_runtime_set_offline_region_observed` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
         return self._native.set_offline_region_observed(region_id, observed)
 
     def set_resource_provider(
         self, provider: ResourceProvider
     ) -> Future[CommandCompletion]:
-        """Registers or replaces a runtime-scoped network resource provider. The
-        callback runs on the binding's dispatcher thread, after native queues
-        the call.
+        """Serves the runtime's network requests through a callback.
+
+        The provider receives the network requests that its routes match, and
+        the library loads the rest as usual. A provider can serve URL schemes
+        that the library can't load itself. The provider replaces the one set
+        before.
 
         See `mln_runtime_set_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1933,9 +2640,10 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_resource_transform(
         self, transform: ResourceTransform
     ) -> Future[CommandCompletion]:
-        """Registers or updates a runtime-scoped URL transform for network
-        resources. The callback runs on the binding's dispatcher thread,
-        after native queues the call.
+        """Rewrites the URLs of the runtime's network requests through a
+        callback.
+
+        The transform replaces the one set before.
 
         See `mln_runtime_set_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1945,10 +2653,14 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def update_offline_region_metadata(
         self, region_id: int, metadata: Buffer
     ) -> Future[OfflineRegionInfo]:
-        """Starts updating opaque binary metadata for an offline region.
+        """Replaces the metadata of the offline region `region_id`.
 
         See `mln_runtime_update_offline_region_metadata` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
         return map_future(
             self._native.update_offline_region_metadata(region_id, metadata),
@@ -1967,10 +2679,17 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
     def create(
         cls, expression: Any, options: StyleExpressionOptions | None = None
     ) -> StyleExpressionHandle:
-        """Parses a style expression.
+        """Parses a style
+        \\[expression\\](https://maplibre.org/maplibre-style-spec/expressions/)
+        to evaluate without a map.
 
         See `mln_style_expression_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `expression` isn't a valid
+          expression, or its result can't have the expected type.
         """
         return _adopt_value(
             _native._StyleExpressionHandle.create(expression, options),
@@ -1979,15 +2698,22 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
         )
 
     def evaluate(self, inputs: StyleExpressionInputs | None = None) -> Any:
-        """Evaluates a parsed expression and writes its result as UTF-8 JSON.
+        """Evaluates a style expression and writes its result as JSON.
+
+        A number in the result that isn't finite becomes null.
 
         See `mln_style_expression_evaluate` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the expression fails to evaluate,
+          such as when it reads an input that `inputs` doesn't set.
         """
         return self._native.evaluate(inputs)
 
     def get_info(self) -> StyleExpressionInfo:
-        """Copies what a parsed expression depends on.
+        """Reads what a style expression's result depends on.
 
         See `mln_style_expression_get_info` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -1995,7 +2721,7 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
         return StyleExpressionInfo._from_native(self._native.get_info())
 
     def close(self) -> None:
-        """Releases a style expression.
+        """Releases a parsed style expression.
 
         See `mln_style_expression_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
@@ -2004,7 +2730,12 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
 
 
 def init_android(jni_env: int, context: int) -> None:
-    """Initializes Android platform services.
+    """Gives the library the Java VM and the app context that it needs on
+    Android.
+
+    Call it before creating a runtime. `jni_env` is the calling thread's
+    `JNIEnv*`, and `context` is an Android `Context`, such as the
+    application.
 
     See `mln_android_init` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -2013,8 +2744,9 @@ def init_android(jni_env: int, context: int) -> None:
 
 
 def c_version() -> int:
-    """Reports the C ABI contract version. The value is 0 while the ABI is
-    unstable, and will increment on each SemVer major release.
+    """Returns the API epoch of the library.
+
+    Headers and a library with different epochs aren't compatible.
 
     See `mln_c_version` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -2023,8 +2755,7 @@ def c_version() -> int:
 
 
 def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
-    """Converts spherical Mercator projected meters to a geographic
-    coordinate.
+    """Converts meters in the Web Mercator projection to a coordinate.
 
     See `mln_lat_lng_for_projected_meters` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -2033,7 +2764,8 @@ def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
 
 
 def clear_log_callback() -> None:
-    """Clears the process-global log callback.
+    """Sends log messages to the platform's log again, instead of a
+    callback.
 
     See `mln_log_clear_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2042,8 +2774,10 @@ def clear_log_callback() -> None:
 
 
 def set_log_async_severity_mask(mask: LogSeverityFlag) -> None:
-    """Controls which log severities MapLibre Native may dispatch
-    asynchronously.
+    """Selects the severities that the library logs on a background thread.
+
+    The library logs other severities on the thread that logged them.
+    `mask` applies to every runtime in the process.
 
     See `mln_log_set_async_severity_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2052,9 +2786,12 @@ def set_log_async_severity_mask(mask: LogSeverityFlag) -> None:
 
 
 def set_log_callback(handler: LogHandler) -> None:
-    """Installs a process-global MapLibre Native log callback. The callback
-    runs on the binding's dispatcher thread, after native queues the
-    call.
+    """Sends the log messages of every runtime in the process to a callback.
+
+    The callback replaces the one set before.
+
+    The callback runs on the binding's dispatcher thread, after native
+    queues the call.
 
     See `mln_log_set_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -2065,7 +2802,8 @@ def set_log_callback(handler: LogHandler) -> None:
 def logical_extent_physical_size(
     extent: LogicalExtent,
 ) -> LogicalExtentPhysicalSizeResult:
-    """Computes the physical device-pixel size of a logical extent.
+    """Computes the size in pixels of a target with a logical size and scale
+    factor.
 
     See `mln_logical_extent_physical_size` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2075,7 +2813,7 @@ def logical_extent_physical_size(
 
 
 def get_network_status() -> NetworkStatus:
-    """Reads MapLibre Native's process-global network status.
+    """Reads whether the library may use the network.
 
     See `mln_network_get_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2084,7 +2822,12 @@ def get_network_status() -> NetworkStatus:
 
 
 def set_network_status(status: NetworkStatus) -> None:
-    """Sets MapLibre Native's process-global network status.
+    """Tells the library whether it may use the network.
+
+    While the status is `NetworkStatus.OFFLINE`, the library starts no
+    network requests. The requests that wait start when the status
+    returns to `NetworkStatus.ONLINE`. The status starts as online and
+    applies to every runtime in the process.
 
     See `mln_network_set_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2093,7 +2836,8 @@ def set_network_status(status: NetworkStatus) -> None:
 
 
 def open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
-    """Returns OpenGL context providers supported by this build.
+    """Reports the OpenGL context platforms that this build of the library
+    has.
 
     See `mln_open_gl_supported_context_provider_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2102,7 +2846,12 @@ def open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag:
 
 
 def get_plugin_register_function_v1() -> int:
-    """Returns the process-wide plugin registration entry point; never null.
+    """Returns the function that registers a plugin's style layer types.
+
+    Pass the function to the plugin's registration entry point before
+    loading a style that uses the plugin's layer types. Plugin callbacks
+    run on library threads and can keep running while the process exits,
+    so they must not use state that the process destroys at exit.
 
     See `mln_plugin_get_register_function_v1` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
@@ -2111,8 +2860,7 @@ def get_plugin_register_function_v1() -> int:
 
 
 def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
-    """Converts a geographic coordinate to spherical Mercator projected
-    meters.
+    """Converts a coordinate to meters in the Web Mercator projection.
 
     See `mln_projected_meters_for_lat_lng` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -2123,7 +2871,8 @@ def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
 
 
 def supported_render_backend_mask() -> RenderBackendFlag:
-    """Reports the render backends available in this native library build.
+    """Returns the render backends that this build of the library draws
+    with.
 
     See `mln_supported_render_backend_mask` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -2141,8 +2890,7 @@ class MapHandleDiscarding:
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
     ) -> None:
-        """Adds a custom geometry source. The callback runs on the binding's
-        dispatcher thread, after native queues the call.
+        """Adds a source whose GeoJSON tiles come from callbacks.
 
         See `mln_map_add_custom_geometry_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2152,8 +2900,7 @@ class MapHandleDiscarding:
     def add_custom_vector_source(
         self, source_id: str, options: CustomVectorSourceOptions
     ) -> None:
-        """Adds a custom vector source. The callback runs on the binding's
-        dispatcher thread, after native queues the call.
+        """Adds a source whose vector tiles come from callbacks.
 
         See `mln_map_add_custom_vector_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2163,7 +2910,10 @@ class MapHandleDiscarding:
     def add_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
-        """Adds a GeoJSON source with prepared inline data.
+        """Adds a GeoJSON source with prepared data.
+
+        The source uses the options that `data` was prepared with. `data` can
+        be released once this function returns.
 
         See `mln_map_add_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2173,7 +2923,7 @@ class MapHandleDiscarding:
     def add_geo_json_source_url(
         self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
     ) -> None:
-        """Adds a GeoJSON source with URL data.
+        """Adds a GeoJSON source that loads its data from `url`.
 
         See `mln_map_add_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2186,7 +2936,10 @@ class MapHandleDiscarding:
         coordinates: Sequence[LatLng],
         image: PremultipliedRgba8Image,
     ) -> None:
-        """Adds an image source with inline image pixels.
+        """Adds an image source that shows `image`.
+
+        `coordinates` are the image's four corners, clockwise from the top
+        left.
 
         See `mln_map_add_image_source_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2198,7 +2951,10 @@ class MapHandleDiscarding:
     def add_image_source_url(
         self, source_id: str, coordinates: Sequence[LatLng], url: str
     ) -> None:
-        """Adds an image source that loads its image from a URL.
+        """Adds an image source that loads its image from `url`.
+
+        `coordinates` are the image's four corners, clockwise from the top
+        left.
 
         See `mln_map_add_image_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2206,7 +2962,12 @@ class MapHandleDiscarding:
         return self._native._discard_add_image_source_url(source_id, coordinates, url)
 
     def add_style_layer_json(self, layer_json: Any, before_layer_id: str) -> None:
-        """Adds one style layer from a full style-spec layer JSON object.
+        """Adds a layer to the map's style.
+
+        `layer_json` is a
+        \\[layer\\](https://maplibre.org/maplibre-style-spec/layers/) object.
+        The layer goes below the layer named `before_layer_id`, or above
+        every layer when `before_layer_id` is empty.
 
         See `mln_map_add_style_layer_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2214,7 +2975,10 @@ class MapHandleDiscarding:
         return self._native._discard_add_style_layer_json(layer_json, before_layer_id)
 
     def add_style_source_json(self, source_id: str, source_json: Any) -> None:
-        """Adds one style source from a style-spec source JSON object.
+        """Adds a source to the map's style.
+
+        `source_json` is a
+        \\[source\\](https://maplibre.org/maplibre-style-spec/sources/) object.
 
         See `mln_map_add_style_source_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2222,7 +2986,14 @@ class MapHandleDiscarding:
         return self._native._discard_add_style_source_json(source_id, source_json)
 
     def apply_camera_delta(self, delta: CameraDelta) -> None:
-        """Submits one atomic relative camera update.
+        """Moves the camera relative to where it is, as a gesture does.
+
+        `delta` can pan the map's content by an offset on the screen, scale
+        the zoom, and add to the bearing and pitch. An anchor keeps one
+        screen point in place while the scale, bearing, or pitch changes. An
+        anchor needs one of those changes, and combines with an offset only
+        when the delta has no animation. The function finishes when the map
+        applies the delta, before an animation ends.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2230,8 +3001,10 @@ class MapHandleDiscarding:
         return self._native._discard_apply_camera_delta(delta)
 
     def begin_command_group(self) -> None:
-        """Begins a command group, which holds this map's render updates until
-        the group ends.
+        """Holds back the map's changes from rendering until
+        `MapHandle.end_command_group()`, so they show in the same frame.
+
+        Groups nest, and the changes render when the outermost group ends.
 
         See `mln_map_begin_command_group` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2239,8 +3012,11 @@ class MapHandleDiscarding:
         return self._native._discard_begin_command_group()
 
     def cancel_camera_transition(self, transition_id: int) -> None:
-        """Cancels the camera transitions of the commands whose animation
-        carried transition_id, and leaves every other transition running.
+        """Stops the running camera animations whose animation options set
+        `transition_id`.
+
+        Other animations keep running. The end handler of each stopped
+        animation reports `CameraTransitionOutcome.CANCELLED`.
 
         See `mln_map_cancel_camera_transition` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2248,7 +3024,10 @@ class MapHandleDiscarding:
         return self._native._discard_cancel_camera_transition(transition_id)
 
     def cancel_transitions(self) -> None:
-        """Cancels the camera transitions running when this command commits.
+        """Stops every running camera animation where it is.
+
+        The end handler of each stopped animation reports
+        `CameraTransitionOutcome.CANCELLED`.
 
         See `mln_map_cancel_transitions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2256,7 +3035,7 @@ class MapHandleDiscarding:
         return self._native._discard_cancel_transitions()
 
     def dump_debug_logs(self) -> None:
-        """Submits an ordered debug-log command.
+        """Logs debugging information about the map's style and sources.
 
         See `mln_map_dump_debug_logs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2264,8 +3043,7 @@ class MapHandleDiscarding:
         return self._native._discard_dump_debug_logs()
 
     def end_command_group(self) -> None:
-        """Ends the innermost command group that
-        `MapHandle.begin_command_group()` began.
+        """Ends the group that `MapHandle.begin_command_group()` began.
 
         See `mln_map_end_command_group` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2275,7 +3053,8 @@ class MapHandleDiscarding:
     def invalidate_custom_geometry_source_region(
         self, source_id: str, bounds: LatLngBounds
     ) -> None:
-        """Invalidates custom geometry source data inside one geographic region.
+        """Makes a custom geometry source ask again for the tiles in `bounds`
+        that the map still needs.
 
         See `mln_map_invalidate_custom_geometry_source_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2287,7 +3066,8 @@ class MapHandleDiscarding:
     def invalidate_custom_geometry_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> None:
-        """Invalidates custom geometry source data for one canonical tile.
+        """Makes a custom geometry source ask for a tile again when the map
+        needs it.
 
         See `mln_map_invalidate_custom_geometry_source_tile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2299,7 +3079,8 @@ class MapHandleDiscarding:
     def invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> None:
-        """Invalidates custom vector source data for one canonical tile.
+        """Makes a custom vector source ask for a tile again when the map needs
+        it.
 
         See `mln_map_invalidate_custom_vector_source_tile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2309,7 +3090,9 @@ class MapHandleDiscarding:
         )
 
     def move_style_layer(self, layer_id: str, before_layer_id: str) -> None:
-        """Moves one style layer before another layer or to the top.
+        """Moves a layer of the map's style below the layer named
+        `before_layer_id`, or above every layer when `before_layer_id` is
+        empty.
 
         See `mln_map_move_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2317,7 +3100,7 @@ class MapHandleDiscarding:
         return self._native._discard_move_style_layer(layer_id, before_layer_id)
 
     def remove_feature_state(self, selector: FeatureStateSelector) -> None:
-        """Removes per-feature state from this map.
+        """Removes the feature state that `selector` selects.
 
         See `mln_map_remove_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2325,7 +3108,7 @@ class MapHandleDiscarding:
         return self._native._discard_remove_feature_state(selector)
 
     def remove_style_image(self, image_id: str) -> None:
-        """Removes one runtime style image by ID.
+        """Removes an image from the map's style.
 
         See `mln_map_remove_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2333,7 +3116,7 @@ class MapHandleDiscarding:
         return self._native._discard_remove_style_image(image_id)
 
     def remove_style_layer(self, layer_id: str) -> None:
-        """Removes one style layer by ID.
+        """Removes a layer from the map's style.
 
         See `mln_map_remove_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2341,7 +3124,7 @@ class MapHandleDiscarding:
         return self._native._discard_remove_style_layer(layer_id)
 
     def remove_style_source(self, source_id: str) -> None:
-        """Removes one style source by ID.
+        """Removes a source from the map's style.
 
         See `mln_map_remove_style_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2349,7 +3132,7 @@ class MapHandleDiscarding:
         return self._native._discard_remove_style_source(source_id)
 
     def request_repaint(self) -> None:
-        """Requests a repaint for a continuous map.
+        """Renders a new frame of a continuous map, even when nothing changed.
 
         See `mln_map_request_repaint` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2357,7 +3140,11 @@ class MapHandleDiscarding:
         return self._native._discard_request_repaint()
 
     def resize(self, extent: LogicalExtent) -> None:
-        """Submits the sole post-creation logical extent update.
+        """Sets the map's size.
+
+        `extent` must keep the scale factor that the map was created with. A
+        map with a render session takes its size from the session, so resize
+        the session with `RenderSessionHandle.resize()` instead.
 
         See `mln_map_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2365,7 +3152,11 @@ class MapHandleDiscarding:
         return self._native._discard_resize(extent)
 
     def set_bounds(self, options: BoundOptions | None = None) -> None:
-        """Submits a copied camera-constraint command.
+        """Limits the camera's center to an area, and its zoom and pitch to
+        ranges.
+
+        Limits that `options` doesn't set keep their current values. When the
+        camera is outside the new limits, it moves inside them.
 
         See `mln_map_set_bounds` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2375,7 +3166,10 @@ class MapHandleDiscarding:
     def set_custom_geometry_source_tile_data(
         self, source_id: str, tile_id: CanonicalTileId, data: Any
     ) -> None:
-        """Sets custom geometry source data for one canonical tile.
+        """Sets the data of a tile in a custom geometry source.
+
+        `data` is a GeoJSON feature collection. The source ignores data for a
+        tile that it hasn't asked for, or has since cancelled.
 
         See `mln_map_set_custom_geometry_source_tile_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2387,7 +3181,7 @@ class MapHandleDiscarding:
     def set_custom_geometry_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> None:
-        """Reports a custom geometry source error for one canonical tile.
+        """Reports that a tile of a custom geometry source failed to load.
 
         See `mln_map_set_custom_geometry_source_tile_error` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2403,7 +3197,10 @@ class MapHandleDiscarding:
         encoding: StyleVectorTileEncoding,
         data: Buffer,
     ) -> None:
-        """Sets custom vector source data for one canonical tile.
+        """Sets the data of a tile in a custom vector source.
+
+        `data` is the tile, encoded as `encoding`. The source ignores data
+        for a tile that it hasn't asked for, or has since cancelled.
 
         See `mln_map_set_custom_vector_source_tile_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2415,7 +3212,7 @@ class MapHandleDiscarding:
     def set_custom_vector_source_tile_error(
         self, source_id: str, tile_id: CanonicalTileId, message: str
     ) -> None:
-        """Reports a custom vector source error for one canonical tile.
+        """Reports that a tile of a custom vector source failed to load.
 
         See `mln_map_set_custom_vector_source_tile_error` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2425,7 +3222,9 @@ class MapHandleDiscarding:
         )
 
     def set_debug_options(self, options: MapDebugFlag) -> None:
-        """Submits a debug-overlay command.
+        """Draws debugging overlays, such as tile borders, on the map.
+
+        `options` replaces the overlays set before.
 
         See `mln_map_set_debug_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2433,7 +3232,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_debug_options(options)
 
     def set_event_mask(self, mask: RuntimeEventFlag) -> None:
-        """Selects which map-originated event types this map queues.
+        """Selects the events that the map reports.
 
         See `mln_map_set_event_mask` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2441,7 +3240,10 @@ class MapHandleDiscarding:
         return self._native._discard_set_event_mask(mask)
 
     def set_feature_state(self, selector: FeatureStateSelector, state: Any) -> None:
-        """Submits a copied per-feature-state command.
+        """Merges `state` into the state of a feature.
+
+        `state` is a JSON object. Its keys replace the same keys in the
+        feature's state, and the other keys stay.
 
         See `mln_map_set_feature_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2449,7 +3251,10 @@ class MapHandleDiscarding:
         return self._native._discard_set_feature_state(selector, state)
 
     def set_free_camera_options(self, options: FreeCameraOptions | None = None) -> None:
-        """Submits a copied free-camera command.
+        """Places the camera at a position and orientation in space.
+
+        The map adjusts them to a camera that it can show, and stops running
+        camera animations.
 
         See `mln_map_set_free_camera_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2459,7 +3264,10 @@ class MapHandleDiscarding:
     def set_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
-        """Updates one GeoJSON source with prepared inline data.
+        """Replaces the data of a GeoJSON source.
+
+        `data` must have been prepared with the same options as the source.
+        It can be released once this function returns.
 
         See `mln_map_set_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2469,7 +3277,11 @@ class MapHandleDiscarding:
     def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool
     ) -> None:
-        """Overrides one GeoJSON source's synchronous tiling at runtime.
+        """Sets whether a GeoJSON source builds its tiles synchronously.
+
+        This works like the synchronous tiling option of
+        `GeoJsonSourceOptions`, but `enabled` can't turn off synchronous
+        tiling that the source's options turned on.
 
         See `mln_map_set_geo_json_source_synchronous_tiling` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2479,7 +3291,7 @@ class MapHandleDiscarding:
         )
 
     def set_geo_json_source_url(self, source_id: str, url: str) -> None:
-        """Updates one GeoJSON source to load data from a URL.
+        """Makes a GeoJSON source load its data from `url`.
 
         See `mln_map_set_geo_json_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2487,8 +3299,9 @@ class MapHandleDiscarding:
         return self._native._discard_set_geo_json_source_url(source_id, url)
 
     def set_global_state_property(self, property_name: str, value: Any) -> None:
-        """Submits a global-state JSON value. JSON null restores the style
-        default.
+        """Sets a value that the style's `global-state`
+        \\[expressions\\](https://maplibre.org/maplibre-style-spec/expressions/)
+        read.
 
         See `mln_map_set_global_state_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2498,7 +3311,10 @@ class MapHandleDiscarding:
     def set_image_source_coordinates(
         self, source_id: str, coordinates: Sequence[LatLng]
     ) -> None:
-        """Updates image source coordinates.
+        """Moves the image of an image source.
+
+        `coordinates` are the image's four corners, clockwise from the top
+        left.
 
         See `mln_map_set_image_source_coordinates` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2510,7 +3326,7 @@ class MapHandleDiscarding:
     def set_image_source_image(
         self, source_id: str, image: PremultipliedRgba8Image
     ) -> None:
-        """Updates an image source with inline image pixels.
+        """Replaces the image of an image source.
 
         See `mln_map_set_image_source_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2518,7 +3334,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_image_source_image(source_id, image)
 
     def set_image_source_url(self, source_id: str, url: str) -> None:
-        """Updates an image source to load its image from a URL.
+        """Makes an image source load its image from `url`.
 
         See `mln_map_set_image_source_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2526,7 +3342,10 @@ class MapHandleDiscarding:
         return self._native._discard_set_image_source_url(source_id, url)
 
     def set_projection_mode(self, mode: ProjectionMode) -> None:
-        """Submits axonometric rendering options.
+        """Sets whether the map draws in perspective or axonometric projection,
+        and how much it skews the view.
+
+        Settings that `mode` doesn't set keep their current values.
 
         See `mln_map_set_projection_mode` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2534,7 +3353,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_projection_mode(mode)
 
     def set_rendering_stats_view_enabled(self, enabled: bool) -> None:
-        """Submits a rendering-stats visibility command.
+        """Shows or hides an overlay of rendering statistics on the map.
 
         See `mln_map_set_rendering_stats_view_enabled` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2547,7 +3366,8 @@ class MapHandleDiscarding:
         image: PremultipliedRgba8Image,
         options: StyleImageOptions | None = None,
     ) -> None:
-        """Sets one runtime style image.
+        """Adds an image to the map's style, or replaces the image named
+        `image_id`.
 
         See `mln_map_set_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2555,9 +3375,9 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_image(image_id, image, options)
 
     def set_style_json(self, json: Any) -> None:
-        """Queues an inline style JSON command. A committed command means the
-        map applied the JSON, not that the style loaded: style loading events
-        report the resource and parse results that follow.
+        """Loads the map's style from `json`.
+
+        The style's sources, sprites, and glyphs load in the background.
 
         See `mln_map_set_style_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2567,7 +3387,13 @@ class MapHandleDiscarding:
     def set_style_layer_property(
         self, layer_id: str, property_name: str, value: Any
     ) -> None:
-        """Sets one layer property using its MapLibre style-spec property name.
+        """Sets a property of a layer in the map's style.
+
+        `property_name` is one of the layer's layout or paint
+        \\[properties\\](https://maplibre.org/maplibre-style-spec/layers/), or
+        `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
+        `value` resets any of these but `source` and `source-layer` to its
+        default.
 
         See `mln_map_set_style_layer_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2577,7 +3403,9 @@ class MapHandleDiscarding:
         )
 
     def set_style_light_json(self, light_json: Any) -> None:
-        """Sets the style light from a style-spec light JSON object.
+        """Replaces the
+        \\[light\\](https://maplibre.org/maplibre-style-spec/light/) of the
+        map's style.
 
         See `mln_map_set_style_light_json` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2585,8 +3413,7 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_light_json(light_json)
 
     def set_style_light_property(self, property_name: str, value: Any) -> None:
-        """Sets one style light property using its MapLibre style-spec property
-        name.
+        """Sets a property of the light of the map's style.
 
         See `mln_map_set_style_light_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2594,8 +3421,10 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_light_property(property_name, value)
 
     def set_style_source_volatile(self, source_id: str, is_volatile: bool) -> None:
-        """Sets whether one style source stores fetched tiles in the persistent
-        cache.
+        """Sets whether a source is volatile.
+
+        The map doesn't store the tiles of a volatile source in the
+        persistent cache.
 
         See `mln_map_set_style_source_volatile` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2605,7 +3434,7 @@ class MapHandleDiscarding:
     def set_style_transition_options(
         self, options: StyleTransitionOptions | None = None
     ) -> None:
-        """Sets the style's global transition options.
+        """Sets the default transition of the map's style.
 
         See `mln_map_set_style_transition_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2613,9 +3442,13 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_transition_options(options)
 
     def set_style_url(self, url: str) -> None:
-        """Queues a style URL command. A committed command means the map
-        accepted the URL, not that the style loaded: style loading events
-        report the network, decode, and parse results that follow.
+        """Loads the map's style from `url`.
+
+        The style loads in the background, and
+        `RuntimeEventType.MAP_STYLE_LOADED` or
+        `RuntimeEventType.MAP_LOADING_FAILED` reports how the load ends.
+        Sources, layers, and images added before the style loads are lost
+        when it loads.
 
         See `mln_map_set_style_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2623,7 +3456,9 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_url(url)
 
     def set_tile_options(self, options: MapTileOptions | None = None) -> None:
-        """Submits a copied tile-options command.
+        """Sets how the map chooses which tiles to load, and at what detail.
+
+        Settings that `options` doesn't set keep their current values.
 
         See `mln_map_set_tile_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2631,7 +3466,9 @@ class MapHandleDiscarding:
         return self._native._discard_set_tile_options(options)
 
     def set_viewport_options(self, options: MapViewportOptions | None = None) -> None:
-        """Submits a copied viewport-options command.
+        """Sets how the map orients and constrains its view.
+
+        Settings that `options` doesn't set keep their current values.
 
         See `mln_map_set_viewport_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2639,7 +3476,13 @@ class MapHandleDiscarding:
         return self._native._discard_set_viewport_options(options)
 
     def update_camera(self, update: CameraUpdate) -> None:
-        """Submits one atomic camera update.
+        """Moves the camera, at once or with an animation.
+
+        Camera fields that `update` doesn't set keep their values, and the
+        update stops any running animation of the fields it sets. The
+        function finishes when the map applies the update, before an
+        animation ends. To learn when an animation ends, set an
+        `CameraTransitionHandler` in its animation options.
 
         See `mln_map_update_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2655,15 +3498,19 @@ class RenderSessionHandleDiscarding:
         self._native = owner._native
 
     def resize(self, extent: LogicalExtent) -> None:
-        """Starts an ordered logical resize of the driver and the map. The
-        driver applies the extent in order with its other work, and later
-        driver work does not wait for the map. The completion runs after both
-        have applied it and the map has published its snapshot. Frames render
-        once a map update matches the applied extent; static and tile maps
-        publish that update for their next still image.
+        """Resizes the session's target and its map.
+
+        `extent` must keep the session's scale factor. To change the scale
+        factor, give the session a new target or attach a new session.
+        Release every acquired frame first.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the session renders into a borrowed ring.
+          Give it new textures of the new size instead.
         """
         return self._native._discard_resize(extent)
 
@@ -2676,7 +3523,7 @@ class RuntimeHandleDiscarding:
         self._native = owner._native
 
     def clear_event_handler(self) -> None:
-        """Stops event delivery and retires the previous handler.
+        """Stops sending the events of the runtime and its maps to a callback.
 
         See `mln_runtime_clear_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2684,7 +3531,7 @@ class RuntimeHandleDiscarding:
         return self._native._discard_clear_event_handler()
 
     def clear_http_header_transform(self) -> None:
-        """Clears the runtime-scoped outgoing HTTP header transform.
+        """Stops adding headers to the runtime's HTTP requests.
 
         See `mln_runtime_clear_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2692,7 +3539,8 @@ class RuntimeHandleDiscarding:
         return self._native._discard_clear_http_header_transform()
 
     def clear_resource_provider(self) -> None:
-        """Clears the runtime-scoped network resource provider.
+        """Removes the runtime's resource provider, so the library loads every
+        request itself.
 
         See `mln_runtime_clear_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2700,7 +3548,7 @@ class RuntimeHandleDiscarding:
         return self._native._discard_clear_resource_provider()
 
     def clear_resource_transform(self) -> None:
-        """Clears the runtime-scoped URL transform for network resources.
+        """Stops rewriting the URLs of the runtime's network requests.
 
         See `mln_runtime_clear_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2708,8 +3556,9 @@ class RuntimeHandleDiscarding:
         return self._native._discard_clear_resource_transform()
 
     def set_event_handler(self, handler: RuntimeEventHandler) -> None:
-        """Selects how runtime and map events reach the host. The callback runs
-        on the binding's dispatcher thread, after native queues the call.
+        """Sends the events of the runtime and its maps to a callback.
+
+        The callback replaces the one set before.
 
         See `mln_runtime_set_event_handler` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2717,19 +3566,32 @@ class RuntimeHandleDiscarding:
         return self._native._discard_set_event_handler(handler)
 
     def set_http_header_transform(self, transform: HttpHeaderTransform) -> None:
-        """Registers or replaces the runtime-scoped outgoing HTTP header
-        transform. The callback runs on the binding's dispatcher thread,
-        after native queues the call.
+        """Adds headers to the runtime's HTTP requests.
+
+        The transform replaces the one set before. In a browser or on
+        OpenHarmony, serve the requests with
+        `RuntimeHandle.set_resource_provider()` instead.
+
+        The callback runs on the binding's dispatcher thread, after native
+        queues the call.
 
         See `mln_runtime_set_http_header_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the library runs in a browser or on
+          OpenHarmony.
         """
         return self._native._discard_set_http_header_transform(transform)
 
     def set_resource_provider(self, provider: ResourceProvider) -> None:
-        """Registers or replaces a runtime-scoped network resource provider. The
-        callback runs on the binding's dispatcher thread, after native queues
-        the call.
+        """Serves the runtime's network requests through a callback.
+
+        The provider receives the network requests that its routes match, and
+        the library loads the rest as usual. A provider can serve URL schemes
+        that the library can't load itself. The provider replaces the one set
+        before.
 
         See `mln_runtime_set_resource_provider` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2737,9 +3599,10 @@ class RuntimeHandleDiscarding:
         return self._native._discard_set_resource_provider(provider)
 
     def set_resource_transform(self, transform: ResourceTransform) -> None:
-        """Registers or updates a runtime-scoped URL transform for network
-        resources. The callback runs on the binding's dispatcher thread,
-        after native queues the call.
+        """Rewrites the URLs of the runtime's network requests through a
+        callback.
+
+        The transform replaces the one set before.
 
         See `mln_runtime_set_resource_transform` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

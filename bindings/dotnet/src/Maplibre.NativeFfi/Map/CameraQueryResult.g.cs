@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Camera result of an ordered camera query.
+/// A map's camera, with the snapshot generation that it matches.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_query_result</c> in the <see

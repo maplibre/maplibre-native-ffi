@@ -12,7 +12,7 @@ struct NativeAcquiredFrameHandle: NativeHandle {
   }
 }
 
-/// A rendered frame that a render session lends until its release.
+/// A rendered frame that the caller holds to read or show.
 ///
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -63,7 +63,7 @@ struct NativeGeoJsonSourceDataHandle: NativeHandle {
   }
 }
 
-/// Prepared GeoJSON data that sources retain independently of its handle.
+/// GeoJSON data, parsed and ready to add to a GeoJSON source.
 ///
 /// See `mln_geo_json_source_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -114,7 +114,7 @@ struct NativeGraphicsDeviceHandle: NativeHandle {
   }
 }
 
-/// A GPU device that native code creates for texture render targets.
+/// A GPU device that the library creates to render maps into textures.
 ///
 /// See `mln_graphics_device` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -165,7 +165,7 @@ struct NativeMapHandle: NativeHandle {
   }
 }
 
-/// A map, which holds map state independent of any render target.
+/// A map, with its style and camera.
 ///
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -217,7 +217,7 @@ struct NativeMapProjectionHandle: NativeHandle {
   }
 }
 
-/// A standalone projection of one map view.
+/// A camera view for converting between screen points and coordinates.
 ///
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -269,7 +269,7 @@ struct NativeRenderSessionHandle: NativeHandle {
   }
 }
 
-/// A render session, which renders one map to one render target.
+/// A render session draws a map into a surface or a texture.
 ///
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -320,7 +320,7 @@ struct NativeResourceRequestHandle: NativeHandle {
   }
 }
 
-/// A resource request that a resource provider handles.
+/// A resource load that a resource provider answers.
 ///
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -370,7 +370,7 @@ struct NativeResourceTransformRequestHandle: NativeHandle {
   }
 }
 
-/// A resource URL transform that waits for its host's answer.
+/// A URL rewrite that a resource transform answers with the URL to load.
 ///
 /// See `mln_resource_transform_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -422,7 +422,7 @@ struct NativeRuntimeHandle: NativeHandle {
   }
 }
 
-/// A runtime: the native scheduler thread and event store for its maps.
+/// A runtime owns maps and the network and cache settings that they share.
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -473,7 +473,7 @@ struct NativeStyleExpressionHandle: NativeHandle {
   }
 }
 
-/// A parsed style expression, immutable and independent of any map.
+/// A parsed style expression.
 ///
 /// See `mln_style_expression` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

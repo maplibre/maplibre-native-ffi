@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Caller-owned premultiplied RGBA8 image pixels.
+/// An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
 /// </summary>
 /// <remarks>
 /// See <c>mln_premultiplied_rgba8_image</c> in the <see
@@ -25,23 +25,17 @@ public readonly partial record struct PremultipliedRgba8Image
         this.Pixels = Pixels;
     }
 
-    /// <summary>
-    /// Image width in pixels. Required.
-    /// </summary>
     public required uint Width { get; init; }
-
-    /// <summary>
-    /// Image height in pixels. Required.
-    /// </summary>
     public required uint Height { get; init; }
 
     /// <summary>
-    /// Bytes per image row. Required, and at least width * 4.
+    /// The number of bytes from the start of one row to the start of the next,
+    /// at least <c>width</c> * 4.
     /// </summary>
     public required uint Stride { get; init; }
 
     /// <summary>
-    /// Premultiplied RGBA8 pixels. Required.
+    /// The rows of pixels, <c>stride</c> bytes apart, from the top row down.
     /// </summary>
     public required ImmutableArray<byte> Pixels
     {

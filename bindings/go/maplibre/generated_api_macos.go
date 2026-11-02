@@ -13,10 +13,13 @@ package maplibre
 import "C"
 import "unsafe"
 
-// WithMetalTexture copies Metal-native metadata from an acquired frame.
+// WithMetalTexture gets the Metal texture of an acquired frame.
 //
 // See mln_acquired_frame_get_metal_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+//
+// Errors:
+//   - StatusTargetLost when the session lost its target.
 func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTextureFrameView) error) error {
 	var outFrame C.mln_metal_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
@@ -29,11 +32,16 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTexture
 	})
 }
 
-// AttachMetalBorrowedTexture starts attachment of a ring of caller-owned Metal
-// textures.
+// AttachMetalBorrowedTexture creates a session that renders the map into a ring
+// of your Metal textures.
 //
 // See mln_map_attach_metal_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagMetal, or when the target supports none of the
+//     producer_sync_kinds in options.
 func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -52,11 +60,16 @@ func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTe
 	return result.session, result.ready, err
 }
 
-// AttachMetalOwnedTexture starts attachment of a session-owned Metal texture
-// ring.
+// AttachMetalOwnedTexture creates a session that renders the map into a ring of
+// new Metal textures.
 //
 // See mln_map_attach_metal_owned_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagMetal, or when the target supports none of the
+//     producer_sync_kinds in options.
 func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -75,10 +88,14 @@ func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureD
 	return result.session, result.ready, err
 }
 
-// AttachMetalSurface starts attachment of a Metal surface target.
+// AttachMetalSurface creates a session that renders the map to a Metal layer.
 //
 // See mln_map_attach_metal_surface in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagMetal.
 func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -97,18 +114,33 @@ func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor,
 	return result.session, result.ready, err
 }
 
-// SetMetalBorrowedTextureTarget starts an ordered replacement of every texture
-// of a caller-owned Metal ring.
+// SetMetalBorrowedTextureTarget replaces the Metal textures that a borrowed
+// ring renders into.
+//
+// Use it to resize the ring, or to give the session textures again after
+// RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. The
+// new ring must have as many textures as the old one, and the same device and
+// command queue. Once the replacement completes, the session no longer uses the
+// old textures.
 //
 // See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+//
+// Errors:
+//   - StatusUnsupported when the new textures have a different pixel format
+//     than the old ones. Attach a new session to change it.
 func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 
-// SetMetalSurfaceTarget starts an ordered Metal surface replacement.
+// SetMetalSurfaceTarget replaces the Metal layer that the session renders to.
+//
+// Use it to give the session a layer again after
+// RenderSessionHandle.ReleaseTarget(), or to move it to another layer. The new
+// layer must use the same device. Once the replacement completes, the session
+// no longer uses the old layer.
 //
 // See mln_render_session_set_metal_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html

@@ -4,11 +4,15 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Adds a custom geometry source. The callback may run on any native worker
-  /// thread, concurrently with runtime and map calls.
+  /// Adds a source whose GeoJSON tiles come from callbacks.
   ///
   /// See `mln_map_add_custom_geometry_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addCustomGeometrySource(
     _ bindingArg0: String,
@@ -25,11 +29,15 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a custom vector source. The callback may run on any native worker
-  /// thread, concurrently with runtime and map calls.
+  /// Adds a source whose vector tiles come from callbacks.
   ///
   /// See `mln_map_add_custom_vector_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addCustomVectorSource(
     _ bindingArg0: String,
@@ -46,10 +54,18 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a GeoJSON source with prepared inline data.
+  /// Adds a GeoJSON source with prepared data.
+  ///
+  /// The source uses the options that `data` was prepared with. `data` can be
+  /// released once this function returns.
   ///
   /// See `mln_map_add_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addGeoJsonSourceData(
     _ bindingArg0: String,
@@ -66,10 +82,15 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a GeoJSON source with URL data.
+  /// Adds a GeoJSON source that loads its data from `url`.
   ///
   /// See `mln_map_add_geo_json_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addGeoJsonSourceUrl(
     _ bindingArg0: String,
@@ -88,10 +109,17 @@ public extension MapHandle {
     }
   }
 
-  /// Adds an image source with inline image pixels.
+  /// Adds an image source that shows `image`.
+  ///
+  /// `coordinates` are the image's four corners, clockwise from the top left.
   ///
   /// See `mln_map_add_image_source_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addImageSourceImage(
     _ bindingArg0: String,
@@ -111,10 +139,17 @@ public extension MapHandle {
     }
   }
 
-  /// Adds an image source that loads its image from a URL.
+  /// Adds an image source that loads its image from `url`.
+  ///
+  /// `coordinates` are the image's four corners, clockwise from the top left.
   ///
   /// See `mln_map_add_image_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addImageSourceUrl(
     _ bindingArg0: String,
@@ -134,10 +169,22 @@ public extension MapHandle {
     }
   }
 
-  /// Adds one style layer from a full style-spec layer JSON object.
+  /// Adds a layer to the map's style.
+  ///
+  /// `layerJson` is a
+  /// \[layer\](https://maplibre.org/maplibre-style-spec/layers/) object. The
+  /// layer goes below the layer named `beforeLayerId`, or above every layer
+  /// when `beforeLayerId` is empty.
   ///
   /// See `mln_map_add_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no layer named `beforeLayerId`, or
+  ///   no source with the ID that the layer uses.
+  /// - `Status.invalidArgument` when the style already has a layer with the new
+  ///   layer's ID.
   @discardableResult
   func addStyleLayerJson(
     _ bindingArg0: String,
@@ -154,10 +201,18 @@ public extension MapHandle {
     }
   }
 
-  /// Adds one style source from a style-spec source JSON object.
+  /// Adds a source to the map's style.
+  ///
+  /// `sourceJson` is a
+  /// \[source\](https://maplibre.org/maplibre-style-spec/sources/) object.
   ///
   /// See `mln_map_add_style_source_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the style already has a source named
+  ///   `sourceId`.
   @discardableResult
   func addStyleSourceJson(
     _ bindingArg0: String,
@@ -174,7 +229,7 @@ public extension MapHandle {
     }
   }
 
-  /// Queries the global-state JSON object, including style defaults.
+  /// Reads the global state of the map's style as a JSON object.
   ///
   /// See `mln_map_get_global_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -188,10 +243,16 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies image source coordinates.
+  /// Reads the corners of an image source's image, clockwise from the top left.
   ///
   /// See `mln_map_get_image_source_coordinates` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
+  ///   source.
   func getImageSourceCoordinates(_ bindingArg0: String) async throws
     -> [LatLng]
   {
@@ -209,7 +270,9 @@ public extension MapHandle {
     }
   }
 
-  /// Copies one complete runtime style image.
+  /// Reads an image of the map's style.
+  ///
+  /// Completes with no value when the style has no image named `imageId`.
   ///
   /// See `mln_map_get_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -232,7 +295,9 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies the complete metadata of one style layer.
+  /// Reads a layer of the map's style.
+  ///
+  /// Completes with no value when the style has no layer named `layerId`.
   ///
   /// See `mln_map_get_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -255,7 +320,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Serializes one style layer as a full style-spec layer JSON object.
+  /// Reads a layer of the map's style as a
+  /// \[layer\](https://maplibre.org/maplibre-style-spec/layers/) object.
+  ///
+  /// Completes with no value when the style has no layer named `layerId`.
   ///
   /// See `mln_map_get_style_layer_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -275,10 +343,16 @@ public extension MapHandle {
     ) }
   }
 
-  /// Serializes one layer property as a style-spec JSON value.
+  /// Reads a property of a layer in the map's style.
+  ///
+  /// Completes with no value when the layer doesn't set the property.
   ///
   /// See `mln_map_get_style_layer_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no layer named `layerId`.
   func getStyleLayerProperty(
     _ bindingArg0: String,
     propertyName bindingArg1: String
@@ -301,7 +375,9 @@ public extension MapHandle {
     }
   }
 
-  /// Serializes one style light property as a style-spec JSON value.
+  /// Reads a property of the light of the map's style.
+  ///
+  /// Completes with no value when the light doesn't set the property.
   ///
   /// See `mln_map_get_style_light_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -323,7 +399,9 @@ public extension MapHandle {
     }
   }
 
-  /// Copies the complete metadata of one style source.
+  /// Reads a source of the map's style.
+  ///
+  /// Completes with no value when the style has no source named `sourceId`.
   ///
   /// See `mln_map_get_style_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -346,7 +424,7 @@ public extension MapHandle {
     ) }
   }
 
-  /// Reads the style's global transition options.
+  /// Reads the default transition of the map's style.
   ///
   /// See `mln_map_get_style_transition_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -362,10 +440,17 @@ public extension MapHandle {
     }
   }
 
-  /// Invalidates custom geometry source data inside one geographic region.
+  /// Makes a custom geometry source ask again for the tiles in `bounds` that
+  /// the map still needs.
   ///
   /// See `mln_map_invalidate_custom_geometry_source_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   geometry source.
   @discardableResult
   func invalidateCustomGeometrySourceRegion(
     _ bindingArg0: String,
@@ -382,10 +467,16 @@ public extension MapHandle {
     }
   }
 
-  /// Invalidates custom geometry source data for one canonical tile.
+  /// Makes a custom geometry source ask for a tile again when the map needs it.
   ///
   /// See `mln_map_invalidate_custom_geometry_source_tile` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   geometry source.
   @discardableResult
   func invalidateCustomGeometrySourceTile(
     _ bindingArg0: String,
@@ -402,10 +493,16 @@ public extension MapHandle {
     }
   }
 
-  /// Invalidates custom vector source data for one canonical tile.
+  /// Makes a custom vector source ask for a tile again when the map needs it.
   ///
   /// See `mln_map_invalidate_custom_vector_source_tile` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   vector source.
   @discardableResult
   func invalidateCustomVectorSourceTile(
     _ bindingArg0: String,
@@ -422,7 +519,7 @@ public extension MapHandle {
     }
   }
 
-  /// Starts an ordered query of every style layer in style order.
+  /// Lists the layers of the map's style, from bottom to top.
   ///
   /// See `mln_map_list_style_layers` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -438,7 +535,7 @@ public extension MapHandle {
     ) }
   }
 
-  /// Lists every style source in style order.
+  /// Lists the sources of the map's style.
   ///
   /// See `mln_map_list_style_sources` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -454,10 +551,16 @@ public extension MapHandle {
     ) }
   }
 
-  /// Moves one style layer before another layer or to the top.
+  /// Moves a layer of the map's style below the layer named `beforeLayerId`, or
+  /// above every layer when `beforeLayerId` is empty.
   ///
   /// See `mln_map_move_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no layer named `layerId` or
+  ///   `beforeLayerId`.
   @discardableResult
   func moveStyleLayer(
     _ bindingArg0: String,
@@ -474,10 +577,14 @@ public extension MapHandle {
     }
   }
 
-  /// Removes one runtime style image by ID.
+  /// Removes an image from the map's style.
   ///
   /// See `mln_map_remove_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no image named `imageId`.
   @discardableResult
   func removeStyleImage(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -492,10 +599,14 @@ public extension MapHandle {
     }
   }
 
-  /// Removes one style layer by ID.
+  /// Removes a layer from the map's style.
   ///
   /// See `mln_map_remove_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no layer named `layerId`.
   @discardableResult
   func removeStyleLayer(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -510,10 +621,15 @@ public extension MapHandle {
     }
   }
 
-  /// Removes one style source by ID.
+  /// Removes a source from the map's style.
   ///
   /// See `mln_map_remove_style_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidState` when a layer still uses the source.
   @discardableResult
   func removeStyleSource(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -528,10 +644,19 @@ public extension MapHandle {
     }
   }
 
-  /// Sets custom geometry source data for one canonical tile.
+  /// Sets the data of a tile in a custom geometry source.
+  ///
+  /// `data` is a GeoJSON feature collection. The source ignores data for a tile
+  /// that it hasn't asked for, or has since cancelled.
   ///
   /// See `mln_map_set_custom_geometry_source_tile_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   geometry source.
   @discardableResult
   func setCustomGeometrySourceTileData(
     _ bindingArg0: String,
@@ -550,10 +675,16 @@ public extension MapHandle {
     }
   }
 
-  /// Reports a custom geometry source error for one canonical tile.
+  /// Reports that a tile of a custom geometry source failed to load.
   ///
   /// See `mln_map_set_custom_geometry_source_tile_error` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   geometry source.
   @discardableResult
   func setCustomGeometrySourceTileError(
     _ bindingArg0: String,
@@ -572,10 +703,19 @@ public extension MapHandle {
     }
   }
 
-  /// Sets custom vector source data for one canonical tile.
+  /// Sets the data of a tile in a custom vector source.
+  ///
+  /// `data` is the tile, encoded as `encoding`. The source ignores data for a
+  /// tile that it hasn't asked for, or has since cancelled.
   ///
   /// See `mln_map_set_custom_vector_source_tile_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   vector source.
   @discardableResult
   func setCustomVectorSourceTileData(
     _ bindingArg0: String,
@@ -596,10 +736,16 @@ public extension MapHandle {
     }
   }
 
-  /// Reports a custom vector source error for one canonical tile.
+  /// Reports that a tile of a custom vector source failed to load.
   ///
   /// See `mln_map_set_custom_vector_source_tile_error` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   vector source.
   @discardableResult
   func setCustomVectorSourceTileError(
     _ bindingArg0: String,
@@ -618,10 +764,19 @@ public extension MapHandle {
     }
   }
 
-  /// Updates one GeoJSON source with prepared inline data.
+  /// Replaces the data of a GeoJSON source.
+  ///
+  /// `data` must have been prepared with the same options as the source. It can
+  /// be released once this function returns.
   ///
   /// See `mln_map_set_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a
+  ///   GeoJSON source, or `data` was prepared with other options.
   @discardableResult
   func setGeoJsonSourceData(
     _ bindingArg0: String,
@@ -638,10 +793,20 @@ public extension MapHandle {
     }
   }
 
-  /// Overrides one GeoJSON source's synchronous tiling at runtime.
+  /// Sets whether a GeoJSON source builds its tiles synchronously.
+  ///
+  /// This works like the synchronous tiling option of `GeoJsonSourceOptions`,
+  /// but `enabled` can't turn off synchronous tiling that the source's options
+  /// turned on.
   ///
   /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a
+  ///   GeoJSON source.
   @discardableResult
   func setGeoJsonSourceSynchronousTiling(
     _ bindingArg0: String,
@@ -658,10 +823,16 @@ public extension MapHandle {
     }
   }
 
-  /// Updates one GeoJSON source to load data from a URL.
+  /// Makes a GeoJSON source load its data from `url`.
   ///
   /// See `mln_map_set_geo_json_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a
+  ///   GeoJSON source.
   @discardableResult
   func setGeoJsonSourceUrl(
     _ bindingArg0: String,
@@ -678,10 +849,17 @@ public extension MapHandle {
     }
   }
 
-  /// Submits a global-state JSON value. JSON null restores the style default.
+  /// Sets a value that the style's `global-state`
+  /// \[expressions\](https://maplibre.org/maplibre-style-spec/expressions/)
+  /// read.
   ///
   /// See `mln_map_set_global_state_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the style or one of its sources or sprites is
+  ///   still loading.
   @discardableResult
   func setGlobalStateProperty(
     _ bindingArg0: String,
@@ -698,10 +876,18 @@ public extension MapHandle {
     }
   }
 
-  /// Updates image source coordinates.
+  /// Moves the image of an image source.
+  ///
+  /// `coordinates` are the image's four corners, clockwise from the top left.
   ///
   /// See `mln_map_set_image_source_coordinates` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
+  ///   source.
   @discardableResult
   func setImageSourceCoordinates(
     _ bindingArg0: String,
@@ -719,10 +905,16 @@ public extension MapHandle {
     }
   }
 
-  /// Updates an image source with inline image pixels.
+  /// Replaces the image of an image source.
   ///
   /// See `mln_map_set_image_source_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
+  ///   source.
   @discardableResult
   func setImageSourceImage(
     _ bindingArg0: String,
@@ -739,10 +931,16 @@ public extension MapHandle {
     }
   }
 
-  /// Updates an image source to load its image from a URL.
+  /// Makes an image source load its image from `url`.
   ///
   /// See `mln_map_set_image_source_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
+  ///   source.
   @discardableResult
   func setImageSourceUrl(_ bindingArg0: String,
                          url bindingArg1: String) async throws
@@ -759,7 +957,7 @@ public extension MapHandle {
     }
   }
 
-  /// Sets one runtime style image.
+  /// Adds an image to the map's style, or replaces the image named `imageId`.
   ///
   /// See `mln_map_set_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -781,10 +979,20 @@ public extension MapHandle {
     }
   }
 
-  /// Sets one layer property using its MapLibre style-spec property name.
+  /// Sets a property of a layer in the map's style.
+  ///
+  /// `propertyName` is one of the layer's layout or paint
+  /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/), or
+  /// `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
+  /// `value` resets any of these but `source` and `source-layer` to its
+  /// default.
   ///
   /// See `mln_map_set_style_layer_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no layer named `layerId`.
   @discardableResult
   func setStyleLayerProperty(
     _ bindingArg0: String,
@@ -803,7 +1011,8 @@ public extension MapHandle {
     }
   }
 
-  /// Sets the style light from a style-spec light JSON object.
+  /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
+  /// the map's style.
   ///
   /// See `mln_map_set_style_light_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -821,7 +1030,7 @@ public extension MapHandle {
     }
   }
 
-  /// Sets one style light property using its MapLibre style-spec property name.
+  /// Sets a property of the light of the map's style.
   ///
   /// See `mln_map_set_style_light_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -841,11 +1050,17 @@ public extension MapHandle {
     }
   }
 
-  /// Sets whether one style source stores fetched tiles in the persistent
+  /// Sets whether a source is volatile.
+  ///
+  /// The map doesn't store the tiles of a volatile source in the persistent
   /// cache.
   ///
   /// See `mln_map_set_style_source_volatile` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
   @discardableResult
   func setStyleSourceVolatile(
     _ bindingArg0: String,
@@ -862,7 +1077,7 @@ public extension MapHandle {
     }
   }
 
-  /// Sets the style's global transition options.
+  /// Sets the default transition of the map's style.
   ///
   /// See `mln_map_set_style_transition_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

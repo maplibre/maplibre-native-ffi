@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * A rendered frame that a render session lends until its release.
+ * A rendered frame that the caller holds to read or show.
  *
  * See `mln_acquired_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -29,8 +29,10 @@ internal constructor(
     get() = binding.isReleased
 
   /**
-   * Consumes an acquired frame without consumer GPU synchronization, so it quarantines the frame's
-   * slot of the texture ring.
+   * Gives up an acquired frame without saying when your GPU stops reading it.
+   *
+   * Because your GPU may still read the frame's texture, the session never renders into that
+   * texture again.
    *
    * See `mln_acquired_frame_discard` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -39,10 +41,14 @@ internal constructor(
     nativeClose(this, binding) { check(C.mln_acquired_frame_discard(handle, diagnostic)) }
 
   /**
-   * Copies OpenGL-native metadata from an acquired frame.
+   * Gets the OpenGL texture of an acquired frame.
    *
    * See `mln_acquired_frame_get_open_gl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session lost its target.
    */
   public fun <T> withOpenGlTexture(block: (OpenGlTextureFrame) -> T): T =
     nativeCall(this, binding) {
@@ -57,10 +63,14 @@ internal constructor(
     }
 
   /**
-   * Copies the producer synchronization for an acquired texture frame.
+   * Reads what to wait for before you read an acquired frame's texture.
    *
    * See `mln_acquired_frame_get_producer_sync` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session lost its target.
    */
   public fun <T> withProducerSync(block: (GpuSync) -> T): T =
     nativeCall(this, binding) {
@@ -75,10 +85,14 @@ internal constructor(
     }
 
   /**
-   * Copies common metadata for an acquired frame.
+   * Reads the frame result of an acquired frame.
    *
    * See `mln_acquired_frame_get_result` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.TARGET_LOST` when the session lost its target.
    */
   public fun getResult(): RenderFrameResult =
     nativeCall(this, binding) {
@@ -88,10 +102,19 @@ internal constructor(
     }
 
   /**
-   * Releases an acquired frame after the host's GPU work that reads it.
+   * Gives an acquired frame back to the session once you're done reading it.
+   *
+   * `consumerCompletion` says when your GPU work that reads the texture finishes. Null means that
+   * the work has already finished. The session waits for that point before it renders into the
+   * texture again.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.UNSUPPORTED` when `RenderSessionCapabilities.consumerSyncKinds` lacks the kind of
+   *   `consumerCompletion`.
    */
   public fun release(consumerCompletion: GpuSync?): Unit =
     nativeClose(this, binding) {

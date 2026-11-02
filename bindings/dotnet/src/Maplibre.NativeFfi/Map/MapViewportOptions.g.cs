@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Live map viewport and render-transform controls.
+/// How the map orients and constrains its view.
 /// </summary>
 /// <remarks>
 /// See <c>mln_map_viewport_options</c> in the <see

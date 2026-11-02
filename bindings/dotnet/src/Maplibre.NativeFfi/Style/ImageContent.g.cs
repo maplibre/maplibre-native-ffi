@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Content-box insets in image pixels, measured from the image's top-left.
+/// The area of an image, in image pixels, that text fits inside.
 /// </summary>
 /// <remarks>
 /// See <c>mln_image_content</c> in the <see

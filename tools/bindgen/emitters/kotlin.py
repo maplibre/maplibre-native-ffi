@@ -27,6 +27,7 @@ from .kotlin_operations import (
     method_name,
     operation,
     owner_disposal,
+    parameter_name,
     public_method,
     receiver_value,
 )
@@ -239,6 +240,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
                 for name in ("generation", "render_update_generation")
             },
         },
+        parameter=parameter_name,
     )
 
 

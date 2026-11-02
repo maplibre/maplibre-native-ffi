@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One caller-owned OpenGL texture of a borrowed texture ring.
+/// An OpenGL texture of a borrowed ring.
 /// </summary>
 /// <remarks>
 /// See <c>mln_open_gl_borrowed_texture</c> in the <see
@@ -18,7 +18,7 @@ public readonly partial record struct OpenGlBorrowedTexture
     }
 
     /// <summary>
-    /// Borrowed OpenGL texture object name. Required.
+    /// Your texture name.
     /// </summary>
     public required uint Texture { get; init; }
 }

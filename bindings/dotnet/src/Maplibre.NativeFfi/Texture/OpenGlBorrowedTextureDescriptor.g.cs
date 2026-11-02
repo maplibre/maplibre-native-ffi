@@ -3,11 +3,21 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL attachment options for a borrowed texture target.
+/// A ring of your OpenGL textures, for
+/// <c>MapHandle.AttachOpenGlBorrowedTexture()</c> and
+/// <c>RenderSessionHandle.SetOpenGlBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_open_gl_borrowed_texture_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// <para><c>extent</c> sets the map's size and the session's scale factor, so
+/// give it the map's scale factor. <c>physical_width</c> and
+/// <c>physical_height</c> give the textures' size in pixels. The context must
+/// use <c>OpenGlContextOwnership.Shared</c>. Each texture must be in your
+/// context's share group, with storage of that size.</para>
+/// <para>The session uses the textures until a replacement or release of the
+/// target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.</para>
+/// <para>See <c>mln_open_gl_borrowed_texture_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct OpenGlBorrowedTextureDescriptor
 {
@@ -29,32 +39,10 @@ public readonly partial record struct OpenGlBorrowedTextureDescriptor
         this.Target = Target;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. physical_width and physical_height
-    /// give the texture's size. A scale_factor that differs from the map's is
-    /// accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Physical texture width in device pixels. Required.
-    /// </summary>
     public required uint PhysicalWidth { get; init; }
-
-    /// <summary>
-    /// Physical texture height in device pixels. Required.
-    /// </summary>
     public required uint PhysicalHeight { get; init; }
-
-    /// <summary>
-    /// Borrowed OpenGL context provider data. The textures must belong to this
-    /// context or a context in the same share group.
-    /// </summary>
     public required OpenGlContextDescriptor Context { get; init; }
-
-    /// <summary>
-    /// The ring's textures, one per slot, in slot order. Required.
-    /// </summary>
     public required ImmutableArray<OpenGlBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
@@ -63,7 +51,7 @@ public readonly partial record struct OpenGlBorrowedTextureDescriptor
     internal ValueArray<OpenGlBorrowedTexture> TexturesStorage { get; init; }
 
     /// <summary>
-    /// OpenGL texture target of every texture. Required: GL_TEXTURE_2D.
+    /// The textures' target. It must be GL_TEXTURE_2D.
     /// </summary>
     public required uint Target { get; init; }
 }

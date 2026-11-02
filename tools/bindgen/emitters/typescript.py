@@ -28,6 +28,7 @@ from .typescript_values import (
     identifier,
     native_fields,
     owner_class,
+    parameter_name,
     public_name,
     registration,
     union_kinds,
@@ -197,6 +198,7 @@ def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Sy
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{identifier(name)}"
             for name in ("generation", "render_update_generation")
         },
+        parameter=parameter_name,
         # Native queues each call, and the realm dispatches the queue on its
         # event loop after the native callback has returned.
         threads=(

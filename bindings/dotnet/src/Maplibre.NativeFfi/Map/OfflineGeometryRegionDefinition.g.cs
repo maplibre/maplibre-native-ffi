@@ -3,11 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Geometry offline region definition.
+/// An offline region that covers a GeoJSON geometry.
 /// </summary>
 /// <remarks>
-/// See <c>mln_offline_geometry_region_definition</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+/// <para>The members other than <c>geometry</c> mean the same as those of
+/// <c>OfflineTilePyramidRegionDefinition</c>.</para>
+/// <para>See <c>mln_offline_geometry_region_definition</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct OfflineGeometryRegionDefinition
 {
@@ -31,21 +33,9 @@ public readonly partial record struct OfflineGeometryRegionDefinition
         this.IncludeIdeographs = IncludeIdeographs;
     }
 
-    /// <summary>
-    /// Style URL. Copied during region creation.
-    /// </summary>
     public string StyleUrl { get; init; } = "";
-
-    /// <summary>
-    /// UTF-8 GeoJSON Geometry. Required.
-    /// </summary>
     public required string Geometry { get; init; }
     public double MinZoom { get; init; }
-
-    /// <summary>
-    /// Maximum zoom. Positive infinity lets each tile source use its own
-    /// maximum zoom.
-    /// </summary>
     public double MaxZoom { get; init; }
     public float PixelRatio { get; init; }
     public bool IncludeIdeographs { get; init; }

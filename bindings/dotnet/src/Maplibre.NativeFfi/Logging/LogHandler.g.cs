@@ -3,14 +3,14 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Process-global log callback. The callback runs synchronously on the thread
-/// that emits the record, or on a MapLibre background thread for a severity
-/// that <c>MaplibreNative.SetLogAsyncSeverityMask()</c> dispatches
-/// asynchronously.
+/// A log callback, for <c>MaplibreNative.SetLogCallback()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_log_handler</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
+/// <para>Runs on the thread that logged the message, or on a background thread
+/// for the severities that <c>MaplibreNative.SetLogAsyncSeverityMask()</c>
+/// selects. The callback can't call the library.</para>
+/// <para>See <c>mln_log_handler</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct LogHandler
 {
@@ -20,8 +20,5 @@ public readonly partial record struct LogHandler
         this.Callback = Callback;
     }
 
-    /// <summary>
-    /// Receives each record.
-    /// </summary>
     public required LogCallback Callback { get; init; }
 }

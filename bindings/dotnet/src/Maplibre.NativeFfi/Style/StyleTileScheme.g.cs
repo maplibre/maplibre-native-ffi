@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Tile URL coordinate scheme values.
+/// Whether a tileset counts tile rows from the north (XYZ) or the south (TMS).
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_tile_scheme</c> in the <see

@@ -15,10 +15,10 @@ GENERATE_LATEX = NO
 GENERATE_XML = NO
 GENERATE_TAGFILE = doxygen/gen/html/maplibre-native-c.tag
 
-EXTRACT_ALL = NO
+# Every declaration is listed, documented or not, so a comment can be left out
+# when the name and type already say everything.
+EXTRACT_ALL = YES
 EXTRACT_STATIC = NO
-HIDE_UNDOC_MEMBERS = YES
-HIDE_UNDOC_CLASSES = YES
 
 OPTIMIZE_OUTPUT_FOR_C = YES
 MACRO_EXPANSION = YES
@@ -26,6 +26,7 @@ EXPAND_ONLY_PREDEF = YES
 PREDEFINED = MLN_API= \
              MLN_NOEXCEPT= \
              "MLN_BINDING(contract)="
+EXCLUDE_SYMBOLS = MLN_API MLN_NOEXCEPT MLN_BINDING
 
 SHOW_INCLUDE_FILES = NO
 SOURCE_BROWSER = NO

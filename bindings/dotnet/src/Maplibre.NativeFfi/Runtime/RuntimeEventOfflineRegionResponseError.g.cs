@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Payload for <c>RuntimeEventType.OfflineRegionResponseError</c>.
+/// The details of <c>RuntimeEventType.OfflineRegionResponseError</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_offline_region_response_error</c> in the <see

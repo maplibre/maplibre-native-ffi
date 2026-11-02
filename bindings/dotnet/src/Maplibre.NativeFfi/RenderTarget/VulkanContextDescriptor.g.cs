@@ -3,11 +3,15 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Vulkan backend context fields shared by Vulkan render targets.
+/// The Vulkan device and queue that a render session uses.
 /// </summary>
 /// <remarks>
-/// See <c>mln_vulkan_context_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// <para>Keep these objects alive until a detach or disposal of the session
+/// completes, or an abandon of it returns. If you discarded a frame of a ring
+/// that the session creates, or abandon the session while you hold a frame,
+/// keep them alive until the process exits instead.</para>
+/// <para>See <c>mln_vulkan_context_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct VulkanContextDescriptor
 {
@@ -32,39 +36,36 @@ public readonly partial record struct VulkanContextDescriptor
     }
 
     /// <summary>
-    /// Borrowed VkInstance. Required.
+    /// A <c>VkInstance</c>.
     /// </summary>
     public required NativePointer Instance { get; init; }
 
     /// <summary>
-    /// Borrowed VkPhysicalDevice. Required.
+    /// A <c>VkPhysicalDevice</c>.
     /// </summary>
     public required NativePointer PhysicalDevice { get; init; }
 
     /// <summary>
-    /// Borrowed VkDevice. Required.
+    /// A <c>VkDevice</c>.
     /// </summary>
     public required NativePointer Device { get; init; }
 
     /// <summary>
-    /// Borrowed graphics VkQueue. Required. The session's driver submits to it
-    /// from its own thread, so a host that uses the same queue passes
-    /// <c>RenderSessionAttachOptions.QueueLock</c> at attach.
+    /// A <c>VkQueue</c> from <c>graphics_queue_family_index</c> that supports
+    /// graphics. If you submit to it too, set
+    /// <c>RenderSessionAttachOptions.QueueLock</c>.
     /// </summary>
     public required NativePointer GraphicsQueue { get; init; }
-
-    /// <summary>
-    /// Queue family index for graphics_queue. Must support graphics commands.
-    /// </summary>
     public uint GraphicsQueueFamilyIndex { get; init; }
 
     /// <summary>
-    /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
+    /// Your <c>vkGetInstanceProcAddr</c>, or null to use the Vulkan loader's.
     /// </summary>
     public NativePointer GetInstanceProcAddr { get; init; }
 
     /// <summary>
-    /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
+    /// Your <c>vkGetDeviceProcAddr</c>, or null to look it up from the
+    /// instance.
     /// </summary>
     public NativePointer GetDeviceProcAddr { get; init; }
 }

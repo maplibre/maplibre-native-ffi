@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Render backend support flags reported by this native library build.
+/// A render backend, as a bit in a set.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_backend_flag</c> in the <see

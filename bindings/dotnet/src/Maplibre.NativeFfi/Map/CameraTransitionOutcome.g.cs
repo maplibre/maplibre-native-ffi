@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How the transitions of one camera command ended.
+/// How a camera change ended.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_transition_outcome</c> in the <see
@@ -11,21 +11,19 @@ namespace Maplibre.NativeFfi;
 public enum CameraTransitionOutcome : uint
 {
     /// <summary>
-    /// Every property of the command reached its target, or a later camera
-    /// write replaced it.
+    /// The camera finished the change, or a later camera change replaced it.
     /// </summary>
     Completed = 0,
 
     /// <summary>
     /// <c>MapHandle.CancelTransitionsAsync()</c>,
-    /// <c>MapHandle.CancelCameraTransitionAsync()</c>, or
-    /// <c>GesturePhase.Cancel</c> ended the transitions, or the command failed
-    /// before it started them.
+    /// <c>MapHandle.CancelCameraTransitionAsync()</c>, or a gesture's
+    /// <c>GesturePhase.Cancel</c> stopped the change.
     /// </summary>
     Cancelled = 1,
 
     /// <summary>
-    /// The map closed before the transitions ended.
+    /// The map closed before the change ended.
     /// </summary>
     Closed = 2,
 }

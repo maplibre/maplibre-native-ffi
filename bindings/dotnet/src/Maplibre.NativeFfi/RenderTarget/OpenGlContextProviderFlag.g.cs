@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL context providers supported by this build.
+/// An OpenGL context platform, as a bit in a set.
 /// </summary>
 /// <remarks>
 /// See <c>mln_open_gl_context_provider_flag</c> in the <see
@@ -13,9 +13,5 @@ public enum OpenGlContextProviderFlag : uint
 {
     Wgl = 1,
     Egl = 2,
-
-    /// <summary>
-    /// Browser WebGL context imported into an Emscripten module.
-    /// </summary>
     WebGl = 4,
 }

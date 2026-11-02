@@ -1,7 +1,6 @@
 /**
  * @file maplibre_native_c/map.h
- * Public C API declarations for map lifecycle, shared types, and offline
- * regions.
+ * Maps, the types that describe their camera and view, and offline regions.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_MAP_H
@@ -22,7 +21,7 @@
 extern "C" {
 #endif
 
-/** Field mask values for mln_camera_options. */
+/** The fields that mln_camera_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_camera_option_field : uint32_t {
   MLN_CAMERA_OPTION_CENTER = 1U << 0U,
   MLN_CAMERA_OPTION_ZOOM = 1U << 1U,
@@ -38,7 +37,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_option_field : uint32_t {
 /** A set of mln_camera_option_field bits. */
 typedef uint32_t mln_camera_option_fields;
 
-/** Field mask values for mln_animation_options. */
+/** The fields that mln_animation_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_DURATION = 1U << 0U,
   MLN_ANIMATION_OPTION_VELOCITY = 1U << 1U,
@@ -50,7 +49,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_animation_option_field : uint32_t {
 /** A set of mln_animation_option_field bits. */
 typedef uint32_t mln_animation_option_fields;
 
-/** Field mask values for mln_camera_fit_options. */
+/** The fields that mln_camera_fit_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_camera_fit_option_field : uint32_t {
@@ -62,24 +61,16 @@ typedef enum MLN_BINDING(
 /** A set of mln_camera_fit_option_field bits. */
 typedef uint32_t mln_camera_fit_option_fields;
 
-/** Field mask values for mln_bound_options. */
+/** The fields that mln_bound_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_bound_option_field : uint32_t {
-  /**
-   * Selects mln_bound_options.bounds as a geographic constraint that the
-   * camera center stays inside. Mutually exclusive with
-   * MLN_BOUND_OPTION_UNBOUNDED.
-   */
   MLN_BOUND_OPTION_BOUNDS = 1U << 0U,
   MLN_BOUND_OPTION_MIN_ZOOM = 1U << 1U,
   MLN_BOUND_OPTION_MAX_ZOOM = 1U << 2U,
   MLN_BOUND_OPTION_MIN_PITCH = 1U << 3U,
   MLN_BOUND_OPTION_MAX_PITCH = 1U << 4U,
   /**
-   * Selects the unbounded geographic constraint, which leaves every camera
-   * center unconstrained and lets the map pan freely across the antimeridian.
-   * This differs from world bounds of -90/-180 to 90/180, which clamp
-   * longitude to that range. Mutually exclusive with mln_bound_options.bounds,
-   * which it leaves unread.
+   * Removes the area that limits the camera's center. It can't be combined
+   * with MLN_BOUND_OPTION_BOUNDS.
    */
   MLN_BOUND_OPTION_UNBOUNDED = 1U << 5U,
 } mln_bound_option_field;
@@ -87,7 +78,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_bound_option_field : uint32_t {
 /** A set of mln_bound_option_field bits. */
 typedef uint32_t mln_bound_option_fields;
 
-/** Field mask values for mln_free_camera_options. */
+/** The fields that mln_free_camera_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_free_camera_option_field : uint32_t {
@@ -98,7 +89,7 @@ typedef enum MLN_BINDING(
 /** A set of mln_free_camera_option_field bits. */
 typedef uint32_t mln_free_camera_option_fields;
 
-/** Field mask values for MapLibre axonometric rendering options. */
+/** The fields that mln_projection_mode sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_projection_mode_field : uint32_t {
   MLN_PROJECTION_MODE_AXONOMETRIC = 1U << 0U,
   MLN_PROJECTION_MODE_X_SKEW = 1U << 1U,
@@ -108,7 +99,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_projection_mode_field : uint32_t {
 /** A set of mln_projection_mode_field bits. */
 typedef uint32_t mln_projection_mode_fields;
 
-/** Debug overlay mask values for mln_map_set_debug_options(). */
+/** A debug overlay that the map draws. */
 typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_flag : uint32_t {
   MLN_MAP_DEBUG_TILE_BORDERS = 1U << 1U,
   MLN_MAP_DEBUG_PARSE_STATUS = 1U << 2U,
@@ -122,7 +113,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_flag : uint32_t {
 /** A set of mln_map_debug_flag bits. */
 typedef uint32_t mln_map_debug_flags;
 
-/** Map north orientation values used by mln_map_viewport_options. */
+/** The screen direction that north points to when the bearing is 0. */
 typedef enum mln_north_orientation : uint32_t {
   MLN_NORTH_ORIENTATION_UP = 0,
   MLN_NORTH_ORIENTATION_RIGHT = 1,
@@ -130,21 +121,25 @@ typedef enum mln_north_orientation : uint32_t {
   MLN_NORTH_ORIENTATION_LEFT = 3,
 } mln_north_orientation;
 
-/** Map constraint modes used by mln_map_viewport_options. */
+/** How the map keeps the camera within the world or within its bounds. */
 typedef enum mln_constrain_mode : uint32_t {
   MLN_CONSTRAIN_MODE_NONE = 0,
+  /** Keeps the world filling the view from top to bottom. */
   MLN_CONSTRAIN_MODE_HEIGHT_ONLY = 1,
+  /** Keeps the world filling the view in both directions. */
   MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT = 2,
+  /** Keeps the whole view inside the bounds from mln_map_set_bounds(). */
   MLN_CONSTRAIN_MODE_SCREEN = 3,
 } mln_constrain_mode;
 
-/** Viewport orientation modes used by mln_map_viewport_options. */
+/** The vertical direction of the image that the map renders. */
 typedef enum mln_viewport_mode : uint32_t {
   MLN_VIEWPORT_MODE_DEFAULT = 0,
+  /** Renders the image upside down. */
   MLN_VIEWPORT_MODE_FLIPPED_Y = 1,
 } mln_viewport_mode;
 
-/** Field mask values for mln_map_viewport_options. */
+/** The fields that mln_map_viewport_options sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_map_viewport_option_field : uint32_t {
@@ -157,13 +152,15 @@ typedef enum MLN_BINDING(
 /** A set of mln_map_viewport_option_field bits. */
 typedef uint32_t mln_map_viewport_option_fields;
 
-/** Tile LOD algorithms used by mln_map_tile_options. */
+/** How the map picks the level of detail of its tiles. */
 typedef enum mln_tile_lod_mode : uint32_t {
+  /** Uses the most detail at the center of the screen. */
   MLN_TILE_LOD_MODE_DEFAULT = 0,
+  /** Uses the most detail closest to the camera. */
   MLN_TILE_LOD_MODE_DISTANCE = 1,
 } mln_tile_lod_mode;
 
-/** Field mask values for mln_map_tile_options. */
+/** The fields that mln_map_tile_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_map_tile_option_field : uint32_t {
   MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1U << 0U,
   MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS = 1U << 1U,
@@ -176,26 +173,24 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_tile_option_field : uint32_t {
 /** A set of mln_map_tile_option_field bits. */
 typedef uint32_t mln_map_tile_option_fields;
 
-/** Map rendering modes used when creating a map. */
+/** When a map renders. */
 typedef enum mln_map_mode : uint32_t {
-  /** Continuously updates as data arrives and map state changes. */
+  /** Renders whenever the map changes. */
   MLN_MAP_MODE_CONTINUOUS = 0,
-  /** Produces one-off still images of an arbitrary viewport. */
+  /** Renders only when mln_map_request_still_image() asks for an image. */
   MLN_MAP_MODE_STATIC = 1,
-  /** Produces one-off still images for a single tile. */
+  /** Renders still images of single tiles, as MLN_MAP_MODE_STATIC does. */
   MLN_MAP_MODE_TILE = 2,
 } mln_map_mode;
-/** Logical extent in UI pixels and the device-pixel scale. */
+
+/** A size in logical pixels, and the physical pixels in each logical pixel. */
 typedef struct mln_logical_extent {
-  /** Width in UI pixels. */
   uint32_t width;
-  /** Height in UI pixels. */
   uint32_t height;
-  /** Device pixels per UI pixel. */
   double scale_factor;
 } mln_logical_extent;
 
-/** Field mask values for mln_map_options. */
+/** The fields that mln_map_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
   MLN_MAP_OPTION_EVENT_MASK = 1U << 0U,
   MLN_MAP_OPTION_TILE_CACHE_ENABLED = 1U << 1U,
@@ -204,66 +199,36 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
 /** A set of mln_map_option_field bits. */
 typedef uint32_t mln_map_option_fields;
 
-/** Options used when creating a map. */
+/** Options for mln_runtime_create_map(). */
 typedef struct mln_map_options {
   uint32_t size;
   mln_map_option_fields fields;
-  /**
-   * Initial logical extent. Required. Width and height must be nonzero, and
-   * scale_factor must be finite and positive. scale_factor is fixed for the
-   * map's lifetime.
-   *
-   * After creation, only mln_map_resize() changes the width and height. A
-   * render session submits it to size the map to its target.
-   */
+  /** The map's first size. Its scale factor stays fixed for the map's life. */
   mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;
   /**
-   * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-   * encodings.
-   *
-   * Enable this on maps that read vector sources created with
-   * MLN_STYLE_VECTOR_TILE_ENCODING_MLT from a tile set that uses FastPFOR. It
-   * is fixed for the lifetime of the map and applies to every MLT source the
-   * map loads. A map created with this false decodes every other MLT encoding
-   * and logs a tile parse warning for the FastPFOR ones.
+   * Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
+   * encoding. Without it, such tiles fail to load.
    */
   bool fast_pfor_enabled;
-  /**
-   * Map-originated event types this map queues.
-   *
-   * Absent selects every event type. Present, MLN_RUNTIME_EVENT_FLAG_ALL
-   * selects every event type this library reports, and
-   * MLN_RUNTIME_EVENT_FLAG_NONE queues none.
-   *
-   * The mask applies throughout construction, including the camera events that
-   * MapLibre reports while it initializes the map's size.
-   */
+  /** The events that the map reports. Without it, the map reports them all. */
   mln_runtime_event_flags event_mask
     MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_EVENT_MASK");
   /**
-   * Whether each source keeps tiles that leave the view, so the map can show
-   * them again without loading them. Absent selects true.
-   *
-   * A map that renders unrelated views, as a tile server's does, seldom shows
-   * a kept tile again and can turn this off to use less memory. It is fixed
-   * for the lifetime of the map and applies to each render session attached
-   * to it.
+   * Whether the map keeps tiles in memory after they leave the view, so they
+   * show again without loading. Without it, the map keeps them.
    */
   bool tile_cache_enabled
     MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_TILE_CACHE_ENABLED");
 } mln_map_options;
 
-/**
- * Screen-space point in logical map pixels, from the top-left of the viewport
- * with y growing downward.
- */
+/** A point on the screen, in logical pixels from the map's top-left corner. */
 typedef struct mln_screen_point {
   double x;
   double y;
 } mln_screen_point;
 
-/** Screen-space inset in logical map pixels. */
+/** Distances in logical pixels from each edge of the map. */
 typedef struct mln_edge_insets {
   double top;
   double left;
@@ -271,38 +236,44 @@ typedef struct mln_edge_insets {
   double right;
 } mln_edge_insets;
 
-/** Geographic coordinate in degrees used by map and projection APIs. */
+/** A geographic coordinate, in degrees. */
 typedef struct mln_lat_lng {
-  /** Latitude in degrees, finite and within [-90, 90] on input. */
   double latitude;
-  /** Longitude in degrees. Input longitude must be finite. */
   double longitude;
 } mln_lat_lng;
 
-/** Camera fields used by snapshots and camera updates. */
+/** A camera, with only the members that `fields` selects. */
 typedef struct mln_camera_options {
   uint32_t size;
   mln_camera_option_fields fields;
   mln_lat_lng center MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER");
+  /** The altitude of the center, in meters above sea level. */
   double center_altitude
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER_ALTITUDE");
+  /** Insets from the map's edges. The camera centers within the rest. */
   mln_edge_insets padding
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_PADDING");
-  /** Optional screen-space focal point in logical map pixels. */
+  /**
+   * The screen point that a change to the zoom, bearing, or pitch keeps in
+   * place. A `center` overrides it.
+   */
   mln_screen_point anchor
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_ANCHOR");
   double zoom MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_ZOOM");
+  /** The rotation from north, in degrees. */
   double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_BEARING");
+  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
   double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_PITCH");
+  /** The roll, in degrees. */
   double roll MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_ROLL");
+  /** The vertical field of view, in degrees. */
   double field_of_view MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_FOV");
 } mln_camera_options;
 
 /**
- * A complete camera, as native reports it.
+ * A map's whole camera.
  *
- * Unlike mln_camera_options, every member is set and there is no anchor, which
- * only directs a camera change.
+ * Its members mean the same as those of mln_camera_options.
  */
 typedef struct mln_camera {
   mln_lat_lng center;
@@ -315,7 +286,12 @@ typedef struct mln_camera {
   double field_of_view;
 } mln_camera;
 
-/** Cubic easing curve for animated camera transitions. */
+/**
+ * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
+ * and (`x2`, `y2`).
+ *
+ * `x1` and `x2` are between 0 and 1.
+ */
 typedef struct mln_unit_bezier {
   double x1;
   double y1;
@@ -323,172 +299,100 @@ typedef struct mln_unit_bezier {
   double y2;
 } mln_unit_bezier;
 
-/** How the transitions of one camera command ended. */
+/** How a camera change ended. */
 typedef enum mln_camera_transition_outcome : uint32_t {
-  /**
-   * Every property of the command reached its target, or a later camera write
-   * replaced it.
-   */
+  /** The camera finished the change, or a later camera change replaced it. */
   MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
   /**
-   * mln_map_cancel_transitions(), mln_map_cancel_camera_transition(), or
-   * MLN_GESTURE_PHASE_CANCEL ended the transitions, or the command failed
-   * before it started them.
+   * mln_map_cancel_transitions(), mln_map_cancel_camera_transition(), or a
+   * gesture's MLN_GESTURE_PHASE_CANCEL stopped the change.
    */
   MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
-  /** The map closed before the transitions ended. */
+  /** The map closed before the change ended. */
   MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2,
 } mln_camera_transition_outcome;
 
-/**
- * The end of one camera command's transitions.
- *
- * The callback borrows it.
- */
+/** The end of a camera change. */
 typedef struct mln_camera_transition_end {
   uint32_t size;
   mln_camera_transition_outcome outcome;
   /**
-   * Generation of the published snapshot that shows the camera where the
-   * transitions left it. The map events of the change that ended them carry
-   * this generation and are queued before the callback runs. Zero for
-   * MLN_CAMERA_TRANSITION_OUTCOME_CLOSED.
+   * The generation of the first map snapshot that shows where the change left
+   * the camera, or 0 when the map closed first.
    */
   uint64_t generation;
 } mln_camera_transition_end;
 
 /**
- * Receives the end of one camera command's transitions.
+ * Receives the end of a camera change.
  *
- * A handler that names a queue queues a copy of the call instead.
- *
- * Threads:
- * The callback runs on the runtime worker.
+ * Lifetimes:
+ * `end` stays valid until the callback returns.
  */
 typedef void (*mln_camera_transition_end_callback)(
   void* user_data, const mln_camera_transition_end* end
 );
 
 /**
- * Callback that one camera command copies to report the end of its
- * transitions.
+ * A callback for the end of a camera change, for mln_animation_options.
  *
- * A handler without a callback is disabled, and a disabled handler must not
- * carry release_user_data or a queue. See
- * mln_animation_options.end_handler for when the callback runs.
+ * The callback runs once for each camera command, after every part of the
+ * change that the command started has ended.
  */
 typedef struct mln_camera_transition_handler {
   mln_camera_transition_end_callback callback MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
-  /**
-   * Optional. Releases user_data on the runtime worker after the callback
-   * returns. A rejected command runs neither callback, and the caller keeps
-   * user_data.
-   */
   mln_user_data_release release_user_data;
-  /**
-   * Optional. The callback and release_user_data run in
-   * mln_delivery_queue_dispatch(). A command rejects an invalid queue
-   * handle with MLN_STATUS_INVALID_ARGUMENT and a released queue with
-   * MLN_STATUS_INVALID_STATE.
-   */
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
 } mln_camera_transition_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
 
-/** Optional animation controls for camera transitions. */
+/** How a camera change animates. */
 typedef struct mln_animation_options {
   mln_animation_option_fields fields;
-  /**
-   * Duration in milliseconds. Must be finite, non-negative, and short enough
-   * to represent as a duration.
-   *
-   * When omitted, ease transitions apply immediately. Fly transitions derive
-   * their duration from velocity.
-   */
   double duration_ms
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_DURATION");
   /**
-   * Average fly velocity in screenfuls per second. Must be positive and finite;
-   * absent selects 1.2. A flight whose derived duration is too long
-   * to represent fails its completion with MLN_STATUS_NATIVE_ERROR. An
-   * explicit duration overrides velocity.
+   * The average speed of a fly animation, in screens per second.
+   * `duration_ms` overrides it.
    */
   double velocity MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_VELOCITY");
-  /** Peak zoom for flyTo transitions. */
+  /** The zoom level at the peak of a fly animation. */
   double min_zoom MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_MIN_ZOOM");
   mln_unit_bezier easing
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_EASING");
   /**
-   * Caller-chosen identity of the command that these options animate, which
-   * mln_map_cancel_camera_transition() matches.
-   *
-   * The C API passes the value through without interpreting it, so callers
-   * pick their own scheme, such as a monotonically increasing counter. Several
-   * commands may share one identity. A command without this field matches no
-   * identity.
+   * An ID that mln_map_cancel_camera_transition() cancels the change by.
+   * Several changes can share one.
    */
   uint64_t transition_id
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_TRANSITION_ID");
-  /**
-   * Reports the end of the command's transitions. Disabled by default.
-   *
-   * For each accepted command that carries an enabled handler, the callback
-   * runs exactly once, on the runtime worker, and release_user_data runs after
-   * it. A command ends when every MapLibre transition that it started has
-   * ended, so a camera delta that pans and zooms reports once, after both. A
-   * jump, a zero-duration transition, and a command that changes no camera
-   * field end right after the command applies.
-   *
-   * The callback runs after the map events of the change that ended the
-   * transitions are queued, and never from inside a MapLibre Native call. A
-   * transition that a command ends reports before that command's completion
-   * runs. A transition that ends outside a command, as rendered frames advance
-   * it, reports from a later task on the runtime worker. When the map closes
-   * first, the callback runs with MLN_CAMERA_TRANSITION_OUTCOME_CLOSED before
-   * the release completes.
-   *
-   * The callback may call any C API that a completion callback may call,
-   * including camera commands, but must return promptly. A rejected command
-   * runs neither callback and leaves user_data with the caller.
-   */
   mln_camera_transition_handler end_handler;
 } mln_animation_options;
 
-/** Camera transition behavior for mln_camera_update. */
+/** How mln_map_update_camera() moves the camera. */
 typedef enum mln_camera_update_mode : uint32_t {
+  /** Moves the camera at once. */
   MLN_CAMERA_UPDATE_MODE_JUMP = 0,
+  /** Animates the camera straight to the target. */
   MLN_CAMERA_UPDATE_MODE_EASE = 1,
+  /** Zooms out, travels to the target, and zooms back in. */
   MLN_CAMERA_UPDATE_MODE_FLY = 2,
 } mln_camera_update_mode;
 
-/**
- * Gesture boundary carried atomically with a camera update or delta.
- *
- * The phase is applied around the camera write and is reported by
- * mln_map_snapshot.gesture_in_progress.
- */
+/** Where a camera change falls in a gesture that the user makes. */
 typedef enum mln_gesture_phase : uint32_t {
-  /** The update carries no gesture boundary and leaves the flag as it is. */
+  /** The change isn't part of a gesture. */
   MLN_GESTURE_PHASE_NONE = 0,
-  /**
-   * Marks a gesture as in progress before the camera write. It does not
-   * cancel running transitions; use mln_map_cancel_transitions() for that.
-   */
   MLN_GESTURE_PHASE_BEGIN = 1,
-  /** Keeps the gesture marked as in progress before the camera write. */
   MLN_GESTURE_PHASE_UPDATE = 2,
-  /** Clears the gesture flag after the camera write. */
   MLN_GESTURE_PHASE_END = 3,
-  /**
-   * Cancels transitions running after the camera write, then clears the
-   * gesture flag.
-   */
+  /** The platform cancelled the gesture. This also cancels camera changes. */
   MLN_GESTURE_PHASE_CANCEL = 4,
 } mln_gesture_phase;
 
-/** Field mask values for mln_camera_delta. */
+/** The fields that mln_camera_delta sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
   MLN_CAMERA_DELTA_OFFSET = 1U << 0U,
   MLN_CAMERA_DELTA_SCALE = 1U << 1U,
@@ -500,46 +404,23 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
 /** A set of mln_camera_delta_field bits. */
 typedef uint32_t mln_camera_delta_fields;
 
-/**
- * One atomic relative camera update.
- *
- * Each selected component resolves against the camera as it stands when the
- * command runs. Immediate deltas therefore compose exactly, however many are
- * queued. An animated delta starts from the value a running transition has
- * reached and replaces that component's transition, so queue animated deltas
- * only after the previous one has rendered or finished.
- *
- * OFFSET pans first, in the current camera's logical pixels: the content moves
- * by offset, so positive x moves it right and positive y moves it down, and a
- * pointer drag delta passes through unchanged. The pan stops short of the
- * horizon. SCALE, BEARING, and PITCH then change the camera about anchor when
- * ANCHOR is set, keeping the coordinate under anchor in the panned camera
- * fixed, or about the center otherwise. ANCHOR requires SCALE, BEARING, or
- * PITCH. ANCHOR combines with OFFSET only for an immediate delta, one whose
- * animation selects no DURATION or a zero duration; a two-finger gesture passes
- * its centroid movement as offset and its new centroid as anchor. An animated
- * bearing change takes the shorter way around.
- *
- * fields may be zero, in which case the delta changes only the gesture phase
- * and its animation's end handler runs at once. gesture_phase is applied around
- * the camera write, as in mln_camera_update. The command copies this struct
- * before returning.
- */
+/** A change to the camera from where it is now, for gestures. */
 typedef struct mln_camera_delta {
   uint32_t size;
   mln_camera_delta_fields fields;
-  /** Pan in logical map pixels; the content moves by this offset. */
+  /** Moves the map's content this far on the screen, as a drag does. */
   mln_screen_point offset
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_OFFSET");
-  /** Positive zoom factor; 2 zooms in one level. */
+  /** Multiplies the map's scale. 2 zooms in by one level. */
   double scale MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_SCALE");
-  /** Degrees added to the bearing. */
+  /** Degrees to add to the bearing. */
   double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_BEARING");
-  /** Degrees added to the pitch; positive tilts further from straight down. */
+  /** Degrees to add to the pitch. */
   double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_PITCH");
   /**
-   * Screen point in logical map pixels that scale, bearing, and pitch keep
-   * fixed.
+   * The screen point that `scale`, `bearing`, and `pitch` keep in place. It
+   * needs one of them, and it combines with `offset` only in a delta without
+   * a duration.
    */
   mln_screen_point anchor
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_ANCHOR");
@@ -549,9 +430,10 @@ typedef struct mln_camera_delta {
 } mln_camera_delta;
 
 /**
- * One atomic absolute camera update.
+ * A camera change for mln_map_update_camera().
  *
- * The command copies this struct before returning.
+ * A jump uses only the end handler of `animation`, and the handler runs as
+ * soon as the camera moves.
  */
 typedef struct mln_camera_update {
   uint32_t size;
@@ -562,24 +444,25 @@ typedef struct mln_camera_update {
   uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_camera_update;
 
-/** Optional fitting controls for camera-for-viewport queries. */
+/** Options for finding the camera that fits an area. */
 typedef struct mln_camera_fit_options {
   uint32_t size;
   mln_camera_fit_option_fields fields;
+  /** Space to leave between the area and each edge of the map. */
   mln_edge_insets padding
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PADDING");
   double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_BEARING");
   double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PITCH");
 } mln_camera_fit_options;
 
-/** Three-component vector used by free camera options. */
+/** A vector in three dimensions. */
 typedef struct mln_vec3 {
   double x;
   double y;
   double z;
 } mln_vec3;
 
-/** Quaternion stored as x, y, z, w components. */
+/** A rotation, as a quaternion. */
 typedef struct mln_quaternion {
   double x;
   double y;
@@ -587,17 +470,26 @@ typedef struct mln_quaternion {
   double w;
 } mln_quaternion;
 
-/** Free camera position and orientation in MapLibre Native camera space. */
+/** The camera's position and orientation in three dimensions. */
 typedef struct mln_free_camera_options {
   uint32_t size;
   mln_free_camera_option_fields fields;
+  /**
+   * The camera's position in Web Mercator units, where the world is 1 wide,
+   * (0, 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is
+   * the altitude in the same units.
+   */
   mln_vec3 position
     MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_POSITION");
+  /**
+   * The camera's rotation from looking straight down with north at the top of
+   * the screen.
+   */
   mln_quaternion orientation
     MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_ORIENTATION");
 } mln_free_camera_options;
 
-/** Optional fields for mln_feature_state_selector. */
+/** The fields that mln_feature_state_selector sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_feature_state_selector_field : uint32_t {
@@ -607,50 +499,38 @@ typedef enum MLN_BINDING(
 /** A set of mln_feature_state_selector_field bits. */
 typedef uint32_t mln_feature_state_selector_fields;
 
-/** Feature-state source, feature, and key selector. */
+/** The features whose state to set, read, or remove. */
 typedef struct mln_feature_state_selector {
   uint32_t size;
   mln_feature_state_selector_fields fields;
-  /**
-   * Source ID. Required.
-   *
-   * Borrowed for the duration of the call.
-   */
   mln_buffer_view source_id MLN_BINDING("required=true");
-  /**
-   * Source layer ID, or empty for none. Required for vector-source
-   * disambiguation.
-   */
+  /** The source layer, for a vector source. Empty for other sources. */
   mln_buffer_view source_layer_id;
   /**
-   * Optional feature ID. Required by set and get, optional for remove. A
-   * numeric feature ID matches its decimal text, such as "7" for the GeoJSON
-   * id 7. Its field bit tells an absent ID from the empty ID "".
+   * The feature's ID. Setting or reading state needs it. Without it,
+   * mln_map_remove_feature_state() removes the state of every feature in the
+   * source layer.
    */
   mln_buffer_view feature_id
     MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_FEATURE_ID");
   /**
-   * State key, or empty to select every key. Used only by remove, and requires
-   * feature_id.
+   * The one key that mln_map_remove_feature_state() removes. It needs
+   * `feature_id`. Empty removes every key.
    */
   mln_buffer_view state_key;
 } mln_feature_state_selector;
 
-/** Geographic bounds in degrees. */
+/** A rectangle of coordinates, from its southwest to its northeast corner. */
 typedef struct mln_lat_lng_bounds {
   mln_lat_lng southwest;
   mln_lat_lng northeast;
 } mln_lat_lng_bounds;
 
-/** Optional map camera constraint fields. */
+/** Limits on the camera, for mln_map_set_bounds(). */
 typedef struct mln_bound_options {
   uint32_t size;
   mln_bound_option_fields fields;
-  /**
-   * Geographic bounds that the camera center stays inside.
-   *
-   * Read when fields contains MLN_BOUND_OPTION_BOUNDS.
-   */
+  /** The area that the camera's center stays within. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_BOUNDS");
   double min_zoom MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MIN_ZOOM");
@@ -659,42 +539,39 @@ typedef struct mln_bound_options {
   double max_pitch MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MAX_PITCH");
 } mln_bound_options;
 
-/** Tile-pyramid offline region definition. */
+/** An offline region that covers a rectangle of the map. */
 typedef struct mln_offline_tile_pyramid_region_definition {
-  /** Style URL. Copied during region creation. */
+  /**
+   * The style whose resources the region holds. Maps use the region when they
+   * load the same style URL.
+   */
   mln_buffer_view style_url;
   mln_lat_lng_bounds bounds;
   double min_zoom;
-  /**
-   * Maximum zoom. Positive infinity lets each tile source use its own maximum
-   * zoom.
-   */
+  /** INFINITY covers every zoom level that the style's sources have. */
   double max_zoom;
+  /** The pixel ratio of the images to download, such as 2 for dense screens. */
   float pixel_ratio;
+  /** Whether the region holds the glyphs of CJK ideographs. */
   bool include_ideographs;
 } mln_offline_tile_pyramid_region_definition;
 
-/** Geometry offline region definition. */
+/**
+ * An offline region that covers a GeoJSON geometry.
+ *
+ * The members other than `geometry` mean the same as those of
+ * mln_offline_tile_pyramid_region_definition.
+ */
 typedef struct mln_offline_geometry_region_definition {
-  /** Style URL. Copied during region creation. */
   mln_buffer_view style_url;
-  /**
-   * UTF-8 GeoJSON Geometry. Required.
-   *
-   * Borrowed during region creation.
-   */
   mln_buffer_view geometry MLN_BINDING("encoding=json;required=true");
   double min_zoom;
-  /**
-   * Maximum zoom. Positive infinity lets each tile source use its own maximum
-   * zoom.
-   */
   double max_zoom;
   float pixel_ratio;
   bool include_ideographs;
 } mln_offline_geometry_region_definition;
 
-/** Offline region definition data. */
+/** The rectangle or geometry of an offline region definition. */
 typedef union mln_offline_region_definition_data {
   mln_offline_tile_pyramid_region_definition tile_pyramid
     MLN_BINDING("variant=MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID");
@@ -702,47 +579,27 @@ typedef union mln_offline_region_definition_data {
     MLN_BINDING("variant=MLN_OFFLINE_REGION_DEFINITION_GEOMETRY");
 } mln_offline_region_definition_data;
 
-/** Tagged offline region definition. */
+/** The area, zoom range, and style that an offline region covers. */
 typedef struct mln_offline_region_definition {
   uint32_t size;
   mln_offline_region_definition_type type;
   mln_offline_region_definition_data data MLN_BINDING("tag=type");
 } mln_offline_region_definition;
 
-/**
- * Region data delivered by an offline completion.
- *
- * The record and every pointer it carries, including the definition's style
- * URL and geometry and the metadata bytes, are borrowed for the duration of the
- * completion callback.
- */
+/** An offline region in the runtime's cache file. */
 typedef struct mln_offline_region_info {
   mln_offline_region_id id;
   mln_offline_region_definition definition;
-  /** Metadata bytes. */
   const uint8_t* metadata MLN_BINDING("length=metadata_size;encoding=bytes");
   size_t metadata_size;
 } mln_offline_region_info;
 
 /**
- * Starts creating an offline region.
+ * Creates an offline region in the runtime's cache file.
  *
- * Input strings, GeoJSON geometry bytes, and metadata are copied before this
- * call returns. A successful completion borrows one mln_offline_region_info
- * value, valid only for the duration of the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, definition
- *   is null or malformed, metadata is null with a non-zero metadata_size, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_OK and one region record.
- * - MLN_STATUS_UNSUPPORTED when the stored definition type is unsupported.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * `metadata` holds any bytes to store with the region, such as its name. The
+ * region doesn't download until mln_runtime_set_offline_region_download_state()
+ * makes its download active.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info")
 MLN_API mln_status mln_runtime_create_offline_region(
@@ -753,25 +610,9 @@ MLN_API mln_status mln_runtime_create_offline_region(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts getting one offline region by ID.
+ * Reads the offline region `region_id`.
  *
- * A successful completion borrows zero or one mln_offline_region_info value,
- * depending on whether the region exists, valid only for the duration of the
- * callback. A missing region completes successfully with no value, as every
- * read of a whole object does; operations on one region complete with
- * MLN_STATUS_NOT_FOUND instead.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_OK and zero or one region record.
- * - MLN_STATUS_UNSUPPORTED when the stored definition type is unsupported.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * The result is null when the cache file has no region with that ID.
  */
 MLN_BINDING("execution=query;result=mln_offline_region_info;nullable=true")
 MLN_API mln_status mln_runtime_get_offline_region(
@@ -779,24 +620,7 @@ MLN_API mln_status mln_runtime_get_offline_region(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Starts listing the offline regions in the runtime database.
- *
- * A successful completion borrows value_count mln_offline_region_info values,
- * value_size bytes apart, valid only for the duration of the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_OK and one record per stored region.
- * - MLN_STATUS_UNSUPPORTED when a stored definition type is unsupported.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
- */
+/** Lists the offline regions in the runtime's cache file. */
 MLN_BINDING("execution=query;result=mln_offline_region_info;shape=array")
 MLN_API mln_status mln_runtime_list_offline_regions(
   mln_runtime runtime, const mln_completion* completion,
@@ -804,38 +628,16 @@ MLN_API mln_status mln_runtime_list_offline_regions(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts merging offline regions from another MapLibre offline database.
+ * Copies the offline regions of another cache file into the runtime's cache
+ * file.
  *
- * side_database_path must identify an existing, readable MapLibre offline
- * database whose schema version matches this library. The runtime opens the
- * database read-only and leaves its contents unchanged. Keep the file present
- * and unchanged until the completion runs.
- *
- * The merge copies only tiles and resources assigned to a region. It does not
- * accept an MBTiles database, which uses a different schema.
- *
- * The call copies side_database_path. A path that names no existing readable
- * database file is rejected with MLN_STATUS_INVALID_ARGUMENT before acceptance.
- * Format, schema, and later filesystem errors reach the completion as a non-OK
- * status and diagnostic.
- *
- * A successful completion borrows value_count mln_offline_region_info values,
- * value_size bytes apart and one per merged region, valid only for the
- * duration of the callback.
+ * A region whose definition and metadata match one that the runtime's file
+ * already has isn't copied again. The result lists the runtime's copy of each
+ * region in the other file.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle,
- *   side_database_path has null data with a nonzero size, contains embedded
- *   NUL, or names no readable database file, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_OK and one record per merged region.
- * - MLN_STATUS_UNSUPPORTED when a merged definition type is unsupported.
- * - MLN_STATUS_NATIVE_ERROR when the merge fails, including a schema mismatch.
+ * - MLN_STATUS_INVALID_ARGUMENT when `side_database_path` isn't a readable
+ *   database file.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info;shape=array")
 MLN_API mln_status mln_runtime_merge_offline_regions(
@@ -844,24 +646,10 @@ MLN_API mln_status mln_runtime_merge_offline_regions(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts updating opaque binary metadata for an offline region.
- *
- * Metadata bytes are copied before this call returns. A successful completion
- * borrows one mln_offline_region_info value carrying the updated region, valid
- * only for the duration of the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, metadata is
- *   null with a non-zero metadata_size, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ * Replaces the metadata of the offline region `region_id`.
  *
  * Completes with:
- * - MLN_STATUS_OK and one region record.
- * - MLN_STATUS_NOT_FOUND when no region carries region_id.
- * - MLN_STATUS_UNSUPPORTED when the stored definition type is unsupported.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info")
 MLN_API mln_status mln_runtime_update_offline_region_metadata(
@@ -872,22 +660,10 @@ MLN_API mln_status mln_runtime_update_offline_region_metadata(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts getting the current download status for an offline region.
- *
- * A successful completion borrows one mln_offline_region_status value, valid
- * only for the duration of the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ * Reads the download progress of the offline region `region_id`.
  *
  * Completes with:
- * - MLN_STATUS_OK and one status value.
- * - MLN_STATUS_NOT_FOUND when no region carries region_id.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=query;result=mln_offline_region_status")
 MLN_API mln_status mln_runtime_get_offline_region_status(
@@ -896,24 +672,11 @@ MLN_API mln_status mln_runtime_get_offline_region_status(
 ) MLN_NOEXCEPT;
 
 /**
- * Enables or disables runtime events for an offline region.
- *
- * An observed region reports progress and errors as runtime events. Disabling
- * observation prevents future events for this region and leaves queued events
- * unchanged.
- * The completion reports the terminal status and carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ * Sets whether the runtime reports the download progress of the offline region
+ * `region_id` as events.
  *
  * Completes with:
- * - MLN_STATUS_OK when observation was changed.
- * - MLN_STATUS_NOT_FOUND when no region carries region_id.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_offline_region_observed(
@@ -922,23 +685,12 @@ MLN_API mln_status mln_runtime_set_offline_region_observed(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets an offline region's native download state.
+ * Starts or pauses the download of the offline region `region_id`.
  *
- * Register observation separately with
- * mln_runtime_set_offline_region_observed() to receive progress and error
- * events. The completion reports the terminal status and carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, state is not
- *   an mln_offline_region_download_state value, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ * A download stops when the runtime closes.
  *
  * Completes with:
- * - MLN_STATUS_OK when the download state was set.
- * - MLN_STATUS_NOT_FOUND when no region carries region_id.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_offline_region_download_state(
@@ -948,21 +700,13 @@ MLN_API mln_status mln_runtime_set_offline_region_download_state(
 ) MLN_NOEXCEPT;
 
 /**
- * Invalidates cached resources for an offline region.
+ * Makes maps check each resource of the offline region `region_id` with the
+ * server before they use it.
  *
- * The completion reports the terminal status and carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ * The region keeps its resources.
  *
  * Completes with:
- * - MLN_STATUS_OK when the region's resources were invalidated.
- * - MLN_STATUS_NOT_FOUND when no region carries region_id.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_invalidate_offline_region(
@@ -971,23 +715,10 @@ MLN_API mln_status mln_runtime_invalidate_offline_region(
 ) MLN_NOEXCEPT;
 
 /**
- * Deletes an offline region.
- *
- * Resources that another region also uses stay offline. The region's other
- * resources become ambient cache, which the ambient cache budget then trims.
- * The completion reports the terminal status and carries no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ * Deletes the offline region `region_id` from the runtime's cache file.
  *
  * Completes with:
- * - MLN_STATUS_OK when the region was deleted.
- * - MLN_STATUS_NOT_FOUND when no region carries region_id.
- * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_delete_offline_region(
@@ -995,38 +726,24 @@ MLN_API mln_status mln_runtime_delete_offline_region(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Lower-level Spherical Mercator projected-meter coordinate.
- *
- * Map coordinate conversion APIs use mln_lat_lng. This type is only for
- * Mercator helper functions.
- */
+/** A point in the Web Mercator projection, in meters. */
 typedef struct mln_projected_meters {
-  /** Distance measured northward from the equator, in meters. */
   double northing;
-  /** Distance measured eastward from the prime meridian, in meters. */
   double easting;
 } mln_projected_meters;
 
-/**
- * MapLibre axonometric rendering options used for snapshots and commands.
- *
- * These control the live map render transform. Geographic coordinates retain
- * their coordinate model.
- */
+/** Settings that skew the map or draw it without perspective. */
 typedef struct mln_projection_mode {
   uint32_t size;
   mln_projection_mode_fields fields;
-  /** Enables a non-perspective axonometric render transform. */
+  /** Whether the map draws without perspective. */
   bool axonometric
     MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_AXONOMETRIC");
-  /** X-skew factor of the axonometric transform. */
   double x_skew MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_X_SKEW");
-  /** Y-skew factor of the axonometric transform. */
   double y_skew MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_Y_SKEW");
 } mln_projection_mode;
 
-/** Live map viewport and render-transform controls. */
+/** How the map orients and constrains its view. */
 typedef struct mln_map_viewport_options {
   uint32_t size;
   mln_map_viewport_option_fields fields;
@@ -1040,160 +757,79 @@ typedef struct mln_map_viewport_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
 } mln_map_viewport_options;
 
-/**
- * Everything that a projection depends on: the transform that a published
- * snapshot or a rendered frame describes.
- *
- * Every member is set on output. mln_map_projection_create() reads every
- * member and requires every field of projection_mode and viewport. Camera
- * constraints are map policy and stay out of the view, because no conversion
- * reads them.
- *
- * A later version may append members. mln_map_snapshot and
- * mln_render_frame_result embed the view as their last member, so their own
- * size versions that growth.
- */
+/** One view of a map: its camera, size, and projection. */
 typedef struct mln_map_view {
   uint32_t size;
-  /**
-   * The camera. Its center is unwrapped: the longitude keeps the visible world
-   * copy and may fall outside -180 to 180.
-   */
   mln_camera camera;
-  /**
-   * Logical size and device-pixel scale. A snapshot carries the map's scale
-   * factor, and a frame carries the scale factor of the target that drew it.
-   */
   mln_logical_extent extent;
-  /** Axonometric mode and skew, with every field set. */
   mln_projection_mode projection_mode;
-  /**
-   * North orientation, constrain mode, viewport mode, and frustum offset, with
-   * every field set.
-   */
   mln_map_viewport_options viewport;
 } mln_map_view;
 
-/** Tile prefetch and LOD tuning controls. */
+/**
+ * How the map picks the tiles to load.
+ *
+ * The `lod_` members lower the level of detail away from the camera, so the
+ * map loads fewer tiles when the pitch is high.
+ */
 typedef struct mln_map_tile_options {
   uint32_t size;
   mln_map_tile_option_fields fields;
-  /** Prefetch zoom delta, at most 255. */
+  /**
+   * How many zoom levels lower the map also loads tiles for, so it can show a
+   * coarse map while the current tiles load. 0 loads only the current tiles.
+   */
   uint32_t prefetch_zoom_delta
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA");
+  /** The radius around the view point, in tiles, that keeps full detail. */
   double lod_min_radius
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS");
+  /** Scales the distance to the view point. Above 1 lowers the detail. */
   double lod_scale MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_SCALE");
+  /** The pitch, in radians, above which the map lowers the detail. */
   double lod_pitch_threshold
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD");
+  /** Zoom levels to add for picking the detail. Below 0 loads fewer tiles. */
   double lod_zoom_shift
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT");
+  /** MLN_TILE_LOD_MODE_DISTANCE ignores `lod_min_radius`. */
   mln_tile_lod_mode lod_mode
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MODE");
 } mln_map_tile_options;
-/**
- * Immutable map state copied from the latest published generation.
- *
- * Every field is unkeyed, fixed-size map state that changes only through this
- * map's own commands or through load progress. Each map command that runs
- * publishes a new generation and reports it through its completion, when it has
- * one, even when the command changes nothing or fails, so a snapshot whose
- * generation is at or past a completion observes that command.
- */
+
+/** A map's state, as mln_map_get_snapshot() reads it. */
 typedef struct mln_map_snapshot {
   uint32_t size;
-  /** Debug overlays that the map draws. */
   mln_map_debug_flags debug_options;
+  /** Grows with each change to the map's state. */
   uint64_t generation;
-  /** True once every requested style and tile resource finished loading. */
+  /** Whether the style and every resource that the view needs have loaded. */
   bool fully_loaded;
   bool rendering_stats_view_enabled;
-  /**
-   * True while the map is inside a gesture.
-   *
-   * A camera update or delta whose gesture_phase is MLN_GESTURE_PHASE_BEGIN or
-   * MLN_GESTURE_PHASE_UPDATE sets it; MLN_GESTURE_PHASE_END and
-   * MLN_GESTURE_PHASE_CANCEL clear it.
-   */
   bool gesture_in_progress;
-  /**
-   * True while a camera command with a duration is still animating.
-   *
-   * Each MapLibre transition reports its own
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE as it ends, while others may keep
-   * the camera moving. The snapshot that the event's generation names reads
-   * false once the last transition has ended. A command without a duration
-   * never sets it.
-   */
   bool transition_in_progress;
   mln_runtime_event_flags event_mask;
-  /**
-   * Generation of the latest render update the map published. A rendered
-   * frame at or past it draws map state that includes every command this
-   * snapshot observes, though animations and resource loads finish in later
-   * frames.
-   *
-   * A command publishes the render update for its change before it reports
-   * its completion, and the completion reports that update's generation as
-   * mln_completion_result.render_update_generation. A frame result with
-   * disposition MLN_RENDER_RESULT_RENDERED and a map_update_generation at or
-   * past that value was rendered from map state that includes the command. A
-   * command group holds its commands' update until the outermost group ends,
-   * so this value stays behind the group's commands until then, while their
-   * completions already report the update that the group end publishes.
-   * For a camera command with a duration, that state is the transition's first
-   * step; the commanded camera appears in the update after the transition's
-   * last frame. Resources a command starts loading, such as a style or source
-   * URL, appear in later updates as they load.
-   */
+  /** Counts the render updates that the map has made for its render session. */
   uint64_t latest_render_update_generation;
   mln_map_tile_options tile;
   mln_bound_options bounds;
   mln_free_camera_options free_camera;
-  /**
-   * The map's camera, extent, projection mode, and viewport options.
-   * mln_map_projection_create() converts coordinates for this view.
-   */
   mln_map_view view;
 } mln_map_snapshot;
 
-/**
- * Camera result of an ordered camera query.
- *
- * The query's completion borrows it.
- */
+/** A map's camera, with the snapshot generation that it matches. */
 typedef struct mln_camera_query_result {
   uint64_t generation;
   mln_camera camera;
 } mln_camera_query_result;
 
 /**
- * Starts creation of a map on the runtime.
+ * Creates a map on `runtime`.
  *
- * Input is copied before this function returns. An accepted creation writes
- * the map to out_map, in a creating state, before the completion can run, so
- * the completion may read it there; the caller owns the map from then on.
- * A rejected creation leaves out_map null. Commands, operations, and queries
- * submitted to the map run after creation finishes; if creation failed, each
- * completes with MLN_STATUS_INVALID_STATE. Until the completion reports
- * MLN_STATUS_OK, mln_map_get_snapshot() and every render target attach return
- * MLN_STATUS_INVALID_STATE. Release or dispose the map whether or not creation
- * succeeds. A map released while it is still creating finishes creation and
- * reports it through the completion before the map retires.
- *
- * Returns:
- * - MLN_STATUS_OK when the creation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle; options is
- *   null, undersized, or carries an invalid field; options->initial_extent has
- *   a zero width or height, or a scale_factor that is not finite and positive;
- *   out_map is null or does not point to the null handle; or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_OK once the map is ready.
- * - MLN_STATUS_NATIVE_ERROR when map creation fails.
+ * Lifetimes:
+ * `out_map` receives the handle before the call returns, while the map is
+ * still being built. Commands sent to the map before the completion runs wait
+ * for it, but mln_map_get_snapshot() fails until then.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_runtime_create_map(
@@ -1203,15 +839,10 @@ MLN_API mln_status mln_runtime_create_map(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the map's latest published snapshot.
+ * Copies the map's state.
  *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or out_snapshot
- *   is null or undersized.
- * - MLN_STATUS_INVALID_STATE when map has been released, or its creation has
- *   not succeeded.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The copy doesn't wait for pending commands. To read the camera after they
+ * apply, use mln_map_get_camera().
  */
 MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_map_get_snapshot(
@@ -1220,32 +851,11 @@ MLN_API mln_status mln_map_get_snapshot(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits the sole post-creation logical extent update.
+ * Sets the map's size.
  *
- * extent.scale_factor must equal the scale factor the map was created with;
- * only width and height may change. A render session sizes the map to its
- * target: attaching a target, replacing it, and mln_render_session_resize()
- * each submit this command with the target's width and height when the call
- * is accepted. An attach that then fails, or a replacement that the driver
- * then refuses, leaves the map at the size that the target named. While a
- * render session is attached, a direct map resize completes with
- * MLN_STATUS_INVALID_STATE; size the map through the session instead.
- * The completion reports terminal disposition and the snapshot generation
- * that the resize published. Resizes apply in acceptance order, so the last
- * one accepted sets the size. A resize to the map's current width and height
- * changes nothing and publishes no render update.
- *
- * Returns:
- * - MLN_STATUS_OK when the resize was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; extent has a
- *   zero width or height, or a scale_factor that is not finite and positive;
- *   extent.scale_factor differs from the value the map was created with; or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when applying the size fails.
+ * `extent` must keep the scale factor that the map was created with. A map
+ * with a render session takes its size from the session, so resize the
+ * session with mln_render_session_resize() instead.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_resize(
@@ -1253,103 +863,34 @@ MLN_API mln_status mln_map_resize(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Requests a repaint for a continuous map.
- *
- * A continuous map also publishes a render update on its own when style data,
- * resources, the camera, or a transition changes. A host keeps a frame demand
- * with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE pending and arms the next one as each
- * result arrives to render updates as the map publishes them.
- *
- * Returns:
- * - MLN_STATUS_OK when the request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or map is not
- *   continuous or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- */
+/** Renders a new frame of a continuous map, even when nothing changed. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_request_repaint(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Begins a command group, which holds this map's render updates until the
- * group ends.
+ * Holds back the map's changes from rendering until
+ * mln_map_end_command_group(), so they show in the same frame.
  *
- * Each command publishes at most one render update. A group combines several
- * commands, such as adding a layer and setting its filter, so that no frame
- * shows only some of them. Commands accepted between this call and the
- * matching mln_map_end_command_group() still commit one at a time, and each
- * completion and snapshot reports its own commit. The render updates of those
- * commands, and of loading and transitions meanwhile, stay unpublished, and
- * the end of the outermost group publishes the latest one. Groups nest. A
- * command that fails inside a group leaves the group open and leaves the
- * other commands applied.
- *
- * While a group is open the map publishes no render update, including those
- * that camera changes, gestures, resource loading, and transitions raise, so
- * attached render targets show nothing new. A render-session resize, and a
- * still image already in flight, finish only after the group ends. Submit the
- * commands and the matching end without waiting for any completion in between,
- * and submit the end on every path, including when a command between them
- * fails to submit.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * Groups nest, and the changes render when the outermost group ends.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_begin_command_group(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Ends the innermost command group that mln_map_begin_command_group() began.
- *
- * Ending the outermost group publishes the latest render update that the group
- * held, and the snapshot that this command publishes reports that update in
- * latest_render_update_generation.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_STATE when map has no open command group.
- */
+/** Ends the group that mln_map_begin_command_group() began. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_end_command_group(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Submits a copied per-feature-state command.
+ * Merges `state` into the state of a feature.
  *
- * selector->source_id, selector->feature_id, and state are copied before
- * return. state must contain one UTF-8 JSON object and is validated before
- * return. The command writes the object's keys and leaves the feature's other
- * keys unchanged. The committed command requests a map repaint.
- *
- * Feature state belongs to the map and applies to the next render update,
- * including the first presented frame that contains the source.
- * mln_map_get_feature_state() reads the map's state.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, selector is null
- *   or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, state is
- *   empty, invalid JSON, or not an object, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * `state` is a JSON object. Its keys replace the same keys in the feature's
+ * state, and the other keys stay.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_feature_state(
@@ -1359,23 +900,9 @@ MLN_API mln_status mln_map_set_feature_state(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered read of per-feature state from this map.
+ * Reads the state of a feature, as a JSON object.
  *
- * selector->source_id and selector->feature_id are copied before return. The
- * read observes every map command accepted before it and copies the map
- * store, not the last rendered frame, so it does not require a render session
- * or a loaded source. The completion borrows UTF-8 bytes holding one JSON
- * object for the callback. Missing feature state is reported as an empty
- * object.
- *
- * Returns:
- * - MLN_STATUS_OK when the read was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, selector is null
- *   or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The object is empty when the feature has no state.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_map_get_feature_state(
@@ -1383,24 +910,7 @@ MLN_API mln_status mln_map_get_feature_state(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Removes per-feature state from this map.
- *
- * selector->source_id is required. selector->feature_id and selector->state_key
- * are optional. Passing both removes one state key from one feature. Passing
- * only feature_id removes all state for that feature. Passing neither removes
- * all feature state for the source/source-layer. The accepted command requests
- * a map repaint.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, selector is null
- *   or invalid, selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY without
- *   MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- */
+/** Removes the feature state that `selector` selects. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_feature_state(
   mln_map map, const mln_feature_state_selector* selector,
@@ -1408,47 +918,15 @@ MLN_API mln_status mln_map_remove_feature_state(
 ) MLN_NOEXCEPT;
 
 /**
- * Requests one still image for a static or tile map, which renders itself.
+ * Renders a still image of a static or tile map.
  *
- * Once the request runs, it submits a frame demand on the map's attached
- * render session, or, while none is attached, on the next session that
- * finishes attaching. The demand renders once the map has loaded what the
- * image shows, and presents on a target that supports presentation. A
- * caller-graphics-thread session still needs
- * mln_render_session_service_driver_work() on its graphics thread meanwhile.
- * Read the image back with mln_render_session_read_texture() once the
- * completion runs, or acquire it once its frame result arrives.
- *
- * Every frame result of such a demand carries
- * MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE, which no host demand can, and the
- * image's frame reports MLN_RENDER_RESULT_RENDERED. Host demands neither
- * replace the request's demand nor are replaced by it. A host demand can
- * complete the image first, since any fully loaded frame of the update this
- * request published or a later one completes it, and a frame of an earlier
- * update never does. The request's demand then ends with
- * MLN_RENDER_RESULT_NO_UPDATE.
- *
- * A demand that ends before the image renders is followed by another once the
- * session can render again. After mln_render_session_barrier() ends one, the
- * next follows when the barrier completes. After one ends with
- * MLN_RENDER_RESULT_TARGET_NOT_READY on an attached session, the next follows
- * the map's next update, a target replacement, or an applied resize. After
- * the session detaches, is disposed, or loses its target, the request waits
- * for the next session to attach.
- *
- * Returns:
- * - MLN_STATUS_OK when the request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or map is not in
- *   MLN_MAP_MODE_STATIC or MLN_MAP_MODE_TILE, or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
+ * The map's render session draws the image once every resource that the image
+ * needs has loaded.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_STATE when a still-image request was already pending
- *   when this request ran, or when the map had an open command group.
- * - MLN_STATUS_CANCELLED when the map closes before the image is produced.
- * - MLN_STATUS_NATIVE_ERROR when rendering the image fails.
+ * - MLN_STATUS_CANCELLED when the map is released before the image is done.
+ * - MLN_STATUS_NATIVE_ERROR when the style or a resource that the image needs
+ *   fails to load.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_map_request_still_image(
@@ -1456,24 +934,9 @@ MLN_API mln_status mln_map_request_still_image(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases a map asynchronously.
+ * Releases the map.
  *
- * A successful call consumes the public handle before returning. The
- * completion runs after previously accepted work is terminal, a session the
- * host disposed with mln_render_session_dispose() has released its map
- * attachment, the native map can no longer call the host, and map-owned
- * callback state has been released. Backend worker and graphics-resource
- * cleanup may continue after completion. The completion state follows the
- * one-shot ownership contract. Teardown may allocate; allocation failure after
- * acceptance terminates the process.
- *
- * Returns:
- * - MLN_STATUS_OK when release was accepted and the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is already closing,
- *   or an attached render session has not been disposed.
- * - MLN_STATUS_NATIVE_ERROR when the completion could not be allocated.
+ * Detach the map's render session first.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_map_release(
@@ -1481,41 +944,19 @@ MLN_API mln_status mln_map_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Consumes a map handle without observing its asynchronous retirement.
+ * Releases the map in any state, and finishes in the background.
  *
- * Attached sessions retain the map until they detach or retire. A successful
- * call consumes the handle before returning. A failed call retains caller
- * ownership. Teardown may allocate; allocation failure after acceptance
- * terminates the process.
- *
- * Returns:
- * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle.
- * - MLN_STATUS_INVALID_STATE when map has been released or is already closing.
+ * Use it from destructors and finalizers. Otherwise, use mln_map_release().
  */
 MLN_API mln_status
 mln_map_dispose(mln_map map, mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 
 /**
- * Queues a style URL command. A committed command means the map accepted the
- * URL, not that the style loaded: style loading events report the network,
- * decode, and parse results that follow.
+ * Loads the map's style from `url`.
  *
- * The function copies url before returning acceptance. The completion reports
- * committed or failed application.
- *
- * The map's first loaded style moves the camera to the style's center, zoom,
- * bearing, and pitch, unless the host moved the camera first. Later style loads
- * leave the camera unchanged.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, url has null
- *   data with a nonzero size or contains embedded NUL, or completion is
- * invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * The style loads in the background, and MLN_RUNTIME_EVENT_MAP_STYLE_LOADED or
+ * MLN_RUNTIME_EVENT_MAP_LOADING_FAILED reports how the load ends. Sources,
+ * layers, and images added before the style loads are lost when it loads.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_url(
@@ -1524,27 +965,12 @@ MLN_API mln_status mln_map_set_style_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Queues an inline style JSON command. A committed command means the map
- * applied the JSON, not that the style loaded: style loading events report the
- * resource and parse results that follow.
+ * Loads the map's style from `json`.
  *
- * The function copies json before returning acceptance. The completion reports
- * committed or failed application.
- *
- * The map's first loaded style moves the camera to the style's center, zoom,
- * bearing, and pitch, unless the host moved the camera first. Later style loads
- * leave the camera unchanged.
- *
- * Returns:
- * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, json.data is
- *   null, json.size is zero, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
- *   closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ * The style's sources, sprites, and glyphs load in the background.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when style parsing or application fails.
+ * - MLN_STATUS_NATIVE_ERROR when `json` isn't a valid style.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_json(
@@ -1553,19 +979,9 @@ MLN_API mln_status mln_map_set_style_json(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered copy of the last successfully parsed style document.
+ * Reads the JSON of the style that the map loaded.
  *
- * The completion borrows the copied UTF-8 bytes for the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the copy fails.
+ * The JSON doesn't include the changes made to the style since it loaded.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_map_get_loaded_style_json(
@@ -1573,57 +989,16 @@ MLN_API mln_status mln_map_get_loaded_style_json(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered copy of the last requested style URL.
+ * Reads the URL of the map's style.
  *
- * The completion borrows the copied UTF-8 bytes for the callback.
- *
- * Returns:
- * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when native code fails.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the copy fails.
+ * The URL is empty when the style came from mln_map_set_style_json().
  */
 MLN_BINDING("execution=query;result=mln_buffer_view")
 MLN_API mln_status mln_map_get_style_url(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/**
- * Selects which map-originated event types this map queues.
- *
- * The mask is an ordered command because mln_map_get_snapshot() reports it, as
- * it reports the effect of every other command; mln_runtime_set_event_mask(),
- * which no snapshot reports, applies at once.
- *
- * This call accepts only bits in MLN_RUNTIME_EVENT_FLAG_ALL. It reads the bits
- * in MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS and ignores runtime-scoped bits, so
- * MLN_RUNTIME_EVENT_FLAG_ALL selects every map-originated type.
- * mln_map_get_snapshot() reports the last committed mask.
- *
- * A map that has not been narrowed selects every map-originated event type this
- * library reports, which covers types a caller's header may not declare. A new
- * mask applies to later events and keeps the events already queued.
- *
- * Select every event type the host reads. These types carry state a host
- * reaches no other way:
- *
- * - MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED and
- *   MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR carry native failure text.
- *
- * Style commands report application failures through their completions
- * regardless of this mask.
- *
- * Returns:
- * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, mask contains an
- *   unknown bit, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
- */
+/** Selects the events that the map reports. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_event_mask(
   mln_map map, mln_runtime_event_flags mask, const mln_completion* completion,

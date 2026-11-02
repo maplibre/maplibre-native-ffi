@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Bitmask values for log severities dispatched asynchronously.
+/// A log severity, as a bit in a set.
 /// </summary>
 /// <remarks>
 /// See <c>mln_log_severity_flag</c> in the <see
@@ -14,6 +14,11 @@ public enum LogSeverityFlag : uint
     Info = 2,
     Warning = 4,
     Error = 8,
+
+    /// <summary>
+    /// The severities logged on a background thread until
+    /// <c>MaplibreNative.SetLogAsyncSeverityMask()</c> changes them.
+    /// </summary>
     Default = 6,
     All = 14,
 }

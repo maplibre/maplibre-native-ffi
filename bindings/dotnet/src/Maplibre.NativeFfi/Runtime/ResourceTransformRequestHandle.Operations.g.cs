@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A resource URL transform that waits for its host's answer.
+/// A URL rewrite that a resource transform answers with the URL to load.
 /// </summary>
 /// <remarks>
 /// See <c>mln_resource_transform_request</c> in the <see
@@ -61,12 +61,12 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     }
 
     /// <summary>
-    /// Answers a resource transform request with a replacement URL and consumes
-    /// its handle.
+    /// Answers a resource transform request with the URL to load instead.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_resource_transform_request_complete</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// <para><c>url</c> must not be empty.</para>
+    /// <para>See <c>mln_resource_transform_request_complete</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void Complete(string url)
     {

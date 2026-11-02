@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Status values returned by status-returning functions.
+/// The result of a call or of asynchronous work.
 /// </summary>
 /// <remarks>
 /// See <c>mln_status</c> in the <see
@@ -13,52 +13,55 @@ public enum Status : int
     Ok = 0,
 
     /// <summary>
-    /// A pointer, size field, mask, or handle argument was invalid.
+    /// An argument is invalid, such as malformed JSON or a value out of range.
     /// </summary>
     InvalidArgument = -1,
 
     /// <summary>
-    /// The object is valid but not currently in a state that permits the call.
+    /// The call doesn't fit the current state, such as removing a source that a
+    /// layer still uses.
     /// </summary>
     InvalidState = -2,
 
     /// <summary>
-    /// The handle is thread-affine and the call came from the wrong thread.
+    /// The call came from a thread that can't make it.
     /// </summary>
     WrongThread = -3,
 
     /// <summary>
-    /// The entry point or requested behavior is unavailable in this build.
+    /// The platform, the build, or the render target lacks the feature.
     /// </summary>
     Unsupported = -4,
 
     /// <summary>
-    /// Native code failed; the diagnostic describes the error.
+    /// The library or the platform hit an error, such as a failed graphics
+    /// driver call.
     /// </summary>
     NativeError = -5,
 
     /// <summary>
-    /// The operation reached its terminal cancelled disposition.
+    /// The work stopped before it finished, such as when its handle was
+    /// released.
     /// </summary>
     Cancelled = -6,
 
     /// <summary>
-    /// A conflicting driver call or lifecycle transition is in flight.
+    /// Another call is still using the same object.
     /// </summary>
     Busy = -7,
 
     /// <summary>
-    /// The render target or graphics receiver was irreversibly lost.
+    /// The render target can't be drawn to anymore.
     /// </summary>
     TargetLost = -8,
 
     /// <summary>
-    /// A nonblocking drain or acquisition has nothing to return yet.
+    /// There is nothing to return yet, such as when no new frame is ready.
     /// </summary>
     NotReady = -9,
 
     /// <summary>
-    /// A call named an ID with no live object behind it.
+    /// Nothing has the given ID.
     /// </summary>
     NotFound = -10,
 }

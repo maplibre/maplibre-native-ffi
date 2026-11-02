@@ -3,29 +3,23 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// One style layer.
+/// A layer in the map's style.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_layer_info</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Id">
-/// Layer ID.
-/// </param>
 /// <param name="Type">
-/// The style-spec layer type string.
-/// </param>
-/// <param name="SourceId">
-/// Source ID. Empty for a layer type that takes no source.
-/// </param>
-/// <param name="SourceLayer">
-/// Source-layer ID. Empty when the layer sets none.
+/// The layer's [type](https://maplibre.org/maplibre-style-spec/layers/#type),
+/// such as <c>fill</c>.
 /// </param>
 /// <param name="MinZoom">
-/// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+/// The zoom level where the layer starts to show, or negative infinity when the
+/// layer doesn't set one.
 /// </param>
 /// <param name="MaxZoom">
-/// Highest zoom at which the layer draws; INFINITY with no upper bound.
+/// The zoom level where the layer stops showing, or infinity when the layer
+/// doesn't set one.
 /// </param>
 public readonly partial record struct StyleLayerInfo(
     string Id,

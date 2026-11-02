@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Bit values for the map and runtime event subscription masks.
+/// An event type, as a bit in a set.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime_event_flag</c> in the <see
@@ -11,9 +11,6 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum RuntimeEventFlag : ulong
 {
-    /// <summary>
-    /// Selects no event type.
-    /// </summary>
     None = 0,
     MapCameraWillChange = 2,
     MapCameraIsChanging = 4,
@@ -40,19 +37,7 @@ public enum RuntimeEventFlag : ulong
     MapSpriteRequested = 8388608,
     MapSpriteLoaded = 16777216,
     MapSpriteError = 33554432,
-
-    /// <summary>
-    /// Selects every map-originated event type this version defines.
-    /// </summary>
     AllMapEvents = 66191358,
-
-    /// <summary>
-    /// Selects every runtime-originated event type this version defines.
-    /// </summary>
     AllRuntimeEvents = 917504,
-
-    /// <summary>
-    /// Selects every event type this version defines.
-    /// </summary>
     All = 67108862,
 }

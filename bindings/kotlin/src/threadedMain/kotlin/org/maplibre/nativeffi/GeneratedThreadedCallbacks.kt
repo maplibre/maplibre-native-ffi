@@ -10,18 +10,20 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * Process-global log callback. Kotlin/Wasm takes `QueuedLogHandler` in its place.
+ * A log callback, for `setLogCallback()`. Kotlin/Wasm takes `QueuedLogHandler` in its place.
+ *
+ * Runs on the thread that logged the message, or on a background thread for the severities that
+ * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class LogHandler(
-  /** Receives each record. */
   public val callback: LogCallback,
 )
 
 /**
- * Receives a MapLibre Native log record. Kotlin/Wasm takes `QueuedLogCallback` in its place.
+ * Receives a log message. Kotlin/Wasm takes `QueuedLogCallback` in its place.
  *
  * Native code calls it on one of its own threads and waits for it to return.
  *
@@ -40,21 +42,27 @@ public fun interface LogCallback {
 }
 
 /**
- * HTTP header transform state: a callback, or native header rules. Kotlin/Wasm takes
+ * Headers to add to HTTP requests, for `RuntimeHandle.setHttpHeaderTransform()`. Kotlin/Wasm takes
  * `HttpHeaderTransformRules` in its place.
+ *
+ * Set either `callback` or `rules`, not both.
+ *
+ * Runs on a library thread.
  *
  * See `mln_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderTransform(
-  /** Header rules for a transform without a callback; empty with one. */
+  /** The first rule that matches a request adds its headers, and no other. */
   public val rules: List<HttpHeaderRule> = emptyList(),
-  /** The callback, or null to apply rules. */
   public val callback: HttpHeaderTransformCallback? = null,
 )
 
 /**
- * Adds end-to-end headers to one outgoing HTTP request attempt.
+ * Sets the headers of an HTTP request before the library sends it.
+ *
+ * `url` is the request's URL after any resource transform. The request waits for the callback, so
+ * return quickly.
  *
  * Native code calls it on one of its own threads and waits for it to return.
  *
@@ -73,6 +81,12 @@ public fun interface HttpHeaderTransformCallback {
   )
 }
 
+/**
+ * The headers that an HTTP header transform callback sets.
+ *
+ * See `mln_http_header_transform_response` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public class HttpHeaderTransformResponse
 internal constructor(
   internal val bindingAddress: Long,
@@ -106,7 +120,10 @@ internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Lo
   allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransform(it, value) }
 
 /**
- * Sets one outgoing HTTP request header for the current transform invocation.
+ * Sets a header on the request that an HTTP header transform callback handles.
+ *
+ * Setting a header again, in any letter case, replaces its value. `name` can't be a header that the
+ * library or the platform manages, such as `Host`, `Range`, `Accept-Encoding`, or `User-Agent`.
  *
  * See `mln_http_header_transform_response_set_header` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -119,9 +136,12 @@ public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): U
   }
 
 /**
- * Installs a process-global MapLibre Native log callback. The callback runs synchronously on the
- * thread that emits the record, or on a MapLibre background thread for a severity that
- * `setLogAsyncSeverityMask()` dispatches asynchronously.
+ * Sends the log messages of every runtime in the process to a callback.
+ *
+ * The callback replaces the one set before.
+ *
+ * Runs on the thread that logged the message, or on a background thread for the severities that
+ * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
  *
  * See `mln_log_set_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
@@ -133,11 +153,19 @@ public fun setLogCallback(handler: LogHandler): Unit =
   }
 
 /**
- * Registers or replaces the runtime-scoped outgoing HTTP header transform. The callback runs
- * synchronously on a MapLibre worker or network thread.
+ * Adds headers to the runtime's HTTP requests.
+ *
+ * The transform replaces the one set before. In a browser or on OpenHarmony, serve the requests
+ * with `RuntimeHandle.setResourceProvider()` instead.
+ *
+ * Runs on a library thread.
  *
  * See `mln_runtime_set_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when the library runs in a browser or on OpenHarmony.
  */
 public fun RuntimeHandle.setHttpHeaderTransform(
   transform: HttpHeaderTransform,

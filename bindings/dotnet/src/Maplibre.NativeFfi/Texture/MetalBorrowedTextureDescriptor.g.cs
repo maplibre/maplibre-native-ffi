@@ -3,11 +3,21 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Metal attachment options for a borrowed texture target.
+/// A ring of your Metal textures, for
+/// <c>MapHandle.AttachMetalBorrowedTexture()</c> and
+/// <c>RenderSessionHandle.SetMetalBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_metal_borrowed_texture_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// <para><c>extent</c> sets the map's size and the session's scale factor, so
+/// give it the map's scale factor. <c>physical_width</c> and
+/// <c>physical_height</c> give the textures' size in pixels. The textures must
+/// all have that size, one device, one pixel format, one sample, and
+/// MTLTextureUsageRenderTarget.</para>
+/// <para>The session uses the textures until a replacement or release of the
+/// target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.</para>
+/// <para>See <c>mln_metal_borrowed_texture_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct MetalBorrowedTextureDescriptor
 {
@@ -27,26 +37,9 @@ public readonly partial record struct MetalBorrowedTextureDescriptor
         this.CommandQueue = CommandQueue;
     }
 
-    /// <summary>
-    /// Logical texture extent. Required. physical_width and physical_height
-    /// give the texture's size. A scale_factor that differs from the map's is
-    /// accepted and logged as a warning.
-    /// </summary>
     public required LogicalExtent Extent { get; init; }
-
-    /// <summary>
-    /// Physical texture width in device pixels. Required.
-    /// </summary>
     public required uint PhysicalWidth { get; init; }
-
-    /// <summary>
-    /// Physical texture height in device pixels. Required.
-    /// </summary>
     public required uint PhysicalHeight { get; init; }
-
-    /// <summary>
-    /// The ring's textures, one per slot, in slot order. Required.
-    /// </summary>
     public required ImmutableArray<MetalBorrowedTexture> Textures
     {
         get => TexturesStorage.AsImmutable();
@@ -55,11 +48,9 @@ public readonly partial record struct MetalBorrowedTextureDescriptor
     internal ValueArray<MetalBorrowedTexture> TexturesStorage { get; init; }
 
     /// <summary>
-    /// <c>id&lt;MTLCommandQueue&gt;</c> / <c>MTL::CommandQueue*</c> on the
-    /// textures' device that the session submits its work to, retained by the
-    /// session. Optional; null makes the session create its own queue.
-    /// <c>GpuSyncKind.QueueOrder</c> orders frames on this queue. A replacement
-    /// names the queue the session attached with.
+    /// Your MTLCommandQueue on the textures' device, or null for a queue of the
+    /// session's own. With your queue, frames can use
+    /// <c>GpuSyncKind.QueueOrder</c>.
     /// </summary>
     public NativePointer CommandQueue { get; init; }
 }

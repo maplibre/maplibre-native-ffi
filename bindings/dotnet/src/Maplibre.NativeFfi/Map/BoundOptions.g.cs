@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Optional map camera constraint fields.
+/// Limits on the camera, for <c>MapHandle.SetBoundsAsync()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_bound_options</c> in the <see
@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public sealed record BoundOptions
 {
     /// <summary>
-    /// Geographic bounds that the camera center stays inside.
+    /// The area that the camera's center stays within.
     /// </summary>
     public LatLngBounds? Bounds { get; init; }
     public double? MinZoom { get; init; }
@@ -21,11 +21,7 @@ public sealed record BoundOptions
     public double? MaxPitch { get; init; }
 
     /// <summary>
-    /// Selects the unbounded geographic constraint, which leaves every camera
-    /// center unconstrained and lets the map pan freely across the
-    /// antimeridian. This differs from world bounds of -90/-180 to 90/180,
-    /// which clamp longitude to that range. Mutually exclusive with
-    /// <c>BoundOptions.Bounds</c>, which it leaves unread.
+    /// Removes the area that limits the camera's center.
     /// </summary>
     public bool Unbounded { get; init; }
 }

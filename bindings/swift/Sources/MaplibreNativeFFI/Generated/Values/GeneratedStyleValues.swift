@@ -3,8 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Canonical tile identity used by custom geometry and custom vector source
-/// callbacks.
+/// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
 ///
 /// See `mln_canonical_tile_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -33,22 +32,27 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
   }
 }
 
-/// Options for custom geometry sources. The callback may run on any native
-/// worker thread, concurrently with runtime and map calls.
+/// The callbacks and options of a custom geometry source.
+///
+/// Zoom levels are whole numbers from 0 to 32.
 ///
 /// See `mln_custom_geometry_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
-  /// Tile fetch callback.
   public var fetchTile: CustomSourceFetchTileCallback
-  /// Optional best-effort tile cancel callback.
   public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
+  /// How far, in pixels, simplified geometry can stray from the original.
   public var tolerance: Double?
+  /// The width of a tile in pixels, a power of two no larger than 8192.
   public var tileSize: UInt32?
+  /// The width in pixels of the margin around a tile that holds geometry from
+  /// beyond its edges.
   public var buffer: UInt32?
+  /// Whether to cut geometry at the outer edge of a tile's margin.
   public var clip: Bool?
+  /// Whether to wrap geometry that crosses the antimeridian.
   public var wrap: Bool?
   public init(
     fetchTile: @escaping CustomSourceFetchTileCallback,
@@ -135,33 +139,34 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
-/// Cancels a request for one tile of a custom geometry or custom vector source,
-/// best effort. The callback may run on any native worker thread, concurrently
-/// with runtime and map calls.
+/// Reports that a custom source no longer needs a tile.
 ///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public typealias CustomSourceCancelTileCallback =
   @Sendable (_ tileId: CanonicalTileId) -> Void
 
-/// Requests one tile of a custom geometry or custom vector source. The callback
-/// may run on any native worker thread, concurrently with runtime and map
-/// calls.
+/// Asks for the data of a tile in a custom source.
+///
+/// Return quickly. Once the data is ready, pass it to
+/// `MapHandle.setCustomGeometrySourceTileData()` or
+/// `MapHandle.setCustomVectorSourceTileData()`. If it fails to load, report
+/// that with `MapHandle.setCustomGeometrySourceTileError()` or
+/// `MapHandle.setCustomVectorSourceTileError()`.
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public typealias CustomSourceFetchTileCallback =
   @Sendable (_ tileId: CanonicalTileId) -> Void
 
-/// Options for custom vector sources. The callback may run on any native worker
-/// thread, concurrently with runtime and map calls.
+/// The callbacks and options of a custom vector source.
+///
+/// Zoom levels are whole numbers from 0 to 32.
 ///
 /// See `mln_custom_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomVectorSourceOptions: Sendable {
-  /// Tile fetch callback.
   public var fetchTile: CustomSourceFetchTileCallback
-  /// Optional best-effort tile cancel callback.
   public var cancelTile: CustomSourceCancelTileCallback?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -220,36 +225,27 @@ private func invokeCustomVectorSourceOptionsCancelTile(
   box.value.cancelTile?(CanonicalTileId(raw: tile_id))
 }
 
-/// Options for GeoJSON sources, indexed and rendered at a fixed 512-pixel tile
-/// size.
+/// Options for a GeoJSON
+/// \[source\](https://maplibre.org/maplibre-style-spec/sources/#geojson).
+///
+/// Zoom levels are whole numbers.
 ///
 /// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
-  /// Minimum tiling zoom. Absent selects 0.
   public var minZoom: Double?
-  /// Maximum tiling zoom, an integer within \[0, 24\]. Absent selects 18.
   public var maxZoom: Double?
-  /// Douglas-Peucker simplification tolerance. Absent selects 0.375.
   public var tolerance: Double?
-  /// Highest zoom that clusters points. Absent selects 17.
   public var clusterMaxZoom: Double?
-  /// Cluster aggregation expressions keyed by property name, as a JSON object
-  /// whose members follow the MapLibre Style Spec clusterProperties form, or
-  /// empty for none.
+  /// The `clusterProperties` object, or empty for none.
   public var clusterProperties: String
-  /// Tile buffer in pixels within \[0, 512\]. Absent selects 128.
   public var buffer: UInt32?
-  /// Cluster radius in pixels within \[0, 4095\]. Absent selects 50.
   public var clusterRadius: UInt32?
-  /// Points required to form a cluster. Absent selects 2.
   public var clusterMinPoints: UInt32?
-  /// Adds line distance metrics to line features. Absent selects false.
   public var lineMetrics: Bool?
-  /// Clusters point features. Absent selects false.
   public var cluster: Bool?
-  /// Tiles the data for the next render update instead of in the background.
-  /// Absent selects false.
+  /// Builds tiles while the map renders instead of in the background, so that
+  /// new data shows in the next frame.
   public var synchronousTiling: Bool?
   public init(
     minZoom: Double? = nil,
@@ -360,7 +356,7 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Content-box insets in image pixels, measured from the image's top-left.
+/// The area of an image, in image pixels, that text fits inside.
 ///
 /// See `mln_image_content` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -398,7 +394,7 @@ public struct ImageContent: Equatable, Hashable, Sendable {
   }
 }
 
-/// One stretchable interval along an image axis, in image pixels.
+/// A range of image pixels, from `from` to `to`, that stretches to fit text.
 ///
 /// See `mln_image_stretch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -423,18 +419,17 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
   }
 }
 
-/// Caller-owned premultiplied RGBA8 image pixels.
+/// An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
 ///
 /// See `mln_premultiplied_rgba8_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
-  /// Image width in pixels. Required.
   public var width: UInt32
-  /// Image height in pixels. Required.
   public var height: UInt32
-  /// Bytes per image row. Required, and at least width \* 4.
+  /// The number of bytes from the start of one row to the start of the next, at
+  /// least `width` \* 4.
   public var stride: UInt32
-  /// Premultiplied RGBA8 pixels. Required.
+  /// The rows of pixels, `stride` bytes apart, from the top row down.
   public var pixels: Data
   public init(width: UInt32, height: UInt32, stride: UInt32, pixels: Data) {
     self.width = width
@@ -470,33 +465,23 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   }
 }
 
-/// One complete runtime style image.
+/// An image in the map's style.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageInfo: Equatable, Hashable, Sendable {
-  /// Image width in pixels.
   public var width: UInt32
-  /// Image height in pixels.
   public var height: UInt32
-  /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
-  /// row first.
+  /// The premultiplied RGBA pixels, in rows of `width` \* 4 bytes, from the top
+  /// row down.
   public var pixels: Data
-  /// Horizontally stretchable intervals.
   public var stretchX: [ImageStretch]
-  /// Vertically stretchable intervals.
   public var stretchY: [ImageStretch]
-  /// Content box, when the image sets one.
   public var content: ImageContent?
-  /// How the image fits text horizontally, when it sets this.
   public var textFitWidth: StyleImageTextFit?
-  /// How the image fits text vertically, when it sets this.
   public var textFitHeight: StyleImageTextFit?
-  /// Sprite pixel ratio.
   public var pixelRatio: Float
-  /// Whether the image is a signed distance field icon.
   public var sdf: Bool
-  /// Whether the map keeps the image once no loaded tile uses it.
   public var keepUnused: Bool
   public init(
     width: UInt32 = 0,
@@ -558,26 +543,25 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Options for runtime style images.
+/// Options for a style image, as the
+/// \[sprite\](https://maplibre.org/maplibre-style-spec/sprite/) spec describes
+/// them.
 ///
 /// See `mln_style_image_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptions: Equatable, Hashable, Sendable {
-  /// Horizontally stretchable intervals.
+  /// The ranges of columns that stretch, in increasing order without overlap.
   public var stretchX: [ImageStretch]?
-  /// Vertically stretchable intervals.
+  /// The ranges of rows that stretch, in increasing order without overlap.
   public var stretchY: [ImageStretch]?
-  /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
-  /// Absent selects STRETCH_OR_SHRINK.
   public var textFitWidth: StyleImageTextFit?
-  /// Absent selects STRETCH_OR_SHRINK.
   public var textFitHeight: StyleImageTextFit?
-  /// Sprite pixel ratio. Absent selects 1.
   public var pixelRatio: Float?
-  /// Whether the image is a signed distance field icon. Absent selects false.
   public var sdf: Bool?
-  /// Keeps the image once no loaded tile uses it. Absent selects false.
+  /// Keeps the image after no layer uses it. Without this, the map can remove
+  /// an image that it asked for through
+  /// `RuntimeEventType.mapStyleImageMissing`.
   public var keepUnused: Bool?
   public init(
     stretchX: [ImageStretch]? = nil,
@@ -671,7 +655,7 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a stretchable image fits text along one axis.
+/// How an image stretches to fit text along one axis.
 ///
 /// See `mln_style_image_text_fit` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -696,22 +680,23 @@ public struct StyleImageTextFit: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// One style layer.
+/// A layer in the map's style.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerInfo: Equatable, Hashable, Sendable {
-  /// Layer ID.
   public var id: String
-  /// The style-spec layer type string.
+  /// The layer's
+  /// \[type\](https://maplibre.org/maplibre-style-spec/layers/#type), such as
+  /// `fill`.
   public var type: String
-  /// Source ID. Empty for a layer type that takes no source.
   public var sourceId: String
-  /// Source-layer ID. Empty when the layer sets none.
   public var sourceLayer: String
-  /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+  /// The zoom level where the layer starts to show, or negative infinity when
+  /// the layer doesn't set one.
   public var minZoom: Double
-  /// Highest zoom at which the layer draws; INFINITY with no upper bound.
+  /// The zoom level where the layer stops showing, or infinity when the layer
+  /// doesn't set one.
   public var maxZoom: Double
   public var visibility: StyleLayerVisibility
   public init(
@@ -752,7 +737,7 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Layer visibility values used by the visibility setter and layer info.
+/// Whether a layer shows.
 ///
 /// See `mln_style_layer_visibility` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -775,7 +760,7 @@ public struct StyleLayerVisibility: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// DEM raster encoding values.
+/// How a raster DEM tile encodes elevation in its colors.
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -798,29 +783,21 @@ public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Complete metadata of one style source.
+/// A source in the map's style.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
-  /// Source ID.
   public var id: String
   public var type: StyleSourceType
-  /// Whether the source is marked volatile.
   public var isVolatile: Bool
-  /// Attribution string, or empty when the source sets none.
   public var attribution: String
-  /// URL that the source loads from, or empty when it has none.
   public var url: String
-  /// Inline TileJSON metadata, when the source was defined with it.
+  /// The tiles that the style lists in the source itself, instead of at a URL.
   public var tileJson: StyleSourceTileInfo?
-  /// Geographic bounds, when inline TileJSON sets them.
   public var bounds: LatLngBounds?
-  /// Tile size in pixels, for a tile source.
   public var tileSize: UInt32?
-  /// Vector tile encoding, for a vector source.
   public var vectorEncoding: StyleVectorTileEncoding?
-  /// DEM raster encoding, when inline TileJSON sets one.
   public var rasterEncoding: StyleRasterDemEncoding?
   public init(
     id: String = "",
@@ -873,16 +850,13 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Inline TileJSON metadata of a tile source.
+/// The tiles of a source, as the style lists them.
 ///
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
-  /// Tile URL templates in TileJSON order.
   public var tileUrls: [String]
-  /// Lowest zoom level the TileJSON provides tiles for.
   public var minZoom: Double
-  /// Highest zoom level the TileJSON provides tiles for.
   public var maxZoom: Double
   public var scheme: StyleTileScheme
   public init(
@@ -911,7 +885,7 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
   }
 }
 
-/// Style source type values returned by source metadata queries.
+/// The type of a style source.
 ///
 /// See `mln_style_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -950,7 +924,7 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Tile URL coordinate scheme values.
+/// Whether a tileset counts tile rows from the north (XYZ) or the south (TMS).
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -973,18 +947,16 @@ public struct StyleTileScheme: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Global style transition options.
+/// The default
+/// \[transition\](https://maplibre.org/maplibre-style-spec/transition/) for
+/// changes to a style's paint properties.
 ///
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
-  /// Transition duration in milliseconds. Must be finite, non-negative, and
-  /// short enough to represent as a duration.
   public var durationMs: Double?
-  /// Transition delay in milliseconds. Must be finite, non-negative, and short
-  /// enough to represent as a duration.
   public var delayMs: Double?
-  /// Whether symbol placement changes cross-fade.
+  /// Whether symbols fade in and out as the map places them.
   public var enablePlacementTransitions: Bool?
   public init(
     durationMs: Double? = nil,
@@ -1026,7 +998,7 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Vector tile encoding values.
+/// The format of vector tiles.
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

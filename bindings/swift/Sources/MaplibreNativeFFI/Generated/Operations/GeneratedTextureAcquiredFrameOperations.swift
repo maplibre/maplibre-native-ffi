@@ -5,10 +5,14 @@ import Foundation
 
 public extension AcquiredFrameHandle {
   #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
-    /// Copies Metal-native metadata from an acquired frame.
+    /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.targetLost` when the session lost its target.
     func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws
       -> Result) throws -> Result
     {
@@ -34,10 +38,14 @@ public extension AcquiredFrameHandle {
     }
   #endif
 
-  /// Copies OpenGL-native metadata from an acquired frame.
+  /// Gets the OpenGL texture of an acquired frame.
   ///
   /// See `mln_acquired_frame_get_open_gl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session lost its target.
   func withOpenGlTexture<Result>(_ body: (OpenGlTextureFrameView) throws
     -> Result) throws -> Result
   {
@@ -63,10 +71,14 @@ public extension AcquiredFrameHandle {
   }
 
   #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-    /// Copies Vulkan-native metadata from an acquired frame.
+    /// Gets the Vulkan image of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_vulkan_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.targetLost` when the session lost its target.
     func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws
       -> Result) throws -> Result
     {

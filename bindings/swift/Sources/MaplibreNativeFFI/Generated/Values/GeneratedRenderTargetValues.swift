@@ -3,30 +3,20 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// EGL context fields shared by OpenGL render targets.
+/// The EGL objects that a render session makes its OpenGL context from.
 ///
 /// See `mln_egl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct EglContextDescriptor: Equatable, Hashable, Sendable {
-  /// Borrowed EGLDisplay. Required and kept initialized through teardown.
-  /// eglGetDisplay(EGL_DEFAULT_DISPLAY) returns the same display for the whole
-  /// process, so a shared display must stay initialized until every session
-  /// using it has detached or been destroyed. The host must not call
-  /// eglTerminate per session.
+  /// An `EGLDisplay`.
   public var display: NativePointer
-  /// Borrowed EGLConfig used to create the session context. Required. OpenGL
-  /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
+  /// An `EGLConfig`.
   public var config: NativePointer
-  /// Borrowed EGLContext whose share group the session context joins. Required
-  /// under shared ownership, where the session also takes its client API from
-  /// this context. A dedicated session joins no share group, so it must be null
-  /// there and names client_api instead.
+  /// Your `EGLContext`, for a shared context.
   public var shareContext: NativePointer
-  /// Client API the session creates its context for. Required under dedicated
-  /// ownership. A shared session queries share_context for it, so this is
-  /// ignored there.
+  /// The API of a dedicated context. A shared context uses the API of yours.
   public var clientApi: OpenGlClientApi
-  /// Optional eglGetProcAddress-compatible function for the host loader.
+  /// Your `eglGetProcAddress`, or null to use the system's.
   public var getProcAddress: NativePointer
   public init(
     display: NativePointer,
@@ -70,16 +60,14 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Backend synchronization copied by frame access and release calls.
+/// A point in GPU work that the other side waits for before using a texture.
 ///
 /// See `mln_gpu_sync` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSync: Equatable, Hashable, Sendable {
   public var kind: GpuSyncKind
-  /// Bit pattern of the GLsync pointer, the VkSemaphore handle, the file
-  /// descriptor, the MTLSharedEvent pointer, or the D3D12 fence's HANDLE.
+  /// The object to wait on, for the kinds that name one.
   public var handle: UInt64
-  /// Counter value of a timeline kind. Zero for other kinds.
   public var value: UInt64
   public init(
     kind: GpuSyncKind = .init(rawValue: 0),
@@ -107,7 +95,7 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   }
 }
 
-/// Synchronization payload kind for acquired texture frames.
+/// How one side waits for the other's GPU work on a shared texture.
 ///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -119,40 +107,21 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The host needs no synchronization object. The work completed before the
-  /// frame became acquirable or before the release call.
+  /// The work has already finished, so there is nothing to wait for.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
-  /// GLsync in the shared EGL or WGL context's share group, used only by a
-  /// caller-graphics-thread driver. handle is nonzero.
+  /// `handle` is a `GLsync` in the session's share group.
   public static let openGlFence: GpuSyncKind = .init(rawValue: 1)
-  /// The host needs no synchronization object. The work was submitted, before
-  /// the frame became acquirable or before the release call, to the queue that
-  /// the session and the host share, which orders it before any work submitted
-  /// there afterwards.
+  /// The work was submitted to the queue that both sides share, so work
+  /// submitted to that queue later runs after it.
   public static let queueOrder: GpuSyncKind = .init(rawValue: 2)
-  /// VkSemaphore of type VK_SEMAPHORE_TYPE_TIMELINE on the Vulkan context's
-  /// device, and the counter value that the work signals. handle is nonzero.
-  /// The device must enable the timelineSemaphore feature, through Vulkan 1.2
-  /// or VK_KHR_timeline_semaphore, for a host to accept or pass this kind.
+  /// `handle` is a `VkSemaphore`. Wait until it reaches `value`.
   public static let vulkanTimelineSemaphore: GpuSyncKind = .init(rawValue: 3)
-  /// A Linux sync file descriptor, which handle holds as an int64_t bit
-  /// pattern. -1 is a fence that has already signaled. Vulkan supports it once
-  /// the device enables VK_KHR_external_semaphore_fd, and EGL where the display
-  /// has EGL_ANDROID_native_fence_sync and EGL_KHR_wait_sync.
+  /// `handle` is a sync file descriptor.
   public static let syncFd: GpuSyncKind = .init(rawValue: 4)
-  /// `id<MTLSharedEvent>` / `MTL::SharedEvent*`, and the value that the work
-  /// signals. handle is nonzero. Metal supports it, as does EGL on ANGLE where
-  /// the display has EGL_ANGLE_metal_shared_event_sync, and Vulkan on MoltenVK
-  /// once the device enables VK_EXT_metal_objects and the timelineSemaphore
-  /// feature.
+  /// `handle` is an `MTLSharedEvent`. Wait until it reaches `value`.
   public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 5)
-  /// An NT HANDLE to a shared ID3D12Fence, and the value that the work signals.
-  /// handle is nonzero. Vulkan supports it once the device enables
-  /// VK_KHR_external_semaphore_win32 and the timelineSemaphore feature, where
-  /// the driver shares timeline semaphores as D3D12 fences. WGL supports it for
-  /// borrowed textures, where the context imports D3D12 fences through
-  /// GL_EXT_semaphore_win32; the session makes its producer fence on a D3D12
-  /// device of the context's adapter.
+  /// `handle` is a shared Windows handle to an `ID3D12Fence`. Wait until it
+  /// reaches `value`.
   public static let d3d12Fence: GpuSyncKind = .init(rawValue: 6)
   public var description: String {
     switch rawValue {
@@ -168,7 +137,7 @@ public struct GpuSyncKind: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// A bit for each `GpuSyncKind`.
+/// A GPU sync kind, as a bit in a set.
 ///
 /// See `mln_gpu_sync_kind_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -190,12 +159,12 @@ public struct GpuSyncKindFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let d3d12Fence: GpuSyncKindFlag = .init(rawValue: 64)
 }
 
-/// Metal backend context fields shared by Metal render targets.
+/// The Metal device that a render session uses.
 ///
 /// See `mln_metal_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
-  /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
+  /// An `MTLDevice`.
   public var device: NativePointer
   public init(device: NativePointer = .null) {
     self.device = device
@@ -212,7 +181,7 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL client API a dedicated EGL session creates its context for.
+/// The OpenGL API that a dedicated EGL context uses.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -224,11 +193,8 @@ public struct OpenGlClientApi: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// No client API is named.
   public static let unspecified: OpenGlClientApi = .init(rawValue: 0)
-  /// Desktop OpenGL, as EGL_OPENGL_API names it.
   public static let gl: OpenGlClientApi = .init(rawValue: 1)
-  /// OpenGL ES, as EGL_OPENGL_ES_API names it.
   public static let gles: OpenGlClientApi = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
@@ -240,14 +206,14 @@ public struct OpenGlClientApi: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// OpenGL backend context fields shared by OpenGL render targets.
+/// How a render session gets the OpenGL context that it renders with.
+///
+/// Keep the objects that it names alive until a detach or disposal of the
+/// session completes, or an abandon of it returns.
 ///
 /// See `mln_open_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
-  /// Whether the session shares its driver thread and graphics objects with the
-  /// host. A private EGL or WGL owned texture and a transferred WebGL canvas
-  /// are dedicated to their core worker.
   public var ownership: OpenGlContextOwnership
   public var data: OpenGlContextDescriptorData
   public init(
@@ -298,7 +264,7 @@ public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Backend-specific OpenGL context data.
+/// The WGL, EGL, or WebGL part of an OpenGL context descriptor.
 ///
 /// See `mln_open_gl_context_descriptor_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -308,8 +274,7 @@ public enum OpenGlContextDescriptorData: Equatable, Hashable, Sendable {
   case webGl(WebGlContextDescriptor)
 }
 
-/// How a session's OpenGL context relates to its driver thread and host
-/// graphics state.
+/// Whether a render session's OpenGL context shares objects with yours.
 ///
 /// See `mln_open_gl_context_ownership` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -321,9 +286,9 @@ public struct OpenGlContextOwnership: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The session shares its thread with host graphics work.
+  /// The session's context shares objects with your `share_context`.
   public static let shared: OpenGlContextOwnership = .init(rawValue: 0)
-  /// The session keeps its own OpenGL context current on its thread.
+  /// The session's context shares objects with no other context.
   public static let dedicated: OpenGlContextOwnership = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
@@ -334,7 +299,7 @@ public struct OpenGlContextOwnership: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// OpenGL context providers supported by this build.
+/// An OpenGL context platform, as a bit in a set.
 ///
 /// See `mln_open_gl_context_provider_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -348,13 +313,16 @@ public struct OpenGlContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
 
   public static let wgl: OpenGlContextProviderFlag = .init(rawValue: 1)
   public static let egl: OpenGlContextProviderFlag = .init(rawValue: 2)
-  /// Browser WebGL context imported into an Emscripten module.
   public static let webGl: OpenGlContextProviderFlag = .init(rawValue: 4)
 }
 
-/// Host lock on the graphics queue that a session shares with its host, copied
-/// by a successful attach. The callback runs on the session's graphics thread
-/// or on the thread that abandons the session.
+/// Your lock on a Vulkan queue that you and a render session both submit to.
+///
+/// The session holds the lock only while it submits or presents to the queue.
+/// Set both `lock` and `unlock`, or neither when you don't submit to the queue
+/// yourself.
+///
+/// It can run on a library thread, and it can't call the library.
 ///
 /// See `mln_queue_lock` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -394,16 +362,15 @@ private func invokeQueueLockUnlock(user_data: UnsafeMutableRawPointer?) {
   box.value.unlock?()
 }
 
-/// Takes or returns the host's lock on the queue that a session shares with it.
-/// Native code relies on the lock being held or released when the call returns.
-/// The callback runs on the session's graphics thread or on the thread that
-/// abandons the session.
+/// Locks or unlocks the Vulkan queue that you share with a render session.
+///
+/// It can run on a library thread, and it can't call the library.
 ///
 /// See `mln_queue_lock_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public typealias QueueLockCallback = @Sendable () -> Void
 
-/// Execution placement for one render session.
+/// The thread that runs a render session's graphics work.
 ///
 /// See `mln_render_driver_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -415,11 +382,9 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// Native code initializes, services, and tears down transferable graphics
-  /// state on a library-owned thread.
+  /// A library thread.
   public static let coreWorker: RenderDriverKind = .init(rawValue: 1)
-  /// The host services driver work on the thread or realm where its graphics
-  /// context is current.
+  /// Your thread, when it calls `RenderSessionHandle.serviceDriverWork()`.
   public static let callerGraphicsThread: RenderDriverKind = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
@@ -430,37 +395,28 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// Common attachment policy copied before an attach call returns.
+/// Options for attaching a render session to a map.
 ///
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionAttachOptions: Sendable {
-  /// Where the session's driver runs. Required.
   public var driver: RenderDriverKind
-  /// Requested slot count of a session-owned texture ring, up to 8. Zero
-  /// selects 2, so the host can retain one frame while the session renders its
-  /// replacement. Private targets grant one slot regardless of this value. A
-  /// borrowed texture ring's depth is its texture count, so borrowed and other
-  /// targets ignore this value.
+  /// How many textures a ring that the session creates has, up to 8. Zero picks
+  /// a default.
   public var requestedTextureRingDepth: UInt32
-  /// Producer synchronization kinds that the host accepts for acquired texture
-  /// frames. The session picks the first one its target supports in this order:
-  /// `GpuSyncKind.queueOrder`, `GpuSyncKind.openGlFence`,
-  /// `GpuSyncKind.vulkanTimelineSemaphore`, `GpuSyncKind.metalSharedEvent`,
-  /// `GpuSyncKind.d3d12Fence`, `GpuSyncKind.syncFd`, then
-  /// `GpuSyncKind.cpuComplete`. Its capabilities report the pick. Zero accepts
-  /// `GpuSyncKind.cpuComplete`, or `GpuSyncKind.queueOrder` on WebGPU, whose
-  /// device has a single queue. A set that the target cannot satisfy fails the
-  /// attach with `Status.unsupported`.
+  /// The kinds of `GpuSync` that you can wait on before you read an acquired
+  /// frame. The session uses one of them that its target supports. Zero lets
+  /// the session pick a kind that names no object to wait on.
   public var producerSyncKinds: GpuSyncKindFlag
-  /// Wakes the receiver when the frame-result queue becomes nonempty.
+  /// Called when frame results are waiting for
+  /// `RenderSessionHandle.drainFrameResults()`. It isn't called again until a
+  /// drain takes them.
   public var frameWake: Wake
-  /// Wakes the graphics receiver when caller-driver work is available,
-  /// including work that a finished driver result releases.
+  /// Called when a session driven by `RenderDriverKind.callerGraphicsThread`
+  /// has work for `RenderSessionHandle.serviceDriverWork()`. It isn't called
+  /// again until a service runs.
   public var driverWorkWake: Wake
-  /// Host lock on the graphics queue, disabled by default. Only Vulkan targets
-  /// accept an enabled lock; other backends fail the attach with
-  /// `Status.unsupported`.
+  /// Your lock on the Vulkan queue, when you submit to it yourself.
   public var queueLock: QueueLock
   public init(
     driver: RenderDriverKind,
@@ -505,22 +461,19 @@ public struct RenderSessionAttachOptions: Sendable {
   }
 }
 
-/// Driver and target capabilities fixed for one attached render session.
+/// What an attached render session supports.
 ///
 /// See `mln_render_session_capabilities` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   public var driver: RenderDriverKind
-  /// Granted texture ring depth: the slot count of a session-owned ring, or the
-  /// texture count of a borrowed one. Zero for a surface.
+  /// How many textures the session's texture ring has.
   public var textureRingDepth: UInt32
   public var flags: RenderSessionCapabilityFlag
-  /// Producer synchronization of acquired frames, picked from the attach
-  /// options' producer_sync_kinds. `GpuSyncKind.cpuComplete` for a target
-  /// without frame acquisition.
+  /// The kind of `GpuSync` that `AcquiredFrameHandle.withProducerSync()`
+  /// reports.
   public var producerSyncKind: GpuSyncKind
-  /// Consumer synchronization kinds that `AcquiredFrameHandle.release()`
-  /// accepts. Empty for a target without frame acquisition.
+  /// The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
   public var consumerSyncKinds: GpuSyncKindFlag
   public init(
     driver: RenderDriverKind = .init(rawValue: 0),
@@ -545,7 +498,7 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   }
 }
 
-/// Optional render-session capabilities.
+/// Something that a render session can do.
 ///
 /// See `mln_render_session_capability_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -558,33 +511,39 @@ public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
     self.rawValue = rawValue
   }
 
+  /// `RenderSessionHandle.acquireFrame()` can take the frames it renders.
   public static let frameAcquisition: RenderSessionCapabilityFlag =
     .init(rawValue: 1)
+  /// `RenderSessionHandle.readTexture()` can copy its texture to memory.
   public static let readback: RenderSessionCapabilityFlag = .init(rawValue: 2)
+  /// It shows frames on a surface.
   public static let presentation: RenderSessionCapabilityFlag =
     .init(rawValue: 4)
 }
 
-/// Vulkan backend context fields shared by Vulkan render targets.
+/// The Vulkan device and queue that a render session uses.
+///
+/// Keep these objects alive until a detach or disposal of the session
+/// completes, or an abandon of it returns. If you discarded a frame of a ring
+/// that the session creates, or abandon the session while you hold a frame,
+/// keep them alive until the process exits instead.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
-  /// Borrowed VkInstance. Required.
+  /// A `VkInstance`.
   public var instance: NativePointer
-  /// Borrowed VkPhysicalDevice. Required.
+  /// A `VkPhysicalDevice`.
   public var physicalDevice: NativePointer
-  /// Borrowed VkDevice. Required.
+  /// A `VkDevice`.
   public var device: NativePointer
-  /// Borrowed graphics VkQueue. Required. The session's driver submits to it
-  /// from its own thread, so a host that uses the same queue passes
-  /// `RenderSessionAttachOptions.queueLock` at attach.
+  /// A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
+  /// you submit to it too, set `RenderSessionAttachOptions.queueLock`.
   public var graphicsQueue: NativePointer
-  /// Queue family index for graphics_queue. Must support graphics commands.
   public var graphicsQueueFamilyIndex: UInt32
-  /// PFN_vkGetInstanceProcAddr for the loader that created the instance.
+  /// Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
   public var getInstanceProcAddr: NativePointer
-  /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
+  /// Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
   public var getDeviceProcAddr: NativePointer
   public init(
     instance: NativePointer,
@@ -642,16 +601,15 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// WebGL context fields shared by OpenGL render targets in the browser.
+/// The WebGL context or canvas that a render session uses.
 ///
 /// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WebGlContextDescriptor: Equatable, Hashable, Sendable {
   public var kind: WebGlContextKind
-  /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
+  /// Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
   public var context: Int32
-  /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
-  /// canvas must still be transferable when attachment starts.
+  /// The canvas's CSS selector, for a transferred canvas.
   public var canvasSelector: String
   public init(
     kind: WebGlContextKind = .init(rawValue: 0),
@@ -686,7 +644,7 @@ public struct WebGlContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// WebGL context placement.
+/// How a render session gets its WebGL context.
 ///
 /// See `mln_web_gl_context_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -698,10 +656,11 @@ public struct WebGlContextKind: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// Use a host-created context on its current browser agent.
+  /// The session uses a context that you created with
+  /// `emscripten_webgl_create_context()`.
   public static let existing: WebGlContextKind = .init(rawValue: 0)
-  /// Transfer the canvas named by canvas_selector to a native worker and create
-  /// a WebGL 2 context there.
+  /// The library transfers the canvas that `canvas_selector` names to a worker
+  /// and creates the context there.
   public static let transferredCanvas: WebGlContextKind = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
@@ -712,19 +671,16 @@ public struct WebGlContextKind: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// WGL context fields shared by OpenGL render targets on Windows.
+/// The WGL objects that a render session makes its OpenGL context from.
 ///
 /// See `mln_wgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WglContextDescriptor: Equatable, Hashable, Sendable {
-  /// Borrowed HDC used to create the session context. Required. A dedicated
-  /// owned texture makes its context current on this HDC from its core worker.
+  /// An `HDC`.
   public var deviceContext: NativePointer
-  /// Borrowed HGLRC whose share group the session context joins. Required under
-  /// shared ownership. A dedicated session joins no share group, so it must be
-  /// null there.
+  /// Your `HGLRC`, for a shared context.
   public var shareContext: NativePointer
-  /// Optional wglGetProcAddress-compatible function for the host loader.
+  /// Your `wglGetProcAddress`, or null to use the system's.
   public var getProcAddress: NativePointer
   public init(
     deviceContext: NativePointer,

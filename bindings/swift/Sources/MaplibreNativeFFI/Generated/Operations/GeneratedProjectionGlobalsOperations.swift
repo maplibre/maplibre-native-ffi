@@ -3,7 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// Converts spherical Mercator projected meters to a geographic coordinate.
+/// Converts meters in the Web Mercator projection to a coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -20,7 +20,7 @@ public func latLngForProjectedMeters(_ bindingArg0: ProjectedMeters) throws
   } result: { LatLng(raw: value0) }
 }
 
-/// Converts a geographic coordinate to spherical Mercator projected meters.
+/// Converts a coordinate to meters in the Web Mercator projection.
 ///
 /// See `mln_projected_meters_for_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// MapLibre axonometric rendering options used for snapshots and commands.
+/// Settings that skew the map or draw it without perspective.
 /// </summary>
 /// <remarks>
 /// See <c>mln_projection_mode</c> in the <see
@@ -12,17 +12,9 @@ namespace Maplibre.NativeFfi;
 public sealed record ProjectionMode
 {
     /// <summary>
-    /// Enables a non-perspective axonometric render transform.
+    /// Whether the map draws without perspective.
     /// </summary>
     public bool? Axonometric { get; init; }
-
-    /// <summary>
-    /// X-skew factor of the axonometric transform.
-    /// </summary>
     public double? XSkew { get; init; }
-
-    /// <summary>
-    /// Y-skew factor of the axonometric transform.
-    /// </summary>
     public double? YSkew { get; init; }
 }

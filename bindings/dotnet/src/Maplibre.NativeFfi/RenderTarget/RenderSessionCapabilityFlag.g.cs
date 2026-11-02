@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Optional render-session capabilities.
+/// Something that a render session can do.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_session_capability_flag</c> in the <see
@@ -11,7 +11,20 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum RenderSessionCapabilityFlag : uint
 {
+    /// <summary>
+    /// <c>RenderSessionHandle.AcquireFrame()</c> can take the frames it
+    /// renders.
+    /// </summary>
     FrameAcquisition = 1,
+
+    /// <summary>
+    /// <c>RenderSessionHandle.ReadTextureAsync()</c> can copy its texture to
+    /// memory.
+    /// </summary>
     Readback = 2,
+
+    /// <summary>
+    /// It shows frames on a surface.
+    /// </summary>
     Presentation = 4,
 }
