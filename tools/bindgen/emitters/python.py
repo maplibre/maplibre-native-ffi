@@ -311,10 +311,12 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         },
         # Native queues each call, and the binding's one dispatcher thread
         # runs it.
-        threads=(
+        threads=async_hosts.threads(
+            bound,
             "The callback runs on the binding's dispatcher thread, after native "
-            "queues the call."
+            "queues the call.",
         ),
+        fields=async_hosts.omitted_fields(bound),
     )
 
 

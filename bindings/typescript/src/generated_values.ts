@@ -723,11 +723,6 @@ export interface HttpHeaderRule {
  * Headers to add to HTTP requests, for
  * `RuntimeHandle.setHttpHeaderTransform()`.
  *
- * Set either `callback` or `rules`, not both.
- *
- * The callback runs asynchronously on the JavaScript thread that registered it,
- * after native queues the call.
- *
  * See `mln_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
@@ -1579,8 +1574,7 @@ export interface Quaternion {
  * Set both `lock` and `unlock`, or neither when you don't submit to the queue
  * yourself.
  *
- * The callback runs asynchronously on the JavaScript thread that registered it,
- * after native queues the call.
+ * It can run on a library thread, and it can't call the library.
  *
  * See `mln_queue_lock` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

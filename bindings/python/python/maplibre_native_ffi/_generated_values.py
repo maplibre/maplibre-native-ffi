@@ -1683,8 +1683,6 @@ class HttpHeaderTransform:
     """Headers to add to HTTP requests, for
     `RuntimeHandle.set_http_header_transform()`.
 
-    Set either `callback` or `rules`, not both.
-
     See `mln_http_header_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
@@ -2661,6 +2659,8 @@ class QueueLock:
     The session holds the lock only while it submits or presents to the
     queue. Set both `lock` and `unlock`, or neither when you don't submit to
     the queue yourself.
+
+    It can run on a library thread, and it can't call the library.
 
     See `mln_queue_lock` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

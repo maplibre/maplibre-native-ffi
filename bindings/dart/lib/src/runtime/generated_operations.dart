@@ -7328,9 +7328,6 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   /// The transform replaces the one set before. In a browser or on OpenHarmony,
   /// serve the requests with `RuntimeHandle.setResourceProvider()` instead.
   ///
-  /// The callback runs asynchronously in the isolate and zone that registered
-  /// it, after native queues the call.
-  ///
   /// See `mln_runtime_set_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   ///

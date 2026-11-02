@@ -12,10 +12,13 @@ public sealed unsafe partial class HttpHeaderTransformResponse
     /// handles.
     /// </summary>
     /// <remarks>
-    /// <para>Setting a header again, in any letter case, replaces its value.
-    /// <c>name</c> can't be a header that the library or the platform manages,
-    /// such as <c>Host</c>, <c>Range</c>, <c>Accept-Encoding</c>, or
-    /// <c>User-Agent</c>.</para>
+    /// <para>Header names ignore letter case, and setting a header again
+    /// replaces its value. <c>name</c> can't be a header that the library or
+    /// the platform manages: <c>Accept-Encoding</c>, <c>Connection</c>,
+    /// <c>Content-Length</c>, <c>Host</c>, <c>If-Modified-Since</c>,
+    /// <c>If-None-Match</c>, <c>Keep-Alive</c>, <c>Proxy-Authorization</c>,
+    /// <c>Proxy-Connection</c>, <c>Range</c>, <c>TE</c>, <c>Trailer</c>,
+    /// <c>Transfer-Encoding</c>, <c>Upgrade</c>, or <c>User-Agent</c>.</para>
     /// <para>See <c>mln_http_header_transform_response_set_header</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>

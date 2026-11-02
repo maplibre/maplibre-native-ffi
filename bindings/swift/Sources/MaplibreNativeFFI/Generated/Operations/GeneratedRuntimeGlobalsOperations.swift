@@ -7,9 +7,12 @@ public extension HttpHeaderTransformResponse {
   /// Sets a header on the request that an HTTP header transform callback
   /// handles.
   ///
-  /// Setting a header again, in any letter case, replaces its value. `name`
-  /// can't be a header that the library or the platform manages, such as
-  /// `Host`, `Range`, `Accept-Encoding`, or `User-Agent`.
+  /// Header names ignore letter case, and setting a header again replaces its
+  /// value. `name` can't be a header that the library or the platform manages:
+  /// `Accept-Encoding`, `Connection`, `Content-Length`, `Host`,
+  /// `If-Modified-Since`, `If-None-Match`, `Keep-Alive`, `Proxy-Authorization`,
+  /// `Proxy-Connection`, `Range`, `TE`, `Trailer`, `Transfer-Encoding`,
+  /// `Upgrade`, or `User-Agent`.
   ///
   /// See `mln_http_header_transform_response_set_header` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
