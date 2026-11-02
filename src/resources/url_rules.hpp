@@ -32,15 +32,12 @@ class CompiledGlob {
   std::vector<Token> tokens_;
 };
 
-// Whether a route or header rule with the kinds mask applies to a request of
-// request_kind.
 [[nodiscard]] constexpr auto matches_kind(
   std::uint32_t kinds, mln_resource_kind request_kind
 ) noexcept -> bool {
   return request_kind < 32U && ((kinds >> request_kind) & 1U) != 0;
 }
 
-// One copied route or header rule pattern.
 struct UrlPattern {
   UrlPattern(std::uint32_t kinds, std::uint32_t flags, std::string_view url);
   std::uint32_t kinds;

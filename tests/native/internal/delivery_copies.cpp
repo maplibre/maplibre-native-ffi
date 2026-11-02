@@ -13,7 +13,6 @@
 
 namespace {
 
-// One copy and the storage it owns.
 struct Copy {
   void* storage = nullptr;
   const void* value = nullptr;
@@ -86,8 +85,6 @@ void a_copy_preserves_the_selected_union_variant() {
   );
 }
 
-// A field its presence bit marks absent reaches the host cleared, whatever
-// the source left in it, so no stale value looks present.
 void a_copy_clears_the_fields_its_presence_bits_mark_absent() {
   static const char text[] = "left behind";
   const auto stale = mln_buffer_view{text, sizeof(text) - 1};

@@ -356,7 +356,6 @@ auto validate_live_attached_texture(
 
 namespace {
 
-// A readback that the backend finished before returning it.
 class CompletedTextureReadback final : public TextureReadback {
  public:
   explicit CompletedTextureReadback(mln::PremultipliedImage image)
@@ -375,8 +374,6 @@ class CompletedTextureReadback final : public TextureReadback {
   mln::PremultipliedImage image_;
 };
 
-// Checks that `texture` can be read back now and describes the image that a
-// readback produces.
 auto prepare_readback(
   mln_render_session texture, mln_render_session_object*& out_live,
   mln_texture_image_info& out_info
@@ -429,8 +426,7 @@ struct TextureReadbackResult {
   mln_texture_image_info info{};
 };
 
-// Checks a finished readback against the image that `info` describes, which
-// the readback captured when it started, and moves it into `out_result`.
+// `info` describes the image as of the readback's start.
 auto readback_result(
   const mln_texture_image_info& info, mln::PremultipliedImage image,
   std::any& out_result

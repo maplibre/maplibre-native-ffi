@@ -92,7 +92,6 @@ String _targetPlatform(CodeConfig code) {
   };
 }
 
-/// The backend that the application selected for [os], if it selected one.
 String? _selectedBackend(BuildInput input, OS os) =>
     switch (input.userDefines['backend']) {
       null => null,
@@ -176,7 +175,6 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
   return matches.single;
 }
 
-/// Describes a request for [platform] with the [backend] selected for it.
 String _request(String platform, String? backend) => backend == null
     ? '$platform with its default backend'
     : '$platform $backend';

@@ -135,7 +135,6 @@ def disposer_arguments(handle, function, raw):
 
 
 def owner_name(handle):
-    """The public owner class of a handle plan."""
     from .swift import name
 
     return name(handle.stem) + "Handle"

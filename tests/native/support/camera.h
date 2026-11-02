@@ -21,8 +21,7 @@ typedef void (*mln_test_transition_end_hook)(
   mln_test_transition_end* probe, const mln_camera_transition_end* end
 );
 
-// Records each call of an end handler and of its release, and pulses on both.
-// The probe must outlive the release.
+// Pulses on each call and on the release. The probe must outlive the release.
 struct mln_test_transition_end {
   atomic_int calls;
   atomic_int releases;
@@ -36,7 +35,6 @@ struct mln_test_transition_end {
 };
 
 void mln_test_transition_end_init(mln_test_transition_end* probe);
-// An enabled handler that records into `probe`.
 mln_camera_transition_handler mln_test_transition_end_handler(
   mln_test_transition_end* probe
 );

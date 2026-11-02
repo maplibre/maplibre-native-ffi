@@ -114,8 +114,6 @@ function(mln_ffi_complete_static_dependencies_for_target out_var)
   set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)
 endfunction()
 
-# Resolves the input archives, mapping CMake targets to the files they produce
-# and passing anything else through as a path.
 function(mln_ffi_archive_inputs archives_var targets_var target)
   set(MLN_FFI_INPUT_ARCHIVES "$<TARGET_FILE:${target}>")
   set(MLN_FFI_INPUT_TARGETS ${target})
@@ -135,7 +133,6 @@ function(mln_ffi_archive_inputs archives_var targets_var target)
   set(${targets_var} ${MLN_FFI_INPUT_TARGETS} PARENT_SCOPE)
 endfunction()
 
-# The ELF steps, in order, as a command list for one add_custom_command.
 function(mln_ffi_elf_archive_commands out_var object archive)
   get_target_property(bundled_runtime mln_ffi_platform_dependencies
                       MLN_FFI_ARCHIVE_BUNDLED_RUNTIME)
@@ -249,7 +246,6 @@ function(mln_ffi_configure_complete_static_archive target)
     message(FATAL_ERROR "Unsupported archive format: ${MLN_FFI_ARCHIVE_FORMAT}")
   endif()
 
-  # Every format packages into a directory of its own, from empty.
   list(
     PREPEND
     MLN_FFI_ARCHIVE_COMMANDS

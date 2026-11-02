@@ -56,7 +56,6 @@ internal actual object ThreadStart {
     return suspendCoroutine { waiting.caller = it }
   }
 
-  /** Resumes the caller of the thread-start call that [token] roots with its [status]. */
   fun deliver(token: Long, status: Int) {
     (NativeRoots.release(token) as? Waiting)?.caller?.resume(status)
   }

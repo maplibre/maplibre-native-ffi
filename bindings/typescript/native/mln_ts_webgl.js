@@ -12,9 +12,6 @@ addToLibrary({
     "emscripten_webgl_make_context_current",
   ],
   $mlnTsWebGl: {
-    // Returns the context's handle, or 0 when [context] is not a WebGL 2
-    // context in this realm. The registration records the attributes that
-    // the context was created with.
     registerContext: (context) =>
       globalThis.WebGL2RenderingContext &&
       context instanceof WebGL2RenderingContext

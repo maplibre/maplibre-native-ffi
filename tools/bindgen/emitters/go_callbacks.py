@@ -214,7 +214,6 @@ def native_constructor(values, plan):
 
 
 def native_input(values, plan):
-    """Copies a registration's native form into its C struct unchanged."""
     descriptor = plan.registration
     typename = public(plan.native)
 
@@ -252,7 +251,6 @@ def registration_input(values, plan):
         f.value.native for f in plan.fields if f.name == descriptor.release
     )
     release = "binding_release"
-    # A native registration takes the place of the funcs.
     native = (
         f"if input.native != nil {{ {native_input(values, plan)} }} else "
         if accepts_native(values, plan)

@@ -40,8 +40,6 @@ static void host_string_views_reject_nul_and_null_data_with_a_length(void) {
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-// An asset:// URL names a file relative to the directory the runtime's
-// asset_path option gives.
 static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
   char path[1024];
   mln_test_temp_path("asset-style.json", path, sizeof(path));

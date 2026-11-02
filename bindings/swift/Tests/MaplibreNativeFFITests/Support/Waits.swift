@@ -47,7 +47,6 @@ final class Pulse: @unchecked Sendable {
     }
   }
 
-  /// Suspends until a signal after `seen`, or until `limit`.
   func wait(past seen: UInt64, until limit: DispatchTime) async {
     await withCheckedContinuation { continuation in
       let id: UInt64? = condition.withLock {

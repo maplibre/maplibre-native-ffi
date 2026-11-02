@@ -5,8 +5,6 @@
 #include "support/test_support.h"
 
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-// A private owned texture needs no host graphics thread: its core worker
-// creates the context, renders, reads pixels, and destroys the context.
 static void dedicated_texture_uses_a_readback_only_core_worker(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

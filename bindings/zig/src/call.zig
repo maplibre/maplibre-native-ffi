@@ -197,7 +197,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             };
         }
 
-        /// Releases encoded inputs and unaccepted callback roots.
         fn end(self: *Self) void {
             self.roots.deinit();
             if (Allocator == std.mem.Allocator) self.arena.deinit();
@@ -249,7 +248,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             return native;
         }
 
-        /// Passes the text's storage and its capacity to the native call.
         fn passText(self: *Self, native: *NativeArgs) void {
             inline for (fields, 0..) |Field, index| {
                 if (comptime marks(Field, "caller_sized_text")) native[offset + index] = @ptrCast(self.text_storage.ptr);
@@ -257,7 +255,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             }
         }
 
-        /// Makes the call again with enough storage while the text did not fit.
         fn fitText(self: *Self, native: *NativeArgs, diagnostic: ?*Diagnostic) Error!void {
             if (comptime !hasText(Args)) return;
             while (self.text_length >= self.text_storage.len) {
@@ -299,7 +296,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             return input;
         }
 
-        /// Encodes an input that native reads through a pointer into `slot`.
         fn encodeInto(self: *Self, comptime Target: type, slot: anytype, input: anytype) Error!Target {
             if (@typeInfo(@TypeOf(input)) == .optional) {
                 return if (input) |present| self.encodeInto(Target, slot, present) else null;
@@ -358,7 +354,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
     };
 }
 
-/// The payload of a value that is an error union, or the value itself.
 fn Settled(comptime T: type) type {
     return switch (@typeInfo(T)) {
         .error_union => |union_info| union_info.payload,
@@ -564,7 +559,6 @@ fn Submitted(comptime Copy: type, comptime Args: type) type {
     return if (Outputs(Args) == void) completion.Future(Copy.Value) else Started(Copy.Value, Args);
 }
 
-/// The allocator that a completion copier receives.
 const CopyContext = struct {
     decode: marshal.Decode,
 };

@@ -72,7 +72,6 @@ def public_name(native: str) -> str:
 
 
 def enum_member(plan: ValuePlan, key: str) -> str:
-    """The Python name of an enum constant."""
     prefix = enum_member_prefix((known for known, _ in plan.enum_values), plan.native)
     return key.removeprefix(prefix)
 
@@ -84,7 +83,6 @@ def variant_name(parent: ValuePlan, field) -> str:
 
 
 def native_name(plan: ValuePlan) -> str:
-    """The class of a registration's native form."""
     return "Native" + public_name(plan.native)
 
 
@@ -264,7 +262,6 @@ class Values:
             yield flag.member, None, flag
 
     def copy(self, plan: ValuePlan, expr: str, *, scope: str = "value") -> str:
-        """An expression that copies the C value `expr` into a Python object."""
         expr = f"({expr})" if expr.startswith(("*", "unsafe ")) else expr
         if plan.kind == "native_pointer":
             pointer = (

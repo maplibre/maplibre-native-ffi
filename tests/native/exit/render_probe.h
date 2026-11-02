@@ -127,7 +127,6 @@ static inline void probe_request_frame(mln_render_session session) {
   );
 }
 
-// Drains the session's frame results and reports whether one was rendered.
 static inline bool probe_drain_rendered(mln_render_session session) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   mln_render_frame_batch_view view = {.size = sizeof(view)};

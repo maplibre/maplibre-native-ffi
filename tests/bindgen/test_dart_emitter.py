@@ -75,7 +75,6 @@ class DartEmitterTests(unittest.TestCase):
                 generated,
             )
         self.assertEqual(generated.count("bool get isClosed => _state.isClosed;"), 2)
-        # Only an event source's id doc names events.
         self.assertEqual(generated.count("which runtime events report"), 1)
         self.assertIn(
             "which runtime events report", generated.split("class MapHandle")[1]
@@ -97,7 +96,6 @@ class DartEmitterTests(unittest.TestCase):
         self.assertIn(
             "List<Reading> _readReadingView(raw.mln_reading_view source) =>", generated
         )
-        # Neither the batch nor its view is public.
         self.assertNotIn("ReadingBatchHandle", generated)
         self.assertNotIn("class ReadingView", dart.lower(api).files[dart.VALUES])
 

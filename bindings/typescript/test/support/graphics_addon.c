@@ -120,7 +120,6 @@ static napi_value destroy(napi_env env, napi_callback_info info) {
 }
 
 #ifdef __OHOS__
-/** A turn's empty work item and the callback that its completion calls. */
 typedef struct turn_work {
   napi_async_work work;
   napi_ref callback;

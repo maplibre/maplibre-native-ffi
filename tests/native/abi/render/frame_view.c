@@ -1,7 +1,5 @@
-// A rendered frame's view: the transform that the frame drew, which builds a
-// projection that places a coordinate on the pixel where the frame drew it,
-// however the camera, the target, and the map's constraints change later. It
-// also shows what a frame gated on a command's render update draws.
+// A rendered frame's view, and what a frame gated on a command's render update
+// draws.
 
 #include <math.h>
 
@@ -31,7 +29,6 @@ static void prepare(mln_map map) {
   ));
 }
 
-// Requests one forced frame and returns its result.
 static mln_render_frame_result render_frame(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
@@ -128,8 +125,7 @@ typedef struct view_row {
   bool world_copy;
 } view_row;
 
-// Applies a row through the map's own commands, under limits raised past the
-// map's defaults of zoom 22 and pitch 60.
+// Raises the zoom and pitch limits past the map's defaults of 22 and 60.
 static void apply(mln_map map, const view_row* row) {
   mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
   bounds.fields =
@@ -282,10 +278,6 @@ static const view_row rows[] = {
 
 enum { row_count = sizeof(rows) / sizeof(rows[0]) };
 
-// Each frame's view converts the dot to where the frame drew it, across every
-// part of the transform that moves a pixel. Every view still converts as it
-// did after later frames, a resize, and bounds that exclude its camera, since
-// the projection takes the view as it is.
 static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -310,12 +302,10 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
       1e-9, row->pitch, frame.view.camera.pitch, row->label
     );
   }
-  // The world-copy row's center stayed east of the antimeridian.
   TEST_ASSERT_GREATER_THAN_DOUBLE(
     180.0, views[row_count - 1].camera.center.longitude
   );
 
-  // An unforced demand with nothing new to draw reports no view.
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
@@ -359,7 +349,6 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// During an eased pan, each frame's view matches the drawn camera as it moves.
 static void each_frame_of_a_transition_reports_its_own_view(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -423,8 +412,6 @@ static mln_render_frame_result render_through_update(
   return (mln_render_frame_result){0};
 }
 
-// A committed command's completion names the render update that includes it,
-// and the first frame that renders that update or a later one draws it.
 static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -454,7 +441,6 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   const uint64_t render_update =
     mln_test_completion_render_update_generation(&jump);
   mln_test_completion_destroy(&jump);
-  // The command published its render update before it completed.
   TEST_ASSERT_GREATER_THAN_UINT64(
     before.rendered_update_generation, render_update
   );
@@ -470,8 +456,6 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A session resize reports the render update of the map's resize, and the
-// first frame at that update draws the new extent.
 static void a_session_resize_reports_the_render_update_of_its_extent(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

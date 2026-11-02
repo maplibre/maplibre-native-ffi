@@ -24,7 +24,6 @@ static int start_detached(void* (*run)(void*), void* argument) {
   return result;
 }
 
-/** Calls [callback] with [user_data] and [result] on the calling thread. */
 EMSCRIPTEN_KEEPALIVE void mln_kw_test_call_completion(
   mln_completion_callback callback, void* user_data,
   const mln_completion_result* result
@@ -32,7 +31,6 @@ EMSCRIPTEN_KEEPALIVE void mln_kw_test_call_completion(
   callback(user_data, result);
 }
 
-/** Calls [release] with [user_data] on the calling thread. */
 EMSCRIPTEN_KEEPALIVE void mln_kw_test_call_release(
   mln_user_data_release release, void* user_data
 ) {
@@ -53,7 +51,6 @@ static void log_error(void) {
   mln_binding_owner_finalize(mln_binding_owner_token_create(0));
 }
 
-/** Emits an error log record on the page. */
 EMSCRIPTEN_KEEPALIVE void mln_kw_test_log_error(void) { log_error(); }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +92,6 @@ static void wait_until_set(volatile uint32_t* flag) {
 #define CONTEND_WAIT_MS 30000.0
 #define SPIN_WAIT_MS 2000.0
 
-/** Waits until [flag] is set, for at most [ms]. Returns whether it was set. */
 static int wait_until_set_within(volatile uint32_t* flag, double ms) {
   double deadline = emscripten_get_now() + ms;
   while (__atomic_load_n(flag, __ATOMIC_SEQ_CST) == 0) {
@@ -226,7 +222,6 @@ void mln_kw_test_remove_dom_canvas(const char* selector);
 
 static uint32_t canvas_serial;
 
-/** Makes [context] current on the calling thread. Returns 0 on success. */
 EMSCRIPTEN_KEEPALIVE int32_t mln_kw_test_webgl_make_current(int32_t context) {
   return emscripten_webgl_make_context_current(context);
 }

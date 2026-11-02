@@ -117,8 +117,6 @@ test "an error returned by a resource provider is contained and reported" {
     defer failed.deinit();
 }
 
-/// A provider that keeps every request matching `url`, hands it to the test,
-/// and denies the rest.
 const DeferringProvider = struct {
     url: []const u8,
     taken: support.Counter = .{},
@@ -348,8 +346,6 @@ const routed_style_json =
     \\{"version":8,"sources":{"routed":{"type":"vector","url":"custom://routed/source.json"}},"layers":[]}
 ;
 
-/// A provider that serves the routed style, denies the routed source, and
-/// counts every request it receives by what it is.
 const RoutedProvider = struct {
     styles: support.Counter = .{},
     sources: support.Counter = .{},

@@ -9,7 +9,6 @@
 
 #include "render_probe.h"
 
-// The host's lock on both sessions' queues, one mutex for both.
 typedef struct probe_queue_lock {
 #ifdef _WIN32
   CRITICAL_SECTION mutex;

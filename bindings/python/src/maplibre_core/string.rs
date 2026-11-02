@@ -4,8 +4,6 @@ use maplibre_native_ffi_sys as sys;
 
 use super::{Error, Result};
 
-/// Copies a borrowed native string view into an owned Rust string.
-///
 /// # Safety
 ///
 /// When `view.size` is nonzero, `view.data` must point to `view.size` bytes of
@@ -15,8 +13,6 @@ pub unsafe fn copy_string_view(view: sys::mln_buffer_view) -> Result<String> {
     unsafe { borrow_string_view(view) }.map(str::to_owned)
 }
 
-/// Borrows a native string view as text.
-///
 /// # Safety
 ///
 /// When `view.size` is nonzero, `view.data` must point to `view.size` bytes of

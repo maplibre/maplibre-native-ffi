@@ -15,12 +15,10 @@ from .model import Api, CType, ModelError
 from .protocol import COMPLETION
 from .semantic import BoundApi, CallbackPlan, FieldPlan, ValuePlan
 
-# The copies that the native core makes for queue deliveries.
 DELIVERY_CAPTURE = "src/delivery/capture_generated.inc"
 
 
 def generate(api: Api | BoundApi) -> dict[str, str]:
-    """The native copies for queue deliveries."""
     return {DELIVERY_CAPTURE: delivery_capture(compile_api(api))}
 
 
@@ -112,7 +110,6 @@ def delivery_capture(bound: BoundApi) -> str:
     for index, (name, callback, plan) in enumerate(calls):
         output.extend(
             [
-                f"// The copied arguments of one {callback.native} call.",
                 f"struct {name} {{",
                 *(
                     f"  {_member(field.value.ctype, field.name)};"
@@ -149,7 +146,6 @@ def delivery_capture(bound: BoundApi) -> str:
 
 
 def _member(ctype: CType, name: str) -> str:
-    """A struct member declaration of a C type."""
     spelling = ctype.spelling
     if spelling.endswith("*"):
         return f"{spelling}{name}"

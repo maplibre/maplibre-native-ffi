@@ -1,6 +1,4 @@
-// Queued completions: what a dispatched completion receives, descriptor
-// validation, results that outlive their producer, and completions whose
-// queue the host released.
+// Queued completions.
 
 #include <string.h>
 
@@ -92,7 +90,6 @@ static bool captured_a_result(void* context) {
   return wait->captured->calls != 0;
 }
 
-// Dispatches queue until the capturing completion has run once.
 static void await_capture(
   mln_delivery_queue queue, const captured_result* captured, void* user_data
 ) {
@@ -140,7 +137,6 @@ static void operation_and_command_completions_reach_the_queue(void) {
   );
   TEST_ASSERT_TRUE(captured.generation > 0);
 
-  // A failed command copies its status and diagnostic.
   completion =
     capturing_completion(queue.handle, &command_tag, &captured, capture_result);
   MLN_TEST_OK(mln_map_remove_style_layer(
@@ -178,19 +174,16 @@ static void a_rejected_submission_queues_nothing(void) {
     mln_runtime_clear_resource_transform(runtime, &completion, NULL)
   );
 
-  // A handle of another type is invalid.
   completion = mln_test_queue_completion(runtime, NULL);
   MLN_TEST_INVALID(
     mln_runtime_clear_resource_transform(runtime, &completion, NULL)
   );
 
-  // Rejected submissions return before accepting any work or completion.
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
   MLN_TEST_STATUS(
     MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
   );
 
-  // A released queue reports as a released handle.
   mln_test_delivery_queue_release(&queue);
   completion = mln_test_queue_completion(queue.handle, NULL);
   MLN_TEST_STATUS(
@@ -200,8 +193,6 @@ static void a_rejected_submission_queues_nothing(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A command accepts a null completion, but a present one still names a
-// callback.
 static void a_command_validates_a_present_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -213,8 +204,6 @@ static void a_command_validates_a_present_completion(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A later command's completion runs after every earlier submission's on the
-// same map, including across a discarded command.
 static void a_later_completion_follows_earlier_queued_completions(void) {
   mln_test_calls_reset();
   mln_test_delivery_queue queue;
@@ -246,8 +235,6 @@ static void a_later_completion_follows_earlier_queued_completions(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A list result's strings live in the queued call, past the map and runtime
-// that produced them.
 static void list_results_outlive_the_runtime(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -271,8 +258,6 @@ static void list_results_outlive_the_runtime(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// The runtime's own release completes through the queue, after its threads
-// are gone.
 static void runtime_release_completes_through_the_queue(void) {
   mln_test_calls_reset();
   mln_test_delivery_queue queue;

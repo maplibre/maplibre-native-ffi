@@ -1,6 +1,4 @@
-// Custom geometry and custom vector sources: when the host's callback state
-// is released, delivered tiles becoming features, failed tiles being reported,
-// and an invalidation cancelling and refetching a tile.
+// Custom geometry and custom vector sources.
 //
 // The two kinds share their contracts, so every shared case runs once per kind.
 // The release callback is the only report that the host's state is no longer
@@ -270,8 +268,6 @@ static mln_map create_map_without_style_events(mln_runtime runtime) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// A host that never subscribes to style-loaded events still learns that a style
-// replacement dropped its source.
 static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
   FOR_EACH_KIND(kind) {
     mln_runtime runtime = mln_test_create_runtime();
@@ -293,7 +289,6 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
       0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
     );
 
-    // The map no longer references the state, so retiring it releases nothing.
     mln_test_destroy_map(map);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       1, atomic_load(&probe.release_count), kind->name
@@ -336,9 +331,6 @@ static void an_explicit_removal_releases_once(void) {
   }
 }
 
-// A synchronous rejection never references the host's state, so it releases
-// nothing. An accepted command that then fails does reference it and releases
-// it. Closing the map releases each live source's state exactly once.
 static void accepted_adds_release_their_callback_state(void) {
   FOR_EACH_KIND(kind) {
     mln_runtime runtime = mln_test_create_runtime();
@@ -367,7 +359,7 @@ static void accepted_adds_release_their_callback_state(void) {
 
     add_source(kind, map, &probe);
     // The duplicate command is accepted, then fails application because the
-    // ID already exists. Its callback state is released independently.
+    // ID already exists.
     mln_test_completion duplicate = mln_test_completion_default(0);
     MLN_TEST_OK(kind->add(map, &probe, ADD_VALID, &duplicate.descriptor));
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -412,8 +404,7 @@ static bool delivered_feature_found(void* context) {
   return list.status == MLN_STATUS_OK && list.count == 1;
 }
 
-// Loads a background style with the kind's source and a layer that draws it,
-// attaches a render session, and renders until the root tile is fetched.
+// Renders until the root tile is fetched.
 static void start_rendering(
   const custom_kind* kind, mln_runtime runtime, mln_map map,
   custom_probe* probe, mln_test_render_fixture* fixture
@@ -434,9 +425,6 @@ static void start_rendering(
   );
 }
 
-// Data delivered for a fetched tile becomes that tile's features, and
-// invalidating the tile, or a region inside it, cancels it and fetches it
-// again.
 static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
   void
 ) {
@@ -447,7 +435,6 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
     mln_test_render_fixture fixture = {0};
     start_rendering(kind, runtime, map, &probe, &fixture);
 
-    // A fetched tile holds no features until the host delivers its data.
     const mln_test_feature_list before = mln_test_style_query_source(
       &fixture, kind->source_id, kind->source_layer
     );
@@ -634,10 +621,8 @@ static void fail_and_recover_tile(const custom_kind* kind) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A failed tile reaches MapLibre's tile error report, and invalidating it
-// fetches it again, so the host can retry and then deliver its data. The log
-// callback belongs to the process, so the case clears it even when an assertion
-// fails, and Unity still reports the failure.
+// The log callback belongs to the process, so the case clears it even when an
+// assertion fails, and Unity still reports the failure.
 static void a_failed_tile_is_reported_and_invalidation_refetches_it(void) {
   FOR_EACH_KIND(kind) {
     atomic_store(&tile_error_logged, false);
@@ -668,10 +653,6 @@ static uint32_t source_type(mln_map map, const char* id) {
   return result.type;
 }
 
-// Tile data and errors go to a tile inside its zoom level's grid of a custom
-// source of the matching kind that exists, in an encoding the API names. An
-// empty tile is data, and a tile operation against the other kind is accepted
-// and then fails on the worker.
 static void tile_operations_check_their_tile_and_source_kind(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -834,9 +815,6 @@ static const struct {
   {"oversized buffer", oversized_buffer, "buffer"},
 };
 
-// Each kind takes every option it declares, and rejects a value out of range
-// before the call returns, naming its field. A rejected add never references
-// the host's state, so only the accepted adds release it, once each.
 static void custom_sources_take_and_validate_every_option(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

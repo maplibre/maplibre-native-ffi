@@ -86,7 +86,6 @@ function rejected<T>(body: () => Promise<T>): Promise<T> {
   }
 }
 
-/** An operation that completes with no value. */
 export function run(start: Start): Promise<void> {
   return rejected(() => submitRun(start));
 }

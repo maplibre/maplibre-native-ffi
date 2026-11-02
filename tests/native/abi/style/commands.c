@@ -1,6 +1,5 @@
-// Style command semantics shared by every style edit: copied inputs, ordered
-// reads, terminal statuses for duplicate and missing IDs, and the style-wide
-// values (global state, transitions, and light) that belong to no layer.
+// Style command semantics shared by every style edit, and the style-wide values
+// that belong to no layer.
 
 #include <math.h>
 
@@ -35,8 +34,6 @@ static bool image_exists(mln_map map, const char* id) {
   return found;
 }
 
-// A command copies its inputs before it returns, adding an ID twice fails the
-// second command, and removing an ID twice reports the second removal missing.
 static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   void
 ) {
@@ -100,10 +97,6 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   mln_test_destroy_runtime(runtime);
 }
 
-// Every command and query that names a style ID reports a missing one the same
-// way, whether it removes, mutates, or reads: NOT_FOUND through the
-// completion. A command also fails its disposition, with a diagnostic naming
-// what is missing.
 static void missing_style_ids_report_not_found(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -205,7 +198,6 @@ static void missing_style_ids_report_not_found(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Reads the style's global state as JSON.
 static void read_global_state(mln_map map, char* out, size_t capacity) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   MLN_TEST_OK(mln_map_get_global_state(map, &completion.descriptor, NULL));
@@ -228,10 +220,6 @@ static void set_global_state(mln_map map, const char* value) {
     TEST_ASSERT_EQUAL_STRING((expected), state);    \
   } while (false)
 
-// Global state needs a loaded style. It starts from the defaults the style
-// declares, a set value reads back as the JSON the host gave, a value that is
-// not JSON fails the command and leaves the state alone, and JSON null
-// restores the style default.
 static void global_state_reads_back_defaults_and_set_properties(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -278,9 +266,6 @@ static void read_loaded_style_json(mln_map map, char* out, size_t capacity) {
   TEST_ASSERT_TRUE(found);
 }
 
-// The loaded document reads back byte for byte, so a host can reload it
-// unchanged. Later edits, such as an added source, do not rewrite it, and a
-// map that parsed nothing reads back empty.
 static void the_loaded_style_document_reads_back_as_loaded(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -302,7 +287,6 @@ static void the_loaded_style_document_reads_back_as_loaded(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Reads the style's transition configuration back through the ordered query.
 static mln_style_transition_options read_transition_options(mln_map map) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_transition_options));
@@ -327,9 +311,6 @@ static void set_transition_options(
 static const uint32_t timing =
   MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
 
-// A map with no style reports no duration, a style without a transition
-// member reports MapLibre Native's 300 ms default, and a style whose
-// transition names only a delay reports only that delay.
 static void a_loaded_style_reports_the_300_ms_transition_default(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -357,8 +338,6 @@ static void a_loaded_style_reports_the_300_ms_transition_default(void) {
 }
 
 // Raw callers can hand the transition setter a struct no binding would build.
-// Undersized input is rejected at submission, unusable field values are
-// rejected by the command, and neither leaves a half-applied configuration.
 static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -375,7 +354,6 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   TEST_ASSERT_EQUAL_DOUBLE(75.0, read.delay_ms);
   TEST_ASSERT_TRUE(read.enable_placement_transitions);
 
-  // Placement transitions stay on unless a set names them.
   mln_style_transition_options placement = {
     .size = sizeof(mln_style_transition_options)
   };
@@ -387,7 +365,6 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   TEST_ASSERT_FALSE(read.enable_placement_transitions);
   set_transition_options(map, &applied);
 
-  // A null or undersized struct never reaches the map worker.
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "options must not be null",
     mln_map_set_style_transition_options(
@@ -403,7 +380,6 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
     )
   );
 
-  // Unknown bits and unusable durations are the command's rejections.
   rejected = applied;
   rejected.fields |= UINT32_C(1) << 31;
   MLN_TEST_EXPECT_COMMAND_FAILED(
@@ -429,8 +405,6 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
     )
   );
 
-  // A rejected set is not a partial set: the configuration is the one that
-  // last committed, including the delay the last rejection tried to replace.
   read = read_transition_options(map);
   TEST_ASSERT_EQUAL_DOUBLE(250.0, read.duration_ms);
   TEST_ASSERT_EQUAL_DOUBLE(75.0, read.delay_ms);
@@ -451,8 +425,7 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
     TEST_ASSERT_EQUAL_STRING((expected), value);                      \
   } while (false)
 
-// The light has no ID to miss, so every bad input is an INVALID_ARGUMENT, and
-// a rejected write leaves the light as it was.
+// The light has no ID to miss, so every bad input is an INVALID_ARGUMENT.
 static void the_style_light_round_trips_through_json(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -486,7 +459,6 @@ static void the_style_light_round_trips_through_json(void) {
   );
   EXPECT_LIGHT_PROPERTY("0.75", map, "intensity");
   EXPECT_LIGHT_PROPERTY("\"viewport\"", map, "anchor");
-  // An unknown name reads as undefined rather than failing.
   EXPECT_LIGHT_PROPERTY("", map, "brightness");
 
   mln_test_destroy_map(map);

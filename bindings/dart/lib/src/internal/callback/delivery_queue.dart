@@ -68,7 +68,6 @@ final class DeliveryRegistration {
   /// one that native code refused.
   void Function()? onRetired;
 
-  /// The user data that names this registration.
   Pointer<Void> get userData => Pointer.fromAddress(token);
 
   /// Retires a registration that native code refused.
@@ -239,7 +238,6 @@ final class DeliveryQueue implements Finalizable {
   }
 }
 
-/// This isolate's delivery queue.
 final isolateDeliveryQueue = DeliveryQueue._();
 
 /// Starts a native completion and returns its future, which fails if native

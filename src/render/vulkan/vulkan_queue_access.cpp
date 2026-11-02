@@ -112,7 +112,6 @@ auto drain_queue(const Slot& slot) -> VkResult {
 // handle means a broken invariant rather than a call to pass through.
 constexpr auto unregistered_result = VK_ERROR_INITIALIZATION_FAILED;
 
-// Drains the slot's queue for a device or queue wait.
 auto wait_idle(const Slot& slot) -> VkResult {
   const auto result = drain_queue(slot);
   return slot.teardown && result != VK_SUCCESS ? VK_ERROR_DEVICE_LOST : result;

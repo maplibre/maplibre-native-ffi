@@ -42,8 +42,7 @@ constexpr uint32_t readback_bytes_per_pixel = 4;
 
 using mln::core::WebGPUBorrowedTarget;
 
-// Checks each texture of a borrowed ring against the descriptor. Runs on the
-// driver, where the browser's WebGPU objects can be read.
+// Runs on the driver, where the browser's WebGPU objects can be read.
 auto validate_webgpu_textures(
   const WebGPUBorrowedTarget& target, mln::Size physical_size
 ) -> mln_status {
@@ -500,7 +499,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
       if (on_ready_) on_ready_();
     }
 
-    // Copies the mapped copy's padded rows into a tightly packed image.
     void unpack() {
       const auto* const mapped = static_cast<const uint8_t*>(
         wgpuBufferGetConstMappedRange(staging_, 0, mapped_size_)

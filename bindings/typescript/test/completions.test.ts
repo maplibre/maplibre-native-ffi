@@ -37,7 +37,6 @@ test("a completion delivers once and reports a value that fails to convert", asy
   } finally {
     JSON.parse = parse;
   }
-  // The completion settled its Promise once and left nothing pending.
   assert.equal(pendingCompletions(), pending);
   await bounded(map.getGlobalState(), "a later call");
   assert.equal(pendingCompletions(), pending);
@@ -55,7 +54,6 @@ test("a submission native rejects frees its completion state", async () => {
   );
   assert.equal(pendingCompletions(), pending);
 
-  // A later submission still completes through the realm's queue.
   const fixture = await openRuntime();
   await bounded(fixture.runtime.clearResourceTransform(), "a later call");
   assert.equal(pendingCompletions(), pending);
@@ -104,7 +102,6 @@ test("discarded commands are fenced and synchronous rejection throws", async () 
   );
 });
 
-/** Rejects with the signal's reason once it aborts. */
 function aborted(signal: AbortSignal): Promise<never> {
   return new Promise((_resolve, reject) =>
     signal.addEventListener("abort", () => reject(signal.reason), {

@@ -40,13 +40,11 @@ fn run<R>(body: impl FnOnce() -> Result<R>) -> std::thread::Result<Result<R>> {
     }))
 }
 
-/// Reports an error that the `callback` trampoline contained.
 fn report_error(callback: &'static str, error: Error) {
     let _scope = CallbackScope::enter();
     report(Report::CallbackError { callback, error });
 }
 
-/// Reports a panic that the `callback` trampoline caught, leaking its payload.
 pub(crate) fn report_panic(callback: &'static str, payload: Box<dyn std::any::Any + Send>) {
     // A panic payload can itself panic when dropped across this C boundary.
     std::mem::forget(payload);
@@ -124,9 +122,8 @@ mod tests {
     use super::*;
     use crate::Status;
 
-    // A status that host code fails with on purpose reaches native; any other
-    // failure answers the callback's failure. The suite checks which reach
-    // the reporter, which is process-global.
+    // The reporter is process-global, so the suite checks which failures
+    // reach it.
     #[test]
     fn a_status_callback_answers_a_deliberate_status_and_fails_otherwise() {
         let failure = sys::MLN_STATUS_NATIVE_ERROR;

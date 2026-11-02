@@ -1,5 +1,4 @@
-// Style sources: URL, attribution, inline tile URLs, source listing,
-// volatility, removal, and image sources and their corners.
+// Style sources and their metadata.
 //
 // URL sources start loading as soon as they are added, so every case that adds
 // one serves the suite's resources through a provider that fails the rest.
@@ -22,7 +21,6 @@ typedef struct source_copy {
 
 #define SOURCE_PROBE_CAPACITY 4
 
-// Copies of the sources one get or list query delivered.
 typedef struct source_probe {
   atomic_bool done;
   mln_status status;
@@ -82,7 +80,7 @@ static void finish_source_probe(const source_probe* probe) {
   TEST_ASSERT_LESS_OR_EQUAL_size_t(SOURCE_PROBE_CAPACITY, probe->count);
 }
 
-// Reads a source's metadata. `found` reports whether the source exists.
+// `found` reports whether the source exists.
 static source_copy read_source(mln_map map, const char* id) {
   source_probe probe = {.status = MLN_STATUS_INVALID_STATE};
   const mln_completion completion = source_completion(&probe);
@@ -116,9 +114,6 @@ static void add_source_json(mln_map map, const char* id, const char* json) {
   ));
 }
 
-// A URL source reports the URL it was added with, or last set to. An inline
-// tile source reports its attribution and tile URLs. A source without a URL or
-// an attribution reports it empty. A missing source completes with no value.
 static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -203,9 +198,6 @@ static void assert_same_source(
   TEST_ASSERT_EQUAL_UINT32(want->vector_encoding, got->vector_encoding);
 }
 
-// Sources list in style order with the same metadata a get reports: the
-// style's own sources as the document declares them, then added ones, less
-// removed ones.
 static void sources_list_in_style_order_with_their_info(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -315,7 +307,6 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Reads an image source's four corners into `out`.
 static void read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
   mln_test_completion completion =
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
@@ -332,8 +323,6 @@ static void read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
 
 static const mln_lat_lng corners[4] = {{1, 2}, {1, 3}, {0, 3}, {0, 2}};
 
-// Image sources hold four corner coordinates and an image, from a URL or from
-// inline pixels, and the typed updates reject every other source kind.
 static void image_sources_hold_corners_and_pixels(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -374,7 +363,6 @@ static void image_sources_hold_corners_and_pixels(void) {
   ));
   read_corners(map, "inline-image", read);
   TEST_ASSERT_EQUAL_MEMORY(moved, read, sizeof(moved));
-  // A URL source takes inline pixels, and an inline one takes a URL.
   MLN_TEST_AWAIT_OK(mln_map_set_image_source_image(
     map, remote_image, &image, &completion.descriptor, NULL
   ));
@@ -382,8 +370,6 @@ static void image_sources_hold_corners_and_pixels(void) {
     map, inline_image, png, &completion.descriptor, NULL
   ));
 
-  // Coordinates come in fours, and pixels must cover the image, before the
-  // call returns.
   mln_completion discard = mln_test_discard_completion();
   MLN_TEST_INVALID(mln_map_set_image_source_coordinates(
     map, inline_image, moved, 3, &discard, NULL
@@ -424,7 +410,6 @@ static void image_sources_hold_corners_and_pixels(void) {
                                    map, geojson, &completion.descriptor, NULL
                                  )
   );
-  // Corners are a member of the source, so reading a missing one fails.
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NOT_FOUND,
     mln_map_get_image_source_coordinates(

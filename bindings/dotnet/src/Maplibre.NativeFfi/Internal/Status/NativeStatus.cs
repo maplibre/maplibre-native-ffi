@@ -13,7 +13,6 @@ internal static unsafe class NativeStatus
             );
     }
 
-    /// <summary>Throws a completion's status, with the generation a failed command published.</summary>
     internal static void Check(mln_status status, string diagnostic, ulong generation)
     {
         if (status != mln_status.MLN_STATUS_OK)

@@ -85,8 +85,6 @@ static bool all_white(const uint8_t* pixels) {
   return true;
 }
 
-// A map renders the label alone in its runtime, then as one of two maps whose
-// renderers share its glyphs, and still after the other map is gone.
 static void maps_of_one_runtime_render_the_glyphs_they_share(void) {
   static uint8_t expected[pixel_bytes];
   static uint8_t actual[pixel_bytes];

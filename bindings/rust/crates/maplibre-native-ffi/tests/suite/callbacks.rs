@@ -1,6 +1,5 @@
 //! Callback registrations: rooting and release, contained panics, request
-//! ownership, provider routes, and process-global
-//! callbacks.
+//! ownership, provider routes, and process-global callbacks.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};

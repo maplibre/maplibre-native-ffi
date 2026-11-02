@@ -113,11 +113,10 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     context.reset();
   }
 
-  // Runs GL teardown with this session's context current, through the surface
-  // it presents to or, failing that, through the drawable the context was
-  // created from. The second try keeps the deletes reachable: this context
-  // lives in the host's share group, so the objects the renderer built there
-  // stay allocated until something in the group deletes them.
+  // Falls back to the drawable the context was created from when the surface
+  // can't be made current. That keeps the deletes reachable: this context lives
+  // in the host's share group, so the objects the renderer built there stay
+  // allocated until something in the group deletes them.
   void cleanup_while_current() {
     try {
       auto guard = mln::gfx::BackendScope{*this};
@@ -146,9 +145,8 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 
   void resize(mln::Size size_) { setRenderableSize(size_); }
 
-  // Presents through a different host surface from here on. The outgoing
-  // surface is never touched, which a host may already have destroyed;
-  // activate() makes the new one current on the next render.
+  // The outgoing surface is never touched, which a host may already have
+  // destroyed; activate() makes the new one current on the next render.
   void set_surface(const mln_open_gl_surface_descriptor& descriptor) {
     // The surface alone. The context descriptor stays as it was at attach: this
     // session's GL context was created from it, and WGL context creation still

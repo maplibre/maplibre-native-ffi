@@ -301,7 +301,6 @@ export class RegisteredWebGlContext {
   declare [Symbol.dispose]: () => void;
 }
 
-// Each class closes for `using` where the host defines Symbol.dispose.
 const dispose = (Symbol as { dispose?: symbol }).dispose;
 if (dispose !== undefined) {
   for (const type of [ImportedWebGpuObject, RegisteredWebGlContext]) {

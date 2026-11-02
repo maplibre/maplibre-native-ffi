@@ -26,9 +26,8 @@
     "gradlew.bat",
     // Oxc rejects the declaration-only style attribute in this logo.
     "../docs/src/assets/maplibre-logo-square-for-light-bg.svg",
-    // Bindgen probe fixtures are generated-looking inputs, not formatted by
-    // the Dart package formatter. Keep them out of dprint the way the old hk
-    // dart-format glob did.
+    // Bindgen probe fixtures are inputs that the Dart formatter must not
+    // rewrite.
     "../tests/bindgen/fixtures/probes/dart/**",
   ],
   // Docs snippets wrap at 70 columns, so they fit the docs site's code

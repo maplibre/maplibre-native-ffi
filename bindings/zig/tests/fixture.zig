@@ -16,11 +16,8 @@ pub const style_json =
     \\"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}
 ;
 
-/// The RGBA8 value of the style's background color.
 pub const background_rgba = [4]u8{ 0xd8, 0xf1, 0xff, 0xff };
 
-/// A deadline for one wait: ten seconds, scaled by MLN_TEST_TIMEOUT_SCALE on
-/// slow runners.
 pub const Deadline = struct {
     at: std.Io.Clock.Timestamp,
 
@@ -77,7 +74,6 @@ pub const Signal = struct {
     }
 };
 
-/// Waits for a flag that another thread sets through `set`.
 pub const Flag = struct {
     signal: Signal = .{},
     value: std.atomic.Value(bool) = .init(false),
@@ -100,7 +96,6 @@ pub const Flag = struct {
     }
 };
 
-/// A count that another thread raises through `add`, with a wait for a target.
 pub const Counter = struct {
     signal: Signal = .{},
     value: std.atomic.Value(usize) = .init(0),
@@ -124,7 +119,6 @@ pub const Counter = struct {
     }
 };
 
-/// Records the calls of a camera end handler and its release.
 pub const EndProbe = struct {
     ends: std.atomic.Value(u32) = .init(0),
     outcome: maplibre.CameraTransitionOutcome = .completed,
@@ -144,14 +138,12 @@ pub const EndProbe = struct {
     }
 };
 
-/// Waits for a future's terminal value and releases the future.
 pub fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
     var future = future_value;
     defer future.deinit();
     return future.wait(null);
 }
 
-/// Waits for an accepted command and asserts that it committed.
 pub fn expectCommitted(future_value: maplibre.Future(maplibre.CommandCompletion)) !void {
     _ = try resolve(future_value);
 }
@@ -280,8 +272,6 @@ pub const Fixture = struct {
         loaded.deinit();
     }
 
-    /// Drains until an event of `event_type` arrives and returns a copy of it,
-    /// blocking until the event handler receives more events.
     pub fn waitForEvent(self: *Fixture, event_type: maplibre.RuntimeEventType) !maplibre.OwnedValue(maplibre.RuntimeEvent) {
         const deadline = Deadline.start();
         while (true) {
@@ -324,7 +314,6 @@ else if (supports_egl)
 else
     test_graphics.MLN_TEST_GRAPHICS_BACKEND_WGL;
 
-/// A device or context from tests/graphics for this build's backend.
 pub const Graphics = struct {
     handle: *test_graphics.mln_test_graphics,
     context: test_graphics.mln_test_graphics_context,
@@ -376,8 +365,6 @@ pub const Graphics = struct {
     }
 };
 
-/// The frame view type that this build's backend hands to a scoped texture
-/// getter.
 pub const OwnedTextureFrame = if (build_options.supports_metal)
     maplibre.MetalTextureFrame
 else if (build_options.supports_vulkan)
@@ -385,7 +372,6 @@ else if (build_options.supports_vulkan)
 else
     maplibre.OpenGlTextureFrame;
 
-/// Reads a scoped view of an acquired frame's texture on this build's backend.
 pub fn getOwnedTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime use: anytype) @TypeOf(getBackendTexture(frame, context, use, null)) {
     return getBackendTexture(frame, context, use, null);
 }

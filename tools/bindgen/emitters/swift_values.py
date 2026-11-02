@@ -294,6 +294,5 @@ class Values:
 
 
 def enum_member(value, key):
-    """The Swift name of an enum constant's static member."""
     prefix = enum_member_prefix((known for known, _ in value.enum_values), value.native)
     return camel(key.removeprefix(prefix).lower())

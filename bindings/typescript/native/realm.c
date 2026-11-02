@@ -73,10 +73,8 @@ typedef struct mln_ts_leak {
   char name[64];
 } mln_ts_leak;
 
-/** A call on a thread of its own, and its outcome once it returns. */
 typedef struct mln_ts_thread_start {
   mln_ts_shim* shim;
-  // The function that settles the call's Promise.
   napi_ref settle;
   mln_ts_thread_run run;
   void (*dispose)(uint64_t handle);
@@ -161,9 +159,6 @@ void mln_ts_throw_status(napi_env env, mln_status status, const char* message) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// The wake shim
-
 static mln_ts_shim* shim_retain(mln_ts_shim* shim) {
   atomic_fetch_add_explicit(&shim->references, 1, memory_order_relaxed);
   return shim;
@@ -178,7 +173,6 @@ static void shim_release(mln_ts_shim* shim) {
   }
 }
 
-/** Posts one message, and reports whether the realm will receive it. */
 static bool shim_post(mln_ts_shim* shim, void* data) {
   bool posted = false;
   mln_ts_mutex_lock(&shim->lock);
@@ -191,7 +185,6 @@ static bool shim_post(mln_ts_shim* shim, void* data) {
   return posted;
 }
 
-/** Closes the shim, and returns its function if this call closed it. */
 static napi_threadsafe_function shim_close(mln_ts_shim* shim) {
   mln_ts_mutex_lock(&shim->lock);
   napi_threadsafe_function function = shim->open ? shim->function : NULL;
@@ -200,13 +193,9 @@ static napi_threadsafe_function shim_close(mln_ts_shim* shim) {
   return function;
 }
 
-/** The queue's wake: asks the realm to dispatch the queue. */
 static void queue_wake(void* user_data) { shim_post(user_data, NULL); }
 
 static void queue_wake_release(void* user_data) { shim_release(user_data); }
-
-// ---------------------------------------------------------------------------
-// Thread starts
 
 /**
  * Disposes what a thread start created for a realm that cannot take it. The
@@ -295,7 +284,6 @@ bool mln_ts_start_thread(
   return true;
 }
 
-/** Reports an exception that a call left pending, as an uncaught one. */
 static void surface_exception(napi_env env) {
   bool pending = false;
   if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
@@ -305,7 +293,6 @@ static void surface_exception(napi_env env) {
   }
 }
 
-/** Calls a function of the realm's TypeScript half with the global receiver. */
 static bool call_realm(
   napi_env env, napi_ref function, size_t argc, const napi_value* argv,
   napi_value* result
@@ -316,7 +303,6 @@ static bool call_realm(
          napi_call_function(env, global, target, argc, argv, result) == napi_ok;
 }
 
-/** Settles a finished thread start's Promise, and frees the start. */
 static void thread_start_settle(napi_env env, mln_ts_thread_start* start) {
   napi_value settle = reference_value(env, start->settle);
   napi_value global;
@@ -390,10 +376,6 @@ static void function_finalize(napi_env env, void* data, void* hint) {
   shim_release(data);
 }
 
-// ---------------------------------------------------------------------------
-// The delivery queue
-
-/** The realm's queue, which the first completion or registration creates. */
 static bool realm_queue(mln_ts_call* call, mln_delivery_queue* out) {
   mln_ts_realm* realm = call->realm;
   if (realm->queue == MLN_HANDLE_NULL) {
@@ -681,9 +663,6 @@ bool mln_ts_read_completion(
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Owner tokens
-
 static void owner_unlink(mln_ts_owner* owner) {
   mln_ts_realm* realm = owner->realm;
   mln_ts_mutex_lock(&realm->owners_lock);
@@ -819,9 +798,6 @@ static void realm_abandon_sessions(mln_ts_realm* realm) {
   mln_ts_mutex_unlock(&realm->owners_lock);
 }
 
-// ---------------------------------------------------------------------------
-// Realm teardown and process exit
-
 static void registry_remove(mln_ts_realm* realm) {
   mln_ts_mutex_lock(&registry_lock);
   for (mln_ts_realm** link = &registry; *link != NULL;
@@ -909,9 +885,6 @@ static napi_value shutdown_at_exit(napi_env env, napi_callback_info info) {
   mln_ts_mutex_unlock(&registry_lock);
   return NULL;
 }
-
-// ---------------------------------------------------------------------------
-// Runtime exports
 
 // install(register, invoke, retire, makeError, takeNative, reportLeak)
 static napi_value install(napi_env env, napi_callback_info info) {

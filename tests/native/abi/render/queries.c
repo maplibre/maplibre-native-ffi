@@ -1,6 +1,4 @@
-// Feature queries against a render session's latest frame: rendered queries
-// by point, box, and line string with layer and filter options, source
-// queries by source layer, and the supercluster feature extensions.
+// Feature queries against a render session's latest frame.
 //
 // The map is 64 x 64 at zoom 0 around (0, 0), so a longitude of 10 degrees
 // lies about 14 pixels from the center.
@@ -50,7 +48,6 @@ static void render_style(
   ));
 }
 
-// Whether the queried feature's properties name `name`.
 static bool feature_named(const mln_test_feature* feature, const char* name) {
   char property[64];
   (void)snprintf(property, sizeof(property), "\"name\":\"%s\"", name);
@@ -214,7 +211,6 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
     }
   }
 
-  // A source query with no options reads every feature the source holds.
   const mln_test_feature_list source =
     mln_test_style_query_source_with(&fixture, "points", NULL);
   MLN_TEST_OK(source.status);
@@ -438,8 +434,6 @@ typedef struct source_row {
   const char* id;
 } source_row;
 
-// A source query reads a vector source through the source layers it names,
-// and each hit names the source layer it came from.
 static void source_queries_read_the_named_source_layers(void) {
   static atomic_int fetches;
   atomic_store(&fetches, 0);
@@ -572,7 +566,6 @@ static mln_status query_extension(
   return status;
 }
 
-// Counts the features in a FeatureCollection's JSON.
 static size_t count_features(const char* collection) {
   size_t count = 0;
   for (const char* cursor = strstr(collection, "\"type\":\"Feature\"");
@@ -713,9 +706,8 @@ static mln_status submit_extension(
   );
 }
 
-// Each malformed input is rejected before the query reaches the driver, so
-// no completion runs. A frame of an empty style renders no feature, so a
-// well-formed rendered query still completes, with an empty borrowed array.
+// A frame of an empty style renders no feature, so a well-formed rendered
+// query still completes, with an empty borrowed array.
 static void malformed_queries_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

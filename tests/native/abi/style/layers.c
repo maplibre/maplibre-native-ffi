@@ -1,6 +1,4 @@
-// Style layers: the layer result, properties and filters through JSON, layer
-// JSON, listing in style order, source bindings, and the source a layer type
-// requires.
+// Style layers and their source bindings.
 
 #include <math.h>
 
@@ -115,9 +113,7 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
     MLN_STYLE_LAYER_VISIBILITY_VISIBLE, probe.info.visibility
   );
   TEST_ASSERT_EQUAL_STRING("info-source", probe.source_id);
-  // A layer that sets no source-layer carries an empty view, not a missing one.
   TEST_ASSERT_EQUAL_size_t(0, probe.source_layer_size);
-  // Unbounded zooms report the documented infinities before bounds are set.
   TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, probe.info.min_zoom);
   TEST_ASSERT_EQUAL_DOUBLE(INFINITY, probe.info.max_zoom);
 
@@ -146,7 +142,6 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   );
   TEST_ASSERT_EQUAL_STRING("roads", probe.source_layer);
 
-  // The list delivers the same record as the get.
   const mln_test_style_list layers = mln_test_style_list_layers(map);
   MLN_TEST_OK(layers.status);
   TEST_ASSERT_EQUAL_size_t(1, layers.count);
@@ -196,9 +191,6 @@ static mln_status read_layer_filter(
     TEST_ASSERT_EQUAL_STRING((expected), property_json);              \
   } while (false)
 
-// Properties and filters read back as the JSON MapLibre Native stores. A bad
-// name or value on a live layer is an INVALID_ARGUMENT that leaves the layer
-// as it was; the layer ID itself is what reports NOT_FOUND.
 static void layer_properties_and_filters_round_trip_through_json(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -236,7 +228,6 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
     )
   );
   EXPECT_LAYER_PROPERTY("4.0", map, "dots", "circle-radius");
-  // A name the layer type lacks reads as undefined rather than failing.
   EXPECT_LAYER_PROPERTY("", map, "dots", "fill-color");
 
   char filter[256];
@@ -250,7 +241,6 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   ));
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
-  // A null filter clears it.
   MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("filter"),
     MLN_BUFFER_LITERAL("null"), &completion.descriptor, NULL
@@ -313,8 +303,6 @@ static void root_properties_match_serialization_and_null_resets_zoom(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Layer JSON serializes the whole layer as it stands after later edits, and
-// adds back as the same layer.
 static void layer_json_serializes_the_current_layer(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -362,7 +350,6 @@ static void move_layer(mln_map map, const char* layer, const char* before) {
   ));
 }
 
-// Both listings report the layer stack bottom to top, as moves leave it.
 static void layers_list_in_style_order_after_moves(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -402,7 +389,6 @@ static void layers_list_in_style_order_after_moves(void) {
   TEST_ASSERT_EQUAL_STRING("circle", layers.entries[1].type);
   TEST_ASSERT_EQUAL_STRING("points", layers.entries[1].source_id);
   TEST_ASSERT_EQUAL_STRING("", layers.entries[1].source_layer);
-  // A layer type that takes no source reports empty source fields.
   TEST_ASSERT_EQUAL_STRING("paper", layers.entries[2].id);
   TEST_ASSERT_EQUAL_STRING("background", layers.entries[2].type);
   TEST_ASSERT_EQUAL_STRING("", layers.entries[2].source_id);
@@ -412,8 +398,6 @@ static void layers_list_in_style_order_after_moves(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A layer's source and source layer change only on layer types that take a
-// source. The source need not exist yet, and an empty source layer clears it.
 static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -469,9 +453,8 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A layer whose type requires a source takes only a source that supports the
-// type: a hillshade layer requires a raster DEM source, and a circle layer
-// cannot draw one. A layer ID is taken once.
+// A hillshade layer requires a raster DEM source, and a circle layer cannot
+// draw one.
 static void a_layer_requires_a_source_that_supports_its_type(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

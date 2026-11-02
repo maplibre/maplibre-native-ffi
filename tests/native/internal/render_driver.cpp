@@ -277,7 +277,6 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
     return backend_->prepare_off_thread_teardown();
   }
   void quarantine() noexcept override { backend_->quarantine(); }
-  // Fails to wait for any synchronization.
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
     if (failure_ == FrameFailure::Release) return MLN_STATUS_NATIVE_ERROR;
     if (failure_ == FrameFailure::ReleaseTargetLost) {
@@ -868,8 +867,6 @@ void a_barrier_waits_for_an_ordered_operation_after_a_running_demand() {
   TEST_ASSERT_TRUE(maintenance_first);
 }
 
-// A newer unforced demand supersedes the earlier one. Forced demands render
-// independently while preserving the target and map generations.
 void unforced_demands_supersede_and_forced_demands_render() {
   auto fixture = Fixture{};
   create_fixture(fixture);
@@ -912,8 +909,6 @@ void unforced_demands_supersede_and_forced_demands_render() {
   destroy_fixture(fixture);
 }
 
-// Superseding a demand before a resize leaves the later forced demand ordered
-// after that resize, even when the map has already published the new extent.
 void supersession_preserves_a_forced_demand_after_a_resize() {
   auto fixture = Fixture{};
   create_fixture(fixture);
@@ -955,8 +950,6 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
   destroy_fixture(fixture);
 }
 
-// Scheduler service may drain results, but cannot take a demand submitted
-// after the work that changes its target extent.
 void scheduler_service_preserves_a_forced_demand_after_a_resize() {
   auto fixture = Fixture{};
   create_fixture(fixture);
@@ -1668,7 +1661,6 @@ struct MaintenanceProbe {
   std::atomic_bool done{false};
 };
 
-// Records whether any frame result was queued when maintenance completed.
 void probe_results(void* context, const mln_completion_result*) {
   auto& probe = *static_cast<MaintenanceProbe*>(context);
   auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
@@ -1796,9 +1788,6 @@ void end_the_running_demand(void* context) {
   barrier.done = true;
 }
 
-// A barrier accepted as a running demand starts waiting ends that demand.
-// A demand accepted after the barrier still waits and renders the next
-// update.
 void a_barrier_ends_a_running_wait_without_ending_a_later_demand() {
   auto fixture = Fixture{};
   create_fixture(fixture);

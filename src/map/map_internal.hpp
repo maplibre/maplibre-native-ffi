@@ -123,7 +123,6 @@ struct HandleTraits<MapProjectionObject> {
   static constexpr auto leasable = true;
 };
 
-// The kinds of host-callback-backed sources the registry tracks.
 enum class CallbackSourceKind : uint8_t { CustomGeometry, CustomVector };
 
 using CallbackSourceRelease = void (*)(void*);

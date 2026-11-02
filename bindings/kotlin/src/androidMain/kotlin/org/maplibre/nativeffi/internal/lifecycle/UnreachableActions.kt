@@ -33,7 +33,6 @@ internal class UnreachableActions private constructor(threadName: String) {
       .start()
   }
 
-  /** Runs [action] once [referent] becomes unreachable. */
   fun register(referent: Any, action: Runnable) {
     // Shares the drain path's lock so an immediate enqueue cannot remove before add.
     synchronized(pendingLock) { pending.add(Registration(referent, queue, action)) }
@@ -75,7 +74,6 @@ internal class UnreachableActions private constructor(threadName: String) {
   internal companion object {
     private val shared = UnreachableActions("maplibre-unreachable-actions")
 
-    /** Runs [action] on the shared reclamation worker once [referent] becomes unreachable. */
     fun register(referent: Any, action: Runnable) {
       shared.register(referent, action)
     }

@@ -63,10 +63,6 @@ static void set_image(
   ));
 }
 
-// A query reports the metadata the host set, including only the text fit it
-// names, and returns the pixels tightly packed whatever stride they arrived
-// with. The result borrows the pixels and intervals for the completion. A
-// missing image reads as no value rather than a failure.
 static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -126,7 +122,6 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_size_t(0, info->stretch_x_count);
   TEST_ASSERT_EQUAL_size_t(0, info->stretch_y_count);
 
-  // A rejected style leaves the image and its retention policy intact.
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NATIVE_ERROR,
     mln_map_set_style_json(
@@ -137,7 +132,6 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_TRUE(info->keep_unused);
 
-  // Replacing an image replaces its metadata too, back to the defaults.
   image.stride = 8;
   image.pixels = packed;
   image.byte_length = sizeof(packed);
@@ -148,7 +142,6 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_FALSE(info->sdf);
   TEST_ASSERT_FALSE(info->keep_unused);
   TEST_ASSERT_EQUAL_HEX32(0, info->fields);
-  // A member whose bit is absent reads as zero.
   const mln_image_content no_content = {0};
   TEST_ASSERT_EQUAL_MEMORY(&no_content, &info->content, sizeof(info->content));
   TEST_ASSERT_EQUAL_UINT32(0, info->text_fit_width);
@@ -185,7 +178,6 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A stretch interval that runs backwards never reaches the map worker.
 static void style_image_inputs_are_validated_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

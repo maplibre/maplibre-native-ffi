@@ -21,7 +21,6 @@ namespace {
 // Small results and diagnostics share the storage reserved for fallback.
 constexpr auto reserved_result_bytes = std::size_t{256};
 
-// Marks a queue item as a call to the completion's callback and release.
 auto set_completion_item(
   delivery::DeliveryItem& item, const mln_completion& descriptor
 ) noexcept -> void {

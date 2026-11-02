@@ -11,7 +11,6 @@ internal static unsafe partial class NativeMethods
     internal const string LibraryName = "maplibre-native-c";
 }
 
-/// <summary>The issued id that every generated handle struct carries.</summary>
 internal interface IMlnHandle
 {
     ulong Value { get; }

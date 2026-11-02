@@ -8,7 +8,6 @@ import org.maplibre.nativeffi.internal.memory.*
  * that the trampoline copied into 8-byte slots.
  */
 internal object DispatchedUpcalls {
-  /** Runs the site numbered [site] with the slots at [arguments]. */
   fun run(site: Int, arguments: Long) {
     when (site) {
       0 -> Upcalls.completion(readAddress(arguments), readAddress(arguments + 8))

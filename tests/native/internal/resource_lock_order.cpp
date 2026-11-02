@@ -294,8 +294,6 @@ void start_writer(const SyncPointScope& sync_points, ParkedProvider& probe) {
   mln_test_flag_set(&probe.writer_started);
 }
 
-// The clear command reaches its terminal event only after a provider callback
-// that was already running returns.
 void clearing_resource_provider_waits_for_in_flight_callback() {
   auto sync_points = SyncPointScope{};
   auto runtime = mln_test_create_runtime();

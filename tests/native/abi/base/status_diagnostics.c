@@ -27,9 +27,7 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
 }
 
-// MapLibre throws while parsing malformed style JSON. The command reports that
-// exception as NATIVE_ERROR carrying the exception's text, the same text the
-// map's loading-failed event carries.
+// MapLibre throws while parsing malformed style JSON.
 static void a_native_exception_becomes_native_error_with_its_text(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -85,8 +83,7 @@ static void android_initialization_requires_its_environment_and_context(void) {
 }
 
 // A binding compares the ABI version against the one it was generated for,
-// and the backend mask decides which render targets it offers. The mask must
-// name exactly the backend this preset built.
+// and the backend mask decides which render targets it offers.
 static void the_library_reports_its_abi_version_and_built_backend(void) {
   TEST_ASSERT_EQUAL_UINT32(0, mln_c_version());
 

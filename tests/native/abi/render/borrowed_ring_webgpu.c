@@ -11,9 +11,6 @@ enum { pixel_count = 64 * 64 };
 
 static const uint8_t red[4] = {255, 0, 0, 255};
 
-// An acquired frame of a borrowed ring needs no producer synchronization
-// object. A copy that the host submits to the device's queue right after
-// acquisition, with no fence of its own, reads the frame the session rendered.
 static void a_borrowed_ring_frame_is_ordered_before_the_hosts_reads(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

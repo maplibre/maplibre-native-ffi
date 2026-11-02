@@ -59,8 +59,7 @@ static uint64_t end_group(mln_map map) {
 }
 
 // Moving a layer removes and re-adds it inside MapLibre, which publishes one
-// update for each step unless the command holds them. The published snapshot
-// exposes the command's single render update.
+// update for each step unless the command holds them.
 static void a_style_command_publishes_one_render_update(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_loaded_map(runtime);
@@ -111,8 +110,6 @@ static void a_camera_gesture_update_publishes_once(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Each command inside the group commits and reports its own snapshot, while
-// the render update waits for the end.
 static void a_group_publishes_one_render_update_at_its_end(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_loaded_map(runtime);
@@ -220,7 +217,6 @@ static void a_still_image_inside_a_group_fails(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Releasing a map clears the update that an open group holds.
 static void a_map_releases_with_an_open_group(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_loaded_map(runtime);

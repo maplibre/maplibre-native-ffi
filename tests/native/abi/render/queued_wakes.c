@@ -1,7 +1,4 @@
-// Render session wakes that name a delivery queue: the wake's calls and its
-// release run in mln_delivery_queue_dispatch(), wakes that arrive while a call
-// is queued join it, releasing the queue reports a live wake's user_data, and
-// attach checks the queue.
+// Render session wakes that name a delivery queue.
 
 #include <string.h>
 
@@ -54,9 +51,6 @@ static bool dispatched_release(void* context) {
   return wait->wake->releases != 0;
 }
 
-// Two frame results each wake the host, but nothing runs until dispatch, and
-// the second wake joins the call the first queued. Disposal queues the wake's
-// release after that call.
 static void a_queued_frame_wake_runs_once_in_dispatch(void) {
   on_case_thread = true;
   static queued_wake wake;
@@ -122,9 +116,6 @@ static void count_abandoned(void* user_data) {
   atomic_fetch_add(&abandoned_wakes, 1);
 }
 
-// Releasing the queue while a session's wake names it passes the wake's
-// user_data to release_abandoned_user_data, and the wake's own release never
-// runs, even after the session goes.
 static void releasing_the_queue_reports_an_abandoned_wake(void) {
   on_case_thread = true;
   static queued_wake wake;
@@ -168,7 +159,6 @@ static void releasing_the_queue_reports_an_abandoned_wake(void) {
 
 static void ignore_wake(void* user_data) { (void)user_data; }
 
-// A disabled wake names no queue, and a released queue is refused.
 static void attach_checks_a_wake_queue(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);

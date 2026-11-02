@@ -1,6 +1,4 @@
-// Standalone style expressions: an expression parses into a handle with no
-// map, evaluates synchronously against the inputs a caller passes, on any
-// thread, and writes its result as JSON into a buffer the caller sizes.
+// Standalone style expressions, which parse and evaluate without a map.
 
 #include <math.h>
 
@@ -333,8 +331,6 @@ static void info_reports_zoom_and_feature_dependence(void) {
   mln_style_expression_release(expression);
 }
 
-// A buffer too small for the result stays unchanged, and the length tells a
-// caller how much to allocate.
 static void a_short_buffer_reports_the_length_it_needs(void) {
   const mln_style_expression expression = create("\"abcdef\"");
   size_t length = 0;
@@ -367,8 +363,6 @@ static void a_short_buffer_reports_the_length_it_needs(void) {
   mln_style_expression_release(expression);
 }
 
-// An input is absent when its field bit is clear or, for JSON, when it is
-// empty, whether the inputs are null or name an empty view.
 static void absent_inputs_fail_the_expressions_that_need_them(void) {
   mln_style_expression_inputs empty = {
     .size = sizeof(mln_style_expression_inputs)
@@ -394,7 +388,6 @@ static void absent_inputs_fail_the_expressions_that_need_them(void) {
       mln_style_expression_release(expression);
     }
 
-    // Absent state reads as null.
     expect_evaluates("[\"feature-state\", \"x\"]", absent[input], "null");
     expect_evaluates("[\"global-state\", \"x\"]", absent[input], "null");
   }

@@ -48,7 +48,6 @@ internal expect object NativeMemory {
 
   fun putDouble(address: Long, value: Double)
 
-  /** Copies [count] bytes starting at [address]. */
   fun getBytes(address: Long, count: Int): ByteArray
 
   fun putBytes(address: Long, value: ByteArray)

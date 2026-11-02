@@ -17,7 +17,6 @@ RUNTIMES = (
 
 
 def test_the_package_loads_the_extension_of_its_runtime() -> None:
-    # The runtime carries the extension, which links the native library in.
     (runtime,) = (name for name in RUNTIMES if name in sys.modules)
     assert _native is sys.modules[f"{runtime}._native"]
     with mln.RuntimeHandle.create() as handle:

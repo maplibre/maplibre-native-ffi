@@ -42,8 +42,7 @@ final class TestGraphics: @unchecked Sendable {
   deinit { mln_test_graphics_destroy(graphics) }
 
   /// Makes an EGL or WGL context current on the calling thread, which then
-  /// drives a
-  /// shared session. Metal and Vulkan have no current context.
+  /// drives a shared session. Metal and Vulkan have no current context.
   func makeCurrentIfNeeded() throws {
     guard backend == MLN_TEST_GRAPHICS_BACKEND_EGL ||
       backend == MLN_TEST_GRAPHICS_BACKEND_WGL else { return }
@@ -136,7 +135,6 @@ final class TestGraphics: @unchecked Sendable {
     }
   }
 
-  /// Opens the acquired frame's texture view for the build's backend.
   func withTextureView<Result>(
     of frame: AcquiredFrameHandle,
     _ body: (any OwnedTextureFrameView) throws -> Result
@@ -270,7 +268,6 @@ final class RenderThread: @unchecked Sendable {
     Wake(callback: { [weak self] in self?.notifyWork() })
   }
 
-  /// Starts servicing `session` on this thread.
   func service(_ session: RenderSessionHandle) {
     condition.withLock {
       self.session = session

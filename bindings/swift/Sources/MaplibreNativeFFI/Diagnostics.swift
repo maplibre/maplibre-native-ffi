@@ -8,7 +8,6 @@ final class ReportObserver: @unchecked Sendable {
   private let lock = NSLock()
   private var handler: (@Sendable (String) -> Void)?
 
-  /// Replaces the handler, or removes it when `handler` is nil.
   func set(_ handler: (@Sendable (String) -> Void)?) {
     lock.withLock { self.handler = handler }
   }

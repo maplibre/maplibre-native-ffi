@@ -26,7 +26,6 @@ extern "C" {
 // it, so a demand has an update to render.
 void mln_test_render_prepare_map(mln_map map);
 
-// Requests a forced frame of the latest update with the supplied token.
 // Every forced demand remains independent.
 void mln_test_render_request_forced(
   const mln_test_render_fixture* fixture, uint64_t token
@@ -64,7 +63,6 @@ const mln_render_frame_result* mln_test_render_view_result(
   const mln_render_frame_batch_view* view, size_t index
 );
 
-// Copies record `index` of `batch`.
 mln_render_frame_result mln_test_render_batch_result(
   mln_render_frame_batch batch, size_t index
 );
@@ -78,7 +76,6 @@ void mln_test_render_until_idle(
   mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 );
 
-// Requests a forced frame, waits for it to render, and acquires it.
 mln_acquired_frame mln_test_render_and_acquire(
   const mln_test_render_fixture* fixture, uint64_t token
 );

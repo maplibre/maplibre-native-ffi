@@ -26,7 +26,6 @@ import { bounded, closeIfLive, nextWake, teardown } from "./harness.ts";
 import { capabilities } from "./host-capabilities.ts";
 import { emptyStyle } from "./styles.ts";
 
-/** Bytes of a UTF-8 string. */
 export function utf8(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
@@ -72,7 +71,6 @@ export const denyingProvider: ResourceProvider = {
   },
 };
 
-/** A route that claims one style URL. */
 export function styleRoute(url: string): ResourceRoute {
   return { kinds: ResourceKindFlag.style, url };
 }
@@ -153,7 +151,6 @@ export interface RuntimeFixture {
   openStyledMap(style?: unknown, options?: MapOptions): Promise<MapHandle>;
 }
 
-/** The map options that a test starts from: a 64 by 64 extent at scale 1. */
 export const mapOptions: MapOptions = {
   initialExtent: { width: 64, height: 64, scaleFactor: 1 },
 };

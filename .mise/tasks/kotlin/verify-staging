@@ -92,7 +92,6 @@ RUNTIME_MODULES = {
     if root.startswith("maplibre-native-ffi-runtime-")
 }
 
-# The native target platform of each Kotlin/Native target.
 NATIVE_TARGETS = {
     "androidNativeArm32": "android-arm",
     "androidNativeArm64": "android-arm64",

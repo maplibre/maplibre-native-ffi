@@ -41,7 +41,6 @@ enum class AndroidTarget(
     taskSuffix = "X86_64",
   );
 
-  /** The NDK C compiler driver for this ABI at [apiLevel]. */
   fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang"
 
   companion object {

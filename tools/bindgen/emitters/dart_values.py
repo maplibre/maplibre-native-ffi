@@ -87,7 +87,6 @@ def identifier(native: str) -> str:
 
 
 def enum_member(value: ValuePlan, key: str) -> str:
-    """The Dart name of an enum constant."""
     prefix = enum_member_prefix((name for name, _ in value.enum_values), value.native)
     return identifier(key.removeprefix(prefix).lower())
 
@@ -100,7 +99,6 @@ def union_name(value: ValuePlan, union) -> str:
 
 
 def variant_name(value: ValuePlan, union, arm) -> str:
-    """The class of one variant of the union that `value` holds in `union`."""
     return union_name(value, union) + pascal(arm.name)
 
 
@@ -579,7 +577,6 @@ class Values:
         return None if field.required else self.default_expression(field.value)
 
     def field_parameter(self, name, typ, field):
-        """The constructor parameter that initializes a member."""
         if field.required:
             return f"required this.{name}"
         if typ.endswith("?"):

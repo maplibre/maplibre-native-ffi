@@ -7,7 +7,6 @@ import org.maplibre.nativeffi.internal.c.Upcalls
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
-// Every render session that the binding attached, for the shutdown hook to abandon.
 private val exitSessions = ExitSessions()
 
 private val exitHookInstalled = AtomicBoolean(false)

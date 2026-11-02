@@ -2,7 +2,7 @@
 
 Dart isolates and Node-API realms run host code only on their own thread, after
 native code returns, and Python runs it only on its binding's dispatcher
-thread. Such a host gives each registration one of five forms:
+thread. Such a host gives each registration one of four forms:
 
 - `queue`: the registration names a delivery queue. Native code answers each
   call itself and queues it, and the callbacks run when the isolate, the
@@ -33,7 +33,6 @@ from .semantic import BoundApi, CallbackPlan, FieldPlan, OperationPlan, ValuePla
 
 
 def callback_fields(value: ValuePlan) -> list[FieldPlan]:
-    """The callback fields of a registration descriptor."""
     if not value.registration:
         return []
     return [f for f in value.fields if f.name in value.registration.callbacks]
@@ -62,7 +61,6 @@ def is_wake(bound: BoundApi, value: ValuePlan) -> bool:
 
 
 def queue_callbacks(bound: BoundApi, value: ValuePlan) -> list[FieldPlan]:
-    """The callbacks of a registration that a delivery queue carries, or none."""
     if not value.registration or not value.registration.queue:
         return []
     return callback_fields(value)

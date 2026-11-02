@@ -1,5 +1,4 @@
-// The hand-written half of the Android JNI shim: native registration, native
-// memory access, and the upcall entry points. See mln_jni.h.
+// The hand-written half of the Android JNI shim. See mln_jni.h.
 #include <android/api-level.h>
 #include <android/log.h>
 #include <maplibre_native_c.h>
@@ -145,7 +144,6 @@ static void mln_jni_clear(jlong address, jlong size) {
   memset(MLN_JNI_POINTER(void*, address), 0, (size_t)size);
 }
 
-// Defines the getter and setter of one primitive Java type.
 #define MLN_JNI_ACCESSORS(name, java_type)                          \
   static java_type mln_jni_get_##name(jlong at) {                   \
     java_type value;                                                \

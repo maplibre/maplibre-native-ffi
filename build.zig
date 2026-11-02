@@ -71,14 +71,11 @@ fn configurePath(b: *std.Build, path: std.Build.LazyPath) []const u8 {
     };
 }
 
-/// An install prefix and its artifact descriptor.
 const Install = struct {
     prefix: []const u8,
     descriptor: ArtifactDescriptor,
 };
 
-/// Reads the install prefix that -Dlocal-build names, and rebuilds when its
-/// descriptor changes.
 fn localInstall(b: *std.Build, prefix: []const u8) Install {
     // A relative path would reach the run-time search path as written.
     if (!std.fs.path.isAbsolute(prefix)) std.debug.panic("-Dlocal-build must be an absolute path; found {s}", .{prefix});
@@ -93,8 +90,6 @@ fn localInstall(b: *std.Build, prefix: []const u8) Install {
     return .{ .prefix = prefix, .descriptor = parsed.value };
 }
 
-/// The target that a platform's Zig target names, at its Android API level if
-/// it has one.
 fn platformQuery(b: *std.Build, platform: Platform) std.Target.Query {
     const arch_os_abi = if (platform.android) |android| b.fmt("{s}.{d}", .{ platform.zigTarget, android.api }) else platform.zigTarget;
     const query = std.Target.Query.parse(.{ .arch_os_abi = arch_os_abi }) catch
@@ -122,8 +117,6 @@ fn requestName(b: *std.Build, target: std.Target, backend: ?RenderBackend) []con
     });
 }
 
-/// The target option, which defaults to the target of an install prefix's
-/// artifact when it differs from the host.
 fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.ResolvedTarget {
     const artifact = descriptor orelse return b.standardTargetOptions(.{});
     const artifact_query = platformQuery(b, artifact.platform);
@@ -167,9 +160,6 @@ fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) s
     return .{ b.dependency(artifact.archive, .{}).path(""), artifact.backend };
 }
 
-/// Declares the -Dtarget, -Dbackend, and -Dlocal-build options and resolves
-/// the native library they select: from the local build if one is named, and
-/// otherwise from the release that the package was published with.
 fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
     const local = if (local_build) |path| localInstall(b, configurePath(b, path)) else null;
     const target = targetOption(b, if (local) |install| install.descriptor else null);
@@ -307,8 +297,6 @@ pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend
     module.addOptions("build_options", build_options);
 }
 
-/// Imports the C declarations as `maplibre_native_c`, without linking
-/// maplibre-native-c.
 fn addMaplibreNativeIncludes(
     b: *std.Build,
     module: *std.Build.Module,

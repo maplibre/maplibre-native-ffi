@@ -55,8 +55,6 @@ func (e *AbiVersionMismatchError) Unwrap() error { return StatusUnsupported }
 // no Go pointers, so cgo permits passing it to native.
 var diagnosticPool = sync.Pool{New: func() any { return new(C.mln_diagnostic) }}
 
-// checkNative runs a status-returning call with a diagnostic and converts a
-// failure status into an *Error that carries the call's diagnostic.
 func checkNative(call func(*C.mln_diagnostic) int32) error {
 	diagnostic := diagnosticPool.Get().(*C.mln_diagnostic)
 	defer diagnosticPool.Put(diagnostic)

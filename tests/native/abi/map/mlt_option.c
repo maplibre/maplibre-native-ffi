@@ -92,7 +92,6 @@ static bool record_mlt_parse_warning(
   return false;
 }
 
-// One static map that loads one recorded tile through a provider.
 typedef struct mlt_map {
   mlt_tile tile;
   mln_runtime runtime;
@@ -133,9 +132,6 @@ static void add_custom_vector_source(mlt_map* map) {
   ));
 }
 
-// Loads the tile at fixture_relative_path into a static map created with the
-// given FastPFOR setting, and renders a still image, which completes once the
-// tile has loaded and rendered.
 static void render_recorded_tile(
   mlt_map* out, tile_delivery delivery, const char* fixture_relative_path,
   bool fast_pfor_enabled

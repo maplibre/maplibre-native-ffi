@@ -34,8 +34,6 @@ import (
 	"unsafe"
 )
 
-// runtimeEventForTest is one synthesized event and its message, which the batch
-// builder copies into a message arena.
 type runtimeEventForTest struct {
 	raw     C.mln_runtime_event
 	message string
@@ -59,8 +57,6 @@ func (event runtimeEventForTest) withMessage(message string) runtimeEventForTest
 	return event
 }
 
-// withPayload writes payload into the event's payload union, as native does
-// for the arm payloadType names.
 func withPayload[T any](event runtimeEventForTest, payloadType C.mln_runtime_event_payload_type, payload T) runtimeEventForTest {
 	event.raw.payload_type = payloadType
 	bindingUnionStore(event.raw.payload[:], payload)
@@ -97,8 +93,6 @@ func (event runtimeEventForTest) withRawPayload(payloadType uint32, bytes []byte
 	return event
 }
 
-// runtimeEventPayloadWindowSizeForTest is the size of the payload union this
-// binding compiled against.
 func runtimeEventPayloadWindowSizeForTest() int {
 	return len(C.mln_runtime_event{}.payload)
 }
@@ -181,8 +175,6 @@ func latLngArrayCompletionForTest(widen int, points []LatLng) *Future[[]LatLng] 
 	return &Future[[]LatLng]{state: state}
 }
 
-// rejectedSubmissionForTest starts a completion that native refuses, and
-// returns the handle the binding passed as the completion's user data.
 func rejectedSubmissionForTest() (cgo.Handle, error) {
 	var submitted cgo.Handle
 	_, err := startCompletion(func(completion *C.mln_completion, _ *C.mln_diagnostic) int32 {
@@ -192,8 +184,6 @@ func rejectedSubmissionForTest() (cgo.Handle, error) {
 	return submitted, err
 }
 
-// staleCallbackCellForTest returns user data that names a handle the binding
-// already deleted, and the function that frees it.
 func staleCallbackCellForTest() (unsafe.Pointer, func()) {
 	handle := cgo.NewHandle(struct{}{})
 	cell := bindingHandleCell(handle)
@@ -232,7 +222,6 @@ func passImageToCForTest(image *C.mln_premultiplied_rgba8_image) (err error) {
 	return nil
 }
 
-// wake returns a native wake whose callback and release are C functions.
 func (recorder *nativeRecorderForTest) wake() Wake {
 	return NewNativeWake(
 		uintptr(unsafe.Pointer(C.mln_go_test_native_call)),
@@ -241,8 +230,6 @@ func (recorder *nativeRecorderForTest) wake() Wake {
 	)
 }
 
-// queueLock returns a native queue lock whose lock, unlock, and release are C
-// functions.
 func (recorder *nativeRecorderForTest) queueLock() QueueLock {
 	return NewNativeQueueLock(
 		uintptr(unsafe.Pointer(C.mln_go_test_native_call)),

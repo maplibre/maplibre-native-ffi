@@ -1,9 +1,6 @@
 // Locale-sensitive style expressions in the browser, which evaluate them with
-// the JavaScript engine's Intl API: number formatting follows the locale,
-// currency, and fraction limits, and a collator follows the locale, its
-// collation extensions, and the requested sensitivity, on every thread that
-// evaluates it. The `_emscripten` suffix builds this file on browser targets
-// only.
+// the JavaScript engine's Intl API. The `_emscripten` suffix builds this file
+// on browser targets only.
 
 #include <stdio.h>
 #include <string.h>
@@ -162,7 +159,6 @@ static void number_format_follows_locale_currency_and_fraction_limits(void) {
   close_map(&map);
 }
 
-// A comparison of two strings under a collator for `locale`.
 static bool compares(
   const locale_map* map, const char* comparison, const char* lhs,
   const char* rhs, const char* locale, bool case_sensitive,

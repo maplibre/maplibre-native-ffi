@@ -41,7 +41,6 @@ addToLibrary({
     releaseTexture: (handle) => _wgpuTextureRelease(handle),
     releaseTextureView: (handle) => _wgpuTextureViewRelease(handle),
 
-    // The JavaScript object behind [handle], or null when it names none.
     object: (handle) => WebGPU.getJsObject(handle) ?? null,
 
     // The WGPUTextureFormat value of a GPUTextureFormat [name], or -1 when the

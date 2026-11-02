@@ -244,7 +244,6 @@ class MetalTextureSessionBackend final
   const void* host_queue_;
 };
 
-// Retains the host's command queue, and checks that it belongs to `device`.
 auto retain_host_queue(
   void* queue, const MTL::Device* device,
   NS::SharedPtr<MTL::CommandQueue>& out_queue

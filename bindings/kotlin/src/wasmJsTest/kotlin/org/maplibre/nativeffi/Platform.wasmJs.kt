@@ -68,7 +68,6 @@ internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
   setLogCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
 }
 
-// The page runs what native has queued so far, as the queue's next wake would.
 internal actual suspend fun awaitDeliveries() {
   HostDelivery.dispatch()
 }

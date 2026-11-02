@@ -1,8 +1,6 @@
 // Transforms for a host that cannot run code on a MapLibre thread: a queued
 // resource transform, which the host answers after dispatch, and native header
-// rules, which answer inside the call. Covers what registration copies and
-// rejects, and, against a loopback server, the answer that reaches the
-// transport.
+// rules, which answer inside the call.
 
 #include <stdlib.h>
 #include <string.h>
@@ -94,7 +92,6 @@ static void rule_registrations_reject_an_invalid_rule(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
-  // A diagnostic for a rejected header never carries its value.
   const mln_http_header header = {
     .name = MLN_BUFFER_LITERAL("Authorization"),
     .value = MLN_BUFFER_LITERAL("secret-token\r\n")
@@ -152,7 +149,6 @@ static void rule_registrations_reject_an_invalid_rule(void) {
     .name = MLN_BUFFER_LITERAL("X-Token"),
     .value = MLN_BUFFER_LITERAL("token"),
   };
-  // A glob longer than 4096 tokens is rejected here as it is for routes.
   static char long_glob[4097];
   memset(long_glob, '?', sizeof(long_glob));
   const mln_http_header_rule long_header_rule = {
@@ -179,8 +175,6 @@ static void rule_registrations_reject_an_invalid_rule(void) {
 
 #if MLN_TEST_PLATFORM_HTTP
 
-// Dispatches queue until one more transform call has kept its request, and
-// returns the request.
 static mln_resource_transform_request await_transform(
   mln_delivery_queue queue, void* tag
 ) {
@@ -191,9 +185,6 @@ static mln_resource_transform_request await_transform(
   return kept.request;
 }
 
-// The request waits for the host, which answers after its dispatched call:
-// the transport fetches the URL the host names. An answer is one-shot, and the
-// handle still needs its release.
 static void the_host_answers_a_dispatched_transform_later(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/rewritten.json",
@@ -254,8 +245,6 @@ static void the_host_answers_a_dispatched_transform_later(void) {
   mln_test_http_server_stop(server);
 }
 
-// A request the host releases unanswered, and one that a released queue
-// abandons: both keep their URLs.
 static void an_unanswered_transform_keeps_its_url(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/abandoned.json",
@@ -305,8 +294,6 @@ static void an_unanswered_transform_keeps_its_url(void) {
   mln_test_http_server_stop(server);
 }
 
-// Clearing the transform queues its release after the last request it
-// queued.
 static void the_release_follows_the_last_transform(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/style.json",
@@ -352,8 +339,6 @@ static void load_style(mln_runtime runtime, const char* url) {
   mln_test_destroy_map(map);
 }
 
-// The first matching header rule supplies all its headers; a later rule that
-// also matches adds none.
 static void the_first_matching_header_rule_supplies_its_headers(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/style.json",
@@ -429,9 +414,6 @@ static void the_first_matching_header_rule_supplies_its_headers(void) {
   mln_test_http_server_stop(server);
 }
 
-// Header rules compare the URL the resource transform produced, so a rule for
-// the original URL adds nothing to a rewritten request, and a rule for the
-// rewritten URL applies even though the style names the original.
 static void header_rules_match_the_rewritten_url(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/rewritten.json",

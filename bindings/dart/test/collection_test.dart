@@ -44,7 +44,6 @@ Future<_Unreachable> _unreachableRuntimeWithProvider() async {
   return _unreachable(runtime);
 }
 
-/// Creates a runtime and a map on it, and keeps only the map.
 Future<(MapHandle, WeakReference<RuntimeHandle>)>
 _mapWithoutItsRuntime() async {
   final runtime = RuntimeHandle.create(RuntimeOptions());
@@ -53,7 +52,6 @@ _mapWithoutItsRuntime() async {
   return (map, WeakReference(runtime));
 }
 
-/// Creates a runtime and keeps only its identity and a weak reference to it.
 _Unreachable _abandonedRuntime() =>
     _unreachable(RuntimeHandle.create(RuntimeOptions()));
 
@@ -89,7 +87,6 @@ Future<void> _collectUnrootedObjects() {
 }
 
 void main() {
-  // Capture the leak reports from tests that abandon owners.
   late List<String> leaks;
   setUp(() {
     leaks = [];

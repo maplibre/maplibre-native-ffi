@@ -43,14 +43,11 @@ static void runtime_creation_validates_its_options(void) {
   MLN_TEST_INVALID(mln_runtime_create(NULL, &runtime, NULL));
   MLN_TEST_INVALID(mln_runtime_create(&defaults, NULL, NULL));
 
-  // The output must point to the null handle, and a rejection leaves it as is.
   runtime = (mln_runtime)1;
   MLN_TEST_INVALID(mln_runtime_create(&defaults, &runtime, NULL));
   TEST_ASSERT_EQUAL_UINT64(1, runtime);
 }
 
-// Every entry point that takes a runtime reports `expected` for `handle`
-// without creating anything.
 static void expect_runtime_calls_reject(
   mln_runtime handle, mln_status expected
 ) {
@@ -87,7 +84,6 @@ static void runtime_calls_reject_a_value_that_names_no_runtime(void) {
   expect_runtime_calls_reject(map, MLN_STATUS_INVALID_ARGUMENT);
   expect_runtime_calls_reject(released, MLN_STATUS_INVALID_STATE);
 
-  // The map named as a runtime is unaffected.
   MLN_TEST_OK(mln_test_map_request_repaint(map));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(live);
@@ -131,8 +127,6 @@ static mln_status create_map_from(
     *(const mln_runtime*)context, descriptor, &map, &completion.descriptor,
     diagnostic
   );
-  // A rejected submission writes no map and never runs or releases the
-  // completion.
   TEST_ASSERT_NOT_EQUAL_INT(MLN_STATUS_OK, status);
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   TEST_ASSERT_FALSE(mln_test_completion_poll(&completion));
@@ -152,8 +146,7 @@ static void map_creation_validates_its_options(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The map comes back through out_map, which must point to the null handle.
-// Null options carry no initial extent, so creation rejects them too.
+// Null options carry no initial extent, so creation rejects them.
 static void map_creation_checks_its_output(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_map_options options = mln_test_map_options();
@@ -174,8 +167,6 @@ static void map_creation_checks_its_output(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Every map entry point below reports a released map as invalid state without
-// running its completion.
 static void a_released_map_accepts_no_call(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

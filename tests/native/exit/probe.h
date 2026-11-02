@@ -34,7 +34,6 @@ typedef struct probe_latch {
   bool done;
 #endif
   mln_status status;
-  // The completion's diagnostic, which a failure prints.
   char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } probe_latch;
 
@@ -225,7 +224,6 @@ static inline void probe_start(void) {
   );
 }
 
-// Creates a runtime with the probe's resource provider.
 static inline mln_runtime probe_create_runtime(void) {
   mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
   mln_runtime runtime = MLN_HANDLE_NULL;

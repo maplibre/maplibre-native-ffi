@@ -289,7 +289,6 @@ auto exports_sync_files(
   }
 }
 
-// The sync kinds that the shared EGL context's display adds.
 auto opengl_sync_support(const mln_open_gl_context_descriptor& context)
   -> mln::core::GpuSyncSupport {
   auto support = mln::core::GpuSyncSupport{};
@@ -428,7 +427,6 @@ struct WglD3D12Fences {
     return fences;
   }
 
-  // Deletes the semaphores and closes the producer fence's handle.
   void release() noexcept {
     if (producer_semaphore != 0) delete_semaphores(1, &producer_semaphore);
     for (const auto& [handle, semaphore] : imported)
@@ -451,7 +449,6 @@ struct WglD3D12Fences {
     return 0;
   }
 
-  // Makes the producer fence on the context's adapter, unless it exists.
   [[nodiscard]] auto create_producer() -> bool {
     if (producer_semaphore != 0) return true;
     if (producer == nullptr) {

@@ -16,7 +16,6 @@ import (
 // //bindings/go:test` passes for the preset, and render_<backend>_test.go
 // supplies what differs between backends.
 
-// backgroundStyle paints the whole target one opaque color, #d8f1ff.
 const backgroundStyle = `{"version":8,"sources":{},"layers":[` +
 	`{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}`
 
@@ -81,8 +80,6 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 	return r
 }
 
-// options returns the fixture's attach options, whose wakes notify frames and
-// driverWork.
 func (r *renderFixture) options() RenderSessionAttachOptions {
 	return RenderSessionAttachOptions{
 		Driver:                    RenderDriverKindCallerGraphicsThread,
@@ -92,12 +89,10 @@ func (r *renderFixture) options() RenderSessionAttachOptions {
 	}
 }
 
-// attachTexture starts attaching the fixture's texture with options.
 func (r *renderFixture) attachTexture(options RenderSessionAttachOptions) (*RenderSessionHandle, *Future[struct{}], error) {
 	return attachOwnedTexture(r.m, r.graphics.Context, r.extent, options)
 }
 
-// start starts attaching the session, which the test's cleanup tears down.
 func (r *renderFixture) start(t *testing.T, options RenderSessionAttachOptions) {
 	t.Helper()
 	var err error
@@ -108,7 +103,6 @@ func (r *renderFixture) start(t *testing.T, options RenderSessionAttachOptions) 
 	t.Cleanup(func() { r.teardown(t) })
 }
 
-// attach services the session until its attachment completes.
 func (r *renderFixture) attach(t *testing.T) {
 	t.Helper()
 	r.service(t, r.attached.Done(), "the attachment")
@@ -129,8 +123,6 @@ func (r *renderFixture) teardown(t *testing.T) {
 	await(t, submitted(r.session.Close()))
 }
 
-// service runs the session's driver work until done closes, blocking on the
-// driver-work wake between rounds.
 func (r *renderFixture) service(t *testing.T, done <-chan struct{}, what string) {
 	t.Helper()
 	deadline := time.NewTimer(testTimeout())
@@ -149,8 +141,6 @@ func (r *renderFixture) service(t *testing.T, done <-chan struct{}, what string)
 	}
 }
 
-// renderFrame demands frames until one renders, servicing the session and
-// draining its results whenever one of its wakes fires.
 func (r *renderFixture) renderFrame(t *testing.T) {
 	t.Helper()
 	deadline := time.NewTimer(testTimeout())
@@ -180,7 +170,6 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 	}
 }
 
-// result drains the frame results and reports the disposition of token's.
 func (r *renderFixture) result(t *testing.T, token uint64) (RenderResult, bool) {
 	t.Helper()
 	results, err := r.session.DrainFrameResults()

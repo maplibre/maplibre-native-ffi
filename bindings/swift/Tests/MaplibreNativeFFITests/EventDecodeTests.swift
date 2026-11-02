@@ -59,7 +59,6 @@ import Testing
   #expect(events.last?.message == "second")
 }
 
-/// A typed payload reads the union member its kind names.
 @Test func typedPayloadsDecodeTheUnionMemberTheirKindNames() throws {
   var frame = rawRuntimeEvent(
     type: MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED.rawValue,

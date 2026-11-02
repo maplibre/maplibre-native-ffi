@@ -1,7 +1,5 @@
-// Queued log handlers: copied records, release on replace and clear, records
-// that a released queue refuses, and dispatched records that may call the C
-// API. Every case changes the process-global handler, so each runs inside
-// restoring_log_state().
+// Queued log handlers. Every case changes the process-global handler, so each
+// runs inside restoring_log_state().
 
 #include <string.h>
 
@@ -120,7 +118,6 @@ LOG_STATE_CASE(a_queue_handler_copies_each_record) {
   // logged the records completes.
   TEST_ASSERT_GREATER_THAN_INT(0, atomic_load(&queue.wakes));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
-  // A cleared handler queues nothing more.
   dump_debug_logs();
 
   dispatch_all(queue.handle);
@@ -136,14 +133,11 @@ LOG_STATE_CASE(a_queue_handler_copies_each_record) {
     TEST_ASSERT_EQUAL_INT64(-1, seen.codes[index]);
     TEST_ASSERT_EQUAL_STRING(expected[index], seen.messages[index]);
   }
-  // Clearing the handler releases it after its final record.
   TEST_ASSERT_EQUAL_CHAR('r', seen.kinds[3]);
   TEST_ASSERT_EQUAL_PTR(&tag, seen.user_data[3]);
   mln_test_delivery_queue_release(&queue);
 }
 
-// Replacing a queue handler releases it once, as the last call for its user
-// data; clearing releases the replacement.
 LOG_STATE_CASE(replace_and_clear_release_a_queue_handler_once) {
   static mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -182,9 +176,6 @@ LOG_STATE_CASE(a_queue_handler_rejects_an_invalid_shape) {
   MLN_TEST_INVALID_STATE(mln_log_set_callback(&handler, NULL));
 }
 
-// A handler whose queue is released stays installed and refuses each record,
-// which neither fails the command that logged it nor keeps the handler from
-// clearing.
 LOG_STATE_CASE(a_handler_on_a_released_queue_refuses_its_records) {
   MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
   static mln_test_delivery_queue queue;
@@ -263,7 +254,6 @@ LOG_STATE_CASE(a_dispatched_handler_may_call_the_c_api) {
   MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_size_t(0, log.records);
   TEST_ASSERT_EQUAL_size_t(0, log.releases);
-  // Clearing queued the release after the handler's last record.
   MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
   TEST_ASSERT_EQUAL_size_t(3, log.records);
   TEST_ASSERT_EQUAL_size_t(0, log.refused_calls);

@@ -333,7 +333,6 @@ constexpr auto element_owns_handles(const mln_texture_readback_result*) noexcept
   -> bool {
   return false;
 }
-// The copied arguments of one mln_camera_transition_end_callback call.
 struct CameraTransitionEndArguments {
   const mln_camera_transition_end* end;
 };
@@ -370,7 +369,6 @@ struct Delivered<CameraTransitionEndArguments> {
     static_cast<void>(callback(user_data, record.end));
   }
 };
-// The copied arguments of one mln_custom_source_cancel_tile_callback call.
 struct CustomSourceCancelTileArguments {
   mln_canonical_tile_id tile_id;
 };
@@ -401,7 +399,6 @@ struct Delivered<CustomSourceCancelTileArguments> {
     static_cast<void>(callback(user_data, record.tile_id));
   }
 };
-// The copied arguments of one mln_custom_source_fetch_tile_callback call.
 struct CustomSourceFetchTileArguments {
   mln_canonical_tile_id tile_id;
 };
@@ -432,7 +429,6 @@ struct Delivered<CustomSourceFetchTileArguments> {
     static_cast<void>(callback(user_data, record.tile_id));
   }
 };
-// The copied arguments of one mln_log_callback call.
 struct LogArguments {
   mln_log_severity severity;
   mln_log_event event;
@@ -464,7 +460,6 @@ struct Delivered<LogArguments> {
     ));
   }
 };
-// The copied arguments of one mln_resource_provider_callback call.
 struct ResourceProviderArguments {
   const mln_resource_request_info* request;
   mln_resource_request handle;
@@ -522,7 +517,6 @@ struct Delivered<ResourceProviderArguments> {
     static_cast<void>(callback(user_data, record.request, record.handle));
   }
 };
-// The copied arguments of one mln_resource_request_cancel_callback call.
 struct ResourceRequestCancelArguments {
   mln_resource_request handle;
 };
@@ -553,7 +547,6 @@ struct Delivered<ResourceRequestCancelArguments> {
     static_cast<void>(callback(user_data, record.handle));
   }
 };
-// The copied arguments of one mln_resource_transform_callback call.
 struct ResourceTransformArguments {
   mln_resource_kind kind;
   mln_buffer_view url;
@@ -591,7 +584,6 @@ struct Delivered<ResourceTransformArguments> {
     );
   }
 };
-// The copied arguments of one mln_runtime_event_callback call.
 struct RuntimeEventArguments {
   const mln_event_batch_view* events;
 };

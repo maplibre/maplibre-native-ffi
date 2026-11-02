@@ -176,7 +176,6 @@ class HandleLifecycleTest {
     }
   }
 
-  /** A weak reference to an object that nothing else references. */
   private suspend fun returnFromUse(runtime: RuntimeHandle) {
     runtime.use {
       return

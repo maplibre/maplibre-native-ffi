@@ -36,7 +36,6 @@ static void remove_state(mln_map map, mln_feature_state_selector selector) {
   ));
 }
 
-// The state object the map store holds for one feature, as JSON.
 static void read_state(
   mln_map map, mln_feature_state_selector selector, char* out, size_t capacity
 ) {
@@ -56,8 +55,6 @@ static void read_state(
     TEST_ASSERT_EQUAL_STRING((expected), state_json); \
   } while (false)
 
-// Sets merge keys into what a feature holds, and removes take one key, one
-// feature, or everything under a source layer, touching nothing else.
 static void state_merges_on_set_and_prunes_on_remove(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -79,7 +76,6 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   hover.state_key = MLN_BUFFER_LITERAL("hover");
   remove_state(map, hover);
   EXPECT_STATE("{\"count\":4}", map, feature);
-  // Removing the last key leaves nothing behind, so a later set starts fresh.
   mln_feature_state_selector count = hover;
   count.state_key = MLN_BUFFER_LITERAL("count");
   remove_state(map, count);
@@ -106,8 +102,6 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   EXPECT_STATE("{}", map, empty_id);
   EXPECT_STATE("{}", map, feature);
 
-  // A source layer is its own namespace, and a remove without a feature clears
-  // one namespace of one source.
   const mln_feature_state_selector roads_one =
     selector_for("tiles", "roads", "1");
   const mln_feature_state_selector roads_two =
@@ -135,7 +129,6 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   EXPECT_STATE("{\"n\":3}", map, water_one);
   EXPECT_STATE("{\"n\":5}", map, other_one);
 
-  // Removing what is not there commits and changes nothing.
   remove_state(map, selector_for("missing", NULL, NULL));
   remove_state(map, hover);
   EXPECT_STATE("{\"n\":5}", map, other_one);
@@ -237,8 +230,6 @@ static void array_state(void* descriptor) {
   ((feature_state_call*)descriptor)->state = MLN_BUFFER_LITERAL("[true]");
 }
 
-// Every selector and state check runs before the call returns, so a rejected
-// call never reaches the map worker.
 static void malformed_selectors_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -303,9 +294,6 @@ static bool feature_rendered(void* context) {
   return query->list.status == MLN_STATUS_OK && query->list.count == 1;
 }
 
-// A render session pushes the map store into the renderer on its next render
-// update, including a source's first, so a rendered query reports state as of
-// the last frame rather than the last command.
 static void rendered_features_carry_state_from_the_last_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -340,7 +328,6 @@ static void rendered_features_carry_state_from_the_last_frame(void) {
   TEST_ASSERT_TRUE(feature_rendered(&query));
   TEST_ASSERT_EQUAL_STRING("{\"hover\":false}", query.list.features[0].state);
 
-  // A removal reaches the renderer the same way, leaving no state at all.
   remove_state(map, feature);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)

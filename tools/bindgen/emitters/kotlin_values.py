@@ -91,7 +91,6 @@ KEYWORDS = {
 
 
 def doc(bound, native: str, indent: str = "") -> str:
-    """The KDoc comment of a declaration, or empty when it has none."""
     from .kotlin import symbols
 
     return docs.block_comment(bound.doc(native), symbols(bound), indent)
@@ -121,7 +120,6 @@ def owner_class(handle):
 
 
 def literal(number, typ):
-    """A Kotlin literal of [typ] for the integer [number]."""
     if typ in {"ULong", "UInt", "UShort", "UByte"}:
         bits = {"ULong": 64, "UInt": 32, "UShort": 16, "UByte": 8}[typ]
         text = f"{number % (1 << bits)}u" + ("L" if typ == "ULong" else "")
@@ -354,7 +352,6 @@ class Values:
         return None
 
     def common(self):
-        """The public value types."""
         from . import kotlin_callbacks
 
         result = [
@@ -503,7 +500,6 @@ class Values:
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
 
     def union_name(self, record, field):
-        """The public type of [record]'s union [field]."""
         if record.union_member:
             return name(record.native)
         return name(record.native) + pascal(field.name)
@@ -653,7 +649,6 @@ class Values:
         return f"{expression}.size.toLong()"
 
     def place(self, value, address, expression):
-        """A statement that writes [value] at [address]."""
         if value.kind == "record":
             return f"{self.put(value)}({address}, {expression})"
         if value.kind == "buffer" and value.buffer_form == "view":

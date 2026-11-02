@@ -1,7 +1,4 @@
-// Camera transitions and gestures: an ease or an animated delta advances only
-// as frames render, its end handler reports how it ended exactly once, a
-// cancellation stops it where it stands, and gesture phases mark the map
-// around a camera write.
+// Camera transitions, animated deltas, and gesture phases.
 
 #include "support/camera.h"
 #include "support/frames.h"
@@ -57,7 +54,6 @@ static mln_camera_update ease_to_zoom(
   return update;
 }
 
-// Gives the animation an identity for mln_map_cancel_camera_transition().
 static void with_transition_id(
   mln_animation_options* animation, uint64_t transition_id
 ) {
@@ -74,7 +70,6 @@ static mln_map_snapshot read_settled_snapshot(
   return snapshot;
 }
 
-// An ordered camera read.
 static mln_camera query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
@@ -86,7 +81,6 @@ static mln_camera query_camera(mln_map map) {
   return result.camera;
 }
 
-// Asserts that the handler ran once with `outcome`, and released after it.
 static void assert_ended(
   mln_test_transition_end* probe, uint32_t outcome, const char* label
 ) {
@@ -127,7 +121,6 @@ static void find_did_change(const mln_runtime_event* event, void* context) {
   }
 }
 
-// Drains the queue and reads the published snapshot from inside the callback.
 // The callback runs after the MapLibre update that ended the transition
 // returns, so the camera events of that update are queued.
 static void observe_end(
@@ -191,7 +184,6 @@ static bool transition_ended(void* context) {
   return false;
 }
 
-// Renders frames until the handler of `probe` has run and released.
 static void render_until_ended(
   const mln_test_render_fixture* fixture, mln_test_transition_end* probe
 ) {
@@ -218,10 +210,7 @@ static bool settled_result(void* context) {
   return true;
 }
 
-// An ease with a duration completes only while frames render. Its handler runs
-// once, from a task after the frame that ended it, when the camera change of
-// its generation is already queued and the published snapshot shows the
-// target. A later frame, the fence for the negative check, runs it no more.
+// A later frame is the fence for checking that the handler runs only once.
 static void a_rendered_ease_completes_at_its_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -336,9 +325,6 @@ static bool is_immediate_change(const mln_runtime_event* event, void* context) {
          event->generation == *(const uint64_t*)context;
 }
 
-// A command with nothing to animate completes within itself: its handler runs
-// before its completion, with the generation that the command published, and
-// that generation's immediate camera change is queued.
 static void an_immediate_command_completes_before_its_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -379,7 +365,6 @@ static void an_immediate_command_completes_before_its_completion(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The handler reports the end whatever the event mask selects.
 static void the_handler_runs_whatever_the_event_mask_selects(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
@@ -424,8 +409,6 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   mln_test_completion cancel = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_cancel_transitions(map, &cancel.descriptor, NULL));
   MLN_TEST_OK(mln_test_completion_finish(&cancel));
-  // The cancelled transition reports its end before the command completes,
-  // and leaves the camera where it stopped, short of the eased target.
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "cancelled");
   TEST_ASSERT_EQUAL_UINT64(
@@ -438,7 +421,6 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
     settled, read_settled_snapshot(runtime, map).view.camera.zoom
   );
 
-  // Cancelling with nothing running commits and changes nothing.
   MLN_TEST_AWAIT_OK(
     mln_map_cancel_transitions(map, &completion.descriptor, NULL)
   );
@@ -457,9 +439,6 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Cancelling an identity ends only the commands that carry it. Another
-// command keeps animating, and the map reports a transition until a later
-// camera write that replaces it completes it.
 static void cancel_camera_transition_ends_only_its_identity(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -517,7 +496,6 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   TEST_ASSERT_TRUE(cancelled.transition_in_progress);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&bearing.calls));
 
-  // An identity that no running command carries changes nothing.
   MLN_TEST_AWAIT_OK(
     mln_map_cancel_camera_transition(map, 8, &completion.descriptor, NULL)
   );
@@ -553,8 +531,6 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A gesture phase only marks the map, except CANCEL, which also ends the
-// transitions still running after its camera write.
 static void gesture_phase_publishes_the_snapshot_flag(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -580,7 +556,6 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
   TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.view.camera.zoom);
 
-  // BEGIN leaves a running ease alone, and CANCEL ends it.
   mln_test_transition_end probe;
   mln_test_transition_end_init(&probe);
   const mln_camera_update eased = ease_to_zoom(3.0, 60000.0, &probe);
@@ -605,7 +580,6 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An animated delta lasting `duration_ms` that reports its end to `probe`.
 static mln_camera_delta animated_delta(
   uint32_t fields, double duration_ms, mln_test_transition_end* probe
 ) {
@@ -625,10 +599,7 @@ static void apply_delta(mln_map map, const mln_camera_delta* delta) {
   );
 }
 
-// An animated delta that pans and zooms runs as two MapLibre transitions and
-// runs its handler once, after both. A rendered delta reaches its target. A
-// delta whose zoom a later jump replaces keeps running until a cancellation
-// ends its pan.
+// An animated delta that pans and zooms runs as two MapLibre transitions.
 static void an_animated_delta_reports_its_end_once(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -682,10 +653,8 @@ static void an_animated_delta_reports_its_end_once(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An animated delta replaces the running transition from its current camera,
-// and the replaced command completes at once. Applying the first delta can
-// advance it before any frame renders, so an ordered read supplies the second
-// scale's starting zoom. No frame demand advances it between the commands.
+// Applying the first delta can advance it before any frame renders, so an
+// ordered read supplies the second scale's starting zoom.
 static void an_animated_delta_replaces_the_running_one(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -723,9 +692,8 @@ static void an_animated_delta_replaces_the_running_one(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A delta carries its gesture phase like a camera update. A delta without
-// components commits only its phase, and runs its handler before its
-// completion, as a release without inertia needs.
+// A delta without components runs its handler before its completion, as a
+// release without inertia needs.
 static void a_delta_carries_its_gesture_phase(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -792,8 +760,6 @@ static void release_transition_close(void* user_data) {
   order->completion.release_user_data(order->completion.user_data);
 }
 
-// Closing a map ends each command that it still animates as closed, with no
-// generation, before the release completes. Disposal does the same.
 static void a_map_close_ends_running_transitions(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = MLN_HANDLE_NULL;
@@ -841,7 +807,6 @@ typedef struct submitting_end {
   atomic_int status;
 } submitting_end;
 
-// Submits a jump from inside the end callback.
 static void submit_from_end(
   mln_test_transition_end* probe, const mln_camera_transition_end* end
 ) {
@@ -860,8 +825,6 @@ static void submit_from_end(
   );
 }
 
-// The handler may submit a command, which runs after the one that ended the
-// transition.
 static void a_handler_may_submit_a_command(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -883,8 +846,6 @@ static void a_handler_may_submit_a_command(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A rejected command runs neither callback and leaves user_data with the
-// caller, and a disabled handler must not carry a release.
 static void a_rejected_command_runs_no_handler(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

@@ -1,7 +1,4 @@
-// The map camera: absolute updates round-trip through the snapshot and the
-// ordered query, relative deltas follow their documented conventions and apply
-// atomically, fits round-trip through the visible bounds, and the unbounded
-// constraint stays distinct from world bounds.
+// The map camera and its constraints.
 
 #include <math.h>
 
@@ -232,9 +229,6 @@ static void assert_camera_field(
   }
 }
 
-// Each field a jump selects reads back from the ordered query, the map
-// snapshot, and the camera snapshot, and the fields it leaves out keep their
-// values.
 static void every_camera_field_round_trips_through_the_snapshot(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -253,7 +247,6 @@ static void every_camera_field_round_trips_through_the_snapshot(void) {
     );
     assert_camera_field(row->label, &row->camera, &snapshot.view.camera);
 
-    // Every earlier row's field is still in place.
     for (size_t earlier = 0; earlier < index; earlier += 1) {
       assert_camera_field(
         camera_rows[earlier].label, &camera_rows[earlier].camera,
@@ -266,8 +259,6 @@ static void every_camera_field_round_trips_through_the_snapshot(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Immediate deltas resolve against the camera as each one runs, so a queue of
-// them composes exactly without awaiting any but the last.
 static void queued_immediate_deltas_compose_exactly(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -302,8 +293,8 @@ static void queued_immediate_deltas_compose_exactly(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// One relative command. Its check follows mln_camera_delta's documented
-// convention for the fields it selects.
+// Each row's check follows mln_camera_delta's documented convention for the
+// fields it selects.
 typedef struct delta_row {
   const char* label;
   uint32_t fields;
@@ -351,12 +342,6 @@ static void assert_same_coordinate(
   );
 }
 
-// OFFSET moves the map content by its offset, so the coordinate at the
-// offset's opposite lands on the center. SCALE multiplies the scale, adding
-// log2(scale) to the zoom, and BEARING and PITCH add their degrees: a positive
-// pitch tilts away from straight down. An anchored change keeps the coordinate
-// under the anchor in place; an unanchored one keeps the center that the pan
-// left.
 static void every_camera_delta_field_follows_its_convention(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 256);
@@ -475,9 +460,7 @@ static void release_snapshot_probe(void* user_data) {
 }
 
 // A two-finger gesture passes its centroid movement as offset and its new
-// centroid as anchor. The pan moves the coordinate at anchor - offset to the
-// anchor, and the zoom and turn keep it there. The command publishes the pan
-// and the ease in one snapshot and announces one render update for them.
+// centroid as anchor.
 static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 256);
@@ -517,7 +500,6 @@ static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
   const uint64_t generation = mln_test_completion_generation(&completion);
   mln_test_completion_destroy(&completion);
 
-  // The snapshot the command published holds both the pan and the ease.
   MLN_TEST_OK(probe.read_status);
   TEST_ASSERT_EQUAL_UINT64(generation, probe.snapshot.generation);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, probe.snapshot.view.camera.zoom);
@@ -650,9 +632,6 @@ static mln_lat_lng_bounds bounds_for_camera(
   return bounds;
 }
 
-// A camera fitted to bounds shows those bounds: the visible box contains them.
-// The three fit inputs agree on the same region, and the fit options reach the
-// result.
 static void camera_fits_round_trip_through_the_visible_bounds(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 512);
@@ -715,7 +694,6 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.zoom, geometry_fit.zoom);
 
   // Padding leaves less of the viewport for the region, so the fit zooms out.
-  // The fitted bearing and pitch are the ones the options ask for.
   mln_camera_fit_options fit = {.size = sizeof(mln_camera_fit_options)};
   fit.fields = MLN_CAMERA_FIT_OPTION_PADDING | MLN_CAMERA_FIT_OPTION_BEARING |
                MLN_CAMERA_FIT_OPTION_PITCH;
@@ -728,7 +706,6 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, padded.bearing);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 15.0, padded.pitch);
 
-  // A fit is a query: the map camera stays where it was.
   const mln_camera current = query_camera(map).camera;
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, current.zoom);
 
@@ -736,9 +713,6 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A viewport across the antimeridian reports a wrapped box that keeps its
-// longitudes inside -180 to 180 and an unwrapped hull that extends past 180
-// on the shortest path through the center.
 static void visible_bounds_unwrap_across_the_antimeridian(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 512);
@@ -787,8 +761,6 @@ static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {
   return snapshot.bounds;
 }
 
-// Every camera entry point checks its arguments before it submits: updates,
-// deltas, fits, constraints, and free camera options.
 static void camera_calls_reject_what_they_cannot_express(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

@@ -39,7 +39,6 @@ CursorKind: Any = cindex.CursorKind
 TypeKind: Any = cindex.TypeKind
 
 ANNOTATION_PREFIX = "mln:"
-# The macro that names the ABI version the headers declare.
 C_VERSION = "MLN_C_VERSION"
 # Source that may separate a doc comment from the start of its declaration,
 # spelled backward: whitespace, an annotation macro, which takes only string

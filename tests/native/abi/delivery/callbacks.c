@@ -1,7 +1,4 @@
-// Queued callback registrations beyond completions, logs, and providers: a
-// camera command's end handler, a custom source's tile fetches and cancels,
-// and a resource request's cancel handler. Each runs every call in dispatch
-// and then its release, and a queue never stands in for a callback.
+// Queued callback registrations beyond completions, logs, and providers.
 
 #include "support/delivery.h"
 #include "support/style.h"
@@ -60,8 +57,6 @@ static mln_camera_update queued_ease(mln_delivery_queue queue, void* token) {
   return update;
 }
 
-// A handler that names a queue still needs its callback, and a released
-// queue is refused. Neither command queues anything.
 static void a_camera_end_handler_needs_a_callback_and_a_live_queue(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -97,8 +92,6 @@ static bool source_reached(void* context) {
 
 static const mln_canonical_tile_id root_tile = {.z = 0, .x = 0, .y = 0};
 
-// A drawn source queues the fetch of its root tile, an invalidation queues
-// its cancel and a second fetch, and removing the source queues its release.
 static void a_custom_source_runs_its_fetches_and_cancels_then_its_release(
   void
 ) {
@@ -179,7 +172,6 @@ static void a_custom_source_runs_its_fetches_and_cancels_then_its_release(
   mln_test_delivery_queue_release(&queue);
 }
 
-// Keeps each request handle that a dispatched provider call receives.
 static void keep_request(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
@@ -200,8 +192,6 @@ static void record_request_cancel(
   mln_test_record_call('k', user_data, MLN_STATUS_OK, 0);
 }
 
-// A request that a style change discards queues its cancel, which names the
-// request, and then the cancel registration's release.
 static void a_request_cancel_handler_runs_its_cancel_then_its_release(void) {
   mln_test_calls_reset();
   mln_test_delivery_queue queue;

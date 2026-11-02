@@ -106,7 +106,6 @@ class RustEmitterTests(unittest.TestCase):
             "out_view.reading_count, out_view.reading_size) }?)",
             source,
         )
-        # Neither the batch nor its view is public.
         self.assertNotIn(prefix + "reading_batch.rs", generated)
         self.assertNotIn("ReadingView", generated[prefix + "values.rs"])
 

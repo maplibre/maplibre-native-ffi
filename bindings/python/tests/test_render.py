@@ -275,7 +275,6 @@ class OwnedTexture:
         return self.frames.wait_until(check, f"frame {token}")
 
     def render_red(self) -> mln.TextureReadbackResult:
-        """Load a red style, then render until a frame reads back red."""
         assert self.map is not None and self.session is not None
         result(self.map.set_style_json(RED_STYLE))
         deadline = time.monotonic() + TIMEOUT
@@ -291,7 +290,6 @@ class OwnedTexture:
                 raise AssertionError("timed out waiting for a red frame")
 
     def stop_service(self) -> None:
-        """Stop servicing the session, if the graphics thread services it."""
         if self._service is not None:
             self._stopping = True
             self._work.set()
@@ -299,9 +297,7 @@ class OwnedTexture:
                 raise AssertionError("the graphics thread did not stop")
 
     def _teardown(self, release: bool) -> None:
-        """Stop servicing, destroy the session and map, then the graphics.
-
-        Without ``release``, a session may still share the graphics object,
+        """Without ``release``, a session may still share the graphics object,
         so everything is left alive rather than destroyed under it.
         """
         self._closed = True
@@ -322,7 +318,6 @@ class OwnedTexture:
             self.graphics.close()
 
     def close(self) -> None:
-        """Detach the session, then tear everything down."""
         if self._closed:
             return
         try:

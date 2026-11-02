@@ -58,7 +58,6 @@ impl<H: NativeHandle + Send> Owner<H> {
         self.native
     }
 
-    /// Prepares a call on the raw handle.
     pub(crate) fn call(&self) -> Call<'_, H> {
         Call::new(self.native)
     }

@@ -2714,7 +2714,6 @@ auto map_event(
 
 }  // namespace
 
-// Producers test their subscription mask before building an event.
 auto push_runtime_map_event_payload(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, mln_runtime_event_type type,

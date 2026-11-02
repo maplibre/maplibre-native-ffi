@@ -29,7 +29,6 @@ internal const val EMPTY_STYLE_JSON: String = """{"version":8,"sources":{},"laye
  */
 internal expect fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): TestResult
 
-/** Asserts that [block] fails with [status], and returns the failure. */
 internal inline fun assertFailsWithStatus(status: Status, block: () -> Unit): MaplibreException =
   assertFailsWith<MaplibreException> { block() }.also { assertEquals(status, it.status) }
 
@@ -79,7 +78,6 @@ internal fun ResourceRequestHandle.deny() {
   )
 }
 
-/** Completes this request with [body]. */
 internal fun ResourceRequestHandle.serve(body: String) {
   complete(ResourceResponse(status = ResourceResponseStatus.OK, bytes = body.encodeToByteArray()))
 }
@@ -115,7 +113,6 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
       throw AssertionError("timed out waiting for $what", timeout)
     }
 
-  /** Waits for the next map event of [type]. */
   suspend fun awaitMapEvent(type: RuntimeEventType): RuntimeEvent =
     awaitEvent("map event $type") { it.type == type && it.sourceType == RuntimeEventSourceType.MAP }
 
@@ -145,7 +142,6 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
   }
 }
 
-/** A small map on a [RuntimeFixture]. */
 internal class MapFixture(val runtimeFixture: RuntimeFixture, val map: MapHandle) {
   val runtime: RuntimeHandle
     get() = runtimeFixture.runtime

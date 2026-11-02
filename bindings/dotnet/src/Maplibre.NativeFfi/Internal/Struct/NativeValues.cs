@@ -5,10 +5,6 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 /// <summary>The steps that generated value encoders repeat for each member.</summary>
 internal static class NativeValues
 {
-    /// <summary>
-    /// Stores a present optional member in its native slot and returns the
-    /// presence bit to set, or no bits when the member is absent.
-    /// </summary>
     internal static TFlags Put<T, TFlags>(T? value, ref T slot, TFlags bit)
         where T : struct
         where TFlags : struct, Enum
@@ -19,7 +15,6 @@ internal static class NativeValues
         return bit;
     }
 
-    /// <inheritdoc cref="Put{T, TFlags}(T?, ref T, TFlags)"/>
     internal static TFlags Put<TPublic, TNative, TFlags>(
         TPublic? value,
         ref TNative slot,
@@ -35,7 +30,6 @@ internal static class NativeValues
         return bit;
     }
 
-    /// <inheritdoc cref="Put{T, TFlags}(T?, ref T, TFlags)"/>
     internal static TFlags Put<TPublic, TNative, TFlags>(
         TPublic? value,
         ref TNative slot,
@@ -51,7 +45,6 @@ internal static class NativeValues
         return bit;
     }
 
-    /// <inheritdoc cref="Put{T, TFlags}(T?, ref T, TFlags)"/>
     internal static TFlags Put<TPublic, TNative, TFlags>(
         TPublic? value,
         ref TNative slot,
@@ -69,7 +62,6 @@ internal static class NativeValues
         return bit;
     }
 
-    /// <inheritdoc cref="Put{T, TFlags}(T?, ref T, TFlags)"/>
     internal static TFlags Put<TPublic, TNative, TFlags>(
         TPublic? value,
         ref TNative slot,

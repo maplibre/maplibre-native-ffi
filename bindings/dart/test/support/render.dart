@@ -108,7 +108,6 @@ final class WorkerSession {
     return worker;
   }
 
-  /// Demands frames until one renders, and returns its result.
   Future<RenderFrameResult> renderFrame() async {
     for (var attempt = 0; attempt < _frameAttempts; attempt++) {
       final token = _nextToken++;

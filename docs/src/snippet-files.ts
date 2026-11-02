@@ -56,7 +56,6 @@ const files: Record<string, Files> = {
   }),
 };
 
-/** A page's snippet source in a language, or undefined if it has none. */
 export function snippetSource(
   language: string,
   page: string,

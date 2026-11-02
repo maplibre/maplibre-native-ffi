@@ -1,9 +1,4 @@
-// Dispatched delivery: registrations and completions that name a queue
-// alongside their callback run in mln_delivery_queue_dispatch() on the
-// calling thread, in push order, with their release after their last call. A
-// dispatched call may call any C function: dispose its owner, release the
-// queue, or dispatch again, which reports BUSY. Releasing a queue abandons
-// what is pending without running it.
+// Dispatched delivery through mln_delivery_queue_dispatch().
 
 #include <string.h>
 
@@ -76,7 +71,6 @@ static bool dispatched_kind(void* context) {
   return memchr(wait->log->kinds, wait->kind, wait->log->count) != NULL;
 }
 
-// Dispatches queue as its wake pulses until a call of kind has run.
 static void dispatch_until(
   mln_delivery_queue queue, const call_log* log, char kind
 ) {
@@ -89,8 +83,6 @@ static void dispatch_until(
   MLN_TEST_OK(wait.failure);
 }
 
-// An empty queue reports NOT_READY, and a released or foreign handle is
-// refused. A queue's own wake cannot name a queue.
 static void dispatch_reports_its_status(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -131,9 +123,6 @@ static void record_generation(
   );
 }
 
-// A map command's events run before its completion, whose release follows
-// it, all on the dispatching thread. Clearing the handler queues its release
-// after its last call.
 static void events_and_their_completion_run_in_push_order(void) {
   static call_log log;
   start_case(&log);
@@ -186,7 +175,6 @@ typedef struct answering_provider {
   mln_status answer;
 } answering_provider;
 
-// Answers each request inside the call through the handle that it owns.
 static void answer_request(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
@@ -212,9 +200,6 @@ static void release_provider(void* user_data) {
   record(&provider->log, 'r', 0);
 }
 
-// A dispatched provider call owns its request handle, and the style loads with
-// the answer it gives there. The provider's release runs in dispatch once a
-// clear retires it.
 static void a_dispatched_request_passes_its_handle_to_the_call(void) {
   static answering_provider provider;
   start_case(&provider.log);
@@ -249,9 +234,6 @@ static void a_dispatched_request_passes_its_handle_to_the_call(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// Releasing the queue abandons the pending request, which fails because no
-// call took its handle, and the release of a registration that still names
-// the queue never runs.
 static void releasing_the_queue_abandons_pending_calls_and_releases(void) {
   static answering_provider provider;
   start_case(&provider.log);
@@ -305,8 +287,6 @@ static void dispatch_from_another_thread(void* argument) {
   state->concurrent = mln_delivery_queue_dispatch(state->queue, NULL);
 }
 
-// Dispatches again from inside the call and from another thread while it
-// runs, then queues a later completion and waits until it is queued.
 static void reenter(void* user_data, const mln_completion_result* result) {
   reentry* state = user_data;
   record(&state->log, result->status == MLN_STATUS_OK ? 'A' : 'F', 0);
@@ -321,9 +301,6 @@ static void reenter(void* user_data, const mln_completion_result* result) {
   state->fenced = mln_test_map_fence(state->map);
 }
 
-// A dispatch while another runs, further up the stack or on another thread,
-// reports BUSY, and the running dispatch then also runs what was queued by
-// the time BUSY returned.
 static void a_dispatch_inside_a_call_is_busy(void) {
   static reentry state;
   start_case(&state.log);
@@ -378,8 +355,6 @@ static void record_second(
   record(&state->log, result->status == MLN_STATUS_OK ? 'B' : 'F', 0);
 }
 
-// A call that releases its queue finishes, release included, and the calls
-// queued after it never run.
 static void a_call_that_releases_the_queue_abandons_the_rest(void) {
   static reentry state;
   start_case(&state.log);
@@ -433,8 +408,6 @@ static void pass_request(
   (void)mln_resource_request_pass_through(handle, NULL);
 }
 
-// A call may dispose the map and runtime that queued it. The runtime's
-// registrations then retire, and their releases run in a later dispatch.
 static void a_call_may_dispose_its_owners(void) {
   static disposing_owner owner;
   start_case(&owner.log);
@@ -473,7 +446,6 @@ static void record_end(void* user_data, const mln_camera_transition_end* end) {
   record(user_data, 'E', end->generation);
 }
 
-// A cancelled ease runs its end handler and then its release in dispatch.
 static void a_camera_end_handler_runs_its_end_then_its_release(void) {
   static call_log log;
   start_case(&log);

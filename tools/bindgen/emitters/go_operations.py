@@ -49,7 +49,6 @@ def receiver_type_name(plan, values):
 
 
 def declared_name(plan, bound, *, dispose=False):
-    """The Go name of an operation's method or package function."""
     receiver, handle = receiver_of(plan)
     method = "Dispose" if dispose else method_name(plan, receiver, handle)
     if plan.factory:
@@ -163,9 +162,8 @@ def borrows_receiver(plan):
 
 
 def operation(plan, values, *, discard=False, dispose=False):
-    """Lower one operation. `dispose` lowers a handle's C dispose as its
-    synchronous `Dispose`, which passes a null completion to a dispose that is
-    also the release."""
+    """`dispose` lowers a handle's C dispose as its synchronous `Dispose`,
+    which passes a null completion to a dispose that is also the release."""
     dropped_completion = None
     if dispose and plan.completion:
         dropped_completion = plan.completion.parameter

@@ -56,7 +56,6 @@ pub fn capture_reports() -> mpsc::Receiver<Report> {
     reports
 }
 
-/// Checks that a void callback contains a panic and reports it on every target.
 pub fn assert_panicking_void_callback_is_reported() {
     let _global = global_state();
     let reports = capture_reports();
@@ -97,7 +96,6 @@ pub fn assert_panicking_void_callback_is_reported() {
     assert_eq!(error.diagnostic(), "callback panicked");
 }
 
-/// The handles that the captured reports name as leaked.
 pub fn leaks(reports: &mpsc::Receiver<Report>) -> Vec<NativeHandleLeak> {
     reports
         .try_iter()
@@ -169,7 +167,6 @@ pub fn wait_for<T, E: std::fmt::Debug>(submitted: std::result::Result<NativeFutu
     wait_on(submitted.expect("the submission failed"))
 }
 
-/// Blocks until an accepted operation completes and returns its value.
 #[track_caller]
 pub fn wait_on<T>(future: NativeFuture<T>) -> T {
     future
@@ -262,7 +259,6 @@ impl LoopbackServer {
         }
     }
 
-    /// The URL that names `path` on this server.
     pub fn url(&self, path: &str) -> String {
         format!("http://{}{path}", self.address)
     }
@@ -339,7 +335,6 @@ pub fn await_release(released: &mpsc::Receiver<()>) {
         .expect("native never released the callback");
 }
 
-/// A response that serves `bytes`.
 pub fn ok_response(bytes: &(impl AsRef<[u8]> + ?Sized)) -> ResourceResponse<'_> {
     ResourceResponse {
         status: ResourceResponseStatus::Ok,
@@ -440,7 +435,6 @@ impl Fixture {
         self.fence();
     }
 
-    /// Loads a style document and waits until it has loaded.
     pub fn load_style(&self, style_json: &str) {
         let loaded = self.map().set_style_json(style_json).unwrap();
         self.await_event_type(RuntimeEventType::MapStyleLoaded);
@@ -491,7 +485,6 @@ pub struct SessionWakes {
     pub released: mpsc::Receiver<()>,
 }
 
-/// A render session together with its wakes.
 pub struct Session {
     pub handle: RenderSessionHandle,
     pub wakes: SessionWakes,
@@ -541,7 +534,6 @@ impl Session {
         let _ = self.handle.service_driver_work();
     }
 
-    /// Demands one frame and returns its result.
     pub fn render_frame(&self) -> RenderFrameResult {
         let token = next_token();
         self.handle
@@ -582,7 +574,6 @@ impl Session {
         drive(&self.wakes.signal, released, || {}).unwrap();
     }
 
-    /// Detaches and releases the session.
     pub fn close(self) {
         self.drive(self.handle.detach().unwrap()).unwrap();
         self.release();

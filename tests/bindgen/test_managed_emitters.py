@@ -141,7 +141,6 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
             self.assertIn(
                 "public override string ToString() => state.ToString();", operations
             )
-            # Only the handles that runtime events name are their source.
             self.assertEqual(
                 event_source,
                 "which runtime events report as their" in operations,

@@ -25,7 +25,6 @@ internal class SharedLoad {
   private val scope = CoroutineScope(SupervisorJob())
   private var loading: Deferred<Unit>? = null
 
-  /** Waits for the load in progress or finished, or starts [load] when there is none. */
   suspend fun await(load: suspend () -> Unit) {
     val current =
       loading

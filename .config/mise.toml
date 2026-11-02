@@ -77,7 +77,6 @@ swift_version = "6.4.2"
 wrangler_version = "4.156.0"
 
 [tools]
-# Repository and native tooling
 # hk.pkl beside this config pins hk's Pkl package and executable together.
 "aqua:jdx/hk" = "{{ read_file(path='hk.pkl') | split(pat='/hk@') | nth(n=1) | split(pat='#') | first }}" # Linter orchestration
 "aqua:dprint/dprint" = "0.64.3" # Formatter orchestration
@@ -103,7 +102,6 @@ sccache = "0.19.0"
   "linux",
 ] }
 
-# Node.js ecosystem
 "core:node" = "26.13.0"
 "aqua:pnpm/pnpm" = "12.16.1"
 
@@ -111,7 +109,6 @@ sccache = "0.19.0"
 # and tests with this same install.
 "core:dart" = "{{vars.dart_version}}"
 
-# Python ecosystem
 "core:python" = "{{vars.python_version}}"
 "aqua:astral-sh/uv" = "0.13.6"
 
@@ -309,7 +306,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # program in tests/native/exit; off the host, one entry per suite and exit
 # program through tools/devices/run. The Emscripten suites run as pages in
 # headless Chromium; see scripts/run-browser-test.mjs for how a browser is
-# located. A target that registers no tests fails rather than passes.
+# located.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
 # A device build that no emulator or simulator runs registers no tests, so it

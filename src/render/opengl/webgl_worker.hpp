@@ -23,7 +23,6 @@
 
 namespace mln::core::opengl {
 
-// Whether this descriptor names a canvas the session transfers to its worker.
 inline auto is_transferred_webgl_canvas(
   const mln_open_gl_context_descriptor& context
 ) -> bool {

@@ -6,15 +6,12 @@ import org.maplibre.nativeffi.internal.c.word
 
 /** The fixtures of `bindings/kotlin/wasm/test_support.c`, which the test module exports. */
 internal object TestSupport {
-  /** Calls the `mln_completion_callback` at [callback] on the page. */
   fun callCompletion(callback: Long, userData: Long, result: Long) =
     mln_kw_test_call_completion(word(callback), word(userData), word(result))
 
-  /** Calls the `mln_user_data_release` at [release] on the page. */
   fun callRelease(release: Long, userData: Long) =
     mln_kw_test_call_release(word(release), word(userData))
 
-  /** Makes native emit an error log record on the page. */
   fun logError() = mln_kw_test_log_error()
 
   /**
@@ -28,7 +25,6 @@ internal object TestSupport {
   /** Contends the holder's mutex, and returns whether the call spun until the holder let go. */
   fun contend(): Boolean = mln_kw_test_contention_contend() != 0
 
-  /** The Workers that wait in the module's pthread pool. */
   fun idleWorkers(): Int = mln_kw_test_pool_workers(0)
 
   /** Every Worker of the module: those in the pool and those that run a thread. */

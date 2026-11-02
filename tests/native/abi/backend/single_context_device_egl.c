@@ -105,8 +105,6 @@ static void render_again(
   read_pixels(fixture, pixels);
 }
 
-// Renders on a device of its own, which gives the session a context of its
-// own.
 static void render_alone(
   mln_runtime runtime, mln_buffer_view style, uint8_t* pixels
 ) {
@@ -119,8 +117,6 @@ static void render_alone(
   mln_graphics_device_release(device);
 }
 
-// Each session keeps its own framebuffer and GL objects in the single context,
-// so two maps that take turns render what a context of their own renders.
 static void sessions_that_take_turns_render_as_alone(void) {
   static uint8_t expected[2][pixel_bytes];
   static uint8_t actual[pixel_bytes];
@@ -162,9 +158,6 @@ static void sessions_that_take_turns_render_as_alone(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A detached session hands the context to the rest, a session that attaches
-// later renders as the first one did, and the context outlives the device
-// handle.
 static void sessions_detach_while_others_render(void) {
   static uint8_t circle[pixel_bytes];
   static uint8_t fill[pixel_bytes];

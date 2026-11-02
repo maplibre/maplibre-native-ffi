@@ -75,7 +75,6 @@ private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredC
   return HandDeliveredCompletion(deferred, callback, userData, release)
 }
 
-/** A command completion. */
 private fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> = capture { call ->
   NativeArena().use { arena -> CompletionBridge.command(arena, call) }
 }

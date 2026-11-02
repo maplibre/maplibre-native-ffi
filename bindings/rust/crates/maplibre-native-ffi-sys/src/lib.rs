@@ -60,7 +60,6 @@ impl NativeHandle for () {
     fn from_raw(_: u64) -> Self {}
 }
 
-/// Implements [`NativeHandle`] for the generated handle newtypes.
 macro_rules! native_handles {
     ($($handle:ident),* $(,)?) => {$(
         impl $crate::NativeHandle for $handle {

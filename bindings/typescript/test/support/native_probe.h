@@ -1,5 +1,3 @@
-// The native probe that test/support/native_probe.c defines.
-
 #ifndef MLN_TS_TEST_NATIVE_PROBE_H
 #define MLN_TS_TEST_NATIVE_PROBE_H
 

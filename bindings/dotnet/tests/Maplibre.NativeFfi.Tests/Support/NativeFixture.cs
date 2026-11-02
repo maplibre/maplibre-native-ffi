@@ -14,10 +14,8 @@ internal sealed class NativeFixture : IAsyncDisposable
 {
     internal const string EmptyStyle = """{"version":8,"sources":{},"layers":[]}""";
 
-    /// <summary>The map options every test starts from: a 64 by 64 extent at scale 1.</summary>
     internal static MapOptions SmallMap => new() { InitialExtent = new LogicalExtent(64, 64, 1) };
 
-    /// <summary>Completes every request with a not-found error, so nothing leaves the process.</summary>
     internal static ResourceProvider DenyingProvider =>
         new()
         {
@@ -94,7 +92,6 @@ internal sealed class NativeFixture : IAsyncDisposable
         }
     }
 
-    /// <summary>Creates a fixture whose map has loaded an empty style.</summary>
     internal static async Task<NativeFixture> WithEmptyStyleAsync(MapOptions? options = null)
     {
         var fixture = await CreateAsync(options);
@@ -110,7 +107,6 @@ internal sealed class NativeFixture : IAsyncDisposable
         }
     }
 
-    /// <summary>Receives events until the map reports one of the given type.</summary>
     internal async Task<RuntimeEvent> WaitForMapEventAsync(RuntimeEventType type)
     {
         var elapsed = Stopwatch.StartNew();

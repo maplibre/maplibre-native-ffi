@@ -1,7 +1,7 @@
-// Binding support: Dart wakes, which post through the post_cobject function
-// that the host passes, so a fake of Dart's NativeApi.postCObject records the
-// messages without a Dart VM. A message is an integer in the Dart_CObject
-// layout of native API version 2; and owner tokens.
+// Binding support: Dart wakes and owner tokens. A Dart wake posts through the
+// post_cobject function the host passes, so a fake of Dart's
+// NativeApi.postCObject records the messages without a Dart VM. A message is
+// an integer in the Dart_CObject layout of native API version 2.
 
 #include "maplibre_native_c/binding_support.h"
 
@@ -65,9 +65,6 @@ static void assert_integer_message(
   TEST_ASSERT_EQUAL_INT64(expected, message->integer);
 }
 
-// A wake posts 0 for each call and 1 when it is released. A closed port that
-// rejects every post changes nothing: the wake still posts, and its release
-// still frees the context.
 static void dart_wakes_post_zero_per_wake_and_one_on_release(void) {
   mln_wake wake = {0};
   MLN_TEST_INVALID(mln_binding_dart_wake_create(NULL, 17, &wake, NULL));
@@ -103,9 +100,6 @@ static mln_map create_untracked_map(mln_runtime runtime) {
   return map;
 }
 
-// Destroying a token after the host released its owner explicitly leaves the
-// owner alone. Finalizing a token disposes the owner, a delivery queue
-// included.
 static void an_owner_token_disposes_its_owner_only_when_finalized(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map released = create_untracked_map(runtime);
@@ -156,8 +150,6 @@ static bool record_finalization_failure(
   return true;
 }
 
-// Finalizing a token whose owner no longer exists reports the failed disposal
-// to the log callback, since no caller can receive its status.
 static void a_failed_finalization_logs_one_error(void) {
   static finalization_failure_probe probe;
   memset(&probe, 0, sizeof(probe));

@@ -1,8 +1,4 @@
-// The snapshot generation that every map event carries: a command's events
-// reach their handler before its completion with the generation it reports, in
-// queue mode and in callback mode, a state event
-// follows a snapshot that already includes its change, and one map's events
-// arrive in non-decreasing generation order.
+// The snapshot generation that every map event carries.
 
 #include "support/style.h"
 #include "support/test_support.h"
@@ -123,7 +119,6 @@ static void record_callback_events(
   recorder_unlock();
 }
 
-// Replaces the runtime's queue handler with a callback that records each event.
 static void recorder_use_callbacks(mln_runtime runtime) {
   recorder_lock();
   recorder.callbacks = true;
@@ -272,9 +267,6 @@ static void assert_range_carries_generation(
   }
 }
 
-// A command's events reach the handler before its completion runs, all with
-// the generation the completion reports. Events raised before a command carry a
-// lower generation.
 static void assert_command_events_precede_completion(bool callbacks) {
   mln_runtime runtime = mln_test_create_runtime();
   recorder_reset(runtime, false);
@@ -323,19 +315,14 @@ static void assert_command_events_precede_completion(bool callbacks) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A queue holds a command's events when its completion runs.
 static void a_command_queues_its_events_before_it_completes(void) {
   assert_command_events_precede_completion(false);
 }
 
-// An event callback has returned from a command's events when its completion
-// runs.
 static void a_command_calls_back_with_its_events_before_it_completes(void) {
   assert_command_events_precede_completion(true);
 }
 
-// A command that runs and fails still publishes, and the failure event it
-// raised carries the generation its completion reports.
 static void a_failed_command_reports_the_generation_of_its_events(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -388,10 +375,6 @@ static bool animated_change_recorded(void* context) {
   );
 }
 
-// A state event follows the snapshot that includes its change. When the eased
-// camera reports its final change the snapshot is at the target zoom, and when
-// the map reports that it finished loading or went idle the snapshot is fully
-// loaded.
 static void state_events_follow_a_snapshot_that_includes_them(void) {
   static const double target_zoom = 5.0;
   mln_runtime_options runtime_options = {.size = sizeof(mln_runtime_options)};

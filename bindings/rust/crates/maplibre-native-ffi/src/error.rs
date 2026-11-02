@@ -172,8 +172,6 @@ mod tests {
             assert_eq!(error.diagnostic(), "failed");
         }
 
-        // A status this binding predates keeps its code rather than folding
-        // into a known one.
         let error = failing_call(-123_456, b"future status\0");
         assert_eq!(error.status(), Status::Unknown(-123_456));
         assert_eq!(error.status().as_raw(), -123_456);
@@ -183,12 +181,10 @@ mod tests {
 
     #[test]
     fn a_diagnostic_is_bounded_by_its_capacity_and_empty_when_none_was_written() {
-        // A message that fills the buffer with no terminator ends at capacity.
         let capacity = DIAGNOSTIC_MESSAGE_CAPACITY;
         let error = failing_call(sys::MLN_STATUS_INVALID_STATE, &vec![b'x'; capacity]);
         assert_eq!(error.diagnostic(), "x".repeat(capacity));
 
-        // Bytes that are not UTF-8 are replaced, not dropped.
         let error = failing_call(sys::MLN_STATUS_INVALID_STATE, b"bad \xff byte\0");
         assert_eq!(error.diagnostic(), "bad \u{fffd} byte");
 

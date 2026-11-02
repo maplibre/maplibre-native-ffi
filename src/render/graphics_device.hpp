@@ -41,9 +41,8 @@ struct HandleTraits<GraphicsDeviceObject> {
   static constexpr auto leasable = true;
 };
 
-// Creates the device of this build's backend from validated options. Each
-// backend defines it; a build whose backend creates no device reports
-// MLN_STATUS_UNSUPPORTED.
+// Each backend defines this, and gets validated options. A backend that
+// creates no device reports MLN_STATUS_UNSUPPORTED.
 auto create_backend_graphics_device(
   const mln_graphics_device_options& options,
   std::shared_ptr<GraphicsDevice>& out_device

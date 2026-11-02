@@ -78,8 +78,6 @@ else()
       "and a browser module renders with webgpu or opengl")
 endif()
 
-# Links [target] from the addon's sources, the archives, and emnapi into an ES
-# module factory and its .wasm.
 function(mln_ffi_browser_module target)
   set_target_properties(${target} PROPERTIES SUFFIX ".mjs")
   target_include_directories(

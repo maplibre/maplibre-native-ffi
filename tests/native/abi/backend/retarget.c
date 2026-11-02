@@ -1,8 +1,4 @@
-// Retargeting a session: a borrowed texture or surface that the host replaces
-// through its backend's set_target, which sizes the map to the replacement,
-// and the replacements a session refuses. Every refusal leaves the session
-// rendering into its old target. A session can also release its target and
-// keep its renderer until set_target hands over the next one.
+// Replacing and releasing a session's target.
 //
 // The targets come from tests/graphics for the preset's backend, so the
 // browser presets, whose canvases JavaScript owns, have no cases here.
@@ -45,10 +41,9 @@ static void restore_fixture_context(const mln_test_render_fixture* fixture) {
 #endif
 }
 
-// A surface replacement leaves the new surface configured for the session. A
-// Metal layer reports the drawable size the session gave it, so the case first
-// shrinks the layer tests/graphics sized; the other backends' surfaces report
-// nothing a host can read.
+// A Metal layer reports the drawable size the session gave it, so the case
+// first shrinks the layer tests/graphics sized; the other backends' surfaces
+// report nothing a host can read.
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 typedef struct layer_size {
   double width;
@@ -105,8 +100,7 @@ static void finish(
   mln_test_completion_destroy(completion);
 }
 
-// Repaints the red style's background blue, with no transition, so the next
-// frame shows the change.
+// No transition, so the next frame shows the change.
 static void paint_background_blue(mln_map map) {
   MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("bg"),
@@ -119,7 +113,6 @@ static void paint_background_blue(mln_map map) {
   ));
 }
 
-// Renders one frame and returns its disposition.
 static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint32_t flags
 ) {
@@ -250,7 +243,6 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the texture replacement");
 
-  // The frame after the swap lands in the replacement alone.
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
   TEST_ASSERT_EQUAL_UINT32(
@@ -386,9 +378,8 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
   close_map(&map);
 }
 
-// No frame published before a replacement can be acquired, not even one that
-// a demand queued ahead of the replacement renders into a texture it
-// replaces. Driver service runs the demand and replacement in queue order.
+// Driver service runs the demand and the replacement in queue order, so the
+// demand renders into a texture that the replacement retires.
 static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   retarget_map map = {0};
   open_borrowed_ring(&map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
@@ -432,7 +423,6 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
 
-  // The first frame after the replacement lands in a new texture.
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
   TEST_ASSERT_EQUAL_UINT32(
@@ -499,9 +489,6 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   close_map(&map);
 }
 
-// A replacement sizes the map to its own extent, so the first frame after it
-// renders, or presents through a new surface, without the host resizing the
-// map.
 static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   enum { width = 48, height = 40 };
   retarget_map map = {0};
@@ -562,7 +549,6 @@ static void a_surface_retarget_sizes_the_map(void) {
   a_retarget_sizes_the_map_to_the_new_target(TARGET_SURFACE);
 }
 
-// Where a replacement comes from.
 enum target_origin {
   // The graphics object the session attached with.
   ORIGIN_SESSION,
@@ -624,7 +610,6 @@ typedef struct replacement {
 // MTLPixelFormatRGBA8Unorm, where tests/graphics makes BGRA8Unorm textures.
 enum { metal_rgba8_unorm = 70 };
 
-// Makes a render-target texture in RGBA order on the session's device.
 static void* new_rgba_texture(const mln_test_render_fixture* fixture) {
   mln_test_graphics_context context = {0};
   TEST_ASSERT_TRUE(mln_test_graphics_get_context(
@@ -703,8 +688,6 @@ static void release_replacement(replacement* made) {
   }
 }
 
-// The session still renders into the target it had: its next frame, of a new
-// color, lands there.
 static void expect_old_target_rendering(
   const refusal_row* row, retarget_map* map
 ) {
@@ -723,7 +706,6 @@ static void expect_old_target_rendering(
   }
 }
 
-// Hands the session a Metal texture that tests/graphics did not make.
 static mln_status submit_metal_texture(
   const mln_test_render_fixture* fixture, void* texture,
   const mln_test_completion* completion
@@ -803,7 +785,6 @@ static void refused_retargets_leave_the_old_target_rendering(void) {
   }
 }
 
-// Runs a target release to completion and expects `expected`.
 static void release_target(
   const mln_test_render_fixture* fixture, mln_status expected
 ) {
@@ -817,9 +798,6 @@ static void release_target(
   finish(fixture, &completion, expected, "the release");
 }
 
-// Once a release completes, the host may destroy the target, and the session
-// renders nothing until set_target hands over another target, which the next
-// frame renders into.
 static void a_released_target_can_be_destroyed_before_the_next(
   enum target_kind kind
 ) {
@@ -915,7 +893,6 @@ static void a_released_surface_can_be_destroyed_before_the_next(void) {
   a_released_target_can_be_destroyed_before_the_next(TARGET_SURFACE);
 }
 
-// One point at the center of the map, drawn as a circle.
 static const char center_point_style_json[] =
   "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\",\"data\":"
   "{\"type\":\"Feature\",\"properties\":{},"
@@ -928,9 +905,6 @@ static bool renders_one_feature(void* context) {
   return list.status == MLN_STATUS_OK && list.count == 1;
 }
 
-// The renderer outlives the target: what it rendered stays queryable while no
-// target is set, and a resize meanwhile applies to the map alone. A detach
-// tears down a session that holds no target.
 static void a_released_target_keeps_the_renderer(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -971,8 +945,6 @@ static void a_released_target_keeps_the_renderer(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A demand waiting for a map update finishes when the target goes, rather than
-// waiting for an update that no target can take.
 static void a_release_finishes_a_waiting_demand(void) {
   retarget_map map = {0};
   open_map(TARGET_BORROWED, &map);
@@ -1004,9 +976,6 @@ static void a_release_finishes_a_waiting_demand(void) {
   close_map(&map);
 }
 
-// A session-owned ring has no target of the host's to release. A borrowed
-// ring refuses a release while the host holds one of its frames, and once the
-// release is accepted, no frame rendered before it can be acquired.
 static void releases_that_a_ring_refuses(void) {
   retarget_map owned = {0};
   open_map(TARGET_OWNED, &owned);

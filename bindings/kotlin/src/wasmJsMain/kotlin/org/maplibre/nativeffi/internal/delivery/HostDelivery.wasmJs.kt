@@ -34,7 +34,6 @@ internal actual object HostDelivery {
     }
   }
 
-  /** Handles one wake of the queue: runs what native has queued so far. */
   fun wake() {
     contain("mln_wake_callback", Unit) { dispatch() }
   }

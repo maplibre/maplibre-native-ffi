@@ -11,7 +11,6 @@ export interface Language {
   lang: string;
   /** The file name each snippet shows in its header. */
   title: string;
-  /** The language's logo. */
   logo: string;
 }
 

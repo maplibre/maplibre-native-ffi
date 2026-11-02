@@ -96,7 +96,6 @@ def symbols(bound: BoundApi) -> docs.Symbol:
 
 def _symbols(bound: BoundApi) -> docs.Symbol:
     values = Values(bound)
-    # Each union, with the record and field that hold it.
     unions = {
         field.value.native: (value, field)
         for value in bound.public_values.values()

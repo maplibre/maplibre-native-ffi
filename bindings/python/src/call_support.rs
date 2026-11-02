@@ -11,7 +11,6 @@ struct GeneratedCall<'py> {
 }
 
 impl<'py> GeneratedCall<'py> {
-    /// Keeps converted inputs alive through the native call.
     fn new(py: Python<'py>) -> Self {
         Self {
             py,
@@ -19,7 +18,6 @@ impl<'py> GeneratedCall<'py> {
         }
     }
 
-    /// Makes a call that returns a status.
     unsafe fn status(
         &mut self,
         call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status,
@@ -53,7 +51,6 @@ impl<'py> GeneratedCall<'py> {
         Ok(present)
     }
 
-    /// Makes a call that returns a value or nothing.
     unsafe fn run<R>(&mut self, call: impl FnOnce() -> R) -> R {
         // SAFETY: the caller upholds the native call contract.
         unsafe { generated_native_call(self.py, call) }
@@ -84,7 +81,6 @@ impl<'py> GeneratedCall<'py> {
         Ok(self.py.None())
     }
 
-    /// Submits an operation whose completion `convert` copies.
     unsafe fn complete<C>(
         &mut self,
         submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
@@ -247,7 +243,6 @@ fn generated_report_panic(payload: Box<dyn std::any::Any + Send>) {
     });
 }
 
-/// Reports an exception that a callback raised to `sys.unraisablehook`.
 fn generated_report_unraisable(py: Python<'_>, error: PyErr) {
     error.write_unraisable(py, None);
 }
@@ -280,8 +275,6 @@ fn generated_json(py: Python<'_>, view: sys::mln_buffer_view) -> PyResult<Py<PyA
     Ok(py.import("json")?.call_method1("loads", (text,))?.unbind())
 }
 
-/// Copies a byte view into Python bytes.
-///
 /// # Safety
 ///
 /// A nonempty view must address readable bytes.

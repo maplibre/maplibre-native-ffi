@@ -303,7 +303,6 @@ class NativeShims:
                 )
             )
         result = self.classify(function.return_type)
-        # C returns no array.
         assert not isinstance(result, Array)
         if isinstance(result, Record):
             parameters.append(
@@ -988,7 +987,6 @@ class NativeShims:
             + " * arguments that the trampoline copied into 8-byte slots.\n"
             + " */\n"
             + "internal object DispatchedUpcalls {\n"
-            + "  /** Runs the site numbered [site] with the slots at [arguments]. */\n"
             + "  fun run(site: Int, arguments: Long) {\n"
             + "    when (site) {\n"
             + "\n".join(branches)

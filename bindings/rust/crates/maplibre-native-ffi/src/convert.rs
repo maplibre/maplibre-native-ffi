@@ -29,7 +29,6 @@ pub(crate) trait FromNative<N>: Sized {
     unsafe fn from_native(native: N) -> Result<Self>;
 }
 
-/// Converts `value` for one call.
 pub(crate) fn to_native<N, T: ToNative<N> + ?Sized>(
     value: &T,
     arena: &mut InputArena,
@@ -251,14 +250,12 @@ pub(crate) unsafe fn present<M: Presence, N, T: FromNative<N>>(
     unsafe { T::from_native(native) }.map(Some)
 }
 
-/// Sets `bit` in `mask` for a true flag.
 pub(crate) fn set_flag<M: Presence>(mask: &mut M, bit: M, value: bool) {
     if value {
         mask.mark(bit);
     }
 }
 
-/// A length as a C count field.
 pub(crate) fn count<C: TryFrom<usize>>(length: usize) -> Result<C> {
     C::try_from(length).map_err(|_| Error::invalid_argument("input exceeds native count range"))
 }
@@ -300,7 +297,6 @@ fn length(count: impl TryInto<usize>) -> Result<usize> {
         .map_err(|_| Error::invalid_argument("native count exceeds the address space"))
 }
 
-/// Converts a slice into a C array that `arena` owns.
 pub(crate) fn array<N: 'static, T: ToNative<N>>(
     values: &[T],
     arena: &mut InputArena,
@@ -312,7 +308,6 @@ pub(crate) fn array<N: 'static, T: ToNative<N>>(
     Ok(arena.array(values))
 }
 
-/// Converts one value into a C pointer that `arena` owns.
 pub(crate) fn reference<N: 'static, T: ToNative<N> + ?Sized>(
     value: &T,
     arena: &mut InputArena,
@@ -321,7 +316,6 @@ pub(crate) fn reference<N: 'static, T: ToNative<N> + ?Sized>(
     Ok(arena.store(value))
 }
 
-/// Converts an optional value into a C pointer, or a null pointer.
 pub(crate) fn optional_reference<N: 'static, T: ToNative<N> + ?Sized>(
     value: Option<&T>,
     arena: &mut InputArena,

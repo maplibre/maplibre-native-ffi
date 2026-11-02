@@ -35,7 +35,6 @@ static void options_reject_unknown_event_mask_bits(void) {
   MLN_TEST_INVALID(mln_test_map_create_status(runtime, &map_options, &bad_map));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_map);
 
-  // The same value the setter rejects, so the two agree.
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_INVALID(
     mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_FLAG_ALL | unknown)
@@ -66,8 +65,6 @@ static void options_without_an_event_mask_select_every_event(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Clearing one bit leaves every other type arriving, which separates
-// suppression from a broken producer.
 // The fixture runtime sets its handler with a discarded command just before
 // this case creates the map. The handler still receives the camera event that
 // the map's construction raises.
@@ -127,8 +124,6 @@ static void count_map_sourced(const mln_runtime_event* event, void* context) {
   }
 }
 
-// Closing a source prevents future publication without rewriting history that
-// is already queued.
 static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -161,7 +156,6 @@ static void count_loading_failure(
   }
 }
 
-// Each failure event carries its own message.
 static void each_event_carries_its_message(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map first = mln_test_create_map(runtime);
@@ -188,8 +182,6 @@ static void each_event_carries_its_message(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The masks change from any thread, and the runtime setter rejects unknown
-// bits but keeps the other group's.
 static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -207,8 +199,6 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
     MLN_TEST_OK(probe.runtime_mask_status);
     MLN_TEST_OK(probe.map_mask_status);
 
-    // Both setters accept MLN_RUNTIME_EVENT_FLAG_ALL, and the map reports it
-    // back whole.
     uint64_t map_mask = 0;
     MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
     TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_FLAG_ALL, map_mask);
@@ -221,8 +211,7 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
       mln_runtime_set_event_mask(runtime, unknown_mask_bit, NULL)
     );
 
-    // One in-group bit for the other source kind, which the setter accepts and
-    // reports back unchanged.
+    // One in-group bit for the other source kind.
     uint64_t runtime_mask = 0;
     MLN_TEST_OK(mln_runtime_set_event_mask(
       runtime, MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED, NULL
@@ -344,8 +333,6 @@ static void release_event_context(void* context) {
   received->releases += 1;
 }
 
-// A callback host copies events during the call and owns rejected contexts.
-// Clear retires accepted callback state before its completion.
 static void callback_event_state_retires_after_its_last_event(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

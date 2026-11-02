@@ -5381,7 +5381,6 @@ func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5414,7 +5413,6 @@ func adoptGeoJsonSourceDataHandle(raw uint64, parent any) *GeoJsonSourceDataHand
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *GeoJsonSourceDataHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5447,7 +5445,6 @@ func adoptGraphicsDeviceHandle(raw uint64, parent any) *GraphicsDeviceHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *GraphicsDeviceHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5480,7 +5477,6 @@ func adoptMapHandle(raw uint64, parent any) *MapHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *MapHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5512,7 +5508,6 @@ func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *MapProjectionHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5545,7 +5540,6 @@ func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *RenderSessionHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5578,7 +5572,6 @@ func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *ResourceRequestHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5611,7 +5604,6 @@ func adoptResourceTransformRequestHandle(raw uint64, parent any) *ResourceTransf
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *ResourceTransformRequestHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5644,7 +5636,6 @@ func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *RuntimeHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -5676,7 +5667,6 @@ func adoptStyleExpressionHandle(raw uint64, parent any) *StyleExpressionHandle {
 	return owner
 }
 
-// owner returns the handle's owner state, or nil for a nil handle.
 func (handle *StyleExpressionHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil

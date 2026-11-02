@@ -1,9 +1,7 @@
-/** A style with no sources and no layers. */
 export function emptyStyle(): object {
   return { version: 8, sources: {}, layers: [] };
 }
 
-/** A style with one background layer of a solid color. */
 export function backgroundStyle(color = "#ff0000"): object {
   return {
     version: 8,

@@ -47,8 +47,6 @@ function(mln_ffi_apple_is_maccatalyst out_var)
   endif()
 endfunction()
 
-# Whether the target uses an embedded Apple SDK rather than macOS or Mac
-# Catalyst.
 function(mln_ffi_apple_is_embedded out_var)
   mln_ffi_apple_is_maccatalyst(maccatalyst)
   if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$" AND NOT maccatalyst)

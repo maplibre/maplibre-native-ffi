@@ -1,13 +1,7 @@
 // What the Vulkan driver does with the host's device and queue. Vulkan is the
 // one backend that checks a context the submission accepted once the driver
 // has it: the other backends reject a bad descriptor at submission or cannot
-// fail after it. And a session shares its device with the host, so it waits on
-// its own queue and never on the whole device, and a host that shares the
-// queue with it gives it a lock that it takes around each call on the queue.
-// Abandon destroys every object that the session created on the device that
-// it can, after it drains the session's queue, and reports how many it keeps.
-// Detach destroys a borrowed ring's objects even when a slot is quarantined,
-// since the slot's image is the host's.
+// fail after it.
 
 #include <vulkan/vulkan_core.h>
 
@@ -16,8 +10,6 @@
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
-// A failed attach still published its session, which the host owns: it
-// abandons and destroys the session, and the map's session slot comes back.
 static void a_failed_attach_still_owns_the_session_it_published(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -262,10 +254,7 @@ static void assert_drained_own_queue(vulkan_observer* observer) {
   TEST_ASSERT_EQUAL_UINT(0, atomic_load(&observer->device_waits));
 }
 
-// Two sessions given one queue each call through the device functions their
-// own context resolved, so a host that interposes on those functions sees only
-// its own session, even while another session shares the queue. A host
-// compositor may submit on its own queue while a session renders, so a
+// A host compositor may submit on its own queue while a session renders, so a
 // session's teardown never waits on the whole device, which would need every
 // queue: it drains its own queue instead.
 static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
@@ -388,7 +377,6 @@ static void submit_until_stopped(void* argument) {
   }
 }
 
-// Resets the shared lock and returns a queue lock on it for a session.
 static mln_queue_lock reset_shared_lock(void) {
   atomic_store(&shared_lock.next_ticket, 0);
   atomic_store(&shared_lock.serving, 0);
@@ -404,11 +392,6 @@ static mln_queue_lock reset_shared_lock(void) {
   };
 }
 
-// A host that submits on the session's queue passes a lock, and the session
-// holds it around every call on the queue, its teardown drain included, so
-// both can use one queue at once. A C API call from the lock callback returns
-// an invalid-state status. The lock's release runs once the session is
-// destroyed.
 static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   observer_reset(&first_observer);
   const mln_queue_lock queue_lock = reset_shared_lock();
@@ -826,11 +809,6 @@ static void abandon_destroying_everything(mln_render_session session) {
   assert_no_live_objects();
 }
 
-// Abandon destroys a session's device objects, so the host may destroy its
-// device once abandon returns. It drains the queue before it destroys any of
-// them, and holds the host's queue lock only around the drain's submission,
-// never across a wait. It then releases the lock: the lock is given back as
-// often as it was taken, and its release has run.
 static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   counter_reset();
   const mln_queue_lock queue_lock = reset_shared_lock();
@@ -871,10 +849,9 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A session-owned ring that the host holds no frame of belongs to the session
-// alone, so abandon destroys it with the rest. That includes a ring whose
-// frame the host released just before abandon, whether or not the driver has
-// run the release yet: CPU_COMPLETE attests that the host's GPU read is done.
+// The ring counts as the session's alone even when the host released its frame
+// just before abandon and the driver has not run the release yet:
+// CPU_COMPLETE attests that the host's GPU read is done.
 static void abandon_destroys_an_owned_texture_ring(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();
@@ -920,9 +897,8 @@ static void abandon_destroys_a_surface_swapchain(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A frame disposed without consumer synchronization quarantines its slot. The
-// slot's image belongs to the host, so detach still destroys every object the
-// session created, and the host may then destroy its device.
+// The quarantined slot's image belongs to the host, so detach still destroys
+// every object the session created.
 static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();

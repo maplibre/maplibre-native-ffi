@@ -174,7 +174,6 @@ function(mln_ffi_node_module target)
   endif()
 endfunction()
 
-# The shipped module: the binding runtime over the C API.
 add_library(maplibre_native_ffi MODULE ${MLN_FFI_SOURCES})
 mln_ffi_node_module(maplibre_native_ffi)
 # The source headers come first, for the binding runtime header that the

@@ -138,7 +138,6 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   void* shared_timeline_ = nullptr;
   std::vector<std::pair<void*, vk::UniqueSemaphore>> imported_timelines_;
 
-  // Submits a wait on `semaphore`, signaling `fence`.
   void submit_wait(
     vk::Semaphore semaphore, const void* timeline, vk::Fence fence
   );

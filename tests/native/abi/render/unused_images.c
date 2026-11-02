@@ -25,7 +25,6 @@ static void supply(mln_map map, const char* id, bool keep_unused) {
   image.stride = 4;
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
-  // An image that the host does not keep leaves keep_unused absent.
   mln_style_image_options options = {.size = sizeof(mln_style_image_options)};
   if (keep_unused) {
     options.fields = MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
@@ -72,7 +71,6 @@ static void reduce_memory_use(
   MLN_TEST_OK(mln_test_render_still_image(fixture, map));
 }
 
-// An unused image stays only while its current options ask to keep it.
 static void only_images_set_with_keep_unused_survive_when_unused(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
@@ -89,12 +87,10 @@ static void only_images_set_with_keep_unused_survive_when_unused(void) {
   supply(map, "dropped-icon", false);
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
 
-  // While a tile uses them, a reduction drops neither.
   reduce_memory_use(map, &fixture);
   TEST_ASSERT_TRUE(has_image(map, "kept-icon"));
   TEST_ASSERT_TRUE(has_image(map, "dropped-icon"));
 
-  // Pointing both icons at another image lays the tile out again without them.
   supply(map, "other-icon", false);
   set_icon_image(map, "kept", "other-icon");
   set_icon_image(map, "dropped", "other-icon");

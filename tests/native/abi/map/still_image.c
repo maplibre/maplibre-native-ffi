@@ -1,9 +1,4 @@
-// Still images: a static or tile map renders one on request through a frame
-// demand of its own on its render session, which resizes between them. The
-// demand outlasts barriers and detachment until the image renders, and never
-// replaces a host demand or is replaced by one. A map in another mode refuses
-// the request, only one request is pending at a time, and closing the map
-// cancels the pending one.
+// Still images that a static or tile map renders through its render session.
 
 #include "support/frames.h"
 #include "support/map.h"
@@ -41,10 +36,6 @@ static void read_center_pixel(
   mln_test_completion_destroy(&readback);
 }
 
-// Each still image renders the map as it stands when the image is taken, so a
-// second request after a style change shows the new style. The host demands
-// no frame: the request's own demand renders the image, and its one result
-// carries the still-image token.
 static void a_static_map_renders_still_images(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
@@ -86,8 +77,7 @@ static void a_static_map_renders_still_images(void) {
 }
 
 // A static or tile map publishes a render update only for a still image, so a
-// session resize applies without waiting for one. The next still image renders
-// at the new extent, and detach, which runs after the resize, completes.
+// session resize applies without waiting for one.
 static void a_tile_map_session_resizes_between_still_images(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_TILE);
@@ -197,9 +187,6 @@ static mln_render_frame_result drain_one_result(mln_render_session session) {
   return result;
 }
 
-// A request with no session attached waits for one, and the session that
-// attaches renders it. When that session detaches first, its demand ends with
-// MLN_RENDER_RESULT_TARGET_NOT_READY, and the next session renders the image.
 static void a_still_image_waits_for_the_next_session(void) {
   held_tile_map held = create_held_tile_map();
   mln_test_completion still = mln_test_completion_default(0);
@@ -231,11 +218,8 @@ static void a_still_image_waits_for_the_next_session(void) {
   destroy_held_tile_map(&held);
 }
 
-// A barrier ends the still image's demand like any other, with
-// MLN_RENDER_RESULT_NO_UPDATE, and the request submits its next demand once
-// the barrier completes. The host holds both frames of the session's ring
-// meanwhile, so each demand parks, and once the host releases one the next
-// demand renders the image without any map update to start it.
+// The host holds both frames of the session's ring, so each demand parks until
+// the host releases one.
 static void a_barrier_ends_a_still_image_demand_until_the_next(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
@@ -283,9 +267,6 @@ static void a_barrier_ends_a_still_image_demand_until_the_next(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A host demand can neither carry the still-image token nor replace the
-// still image's demand, even with the same flags, and the still image's
-// demand does not replace the host's. Both reach a result of their own.
 static void host_demands_and_a_still_image_demand_never_replace_each_other(
   void
 ) {
@@ -335,8 +316,6 @@ static void host_demands_and_a_still_image_demand_never_replace_each_other(
   destroy_held_tile_map(&held);
 }
 
-// A continuous map renders frames on demand and has no still image to give.
-// The refused request leaves the completion with the caller.
 static void a_continuous_map_refuses_a_still_image(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_CONTINUOUS);
@@ -354,8 +333,6 @@ static void a_continuous_map_refuses_a_still_image(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A second request that reaches the map worker while the first is pending
-// completes MLN_STATUS_INVALID_STATE, and closing the map cancels the first.
 static void map_close_cancels_the_pending_still_image(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);

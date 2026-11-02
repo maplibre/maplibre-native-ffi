@@ -41,7 +41,6 @@ auto next_sized_element(const std::byte*& cursor) -> const Element* {
   return element;
 }
 
-// Checks the members that routes and header rules share.
 auto check_pattern(
   const char* what, std::size_t index, std::uint32_t kinds, std::uint32_t flags,
   mln_buffer_view url

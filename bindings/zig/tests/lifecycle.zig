@@ -93,7 +93,6 @@ test "a released projection is closed and a second release or deinit does nothin
     scoped.release();
 }
 
-/// Checks a handle's `{f}` text against `template`, which formats its id.
 fn expectFormat(comptime template: []const u8, handle: anytype) !void {
     var expected: [64]u8 = undefined;
     var actual: [64]u8 = undefined;
@@ -122,9 +121,8 @@ fn countRelease(counter: *support.Counter) void {
     counter.add();
 }
 
-// Native retirement of a disposed runtime waits
-// for its live maps, so the runtime's callback registrations stay rooted until
-// the last map goes.
+// Native retirement of a disposed runtime waits for its live maps, so the
+// runtime's callback registrations stay rooted until the last map goes.
 test "a child map keeps its disposed runtime's callbacks alive" {
     var handler_releases = support.Counter{};
     var runtime = try maplibre.Runtime.create(.{}, null);

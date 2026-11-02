@@ -1,7 +1,4 @@
-// Which map changes reach the next frame. A mutation must publish a render
-// update, and a host that renders only on those updates must then see the
-// change in its pixels. A frame result reports whether the map wants another
-// frame, and whether it drew the map fully loaded.
+// Which map changes reach the next frame, and what a frame result reports.
 
 #include "support/frames.h"
 #include "support/resources.h"
@@ -146,7 +143,6 @@ static void remove_the_swatch(
   ));
 }
 
-// A layer paints from global state, so a new value repaints it.
 static void set_the_global_color(
   mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 ) {
@@ -234,9 +230,6 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
   }
 }
 
-// A frame never shows part of a command group: one rendered while the group
-// is open still shows the map from before it, though its commands have
-// committed.
 static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -517,7 +510,6 @@ typedef struct frame_seek {
   bool needs_repaint;
 } frame_seek;
 
-// Demands one frame and reports whether its result matched.
 static bool frame_matches(void* context) {
   const frame_seek* seek = context;
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
@@ -540,8 +532,8 @@ static bool frame_matches(void* context) {
   return matched;
 }
 
-// Demands frames until one result matches `seek`. Each demand waits on its
-// own result, so the loop never decides by elapsed time.
+// Each demand waits on its own result, so the loop never decides by elapsed
+// time.
 static void demand_until(frame_seek seek, const char* what) {
   const mln_test_deadline deadline = mln_test_deadline_default();
   while (!frame_matches(&seek)) {
@@ -549,8 +541,6 @@ static void demand_until(frame_seek seek, const char* what) {
   }
 }
 
-// A settled static map reports no repaint, and a running paint transition
-// asks for another frame from every rendered one.
 static void frame_results_report_whether_the_map_needs_another_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -625,8 +615,6 @@ static mln_render_frame_result render_forced(
   return result;
 }
 
-// A frame drawn while a tile it needs is loading is partial, and a frame
-// drawn once the tile has loaded is full.
 static void frame_results_report_whether_the_map_was_fully_loaded(void) {
   mln_test_provider* provider = mln_test_provider_create(held_tile, 1);
   mln_runtime runtime = mln_test_create_runtime();
@@ -703,7 +691,6 @@ static bool capture_drawn_frame(const mln_runtime_event* event, void* context) {
   return true;
 }
 
-// A frame that draws reports its draws, and counts itself among the frames.
 static void a_drawn_frame_reports_its_statistics(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

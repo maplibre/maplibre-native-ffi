@@ -273,7 +273,6 @@ internal object TestGraphics {
       TestBackend.WEBGPU -> backendTextureSize(frame)
     }
 
-  /** A Metal owned texture of [extent] on [context]'s device. */
   fun metalOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
     MetalOwnedTextureDescriptor(
       extent,
@@ -283,7 +282,6 @@ internal object TestGraphics {
       commandQueue = NativePointer.NULL_POINTER,
     )
 
-  /** A Vulkan owned texture of [extent] on [context]'s device. */
   fun vulkanOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
     VulkanOwnedTextureDescriptor(
       extent,
@@ -298,7 +296,6 @@ internal object TestGraphics {
       ),
     )
 
-  /** A WebGPU owned texture of [extent] on [context]'s device. */
   fun webGpuOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
     WebGpuOwnedTextureDescriptor(
       extent,

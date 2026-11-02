@@ -37,7 +37,6 @@ struct RequestHeader {
   bool sensitive = false;
 };
 
-// The reply headers that a Response takes.
 struct ReplyHeaders {
   std::optional<std::string> etag;
   std::optional<std::string> modified;

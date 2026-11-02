@@ -175,7 +175,6 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
       expectedBackend.set(backend.id)
     }
 
-  // The binding project checks the local build of each ABI before it packages the libraries.
   tasks.configureEach {
     if (name == "preAndroidMainBuild" || name == "mergeAndroidMainJniLibFolders") {
       dependsOn(verifyBackend, ":bindings:kotlin:packageAndroidRuntimeLibraries")

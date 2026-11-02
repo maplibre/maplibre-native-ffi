@@ -69,7 +69,6 @@ static inline bool mln_test_tile_info_is_zero(
 // call. Tests pass MLN_TEST_DIAGNOSTIC to direct calls whose message they read.
 mln_diagnostic* mln_test_diagnostic(void);
 #define MLN_TEST_DIAGNOSTIC mln_test_diagnostic()
-// The message the latest call that wrote the test diagnostic left behind.
 const char* mln_test_last_error(void);
 
 // These helpers track what they create per calling thread so the suite can
@@ -138,8 +137,7 @@ void mln_test_temp_path(const char* name, char* out_path, size_t capacity);
 // the file cannot be read.
 uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size);
 
-// Opaque host thread used by tests that need a second native thread. Each one
-// releases its cached graphics device before it exits.
+// Each host thread releases its cached graphics device before it exits.
 typedef struct mln_test_thread mln_test_thread;
 
 mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument);

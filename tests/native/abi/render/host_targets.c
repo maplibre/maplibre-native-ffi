@@ -23,8 +23,6 @@
 #include "support/test_support.h"
 
 #if !defined(__EMSCRIPTEN__)
-// Renders one frame of the map's style with `flags`, and returns that frame's
-// disposition.
 static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint64_t token, uint32_t flags
 ) {
@@ -133,11 +131,6 @@ static uint32_t acquire_ring_frame(
   return slot;
 }
 
-// A borrowed ring hands each rendered frame to the host through acquisition,
-// naming the host's texture for the frame's slot, and never renders into a
-// texture whose frame the host holds: with every frame held, a demand waits
-// for a release. The ring belongs to its owner, so the session reads nothing
-// back and refuses a resize.
 static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -245,10 +238,6 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
-// A queue-ordered frame is acquirable once submitted. The host reads its
-// texture on the queue that it shares with the session, with no wait of its
-// own, and releases the frame in queue order, after which the session renders
-// into the slot again.
 static void queue_ordered_frames_share_the_hosts_queue(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -318,8 +307,6 @@ static void queue_ordered_frames_share_the_hosts_queue(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A queue-ordered owned ring rebuilds its textures at a new size once the
-// queue it shares with the host has finished with the old ones.
 static void a_queue_ordered_ring_resizes_after_the_hosts_reads(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -373,11 +360,6 @@ static void a_queue_ordered_ring_resizes_after_the_hosts_reads(void) {
 #define TIMELINES_REQUIRED 1
 #endif
 
-// A timeline frame is acquirable once submitted: the session signals its
-// semaphore after the frame, and the host waits for the frame's value before
-// it reads. The host releases the frame with its own timeline, and the
-// session's next frame waits until the host signals it. A device without
-// timelines refuses them.
 static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -473,7 +455,6 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT64(produced, producer.handle);
   TEST_ASSERT_GREATER_THAN_UINT64(first_value, producer.value);
-  // The second frame waits for the host's semaphore.
   TEST_ASSERT_EQUAL_INT(
     0, mln_test_graphics_vulkan_timeline_wait(
          graphics, produced, producer.value, 0
@@ -506,8 +487,6 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-// A ring whose image goes to another owner between frames hands each frame
-// over, and the session takes the image back to render into it again.
 static void vulkan_images_go_to_their_owner_between_frames(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -556,11 +535,6 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
 #define SYNC_FILES_REQUIRED 0
 #endif
 
-// Sync files hand frames over where the driver supports them, and a target
-// whose driver does not refuses them. The host polls the producer's file
-// before it reads, and releases with a duplicate of it, which the session
-// takes, or with -1, a fence that has signaled. A release the session refuses
-// leaves the host its file.
 static void sync_files_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -653,12 +627,8 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
 // semaphores. Under Wine, winevulkan shares them over a hardware driver.
 #define D3D12_FENCES_REQUIRED 0
 
-// A D3D12 fence frame is acquirable once submitted: the session signals its
-// fence after the frame, and the host waits for the frame's value before it
-// reads. The host releases the frame with its own fence, and the session's
-// next frame waits until the host signals it. The host opens each fence's
-// handle as a timeline semaphore of its own device, as D3D12 would open it as
-// an ID3D12Fence. A driver without D3D12 fences refuses them.
+// The host opens each fence's handle as a timeline semaphore of its own
+// device, as D3D12 would open it as an ID3D12Fence.
 static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -754,7 +724,6 @@ static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
   MLN_TEST_OK(mln_acquired_frame_get_producer_sync(second, &producer, NULL));
   TEST_ASSERT_EQUAL_UINT64(produced_handle, producer.handle);
   TEST_ASSERT_GREATER_THAN_UINT64(first_value, producer.value);
-  // The second frame waits for the host's fence.
   TEST_ASSERT_EQUAL_INT(
     0, mln_test_graphics_vulkan_timeline_wait(
          graphics, produced, producer.value, 0
@@ -800,11 +769,7 @@ static bool event_reached(void* context) {
          target->value;
 }
 
-// A shared event frame is acquirable once committed: the session signals its
-// event after the frame, and the host waits for the frame's value before it
-// reads. The host releases the frame with its own event, and the session's
-// next frame waits until the host signals it. Metal, MoltenVK, and ANGLE all
-// hand frames over this way.
+// Metal, MoltenVK, and ANGLE all hand frames over this way.
 static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -877,7 +842,6 @@ static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
   );
   TEST_ASSERT_GREATER_THAN_UINT64(produced.value, producer.value);
   produced.value = producer.value;
-  // The second frame waits for the host's event.
   TEST_ASSERT_FALSE(event_reached(&produced));
   mln_test_graphics_metal_shared_event_signal(consumed, release_value);
   TEST_ASSERT_TRUE(mln_test_await(
@@ -1015,9 +979,6 @@ static void owned_opengl_frames_support_gpu_fences(void) {
 }
 #endif
 
-// A surface presents the frames it renders and reads none back. A resize
-// reaches the host's surface, so the next frame, which presents nothing,
-// renders at the new extent.
 static void a_surface_presents_frames_and_takes_a_resize(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1057,9 +1018,8 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-// A replacement surface may carry a new scale factor. The renderer bakes the
-// pixel ratio into its shaders, so the session rebuilds it and renders at the
-// new ratio.
+// The renderer bakes the pixel ratio into its shaders, so a new scale factor
+// makes the session rebuild it.
 static void a_surface_replacement_can_change_the_scale_factor(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

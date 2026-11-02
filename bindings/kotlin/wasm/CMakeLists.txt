@@ -79,9 +79,6 @@ else()
       "and a browser module renders with webgpu or opengl")
 endif()
 
-# Links the module [target] as [output].mjs from the binding's sources and its
-# graphics library, the C files in SOURCES, and the JavaScript libraries in
-# JS_LIBRARIES.
 function(mln_kw_module target output)
   cmake_parse_arguments(PARSE_ARGV 2 MODULE "" "" "SOURCES;JS_LIBRARIES")
   add_executable(

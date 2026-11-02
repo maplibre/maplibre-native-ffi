@@ -35,7 +35,6 @@ internal static unsafe class NativeCompletion
         return *(T*)result->value;
     }
 
-    /// <summary>Copies each element of the result's array, which native lays out value_size bytes apart.</summary>
     internal static T[] Values<T>(mln_completion_result* result)
         where T : unmanaged
     {
@@ -62,16 +61,13 @@ internal static unsafe class NativeCompletion
         return values;
     }
 
-    /// <summary>Copies the one value of a result.</summary>
     internal static T Single<TNative, T>(mln_completion_result* result, Func<TNative, T> copy)
         where TNative : unmanaged => copy(Value<TNative>(result));
 
-    /// <summary>Copies the value of a result that may hold none.</summary>
     internal static T? Optional<TNative, T>(mln_completion_result* result, Func<TNative, T?> copy)
         where TNative : unmanaged
         where T : class => result->value_count == 0 ? null : copy(Value<TNative>(result));
 
-    /// <inheritdoc cref="Optional{TNative, T}"/>
     internal static T? OptionalValue<TNative, T>(
         mln_completion_result* result,
         Func<TNative, T> copy
@@ -79,7 +75,6 @@ internal static unsafe class NativeCompletion
         where TNative : unmanaged
         where T : struct => result->value_count == 0 ? null : copy(Value<TNative>(result));
 
-    /// <summary>Copies each value of a result's array.</summary>
     internal static T[] Array<TNative, T>(mln_completion_result* result, Func<TNative, T> copy)
         where TNative : unmanaged
     {
@@ -90,14 +85,12 @@ internal static unsafe class NativeCompletion
         return copied;
     }
 
-    /// <summary>Copies each value of a result's array, which may be absent.</summary>
     internal static T[]? OptionalArray<TNative, T>(
         mln_completion_result* result,
         Func<TNative, T> copy
     )
         where TNative : unmanaged => result->value == null ? null : Array(result, copy);
 
-    /// <summary>Starts a command completion, whose task holds the command's generations.</summary>
     internal static mln_completion* StartCommand(
         mln_completion* completion,
         out Pending<CommandCompletion> pending
@@ -111,7 +104,6 @@ internal static unsafe class NativeCompletion
             out pending
         );
 
-    /// <summary>Starts a completion that carries no value.</summary>
     internal static mln_completion* StartUnit(
         mln_completion* completion,
         out Pending<bool> pending

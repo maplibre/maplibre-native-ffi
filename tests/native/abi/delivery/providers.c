@@ -1,6 +1,4 @@
-// Queued resource providers: copied requests that the host completes after
-// dispatch, cancelled requests, release order, and requests that a released
-// queue fails.
+// Queued resource providers.
 
 #include <string.h>
 
@@ -74,8 +72,6 @@ static mln_resource_response style_response(void) {
   };
 }
 
-// Dispatches queue until one provider call has kept its request, and returns
-// the request's handle.
 static mln_resource_request await_request(mln_delivery_queue queue, void* tag) {
   mln_test_dispatch_until_calls(queue, 1);
   TEST_ASSERT_EQUAL_size_t(1, kept.calls);
@@ -83,8 +79,6 @@ static mln_resource_request await_request(mln_delivery_queue queue, void* tag) {
   return kept.handle;
 }
 
-// The host dispatches a copied request on its own thread, keeps its handle,
-// and completes it after the call. The style loads with the host's response.
 static void the_host_completes_a_dispatched_request_later(void) {
   static const char style_url[] = "custom://queued-provider-style.json";
   mln_test_delivery_queue queue;
@@ -98,8 +92,6 @@ static void the_host_completes_a_dispatched_request_later(void) {
 
   const mln_resource_request handle = await_request(queue.handle, &tag);
   TEST_ASSERT_EQUAL_UINT32(sizeof(mln_resource_request_info), kept.size);
-  // The copy keeps each URL NUL-terminated and leaves the absent entity tag
-  // empty.
   TEST_ASSERT_TRUE(kept.urls_terminated);
   TEST_ASSERT_EQUAL_size_t(0, kept.prior_etag_size);
   TEST_ASSERT_EQUAL_STRING(style_url, kept.requested_url);
@@ -190,9 +182,7 @@ static void ignore_cancel(void* user_data, mln_resource_request handle) {
   (void)handle;
 }
 
-// MapLibre may cancel a queued request before the host dispatches it. The
-// call still receives the handle, the host sees the cancellation, and
-// registers nothing.
+// MapLibre may cancel a queued request before the host dispatches it.
 static void a_request_cancelled_before_dispatch_reports_it(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -229,7 +219,6 @@ static void a_request_cancelled_before_dispatch_reports_it(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// Replacing a queue provider queues its release after its last request.
 static void the_release_follows_the_last_request(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -262,7 +251,6 @@ static void the_release_follows_the_last_request(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-// A refused queue delivery fails the request before native loading.
 static void a_released_queue_fails_requests(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -285,8 +273,6 @@ static void a_released_queue_fails_requests(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Releasing a queue that holds a request it has not dispatched releases its
-// handle, which fails the request instead of leaving its load waiting.
 static void releasing_a_queue_fails_its_pending_requests(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -455,7 +441,6 @@ static void routes_step_by_their_declared_size(void) {
 
 #if MLN_TEST_PLATFORM_HTTP
 
-// A callback provider that answers every request it sees with an empty style.
 static void answer_with_style(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
@@ -473,8 +458,6 @@ static void load_style(mln_runtime runtime, const char* url) {
   mln_test_destroy_map(map);
 }
 
-// Routes filter a callback provider too: a request inside them reaches the
-// callback, and one outside them loads natively from the server.
 static void routes_filter_a_callback_provider(void) {
   static const mln_test_http_route served[] = {
     {.path = "/native/style.json",
@@ -529,7 +512,6 @@ static void routes_filter_a_callback_provider(void) {
   mln_test_http_server_stop(server);
 }
 
-// A queue provider's routes decide which requests reach the queue.
 static void routes_filter_a_queue_provider(void) {
   static const mln_test_http_route served[] = {
     {.path = "/native/style.json",
@@ -586,9 +568,6 @@ static void transform_to(
   ));
 }
 
-// The host can decline a request after its dispatched call. The resource
-// transform still applies, and the request never visits the provider a second
-// time.
 static void a_dispatched_request_can_pass_through_once(void) {
   const mln_test_http_route route = {
     .path = "/rewritten.json",

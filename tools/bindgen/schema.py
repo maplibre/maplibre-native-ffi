@@ -82,7 +82,7 @@ ANNOTATION_VALUES = {
     "required": frozenset({"true"}),
 }
 
-# The same semantic vocabulary applies to all target languages.
+# Keys that every declaration kind accepts.
 COMMON_KEYS = frozenset({"ownership", "encoding", "nullable", "lifetime"})
 FUNCTION_KEYS = COMMON_KEYS | frozenset(
     {
@@ -189,7 +189,6 @@ INTEGER_RANGES = {
 
 
 def platforms(function: Function) -> frozenset[str]:
-    """The platforms where a function can do its work."""
     value = function.metadata.get("platforms")
     return frozenset(value.split(",")) if value else frozenset(PLATFORMS)
 
@@ -1370,7 +1369,6 @@ def reference_errors(api: Api) -> list[str]:
 
 
 def registration_parameters(api: Api, function: Function) -> list:
-    """The parameters that pass a callback registration record by pointer."""
     result = []
     for parameter in function.parameters:
         pointee = parameter.type.pointee
@@ -1451,7 +1449,6 @@ def absence_errors(api: Api, function: Function, context: str) -> list[str]:
 def callback_result_errors(
     typedef, value: str, key: str, enum_constants, context: str
 ) -> list[str]:
-    """Check that a callback can return `value` as its declared result."""
     signature = typedef.type.pointee
     result = signature.result
     if result is not None and result.canonical in {"bool", "_Bool"}:

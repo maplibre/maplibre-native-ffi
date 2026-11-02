@@ -1,6 +1,4 @@
-// GeoJSON sources: preparing data and validating its options, installing one
-// prepared handle on many sources, matching data to a source's options, the
-// clustering fields, and URL data served through a resource provider.
+// GeoJSON sources and the data prepared for them.
 
 #include "support/style.h"
 #include "support/test_support.h"
@@ -233,9 +231,6 @@ static const geojson_data_case geojson_data_cases[] = {
    {"a single feature"}},
 };
 
-// Preparation is synchronous and touches no runtime or map, so validation
-// reports through status and the call's diagnostic, and leaves the output
-// handle null.
 static void geojson_data_preparation_validates_documents_and_options(void) {
   for (size_t index = 0;
        index < sizeof(geojson_data_cases) / sizeof(geojson_data_cases[0]);
@@ -267,7 +262,6 @@ static void geojson_data_preparation_validates_documents_and_options(void) {
     }
   }
 
-  // A populated output handle is rejected rather than silently overwritten.
   mln_geo_json_source_data populated = prepare(EMPTY_COLLECTION, NULL);
   mln_geo_json_source_data reused = populated;
   MLN_TEST_INVALID(mln_geo_json_source_data_create(
@@ -275,9 +269,9 @@ static void geojson_data_preparation_validates_documents_and_options(void) {
   ));
   mln_geo_json_source_data_release(populated);
 
-  // Every field in range prepares. The clustering constraints belong to
-  // clustering alone, so the same data tiles fine without it, and an empty
-  // collection carries nothing to cluster, so a later update supplies them.
+  // The clustering constraints belong to clustering alone, so the same data
+  // tiles fine without it, and an empty collection carries nothing to cluster,
+  // so a later update supplies them.
   mln_geo_json_source_options options = {
     .size = sizeof(mln_geo_json_source_options)
   };
@@ -353,10 +347,6 @@ static void geojson_pixel_options_respect_the_scaled_limits(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
 }
 
-// Data prepared with every field installs on a source, and a URL source takes
-// the same options. A URL source checks the same fields: the numeric ones when
-// the call submits, and the cluster properties in the command, which parses
-// them.
 static void geojson_sources_take_and_validate_their_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -404,9 +394,8 @@ static void geojson_sources_take_and_validate_their_options(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The submit-time lease keeps the prepared index alive, so one handle serves
-// any number of sources, each of which keeps its own reference after the host
-// destroys the handle. A destroyed handle rejects new installs at submission.
+// The submit-time lease keeps the prepared index alive, so each source keeps
+// its own reference after the host destroys the handle.
 static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -427,7 +416,6 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
     draw_source(map, sources[index]);
   }
 
-  // A second destroy is a no-op, and the dead handle installs nowhere.
   mln_geo_json_source_data_release(data);
   mln_geo_json_source_data_release(MLN_HANDLE_NULL);
   mln_completion rejected = mln_test_discard_completion();
@@ -553,8 +541,6 @@ static void prepared_data_must_match_the_source_options(void) {
     mln_geo_json_source_data_release(data);
   }
 
-  // Every other option is compared too, so data that differs from the source
-  // in any one field does not match it.
   static const geojson_field_case fields[] = {
     {MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, change_cluster_max_zoom},
     {MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS, change_cluster_radius},
@@ -616,8 +602,7 @@ static void render_points(
   mln_test_destroy_runtime(runtime);
 }
 
-// The clustering fields decide which points a rendered source holds. Two
-// points 11.25 degrees apart lie 16 pixels apart at zoom 0, because GeoJSON
+// Two points 11.25 degrees apart lie 16 pixels apart at zoom 0, because GeoJSON
 // sources cluster on a fixed 512-pixel tile: a 15-pixel radius leaves them
 // apart and a 17-pixel one joins them, unless the cluster needs more points
 // than there are.
@@ -644,8 +629,6 @@ static void clustering_fields_decide_which_points_the_source_holds(void) {
   render_points(points, &options, 2, NULL);
 }
 
-// A URL source loads its data through the runtime's resource provider when it
-// is added, and again from each URL it is set to.
 static void a_url_source_loads_through_the_resource_provider(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

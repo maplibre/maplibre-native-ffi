@@ -63,7 +63,6 @@ async function httpOrigin(
   };
 }
 
-/** A queue of a realm's messages, which next() takes in order. */
 function inbox(): { push(message: unknown): void; next(): Promise<unknown> } {
   const messages: unknown[] = [];
   const waiters: ((message: unknown) => void)[] = [];

@@ -26,7 +26,6 @@ typedef struct main_thread_case {
   mln_test_render_fixture fixture;
 } main_thread_case;
 
-// Attaches a session on a main-thread device and renders a red frame into it.
 static void start_case(main_thread_case* run) {
   run->runtime = mln_test_create_runtime();
   run->map = mln_test_create_map(run->runtime);
@@ -118,10 +117,6 @@ static void service_until_delivered(
   ));
 }
 
-// The first service submits the copy and its map, then returns with the
-// readback still pending: the map cannot finish inside a call on the main
-// thread. Its callback wakes the driver, and the next service finishes the
-// readback.
 static void a_readback_serviced_on_the_main_thread_finishes_on_a_later_service(
   void
 ) {
@@ -181,9 +176,6 @@ static void assert_queued(const queued_behind* queued, size_t count) {
   }
 }
 
-// A second readback and a command queued while a readback is pending run after
-// it, in the order they were accepted, and the second readback starts only
-// once the first has finished.
 static void work_behind_a_pending_readback_runs_after_it(void) {
   main_thread_case run = {0};
   start_case(&run);
@@ -227,9 +219,6 @@ static void read_then_detach_here(void* context) {
   queued->statuses[2] = mln_render_session_detach(session, &detach, NULL);
 }
 
-// Detach waits for a pending readback instead of ending it: the readback
-// copied its frame when it started, and finishes with those pixels before the
-// detach releases the texture.
 static void a_detach_behind_a_pending_readback_waits_for_it(void) {
   main_thread_case run = {0};
   start_case(&run);
@@ -266,9 +255,8 @@ static void service_then_lose_the_device_here(void* context) {
     mln_render_session_dump_debug_logs(queued->fixture->session, &fence, NULL);
 }
 
-// Losing the device while a readback's map is pending fails the readback
-// instead of leaving it pending. WebGPU aborts the map, its callback wakes the
-// driver, and the next service fails the readback and runs the work behind it.
+// WebGPU aborts a pending map when the device is lost. Its callback wakes the
+// driver, and the next service fails the readback.
 static void losing_the_device_fails_a_pending_readback(void) {
   main_thread_case run = {0};
   start_case(&run);
@@ -320,10 +308,9 @@ static void read_then_abandon_here(void* context) {
   run->statuses[2] = mln_render_session_abandon(session, &abandoned, NULL);
 }
 
-// Abandoning the session while its readback's map is pending fails the
-// readback with MLN_STATUS_TARGET_LOST. The case checks only the completion:
-// the map's callback runs on the main thread at some point before or after the
-// case destroys the session and the device.
+// The case checks only the completion: the map's callback runs on the main
+// thread at some point before or after the case destroys the session and the
+// device.
 static void abandoning_a_pending_readback_fails_it_with_target_lost(void) {
   main_thread_case run = {0};
   start_case(&run);

@@ -15,7 +15,6 @@ import type { Addon } from "./addon.ts";
 const SCOPE = "@maplibre/native-ffi";
 const BACKENDS = ["opengl", "metal", "vulkan", "opengl-mingw", "vulkan-mingw"];
 
-/** The addon package of a backend for this platform and architecture. */
 function addonPackage(backend: string): string {
   let libc = process.platform === "linux" ? "-gnu" : "";
   // Deno publishes GNU Linux binaries; its getReport() needs --allow-sys.

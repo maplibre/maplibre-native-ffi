@@ -93,7 +93,6 @@ class SwiftEmitterTests(unittest.TestCase):
             owners.count("public var description: String { handle.description }"),
             2,
         )
-        # Only an event source's id doc names events.
         self.assertEqual(owners.count("runtime events report"), 1)
         self.assertIn("runtime events report", owners.split("class MapHandle")[1])
         self.assertIn(
