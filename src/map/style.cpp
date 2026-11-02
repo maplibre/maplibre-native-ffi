@@ -1317,6 +1317,29 @@ auto map_set_style_source_volatile(
   return MLN_STATUS_OK;
 }
 
+namespace {
+
+// Tracks the source before the style takes it, so the two cannot disagree. A
+// throw while tracking leaves no source in the style, and a style that rejects
+// the source untracks it again; either way the add failed and the caller still
+// owns user_data. Tracking afterwards would leave a live source whose release
+// never runs.
+auto add_callback_source(
+  MapObject& live, const std::string& source_id, CallbackSourceKind kind,
+  CallbackSourceRelease release, void* user_data,
+  std::unique_ptr<mln::style::Source> source
+) -> void {
+  track_callback_source(live, source_id, kind, release, user_data);
+  try {
+    map_native(live).getStyle().addSource(std::move(source));
+  } catch (...) {
+    untrack_callback_source(live, source_id);
+    throw;
+  }
+}
+
+}  // namespace
+
 auto map_add_custom_geometry_source(
   MapObject& live, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
@@ -1329,30 +1352,13 @@ auto map_add_custom_geometry_source(
   }
 
   const auto effective = effective_custom_geometry_source_options(*options);
-  // Tracked before the style takes the source, so the two cannot disagree. A
-  // throw while tracking leaves no source in the style, and a style that
-  // rejects the source untracks it again; either way the add failed and the
-  // caller still owns user_data. Tracking afterwards would leave a live source
-  // whose release never runs.
-  track_callback_source(
+  add_callback_source(
     live, id, CallbackSourceKind::CustomGeometry, effective.release_user_data,
-    effective.user_data
+    effective.user_data,
+    std::make_unique<mln::style::CustomGeometrySource>(
+      id, to_native_custom_geometry_source_options(effective)
+    )
   );
-  try {
-    style.addSource(
-      std::make_unique<mln::style::CustomGeometrySource>(
-        id, to_native_custom_geometry_source_options(effective)
-      )
-    );
-  } catch (...) {
-    // Mirrors track_callback_source()'s own early return: a source with no
-    // release callback was never tracked, so there is nothing to untrack and
-    // no entry of another source's to erase.
-    if (effective.release_user_data != nullptr) {
-      untrack_callback_source(live, id);
-    }
-    throw;
-  }
   return MLN_STATUS_OK;
 }
 
@@ -1485,30 +1491,13 @@ auto map_add_custom_vector_source(
   }
 
   const auto effective = effective_custom_vector_source_options(*options);
-  // Tracked before the style takes the source, so the two cannot disagree. A
-  // throw while tracking leaves no source in the style, and a style that
-  // rejects the source untracks it again; either way the add failed and the
-  // caller still owns user_data. Tracking afterwards would leave a live source
-  // whose release never runs.
-  track_callback_source(
+  add_callback_source(
     live, id, CallbackSourceKind::CustomVector, effective.release_user_data,
-    effective.user_data
+    effective.user_data,
+    std::make_unique<mln::style::CustomVectorSource>(
+      id, to_native_custom_vector_source_options(effective)
+    )
   );
-  try {
-    style.addSource(
-      std::make_unique<mln::style::CustomVectorSource>(
-        id, to_native_custom_vector_source_options(effective)
-      )
-    );
-  } catch (...) {
-    // Mirrors track_callback_source()'s own early return: a source with no
-    // release callback was never tracked, so there is nothing to untrack and
-    // no entry of another source's to erase.
-    if (effective.release_user_data != nullptr) {
-      untrack_callback_source(live, id);
-    }
-    throw;
-  }
   return MLN_STATUS_OK;
 }
 
@@ -2019,15 +2008,7 @@ auto map_set_style_light_property(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* light = map_native(live).getStyle().getLight();
-  if (light == nullptr) {
-    // MapLibre Native's style always holds a light, so this is an internal
-    // invariant rather than a documented outcome.
-    set_thread_error("style has no light");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-
-  auto error = light->setProperty(
+  auto error = map_native(live).getStyle().getLight()->setProperty(
     string_from_view(property_name),
     mln::style::conversion::Convertible{
       static_cast<const mln::JSValue*>(&document)
@@ -2045,15 +2026,9 @@ auto map_get_style_light_property(
   bool& out_found
 ) -> mln_status {
   out_found = false;
-  auto* light = map_native(live).getStyle().getLight();
-  if (light == nullptr) {
-    // MapLibre Native's style always holds a light, so this is an internal
-    // invariant rather than a documented outcome.
-    set_thread_error("style has no light");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-
-  const auto property = light->getProperty(string_from_view(property_name));
+  const auto property = map_native(live).getStyle().getLight()->getProperty(
+    string_from_view(property_name)
+  );
   if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
