@@ -47,7 +47,7 @@ export const languages: Language[] = [
     label: "Go",
     lang: "go",
     title: "main.go",
-    logo: devicon("go/go-original-wordmark"),
+    logo: devicon("go/go-original"),
   },
   {
     id: "kotlin",

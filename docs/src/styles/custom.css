@@ -59,8 +59,25 @@
   cursor: pointer;
 }
 
+/* A sidebar link to a language's page shows the language's logo, which the
+   site config sets as --logo. */
+.sidebar-content a[data-logo] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sidebar-content a[data-logo]::before {
+  content: "";
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  background: var(--logo) center / contain no-repeat;
+}
+
 /* Rust's logo is black. */
-:root[data-theme="dark"] .language-picker img[data-logo="rust"] {
+:root[data-theme="dark"] img[data-logo="rust"],
+:root[data-theme="dark"] a[data-logo="rust"]::before {
   filter: invert(1);
 }
 
