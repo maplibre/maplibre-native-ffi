@@ -31,7 +31,14 @@ from ..semantic import (
     ValuePlan,
     output_member,
 )
-from .typescript import Lowered, attachment_name, owner_native, scoped_name
+from .typescript import (
+    Lowered,
+    NativeParameter,
+    PublicParameter,
+    attachment_name,
+    owner_native,
+    scoped_name,
+)
 from .typescript_native_values import NativeValues
 from .typescript_values import (
     OWNER_MEMBERS,
@@ -136,13 +143,15 @@ def lower_arguments(plan: OperationPlan, values: Values, natives: NativeValues) 
     # A parameter with a default must not precede one without.
     seen_required = False
     for position in range(len(lowered.parameters) - 1, -1, -1):
-        name, ts, default = lowered.parameters[position]
-        if default is None:
+        public = lowered.parameters[position]
+        if public.default is None:
             seen_required = True
-        elif seen_required and default == "{}":
-            lowered.parameters[position] = (name, ts, None)
+        elif seen_required and public.default == "{}":
+            lowered.parameters[position] = public._replace(default=None)
         elif seen_required:
-            lowered.parameters[position] = (name, ts + " | undefined", None)
+            lowered.parameters[position] = public._replace(
+                type=public.type + " | undefined", default=None
+            )
     return call
 
 
@@ -160,7 +169,7 @@ def lower_receiver(call: Call, reference: bool) -> None:
         f'{{ uint64_t number = 0; if (!mln_ts_read_u64(call, call->argv[{call.index}], &number, "{identifier(name)}")) goto done; {local} = ({receiver})number; }}'
     )
     args.append(f"&{local}" if reference else local)
-    lowered.native_parameters.append((identifier(name), "bigint"))
+    lowered.native_parameters.append(NativeParameter(identifier(name), "bigint"))
     lowered.arguments.append("handle" if plan.consumes else "this.id")
     call.index += 1
     if plan.consumes:
@@ -170,7 +179,7 @@ def lower_receiver(call: Call, reference: bool) -> None:
         body.append(
             f"if (!mln_ts_read_owner(call, call->argv[{call.index}])) goto done;"
         )
-        lowered.native_parameters.append(("token", "object | undefined"))
+        lowered.native_parameters.append(NativeParameter("token", "object | undefined"))
         lowered.arguments.append("token")
         call.index += 1
 
@@ -313,8 +322,8 @@ def lower_input(
         locals_.append(f"uint64_t {local} = 0;")
         body.append(f"if (!mln_ts_read_u64(call, {js}, &{local}, {path})) goto done;")
         args.append(local)
-        lowered.parameters.append((public_name_, values.ts(value), None))
-        lowered.native_parameters.append((public_name_, "bigint"))
+        lowered.parameters.append(PublicParameter(public_name_, values.ts(value), None))
+        lowered.native_parameters.append(NativeParameter(public_name_, "bigint"))
         return
     if value.kind == "array" or is_counted(value):
         values.check(value, "in")
@@ -358,12 +367,14 @@ def lower_input(
             body.append(f"if (!mln_ts_is_absent(call, {js})) {{")
             body += [f"  {line}" for line in read]
             body.append("}")
-            lowered.parameters.append((public_name_, ts, "undefined"))
-            lowered.native_parameters.append((public_name_, ts + " | undefined"))
+            lowered.parameters.append(PublicParameter(public_name_, ts, "undefined"))
+            lowered.native_parameters.append(
+                NativeParameter(public_name_, ts + " | undefined")
+            )
         else:
             body += read
-            lowered.parameters.append((public_name_, ts, None))
-            lowered.native_parameters.append((public_name_, ts))
+            lowered.parameters.append(PublicParameter(public_name_, ts, None))
+            lowered.native_parameters.append(NativeParameter(public_name_, ts))
         return
     if value.kind == "reference":
         element = value.unwrapped
@@ -406,10 +417,12 @@ def lower_input(
             and values.all_omittable(element)
         )
         lowered.native_parameters.append(
-            (public_name_, ts + (" | undefined" if nullable or optional else ""))
+            NativeParameter(
+                public_name_, ts + (" | undefined" if nullable or optional else "")
+            )
         )
         lowered.parameters.append(
-            (
+            PublicParameter(
                 public_name_,
                 ts,
                 "undefined" if nullable else ("{}" if optional else None),
@@ -443,10 +456,10 @@ def lower_input(
     args.append(local)
     ts = values.ts(value)
     lowered.native_parameters.append(
-        (public_name_, ts + (" | undefined" if absent else ""))
+        NativeParameter(public_name_, ts + (" | undefined" if absent else ""))
     )
     lowered.parameters.append(
-        (
+        PublicParameter(
             public_name_,
             ts,
             "undefined" if values.absent(value) else ("{}" if absent else None),
@@ -584,7 +597,9 @@ def lower_view(call: Call, values: Values, natives: NativeValues) -> Lowered:
     lowered.view = value.native
     lowered.shape = "view"
     lowered.method = identifier("with_" + view.stem)
-    lowered.parameters = [("use", f"(view: {scoped_name(value.native)}) => T", None)]
+    lowered.parameters = [
+        PublicParameter("use", f"(view: {scoped_name(value.native)}) => T", None)
+    ]
     lowered.returns = "T"
     return lowered
 
@@ -629,7 +644,7 @@ def submit(
     settle = f"call->argv[{call.index}]"
     nullable = completion.discardable or completion.optional
     lowered.native_parameters.append(
-        (
+        NativeParameter(
             "completion",
             "NativeCompletion | undefined" if nullable else "NativeCompletion",
         )
@@ -857,7 +872,7 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
             f"mln_ts_dispose_{name}, &arguments, sizeof arguments);"
         ),
     ]
-    lowered.native_parameters.append(("start", "NativeThreadStart"))
+    lowered.native_parameters.append(NativeParameter("start", "NativeThreadStart"))
     lowered.shape = "thread_start"
     lowered.returns = f"Promise<{owner_class(owned.handle)}>"
     return lowered
@@ -1113,7 +1128,7 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
                 e.method
                 for e in scoped
                 if e.shape == "close"
-                and all(d == "undefined" for _, _, d in e.parameters)
+                and all(p.default == "undefined" for p in e.parameters)
             ),
             None,
         )
