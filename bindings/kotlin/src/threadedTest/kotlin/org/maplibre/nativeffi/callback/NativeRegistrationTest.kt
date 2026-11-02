@@ -29,6 +29,7 @@ import org.maplibre.nativeffi.render.TestBackend
 import org.maplibre.nativeffi.render.TestGraphics
 import org.maplibre.nativeffi.render.attachOffscreenSession
 import org.maplibre.nativeffi.render.withRenderSession
+import org.maplibre.nativeffi.render.withTestTextures
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
@@ -95,46 +96,46 @@ class NativeRegistrationTest {
     HostFunctions().use { host ->
       withSmallMap {
         val lock = QueueLock.native(host.call, host.call, host.userData, host.release)
-        if (TestGraphics.backend == TestBackend.VULKAN) {
-          withRenderSession(
-            RenderDriverKind.CALLER_GRAPHICS_THREAD,
-            attach = { options ->
-              TestGraphics.attachOwnedTexture(map, WIDTH, HEIGHT, options.copy(queueLock = lock))
-            },
-          ) {
-            setStyle(RED_BACKGROUND_STYLE)
-            renderFrame()
+        withTestTextures(WIDTH, HEIGHT, 1) { textures ->
+          if (TestGraphics.backend == TestBackend.VULKAN) {
+            withRenderSession(
+              RenderDriverKind.CALLER_GRAPHICS_THREAD,
+              attach = { options ->
+                TestGraphics.attachBorrowedTexture(map, textures, options.copy(queueLock = lock))
+              },
+            ) {
+              setStyle(RED_BACKGROUND_STYLE)
+              renderFrame()
+            }
+            host.released.awaitWithin("native to release the queue lock")
+            assertTrue(host.calls.load() > 0)
+          } else {
+            // Only a Vulkan target takes a queue lock, so native rejects one that reaches it.
+            withContext(TestGraphics.thread) {
+              assertFailsWithStatus(Status.UNSUPPORTED) {
+                TestGraphics.attachBorrowedTexture(
+                  map,
+                  textures,
+                  RenderSessionAttachOptions(
+                    driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+                    queueLock = lock,
+                  ),
+                )
+              }
+            }
           }
-          host.released.awaitWithin("native to release the queue lock")
-          assertTrue(host.calls.load() > 0)
-        } else {
-          // Only a Vulkan target takes a queue lock, so native rejects one that reaches it.
+          assertEquals(1, host.releases.load())
           withContext(TestGraphics.thread) {
-            assertFailsWithStatus(Status.UNSUPPORTED) {
-              TestGraphics.attachOwnedTexture(
+            assertFailsWith<IllegalStateException> {
+              TestGraphics.attachBorrowedTexture(
                 map,
-                WIDTH,
-                HEIGHT,
+                textures,
                 RenderSessionAttachOptions(
                   driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
                   queueLock = lock,
                 ),
               )
             }
-          }
-        }
-        assertEquals(1, host.releases.load())
-        withContext(TestGraphics.thread) {
-          assertFailsWith<IllegalStateException> {
-            TestGraphics.attachOwnedTexture(
-              map,
-              WIDTH,
-              HEIGHT,
-              RenderSessionAttachOptions(
-                driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-                queueLock = lock,
-              ),
-            )
           }
         }
       }

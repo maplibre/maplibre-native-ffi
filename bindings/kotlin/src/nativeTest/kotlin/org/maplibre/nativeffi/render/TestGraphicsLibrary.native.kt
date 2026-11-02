@@ -16,6 +16,10 @@ import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_create
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_get_context
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_last_error
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_make_current
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_texture_create
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_texture_destroy
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_texture_get_info
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_texture_info
 
 /** tests/graphics over cinterop, linked into the test executable from graphics.c. */
 internal actual object TestGraphicsLibrary {
@@ -55,8 +59,38 @@ internal actual object TestGraphicsLibrary {
     }
   }
 
-  actual fun transferredCanvas(width: Int, height: Int): TestCanvas =
-    throw UnsupportedOperationException("tests/graphics transfers no canvas; only WebGL does")
+  actual fun createTexture(graphics: Long, width: Int, height: Int): TestTexture {
+    val texture =
+      checkNotNull(
+        mln_test_graphics_texture_create(handle(graphics), width.toUInt(), height.toUInt()),
+      ) {
+        "tests/graphics could not create a texture: ${lastError()}"
+      }
+    return try {
+      memScoped {
+        val info = alloc<mln_test_graphics_texture_info>()
+        check(mln_test_graphics_texture_get_info(texture, info.ptr)) {
+          "tests/graphics could not describe a texture: ${lastError()}"
+        }
+        TestTexture(
+          width = info.width,
+          height = info.height,
+          format = info.format,
+          metalTexture = info.metal_texture.toLong(),
+          vulkanImage = info.vulkan_image,
+          vulkanImageView = info.vulkan_image_view,
+          vulkanFinalLayout = info.vulkan_final_layout,
+          openGlTexture = info.opengl_texture,
+          openGlTarget = info.opengl_target,
+        ) {
+          mln_test_graphics_texture_destroy(texture)
+        }
+      }
+    } catch (failure: Throwable) {
+      mln_test_graphics_texture_destroy(texture)
+      throw failure
+    }
+  }
 
   private fun handle(graphics: Long): CPointer<mln_test_graphics> =
     checkNotNull(graphics.toCPointer())

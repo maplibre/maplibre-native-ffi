@@ -3,6 +3,7 @@
 // Each fixture plays native for a test: it calls the C functions that Kotlin
 // wrote into a descriptor, or makes native queue a call for the page, from the
 // page or from a thread of its own.
+#include <GLES3/gl3.h>
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
 #include <emscripten/proxying.h>
@@ -203,18 +204,14 @@ EMSCRIPTEN_KEEPALIVE void mln_kw_test_pool_release(void) {
 }
 
 // ---------------------------------------------------------------------------
-// WebGL canvases
+// WebGL textures and canvases
 //
 // The browser builds keep their own GPU fixtures, since WebGL contexts come
 // from JavaScript; see tests/graphics/include/mln_test_graphics.h. The page
 // creates the context that its sessions share, and these fixtures add the
-// canvases that a session's core worker takes over. The JavaScript halves are
-// in test_support.js.
+// textures of a borrowed ring on it, and the canvas elements that a session
+// takes over. The JavaScript halves are in test_support.js.
 
-void mln_kw_test_register_transferred_canvas(
-  const char* selector, int32_t width, int32_t height, void* shared
-);
-void mln_kw_test_unregister_canvas(const char* name);
 void mln_kw_test_add_dom_canvas(
   const char* selector, int32_t width, int32_t height, void* shared
 );
@@ -226,18 +223,102 @@ EMSCRIPTEN_KEEPALIVE int32_t mln_kw_test_webgl_make_current(int32_t context) {
   return emscripten_webgl_make_context_current(context);
 }
 
-/** The canvas that a session's core worker takes over. */
-typedef enum mln_kw_test_canvas_kind {
-  /** An OffscreenCanvas registered for the transfer, as a worker would be. */
-  MLN_KW_TEST_CANVAS_OFFSCREEN = 0,
-  /** A canvas element in the document, as a page would show. */
-  MLN_KW_TEST_CANVAS_ELEMENT = 1,
-} mln_kw_test_canvas_kind;
+/**
+ * Makes [context] current for a fixture's GL calls, and returns the context
+ * that was current, which the fixture makes current again afterwards. Returns
+ * -1 when [context] can't be made current.
+ */
+static EMSCRIPTEN_WEBGL_CONTEXT_HANDLE enter_context(int32_t context) {
+  const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous =
+    emscripten_webgl_get_current_context();
+  if (
+    emscripten_webgl_make_context_current(context) != EMSCRIPTEN_RESULT_SUCCESS
+  ) {
+    return -1;
+  }
+  return previous;
+}
+
+static void leave_context(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous) {
+  (void)emscripten_webgl_make_context_current(previous);
+}
+
+/**
+ * Creates an RGBA8 texture of [width] x [height] on [context], as a page's
+ * own renderer would for a borrowed ring, and returns its name, or 0 on
+ * failure.
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t mln_kw_test_webgl_texture_create(
+  int32_t context, int32_t width, int32_t height
+) {
+  const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous = enter_context(context);
+  if (previous < 0) {
+    return 0;
+  }
+  GLuint texture = 0;
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexImage2D(
+    GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+    NULL
+  );
+  glBindTexture(GL_TEXTURE_2D, 0);
+  if (glGetError() != GL_NO_ERROR) {
+    glDeleteTextures(1, &texture);
+    texture = 0;
+  }
+  leave_context(previous);
+  return texture;
+}
+
+/**
+ * Reads the pixel at [x], [y] of [texture] on [context], with red in the low
+ * byte and alpha in the high byte. Returns 0 on failure, which no opaque pixel
+ * reads as.
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t mln_kw_test_webgl_texture_pixel(
+  int32_t context, uint32_t texture, int32_t x, int32_t y
+) {
+  const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous = enter_context(context);
+  if (previous < 0) {
+    return 0;
+  }
+  GLint bound = 0;
+  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &bound);
+  GLuint framebuffer = 0;
+  glGenFramebuffers(1, &framebuffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+  glFramebufferTexture2D(
+    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0
+  );
+  uint8_t pixel[4] = {0};
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+    glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)bound);
+  glDeleteFramebuffers(1, &framebuffer);
+  leave_context(previous);
+  return (uint32_t)pixel[0] | (uint32_t)pixel[1] << 8 |
+         (uint32_t)pixel[2] << 16 | (uint32_t)pixel[3] << 24;
+}
+
+/** Deletes [texture] from [context]. */
+EMSCRIPTEN_KEEPALIVE void mln_kw_test_webgl_texture_destroy(
+  int32_t context, uint32_t texture
+) {
+  const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous = enter_context(context);
+  if (previous < 0) {
+    return;
+  }
+  glDeleteTextures(1, &texture);
+  leave_context(previous);
+}
 
 typedef struct mln_kw_test_canvas {
   /** The selector a WebGL context descriptor names. The first member. */
   char selector[32];
-  uint32_t kind;
   /**
    * The width, height, and owning thread that Emscripten keeps for a
    * transferred canvas, at canvasSharedPtr.
@@ -255,12 +336,12 @@ _Static_assert(
 );
 
 /**
- * Creates a canvas of [kind] and [width] x [height] that pthread_create
- * transfers to a session's core worker. The returned address is its
- * NUL-terminated selector. Returns null when allocation failed.
+ * Adds a canvas element of [width] x [height] to the document, which
+ * pthread_create transfers to a session's core worker. The returned address is
+ * its NUL-terminated selector. Returns null when allocation failed.
  */
 EMSCRIPTEN_KEEPALIVE mln_kw_test_canvas* mln_kw_test_canvas_create(
-  uint32_t kind, int32_t width, int32_t height
+  int32_t width, int32_t height
 ) {
   mln_kw_test_canvas* canvas = calloc(1, sizeof *canvas);
   if (canvas == NULL) {
@@ -270,32 +351,19 @@ EMSCRIPTEN_KEEPALIVE mln_kw_test_canvas* mln_kw_test_canvas_create(
     canvas->selector, sizeof canvas->selector, "#mln-kw-canvas-%u",
     ++canvas_serial
   );
-  canvas->kind = kind;
   canvas->shared.width = width;
   canvas->shared.height = height;
-  if (kind == MLN_KW_TEST_CANVAS_ELEMENT) {
-    mln_kw_test_add_dom_canvas(
-      canvas->selector, width, height, &canvas->shared
-    );
-  } else {
-    mln_kw_test_register_transferred_canvas(
-      canvas->selector, width, height, &canvas->shared
-    );
-  }
+  mln_kw_test_add_dom_canvas(canvas->selector, width, height, &canvas->shared);
   return canvas;
 }
 
 /**
- * Removes [canvas] from the page and frees it. Call it once the session that
- * took the canvas over has closed.
+ * Removes [canvas] from the document and frees it. Call it once the session
+ * that took the canvas over has closed.
  */
 EMSCRIPTEN_KEEPALIVE void mln_kw_test_canvas_destroy(
   mln_kw_test_canvas* canvas
 ) {
-  if (canvas->kind == MLN_KW_TEST_CANVAS_ELEMENT) {
-    mln_kw_test_remove_dom_canvas(canvas->selector);
-  } else {
-    mln_kw_test_unregister_canvas(canvas->selector);
-  }
+  mln_kw_test_remove_dom_canvas(canvas->selector);
   free(canvas);
 }

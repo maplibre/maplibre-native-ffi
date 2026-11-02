@@ -1,6 +1,6 @@
 // Render sessions on a core worker: rendering and readback offscreen,
-// teardown before the device goes, and the scope of a borrowed frame
-// view of an owned texture.
+// disposal and close of an attached session, and the scope of a frame view of
+// a borrowed texture.
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
@@ -87,7 +87,7 @@ void main() {
     'a frame view expires with its scope and holds off release inside it',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final worker = await WorkerSession.attachOwnedTexture(map);
+      final worker = await WorkerSession.attachBorrowedTexture(map);
       await worker.renderFrame();
       final session = worker.session;
       final frame = session.acquireFrame()!;

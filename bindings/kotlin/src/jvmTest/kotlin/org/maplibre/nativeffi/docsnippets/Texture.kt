@@ -13,10 +13,8 @@ import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.VulkanBorrowedTexture
 import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.VulkanContextDescriptor
-import org.maplibre.nativeffi.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.Wake
 import org.maplibre.nativeffi.attachVulkanBorrowedTexture
-import org.maplibre.nativeffi.attachVulkanOwnedTexture
 import org.maplibre.nativeffi.setVulkanBorrowedTextureTarget
 import org.maplibre.nativeffi.withVulkanTexture
 
@@ -56,15 +54,6 @@ private suspend fun renderToTexture(
   newViews: List<ULong>,
 ) {
   // #region attach-owned
-  val texture =
-    VulkanOwnedTextureDescriptor(
-      // The texture's size in logical pixels, and its scale factor.
-      extent =
-        LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
-      // Your VkInstance, VkPhysicalDevice,
-      // VkDevice, and graphics VkQueue.
-      context = vulkan,
-    )
   val options =
     RenderSessionAttachOptions(
       driver = RenderDriverKind.CORE_WORKER,
@@ -76,14 +65,7 @@ private suspend fun renderToTexture(
           unlock = { queueMutex.unlock() },
         ),
     )
-
-  val owned = map.attachVulkanOwnedTexture(texture, options)
-  session = owned.session
-  owned.ready.await()
   // #endregion attach-owned
-
-  drawFrame()
-  session.release().await()
 
   // #region attach-borrowed
   var ring =
@@ -110,11 +92,12 @@ private suspend fun renderToTexture(
       finalLayout = 5u, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-  // The same attach options as for an owned ring.
   val borrowed = map.attachVulkanBorrowedTexture(ring, options)
   session = borrowed.session
   borrowed.ready.await()
   // #endregion attach-borrowed
+
+  drawFrame()
 
   // #region resize-borrowed
   ring =

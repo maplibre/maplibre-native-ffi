@@ -31,7 +31,7 @@ import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.UrlMatchFlag
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.render.withOwnedTexture
+import org.maplibre.nativeffi.render.withOffscreenSession
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runThenRelease
 import org.maplibre.nativeffi.setHttpHeaderTransform
@@ -117,7 +117,7 @@ class AndroidHttpTransportTest {
       server ->
       // A static map renders its still image only once every source has loaded, and a PMTiles
       // source loads only when its ranged reads of the archive's header and metadata succeed.
-      withOwnedTexture(width = 64, height = 64, provider = nativeHttp()) {
+      withOffscreenSession(width = 64, height = 64, provider = nativeHttp()) {
         setStyle(
           """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://${server.url("/archive.pmtiles")}"}},"layers":[]}""",
         )

@@ -11,14 +11,20 @@ const (
 	queueLockSupported = false
 )
 
-func attachOwnedTexture(
-	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
+func attachBorrowedTexture(
+	m *MapHandle, _ testsupport.Context, extent LogicalExtent, textures []*testsupport.Texture,
+	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	return m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
-		Extent:  extent,
-		Context: MetalContextDescriptor{Device: context.MetalDevice},
-		// MTLPixelFormatBGRA8Unorm.
-		PixelFormat: 80,
+	ring := make([]MetalBorrowedTexture, len(textures))
+	for index, texture := range textures {
+		ring[index] = MetalBorrowedTexture{Texture: texture.Info.MetalTexture}
+	}
+	info := textures[0].Info
+	return m.AttachMetalBorrowedTexture(MetalBorrowedTextureDescriptor{
+		Extent:         extent,
+		PhysicalWidth:  info.Width,
+		PhysicalHeight: info.Height,
+		Textures:       ring,
 	}, options)
 }
 

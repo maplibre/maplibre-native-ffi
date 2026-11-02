@@ -1,30 +1,33 @@
 package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.maplibre.nativeffi.AcquiredFrameHandle
 import org.maplibre.nativeffi.EglContextDescriptor
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapHandle
-import org.maplibre.nativeffi.MetalContextDescriptor
-import org.maplibre.nativeffi.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.MetalBorrowedTexture
+import org.maplibre.nativeffi.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.NativePointer
 import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.OpenGlBorrowedTexture
+import org.maplibre.nativeffi.OpenGlBorrowedTextureDescriptor
 import org.maplibre.nativeffi.OpenGlClientApi
 import org.maplibre.nativeffi.OpenGlContextDescriptor
 import org.maplibre.nativeffi.OpenGlContextDescriptorData
 import org.maplibre.nativeffi.OpenGlContextOwnership
 import org.maplibre.nativeffi.OpenGlContextProviderFlag
-import org.maplibre.nativeffi.OpenGlOwnedTextureDescriptor
 import org.maplibre.nativeffi.RenderBackendFlag
-import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.VulkanBorrowedTexture
+import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.VulkanContextDescriptor
-import org.maplibre.nativeffi.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.WebGlContextDescriptor
 import org.maplibre.nativeffi.WebGlContextKind
+import org.maplibre.nativeffi.WebGpuBorrowedTexture
+import org.maplibre.nativeffi.WebGpuBorrowedTextureDescriptor
 import org.maplibre.nativeffi.WebGpuContextDescriptor
-import org.maplibre.nativeffi.WebGpuOwnedTextureDescriptor
 import org.maplibre.nativeffi.WglContextDescriptor
 import org.maplibre.nativeffi.openGlSupportedContextProviderMask
 import org.maplibre.nativeffi.supportedRenderBackendMask
@@ -53,11 +56,27 @@ internal class TestGraphicsContext(
 )
 
 /**
- * A canvas that a session's core worker takes over, named by [selector]. [close] removes it once
- * that session has closed.
+ * A texture of a test graphics context that a borrowed ring can name, and its size. Only its
+ * backend's fields are set. A WebGL texture is a name in the module's GL table, and a WebGPU
+ * texture and its view are emdawnwebgpu handles: the page creates them on its own context or
+ * device. [close] destroys it.
  */
-internal class TestCanvas(val selector: String, private val remove: () -> Unit) : AutoCloseable {
-  override fun close() = remove()
+internal class TestTexture(
+  val width: UInt,
+  val height: UInt,
+  /** The MTLPixelFormat, VkFormat, or WGPUTextureFormat. */
+  val format: UInt = 0u,
+  val metalTexture: Long = 0,
+  val vulkanImage: ULong = 0uL,
+  val vulkanImageView: ULong = 0uL,
+  val vulkanFinalLayout: UInt = 0u,
+  val openGlTexture: UInt = 0u,
+  val openGlTarget: UInt = 0u,
+  val webGpuTexture: Long = 0,
+  val webGpuTextureView: Long = 0,
+  private val destroy: () -> Unit,
+) : AutoCloseable {
+  override fun close() = destroy()
 }
 
 /**
@@ -81,10 +100,10 @@ internal expect object TestGraphicsLibrary {
   fun makeCurrent(graphics: Long)
 
   /**
-   * Creates a canvas of [width] x [height] that a WebGL session transfers to its core worker. Only
-   * the browser fixtures have one; elsewhere this throws.
+   * Creates a texture of [width] x [height] on [graphics] that a borrowed ring can render into, or
+   * throws with the reason. Call it on the thread where an EGL, WGL, or WebGL context is current.
    */
-  fun transferredCanvas(width: Int, height: Int): TestCanvas
+  fun createTexture(graphics: Long, width: Int, height: Int): TestTexture
 }
 
 /** The graphics backend a build renders with, and its context from the test graphics library. */
@@ -139,22 +158,15 @@ internal object TestGraphics {
 
   val backend: TestBackend by lazy { TestBackend.ofBuild() }
 
-  /**
-   * The driver of the owned texture that the render tests read back. WebGL reads it back from a
-   * core worker over a transferred canvas, and the other render tests drive the page's existing
-   * context, so the suite covers both WebGL context kinds. Every other backend reads it back on
-   * [thread].
-   */
-  val readbackDriver: RenderDriverKind
-    get() =
-      if (backend == TestBackend.WEBGL) RenderDriverKind.CORE_WORKER
-      else RenderDriverKind.CALLER_GRAPHICS_THREAD
+  private class Shared(val graphics: Long, val context: TestGraphicsContext)
 
   // Read and written on [thread] only.
-  private var shared: TestGraphicsContext? = null
+  private var shared: Shared? = null
 
   /** The build's context, made current on [thread] when its backend has a current context. */
-  suspend fun context(): TestGraphicsContext =
+  suspend fun context(): TestGraphicsContext = shared().context
+
+  private suspend fun shared(): Shared =
     withContext(thread) {
       shared
         ?: run {
@@ -164,103 +176,83 @@ internal object TestGraphics {
           ) {
             TestGraphicsLibrary.makeCurrent(graphics)
           }
-          TestGraphicsLibrary.context(graphics).also { shared = it }
+          Shared(graphics, TestGraphicsLibrary.context(graphics)).also { shared = it }
         }
     }
 
   /**
-   * The canvas that an owned texture of [width] x [height] takes over when [driver] drives it, or
-   * null when it renders with the build's context instead. Close it after the texture's session.
+   * Creates [count] textures of [width] x [height] on the build's context, for a borrowed ring.
+   * Destroy them with [destroyTextures] once every session that renders into them has retired.
    */
-  fun ownedTextureCanvas(width: Int, height: Int, driver: RenderDriverKind): TestCanvas? =
-    if (driver == RenderDriverKind.CORE_WORKER) TestGraphicsLibrary.transferredCanvas(width, height)
-    else null
+  suspend fun createTextures(width: Int, height: Int, count: Int): List<TestTexture> =
+    withContext(thread) {
+      val graphics = shared().graphics
+      val textures = mutableListOf<TestTexture>()
+      try {
+        repeat(count) { textures += TestGraphicsLibrary.createTexture(graphics, width, height) }
+      } catch (failure: Throwable) {
+        textures.forEach { it.close() }
+        throw failure
+      }
+      textures
+    }
+
+  /** Destroys [textures] from [createTextures]. */
+  suspend fun destroyTextures(textures: List<TestTexture>) {
+    withContext(NonCancellable + thread) { textures.forEach { it.close() } }
+  }
 
   /**
-   * Submits an owned-texture attach of [width] x [height] on the build's backend. A texture with a
-   * [canvas] from [ownedTextureCanvas] renders on a core worker over that canvas, and any other on
-   * [thread] with the build's context.
+   * Submits an attach of a borrowed ring of [textures], from [createTextures], on the build's
+   * backend. Call it on [thread], where the build's OpenGL context is current.
    */
-  suspend fun attachOwnedTexture(
+  suspend fun attachBorrowedTexture(
     map: MapHandle,
-    width: Int,
-    height: Int,
+    textures: List<TestTexture>,
     options: RenderSessionAttachOptions,
-    canvas: TestCanvas? = null,
   ): NewRenderSession {
-    val extent = LogicalExtent(width.toUInt(), height.toUInt(), 1.0)
-    if (canvas != null) {
-      return map.attachOpenGlOwnedTexture(
-        OpenGlOwnedTextureDescriptor(
-          extent,
-          OpenGlContextDescriptor(
-            OpenGlContextOwnership.DEDICATED,
-            OpenGlContextDescriptorData.WebGl(
-              WebGlContextDescriptor(
-                WebGlContextKind.TRANSFERRED_CANVAS,
-                canvasSelector = canvas.selector,
-              ),
-            ),
-          ),
-        ),
-        options,
-      )
-    }
     val context = context()
-    return when (backend) {
-      TestBackend.EGL ->
-        map.attachOpenGlOwnedTexture(
-          OpenGlOwnedTextureDescriptor(
-            extent,
-            OpenGlContextDescriptor(
-              OpenGlContextOwnership.SHARED,
-              OpenGlContextDescriptorData.Egl(
-                EglContextDescriptor(
-                  pointer(context.eglDisplay),
-                  pointer(context.eglConfig),
-                  pointer(context.eglContext),
-                  OpenGlClientApi.GLES,
-                  NativePointer.NULL_POINTER,
-                ),
-              ),
+    val texture = textures.first()
+    val extent = LogicalExtent(texture.width, texture.height, 1.0)
+    val openGlContext =
+      when (backend) {
+        TestBackend.EGL ->
+          OpenGlContextDescriptorData.Egl(
+            EglContextDescriptor(
+              pointer(context.eglDisplay),
+              pointer(context.eglConfig),
+              pointer(context.eglContext),
+              OpenGlClientApi.GLES,
+              NativePointer.NULL_POINTER,
             ),
-          ),
-          options,
-        )
-      TestBackend.WGL ->
-        map.attachOpenGlOwnedTexture(
-          OpenGlOwnedTextureDescriptor(
-            extent,
-            OpenGlContextDescriptor(
-              OpenGlContextOwnership.SHARED,
-              OpenGlContextDescriptorData.Wgl(
-                WglContextDescriptor(
-                  pointer(context.wglDeviceContext),
-                  pointer(context.wglContext),
-                  NativePointer.NULL_POINTER,
-                ),
-              ),
+          )
+        TestBackend.WGL ->
+          OpenGlContextDescriptorData.Wgl(
+            WglContextDescriptor(
+              pointer(context.wglDeviceContext),
+              pointer(context.wglContext),
+              NativePointer.NULL_POINTER,
             ),
-          ),
-          options,
-        )
-      TestBackend.WEBGL ->
-        map.attachOpenGlOwnedTexture(
-          OpenGlOwnedTextureDescriptor(
-            extent,
-            OpenGlContextDescriptor(
-              OpenGlContextOwnership.SHARED,
-              OpenGlContextDescriptorData.WebGl(
-                WebGlContextDescriptor(WebGlContextKind.EXISTING, context.webGlContext),
-              ),
-            ),
-          ),
-          options,
-        )
-      TestBackend.METAL,
-      TestBackend.VULKAN,
-      TestBackend.WEBGPU -> attachBackendOwnedTexture(map, extent, context, options)
-    }
+          )
+        TestBackend.WEBGL ->
+          OpenGlContextDescriptorData.WebGl(
+            WebGlContextDescriptor(WebGlContextKind.EXISTING, context.webGlContext),
+          )
+        TestBackend.METAL,
+        TestBackend.VULKAN,
+        TestBackend.WEBGPU -> return attachBackendBorrowedTexture(map, textures, context, options)
+      }
+    return map.attachOpenGlBorrowedTexture(
+      OpenGlBorrowedTextureDescriptor(
+        extent,
+        physicalWidth = texture.width,
+        physicalHeight = texture.height,
+        context = OpenGlContextDescriptor(OpenGlContextOwnership.SHARED, openGlContext),
+        textures = textures.map { OpenGlBorrowedTexture(it.openGlTexture) },
+        target = texture.openGlTarget,
+      ),
+      options,
+    )
   }
 
   /** Reads the size of the backend texture behind [frame] through its typed view. */
@@ -274,51 +266,77 @@ internal object TestGraphics {
       TestBackend.WEBGPU -> backendTextureSize(frame)
     }
 
-  fun metalOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
-    MetalOwnedTextureDescriptor(
-      extent,
-      MetalContextDescriptor(pointer(context.metalDevice)),
-      // MTLPixelFormatBGRA8Unorm.
-      pixelFormat = 80uL,
+  fun metalBorrowedTexture(textures: List<TestTexture>): MetalBorrowedTextureDescriptor {
+    val texture = textures.first()
+    return MetalBorrowedTextureDescriptor(
+      LogicalExtent(texture.width, texture.height, 1.0),
+      physicalWidth = texture.width,
+      physicalHeight = texture.height,
+      textures = textures.map { MetalBorrowedTexture(pointer(it.metalTexture)) },
       commandQueue = NativePointer.NULL_POINTER,
     )
+  }
 
-  fun vulkanOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
-    VulkanOwnedTextureDescriptor(
-      extent,
-      VulkanContextDescriptor(
-        pointer(context.vulkanInstance),
-        pointer(context.vulkanPhysicalDevice),
-        pointer(context.vulkanDevice),
-        pointer(context.vulkanQueue),
-        context.vulkanQueueFamilyIndex,
-        pointer(context.vulkanGetInstanceProcAddr),
-        pointer(context.vulkanGetDeviceProcAddr),
-      ),
+  fun vulkanBorrowedTexture(
+    textures: List<TestTexture>,
+    context: TestGraphicsContext,
+  ): VulkanBorrowedTextureDescriptor {
+    val texture = textures.first()
+    return VulkanBorrowedTextureDescriptor(
+      LogicalExtent(texture.width, texture.height, 1.0),
+      physicalWidth = texture.width,
+      physicalHeight = texture.height,
+      context =
+        VulkanContextDescriptor(
+          pointer(context.vulkanInstance),
+          pointer(context.vulkanPhysicalDevice),
+          pointer(context.vulkanDevice),
+          pointer(context.vulkanQueue),
+          context.vulkanQueueFamilyIndex,
+          pointer(context.vulkanGetInstanceProcAddr),
+          pointer(context.vulkanGetDeviceProcAddr),
+        ),
+      textures = textures.map { VulkanBorrowedTexture(it.vulkanImage, it.vulkanImageView) },
+      format = texture.format,
+      finalLayout = texture.vulkanFinalLayout,
     )
+  }
 
-  fun webGpuOwnedTexture(extent: LogicalExtent, context: TestGraphicsContext) =
-    WebGpuOwnedTextureDescriptor(
-      extent,
+  fun webGpuBorrowedTexture(
+    textures: List<TestTexture>,
+    context: TestGraphicsContext,
+  ): WebGpuBorrowedTextureDescriptor {
+    val texture = textures.first()
+    return WebGpuBorrowedTextureDescriptor(
+      LogicalExtent(texture.width, texture.height, 1.0),
+      physicalWidth = texture.width,
+      physicalHeight = texture.height,
       // Sessions use no instance, and null names the device's default queue, as a browser host
       // without a queue of its own hands over.
-      WebGpuContextDescriptor(
-        NativePointer.NULL_POINTER,
-        pointer(context.webGpuDevice),
-        NativePointer.NULL_POINTER,
-      ),
+      context =
+        WebGpuContextDescriptor(
+          NativePointer.NULL_POINTER,
+          pointer(context.webGpuDevice),
+          NativePointer.NULL_POINTER,
+        ),
+      textures =
+        textures.map {
+          WebGpuBorrowedTexture(pointer(it.webGpuTexture), pointer(it.webGpuTextureView))
+        },
+      format = texture.format,
     )
+  }
 
   private fun pointer(address: Long): NativePointer = NativePointer.ofAddress(address)
 }
 
 /**
- * Submits an owned-texture attach on a backend whose attach only some targets declare. Each target
- * attaches the backends that its source sets declare and rejects the others.
+ * Submits a borrowed-texture attach on a backend whose attach only some targets declare. Each
+ * target attaches the backends that its source sets declare and rejects the others.
  */
-internal expect fun TestGraphics.attachBackendOwnedTexture(
+internal expect fun TestGraphics.attachBackendBorrowedTexture(
   map: MapHandle,
-  extent: LogicalExtent,
+  textures: List<TestTexture>,
   context: TestGraphicsContext,
   options: RenderSessionAttachOptions,
 ): NewRenderSession

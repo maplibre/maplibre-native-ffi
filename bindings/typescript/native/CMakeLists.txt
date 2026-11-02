@@ -201,6 +201,16 @@ if(WIN32)
 else()
   install(FILES "${MLN_FFI_NATIVE_LIBRARY}" DESTINATION .)
 endif()
+if(APPLE)
+  # macOS has no EGL, so the host brings ANGLE, and the C library loads it from
+  # beside itself. The OpenGL build installs ANGLE in the prefix for tests, and
+  # the suite's addon takes it along. The packages leave it out.
+  file(GLOB MLN_FFI_ANGLE_LIBRARIES "${MLN_FFI_NATIVE_PREFIX}/lib/libEGL.dylib"
+       "${MLN_FFI_NATIVE_PREFIX}/lib/libGLESv2.dylib")
+  if(MLN_FFI_ANGLE_LIBRARIES)
+    install(FILES ${MLN_FFI_ANGLE_LIBRARIES} DESTINATION .)
+  endif()
+endif()
 # The addon package ships the licenses of the native library it carries, so the
 # install prefix alone is enough to pack it.
 install(

@@ -43,44 +43,6 @@ fn assert_background(pixels: &[u8]) {
     }
 }
 
-/// Attaches a session-owned texture on a context of the build's backend,
-/// which this thread drives, and returns the context that must outlive it.
-#[cfg(mln_render_backend = "opengl")]
-fn owned_texture_session(map: &MapHandle) -> (webgl::WebGlTestContext, Session) {
-    let context = webgl::WebGlTestContext::new(EXTENT.width, EXTENT.height).unwrap();
-    let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
-    // SAFETY: the context outlives the session, on this thread.
-    let attachment = unsafe {
-        map.attach_open_gl_owned_texture(
-            &OpenGlOwnedTextureDescriptor {
-                extent: EXTENT,
-                context: context.descriptor(),
-            },
-            &options,
-        )
-    }
-    .unwrap();
-    (context, Session::finish_attach(attachment, wakes))
-}
-
-#[cfg(mln_render_backend = "webgpu")]
-fn owned_texture_session(map: &MapHandle) -> (webgpu::WebGpuTestContext, Session) {
-    let context = webgpu::WebGpuTestContext::new().unwrap();
-    let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
-    // SAFETY: the device outlives the session, on this thread.
-    let attachment = unsafe {
-        map.attach_web_gpu_owned_texture(
-            &WebGpuOwnedTextureDescriptor {
-                extent: EXTENT,
-                context: context.descriptor(),
-            },
-            &options,
-        )
-    }
-    .unwrap();
-    (context, Session::finish_attach(attachment, wakes))
-}
-
 #[cfg(mln_render_backend = "opengl")]
 #[test]
 fn a_webgl_session_renders_into_a_host_texture() {
@@ -157,14 +119,13 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let reports = capture_reports();
 
     let fixture = styled_fixture();
-    let (context, session) = owned_texture_session(fixture.map());
+    let session = Session::offscreen(fixture.map(), EXTENT);
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let (runtime, map) = fixture.into_parts();
     // No explicit close: each drop disposes its handle, children first.
     drop(session);
     drop(map);
     drop(runtime);
-    drop(context);
 
     set_reporter(None);
     let leaked = leaks(&reports);

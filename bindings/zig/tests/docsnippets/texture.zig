@@ -6,7 +6,7 @@ const maplibre = @import("maplibre_native_ffi");
 
 // Targets without Vulkan, such as Mac Catalyst, have no Vulkan attach methods.
 comptime {
-    if (@TypeOf(maplibre.Map.attachVulkanOwnedTexture) != void) _ = &renderToTexture;
+    if (@TypeOf(maplibre.Map.attachVulkanBorrowedTexture) != void) _ = &renderToTexture;
 }
 
 var session: maplibre.RenderSession = undefined;
@@ -50,35 +50,13 @@ fn renderToTexture(
     new_views: [2]u64,
 ) !void {
     // #region attach-owned
-    const texture = maplibre.VulkanOwnedTextureDescriptor{
-        // The texture's size in logical pixels, and its scale factor.
-        .extent = .{
-            .width = 800,
-            .height = 600,
-            .scale_factor = 2.0,
-        },
-        // Your VkInstance, VkPhysicalDevice,
-        // VkDevice, and graphics VkQueue.
-        .context = vulkan,
-    };
     const options = maplibre.RenderSessionAttachOptions{
         .driver = .core_worker,
         .frame_wake = .{ .callback = onFrameWake },
         // Only if your renderer also submits to the graphics queue.
         .queue_lock = .{ .lock = lockQueue, .unlock = unlockQueue },
     };
-
-    var owned =
-        try map.attachVulkanOwnedTexture(texture, options, null);
-    defer owned.ready.deinit();
-    session = owned.session;
-    try owned.ready.wait(null);
     // #endregion attach-owned
-
-    try drawFrame();
-    var closed = try session.release(null);
-    defer closed.deinit();
-    try closed.wait(null);
 
     // #region attach-borrowed
     // Your VkImage and VkImageView for each texture of the ring.
@@ -101,7 +79,6 @@ fn renderToTexture(
         .final_layout = 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
 
-    // The same attach options as for an owned ring.
     var borrowed = try map.attachVulkanBorrowedTexture(
         allocator,
         ring,
@@ -112,6 +89,8 @@ fn renderToTexture(
     session = borrowed.session;
     try borrowed.ready.wait(null);
     // #endregion attach-borrowed
+
+    try drawFrame();
 
     // #region resize-borrowed
     // Your new textures, at the new size.

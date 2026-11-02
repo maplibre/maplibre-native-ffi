@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.render.withOwnedTexture
+import org.maplibre.nativeffi.render.withOffscreenSession
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
@@ -84,7 +84,7 @@ class AndroidAssetStyleTest {
     // A static map renders its still image only once every source has loaded, and a PMTiles
     // source loads only when its ranged reads of the archive's header and metadata succeed. A range
     // miss returns the whole archive, which fails the source and the still image with it.
-    withOwnedTexture(
+    withOffscreenSession(
       width = 64,
       height = 64,
       provider = localFilesProvider(),

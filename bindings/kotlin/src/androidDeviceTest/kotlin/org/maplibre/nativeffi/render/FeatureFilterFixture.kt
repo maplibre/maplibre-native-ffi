@@ -30,7 +30,7 @@ internal suspend fun assertFilterSelects(
     """{"version":8,"sources":{"point":{"type":"geojson","data":{
       "type":"FeatureCollection","features":[$features]}}},"layers":[{
       "id":"cases","type":"circle","source":"point","filter":$filter,"paint":{"circle-radius":4}}]}"""
-  withOwnedTexture(width = FILTER_MAP_SIZE, height = FILTER_MAP_SIZE) {
+  withOffscreenSession(width = FILTER_MAP_SIZE, height = FILTER_MAP_SIZE) {
     val map = mapFixture.map
     map
       .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(0.0, 0.0), zoom = 2.0)))

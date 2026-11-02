@@ -11,11 +11,22 @@ const (
 	queueLockSupported = true
 )
 
-func attachOwnedTexture(
-	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
+func attachBorrowedTexture(
+	m *MapHandle, context testsupport.Context, extent LogicalExtent, textures []*testsupport.Texture,
+	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	return m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{
-		Extent: extent,
+	ring := make([]VulkanBorrowedTexture, len(textures))
+	for index, texture := range textures {
+		ring[index] = VulkanBorrowedTexture{Image: texture.Info.VulkanImage, ImageView: texture.Info.VulkanImageView}
+	}
+	info := textures[0].Info
+	return m.AttachVulkanBorrowedTexture(VulkanBorrowedTextureDescriptor{
+		Extent:         extent,
+		PhysicalWidth:  info.Width,
+		PhysicalHeight: info.Height,
+		Textures:       ring,
+		Format:         info.Format,
+		FinalLayout:    info.VulkanFinalLayout,
 		Context: VulkanContextDescriptor{
 			Instance:                 context.VulkanInstance,
 			PhysicalDevice:           context.VulkanPhysicalDevice,

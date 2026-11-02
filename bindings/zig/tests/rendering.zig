@@ -1,5 +1,5 @@
-//! Render sessions on the build's backend, with GPU contexts from
-//! tests/graphics.
+//! Render sessions on the build's backend: offscreen, or borrowed textures
+//! from tests/graphics.
 
 const std = @import("std");
 const testing = std.testing;
@@ -16,11 +16,15 @@ fn createFixture() !*support.Fixture {
     return fixture;
 }
 
-fn renderAndReadBack(owned: *support.OwnedTexture) !void {
-    const capabilities = try owned.session.getCapabilities(null);
+test "an offscreen session renders a frame that reads back as pixels" {
+    const fixture = try createFixture();
+    defer fixture.destroy();
+    const offscreen = try support.TextureSession.attachOffscreen(fixture.map, extent);
+    defer offscreen.close();
+    const capabilities = try offscreen.session.getCapabilities(null);
     try testing.expect(capabilities.flags.readback);
-    _ = try owned.renderUntilRendered();
-    var image = try owned.resolve(try owned.session.readTexture(testing.allocator, null));
+    _ = try offscreen.renderUntilRendered();
+    var image = try offscreen.resolve(try offscreen.session.readTexture(testing.allocator, null));
     defer image.deinit();
     try testing.expectEqual(extent.width, image.value.info.width);
     try testing.expectEqual(extent.height, image.value.info.height);
@@ -31,25 +35,17 @@ fn renderAndReadBack(owned: *support.OwnedTexture) !void {
     }
 }
 
-test "an owned-texture session renders a frame that reads back as pixels" {
-    const fixture = try createFixture();
-    defer fixture.destroy();
-    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
-    defer owned.close();
-    try renderAndReadBack(owned);
-}
-
 // Before any demand, native reports the drain and the acquire as not ready,
 // which read as empty and as null.
 test "a drain before any demand returns no batch" {
     const fixture = try createFixture();
     defer fixture.destroy();
-    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
-    defer owned.close();
-    var results = try owned.session.drainFrameResults(testing.allocator, null);
+    const borrowed = try support.TextureSession.attachBorrowed(fixture.map, extent, support.TextureSession.borrowed_driver);
+    defer borrowed.close();
+    var results = try borrowed.session.drainFrameResults(testing.allocator, null);
     defer results.deinit();
     try testing.expectEqual(@as(usize, 0), results.value.len);
-    try testing.expect(try owned.session.acquireFrame(null) == null);
+    try testing.expect(try borrowed.session.acquireFrame(null) == null);
 }
 
 // A scoped view leases its frame for the callback. Inside the scope, releasing
@@ -59,16 +55,16 @@ test "a drain before any demand returns no batch" {
 test "a scoped frame view holds its frame until the scope returns" {
     const fixture = try createFixture();
     defer fixture.destroy();
-    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
-    defer owned.close();
-    _ = try owned.renderUntilRendered();
-    var frame = (try owned.session.acquireFrame(null)).?;
+    const borrowed = try support.TextureSession.attachBorrowed(fixture.map, extent, support.TextureSession.borrowed_driver);
+    defer borrowed.close();
+    _ = try borrowed.renderUntilRendered();
+    var frame = (try borrowed.session.acquireFrame(null)).?;
     try support.expectCommitted(try fixture.map.requestRepaint(null));
-    _ = try owned.renderUntilRendered();
-    var sibling = (try owned.session.acquireFrame(null)).?;
+    _ = try borrowed.renderUntilRendered();
+    var sibling = (try borrowed.session.acquireFrame(null)).?;
 
-    const width = try support.getOwnedTexture(frame, {}, struct {
-        fn use(_: void, view: support.OwnedTextureFrame) u32 {
+    const width = try support.getFrameTexture(frame, {}, struct {
+        fn use(_: void, view: support.FrameTexture) u32 {
             return view.width;
         }
     }.use);
@@ -91,7 +87,7 @@ test "a scoped frame view holds its frame until the scope returns" {
             return error.HostConsumerFailed;
         }
     };
-    try testing.expectError(error.HostConsumerFailed, frame.getProducerSync(Probe{ .frame = &frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
+    try testing.expectError(error.HostConsumerFailed, frame.getProducerSync(Probe{ .frame = &frame, .sibling = &sibling, .session = borrowed.session }, Probe.inspect, null));
     try testing.expect(sibling.isClosed() and !frame.isClosed());
     try frame.release(null, null);
     try testing.expect(frame.isClosed());
@@ -105,17 +101,21 @@ test "a scoped frame view holds its frame until the scope returns" {
 test "disposing a parent graph retires its acquired frame and session" {
     const fixture = try createFixture();
     defer fixture.destroy();
-    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
-    defer owned.close();
-    _ = try owned.renderUntilRendered();
-    var frame = (try owned.session.acquireFrame(null)).?;
+    const borrowed = try support.TextureSession.attachBorrowed(fixture.map, extent, support.TextureSession.borrowed_driver);
+    defer borrowed.close();
+    _ = try borrowed.renderUntilRendered();
+    var frame = (try borrowed.session.acquireFrame(null)).?;
 
     fixture.map.deinit();
     try frame.discard(null);
-    owned.session.deinit();
-    try testing.expectError(error.InvalidState, frame.getResult(null));
-    try testing.expectError(error.InvalidState, owned.session.getSnapshot(null));
-    // The graphics context outlives the session, so the test waits for the
-    // runtime to retire everything before the deferred teardown destroys it.
+    borrowed.session.deinit();
+    // The textures and graphics context outlive the session, so the test waits
+    // for the runtime to retire everything before the deferred teardown
+    // destroys them, also when a check fails.
+    {
+        errdefer fixture.releaseRuntimeWhenChildless() catch {};
+        try testing.expectError(error.InvalidState, frame.getResult(null));
+        try testing.expectError(error.InvalidState, borrowed.session.getSnapshot(null));
+    }
     try fixture.releaseRuntimeWhenChildless();
 }

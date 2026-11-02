@@ -487,12 +487,22 @@ impl Session {
             })
         };
         let options = RenderSessionAttachOptions {
-            requested_texture_ring_depth: 2,
             frame_wake: wake(),
             driver_work_wake: wake(),
             ..RenderSessionAttachOptions::new(driver)
         };
         (options, SessionWakes { signal, released })
+    }
+
+    /// Attaches an offscreen session on a device of its own, which the core's
+    /// worker drives, and waits until it is attached.
+    pub fn offscreen(map: &MapHandle, extent: LogicalExtent) -> Self {
+        let (options, wakes) = Self::attach_options(RenderDriverKind::CoreWorker);
+        let descriptor = OffscreenDescriptor::new(extent);
+        Self::finish_attach(
+            map.attach_offscreen(&descriptor, &options, None).unwrap(),
+            wakes,
+        )
     }
 
     /// Completes an attachment, servicing driver work while it is pending.

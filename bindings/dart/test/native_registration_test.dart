@@ -1,7 +1,7 @@
 // Native registrations: wakes and queue locks whose function pointers and
 // context native code in the host supplies. Sessions render offscreen, which
-// rejects a queue lock, so an accepted lock needs a Vulkan owned texture in a
-// context from tests/graphics.
+// rejects a queue lock, so an accepted lock needs a Vulkan borrowed texture in
+// a context from tests/graphics.
 import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -19,7 +19,7 @@ final _extent = LogicalExtent(
   scaleFactor: 1,
 );
 
-/// Only a Vulkan owned texture takes a queue lock.
+/// Only a Vulkan target takes a queue lock.
 final Object _vulkanSkip = buildAttachesVulkan
     ? false
     : 'Only a Vulkan target takes a queue lock';
@@ -124,7 +124,7 @@ void main() {
     // answers at once. The host shares no queue with the session.
     final locks = _Recorder();
     final releases = _Recorder();
-    final attachment = TestGraphics.open().attachOwnedTexture(
+    final attachment = TestGraphics.open().attachBorrowedTexture(
       map,
       _extent,
       _options(queueLock: _queueLock(locks, releases)),

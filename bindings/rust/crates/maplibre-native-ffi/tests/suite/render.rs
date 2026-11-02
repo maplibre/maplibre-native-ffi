@@ -1,9 +1,9 @@
-//! Render sessions on the backend this build compiled in, with GPU contexts
-//! from tests/graphics.
+//! Render sessions offscreen, and on the backend this build compiled in with
+//! GPU contexts and textures from tests/graphics.
 
 use maplibre_native_ffi::*;
 
-use crate::support::graphics::{Graphics, with_frame_view};
+use crate::support::graphics::{Graphics, Texture, with_frame_view};
 use crate::support::*;
 
 const EXTENT: LogicalExtent = LogicalExtent::new(32, 16, 1.0);
@@ -20,18 +20,21 @@ fn styled_fixture() -> Fixture {
     fixture
 }
 
-/// A styled fixture with an owned-texture session attached on this thread,
-/// which drives it.
-fn rendering_fixture(graphics: &Graphics) -> (Fixture, Session) {
+/// A styled fixture with an offscreen session attached.
+fn offscreen_fixture() -> (Fixture, Session) {
     let fixture = styled_fixture();
-    let session = graphics.owned_texture_session(fixture.map(), EXTENT);
+    let session = Session::offscreen(fixture.map(), EXTENT);
     (fixture, session)
 }
 
+/// A host texture of EXTENT's size, for one slot of a borrowed ring.
+fn host_texture(graphics: &Graphics) -> Texture<'_> {
+    graphics.texture(EXTENT.width, EXTENT.height)
+}
+
 #[test]
-fn an_owned_texture_session_renders_a_frame_the_binding_reads_back() {
-    let graphics = Graphics::new();
-    let (_fixture, session) = rendering_fixture(&graphics);
+fn an_offscreen_session_renders_a_frame_the_binding_reads_back() {
+    let (_fixture, session) = offscreen_fixture();
 
     let result = session.render_frame();
     assert_eq!(result.disposition, RenderResult::Rendered);
@@ -52,7 +55,9 @@ fn an_owned_texture_session_renders_a_frame_the_binding_reads_back() {
 #[test]
 fn a_drain_before_any_demand_returns_no_batch() {
     let graphics = Graphics::new();
-    let (_fixture, session) = rendering_fixture(&graphics);
+    let ring = [host_texture(&graphics)];
+    let fixture = styled_fixture();
+    let session = graphics.borrowed_texture_session(fixture.map(), EXTENT, &ring);
     // Native reports both calls as not ready, which reads as empty and as no
     // value.
     assert!(session.handle.drain_frame_results().unwrap().is_empty());
@@ -63,7 +68,10 @@ fn a_drain_before_any_demand_returns_no_batch() {
 #[test]
 fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     let graphics = Graphics::new();
-    let (fixture, session) = rendering_fixture(&graphics);
+    // The test holds two frames at once, one in each texture.
+    let ring = [host_texture(&graphics), host_texture(&graphics)];
+    let fixture = styled_fixture();
+    let session = graphics.borrowed_texture_session(fixture.map(), EXTENT, &ring);
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let frame = session
         .handle
@@ -100,8 +108,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let _global = global_state();
     let reports = capture_reports();
 
-    let graphics = Graphics::new();
-    let (fixture, session) = rendering_fixture(&graphics);
+    let (fixture, session) = offscreen_fixture();
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let (runtime, map) = fixture.into_parts();
     // No explicit close: each drop disposes its handle, children first.
@@ -109,8 +116,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     drop(handle);
     drop(map);
     drop(runtime);
-    // The graph retires off this thread, and the session can still reach the
-    // device until it does, so the device outlives the session's wakes.
+    // The graph retires off this thread, which releases the session's wakes.
     await_release(&wakes.released);
 
     set_reporter(None);
@@ -118,20 +124,18 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     assert!(leaked.is_empty(), "{leaked:?}");
 }
 
-// Only a core worker attaches without the host servicing driver work, which
-// is what dropping the session takes away. Context-sharing backends drive
-// their sessions from the host's thread.
-#[cfg(not(mln_render_backend = "opengl"))]
+// An offscreen session's core worker attaches without the host servicing
+// driver work, which is what dropping the session takes away.
 #[test]
 fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     let _global = global_state();
     let reports = capture_reports();
 
-    let graphics = Graphics::new();
     let fixture = styled_fixture();
     let (options, wakes) = Session::attach_options(RenderDriverKind::CoreWorker);
-    let (session, attached) = graphics
-        .attach_owned_texture(fixture.map(), EXTENT, &options)
+    let (session, attached) = fixture
+        .map()
+        .attach_offscreen(&OffscreenDescriptor::new(EXTENT), &options, None)
         .unwrap();
     // The drop races the attachment. Native owns the session either way, so
     // the completion still resolves and nothing leaks.
@@ -142,7 +146,7 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     let (runtime, map) = fixture.into_parts();
     drop(map);
     drop(runtime);
-    // The options hold the wakes too, and the device outlives them.
+    // The options hold the wakes too.
     drop(options);
     await_release(&wakes.released);
 

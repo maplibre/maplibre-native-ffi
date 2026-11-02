@@ -13,11 +13,21 @@ const (
 
 // A shared WGL context takes the caller driver, which runs on the thread the
 // fixture made that context current on.
-func attachOwnedTexture(
-	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
+func attachBorrowedTexture(
+	m *MapHandle, context testsupport.Context, extent LogicalExtent, textures []*testsupport.Texture,
+	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	return m.AttachOpenGlOwnedTexture(OpenGlOwnedTextureDescriptor{
-		Extent: extent,
+	ring := make([]OpenGlBorrowedTexture, len(textures))
+	for index, texture := range textures {
+		ring[index] = OpenGlBorrowedTexture{Texture: texture.Info.OpenGlTexture}
+	}
+	info := textures[0].Info
+	return m.AttachOpenGlBorrowedTexture(OpenGlBorrowedTextureDescriptor{
+		Extent:         extent,
+		PhysicalWidth:  info.Width,
+		PhysicalHeight: info.Height,
+		Textures:       ring,
+		Target:         info.OpenGlTarget,
 		Context: OpenGlContextDescriptor{
 			Ownership: OpenGlContextOwnershipShared,
 			Data: OpenGlContextDescriptorDataWglVariant{Value: WglContextDescriptor{

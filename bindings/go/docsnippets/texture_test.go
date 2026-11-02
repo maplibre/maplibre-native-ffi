@@ -51,15 +51,6 @@ func renderToTexture(
 	images, views, newImages, newViews [2]uint64,
 ) error {
 	// #region attach-owned
-	texture := maplibre.VulkanOwnedTextureDescriptor{
-		// The texture's size in logical pixels, and its scale factor.
-		Extent: maplibre.LogicalExtent{
-			Width: 800, Height: 600, ScaleFactor: 2,
-		},
-		// Your VkInstance, VkPhysicalDevice,
-		// VkDevice, and graphics VkQueue.
-		Context: vulkan,
-	}
 	options := maplibre.RenderSessionAttachOptions{
 		Driver:    maplibre.RenderDriverKindCoreWorker,
 		FrameWake: maplibre.Wake{Callback: onFrameWake},
@@ -69,27 +60,7 @@ func renderToTexture(
 			Lock: queue.Lock, Unlock: queue.Unlock,
 		},
 	}
-
-	owned, ready, err := m.AttachVulkanOwnedTexture(texture, options)
-	if err != nil {
-		return err
-	}
-	session = owned
-	if _, err := ready.Await(ctx); err != nil {
-		return err
-	}
 	// #endregion attach-owned
-
-	if err := drawFrame(); err != nil {
-		return err
-	}
-	closed, err := session.Close()
-	if err != nil {
-		return err
-	}
-	if _, err := closed.Await(ctx); err != nil {
-		return err
-	}
 
 	// #region attach-borrowed
 	ring := maplibre.VulkanBorrowedTextureDescriptor{
@@ -109,7 +80,6 @@ func renderToTexture(
 		FinalLayout: 5,  // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 	}
 
-	// The same attach options as for an owned ring.
 	borrowed, ready, err := m.AttachVulkanBorrowedTexture(ring, options)
 	if err != nil {
 		return err
@@ -119,6 +89,10 @@ func renderToTexture(
 		return err
 	}
 	// #endregion attach-borrowed
+
+	if err := drawFrame(); err != nil {
+		return err
+	}
 
 	// #region resize-borrowed
 	ring.Extent = maplibre.LogicalExtent{

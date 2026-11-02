@@ -15,6 +15,12 @@ internal object TestGraphicsJni {
 
   external fun makeCurrent(graphics: Long): Boolean
 
+  external fun textureCreate(graphics: Long, width: Int, height: Int): Long
+
+  external fun textureInfo(texture: Long): LongArray?
+
+  external fun textureDestroy(texture: Long)
+
   external fun lastError(): String
 
   external fun callCompletion(callback: Long, userData: Long, result: Long)
@@ -56,6 +62,29 @@ internal actual object TestGraphicsLibrary {
     }
   }
 
-  actual fun transferredCanvas(width: Int, height: Int): TestCanvas =
-    throw UnsupportedOperationException("tests/graphics transfers no canvas; only WebGL does")
+  actual fun createTexture(graphics: Long, width: Int, height: Int): TestTexture {
+    val texture = TestGraphicsJni.textureCreate(graphics, width, height)
+    check(texture != 0L) {
+      "tests/graphics could not create a texture: ${TestGraphicsJni.lastError()}"
+    }
+    val values = TestGraphicsJni.textureInfo(texture)
+    if (values == null) {
+      val reason = TestGraphicsJni.lastError()
+      TestGraphicsJni.textureDestroy(texture)
+      error("tests/graphics could not describe a texture: $reason")
+    }
+    return TestTexture(
+      vulkanImage = values[0].toULong(),
+      vulkanImageView = values[1].toULong(),
+      metalTexture = values[2],
+      width = values[3].toUInt(),
+      height = values[4].toUInt(),
+      format = values[5].toUInt(),
+      vulkanFinalLayout = values[6].toUInt(),
+      openGlTexture = values[7].toUInt(),
+      openGlTarget = values[8].toUInt(),
+    ) {
+      TestGraphicsJni.textureDestroy(texture)
+    }
+  }
 }

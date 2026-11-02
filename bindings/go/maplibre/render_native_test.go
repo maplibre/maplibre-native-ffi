@@ -22,7 +22,7 @@ func TestNativeWakesServiceASessionAndAreReleasedOnce(t *testing.T) {
 	r.attach(t)
 	r.renderFrame(t)
 
-	if _, _, err := r.attachTexture(options); !errors.Is(err, StatusInvalidState) {
+	if _, _, err := r.attachSession(options); !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("attach with consumed native wakes = %v, want StatusInvalidState", err)
 	}
 	if frames.releases.Load() != 0 || driverWork.releases.Load() != 0 {
@@ -54,7 +54,7 @@ func TestNativeQueueLockReachesTheAttach(t *testing.T) {
 	options := r.options()
 	options.QueueLock = lock.queueLock()
 	if !queueLockSupported {
-		if _, _, err := r.attachTexture(options); !errors.Is(err, StatusUnsupported) {
+		if _, _, err := r.attachSession(options); !errors.Is(err, StatusUnsupported) {
 			t.Fatalf("attach with a queue lock = %v, want StatusUnsupported", err)
 		}
 		if releases := lock.releases.Load(); releases != 1 {

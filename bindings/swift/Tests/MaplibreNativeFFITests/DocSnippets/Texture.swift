@@ -43,30 +43,13 @@
     newViews: [UInt64]
   ) async throws {
     // #region attach-owned
-    let texture = VulkanOwnedTextureDescriptor(
-      // The texture's size in logical pixels, and its scale factor.
-      extent: LogicalExtent(width: 800, height: 600, scaleFactor: 2),
-      // Your VkInstance, VkPhysicalDevice,
-      // VkDevice, and graphics VkQueue.
-      context: vulkan
-    )
     let options = RenderSessionAttachOptions(
       driver: .coreWorker,
       frameWake: Wake(callback: onFrameWake),
       // Only if your renderer also submits to the graphics queue.
       queueLock: QueueLock(lock: lockQueue, unlock: unlockQueue)
     )
-
-    let owned = try map.attachVulkanOwnedTexture(
-      descriptor: texture,
-      options: options
-    )
-    session = owned.session
-    try await owned.ready.value
     // #endregion attach-owned
-
-    try drawFrame()
-    try await session.close()
 
     // #region attach-borrowed
     var ring = VulkanBorrowedTextureDescriptor(
@@ -84,7 +67,6 @@
       finalLayout: 5 // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-    // The same attach options as for an owned ring.
     let borrowed = try map.attachVulkanBorrowedTexture(
       descriptor: ring,
       options: options
@@ -92,6 +74,8 @@
     session = borrowed.session
     try await borrowed.ready.value
     // #endregion attach-borrowed
+
+    try drawFrame()
 
     // #region resize-borrowed
     ring.extent = LogicalExtent(
