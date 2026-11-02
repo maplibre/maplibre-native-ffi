@@ -320,12 +320,17 @@ class Values:
             value.native in writers for writers in self.split_writers.values()
         )
 
-    def field_default(self, field):
-        """A field's zero value, or None when a caller must give it."""
-        return None if field.required else self.default(field.value)
+    def member_default(self, field, typ, required=False):
+        """The default of a record member of Kotlin type [typ], or None when
+        a caller must give it."""
+        if required or field.required:
+            return None
+        if typ.endswith("?"):
+            return "null"
+        return self.value_default(field.value)
 
-    def default(self, value):
-        """A field's default, or None when a caller must give it."""
+    def value_default(self, value):
+        """A value's zero value, or None when it has none."""
         if value.nullable:
             return "null"
         if value.kind == "scalar":
@@ -343,8 +348,7 @@ class Values:
                 if not value.union_member
                 and not self.output_only(value)
                 and all(
-                    not field.required
-                    and (typ.endswith("?") or self.field_default(field))
+                    self.member_default(field, typ) is not None
                     for _, typ, field in self.members(value)
                 )
                 else None
@@ -429,13 +433,7 @@ class Values:
             required = self.output_only(value)
             for member, typ, field in self.members(value):
                 typed.append((member, typ))
-                default = (
-                    None
-                    if required or field.required
-                    else "null"
-                    if typ.endswith("?")
-                    else self.field_default(field)
-                )
+                default = self.member_default(field, typ, required)
                 args.append(
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
                     + f"  public val {member}: {typ}"

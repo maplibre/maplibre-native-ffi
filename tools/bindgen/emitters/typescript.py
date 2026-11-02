@@ -10,6 +10,7 @@ execution shape.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from .. import async_hosts, docs, model
 from ..compiler import compile_api
@@ -38,6 +39,21 @@ TS_DIRECTORY = "bindings/typescript/src"
 NATIVE_DIRECTORY = "bindings/typescript/native"
 
 
+class PublicParameter(NamedTuple):
+    """A parameter of the public TypeScript method."""
+
+    name: str
+    type: str
+    default: str | None
+
+
+class NativeParameter(NamedTuple):
+    """A parameter of the addon function, for the addon interface."""
+
+    name: str
+    type: str
+
+
 @dataclass
 class Lowered:
     """One operation, as both halves of the binding call it."""
@@ -45,13 +61,11 @@ class Lowered:
     plan: OperationPlan
     owner: str | None
     method: str
-    # (name, type, default) of each public parameter.
-    parameters: list[tuple[str, str, str | None]] = field(default_factory=list)
+    parameters: list[PublicParameter] = field(default_factory=list)
     # The TypeScript expressions that the addon function receives, before
     # the completion token.
     arguments: list[str] = field(default_factory=list)
-    # (name, type) of each addon parameter, for the addon interface.
-    native_parameters: list[tuple[str, str]] = field(default_factory=list)
+    native_parameters: list[NativeParameter] = field(default_factory=list)
     native_result: str = "void"
     shape: str = "call"
     returns: str = "void"

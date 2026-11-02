@@ -340,13 +340,7 @@ def declaration(value, values):
         values.members(value), key=lambda member: member[2].value.kind == "callback"
     )
     for member, typ, field in members:
-        default = (
-            None
-            if field.required
-            else "null"
-            if typ.endswith("?")
-            else values.field_default(field)
-        )
+        default = values.member_default(field, typ)
         defaults.append(f"{member}: {typ}" + (f" = {default}" if default else ""))
         parameters.append(
             doc(values.bound, f"{value.native}.{field.name}", "  ")

@@ -289,39 +289,6 @@ def checked_call(
     return f"{runtime}::check(|diagnostic| unsafe {{ {call} }})"
 
 
-def reads_receiver(plan: OperationPlan) -> bool:
-    """An immediate receiver call copies borrowed output without a native view
-    scope, which the Python binding guards."""
-    from .rust_dynamic_values import dynamic
-
-    def borrowed(value):
-        target = value.unwrapped
-        return "owner" in {value.lifetime, target.lifetime} or dynamic(target)
-
-    return bool(
-        plan.receiver
-        and not plan.consumes
-        and not plan.view
-        and plan.execution == "immediate"
-        and any(
-            borrowed(output.value)
-            for output in plan.outputs
-            if not output.sized_by and not output.result_length
-        )
-    )
-
-
-def counted_owner(bound: BoundApi, native: str) -> bool:
-    """A release must not overlap a copy from this owner's borrowed output."""
-    return any(
-        reads_receiver(plan)
-        and any(
-            p.name == plan.receiver and p.value.native == native for p in plan.inputs
-        )
-        for plan in bound.operations
-    )
-
-
 def lower(api: Api | BoundApi) -> Lowered:
     chunks, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api)
