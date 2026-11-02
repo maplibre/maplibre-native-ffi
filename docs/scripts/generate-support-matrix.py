@@ -13,6 +13,7 @@ from tools.ci import plan
 from tools.ci.gaps import (
     BACKEND_LABELS,
     BINDING_LABELS,
+    DEVICE_PLATFORMS,
     GAP_STATUSES,
     OPERATIONS,
     PLATFORM_LABELS,
@@ -87,11 +88,6 @@ def support_matrix() -> dict[str, Any]:
         )
 
     def cell(name: str, target: Target) -> dict[str, str]:
-        entry = (
-            explanation(name, target, "test")
-            or explanation(name, target, "build")
-            or explanation(name, target, "package")
-        )
         status = coverage.get((name, target))
         if status is None:
             entry = explanation(name, target, "test") or explanation(
@@ -102,18 +98,16 @@ def support_matrix() -> dict[str, Any]:
                     f"error: CI does not reach {name} on {target}; add its gap to docs/support-gaps.toml"
                 )
             status = entry.status
-        result = {"status": status}
-        if entry and entry.reason:
-            # Tooltips show plain text, so code spans drop their backticks.
-            result["detail"] = entry.reason.replace("`", "")
-        return result
+        return {"status": status}
 
-    platforms: dict[str, dict[tuple[str, str], dict[str, list[dict[str, Any]]]]] = (
-        defaultdict(lambda: defaultdict(dict))
-    )
+    platforms: dict[
+        str, dict[tuple[str, str | None], dict[str, list[dict[str, str]]]]
+    ] = defaultdict(lambda: defaultdict(dict))
     for target in targets:
-        arch = (target.arch, target.arch_label())
-        platforms[target.platform][arch][target.backend] = [
+        variant = None
+        if target.platform in DEVICE_PLATFORMS:
+            variant = "simulator" if target.simulator else "device"
+        platforms[target.platform][(target.arch, variant)][target.backend] = [
             cell(name, target) for name in BINDING_LABELS
         ]
 
@@ -140,7 +134,7 @@ def support_matrix() -> dict[str, Any]:
                 "architectures": [
                     {
                         "arch": arch,
-                        "label": label,
+                        **({"variant": variant} if variant else {}),
                         "backends": [
                             {
                                 "backend": value,
@@ -150,7 +144,7 @@ def support_matrix() -> dict[str, Any]:
                             for value, cells in backends.items()
                         ],
                     }
-                    for (arch, label), backends in architectures.items()
+                    for (arch, variant), backends in architectures.items()
                 ],
             }
             for name, architectures in platforms.items()
