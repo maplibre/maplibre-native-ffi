@@ -132,8 +132,11 @@ test(
   "a map keeps its runtime reachable",
   async () => {
     const { map, runtime } = await mapWithoutItsRuntime();
-    // Had the collector reclaimed the runtime, its owner token would have
-    // disposed the runtime and the map, and both closes would fail.
+    // A new WeakRef holds its target until the job that made it ends, so the
+    // collection waits a turn. Had the collector reclaimed the runtime, its
+    // owner token would have disposed the runtime and the map, and both closes
+    // would fail.
+    await turn();
     capabilities.forcedGc!();
     await turn();
     await bounded(map.close(), "map close");
