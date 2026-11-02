@@ -200,11 +200,11 @@ static void open_map(enum target_kind kind, retarget_map* out) {
   bool attached = false;
   switch (kind) {
     case TARGET_OWNED:
-      attached = mln_test_render_fixture_create(out->map, &out->fixture);
+      attached = mln_test_render_fixture_create_owned(out->map, &out->fixture);
       break;
     case TARGET_BORROWED:
-      attached = mln_test_render_fixture_create_borrowed_texture(
-        out->map, &out->fixture
+      attached = mln_test_render_fixture_create_borrowed_ring(
+        out->map, &out->fixture, 1, MLN_TEST_PRESET_DRIVER
       );
       break;
     case TARGET_SURFACE:

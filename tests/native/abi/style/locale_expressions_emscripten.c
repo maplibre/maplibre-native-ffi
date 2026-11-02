@@ -57,7 +57,9 @@ static void open_map(
   mln_test_load_style_and_wait(
     map->map, mln_test_buffer_view(style, (size_t)size)
   );
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map->map, &map->fixture));
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_offscreen(map->map, &map->fixture)
+  );
   // The still image waits for the source to load.
   MLN_TEST_OK(mln_test_render_still_image(&map->fixture, map->map));
 }

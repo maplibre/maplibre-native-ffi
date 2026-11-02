@@ -18,15 +18,26 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(graphics, mln_test_graphics_last_error());
   mln_test_graphics_context context = {0};
   TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
+  mln_test_graphics_texture* texture =
+    mln_test_graphics_texture_create(graphics, 32, 32);
+  TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
+  mln_test_graphics_texture_info info = {0};
+  TEST_ASSERT_TRUE(mln_test_graphics_texture_get_info(texture, &info));
+  const mln_vulkan_borrowed_texture image = {
+    .image = info.vulkan_image,
+    .image_view = info.vulkan_image_view,
+  };
 
-  mln_vulkan_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_owned_texture_descriptor)
+  mln_vulkan_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
   };
   descriptor.extent = (mln_logical_extent){
     .width = 32,
     .height = 32,
     .scale_factor = 1.0,
   };
+  descriptor.physical_width = 32;
+  descriptor.physical_height = 32;
   descriptor.context = (mln_vulkan_context_descriptor){
     .instance = context.vulkan_instance,
     .physical_device = context.vulkan_physical_device,
@@ -38,15 +49,18 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
     .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
     .get_device_proc_addr = context.vulkan_get_device_proc_addr,
   };
+  descriptor.textures = &image;
+  descriptor.texture_count = 1;
+  descriptor.format = info.format;
+  descriptor.final_layout = info.vulkan_final_layout;
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
-  options.requested_texture_ring_depth = 2;
   mln_render_session session = MLN_HANDLE_NULL;
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_attach_vulkan_owned_texture(
+    mln_map_attach_vulkan_borrowed_texture(
       map, &descriptor, &options, &session, &completion.descriptor, NULL
     )
   );
@@ -65,8 +79,9 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   );
 
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   mln_test_render_fixture_destroy(&fixture);
+  mln_test_graphics_texture_destroy(texture);
   mln_test_graphics_destroy(graphics);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

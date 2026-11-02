@@ -41,7 +41,7 @@ static void a_static_map_renders_still_images(void) {
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   mln_test_completion still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, NULL));
@@ -83,7 +83,7 @@ static void a_tile_map_session_resizes_between_still_images(void) {
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_TILE);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
 
   MLN_TEST_RENDER_AWAIT(
@@ -193,7 +193,7 @@ static void a_still_image_waits_for_the_next_session(void) {
   MLN_TEST_OK(mln_map_request_still_image(held.map, &still.descriptor, NULL));
 
   mln_test_render_fixture first = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(held.map, &first));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(held.map, &first));
   render_until_tile_requested(&first, &held);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &first,
@@ -210,7 +210,7 @@ static void a_still_image_waits_for_the_next_session(void) {
   // Detach cancelled the held request, so the next session's renderer asks
   // for the tile again and receives an empty one.
   mln_test_render_fixture second = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(held.map, &second));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(held.map, &second));
   MLN_TEST_OK(mln_test_render_pending_still_image(&second, &still));
   mln_test_completion_destroy(&still);
   answer_held_tile(&held);
@@ -225,7 +225,7 @@ static void a_barrier_ends_a_still_image_demand_until_the_next(void) {
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   mln_render_session_capabilities capabilities = {
     .size = sizeof(mln_render_session_capabilities)
@@ -272,7 +272,9 @@ static void host_demands_and_a_still_image_demand_never_replace_each_other(
 ) {
   held_tile_map held = create_held_tile_map();
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(held.map, &fixture));
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_offscreen(held.map, &fixture)
+  );
   mln_test_completion still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(held.map, &still.descriptor, NULL));
   render_until_tile_requested(&fixture, &held);

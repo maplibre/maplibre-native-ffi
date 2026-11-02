@@ -41,14 +41,35 @@ struct Fixture {
   mln_test_render_fixture render{};
 };
 
-// A map with a loaded style, attached to the preset's render fixture. The
-// render fixture's wakes point into it, so it is filled in place.
+// A map with a loaded style, attached to a borrowed ring on the preset's
+// driver. The render fixture's wakes point into it, so it is filled in place.
 void create_fixture(Fixture& fixture) {
   fixture.runtime = mln_test_create_runtime();
   fixture.map = mln_test_create_map(fixture.runtime);
   mln_test_render_prepare_map(fixture.map);
   TEST_ASSERT_TRUE(
-    mln_test_render_fixture_create(fixture.map, &fixture.render)
+    mln_test_render_fixture_create_borrowed(fixture.map, &fixture.render)
+  );
+}
+
+// create_fixture() for a case that resizes the session, which only a session
+// that owns its texture does.
+void create_offscreen_fixture(Fixture& fixture) {
+  fixture.runtime = mln_test_create_runtime();
+  fixture.map = mln_test_create_map(fixture.runtime);
+  mln_test_render_prepare_map(fixture.map);
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_offscreen(fixture.map, &fixture.render)
+  );
+}
+
+// create_fixture() for a case about a ring that the session owns.
+void create_owned_fixture(Fixture& fixture) {
+  fixture.runtime = mln_test_create_runtime();
+  fixture.map = mln_test_create_map(fixture.runtime);
+  mln_test_render_prepare_map(fixture.map);
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_owned(fixture.map, &fixture.render)
   );
 }
 
@@ -69,7 +90,7 @@ void block_driver(const Fixture& fixture, DriverBlocker& blocker) {
 
 void a_resize_queued_before_detach_completes_as_failed() {
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_offscreen_fixture(fixture);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
   auto resize = mln_test_completion_default(0);
@@ -479,7 +500,11 @@ void a_failed_release_submission_preserves_the_acquired_frame() {
 void resize_and_driver_exceptions_use_the_session_failure_path() {
   for (const auto resize_failure : {false, true}) {
     auto fixture = Fixture{};
-    create_fixture(fixture);
+    if (resize_failure) {
+      create_offscreen_fixture(fixture);
+    } else {
+      create_fixture(fixture);
+    }
     mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
     if (resize_failure) install_frame_failure(fixture, FrameFailure::Resize);
     auto blocker = DriverBlocker{};
@@ -550,7 +575,7 @@ void a_failed_session_completes_its_pending_still_image() {
       fixture.map, mln_test_red_background_style_json
     );
     TEST_ASSERT_TRUE(
-      mln_test_render_fixture_create(fixture.map, &fixture.render)
+      mln_test_render_fixture_create_borrowed(fixture.map, &fixture.render)
     );
     MLN_TEST_OK(mln_test_render_still_image(&fixture.render, fixture.map));
     install_frame_failure(fixture, failure);
@@ -697,7 +722,7 @@ void an_update_during_a_failed_still_image_attempt_retries_it() {
   fixture.map = mln_test_create_map_with_options(fixture.runtime, &options);
   mln_test_load_style_and_wait(fixture.map, mln_test_red_background_style_json);
   TEST_ASSERT_TRUE(
-    mln_test_render_fixture_create(fixture.map, &fixture.render)
+    mln_test_render_fixture_create_borrowed(fixture.map, &fixture.render)
   );
   MLN_TEST_OK(mln_test_render_still_image(&fixture.render, fixture.map));
   auto update = UpdateDuringAttempt{.map = fixture.map};
@@ -748,7 +773,7 @@ void an_idle_demand_reports_a_failed_backend_activation() {
 
 void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_offscreen_fixture(fixture);
   mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
@@ -912,7 +937,7 @@ void unforced_demands_supersede_and_forced_demands_render() {
 
 void supersession_preserves_a_forced_demand_after_a_resize() {
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_offscreen_fixture(fixture);
   mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   auto before = mln_render_session_snapshot{};
   before.size = sizeof(before);
@@ -953,7 +978,7 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
 
 void scheduler_service_preserves_a_forced_demand_after_a_resize() {
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_offscreen_fixture(fixture);
   mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
@@ -998,7 +1023,7 @@ void submit_concurrent_resize(void* context) {
 void concurrent_resizes_publish_matching_map_and_driver_extents() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_offscreen_fixture(fixture);
   auto first = mln_test_completion_default(0);
   auto second = mln_test_completion_default(0);
   auto a = ConcurrentResize{fixture.render.session, {32, 48, 1.0}, &first};
@@ -1397,11 +1422,11 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
 // host's GPU read is done. Abandon runs the queued release before it decides
 // what to keep, so it destroys a Vulkan or Metal ring with the rest. Holding
 // the driver keeps the release queued until the abandon, which no public
-// fence reaches.
+// fence reaches. Only a ring that the session owns is the session's to keep.
 void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_owned_fixture(fixture);
   auto frame = mln_test_render_and_acquire(&fixture.render, 141);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
@@ -1461,12 +1486,12 @@ void release_with_a_gpu_wait(
 // A frame release can reach a session after abandon took its backend and
 // before abandon decides what to keep. Native never runs the GPU wait that
 // such a release hands over, so the host's GPU may still read the slot, and
-// abandon keeps the ring. The blocked driver keeps the operation queued until
-// abandon discards it, which no public fence reaches.
+// abandon keeps the ring that the session owns. The blocked driver keeps the
+// operation queued until abandon discards it, which no public fence reaches.
 void abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
-  create_fixture(fixture);
+  create_owned_fixture(fixture);
   {
     // The session accepts the fence that the racing release hands over.
     const auto live = mln::core::lease_render_session(fixture.render.session);

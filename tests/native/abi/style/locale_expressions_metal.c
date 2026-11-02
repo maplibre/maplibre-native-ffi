@@ -100,7 +100,7 @@ static uint32_t selected_names(
     map, mln_test_buffer_view(style, (size_t)style_size)
   );
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   // The still image waits for the source to load.
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
 

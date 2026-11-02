@@ -278,7 +278,7 @@ static void a_reloaded_style_renders_a_layer_added_again(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(reload_base_style));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   add_composed_circle(map);
   expect_green_center(&fixture, map);
 

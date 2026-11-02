@@ -216,7 +216,7 @@ static void a_rendered_ease_completes_at_its_target(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_drain_all(runtime);
 
   mln_test_transition_end probe;
@@ -263,7 +263,7 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_background_style_json));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   const mln_camera_update ease = ease_to_zoom(5.0, 20.0, NULL);
   const uint64_t started = update_camera_generation(map, &ease);
@@ -605,7 +605,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   const mln_camera start = query_camera(map);
 
   mln_test_transition_end rendered;
@@ -660,7 +660,7 @@ static void an_animated_delta_replaces_the_running_one(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_transition_end replaced;
   mln_test_transition_end_init(&replaced);
   mln_camera_delta first =

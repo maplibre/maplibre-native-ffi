@@ -41,7 +41,7 @@ static void render_style(
   mln_test_render_fixture* fixture
 ) {
   mln_test_load_style_and_wait(map, style);
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, fixture));
   rendered_count wait = {.fixture = fixture, .count = rendered};
   TEST_ASSERT_TRUE(mln_test_style_render_until(
     fixture, renders_count, &wait, "the style's features to render"
@@ -251,7 +251,7 @@ static void location_indicator_hits_name_only_their_layer(void) {
     map, MLN_BUFFER_LITERAL("dot"), &image, NULL, &completion.descriptor, NULL
   ));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   rendered_count wait = {.fixture = &fixture, .count = 1};
   TEST_ASSERT_TRUE(mln_test_style_render_until(
     &fixture, renders_count, &wait, "the location indicator to render"
@@ -458,7 +458,7 @@ static void source_queries_read_the_named_source_layers(void) {
     (mln_buffer_view){0}, &completion.descriptor, NULL
   ));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   fetch_wait fetched = {.fetches = &fetches};
   TEST_ASSERT_TRUE(mln_test_style_render_until(
     &fixture, root_fetched, &fetched, "the root tile fetch"
@@ -713,7 +713,7 @@ static void malformed_queries_are_rejected_at_submission(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   static const mln_test_validation_case cases[] = {
     {"undersized geometry", undersized_geometry, MLN_STATUS_INVALID_ARGUMENT,

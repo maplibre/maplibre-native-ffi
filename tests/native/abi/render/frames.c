@@ -18,7 +18,7 @@ static void attach(
   *runtime = mln_test_create_runtime();
   *map = mln_test_create_map(*runtime);
   mln_test_load_style_and_wait(*map, style);
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(*map, fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(*map, fixture));
 }
 
 static void detach(
@@ -45,7 +45,7 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_render_session_get_failure(fixture.session, NULL));
   mln_test_completion readback = mln_test_completion_readback();
   MLN_TEST_OK(
@@ -63,7 +63,8 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   MLN_TEST_OK(mln_render_session_get_failure(fixture.session, NULL));
 
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
-  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 260);
+  mln_test_render_request_forced(&fixture, 260);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   mln_texture_image_info info = {0};
   uint8_t pixel[4] = {0};
   MLN_TEST_OK(mln_test_render_read_back(&fixture, &info, pixel, 4));
@@ -71,7 +72,6 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   TEST_ASSERT_EQUAL_UINT32(64, info.height);
   const uint8_t red[4] = {255, 0, 0, 255};
   TEST_ASSERT_EQUAL_HEX8_ARRAY(red, pixel, 4);
-  mln_test_render_release_frame(&frame);
   detach(runtime, map, &fixture);
 }
 
@@ -221,7 +221,8 @@ static uint64_t expect_preset_texture(
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->texture);
   // GL_TEXTURE_2D.
   TEST_ASSERT_EQUAL_HEX32(0x0DE1, frame->target);
-  TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->internal_format);
+  // The host knows a borrowed ring's format, so the frame reports none.
+  TEST_ASSERT_EQUAL_UINT32(0, frame->internal_format);
 #else
   const mln_web_gpu_texture_frame* frame = &record->webgpu;
   TEST_ASSERT_NOT_NULL(frame->texture);
@@ -424,11 +425,10 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
 }
 
 // Abandon right after the host acquires a frame succeeds even though a core
-// worker may still be inside the call that rendered it. The host's GPU may
-// still read the frame's texture, so abandon keeps the ring's backend. It
-// destroys a Vulkan or Metal renderer, whose objects the host never reads,
-// and keeps an OpenGL or WebGPU one, which only its graphics thread may
-// destroy.
+// worker may still be inside the call that rendered it. The ring's textures
+// are the host's, so abandon destroys a Vulkan or Metal backend and renderer,
+// whose objects the host never reads, and keeps an OpenGL or WebGPU one,
+// which only its graphics thread may destroy.
 static void an_acquired_frame_still_releases_after_abandon(void) {
   mln_runtime runtime;
   mln_map map;
@@ -440,12 +440,15 @@ static void an_acquired_frame_still_releases_after_abandon(void) {
     .size = sizeof(mln_render_abandon_result)
   };
   MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_CLEAN, abandoned.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(0, abandoned.quarantined_resource_count);
+#else
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
   );
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
-  TEST_ASSERT_EQUAL_UINT32(1, abandoned.quarantined_resource_count);
-#else
   TEST_ASSERT_EQUAL_UINT32(2, abandoned.quarantined_resource_count);
 #endif
   mln_render_frame_result invalid = {.size = sizeof(mln_render_frame_result)};
@@ -453,7 +456,7 @@ static void an_acquired_frame_still_releases_after_abandon(void) {
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(frame, &invalid, NULL)
   );
   mln_test_render_release_frame(&frame);
-  detach_keeping_the_ring(runtime, map, &fixture);
+  detach(runtime, map, &fixture);
 }
 
 // A release while detach is in flight finds the frame already released
@@ -618,12 +621,14 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
 }
 
 // Holding the first frame while the second renders is what puts a texture in
-// the second slot of the two-deep ring.
+// the second slot of the two-deep ring. Only a session that owns its ring
+// resizes it and reads it back.
 static void a_resize_retires_every_old_size_slot(void) {
-  mln_runtime runtime;
-  mln_map map;
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_test_render_fixture fixture = {0};
-  attach(&runtime, &map, &fixture, mln_test_empty_style_json);
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_owned(map, &fixture));
   mln_acquired_frame held = mln_test_render_and_acquire(&fixture, 301);
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 302);
   mln_test_render_release_frame(&frame);

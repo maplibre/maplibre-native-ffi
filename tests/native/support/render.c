@@ -170,26 +170,44 @@ mln_status mln_test_render_session_dispose(mln_render_session session) {
   return mln_test_completion_settle(&completion);
 }
 
-bool mln_test_render_fixture_create(
-  mln_map map, mln_test_render_fixture* fixture
+size_t mln_test_render_ring_depth(
+  const mln_render_session_attach_options* options
 ) {
-  return mln_test_render_fixture_create_with(
-    map, fixture, mln_test_backend_attach
-  );
+  const uint32_t requested = options->requested_texture_ring_depth;
+  if (requested == 0) {
+    return 2;
+  }
+  return requested < MLN_TEXTURE_RING_MAX_DEPTH ? requested
+                                                : MLN_TEXTURE_RING_MAX_DEPTH;
 }
 
-bool mln_test_render_fixture_create_with(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach
+// An offscreen session creates its own device, so the fixture holds no state.
+static bool attach_offscreen(
+  mln_map map, const mln_render_session_attach_options* options,
+  void** out_state, mln_render_session* out_session,
+  const mln_completion* completion, mln_status* out_status
 ) {
-  return mln_test_render_fixture_create_with_driver(
-    map, fixture, attach, mln_test_backend_driver()
+  mln_offscreen_descriptor descriptor = {
+    .size = sizeof(mln_offscreen_descriptor)
+  };
+  descriptor.extent = (mln_logical_extent){
+    .width = 64,
+    .height = 64,
+    .scale_factor = 1.0,
+  };
+  *out_state = NULL;
+  *out_status = mln_map_attach_offscreen(
+    map, &descriptor, options, MLN_HANDLE_NULL, out_session, completion,
+    MLN_TEST_DIAGNOSTIC
   );
+  return true;
 }
 
+// Attaches with `attach` on `driver`, asking for a ring of `ring_depth`
+// textures, where zero takes the default.
 static bool create_fixture(
   mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach, uint32_t driver,
+  mln_test_backend_attach_fn attach, uint32_t driver, uint32_t ring_depth,
   bool serviced_on_main_thread
 ) {
   if (map == MLN_HANDLE_NULL || fixture == NULL) {
@@ -203,6 +221,7 @@ static bool create_fixture(
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = fixture->driver;
+  options.requested_texture_ring_depth = ring_depth;
   options.frame_wake = (mln_wake){
     .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes
   };
@@ -263,11 +282,13 @@ static bool create_fixture(
   return true;
 }
 
-bool mln_test_render_fixture_create_with_driver(
+bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach, uint32_t driver
+  mln_test_backend_attach_fn attach
 ) {
-  return create_fixture(map, fixture, attach, driver, false);
+  return create_fixture(
+    map, fixture, attach, mln_test_backend_driver(), 0, false
+  );
 }
 
 #if defined(__EMSCRIPTEN__)
@@ -275,9 +296,48 @@ bool mln_test_render_fixture_create_serviced_on_main_thread(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
 ) {
-  return create_fixture(map, fixture, attach, mln_test_backend_driver(), true);
+  return create_fixture(
+    map, fixture, attach, mln_test_backend_driver(), 0, true
+  );
 }
 #endif
+
+bool mln_test_render_fixture_create_offscreen(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  return create_fixture(
+    map, fixture, attach_offscreen, MLN_RENDER_DRIVER_CORE_WORKER, 0, false
+  );
+}
+
+bool mln_test_render_fixture_create_borrowed(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  return mln_test_render_fixture_create_with(
+    map, fixture, mln_test_backend_attach_borrowed
+  );
+}
+
+bool mln_test_render_fixture_create_borrowed_ring(
+  mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
+) {
+  if (depth == 0 || depth > MLN_TEXTURE_RING_MAX_DEPTH) {
+    return false;
+  }
+  return create_fixture(
+    map, fixture, mln_test_backend_attach_borrowed,
+    driver == MLN_TEST_PRESET_DRIVER ? mln_test_backend_driver() : driver,
+    (uint32_t)depth, false
+  );
+}
+
+bool mln_test_render_fixture_create_owned(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  return mln_test_render_fixture_create_with(
+    map, fixture, mln_test_backend_attach_owned
+  );
+}
 
 mln_status mln_test_render_fixture_start_attach(
   mln_map map, const mln_render_session_attach_options* options,
@@ -289,7 +349,7 @@ mln_status mln_test_render_fixture_start_attach(
   mln_render_session_attach_options attach = *options;
   attach.driver = fixture->driver;
   mln_status status = MLN_STATUS_INVALID_STATE;
-  if (!mln_test_backend_attach(
+  if (!mln_test_backend_attach_borrowed(
         map, &attach, &fixture->backend_state, &fixture->session, completion,
         &status
       )) {

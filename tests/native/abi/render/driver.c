@@ -38,7 +38,7 @@ static void an_attached_session_holds_its_map(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
 
   mln_render_session_capabilities capabilities = {
     .size = sizeof(mln_render_session_capabilities)
@@ -73,7 +73,7 @@ static void an_attached_session_holds_its_map(void) {
   );
 
   mln_test_render_fixture second = {0};
-  TEST_ASSERT_FALSE(mln_test_render_fixture_create(map, &second));
+  TEST_ASSERT_FALSE(mln_test_render_fixture_create_borrowed(map, &second));
   TEST_ASSERT_NOT_NULL(
     strstr(mln_test_last_error(), "map already has an attached render session")
   );
@@ -121,7 +121,7 @@ static void an_attached_session_holds_its_map(void) {
   mln_render_frame_batch_release(batch);
 
   mln_test_render_fixture_destroy(&fixture);
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &second));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &second));
   mln_test_render_fixture_destroy(&second);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -132,7 +132,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
@@ -141,7 +141,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
     MLN_RENDER_SESSION_STATE_DETACHED, read_snapshot(fixture.session).state
   );
   mln_test_render_fixture other = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &other));
   mln_test_render_fixture_destroy(&other);
 
   const mln_render_session detached = fixture.session;
@@ -292,7 +292,7 @@ static void maintenance_commands_run_in_order_with_frames(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
 
   maintenance_probe probe = {.session = fixture.session};
   atomic_init(&probe.completed, false);
@@ -330,7 +330,7 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
 
   // A caller driver runs nothing until the case services it, so the command
   // is still queued at abandon. A core worker may already have run it, and
@@ -385,7 +385,7 @@ static void abandon_at_exit_keeps_every_graphics_object(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   mln_test_render_request_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
@@ -461,7 +461,7 @@ static void abandon_from_a_driver_completion_is_busy(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   // A rendered frame gives the maintenance command a renderer to act on.
   mln_test_render_request_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
@@ -623,7 +623,7 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&released));
 
   mln_test_render_fixture other = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &other));
   mln_test_render_fixture_destroy(&other);
 
   mln_test_render_fixture_destroy(&fixture);
@@ -674,7 +674,7 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   mln_test_render_fixture_destroy(&fixture);
 
   mln_test_render_fixture other = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &other));
   mln_test_render_fixture_destroy(&other);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -696,7 +696,7 @@ static void dispose_completes_once_the_session_has_retired(
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   mln_test_render_request_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   if (state == DISPOSED_DETACHED) {
@@ -723,7 +723,7 @@ static void dispose_completes_once_the_session_has_retired(
   mln_test_render_fixture_destroy(&fixture);
 
   mln_test_render_fixture other = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &other));
   mln_test_render_fixture_destroy(&other);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -745,7 +745,7 @@ static void dispose_rejects_an_invalid_completion_and_a_released_session(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   const mln_completion undersized = {0};
   MLN_TEST_INVALID(
     mln_render_session_dispose(fixture.session, &undersized, NULL)
@@ -794,7 +794,7 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   const mln_map_options map_options = mln_test_map_options();
   MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
   MLN_TEST_OK(mln_map_dispose(map, NULL));
   TEST_ASSERT_FALSE(atomic_load(&retired));
@@ -1090,7 +1090,7 @@ static void a_target_scale_that_differs_from_the_map_attaches_with_a_warning(
     options.initial_extent.scale_factor = 3.0;
     mln_map map = mln_test_create_map_with_options(runtime, &options);
     mln_test_render_fixture fixture = {0};
-    TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+    TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
     TEST_ASSERT_TRUE_MESSAGE(
       mln_test_wait_for_flag(&render_warning_logged),
       "the attach logged no render warning"

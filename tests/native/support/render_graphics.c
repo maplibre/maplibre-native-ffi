@@ -194,7 +194,7 @@ static mln_open_gl_context_descriptor host_context(
 }
 #endif
 
-bool mln_test_backend_attach(
+bool mln_test_backend_attach_owned(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
@@ -351,18 +351,17 @@ static bool describe_surface(
   return true;
 }
 
-static size_t attach_ring_depth = 1;
-
-static bool attach_borrowed_texture(
+bool mln_test_backend_attach_borrowed(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
+  const size_t depth = mln_test_render_ring_depth(options);
   host_state* state = host_state_create();
   if (state == NULL) {
     return false;
   }
-  for (size_t index = 0; index < attach_ring_depth; index += 1) {
+  for (size_t index = 0; index < depth; index += 1) {
     state->textures[index] = mln_test_graphics_texture_create(
       state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
     );
@@ -371,7 +370,7 @@ static bool attach_borrowed_texture(
   borrowed_entry entries[MLN_TEXTURE_RING_MAX_DEPTH];
   borrowed_descriptor descriptor;
   if (
-    state->texture_count != attach_ring_depth ||
+    state->texture_count != depth ||
     !describe_ring(
       &state->context, state->textures, state->texture_count, entries,
       &descriptor
@@ -383,6 +382,7 @@ static bool attach_borrowed_texture(
   }
   *out_state = state;
   mln_render_session_attach_options attach = *options;
+  attach.requested_texture_ring_depth = 0;
   attach.producer_sync_kinds |= attach_sync_kinds;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
@@ -444,35 +444,12 @@ static bool attach_surface(
   return true;
 }
 
-bool mln_test_render_fixture_create_borrowed_texture(
-  mln_map map, mln_test_render_fixture* fixture
-) {
-  return mln_test_render_fixture_create_with(
-    map, fixture, attach_borrowed_texture
-  );
-}
-
-bool mln_test_render_fixture_create_borrowed_ring(
-  mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
-) {
-  if (depth == 0 || depth > MLN_TEXTURE_RING_MAX_DEPTH) {
-    return false;
-  }
-  attach_ring_depth = depth;
-  const bool attached = mln_test_render_fixture_create_with_driver(
-    map, fixture, attach_borrowed_texture,
-    driver == MLN_TEST_PRESET_DRIVER ? mln_test_backend_driver() : driver
-  );
-  attach_ring_depth = 1;
-  return attached;
-}
-
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 bool mln_test_render_fixture_create_metal_owned_texture(
   mln_map map, mln_test_render_fixture* fixture, uint64_t pixel_format
 ) {
   attach_pixel_format = pixel_format;
-  const bool attached = mln_test_render_fixture_create(map, fixture);
+  const bool attached = mln_test_render_fixture_create_owned(map, fixture);
   attach_pixel_format = 0;
   return attached;
 }
@@ -483,10 +460,11 @@ bool mln_test_render_fixture_create_synced(
   mln_gpu_sync_kind_flags producer_sync_kinds
 ) {
   attach_sync_kinds = producer_sync_kinds;
-  const bool attached = borrowed ? mln_test_render_fixture_create_borrowed_ring(
-                                     map, fixture, 1, MLN_TEST_PRESET_DRIVER
-                                   )
-                                 : mln_test_render_fixture_create(map, fixture);
+  const bool attached = borrowed
+                          ? mln_test_render_fixture_create_borrowed_ring(
+                              map, fixture, 1, MLN_TEST_PRESET_DRIVER
+                            )
+                          : mln_test_render_fixture_create_owned(map, fixture);
   attach_sync_kinds = 0;
   return attached;
 }
@@ -530,8 +508,7 @@ bool mln_test_render_fixture_create_vulkan_owned_texture(
 ) {
   wrap_device_proc_addr = wrap;
   attach_queue_lock = queue_lock;
-  const bool attached =
-    mln_test_render_fixture_create_with(map, fixture, mln_test_backend_attach);
+  const bool attached = mln_test_render_fixture_create_owned(map, fixture);
   wrap_device_proc_addr = NULL;
   attach_queue_lock = NULL;
   return attached;

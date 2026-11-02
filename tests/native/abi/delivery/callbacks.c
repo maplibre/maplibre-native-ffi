@@ -122,7 +122,7 @@ static void a_custom_source_runs_its_fetches_and_cancels_then_its_release(
     MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
   ));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   queued_source fetched = {.queue = queue.handle, .fetches = 1};
   TEST_ASSERT_TRUE(mln_test_style_render_until(

@@ -16,7 +16,7 @@ static void a_borrowed_ring_frame_is_ordered_before_the_hosts_reads(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_webgpu_borrowed_ring_create(map, &fixture, 2));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
 
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
   mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};

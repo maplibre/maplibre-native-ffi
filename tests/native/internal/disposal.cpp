@@ -390,8 +390,8 @@ void flag_wake_release(void* context) {
   mln_test_pulse();
 }
 
-// Attaches the preset's render fixture with a frame wake whose release sets
-// `released`, which happens once disposal has retired the session.
+// Attaches a borrowed ring on the preset's driver with a frame wake whose
+// release sets `released`, which happens once disposal has retired the session.
 void attach_observed(
   mln_map map, mln_test_render_fixture& fixture, std::atomic_bool& released
 ) {
@@ -494,8 +494,8 @@ void a_map_releases_while_its_disposed_session_retires() {
 }
 
 // A session whose frame the host still holds keeps its target in the host's
-// hands, so disposal abandons it on every driver. The abandon keeps the ring,
-// and a kept Vulkan ring is a child of the host's device.
+// hands, so disposal abandons it on every driver. Whatever the abandon keeps
+// of a Vulkan session is a child of the host's device.
 void disposal_abandons_a_session_with_an_acquired_frame() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();

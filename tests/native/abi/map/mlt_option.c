@@ -165,7 +165,9 @@ static void render_recorded_tile(
   } else {
     add_custom_vector_source(out);
   }
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(out->map, &out->fixture));
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_offscreen(out->map, &out->fixture)
+  );
   MLN_TEST_OK(mln_test_render_still_image(&out->fixture, out->map));
 }
 

@@ -397,7 +397,7 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   atomic_store(&recorder.map, map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   MLN_TEST_AWAIT_OK(mln_map_set_style_json(
     map, mln_test_background_style_json, &completion.descriptor, NULL

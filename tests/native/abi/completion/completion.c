@@ -167,7 +167,7 @@ static void a_session_barrier_fences_a_discarded_resize(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_render_session_snapshot before = {.size = sizeof(before)};
   MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
   const mln_logical_extent extent = {
