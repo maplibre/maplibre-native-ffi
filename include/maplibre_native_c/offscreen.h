@@ -46,7 +46,8 @@ typedef struct mln_offscreen_device_options {
    * The OpenGL API that the device's sessions render with. An EGL device
    * defaults to MLN_OPEN_GL_CLIENT_API_GLES, and takes
    * MLN_OPEN_GL_CLIENT_API_GL too on Linux and FreeBSD. A WGL device
-   * takes only MLN_OPEN_GL_CLIENT_API_GL, its default. Other devices take
+   * takes only MLN_OPEN_GL_CLIENT_API_GL, its default, and a WebGL device
+   * only MLN_OPEN_GL_CLIENT_API_GLES, its default. Other devices take
    * neither.
    */
   mln_open_gl_client_api client_api
@@ -65,9 +66,12 @@ typedef struct mln_offscreen_descriptor {
  * mln_map_attach_offscreen() creates a device of its own when it gets none.
  * Create one to share it among the sessions on many maps, or to pick a GPU.
  *
+ * A browser WebGPU build can't create a device here, because the browser
+ * answers a request for one asynchronously. Attach without a device instead.
+ *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when this build's render backend can't create a
- *   device, or can't render with `client_api`.
+ * - MLN_STATUS_UNSUPPORTED in a browser WebGPU build, or when the device can't
+ *   render with `client_api`.
  * - MLN_STATUS_NATIVE_ERROR when `adapter_index` names no GPU, or the platform
  *   can't create the device.
  */
@@ -97,8 +101,6 @@ MLN_API void mln_offscreen_device_release(
  *
  * Returns:
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_UNSUPPORTED when `device` is null and this build's render
- *   backend can't create a device.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when `device` is null and the platform can't

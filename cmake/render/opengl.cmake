@@ -125,7 +125,7 @@ function(mln_ffi_configure_renderer target)
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/gl/headless_backend.cpp)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
-    # A browser host owns its WebGL context and hands it to a session, so
+    # A browser build makes its WebGL contexts through Emscripten, so
     # upstream's EGL headless host has nothing to do here.
     set(MLN_FFI_VENDOR_OPENGL_SOURCES)
   endif()
@@ -234,6 +234,9 @@ function(mln_ffi_configure_renderer target)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_offscreen_device.cpp)
+  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    list(APPEND MLN_FFI_OPENGL_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/render/opengl/webgl_offscreen_device.cpp)
   endif()
   set_source_files_properties(
     ${MLN_FFI_OPENGL_SOURCES}

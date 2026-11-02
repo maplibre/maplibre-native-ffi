@@ -3244,8 +3244,8 @@ type OffscreenDeviceOptions struct {
 	SingleContext *bool
 	// The OpenGL API that the device's sessions render with. An EGL device defaults
 	// to OpenGlClientApiGles, and takes OpenGlClientApiGl too on Linux and FreeBSD.
-	// A WGL device takes only OpenGlClientApiGl, its default. Other devices take
-	// neither.
+	// A WGL device takes only OpenGlClientApiGl, its default, and a WebGL device
+	// only OpenGlClientApiGles, its default. Other devices take neither.
 	ClientApi *OpenGlClientApi
 }
 
@@ -6033,8 +6033,6 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 //
 // Errors:
 //   - StatusInvalidState when the map already has a render session.
-//   - StatusUnsupported when device is null and this build's render backend
-//     can't create a device.
 //   - StatusNativeError when device is null and the platform can't create a
 //     device.
 func (receiver *MapHandle) AttachOffscreen(descriptor OffscreenDescriptor, options RenderSessionAttachOptions, device *OffscreenDeviceHandle) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
@@ -7356,12 +7354,15 @@ func SetNetworkStatus(status NetworkStatus) error {
 // MapHandle.AttachOffscreen() creates a device of its own when it gets none.
 // Create one to share it among the sessions on many maps, or to pick a GPU.
 //
+// A browser WebGPU build can't create a device here, because the browser
+// answers a request for one asynchronously. Attach without a device instead.
+//
 // See mln_offscreen_device_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
 //
 // Errors:
-//   - StatusUnsupported when this build's render backend can't create a device,
-//     or can't render with client_api.
+//   - StatusUnsupported in a browser WebGPU build, or when the device can't
+//     render with client_api.
 //   - StatusNativeError when adapter_index names no GPU, or the platform can't
 //     create the device.
 func NewOffscreenDevice(options *OffscreenDeviceOptions) (*OffscreenDeviceHandle, error) {

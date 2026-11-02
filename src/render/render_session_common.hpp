@@ -41,6 +41,7 @@
 #include "operation/operation.hpp"
 #include "render/discard_present.hpp"
 #include "render/queue_lock.hpp"
+#include "render/worker_condition.hpp"
 #include "wake/wake.hpp"
 
 struct mln_render_session_object;
@@ -881,7 +882,7 @@ struct mln_render_session_object
   // next one, so a demand that fails meanwhile leaves the image a retry.
   bool still_image_rearm = false;
   std::deque<mln::core::RenderDriverWork> driver_work;
-  std::condition_variable worker_condition;
+  mln::core::WorkerCondition worker_condition;
   mln::core::WorkerThread worker;
   // Backends with transfer-time thread attributes may replace the default
   // worker thread before attachment.

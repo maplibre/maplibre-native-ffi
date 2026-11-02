@@ -66,12 +66,15 @@ public sealed unsafe partial class OffscreenDeviceHandle
     /// <para><c>MapHandle.AttachOffscreen()</c> creates a device of its own
     /// when it gets none. Create one to share it among the sessions on many
     /// maps, or to pick a GPU.</para>
+    /// <para>A browser WebGPU build can't create a device here, because the
+    /// browser answers a request for one asynchronously. Attach without a
+    /// device instead.</para>
     /// <para>See <c>mln_offscreen_device_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when this build's render
-    /// backend can't create a device, or can't render with
+    /// <item><description><c>Status.Unsupported</c> in a browser WebGPU build,
+    /// or when the device can't render with
     /// <c>client_api</c>.</description></item>
     /// <item><description><c>Status.NativeError</c> when <c>adapter_index</c>
     /// names no GPU, or the platform can't create the

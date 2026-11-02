@@ -2532,7 +2532,8 @@ pub struct OffscreenDeviceOptions {
     /// The OpenGL API that the device's sessions render with. An EGL device
     /// defaults to `OpenGlClientApi::Gles`, and takes `OpenGlClientApi::Gl` too
     /// on Linux and FreeBSD. A WGL device takes only `OpenGlClientApi::Gl`, its
-    /// default. Other devices take neither.
+    /// default, and a WebGL device only `OpenGlClientApi::Gles`, its default.
+    /// Other devices take neither.
     pub client_api: Option<OpenGlClientApi>,
 }
 impl ToNative<sys::mln_offscreen_device_options> for OffscreenDeviceOptions {

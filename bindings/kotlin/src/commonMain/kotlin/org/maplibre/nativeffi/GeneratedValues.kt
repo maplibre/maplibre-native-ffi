@@ -2115,7 +2115,8 @@ public data class OffscreenDeviceOptions(
   /**
    * The OpenGL API that the device's sessions render with. An EGL device defaults to
    * `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux and FreeBSD. A WGL device
-   * takes only `OpenGlClientApi.GL`, its default. Other devices take neither.
+   * takes only `OpenGlClientApi.GL`, its default, and a WebGL device only `OpenGlClientApi.GLES`,
+   * its default. Other devices take neither.
    */
   public val clientApi: OpenGlClientApi? = null,
 )

@@ -38,7 +38,8 @@ public struct OffscreenDeviceOptions: Equatable, Hashable, Sendable {
   /// The OpenGL API that the device's sessions render with. An EGL device
   /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on
   /// Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
-  /// default. Other devices take neither.
+  /// default, and a WebGL device only `OpenGlClientApi.gles`, its default.
+  /// Other devices take neither.
   public var clientApi: OpenGlClientApi?
   public init(
     adapterIndex: UInt32? = nil,

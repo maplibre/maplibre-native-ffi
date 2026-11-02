@@ -571,8 +571,6 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_STATE` when the map already has a render session.
-        - `Status.UNSUPPORTED` when `device` is null and this build's render
-          backend can't create a device.
         - `Status.NATIVE_ERROR` when `device` is null and the platform can't
           create a device.
         """
@@ -1801,13 +1799,17 @@ class _OffscreenDeviceHandleOperations(GeneratedOperations):
         gets none. Create one to share it among the sessions on many maps, or
         to pick a GPU.
 
+        A browser WebGPU build can't create a device here, because the
+        browser answers a request for one asynchronously. Attach without a
+        device instead.
+
         See `mln_offscreen_device_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
 
         Errors:
 
-        - `Status.UNSUPPORTED` when this build's render backend can't create
-          a device, or can't render with `client_api`.
+        - `Status.UNSUPPORTED` in a browser WebGPU build, or when the device
+          can't render with `client_api`.
         - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the
           platform can't create the device.
         """

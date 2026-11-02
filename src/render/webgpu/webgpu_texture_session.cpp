@@ -29,6 +29,7 @@
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 #include "render/texture_session.hpp"
+#include "render/webgpu/webgpu_texture_session.hpp"
 // clang-format on
 
 namespace {
@@ -1271,6 +1272,15 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
 #else
   return 0;
 #endif
+}
+
+auto create_webgpu_owned_texture_backend(
+  const mln_web_gpu_owned_texture_descriptor& descriptor, mln::Size size,
+  std::size_t ring_depth, std::unique_ptr<TextureSessionBackend>& out_backend
+) -> mln_status {
+  out_backend =
+    std::make_unique<WebGPUTextureSessionBackend>(descriptor, size, ring_depth);
+  return MLN_STATUS_OK;
 }
 
 auto webgpu_owned_texture_attach_start(
