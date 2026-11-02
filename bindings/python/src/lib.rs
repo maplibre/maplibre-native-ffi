@@ -197,17 +197,6 @@ struct PyCompletionBridge {
     convert: Mutex<Option<PyCompletionConverter>>,
 }
 
-fn new_python_future(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    let future = py
-        .import("maplibre_native_ffi._future")?
-        .getattr("NativeFuture")?
-        .call0()?;
-    // The future stays pending until its completion arrives, so cancel()
-    // abandons the wait. Native work continues to its terminal disposition
-    // either way.
-    Ok(future)
-}
-
 unsafe extern "C" fn complete_python_future(
     user_data: *mut c_void,
     result: *const sys::mln_completion_result,
@@ -285,7 +274,11 @@ where
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
     let queue = generated_dispatch_queue()?;
-    let future = new_python_future(py)?.unbind();
+    let future = py
+        .import("maplibre_native_ffi._future")?
+        .getattr("NativeFuture")?
+        .call0()?
+        .unbind();
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
         convert: Mutex::new(Some(Box::new(convert))),
