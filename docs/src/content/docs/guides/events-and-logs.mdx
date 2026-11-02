@@ -12,9 +12,9 @@ logs.
 
 ## Set an event handler
 
-Set one event handler on the runtime to receive the events of every map on that
-runtime. Set it before you create a map, so that it receives the map's first
-events.
+Set one event handler on the runtime with [](api:mln_runtime_set_event_handler)
+to receive the events of every map on that runtime. Set it before you create a
+map, so that it receives the map's first events.
 
 Each event names its type and the map that sent it. Compare that map with the
 maps you hold.
@@ -27,17 +27,18 @@ work to another thread.
 ## Choose the events a map sends
 
 A map sends every event by default. To send only the events you act on, set an
-event mask in the map options. You can change a map's mask later.
+event mask in the map options. You can change a map's mask later with
+[](api:mln_map_set_event_mask).
 
-Events report style and resource loading, rendering, and camera changes. The API
-reference lists them.
+Events report style and resource loading, rendering, and camera changes, and
+[](api:mln_runtime_event_type) lists them.
 
 <Snippet page="events-and-logs" region="mask" />
 
 ## Capture logs
 
-Set a log callback to send the library's logs to your logger. One callback
-receives the logs of every runtime in the process.
+Set a log callback with [](api:mln_log_set_callback) to send the library's logs
+to your logger. One callback receives the logs of every runtime in the process.
 
 The callback runs on a library thread, and it can't call the library.
 

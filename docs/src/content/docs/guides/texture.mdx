@@ -47,14 +47,14 @@ destroy them only after the session closes.
 
 Render frames with the same loop as for a window, without asking to present.
 
-When a frame renders, acquire it, and get its texture for your backend. The
-frame's rendering has already finished, so your renderer can read the texture
-right away.
+When a frame renders, acquire it with [](api:mln_render_session_acquire_frame),
+and get its texture for your backend. The frame's rendering has already
+finished, so your renderer can read the texture right away.
 
-Release the frame after your reads finish. The session renders into that texture
-again only after the release. Release every acquired frame before you close the
-session. To sync on the GPU instead, see the GPU sync kinds in the
-[API reference](/maplibre-native-ffi/reference/c/render__target_8h.html).
+Release the frame with [](api:mln_acquired_frame_release) after your reads
+finish. The session renders into that texture again only after the release.
+Release every acquired frame before you close the session. To sync on the GPU
+instead, see [](api:mln_gpu_sync_kind).
 
 Keep at most one frame acquired while the next renders. If every texture in the
 ring is acquired, the next frame waits.

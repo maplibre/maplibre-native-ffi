@@ -39,16 +39,17 @@ the target.
 
 ## Create a runtime
 
-Create a runtime with the default options. One runtime can serve all your maps.
-To set a cache file, see [Offline](/maplibre-native-ffi/guides/offline/).
+Create a [](api:mln_runtime) with the default options. One runtime can serve all
+your maps. To set a cache file, see
+[Offline](/maplibre-native-ffi/guides/offline/).
 
 <Snippet page="create-a-map" region="runtime" />
 
 ## Create a map
 
-Create a map on the runtime, and give it a size in logical pixels, a scale
-factor, and a map mode. The scale factor and the mode can't change later. For
-the mode, see
+Create a [](api:mln_map) on the runtime, and give it a size in logical pixels, a
+scale factor, and a map mode. The scale factor and the mode can't change later.
+For the mode, see
 [Choose a render target](/maplibre-native-ffi/guides/choose-a-target/).
 
 Wait for the map to be created before you attach a render target.
@@ -57,8 +58,9 @@ Wait for the map to be created before you attach a render target.
 
 ## Set a style
 
-Set the map's style by URL. You don't need to wait for it to load. To load style
-JSON or change the style, see [Style](/maplibre-native-ffi/guides/style/).
+Set the map's style by URL with [](api:mln_map_set_style_url). You don't need to
+wait for it to load. To load style JSON or change the style, see
+[Style](/maplibre-native-ffi/guides/style/).
 
 <Snippet page="create-a-map" region="style" />
 
@@ -79,7 +81,7 @@ loading, as events. See
 A call fails in one of two ways. Either it fails right away when an argument or
 the object's state is wrong, or it starts and its result reports a failure. Each
 binding reports both with its language's own errors, and every failure has a
-message that describes it.
+[](api:mln_status) and a message that describes it.
 
 <Snippet page="create-a-map" region="errors" />
 

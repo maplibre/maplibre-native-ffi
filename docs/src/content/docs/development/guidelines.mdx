@@ -251,6 +251,11 @@ Docs site pages introduce concepts and show common tasks, not every feature or
 detailed contracts. Avoid bloating these; not every feature needs a section and
 example on the docs site. Avoid narrating implementation details.
 
+Guide pages share their prose across languages, so put language-specific code in
+snippets. To name an API symbol in prose, write its C name as
+`[](api:mln_map_set_style_url)`. The site shows the name in the reader's
+language and links to that language's reference.
+
 An API reference exists for each language binding; the C reference is the
 source, and the rest are generated from there. The API reference describes
 observable functionality and contracts; it must not narrate implementation.

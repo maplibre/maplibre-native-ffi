@@ -13,38 +13,45 @@ region keeps a whole area that you download on purpose.
 
 ## Set a cache file
 
-Set a cache file path when you create the runtime. Without one, the cache lives
-in memory, and offline regions are lost when the runtime closes.
+Set a cache file path in [](api:mln_runtime_options) when you create the
+runtime. Without one, the cache lives in memory, and offline regions are lost
+when the runtime closes.
 
 <Snippet page="offline" region="cache-file" />
 
 ## Manage the ambient cache
 
-Set the ambient cache's maximum size to bound its disk use. The library removes
-old resources to fit. Offline regions don't count toward it.
+Set the ambient cache's maximum size with
+[](api:mln_runtime_set_maximum_ambient_cache_size) to bound its disk use. The
+library removes old resources to fit. Offline regions don't count toward it.
 
-Clear the ambient cache to free its space. When your tiles change, invalidate
-the cache instead. It keeps the data, but maps check each resource with the
-server before they use it.
+Clear the ambient cache with [](api:mln_runtime_run_ambient_cache_operation) to
+free its space. When your tiles change, invalidate the cache instead. It keeps
+the data, but maps check each resource with the server before they use it.
 
 <Snippet page="offline" region="ambient" />
 
 ## Download a region
 
-Define the region: the style URL, the bounds, the zoom range, and the pixel
-ratio. To follow a shape, give a GeoJSON geometry in place of the bounds. Each
-zoom level has four times the tiles of the one before.
+Define the region with [](api:mln_offline_tile_pyramid_region_definition): the
+style URL, the bounds, the zoom range, and the pixel ratio. To follow a shape,
+use [](api:mln_offline_geometry_region_definition) instead, with a GeoJSON
+geometry in place of the bounds. Each zoom level has four times the tiles of the
+one before.
 
 You can store any bytes with the region as metadata, such as its name.
 
-Create the region, then set its download active. Maps on the runtime use the
-region's resources when they load the same style URL, with no other setup.
+Create the region with [](api:mln_runtime_create_offline_region), then set its
+download active with [](api:mln_runtime_set_offline_region_download_state). Maps
+on the runtime use the region's resources when they load the same style URL,
+with no other setup.
 
 <Snippet page="offline" region="download" />
 
 ## Track download progress
 
-Observe the region to receive its progress as events in your event handler. See
+Observe the region with [](api:mln_runtime_set_offline_region_observed) to
+receive its progress as events in your event handler. See
 [Events and logs](/maplibre-native-ffi/guides/events-and-logs/).
 
 Each status event counts the completed and required resources, and says whether
@@ -55,14 +62,17 @@ download.
 
 ## Update and delete regions
 
-List the regions in the cache file. A download stops when the runtime closes. To
-resume it, set the download active again, and it skips the resources it already
-has.
+List the regions in the cache file with
+[](api:mln_runtime_list_offline_regions). A download stops when the runtime
+closes. To resume it, set the download active again, and it skips the resources
+it already has.
 
-When the server's data changes, invalidate the region. Maps then check each of
-its resources with the server before they use it.
+When the server's data changes, invalidate the region with
+[](api:mln_runtime_invalidate_offline_region). Maps then check each of its
+resources with the server before they use it.
 
-Delete a region you no longer need. Its resources that no other region uses move
-to the ambient cache.
+Delete a region you no longer need with
+[](api:mln_runtime_delete_offline_region). Its resources that no other region
+uses move to the ambient cache.
 
 <Snippet page="offline" region="manage" />

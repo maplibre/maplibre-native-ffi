@@ -48,23 +48,26 @@ handle for your backend:
 
 Attach the surface to the map at the window's size and scale factor, and wait
 for the attach to finish. Keep the surface until the session closes. Also pass
-the frame wake that [Render frames](#render-frames) uses.
+the [](api:mln_render_session_attach_options.frame_wake) that
+[Render frames](#render-frames) uses.
 
-The driver runs the session's graphics work. Use the library thread unless the
-surface uses your OpenGL context or WebGPU in a browser, and use your graphics
-thread for those. See
+The [](api:mln_render_session_attach_options.driver) runs the session's graphics
+work. Use the library thread unless the surface uses your OpenGL context or
+WebGPU in a browser, and use your graphics thread for those. See
 [Render on your graphics thread](#render-on-your-graphics-thread).
 
 <Snippet page="window" region="attach" />
 
 ## Render frames
 
-Ask for one frame at a time, starting after the attach finishes. Ask the frame
-to present and to wait for the map's next update, so that an idle map renders
-nothing. Stop asking before you close the session.
+Ask for one frame at a time with [](api:mln_render_session_request_frame),
+starting after the attach finishes. Ask the frame to present and to wait for the
+map's next update, so that an idle map renders nothing. Stop asking before you
+close the session.
 
 The frame wake can run on a library thread, so have it schedule a drain of the
-frame results on your event loop.
+frame results on your event loop with
+[](api:mln_render_session_drain_frame_results).
 
 <Snippet page="window" region="frame-wake" />
 
@@ -77,9 +80,9 @@ When a frame fails, close the session and attach a new one.
 
 ## Resize the window
 
-When the window's size changes, resize the session to the new width and height,
-and it resizes the map too. Keep asking for frames, and they render at the new
-size once the map has applied it.
+When the window's size changes, resize the session to the new width and height
+with [](api:mln_render_session_resize), and it resizes the map too. Keep asking
+for frames, and they render at the new size once the map has applied it.
 
 To change the scale factor, or if the platform gives you a new surface for the
 new size, set the surface as the session's target instead. See the next section.
@@ -89,9 +92,9 @@ new size, set the surface as the session's target instead. See the next section.
 ## Handle a lost surface
 
 When the platform takes the surface away, such as when your application goes to
-the background, stop asking for frames. Release the session's target, and wait
-for the release before the surface is destroyed. The session keeps its tiles and
-other renderer state.
+the background, stop asking for frames. Release the session's target with
+[](api:mln_render_session_release_target), and wait for the release before the
+surface is destroyed. The session keeps its tiles and other renderer state.
 
 When the platform gives you a surface again, set it as the session's target.
 Wait for that to finish, then ask for a frame.
@@ -101,13 +104,15 @@ Wait for that to finish, then ask for a frame.
 ## Render on your graphics thread
 
 With the graphics-thread driver, the session's graphics work runs only when you
-service the session on your graphics thread. Make the target's context current
-there first.
+service the session on your graphics thread with
+[](api:mln_render_session_service_driver_work). Make the target's context
+current there first.
 
-Pass a driver work wake when you attach. Each time it fires, schedule a service
-of the session on your graphics thread, even while you ask for no frames.
-Attaching, detaching, and releasing the target finish only through service. To
-close the session, detach it first, and keep servicing until the detach
+Pass a [](api:mln_render_session_attach_options.driver_work_wake) when you
+attach. Each time it fires, schedule a service of the session on your graphics
+thread, even while you ask for no frames. Attaching, detaching, and releasing
+the target finish only through service. To close the session, detach it first
+with [](api:mln_render_session_detach), and keep servicing until the detach
 finishes.
 
 <Snippet page="window" region="service" />

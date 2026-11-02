@@ -7,9 +7,10 @@ description: Pick the render target, and the guide, for how you show the map.
 
 import { LinkCard } from "@astrojs/starlight/components";
 
-A render session draws one map into one target: a surface that presents to a
-window, or a texture that your code reads or draws. The map's mode decides when
-it renders: continuously as it changes, or once for each image you request.
+A [](api:mln_render_session) draws one map into one target: a surface that
+presents to a window, or a texture that your code reads or draws. The
+[](api:mln_map_mode) decides when the map renders: continuously as it changes,
+or once for each image you request.
 
 ```mermaid
 flowchart TD

@@ -14,17 +14,18 @@ has a center, a zoom, a bearing, and a pitch.
 
 ## Read the camera
 
-Read the camera from the map's snapshot. The read returns right away, but it can
-lag behind changes you just sent. To read the camera after your changes apply,
-query the camera instead, and wait for the result. See
+Read the camera from the map's snapshot with [](api:mln_map_get_snapshot). The
+read returns right away, but it can lag behind changes you just sent. To read
+the camera after your changes apply, query the camera with
+[](api:mln_map_get_camera) instead, and wait for the result. See
 [Wait for results](/maplibre-native-ffi/guides/create-a-map/#wait-for-results).
 
 <Snippet page="camera" region="read" />
 
 ## Move the camera
 
-Send a camera update in jump mode, and set only the fields you want to change.
-The other fields keep their values.
+Send a camera update with [](api:mln_map_update_camera) in jump mode, and set
+only the fields you want to change. The other fields keep their values.
 
 <Snippet page="camera" region="jump" />
 
@@ -34,26 +35,29 @@ Send a camera update in ease or fly mode, with a duration. Ease moves straight
 to the target, while fly zooms out, travels, and zooms back in.
 
 The update's completion reports that the animation started. To act when it ends,
-set an end handler that reports whether the animation completed or was
-cancelled.
+set a [](api:mln_camera_transition_handler) that reports whether the animation
+completed or was cancelled.
 
 A later camera change replaces the animation of each field that it sets. To stop
-an animation where it is, cancel the map's camera transitions.
+an animation where it is, cancel the map's camera transitions with
+[](api:mln_map_cancel_transitions).
 
 <Snippet page="camera" region="animate" />
 
 ## Fit the camera to an area
 
-Query the camera that fits a bounding box, then jump or animate to that camera.
-To fit a list of coordinates or a GeoJSON geometry instead, use the matching
-query.
+Query the camera that fits a bounding box with
+[](api:mln_map_camera_for_lat_lng_bounds), then jump or animate to that camera.
+To fit a list of coordinates or a GeoJSON geometry instead, use
+[](api:mln_map_camera_for_lat_lngs) or [](api:mln_map_camera_for_geometry).
 
 <Snippet page="camera" region="fit" />
 
 ## Limit where the camera can go
 
-Set the map's bounds to keep the center inside an area, and the zoom and pitch
-inside ranges. Limits that you leave out keep their current values.
+Set the map's bounds with [](api:mln_map_set_bounds) to keep the center inside
+an area, and the zoom and pitch inside ranges. Limits that you leave out keep
+their current values.
 
 <Snippet page="camera" region="limit" />
 
@@ -63,7 +67,7 @@ Your code recognizes each gesture from its input events. Screen points are in
 logical pixels from the map's top-left corner.
 
 When a gesture starts, cancel the camera transitions, then send a camera delta
-with the begin phase.
+with [](api:mln_map_apply_camera_delta) in the begin phase.
 
 For each movement, send a delta with the update phase, and pass the change since
 the last delta. For a drag, pass the movement as the offset, and for a pinch,
@@ -76,9 +80,9 @@ the gesture, send the cancel phase instead.
 
 ## Convert between pixels and coordinates
 
-Create a projection from the snapshot's view, and use it to convert screen
-points to coordinates and coordinates to screen points. A projection keeps the
-view it was created from, so create a new one after the camera moves. Close the
-projection when you're done.
+Create a [](api:mln_map_projection) from the snapshot's view, and use it to
+convert screen points to coordinates and coordinates to screen points. A
+projection keeps the view it was created from, so create a new one after the
+camera moves. Close the projection when you're done.
 
 <Snippet page="camera" region="convert" />

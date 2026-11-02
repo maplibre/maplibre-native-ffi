@@ -16,7 +16,8 @@ and images. Sources and layers use the JSON of the
 
 ## Load a style
 
-Set the style by URL or by JSON.
+Set the style by URL with [](api:mln_map_set_style_url), or by JSON with
+[](api:mln_map_set_style_json).
 
 <Aside type="caution">
   Loading a style removes the sources, layers, and images you added. Wait for
@@ -28,39 +29,46 @@ Set the style by URL or by JSON.
 
 ## Add a source and a layer
 
-Add a source with its ID and its JSON. The JSON is the object that a style puts
-under `sources`. See
+Add a source by its ID and its JSON with [](api:mln_map_add_style_source_json).
+The JSON is the object that a style puts under `sources`. See
 [Sources](https://maplibre.org/maplibre-style-spec/sources/) in the style spec.
 
-Add a layer with its JSON. To draw it under another layer, give that layer's ID,
-or give no ID to draw it on top. See
+Add a layer by its JSON with [](api:mln_map_add_style_layer_json). To draw it
+under another layer, give that layer's ID, or give no ID to draw it on top. See
 [Layers](https://maplibre.org/maplibre-style-spec/layers/) in the style spec.
 
 <Snippet page="style" region="add" />
 
-For GeoJSON data in memory, prepare the data first, then add a GeoJSON source
-with the prepared data. You can prepare data on any thread. To update the
-source, prepare new data with the same options, and set it on the source.
+For GeoJSON data in memory, prepare it as [](api:mln_geo_json_source_data)
+first, then add a GeoJSON source with [](api:mln_map_add_geo_json_source_data).
+You can prepare data on any thread. To update the source, prepare new data with
+the same options, and set it on the source with
+[](api:mln_map_set_geo_json_source_data).
 
 <Snippet page="style" region="geojson" />
 
-To remove a source and its layers, remove the layers first, then the source.
+To remove a source and its layers, remove the layers with
+[](api:mln_map_remove_style_layer) first, then the source with
+[](api:mln_map_remove_style_source).
 
 ## Change a layer
 
-Set a layer property by its style-spec name and a JSON value. The same call sets
-`visibility` and `filter`. A JSON null restores the default, and a value can be
-an [expression](https://maplibre.org/maplibre-style-spec/expressions/).
+Set a layer property by its style-spec name and a JSON value with
+[](api:mln_map_set_style_layer_property). The same call sets `visibility` and
+`filter`. A JSON null restores the default, and a value can be an
+[expression](https://maplibre.org/maplibre-style-spec/expressions/).
 
 Each change can show in its own frame. To show several changes in the same
-frame, send them between the start and the end of a command group.
+frame, send them between [](api:mln_map_begin_command_group) and
+[](api:mln_map_end_command_group).
 
 <Snippet page="style" region="set-property" />
 
 ## Add an image
 
-Set a style image with an ID and premultiplied RGBA pixels. A symbol layer draws
-the image by that ID in `icon-image`.
+Set a style image by its ID and premultiplied RGBA pixels with
+[](api:mln_map_set_style_image). A symbol layer draws the image by that ID in
+`icon-image`.
 
 <Snippet page="style" region="image" />
 

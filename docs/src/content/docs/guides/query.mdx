@@ -18,7 +18,8 @@ while you wait, or the query doesn't finish. See
 
 ## Query rendered features
 
-Query rendered features at a screen point or in a box.
+Query rendered features at a screen point or in a box with
+[](api:mln_render_session_query_rendered_features).
 [Camera](/maplibre-native-ffi/guides/camera/#convert-between-pixels-and-coordinates)
 covers screen points. Name the layers to query, or leave them out to query every
 layer.
@@ -30,8 +31,9 @@ several layers draw appears once for each layer.
 
 ## Query source features
 
-Query a source's features by the source's ID, and for a vector source, name the
-source layers. To keep only some features, pass a
+Query a source's features by the source's ID with
+[](api:mln_render_session_query_source_features), and for a vector source, name
+the source layers. To keep only some features, pass a
 [filter](https://maplibre.org/maplibre-style-spec/expressions/).
 
 The result has only the features in tiles that the source loaded for the current
