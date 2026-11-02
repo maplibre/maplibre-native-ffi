@@ -4,8 +4,9 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
+// Targets without Vulkan, such as Mac Catalyst, have no Vulkan attach methods.
 comptime {
-    _ = &renderToTexture;
+    if (@TypeOf(maplibre.Map.attachVulkanOwnedTexture) != void) _ = &renderToTexture;
 }
 
 var session: maplibre.RenderSession = undefined;

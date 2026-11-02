@@ -4,10 +4,13 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
+// Targets without Vulkan, such as Mac Catalyst, have no Vulkan attach methods.
 comptime {
-    _ = &renderToWindow;
-    _ = &surfaceLost;
-    _ = &surfaceRestored;
+    if (@TypeOf(maplibre.Map.attachVulkanSurface) != void) {
+        _ = &renderToWindow;
+        _ = &surfaceLost;
+        _ = &surfaceRestored;
+    }
 }
 
 const allocator = std.heap.smp_allocator;
