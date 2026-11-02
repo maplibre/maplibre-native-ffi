@@ -157,24 +157,21 @@ class CallbackSourceRegistry final {
 
   auto add(
     const std::string& source_id, CallbackSourceKind kind,
-    CallbackSourceRelease release, void* user_data
+    CallbackSourceRelease release_user_data, void* user_data
   ) -> void {
-    // An entry already under this ID belongs to a source that the style dropped
-    // before reconciliation ran, so it still owes its release. Invoke it here
-    // rather than letting the assignment below drop it, which keeps
-    // exactly-once independent of when the style-loaded observer reconciles.
-    if (const auto stale = entries_.find(source_id); stale != entries_.end()) {
-      const auto owed = stale->second;
-      entries_.erase(stale);
-      invoke(owed);
-    }
-    if (release == nullptr) {
+    // The caller has checked that the style holds no source under this ID, so
+    // an entry here outlived a style load that threw before reconciling, and
+    // it still owes its release.
+    release(source_id);
+    if (release_user_data == nullptr) {
       return;
     }
     // The caller tracks before the style takes the source, so a throw here
     // leaves nothing committed and the caller still owns user_data. A failed
     // add owes no release.
-    entries_.insert_or_assign(source_id, Entry{kind, release, user_data});
+    entries_.insert_or_assign(
+      source_id, Entry{kind, release_user_data, user_data}
+    );
   }
 
   // Drops an entry without releasing it, for a source the style then rejected.
@@ -3168,6 +3165,7 @@ namespace {
 
 struct MapSubmissionContext {
   std::shared_ptr<MapObject> map;
+  // Work that holds this context keeps map teardown waiting until it finishes.
   std::shared_ptr<ControlLease> control;
   std::shared_ptr<RuntimeObject> runtime;
 };
@@ -3272,15 +3270,15 @@ auto start_style_operation(
   const auto acquire_status = acquire_map_submission(map, context);
   if (acquire_status != MLN_STATUS_OK) return acquire_status;
   auto state = std::make_shared<OperationObject>(std::move(result_callback));
-  const auto submission = submit_runtime_operation(
-    context.runtime, state,
-    [live = std::move(context.map), control = std::move(context.control), state,
+  const auto runtime = context.runtime;
+  return submit_runtime_operation(
+    runtime, state,
+    [submission = std::move(context), state,
      work = std::move(work)]() mutable -> void {
-      // The control lease is captured so map teardown waits for this work.
-      static_cast<void>(control);
+      auto& live = *submission.map;
       auto result = std::make_shared<StyleOperationResult>();
       clear_thread_error();
-      if (map_creation_failed(*live)) {
+      if (map_creation_failed(live)) {
         state->complete(
           MLN_STATUS_INVALID_STATE, thread_last_error_message(),
           std::any{result}
@@ -3288,7 +3286,7 @@ auto start_style_operation(
         return;
       }
       try {
-        const auto status = std::invoke(std::move(work), *live, *result);
+        const auto status = std::invoke(std::move(work), live, *result);
         state->complete(status, thread_last_error_message(), std::any{result});
       } catch (const std::exception& exception) {
         state->complete(MLN_STATUS_NATIVE_ERROR, exception.what(), result);
@@ -3300,7 +3298,6 @@ auto start_style_operation(
     },
     completion_state
   );
-  return submission;
 }
 
 namespace {
@@ -3351,15 +3348,14 @@ auto start_geometry_operation(
         }
       );
     });
-  const auto submission = submit_runtime_operation(
-    context.runtime, state,
-    [live = std::move(context.map), control = std::move(context.control), state,
-     work = std::move(work)]() mutable {
-      // The control lease is captured so map teardown waits for this work.
-      static_cast<void>(control);
+  const auto runtime = context.runtime;
+  return submit_runtime_operation(
+    runtime, state,
+    [submission = std::move(context), state, work = std::move(work)]() mutable {
+      auto& live = *submission.map;
       auto result = GeometryValue<Function>{};
       clear_thread_error();
-      if (map_creation_failed(*live)) {
+      if (map_creation_failed(live)) {
         state->complete(
           MLN_STATUS_INVALID_STATE, thread_last_error_message(),
           std::any{std::move(result)}
@@ -3367,7 +3363,7 @@ auto start_geometry_operation(
         return;
       }
       try {
-        const auto status = std::invoke(std::move(work), *live, result);
+        const auto status = std::invoke(std::move(work), live, result);
         state->complete(
           status, thread_last_error_message(), std::any{std::move(result)}
         );
@@ -3384,7 +3380,6 @@ auto start_geometry_operation(
     },
     completion_state
   );
-  return submission;
 }
 
 }  // namespace
