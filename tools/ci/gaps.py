@@ -85,12 +85,6 @@ class Target:
             BACKEND_ORDER.index(self.backend),
         )
 
-    def arch_label(self) -> str:
-        if self.platform not in DEVICE_PLATFORMS:
-            return self.arch
-        kind = "simulator" if self.simulator else "device"
-        return f"{kind} {self.arch}"
-
 
 def target_from_name(preset: str) -> Target:
     platform, arch, backend = preset.rsplit("-", 2)

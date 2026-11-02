@@ -1,86 +1,94 @@
 ---
 import supportMatrix from "../generated/support-matrix.json";
 
-type Status =
-  | "tested"
-  | "build-only"
-  | "path-known"
-  | "blocked"
-  | "not-investigated";
+// The matrix also says why a target is unsupported, which matters only to
+// maintainers, so the site shows every such status as unsupported.
+type Status = "tested" | "build-only" | "unsupported";
 
-type Cell = {
-  status: string;
-  detail?: string;
-};
+const statuses: { status: Status; label: string; glyph: string }[] = [
+  { status: "tested", label: "Tested in CI", glyph: "✓" },
+  { status: "build-only", label: "Built only", glyph: "◐" },
+  { status: "unsupported", label: "Not supported", glyph: "✕" },
+];
+const glyphs = new Map(statuses.map((row) => [row.status, row.glyph]));
+const statusLabels = new Map(statuses.map((row) => [row.status, row.label]));
 
-const glyphs: Record<Status, string> = {
-  tested: "✓",
-  "build-only": "◐",
-  "path-known": "○",
-  blocked: "✕",
-  "not-investigated": "?",
-};
+function siteStatus(status: string): Status {
+  return status === "tested" || status === "build-only"
+    ? status
+    : "unsupported";
+}
 
-const statusLabels = new Map(
-  supportMatrix.statuses.map((row) => [row.status, row.label]),
-);
-
-const sourceRoot = "https://github.com/maplibre/maplibre-native-ffi/tree/main";
 const issueRoot = "https://github.com/maplibre/maplibre-native-ffi/issues";
+const bindings = supportMatrix.bindings;
 
-const rows = supportMatrix.platforms.flatMap((platform) => {
-  const platformRows = platform.architectures.reduce(
-    (count, arch) => count + arch.backends.length,
-    0,
-  );
-  return platform.architectures.flatMap((arch, archIndex) =>
-    arch.backends.map((backend, backendIndex) => ({
-      platform: platform.label,
-      arch: arch.label,
-      backend: backend.label,
-      cells: backend.cells as Cell[],
-      platformRows: archIndex === 0 && backendIndex === 0 ? platformRows : 0,
-      archRows: backendIndex === 0 ? arch.backends.length : 0,
-    })),
-  );
+// Backends of one architecture share a row when every binding gives them the
+// same status.
+const groups = supportMatrix.platforms.map((platform, platformIndex) => {
+  // A label such as `Linux (GNU)` names a platform and its variant.
+  const parts = /^(.*) \((.*)\)$/.exec(platform.label);
+  const rows = platform.architectures.flatMap((arch, archIndex) => {
+    const merged = new Map<string, { backends: string[]; cells: Status[] }>();
+    for (const backend of arch.backends) {
+      const cells = backend.cells.map((cell) => siteStatus(cell.status));
+      const row = merged.get(cells.join());
+      if (row) row.backends.push(backend.label);
+      else merged.set(cells.join(), { backends: [backend.label], cells });
+    }
+    const variant = "variant" in arch ? arch.variant : undefined;
+    return [...merged.values()].map((row, index) => ({
+      ...row,
+      arch: arch.arch,
+      variant,
+      archGroup: `arch-${platformIndex}-${archIndex}`,
+      archSpan: index === 0 ? merged.size : 0,
+    }));
+  });
+  return {
+    label: platform.label,
+    name: parts ? parts[1] : platform.label,
+    variant: parts?.[2],
+    rows,
+  };
 });
 
-type Gap = {
-  status: string;
-  binding: string;
-  scope: string;
-  reason: string;
-  link?: string;
-};
+// Hovering a binding's header or cell highlights its column, and hovering any
+// part of an architecture that spans rows highlights all of them.
+const table = ".support-matrix table";
+const highlight = [
+  ...bindings.map(
+    (_, index) =>
+      `${table}:has(.col-${index}:hover) .col-${index} { background: var(--sl-color-gray-6); }
+${table}:has(.col-${index}:hover) th.col-${index} a { color: var(--sl-color-text-accent); }`,
+  ),
+  ...groups.flatMap((platform) =>
+    platform.rows
+      .filter((row) => row.archSpan > 1)
+      .map(
+        ({ archGroup: group }) =>
+          `${table}:has(tr.${group}:hover) th.${group},
+${table}:has(th.${group}:hover) tr.${group} > * { background: var(--sl-color-gray-6); }`,
+      ),
+  ),
+].join("\n");
 
-function gapsWith(status: string) {
-  return (supportMatrix.gaps as Gap[]).filter((gap) => gap.status === status);
-}
-
-const gapSections = [
-  { title: "Blocked upstream", gaps: gapsWith("blocked") },
-  { title: "Not started, path known", gaps: gapsWith("path-known") },
-];
-
-// Reasons are Markdown whose only markup is code spans.
-function codeSpans(text: string) {
-  return text
-    .split("`")
-    .map((part, index) => ({ part, code: index % 2 === 1 }));
-}
-
-function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
-  const label = `${binding} on ${row.platform} ${row.arch} with ${row.backend}: ${statusLabels.get(cell.status)}`;
-  return cell.detail ? `${label}. ${cell.detail}` : label;
+function cellLabel(
+  binding: string,
+  target: string,
+  backends: string[],
+  status: Status,
+) {
+  return `${binding} on ${target} with ${backends.join(" or ")}: ${statusLabels.get(status)}`;
 }
 ---
 
 <div class="not-content support-matrix">
+  <style is:inline set:html={highlight} />
   <p class="legend">
-    {supportMatrix.statuses.map((row) => (
+    {statuses.map((row) => (
       <span>
         <span class={`cell ${row.status}`} aria-hidden="true">
-          {glyphs[row.status as Status]}
+          {row.glyph}
         </span>
         {row.label}
       </span>
@@ -93,84 +101,69 @@ function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
           <th scope="col">Platform</th>
           <th scope="col">Arch</th>
           <th scope="col">Backend</th>
-          {supportMatrix.bindings.map((binding) => (
-            <th scope="col" class="binding">
-              <a
-                href={`${sourceRoot}/${binding.sourceDirectory}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {binding.label}
-              </a>
+          {bindings.map((binding, index) => (
+            <th scope="col" class={`binding col-${index}`}>
+              <a href={binding.installPage}>{binding.label}</a>
             </th>
           ))}
         </tr>
       </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr class:list={{ "platform-start": row.platformRows > 0 }}>
-            {row.platformRows > 0 && (
-              <th scope="rowgroup" rowspan={row.platformRows}>
-                {row.platform}
+      {groups.map((platform) => (
+        <tbody>
+          {platform.rows.map((row, rowIndex) => (
+            <tr class={row.archGroup}>
+              {rowIndex === 0 && (
+                <th
+                  scope="rowgroup"
+                  rowspan={platform.rows.length}
+                  class="platform"
+                >
+                  {platform.name}
+                  {platform.variant && (
+                    <span class="variant">{platform.variant}</span>
+                  )}
+                </th>
+              )}
+              {row.archSpan > 0 && (
+                <th
+                  scope="row"
+                  rowspan={row.archSpan}
+                  class={`secondary ${row.archGroup}`}
+                >
+                  {row.arch}
+                  {row.variant && <span class="variant">{row.variant}</span>}
+                </th>
+              )}
+              <th scope="row" class="secondary backend">
+                {row.backends.join(", ")}
               </th>
-            )}
-            {row.archRows > 0 && (
-              <th scope="row" class="secondary" rowspan={row.archRows}>
-                {row.arch}
-              </th>
-            )}
-            <th scope="row" class="secondary">{row.backend}</th>
-            {row.cells.map((cell, index) => {
-              const label = cellLabel(supportMatrix.bindings[index].label, row, cell);
-              return (
-                <td>
-                  <span
-                    class={`cell ${cell.status}`}
-                    title={label}
-                    aria-label={label}
-                    role="img"
-                  >
-                    {glyphs[cell.status as Status]}
-                  </span>
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-      </tbody>
+              {row.cells.map((status, index) => {
+                const target = [platform.label, row.arch, row.variant]
+                  .filter(Boolean)
+                  .join(" ");
+                const label = cellLabel(bindings[index].label, target, row.backends, status);
+                return (
+                  <td class={`col-${index}`}>
+                    <span
+                      class={`cell ${status}`}
+                      aria-label={label}
+                      role="img"
+                    >
+                      {glyphs.get(status)}
+                    </span>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      ))}
     </table>
   </div>
-  <details class="gaps">
-    <summary>Gaps and their causes</summary>
-    {gapSections.map((section) => (
-      <>
-        <p class="gap-title">{section.title}</p>
-        <ul>
-          {section.gaps.map((gap) => (
-            <li>
-              <strong>
-                {gap.binding} on {gap.scope}:
-              </strong>{" "}
-              {codeSpans(gap.reason).map(({ part, code }) => (code ? (
-                <code>{part}</code>
-              ) : part))}
-              {gap.link && (
-                <>
-                  {" "}
-                  <a href={gap.link} target="_blank" rel="noopener noreferrer"
-                  >Upstream</a>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      </>
-    ))}
-  </details>
   <p class="note">
-    Hover a cell for details. TypeScript runs under Node, Bun, and Deno, in
-    ArkTS apps on OpenHarmony, and in the browser. OpenGL uses WGL on Windows
-    and EGL on other platforms. macOS EGL uses ANGLE.{" "}
+    TypeScript runs under Node, Bun, and Deno, in ArkTS apps on OpenHarmony, and
+    in the browser. OpenGL uses WGL on Windows and EGL on other platforms. macOS
+    EGL uses ANGLE.{" "}
     <a
       href={`${issueRoot}/${supportMatrix.issue}`}
       target="_blank"
@@ -203,19 +196,31 @@ function cellLabel(binding: string, row: (typeof rows)[number], cell: Cell) {
   margin-block: 0.75rem;
 }
 table {
-  border-collapse: separate;
-  border-spacing: 2px;
+  border-collapse: collapse;
 }
 th {
   font-weight: 600;
   text-align: start;
   white-space: nowrap;
-  padding: 0 0.5rem 0 0;
+  padding: 1px 0.5rem 1px 0;
   vertical-align: top;
+  line-height: 1.375rem;
 }
 th.secondary {
   color: var(--sl-color-gray-3);
   font-weight: 400;
+}
+/* Fits two backends on a line, and wraps a third. */
+th.backend {
+  white-space: normal;
+  min-width: 7rem;
+}
+.variant {
+  display: block;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+  font-weight: 400;
+  line-height: 1rem;
 }
 thead th {
   vertical-align: bottom;
@@ -225,23 +230,44 @@ thead th {
 th.binding {
   padding: 0;
   height: 6rem;
+  border-radius: 0.25rem 0.25rem 0 0;
 }
 th.binding a {
   display: block;
   margin-inline: auto;
+  padding-inline: 0.25rem;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   color: var(--sl-color-white);
   font-weight: 600;
   text-decoration: none;
 }
-tr.platform-start > * {
+tbody {
   border-top: 1px solid var(--sl-color-hairline);
+}
+tbody > tr:first-child > * {
   padding-top: 0.25rem;
 }
+tbody > tr:last-child > * {
+  padding-bottom: 0.25rem;
+}
 td {
-  padding: 0;
-  text-align: center;
+  /* Lets a cell's badge fill the row's height. */
+  height: 1px;
+  padding: 1px;
+}
+td > .cell {
+  display: flex;
+  height: 100%;
+  min-height: 1.25rem;
+}
+tr:hover > *,
+tbody:hover > tr > th.platform,
+tbody:has(th.platform:hover) > tr > * {
+  background: var(--sl-color-gray-6);
+}
+tbody:hover > tr > th.platform {
+  color: var(--sl-color-text-accent);
 }
 .cell {
   display: inline-flex;
@@ -265,42 +291,14 @@ td {
   border-color: var(--sl-color-gray-5);
   color: var(--sl-color-white);
 }
-.blocked {
+.unsupported {
   background: var(--sl-color-red-low);
   border-color: var(--sl-color-red);
   color: var(--sl-color-red-high);
 }
-.path-known {
-  border-color: var(--sl-color-gray-3);
-  color: var(--sl-color-white);
-}
-.not-investigated {
-  background: var(--sl-color-orange-low);
-  border-color: var(--sl-color-orange);
-  color: var(--sl-color-orange-high);
-}
 .note {
   color: var(--sl-color-gray-3);
 }
-.gaps {
-  margin-block: 0.75rem;
-}
-.gaps summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.gap-title {
-  margin-block: 0.75rem 0.25rem;
-  font-weight: 600;
-}
-.gaps ul {
-  margin: 0;
-  padding-inline-start: 1.25rem;
-}
-.gaps li {
-  margin-block: 0.25rem;
-}
-.gaps a,
 .note a {
   color: var(--sl-color-text-accent);
 }
