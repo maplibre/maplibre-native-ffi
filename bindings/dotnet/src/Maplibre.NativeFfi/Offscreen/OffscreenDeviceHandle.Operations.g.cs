@@ -71,7 +71,8 @@ public sealed unsafe partial class OffscreenDeviceHandle
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when this build's render
-    /// backend can't create a device.</description></item>
+    /// backend can't create a device, or can't render with
+    /// <c>client_api</c>.</description></item>
     /// <item><description><c>Status.NativeError</c> when <c>adapter_index</c>
     /// names no GPU, or the platform can't create the
     /// device.</description></item>

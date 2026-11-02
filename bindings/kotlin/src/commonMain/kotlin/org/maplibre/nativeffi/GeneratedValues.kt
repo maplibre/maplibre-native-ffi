@@ -585,7 +585,7 @@ public value class OfflineRegionDownloadState(public val rawValue: UInt) {
 }
 
 /**
- * The OpenGL API that a dedicated EGL context uses.
+ * The OpenGL API that a context renders with.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -2112,6 +2112,12 @@ public data class OffscreenDeviceOptions(
    * an EGL device reads it.
    */
   public val singleContext: Boolean? = null,
+  /**
+   * The OpenGL API that the device's sessions render with. An EGL device defaults to
+   * `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux and FreeBSD. A WGL device
+   * takes only `OpenGlClientApi.GL`, its default. Other devices take neither.
+   */
+  public val clientApi: OpenGlClientApi? = null,
 )
 
 /**

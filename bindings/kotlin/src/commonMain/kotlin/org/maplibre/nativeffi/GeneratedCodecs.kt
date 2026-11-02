@@ -96,7 +96,7 @@ internal fun NativeArena.writeMapView(value: MapView): Long =
   allocate(w(208, 208, 196), w(8, 8, 4)).also { putMapView(it, value) }
 
 internal fun NativeArena.putOffscreenDeviceOptions(target: Long, value: OffscreenDeviceOptions) {
-  writeU32(target, 16.toUInt())
+  writeU32(target, 20.toUInt())
   var fields = 0u
   value.adapterIndex?.let {
     fields = fields or 1u
@@ -106,11 +106,15 @@ internal fun NativeArena.putOffscreenDeviceOptions(target: Long, value: Offscree
     fields = fields or 2u
     writeBool(target + 12, it)
   }
+  value.clientApi?.let {
+    fields = fields or 4u
+    writeU32(target + 16, it.rawValue)
+  }
   writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeOffscreenDeviceOptions(value: OffscreenDeviceOptions): Long =
-  allocate(16, 4).also { putOffscreenDeviceOptions(it, value) }
+  allocate(20, 4).also { putOffscreenDeviceOptions(it, value) }
 
 internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
   writeF64(target, value.latitude)

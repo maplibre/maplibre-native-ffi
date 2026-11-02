@@ -2394,6 +2394,10 @@ fn generated_input_mln_offscreen_device_options<'py>(
         raw.single_context = field.extract::<bool>()?;
         raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
     }
+    if let Some(field) = generated_present(value, "client_api")? {
+        raw.client_api = field.extract::<sys::mln_open_gl_client_api>()?;
+        raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
+    }
     Ok(raw)
 }
 

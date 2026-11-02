@@ -55,9 +55,13 @@ auto egl_extension(const char* name) -> Function {
   return reinterpret_cast<Function>(eglGetProcAddress(name));
 }
 
-// A display that initializes and has an OpenGL ES 3 config with pbuffers,
-// which a dedicated session needs to make its context current.
-auto usable_config(EGLDisplay display) -> EGLConfig {
+auto api_name(EGLenum api) -> const char* {
+  return api == EGL_OPENGL_API ? "desktop OpenGL" : "OpenGL ES 3";
+}
+
+// A display that initializes and has a config with pbuffers that renders
+// `api`, which a dedicated session needs to make its context current.
+auto usable_config(EGLDisplay display, EGLenum api) -> EGLConfig {
   if (display == EGL_NO_DISPLAY || !eglInitialize(display, nullptr, nullptr)) {
     return nullptr;
   }
@@ -65,7 +69,7 @@ auto usable_config(EGLDisplay display) -> EGLConfig {
     EGL_SURFACE_TYPE,
     EGL_PBUFFER_BIT,
     EGL_RENDERABLE_TYPE,
-    EGL_OPENGL_ES3_BIT,
+    api == EGL_OPENGL_API ? EGL_OPENGL_BIT : EGL_OPENGL_ES3_BIT,
     EGL_RED_SIZE,
     8,
     EGL_GREEN_SIZE,
@@ -97,8 +101,9 @@ struct DisplayChoice {
   const char* platform = "";
 };
 
-auto choose(EGLDisplay display, const char* platform) -> DisplayChoice {
-  auto* const config = usable_config(display);
+auto choose(EGLDisplay display, const char* platform, EGLenum api)
+  -> DisplayChoice {
+  auto* const config = usable_config(display, api);
   if (config == nullptr) {
     return {};
   }
@@ -108,7 +113,8 @@ auto choose(EGLDisplay display, const char* platform) -> DisplayChoice {
 }
 
 #if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
-auto device_display(uint32_t index, DisplayChoice& out_choice) -> mln_status {
+auto device_display(uint32_t index, EGLenum api, DisplayChoice& out_choice)
+  -> mln_status {
   const auto get_platform_display =
     egl_extension<GetPlatformDisplay>("eglGetPlatformDisplayEXT");
   const auto query_devices = egl_extension<QueryDevices>("eglQueryDevicesEXT");
@@ -136,12 +142,14 @@ auto device_display(uint32_t index, DisplayChoice& out_choice) -> mln_status {
     return MLN_STATUS_NATIVE_ERROR;
   }
   out_choice = choose(
-    get_platform_display(egl_platform_device, devices[index], nullptr), "device"
+    get_platform_display(egl_platform_device, devices[index], nullptr),
+    "device", api
   );
   if (out_choice.display == EGL_NO_DISPLAY) {
-    set_thread_error(
-      "the EGL device at adapter_index has no OpenGL ES 3 pbuffer config"
-    );
+    const auto message =
+      std::string{"the EGL device at adapter_index has no "} + api_name(api) +
+      " pbuffer config";
+    set_thread_error(message.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
@@ -154,7 +162,7 @@ auto device_display(uint32_t index, DisplayChoice& out_choice) -> mln_status {
 // NVIDIA's, takes its first device instead. Apple uses ANGLE on Metal, and
 // Android and OpenHarmony keep the default display, which serves their own
 // window systems.
-auto default_display() -> DisplayChoice {
+auto default_display(EGLenum api) -> DisplayChoice {
 #if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
   if (
     const auto get_platform_display =
@@ -164,14 +172,15 @@ auto default_display() -> DisplayChoice {
     if (
       auto choice = choose(
         get_platform_display(egl_platform_surfaceless_mesa, nullptr, nullptr),
-        "surfaceless"
+        "surfaceless", api
       );
       choice.display != EGL_NO_DISPLAY
     ) {
       return choice;
     }
     if (
-      auto choice = DisplayChoice{}; device_display(0, choice) == MLN_STATUS_OK
+      auto choice = DisplayChoice{};
+      device_display(0, api, choice) == MLN_STATUS_OK
     ) {
       return choice;
     }
@@ -191,27 +200,27 @@ auto default_display() -> DisplayChoice {
     // native display is spelled out.
     return choose(
       get_platform_display(egl_platform_angle, nullptr, attributes.data()),
-      "ANGLE Metal"
+      "ANGLE Metal", api
     );
   }
 #endif
-  return choose(eglGetDisplay(EGL_DEFAULT_DISPLAY), "default");
+  return choose(eglGetDisplay(EGL_DEFAULT_DISPLAY), "default", api);
 }
 
 // Binding an API is per thread, so the calling thread keeps the one it had.
 auto create_single_context(
-  const DisplayChoice& choice,
+  const DisplayChoice& choice, EGLenum api,
   std::shared_ptr<opengl::EglSingleContext>& out_single
 ) -> mln_status {
   const auto previous_api = eglQueryAPI();
-  if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
-    set_thread_error("binding the EGL OpenGL ES API failed");
+  if (eglBindAPI(api) == EGL_FALSE) {
+    const auto message =
+      std::string{"binding the EGL "} + api_name(api) + " API failed";
+    set_thread_error(message.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
-  const auto attributes =
-    std::array<EGLint, 3>{EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
-  auto* const context = eglCreateContext(
-    choice.display, choice.config, EGL_NO_CONTEXT, attributes.data()
+  auto* const context = opengl::create_egl_context(
+    choice.display, choice.config, EGL_NO_CONTEXT, api
   );
   const auto error = eglGetError();
   eglBindAPI(previous_api);
@@ -233,7 +242,7 @@ auto create_single_context(
 class EglOffscreenDevice final : public OffscreenDevice {
  public:
   EglOffscreenDevice(
-    const DisplayChoice& choice,
+    const DisplayChoice& choice, mln_open_gl_client_api client_api,
     std::shared_ptr<opengl::EglSingleContext> single
   )
       : single_(std::move(single)),
@@ -248,7 +257,7 @@ class EglOffscreenDevice final : public OffscreenDevice {
                 .display = choice.display,
                 .config = choice.config,
                 .share_context = nullptr,
-                .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
+                .client_api = client_api,
                 .get_proc_address = nullptr,
               },
             },
@@ -274,19 +283,31 @@ auto create_backend_offscreen_device(
   const mln_offscreen_device_options& options,
   std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status {
+  const auto client_api = options.client_api == MLN_OPEN_GL_CLIENT_API_GL
+                            ? MLN_OPEN_GL_CLIENT_API_GL
+                            : MLN_OPEN_GL_CLIENT_API_GLES;
+#if !defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
+  if (client_api == MLN_OPEN_GL_CLIENT_API_GL) {
+    set_thread_error(
+      "this platform's EGL implements OpenGL ES only, not desktop OpenGL"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+#endif
+  const auto api = opengl::egl_api(client_api);
   auto choice = DisplayChoice{};
   if ((options.fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) == 0U) {
-    choice = default_display();
+    choice = default_display(api);
     if (choice.display == EGL_NO_DISPLAY) {
-      const auto message =
-        "no EGL display has an OpenGL ES 3 pbuffer config (EGL error " +
-        std::to_string(eglGetError()) + ")";
+      const auto message = std::string{"no EGL display has a "} +
+                           api_name(api) + " pbuffer config (EGL error " +
+                           std::to_string(eglGetError()) + ")";
       set_thread_error(message.c_str());
       return MLN_STATUS_NATIVE_ERROR;
     }
   } else {
 #if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
-    const auto status = device_display(options.adapter_index, choice);
+    const auto status = device_display(options.adapter_index, api, choice);
     if (status != MLN_STATUS_OK) {
       return status;
     }
@@ -300,25 +321,28 @@ auto create_backend_offscreen_device(
       set_thread_error(message.c_str());
       return MLN_STATUS_NATIVE_ERROR;
     }
-    choice = default_display();
+    choice = default_display(api);
     if (choice.display == EGL_NO_DISPLAY) {
-      set_thread_error("the EGL display has no OpenGL ES 3 pbuffer config");
+      const auto message = std::string{"the EGL display has no "} +
+                           api_name(api) + " pbuffer config";
+      set_thread_error(message.c_str());
       return MLN_STATUS_NATIVE_ERROR;
     }
 #endif
   }
   auto single = std::shared_ptr<opengl::EglSingleContext>{};
   if (options.single_context) {
-    const auto status = create_single_context(choice, single);
+    const auto status = create_single_context(choice, api, single);
     if (status != MLN_STATUS_OK) {
       return status;
     }
   }
   mln::Log::Info(
     mln::Event::Render, std::string{"offscreen device uses the EGL "} +
-                          choice.platform + " platform"
+                          choice.platform + " platform with " + api_name(api)
   );
-  out_device = std::make_shared<EglOffscreenDevice>(choice, std::move(single));
+  out_device =
+    std::make_shared<EglOffscreenDevice>(choice, client_api, std::move(single));
   return MLN_STATUS_OK;
 }
 

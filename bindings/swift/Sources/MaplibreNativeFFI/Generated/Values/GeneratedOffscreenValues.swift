@@ -35,9 +35,19 @@ public struct OffscreenDeviceOptions: Equatable, Hashable, Sendable {
   /// Whether the device's sessions take turns in one OpenGL context instead of
   /// having one each. Only an EGL device reads it.
   public var singleContext: Bool?
-  public init(adapterIndex: UInt32? = nil, singleContext: Bool? = nil) {
+  /// The OpenGL API that the device's sessions render with. An EGL device
+  /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on
+  /// Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
+  /// default. Other devices take neither.
+  public var clientApi: OpenGlClientApi?
+  public init(
+    adapterIndex: UInt32? = nil,
+    singleContext: Bool? = nil,
+    clientApi: OpenGlClientApi? = nil
+  ) {
     self.adapterIndex = adapterIndex
     self.singleContext = singleContext
+    self.clientApi = clientApi
   }
 
   init(raw: mln_offscreen_device_options) {
@@ -45,6 +55,8 @@ public struct OffscreenDeviceOptions: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.adapter_index : nil
     singleContext = raw.fields & MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT
       .rawValue != 0 ? raw.single_context : nil
+    clientApi = raw.fields & MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API
+      .rawValue != 0 ? OpenGlClientApi(rawValue: raw.client_api.rawValue) : nil
   }
 
   func nativeValue() -> mln_offscreen_device_options {
@@ -58,6 +70,10 @@ public struct OffscreenDeviceOptions: Equatable, Hashable, Sendable {
     if let item = singleContext {
       raw.fields |= MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT.rawValue; raw
         .single_context = item
+    }
+    if let item = clientApi {
+      raw.fields |= MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API.rawValue; raw
+        .client_api = mln_open_gl_client_api(rawValue: item.rawValue)
     }
     return raw
   }

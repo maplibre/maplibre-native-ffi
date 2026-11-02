@@ -531,7 +531,7 @@ func (value OfflineRegionDownloadState) String() string {
 }
 
 // OpenGlClientApi corresponds to mln_open_gl_client_api. The OpenGL API that a
-// dedicated EGL context uses.
+// context renders with.
 //
 // See mln_open_gl_client_api in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
@@ -3242,6 +3242,11 @@ type OffscreenDeviceOptions struct {
 	// Whether the device's sessions take turns in one OpenGL context instead of
 	// having one each. Only an EGL device reads it.
 	SingleContext *bool
+	// The OpenGL API that the device's sessions render with. An EGL device defaults
+	// to OpenGlClientApiGles, and takes OpenGlClientApiGl too on Linux and FreeBSD.
+	// A WGL device takes only OpenGlClientApiGl, its default. Other devices take
+	// neither.
+	ClientApi *OpenGlClientApi
 }
 
 func nativeOffscreenDeviceOptions(input OffscreenDeviceOptions, arena *bindingArena) C.mln_offscreen_device_options {
@@ -3250,6 +3255,7 @@ func nativeOffscreenDeviceOptions(input OffscreenDeviceOptions, arena *bindingAr
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, input.SingleContext, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API, &raw.client_api, input.ClientApi, arena, bindingNumber[OpenGlClientApi, C.mln_open_gl_client_api])
 	return raw
 }
 
@@ -7354,7 +7360,8 @@ func SetNetworkStatus(status NetworkStatus) error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
 //
 // Errors:
-//   - StatusUnsupported when this build's render backend can't create a device.
+//   - StatusUnsupported when this build's render backend can't create a device,
+//     or can't render with client_api.
 //   - StatusNativeError when adapter_index names no GPU, or the platform can't
 //     create the device.
 func NewOffscreenDevice(options *OffscreenDeviceOptions) (*OffscreenDeviceHandle, error) {

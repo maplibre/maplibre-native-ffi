@@ -4900,6 +4900,17 @@ bool mln_ts_write_offscreen_device_options(
     }
     out->fields |= MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
   }
+  if (!mln_ts_member(call, value, "clientApi", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "clientApi");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->client_api = (mln_open_gl_client_api)number;
+    }
+    out->fields |= MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
+  }
   return true;
 }
 

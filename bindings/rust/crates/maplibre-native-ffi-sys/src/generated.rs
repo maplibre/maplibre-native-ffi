@@ -185,6 +185,7 @@ pub const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE: mln_offline_region_download_state 
 pub type mln_offscreen_device_option_field = u32;
 pub const MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX: mln_offscreen_device_option_field = 1;
 pub const MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT: mln_offscreen_device_option_field = 2;
+pub const MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API: mln_offscreen_device_option_field = 4;
 pub type mln_open_gl_client_api = u32;
 pub const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED: mln_open_gl_client_api = 0;
 pub const MLN_OPEN_GL_CLIENT_API_GL: mln_open_gl_client_api = 1;
@@ -987,6 +988,7 @@ pub struct mln_offscreen_device_options {
     pub fields: mln_offscreen_device_option_fields,
     pub adapter_index: u32,
     pub single_context: bool,
+    pub client_api: mln_open_gl_client_api,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

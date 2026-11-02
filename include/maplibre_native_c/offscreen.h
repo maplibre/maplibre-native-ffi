@@ -23,6 +23,7 @@ typedef enum MLN_BINDING(
 ) mln_offscreen_device_option_field : uint32_t {
   MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1U << 0U,
   MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 1U << 1U,
+  MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API = 1U << 2U,
 } mln_offscreen_device_option_field;
 
 /** A set of mln_offscreen_device_option_field bits. */
@@ -41,6 +42,15 @@ typedef struct mln_offscreen_device_options {
    */
   bool single_context
     MLN_BINDING("mask=fields;bit=MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT");
+  /**
+   * The OpenGL API that the device's sessions render with. An EGL device
+   * defaults to MLN_OPEN_GL_CLIENT_API_GLES, and takes
+   * MLN_OPEN_GL_CLIENT_API_GL too on Linux and FreeBSD. A WGL device
+   * takes only MLN_OPEN_GL_CLIENT_API_GL, its default. Other devices take
+   * neither.
+   */
+  mln_open_gl_client_api client_api
+    MLN_BINDING("mask=fields;bit=MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API");
 } mln_offscreen_device_options;
 
 /** The image that mln_map_attach_offscreen() renders. */
@@ -57,7 +67,7 @@ typedef struct mln_offscreen_descriptor {
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when this build's render backend can't create a
- *   device.
+ *   device, or can't render with `client_api`.
  * - MLN_STATUS_NATIVE_ERROR when `adapter_index` names no GPU, or the platform
  *   can't create the device.
  */

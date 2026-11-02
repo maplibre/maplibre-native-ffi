@@ -1485,7 +1485,7 @@ pub const OffscreenDevice = struct {
     /// Errors:
     ///
     /// - `error.Unsupported` when this build's render backend can't create a
-    ///   device.
+    ///   device, or can't render with `client_api`.
     /// - `error.NativeError` when `adapter_index` names no GPU, or the platform
     ///   can't create the device.
     pub fn create(options: ?OffscreenDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!OffscreenDevice {
@@ -4446,18 +4446,25 @@ pub const OffscreenDeviceOptions = struct {
     /// Whether the device's sessions take turns in one OpenGL context instead
     /// of having one each. Only an EGL device reads it.
     single_context: ?bool = null,
+    /// The OpenGL API that the device's sessions render with. An EGL device
+    /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too
+    /// on Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
+    /// default. Other devices take neither.
+    client_api: ?OpenGlClientApi = null,
     pub fn toNative(self: OffscreenDeviceOptions) c.mln_offscreen_device_options {
         var raw = std.mem.zeroes(c.mln_offscreen_device_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_offscreen_device_options);
         marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
         marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, self.single_context);
+        marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API, &raw.client_api, self.client_api);
         return raw;
     }
     pub fn fromNative(raw: c.mln_offscreen_device_options) OffscreenDeviceOptions {
         return .{
             .adapter_index = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
             .single_context = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT != 0) raw.single_context else null,
+            .client_api = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API != 0) OpenGlClientApi.fromNative(raw.client_api) else null,
         };
     }
 };
@@ -4537,7 +4544,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
     }
 };
 
-/// The OpenGL API that a dedicated EGL context uses.
+/// The OpenGL API that a context renders with.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

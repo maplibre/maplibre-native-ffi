@@ -1807,7 +1807,7 @@ class _OffscreenDeviceHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.UNSUPPORTED` when this build's render backend can't create
-          a device.
+          a device, or can't render with `client_api`.
         - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the
           platform can't create the device.
         """

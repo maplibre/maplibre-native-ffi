@@ -549,6 +549,7 @@ internal unsafe struct mln_offscreen_device_options
     public mln_offscreen_device_option_field fields;
     public uint adapter_index;
     public byte single_context;
+    public mln_open_gl_client_api client_api;
 }
 
 internal unsafe struct mln_open_gl_borrowed_texture
@@ -1569,6 +1570,7 @@ internal enum mln_offscreen_device_option_field : uint
 {
     MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1,
     MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 2,
+    MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API = 4,
 }
 
 internal enum mln_open_gl_client_api : uint

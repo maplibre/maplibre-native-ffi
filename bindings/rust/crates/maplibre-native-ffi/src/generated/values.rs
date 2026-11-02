@@ -2529,9 +2529,14 @@ pub struct OffscreenDeviceOptions {
     /// Whether the device's sessions take turns in one OpenGL context instead
     /// of having one each. Only an EGL device reads it.
     pub single_context: Option<bool>,
+    /// The OpenGL API that the device's sessions render with. An EGL device
+    /// defaults to `OpenGlClientApi::Gles`, and takes `OpenGlClientApi::Gl` too
+    /// on Linux and FreeBSD. A WGL device takes only `OpenGlClientApi::Gl`, its
+    /// default. Other devices take neither.
+    pub client_api: Option<OpenGlClientApi>,
 }
 impl ToNative<sys::mln_offscreen_device_options> for OffscreenDeviceOptions {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_offscreen_device_options> {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_offscreen_device_options> {
         let mut raw: sys::mln_offscreen_device_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_offscreen_device_options>() as _;
         raw.fields = 0;
@@ -2542,6 +2547,10 @@ impl ToNative<sys::mln_offscreen_device_options> for OffscreenDeviceOptions {
         if let Some(item) = &self.single_context {
             raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
             raw.single_context = *item;
+        }
+        if let Some(item) = &self.client_api {
+            raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
+            raw.client_api = to_native(&*item, arena)?;
         }
         Ok(raw)
     }
@@ -2635,7 +2644,7 @@ impl<'a> ToNative<sys::mln_open_gl_borrowed_texture_descriptor>
 }
 
 native_enum! {
-/// The OpenGL API that a dedicated EGL context uses.
+/// The OpenGL API that a context renders with.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

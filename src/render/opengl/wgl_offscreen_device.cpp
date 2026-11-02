@@ -139,6 +139,10 @@ auto create_backend_offscreen_device(
   const mln_offscreen_device_options& options,
   std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status {
+  if (options.client_api == MLN_OPEN_GL_CLIENT_API_GLES) {
+    set_thread_error("WGL creates desktop OpenGL contexts, not OpenGL ES");
+    return MLN_STATUS_UNSUPPORTED;
+  }
   if (
     (options.fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) != 0U &&
     options.adapter_index != 0

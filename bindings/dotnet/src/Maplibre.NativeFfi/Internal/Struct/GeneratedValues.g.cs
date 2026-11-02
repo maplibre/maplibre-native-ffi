@@ -1190,6 +1190,12 @@ internal static unsafe class GeneratedValues
             MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT,
             static present => (byte)(present ? 1 : 0)
         );
+        native.fields |= Put(
+            value.ClientApi,
+            ref native.client_api,
+            MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API,
+            static present => (mln_open_gl_client_api)present
+        );
         return native;
     }
 
