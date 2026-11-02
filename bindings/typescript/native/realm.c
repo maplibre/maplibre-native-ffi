@@ -6,7 +6,9 @@
 // and the realm dispatches the queue on its event loop, after the native
 // callback that queued each call has returned. Every completion, registration,
 // and wake of the realm names the queue, so its trampoline runs there and
-// calls the JavaScript value that its user data references. Native code copies
+// calls the JavaScript value that its user data references. A native
+// registration instead carries function pointers from native code in the host,
+// which the realm copies into the C descriptor unchanged. Native code copies
 // every argument and answers every synchronous decision itself.
 
 // dladdr is a Darwin extension.
@@ -32,13 +34,15 @@
 #include <dlfcn.h>
 #endif
 
-// What the threadsafe function's data carries: NULL asks the realm to dispatch
-// its queue, and a pointer is a leak report, or, with MLN_TS_MESSAGE_THREAD
-// set, a finished thread start.
-enum {
-  MLN_TS_MESSAGE_THREAD = 1,
-  MLN_TS_MESSAGE_MASK = 1,
-};
+/**
+ * What the threadsafe function's data carries. NULL asks the realm to dispatch
+ * its queue, and every other message begins with its kind.
+ */
+typedef enum mln_ts_message_kind {
+  MLN_TS_MESSAGE_DISPATCH,
+  MLN_TS_MESSAGE_LEAK,
+  MLN_TS_MESSAGE_THREAD_START,
+} mln_ts_message_kind;
 
 /**
  * What native threads reach of a realm. A poster calls the threadsafe function
@@ -69,11 +73,13 @@ typedef struct mln_ts_host {
 
 /** An owner that the collector reclaimed while open. */
 typedef struct mln_ts_leak {
+  mln_ts_message_kind kind;
   uint64_t handle;
   char name[64];
 } mln_ts_leak;
 
 typedef struct mln_ts_thread_start {
+  mln_ts_message_kind kind;
   mln_ts_shim* shim;
   napi_ref settle;
   mln_ts_thread_run run;
@@ -222,7 +228,7 @@ static void* thread_start_main(void* argument) {
   start->allocations = NULL;
   // The realm may free the start as soon as the post lands.
   mln_ts_shim* shim = start->shim;
-  if (!shim_post(shim, (void*)((uintptr_t)start | MLN_TS_MESSAGE_THREAD))) {
+  if (!shim_post(shim, start)) {
     thread_start_abandon(start);
   }
   shim_release(shim);
@@ -250,6 +256,7 @@ bool mln_ts_start_thread(
     return false;
   }
   memcpy(start->arguments, arguments, size);
+  start->kind = MLN_TS_MESSAGE_THREAD_START;
   start->shim = shim_retain(call->realm->shim);
   start->run = run;
   start->dispose = dispose;
@@ -333,36 +340,40 @@ static void receive(
 ) {
   (void)callback;
   mln_ts_realm* realm = context;
-  uintptr_t bits = (uintptr_t)data;
-  mln_ts_thread_start* start =
-    (bits & MLN_TS_MESSAGE_MASK) == MLN_TS_MESSAGE_THREAD
-      ? (mln_ts_thread_start*)(bits & ~(uintptr_t)MLN_TS_MESSAGE_MASK)
-      : NULL;
-  mln_ts_leak* leak = data != NULL && start == NULL ? data : NULL;
+  mln_ts_message_kind kind =
+    data != NULL ? *(mln_ts_message_kind*)data : MLN_TS_MESSAGE_DISPATCH;
   napi_handle_scope scope;
   if (env == NULL || napi_open_handle_scope(env, &scope) != napi_ok) {
-    free(leak);
-    if (start != NULL) {
-      thread_start_abandon(start);
+    if (kind == MLN_TS_MESSAGE_THREAD_START) {
+      thread_start_abandon(data);
+    } else {
+      free(data);
     }
     return;
   }
-  if (data == NULL) {
-    // Each call opens a scope of its own, and the TypeScript half catches
-    // what a host value throws. Calls that arrive meanwhile wake again.
-    mln_diagnostic diagnostic = {.size = sizeof diagnostic};
-    mln_delivery_queue_dispatch(realm->queue, &diagnostic);
-  } else if (start != NULL) {
-    thread_start_settle(env, start);
-  } else {
-    napi_value argv[2] = {
-      mln_ts_text(env, leak->name, strlen(leak->name)),
-      mln_ts_u64(env, leak->handle)
-    };
-    if (!call_realm(env, realm->report_leak, 2, argv, NULL)) {
-      surface_exception(env);
+  switch (kind) {
+    case MLN_TS_MESSAGE_DISPATCH: {
+      // Each call opens a scope of its own, and the TypeScript half catches
+      // what a host value throws. Calls that arrive meanwhile wake again.
+      mln_diagnostic diagnostic = {.size = sizeof diagnostic};
+      mln_delivery_queue_dispatch(realm->queue, &diagnostic);
+      break;
     }
-    free(leak);
+    case MLN_TS_MESSAGE_LEAK: {
+      mln_ts_leak* leak = data;
+      napi_value argv[2] = {
+        mln_ts_text(env, leak->name, strlen(leak->name)),
+        mln_ts_u64(env, leak->handle)
+      };
+      if (!call_realm(env, realm->report_leak, 2, argv, NULL)) {
+        surface_exception(env);
+      }
+      free(leak);
+      break;
+    }
+    case MLN_TS_MESSAGE_THREAD_START:
+      thread_start_settle(env, data);
+      break;
   }
   napi_close_handle_scope(env, scope);
 }
@@ -502,18 +513,6 @@ bool mln_ts_upcall_end(
   return received;
 }
 
-/** The release that a call runs for a native registration it does not pass
- * on. */
-typedef struct mln_ts_native_release {
-  mln_user_data_release release;
-  void* user_data;
-} mln_ts_native_release;
-
-static void native_release(void* data) {
-  mln_ts_native_release* entry = data;
-  entry->release(entry->user_data);
-}
-
 bool mln_ts_read_native_registration(
   mln_ts_call* call, napi_value value, const char* kind, size_t callbacks,
   uint64_t* out, const char* path
@@ -562,19 +561,10 @@ bool mln_ts_read_native_registration(
   if (out[callbacks + 1] == 0) {
     return true;
   }
-  mln_ts_native_release* entry = mln_ts_allocate(call, sizeof *entry);
-  if (entry == NULL) {
-    // This call took the registration, so it releases the context even
-    // though it fails before native code sees it.
-    ((mln_user_data_release)(uintptr_t)out[callbacks + 1])(
-      (void*)(uintptr_t)out[callbacks]
-    );
-    return false;
-  }
-  entry->release = (mln_user_data_release)(uintptr_t)out[callbacks + 1];
-  entry->user_data = (void*)(uintptr_t)out[callbacks];
-  // The call's rejections run before its allocations are freed.
-  return mln_ts_reject_later(call, native_release, entry);
+  return mln_ts_reject_later(
+    call, (mln_user_data_release)(uintptr_t)out[callbacks + 1],
+    (void*)(uintptr_t)out[callbacks]
+  );
 }
 
 static napi_value completion_header(
@@ -713,6 +703,7 @@ static void owner_finalize(napi_env env, void* data, void* hint) {
     if (owner_end(owner, true)) {
       mln_ts_leak* leak = calloc(1, sizeof *leak);
       if (leak != NULL) {
+        leak->kind = MLN_TS_MESSAGE_LEAK;
         leak->handle = owner->handle;
         memcpy(leak->name, owner->name, sizeof leak->name);
         if (!shim_post(owner->realm->shim, leak)) {

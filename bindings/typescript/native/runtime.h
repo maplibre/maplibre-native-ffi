@@ -1,16 +1,9 @@
-// The handwritten runtime of the Node-API addon.
+// The handwritten runtime of the Node-API addon, which generated code calls.
 //
-// Generated export functions convert their arguments through the helpers here,
-// call the C function directly, and return a JavaScript value. Every
-// completion, registration, and wake that JavaScript supplies names the realm's
-// delivery queue, with a generated trampoline as its callback and a reference
-// to its JavaScript value as its user data. The realm dispatches the queue on
-// its event loop when the queue's wake posts to the realm's threadsafe
-// function, so each trampoline runs on the JavaScript thread. A native
-// registration instead carries function pointers from native code in the host,
-// which the runtime copies into the C descriptor unchanged. The runtime also
-// keeps the owner tokens that finalizers dispose through, and the realm's
-// teardown.
+// A generated export begins a call, converts its arguments through the helpers
+// here, calls the C function directly, and ends the call, which returns a
+// JavaScript value and frees what native code did not accept. realm.c
+// describes how registrations and completions reach JavaScript.
 
 #ifndef MAPLIBRE_NATIVE_FFI_NODE_RUNTIME_H
 #define MAPLIBRE_NATIVE_FFI_NODE_RUNTIME_H
@@ -97,7 +90,10 @@ const char* mln_ts_index_path(
 void* mln_ts_allocate(mln_ts_call* call, size_t size);
 /** Frees call memory that a call handed off, as mln_ts_start_thread does. */
 void mln_ts_free_allocations(mln_ts_allocation* allocations);
-/** Runs reject(data) when the call ends, unless native code accepted it. */
+/**
+ * Runs reject(data) when the call ends, unless native code accepted it. When
+ * it cannot record data, it runs reject(data) at once and throws.
+ */
 bool mln_ts_reject_later(
   mln_ts_call* call, void (*reject)(void* data), void* data
 );
