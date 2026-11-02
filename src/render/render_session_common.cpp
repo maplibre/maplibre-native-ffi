@@ -433,9 +433,8 @@ auto make_string_vector(std::span<const mln_buffer_view> strings)
   return result;
 }
 
-// Draws without handing the frame to the host target. The previous setting is
-// restored rather than cleared, so an inner warmup render nests inside a demand
-// that already asked for no presentation.
+// Restores the previous setting rather than clearing it, so an inner warmup
+// render nests inside a demand that already asked for no presentation.
 class DiscardedPresent {
  public:
   explicit DiscardedPresent(bool discard)
@@ -453,7 +452,6 @@ class DiscardedPresent {
   bool previous_;
 };
 
-// A warmup render, which also keeps its frame callbacks from reaching the map.
 class UnpresentedRender {
  public:
   explicit UnpresentedRender(mln::core::SessionFrameObserver& observer)
@@ -607,10 +605,8 @@ auto to_screen_line_string(
   return true;
 }
 
-// Normalizes a query box and intersects it with the viewport. Native tile-space
-// query geometry saturates a few tiles past a tile's own bounds, so a box that
-// over-covers the viewport degrades into an empty answer. Returns nullopt when
-// the box lies entirely outside the viewport.
+// Native tile-space query geometry saturates a few tiles past a tile's own
+// bounds, so a box that over-covers the viewport degrades into an empty answer.
 auto clip_screen_box_to_viewport(
   mln_screen_box box, uint32_t width, uint32_t height
 ) -> std::optional<mln::ScreenBox> {
@@ -785,7 +781,6 @@ auto resubmit_parked_retirements(RetirementTask* task) noexcept -> void {
     task = next;
   }
 }
-// What abandon does with the graphics objects it takes from a session.
 enum class AbandonedGraphics : std::uint8_t {
   // Destroys each one whose destruction is safe on the abandoning thread.
   DestroyWhenSafe,
@@ -952,8 +947,7 @@ auto finish_driver_work(
   operation->complete(status, std::move(message), {});
 }
 
-// Whether a texture ring has no slot left to render into. A surface has no
-// ring and renders into its target directly.
+// A surface has no ring and renders into its target directly.
 auto every_slot_quarantined_locked(const mln_render_session_object& session)
   -> bool {
   const auto& slots = session.texture.slots;
@@ -985,12 +979,10 @@ void invalidate_unacquired_texture_frames_locked(
   }
 }
 
-// The host wakes that a section holding control_mutex owes. A wake callback may
-// call back into the session, which would relock control_mutex, so the section
-// records its wakes here and they run when this object is destroyed. Declare it
-// before the lock so the lock is released first. The coalescing flags are set
-// under the lock as before, and every recorded wake still runs, so none is
-// lost.
+// A wake callback may call back into the session and relock control_mutex, so
+// a section holding that lock records its wakes here, and they run when this
+// object is destroyed. Declare it before the lock so the lock is released
+// first.
 class DeferredWakes final {
  public:
   DeferredWakes() = default;
@@ -1028,10 +1020,6 @@ auto close_wakes(
   if (driver != nullptr) driver->close();
 }
 
-// Whether the driver can take the item at the front of its queue now. A
-// pending driver result holds the queue until it is ready.
-// Whether the work at the front of the queue renders a frame while the GPU has
-// as many unfinished frames as the texture ring has slots.
 auto frame_waits_for_gpu_locked(
   const mln_render_session_object& session
 ) noexcept -> bool {
@@ -1050,8 +1038,8 @@ auto driver_work_runnable_locked(
   return !ready || ready();
 }
 
-// Wakes the driver when it can take work. Work queued behind a pending driver
-// result wakes nothing until resume_driver_work() reports the result ready.
+// Work queued behind a pending driver result wakes nothing until
+// resume_driver_work() reports the result ready.
 // A frame that the frames in flight hold back wakes a caller driver once,
 // since only a service asks the backend to report their end.
 auto publish_driver_work_locked(
@@ -1070,7 +1058,6 @@ auto publish_driver_work_locked(
   }
 }
 
-// Queues work in driver order.
 auto push_driver_work_locked(
   mln_render_session_object& session, RenderDriverWork work,
   DeferredWakes& wakes
@@ -1085,8 +1072,7 @@ auto run_frame_demand(
   const std::shared_ptr<const mln_frame_demand>& expected
 ) noexcept -> void;
 
-// Queues work for a demand, defaulting to the session's front demand. If
-// allocation fails, later driver work or detach gives the demand a result.
+// If allocation fails, later driver work or detach gives the demand a result.
 auto queue_frame_demand_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes,
   const std::shared_ptr<const mln_frame_demand>& demand = {}
@@ -1110,9 +1096,9 @@ auto queue_frame_demand_work_locked(
   return true;
 }
 
-// Runs the front demand again. A full ring parks a demand without a work item,
-// so a released frame that frees a slot runs it, as does a quarantined ring
-// once the demand ahead of it ended.
+// A full ring parks a demand without a work item, so a released frame that
+// frees a slot runs it again, as does a quarantined ring once the demand ahead
+// of it ended.
 auto resume_parked_demand_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
@@ -1125,9 +1111,6 @@ auto resume_parked_demand_locked(
   static_cast<void>(queue_frame_demand_work_locked(session, wakes));
 }
 
-// Moves every demand that waits for a map update back to the front of the
-// queue, ahead of the later demands there, in the order they began waiting.
-// Returns how many moved.
 auto requeue_update_waiting_demands_locked(mln_render_session_object& session)
   -> std::size_t {
   auto& waiting = session.update_waiting_demands;
@@ -1332,10 +1315,8 @@ struct RenderDriverAdmission {
   std::function<void(mln_render_session_object&)> commit;
 };
 
-// Shared body of the driver submissions: check the session, register the
-// completion, and hand one work item to the selected driver. An empty
-// `deliver` takes the plain committed completion, and an empty `admit` admits
-// every submission to an attached session.
+// An empty `deliver` takes the plain committed completion, and an empty
+// `admit` admits every submission to an attached session.
 auto submit_driver_work(
   mln_render_session session, const mln_completion* completion,
   CompletionOperation::Delivery deliver,
@@ -1391,8 +1372,6 @@ auto cancel_operation(const std::shared_ptr<OperationObject>& operation)
   };
 }
 
-// The delivery and work of a driver submission that completes without a
-// value.
 auto valueless_driver_work(
   RenderDriverCallable work, const ValuelessCompletion& valueless
 ) {
@@ -1419,12 +1398,11 @@ auto valueless_driver_work(
   };
 }
 
-// Runs a driver result's work and completes its operation with what the work
-// reports. Work that leaves a PendingDriverResult puts the rest of the result
-// at the front of the driver's queue instead, where it holds the work behind
-// it until it is ready. The driver popped the running work from that front,
-// so the result keeps its place in the accepted order. No abandon can empty
-// the queue first: abandon waits out or refuses a driver call in flight.
+// Work that leaves a PendingDriverResult puts the rest of the result at the
+// front of the driver's queue instead of completing, where it holds the work
+// behind it until it is ready. The driver popped the running work from that
+// front, so the result keeps its place in the accepted order. No abandon can
+// empty the queue first: abandon waits out or refuses a driver call in flight.
 auto run_driver_result(
   const std::shared_ptr<mln_render_session_object>& live,
   const std::shared_ptr<OperationObject>& operation,
@@ -1569,9 +1547,6 @@ constexpr std::array producer_sync_preference = {
   MLN_GPU_SYNC_CPU_COMPLETE,
 };
 
-// Picks the producer kind from the kinds the host accepts and the target
-// supports. Zero accepts CPU completion, or queue order on a target that
-// cannot complete on the CPU.
 auto pick_producer_sync_kind(
   mln_gpu_sync_kind_flags accepted, mln_gpu_sync_kind_flags supported
 ) -> std::optional<mln_gpu_sync_kind> {
@@ -2349,7 +2324,6 @@ auto render_session_render_update_on_driver(
   // Lambdas capture this reference rather than the structured binding, which
   // OpenHarmony's clang does not accept as a capture.
   const auto& rendered_update = update;
-  // Returns an early status, or nothing once the render attempt returns.
   const auto render_once = [&]() -> std::optional<mln_status> {
     try {
       live->frame_observer.begin_render();
@@ -2401,7 +2375,6 @@ auto render_session_render_update_on_driver(
   if (const auto early = render_once()) {
     return *early;
   }
-  // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
   // Static maps can return without drawing while style or tile data is pending.
   // Only a completed frame reports its view and replaces the backend state.
@@ -2797,7 +2770,6 @@ auto publish_frame_result_locked(
   }
 }
 
-// Publishes `disposition` for a demand that ends without starting.
 auto finish_demand_locked(
   mln_render_session_object& session, const mln_frame_demand& pending,
   mln_render_result disposition, DeferredWakes& wakes
@@ -4258,8 +4230,8 @@ auto render_session_maintenance_start(
 }
 
 namespace {
-// Runs on the driver. Detaches the target and ends outstanding demands.
-// Disposal drops their results because the host no longer drains them.
+// Runs on the driver. Disposal drops the results of outstanding demands
+// because the host no longer drains them.
 auto finish_detach(const std::shared_ptr<mln_render_session_object>& live)
   -> mln_status {
   static_cast<void>(map_set_render_session_notices(live->map, {}));
@@ -4397,8 +4369,6 @@ struct AbandonedObjects {
   std::unique_ptr<TextureSessionBackend> texture;
 };
 
-// Destroys what abandon took from a session when that is safe on this thread,
-// keeps the rest until the process exits, and returns how many it kept.
 // `keep_ring` says the host's GPU may still read a texture of the session's
 // ring, which lives in the texture backend. The renderer goes either way, as
 // it does when detach keeps a ring: the host's GPU never reads its objects.

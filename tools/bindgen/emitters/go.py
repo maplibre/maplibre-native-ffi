@@ -167,7 +167,6 @@ def public_dispose(handle) -> bool:
 
 
 def owner_members(owner: str, event_source: bool) -> str:
-    """The state members that every handle owner declares."""
     id_doc = (
         "// Id returns the native handle value, which runtime events report as their\n"
         "// source. It stays readable after the handle closes, so events drained later\n"
@@ -194,7 +193,6 @@ def _lower(api):
 
     bound = compile_api(api, TARGETS)
     values, lowered, generated, unsupported = lower_operations(bound)
-    # The operations that serve every platform, and those of each constraint.
     operations, constrained = [], {}
     for plan, source in lowered:
         if (build := constraint(plan)) is None:
@@ -236,7 +234,7 @@ def _lower(api):
         owners.append(
             doc(bound, native, owner)
             + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",func(raw uint64){{ {dispose} }})}}; return owner }}\n'
-            f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
+            f"func (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
             + owner_members(owner, native in bound.event_sources)
         )
         used_support.add(disposer)

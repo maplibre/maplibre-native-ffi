@@ -53,7 +53,6 @@ class GoEmitterTests(unittest.TestCase):
             "defer C.mln_reading_batch_release(outBatch)\n",
             source,
         )
-        # Neither the batch nor its view is public.
         self.assertNotIn("ReadingBatchHandle", source)
         self.assertNotIn("ReadingView", source)
 
@@ -71,7 +70,6 @@ class GoEmitterTests(unittest.TestCase):
     def test_a_zero_literal_is_the_default(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertNotRegex(source, r"func Default[A-Z]")
-        # An input starts from a zeroed record, with its size set.
         self.assertIn(
             "func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options { raw := C.mln_map_options{}; raw.size = ",
             source,
@@ -163,7 +161,6 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         validate(api)
         self.assertEqual(go.lower(api).generated, ["mln_lease_dispose"])
         source = emitted(go, api)["generated_api.go"]
-        # Close returns a future; the owner's disposer passes a null completion.
         self.assertIn(
             "func (receiver *LeaseHandle) Close() (*Future[struct{}], error)", source
         )
@@ -171,7 +168,6 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
             "C.mln_lease_dispose(C.mln_lease(raw), completion, diagnostic)", source
         )
         self.assertIn("C.mln_lease_dispose(C.mln_lease(raw), nil, nil)", source)
-        # Dispose is the synchronous form, which passes a null completion.
         self.assertIn("func (receiver *LeaseHandle) Dispose() error", source)
         self.assertIn("C.mln_lease_dispose(C.mln_lease(raw), nil, diagnostic)", source)
 
@@ -197,7 +193,6 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         for owner in owners:
             for member in ("Id() uint64", "IsClosed() bool", "String() string"):
                 self.assertIn(f"func (handle *{owner}) {member}", source)
-        # Only the runtime and the map are event sources.
         sources = re.findall(
             r"// Id returns the native handle value, which runtime events report"
             r" as their\n(?://.*\n)*func \(handle \*(\w+)\) Id\(\)",

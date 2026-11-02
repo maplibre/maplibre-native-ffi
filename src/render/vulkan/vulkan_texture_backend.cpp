@@ -49,9 +49,9 @@ auto owned_descriptor_from_borrowed(
   };
 }
 
-// Waits on the frame fence. A failed wait, such as a lost device, leaves the
-// frame's GPU work unfinished, so the render or readback fails instead of
-// publishing that frame as complete.
+// A failed wait, such as a lost device, leaves the frame's GPU work
+// unfinished, so the render or readback fails instead of publishing that frame
+// as complete.
 void wait_frame(const mln::vulkan::Context& context) {
   if (!context.waitFrame()) {
     throw std::runtime_error("Vulkan frame fence wait failed");
@@ -257,8 +257,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   // Built once: a replacement target must match its format and final layout,
-  // which
-  // VulkanTextureBackend::matches_borrowed_target checks.
+  // which VulkanTextureBackend::matches_borrowed_target checks.
   void create_render_pass() {
     const auto& device = backend.getDevice();
     const auto& dispatcher = backend.getDispatcher();

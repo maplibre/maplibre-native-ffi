@@ -1,9 +1,7 @@
 // Locale-sensitive style expressions on targets that evaluate them with ICU:
 // Linux, with the CLDR data that ICU4X compiles into the library, and
-// OpenHarmony and Windows, with the system's ICU4C. Number formatting follows
-// the locale, currency, and fraction limits, and a collator follows the locale,
-// its collation extensions, and the requested sensitivity. The `_icu` suffix
-// builds this file on those targets only.
+// OpenHarmony and Windows, with the system's ICU4C. The `_icu` suffix builds
+// this file on those targets only.
 
 #include <stdio.h>
 
@@ -98,7 +96,6 @@ static void number_format_follows_locale_currency_and_fraction_limits(void) {
   close_map(&map);
 }
 
-// A comparison of two strings under a collator for `locale`.
 static bool compares(
   const locale_map* map, const char* comparison, const char* lhs,
   const char* rhs, const char* locale, bool case_sensitive,

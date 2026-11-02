@@ -54,7 +54,6 @@ prepare_browser_runtimes() {
   done
 }
 
-# Adds the tasks that publish each named publication of a project.
 add_publications() {
   local project="$1"
   shift

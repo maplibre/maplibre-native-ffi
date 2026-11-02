@@ -12,7 +12,6 @@
 #include "support/test_support.h"
 
 namespace {
-// The calls that this file's queues dispatched.
 struct DispatchedCalls {
   std::size_t requests = 0;
   std::size_t cancels = 0;

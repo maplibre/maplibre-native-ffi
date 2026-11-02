@@ -252,7 +252,6 @@ pub(crate) fn copy_slice<T: Copy>(result: &sys::mln_completion_result) -> Result
     }
 }
 
-/// Copies a completion's one value.
 pub(crate) fn value<N: Copy, T: FromNative<N>>(result: &sys::mln_completion_result) -> Result<T> {
     let value = copy_value::<N>(result)?;
     // SAFETY: the value and the storage it points to are borrowed for the
@@ -260,7 +259,6 @@ pub(crate) fn value<N: Copy, T: FromNative<N>>(result: &sys::mln_completion_resu
     unsafe { from_native(value) }
 }
 
-/// Copies a completion's value, or `None` when it carries no value.
 pub(crate) fn optional<N: Copy, T: FromNative<N>>(
     result: &sys::mln_completion_result,
 ) -> Result<Option<T>> {
@@ -270,7 +268,6 @@ pub(crate) fn optional<N: Copy, T: FromNative<N>>(
     value::<N, T>(result).map(Some)
 }
 
-/// Copies every value of a completion.
 pub(crate) fn list<N: Copy, T: FromNative<N>>(
     result: &sys::mln_completion_result,
 ) -> Result<Vec<T>> {
@@ -304,7 +301,6 @@ mod tests {
         release_user_data: sys::mln_user_data_release,
     }
 
-    /// A completion result with `status` and nothing else.
     fn result(status: sys::mln_status) -> sys::mln_completion_result {
         // SAFETY: an all-zero completion result is a valid empty result.
         let mut result = unsafe { std::mem::zeroed::<sys::mln_completion_result>() };
@@ -356,7 +352,6 @@ mod tests {
         (future, accepted.unwrap())
     }
 
-    /// Returns the result of a future that native has already completed.
     fn completed<T>(future: NativeFuture<T>) -> Result<T> {
         future
             .wait(Duration::ZERO)
@@ -456,7 +451,6 @@ mod tests {
     fn a_wait_gives_the_future_back_until_native_completes_it() {
         let (future, accepted) = accept(unit);
 
-        // Nothing has completed, so the wait ends without a result.
         let future = future.wait(Duration::ZERO).unwrap_err();
 
         accepted.deliver(sys::MLN_STATUS_OK);
@@ -494,7 +488,6 @@ mod tests {
             accepted.release();
         }
 
-        // Only a committed command resolves, with the generations it published.
         let mut committed = result(sys::MLN_STATUS_OK);
         committed.generation = 8;
         committed.render_update_generation = 3;
@@ -516,7 +509,6 @@ mod tests {
         let probe = DropProbe(Arc::clone(&dropped));
         let (future, accepted) = accept(move |_| Ok(probe));
 
-        // Nothing has completed, so a bounded wait gives up.
         let future = future.wait(Duration::ZERO).unwrap_err();
 
         // Dropping the future is how a caller stops waiting. Native still owns

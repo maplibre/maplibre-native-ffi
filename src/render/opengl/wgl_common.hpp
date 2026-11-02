@@ -42,8 +42,6 @@ inline auto get_opengl32_proc_address(const char* name) -> PROC {
   return reinterpret_cast<PROC>(GetProcAddress(module, name));
 }
 
-// A GL entry point of the current context, from the host's loader, WGL, or
-// opengl32 itself.
 inline auto get_wgl_proc_address(
   const mln_wgl_context_descriptor& wgl, const char* name
 ) -> PROC {

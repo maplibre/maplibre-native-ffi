@@ -19,7 +19,6 @@ internal sealed class RenderFixture : IDisposable
     internal const uint Width = 32;
     internal const uint Height = 16;
 
-    /// <summary>A style that paints every pixel opaque red.</summary>
     internal const string RedStyle = """
         {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ff0000"}}]}
         """;
@@ -27,7 +26,6 @@ internal sealed class RenderFixture : IDisposable
     private readonly SemaphoreSlim wake = new(0);
     private ulong token;
 
-    /// <summary>The graphics backends this build renders with, from its backend masks.</summary>
     internal static TheoryData<TestGraphicsBackend> Backends
     {
         get
@@ -110,11 +108,9 @@ internal sealed class RenderFixture : IDisposable
         RenderSessionAttachOptions options
     );
 
-    /// <summary>Runs a test on a new graphics thread that creates, drives, and disposes a fixture.</summary>
     internal static void Run(TestGraphicsBackend backend, Action<RenderFixture> test) =>
         Run(backend, static (_, options) => options, test);
 
-    /// <summary>Runs a test on a fixture whose session attaches with the configured options.</summary>
     internal static void Run(
         TestGraphicsBackend backend,
         Configure configure,
@@ -143,7 +139,6 @@ internal sealed class RenderFixture : IDisposable
         failure?.Throw();
     }
 
-    /// <summary>Services the session's driver on this thread until the operation completes.</summary>
     internal void Await(Task operation, string what = "a render session operation")
     {
         operation.ContinueWith(
@@ -168,7 +163,6 @@ internal sealed class RenderFixture : IDisposable
         return operation.Result;
     }
 
-    /// <summary>Demands frames until one renders, and returns its result.</summary>
     internal RenderFrameResult RenderFrame()
     {
         var elapsed = Stopwatch.StartNew();
@@ -223,7 +217,6 @@ internal sealed class RenderFixture : IDisposable
 
     private IReadOnlyList<RenderFrameResult> DrainFrames() => Session.DrainFrameResults();
 
-    /// <summary>Attaches an owned texture target of the fixture's backend to its map.</summary>
     internal RenderSessionHandle Attach(RenderSessionAttachOptions options)
     {
         var extent = new LogicalExtent(Width, Height, 1);

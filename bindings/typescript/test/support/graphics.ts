@@ -390,7 +390,6 @@ export function requestFrame(session: RenderSessionHandle, token: bigint) {
   session.requestFrame({ token });
 }
 
-/** The frame result for `token` among the session's drained results. */
 function takeResult(
   session: RenderSessionHandle,
   token: bigint,
@@ -521,7 +520,6 @@ export class TestSession {
     throw new Error(`${frameAttempts} frame demands rendered nothing`);
   }
 
-  /** Waits on the wake until `settled` returns a value. */
   async #until<T>(
     settled: () => T | undefined,
     what: string,

@@ -445,7 +445,6 @@ class RenderSessionScheduler final : public mln::Scheduler {
     RenderSessionScheduler& scheduler_;
   };
 
-  // Runs the hook, and returns early when there is none.
   auto notify_work_available() -> void;
 
   std::mutex mutex_;
@@ -862,7 +861,6 @@ struct mln_render_session_object
   mln_render_session_capabilities capabilities{};
   uint64_t generation = 1;
   uint64_t map_update_generation = 0;
-  // The map update generation of the last rendered frame.
   uint64_t rendered_update_generation = 0;
   uint64_t rendered_target_generation = 0;
   uint64_t frame_generation = 0;

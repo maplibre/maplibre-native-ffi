@@ -11,7 +11,6 @@ import sys
 from importlib import import_module
 from importlib.util import find_spec
 
-# Each runtime's top-level module, and the distribution that installs it.
 RUNTIMES = {
     "maplibre_native_ffi_runtime_opengl": "maplibre-native-ffi-runtime-opengl",
     "maplibre_native_ffi_runtime_metal": "maplibre-native-ffi-runtime-metal",

@@ -14,7 +14,6 @@
 extern "C" {
 #endif
 
-// The driver the backend's owned-texture fixture attaches with.
 uint32_t mln_test_backend_driver(void);
 
 // Creates a host-owned context and submits a 64x64 owned-texture attach with
@@ -38,23 +37,19 @@ typedef bool (*mln_test_backend_attach_fn)(
   const mln_completion* completion, mln_status* out_status
 );
 
-// mln_test_render_fixture_create() with another attach function.
 bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
 );
 
-// mln_test_render_fixture_create_with() for a session on `driver` instead of
-// the preset's.
 bool mln_test_render_fixture_create_with_driver(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach, uint32_t driver
 );
 
 #if defined(__EMSCRIPTEN__)
-// mln_test_render_fixture_create_with() for a session that the browser main
-// thread services from its first service on, so its backend initializes
-// there.
+// The browser main thread services this session from its first service on,
+// so its backend initializes there.
 bool mln_test_render_fixture_create_serviced_on_main_thread(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach

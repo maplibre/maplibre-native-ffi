@@ -31,7 +31,6 @@ mln_status mln_test_set_http_header_transform(
 );
 mln_status mln_test_clear_http_header_transform(mln_runtime runtime);
 
-// Waits for the map's MAP_LOADING_FAILED event and copies its message.
 bool mln_test_await_loading_failure(
   mln_runtime runtime, mln_map map, char* out_message, size_t capacity
 );
@@ -101,7 +100,6 @@ void mln_test_provider_destroy(mln_test_provider* provider);
 void mln_test_provider_install(
   mln_runtime runtime, mln_test_provider* provider
 );
-// How many requests for `url` the provider has recorded.
 int mln_test_provider_requests(mln_test_provider* provider, const char* url);
 // Waits within the default deadline for `count` requests for `url`.
 bool mln_test_provider_wait_for_requests(
@@ -114,7 +112,6 @@ const mln_test_provider_request* mln_test_provider_request_at(
 
 // A response carrying `text` as its bytes, with every other field unset.
 mln_resource_response mln_test_text_response(const char* text);
-// A provider error with `reason` and `message`.
 mln_resource_response mln_test_error_response(
   uint32_t reason, const char* message
 );

@@ -127,8 +127,8 @@ void EglSharedContext::activate_single(
   }
 }
 
-// The API to bind before creating a context and making it current. A dedicated
-// context has no share context to ask, so the descriptor names it.
+// A dedicated context has no share context to ask for its API, so the
+// descriptor names it.
 auto EglSharedContext::requested_api() const -> EGLenum {
   if (dedicated()) {
     return descriptor_.client_api == MLN_OPEN_GL_CLIENT_API_GL

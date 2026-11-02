@@ -43,7 +43,6 @@ _BASE_SWITCHES = {"STANDARD_TYPES", "COMPLETION_RUNTIME", "ABI_VERSION", "QUEUE"
 
 
 def protocol_groups() -> tuple[str, ...]:
-    """The fixture's declaration groups, in file order."""
     names = re.findall(
         r"^#ifdef MLN_PROTOCOL_(\w+)$", PROTOCOLS.read_text(), re.MULTILINE
     )
@@ -91,7 +90,6 @@ def parse_directory(directory: Path, clang_args: tuple[str, ...] = ()) -> Api:
 
 
 def emitted(emitter, api) -> dict[str, str]:
-    """An emitter's generated files, by path from its binding's directory."""
     directory = getattr(emitter, "DIRECTORY", None)
     return {
         path.removeprefix(f"{directory}/") if directory else path: source
@@ -100,7 +98,6 @@ def emitted(emitter, api) -> dict[str, str]:
 
 
 def real_api() -> Api:
-    """The repository's own public headers."""
     return parse_directory(ROOT / "include", REAL_CLANG_ARGS)
 
 
@@ -120,8 +117,6 @@ def _digest(directory: Path, clang_args: tuple[str, ...]) -> str:
 
 @dataclass(frozen=True)
 class Tool:
-    """A probe toolchain executable and the environment it runs in."""
-
     executable: str
     environment: tuple[tuple[str, str], ...]
 

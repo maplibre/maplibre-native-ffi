@@ -261,7 +261,6 @@ RESERVED = frozenset(
 
 
 def callback_type(values, field):
-    """The function pointer type of a registration's callback field."""
     plan = values.bound.callbacks[field.value.native]
     result = (
         "void"

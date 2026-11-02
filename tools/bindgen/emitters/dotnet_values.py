@@ -59,7 +59,6 @@ def member(name: str) -> str:
 
 
 def variant_constant(variant: FieldPlan) -> str:
-    """The tag constant that selects a union variant."""
     assert variant.presence is not None and variant.presence.variant is not None
     return variant.presence.variant
 
@@ -87,8 +86,6 @@ def typed_mask(field: FieldPlan) -> str | None:
 
 
 def enum_member(native: str, constants, key: str) -> str:
-    """The .NET member of the enum `native` for its C constant `key`, among
-    all of the enum's `constants`."""
     prefix = enum_member_prefix(constants, native)
     return pascal(key.removeprefix(prefix).lower())
 
@@ -793,7 +790,6 @@ class Values:
         )
 
     def function_pointer(self, native: str) -> str:
-        """The unmanaged function pointer type of a callback typedef."""
         callback = self.bound.callbacks[native]
         types = [self.raw_type(parameter.value) for parameter in callback.parameters]
         void = callback.result.ctype.kind == "void"
@@ -877,7 +873,6 @@ class Values:
     def field_encoding(
         self, plan: ValuePlan, name: str, field: FieldPlan, expression: str, indent: str
     ) -> list[str]:
-        """The statements that store one member's value."""
         encoded = []
         if field.value.kind == "union":
             assert field.value.tag is not None
@@ -1299,7 +1294,6 @@ class Values:
         return f"    public {name}()\n        : this({arguments}) {{ }}\n"
 
     def member_doc(self, plan: ValuePlan, field: FieldPlan) -> str:
-        """The XML doc comment of a member."""
         return docs.xml_comment(
             self.bound.doc(f"{plan.native}.{field.name}"), self.symbols(), "    "
         )

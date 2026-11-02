@@ -101,7 +101,6 @@ export interface Capabilities {
   };
   /** Loads the test-only addon over tests/graphics. */
   readonly testGraphics: () => unknown;
-  /** Keeps a timer from holding the event loop open. */
   readonly unrefTimer: (timer: ReturnType<typeof setTimeout>) => void;
 }
 
@@ -226,7 +225,6 @@ function httpOrigin(routes: Readonly<Record<string, string>>): Promise<Origin> {
   });
 }
 
-/** A queue of a realm's messages, which next() takes in order. */
 function inbox(): { push(message: unknown): void; next(): Promise<unknown> } {
   const messages: unknown[] = [];
   const waiters: ((message: unknown) => void)[] = [];

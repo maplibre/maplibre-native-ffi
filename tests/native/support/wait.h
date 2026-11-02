@@ -54,7 +54,6 @@ bool mln_test_await_on_event_loop(
   const char* what
 );
 
-// A flag one thread sets and another waits for.
 void mln_test_flag_set(atomic_bool* flag);
 // Waits for the flag within the default deadline.
 bool mln_test_wait_for_flag(const atomic_bool* flag);
@@ -104,7 +103,6 @@ typedef struct mln_test_completion {
     );                                                                        \
     mln_test_completion_destroy(&completion);                                 \
   } while (false)
-// The same, expecting the command to succeed.
 #define MLN_TEST_AWAIT_OK(...) \
   MLN_TEST_AWAIT_COMMAND(MLN_STATUS_OK, (__VA_ARGS__))
 

@@ -4,7 +4,6 @@
 #MISE shell="bash"
 set -euo pipefail
 
-# The preset selects the compiler and test runner.
 case "$usage_preset" in
   android-arm-*)
     echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/go:build and test an android-arm64 or android-x64 preset instead." >&2

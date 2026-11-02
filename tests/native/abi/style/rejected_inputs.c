@@ -1,22 +1,17 @@
-// Style commands that refuse their input or their target: empty views,
-// images without pixels, invalid style JSON, and sources whose ID is
-// taken or whose kind does not take the command.
+// Style commands that refuse their input or their target.
 
 #include "support/style.h"
 #include "support/test_support.h"
 
 // Expects `expression`, which submits with `completion.descriptor`, to refuse
-// the empty view `name` before it returns. The diagnostic names the view, and
-// the completion stays with the caller without its callback running.
+// the empty view `name` before it returns.
 #define EXPECT_EMPTY_REJECTED(name, expression) \
   MLN_TEST_EXPECT_COMMAND_REJECTED(name " must not be empty", expression)
 
 static const mln_lat_lng corners[4] = {{1, 1}, {1, 2}, {0, 2}, {0, 1}};
 
-// Every ID, URL, and JSON input that must name at least one byte is
-// refused at submission when empty, so no empty view reaches the map worker.
-// One shared check guards every such input, so one ID and one other view stand
-// for them.
+// One shared check guards every input that must not be empty, so one ID and
+// one other view stand for them.
 static void empty_views_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -92,8 +87,6 @@ static void style_commands_reject_invalid_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A command whose target is taken or of the wrong kind fails at commit with
-// the reason.
 static void source_commands_fail_on_a_taken_or_wrong_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

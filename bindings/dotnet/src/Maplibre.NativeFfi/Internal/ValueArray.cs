@@ -41,7 +41,6 @@ internal static class ValueArray
     internal static ValueArray<T> From<T>(ImmutableArray<T> items) =>
         new(ImmutableCollectionsMarshal.AsArray(items));
 
-    /// <summary>Adopts a caller's optional elements, keeping an absent array absent.</summary>
     internal static ValueArray<T>? FromOptional<T>(ImmutableArray<T>? items) =>
         items is { } value ? From(value) : null;
 

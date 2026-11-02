@@ -67,7 +67,6 @@ struct DeliveryItem {
 
 static_assert(std::is_trivially_destructible_v<DeliveryItem>);
 
-// Passes one copied argument record to the host callback of a call.
 template <class Record>
 auto invoke_delivered(DeliveryItem& item) noexcept -> void {
   Delivered<Record>::invoke(

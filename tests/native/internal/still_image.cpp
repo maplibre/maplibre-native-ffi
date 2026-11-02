@@ -28,7 +28,6 @@ constexpr char green_background_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"bg\","
   "\"type\":\"background\",\"paint\":{\"background-color\":\"#00ff00\"}}]}";
 
-// Reads back the center pixel of the frame the session rendered last.
 void read_center_pixel(
   const mln_test_render_fixture& fixture, std::uint8_t (&out_rgba)[4]
 ) {

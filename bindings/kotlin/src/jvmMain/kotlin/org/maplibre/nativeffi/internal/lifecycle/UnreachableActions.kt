@@ -19,7 +19,6 @@ internal class UnreachableActions private constructor(threadName: String) {
     }
   }
 
-  /** Runs [action] once [referent] becomes unreachable. */
   fun register(referent: Any, action: Runnable) {
     cleaner.register(referent, action)
   }
@@ -27,7 +26,6 @@ internal class UnreachableActions private constructor(threadName: String) {
   internal companion object {
     private val shared = UnreachableActions("maplibre-unreachable-actions")
 
-    /** Runs [action] on the shared reclamation worker once [referent] becomes unreachable. */
     fun register(referent: Any, action: Runnable) {
       shared.register(referent, action)
     }

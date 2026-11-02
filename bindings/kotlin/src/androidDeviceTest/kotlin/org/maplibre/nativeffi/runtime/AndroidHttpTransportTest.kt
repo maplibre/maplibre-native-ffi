@@ -291,7 +291,6 @@ private class LoopbackServer(private val routes: Map<String, Route>) : AutoClose
 
   fun requests(path: String): List<Request> = recorded.filter { it.path == path }
 
-  /** Waits for a request for [path]. */
   fun awaitRequest(path: String) {
     lock.withLock {
       var remaining = TimeUnit.SECONDS.toNanos(10)

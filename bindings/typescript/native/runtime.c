@@ -20,9 +20,6 @@ struct mln_ts_rejection {
   void* data;
 };
 
-// ---------------------------------------------------------------------------
-// Calls
-
 bool mln_ts_begin(
   mln_ts_call* call, napi_env env, napi_callback_info info, size_t arguments
 ) {
@@ -34,7 +31,6 @@ bool mln_ts_begin(
   ) {
     return false;
   }
-  // Missing arguments read as undefined.
   for (size_t index = call->argc; index < arguments; index++) {
     call->argv[index] = mln_ts_undefined(env);
   }
@@ -172,9 +168,6 @@ const char* mln_ts_index_path(
   return buffer;
 }
 
-// ---------------------------------------------------------------------------
-// JavaScript to C
-
 static napi_valuetype type_of(mln_ts_call* call, napi_value value) {
   napi_valuetype type = napi_undefined;
   napi_typeof(call->env, value, &type);
@@ -307,7 +300,6 @@ bool mln_ts_read_text(
   return true;
 }
 
-// Calls JSON[name](argument) on the realm's global JSON object.
 static napi_value call_json(
   napi_env env, const char* name, napi_value argument
 ) {
@@ -445,9 +437,6 @@ int mln_ts_read_kind(
   }
   return -1;
 }
-
-// ---------------------------------------------------------------------------
-// C to JavaScript
 
 napi_value mln_ts_undefined(napi_env env) {
   napi_value value = NULL;

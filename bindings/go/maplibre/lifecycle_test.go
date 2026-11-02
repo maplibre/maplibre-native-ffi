@@ -30,8 +30,6 @@ type handleMembers interface {
 	String() string
 }
 
-// checkHandleMembers checks that handle has an id and reports closed in
-// IsClosed and in String.
 func checkHandleMembers(t *testing.T, handle handleMembers, typeName string, closed bool) {
 	t.Helper()
 	if handle.Id() == 0 {

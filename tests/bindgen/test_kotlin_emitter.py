@@ -229,7 +229,6 @@ class KotlinLayoutTests(unittest.TestCase):
                 f'"{handle}Handle(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"',
                 owner,
             )
-            # Only the handles that runtime events name are their source.
             self.assertEqual(
                 handle in {"Runtime", "Map"},
                 "runtime events report as their source" in owner,
@@ -293,7 +292,6 @@ class KotlinLayoutTests(unittest.TestCase):
             "internal fun readReadingView(source: Long): List<Reading> = readStrided(",
             codecs,
         )
-        # Neither the batch nor its view is public.
         values = outputs[f"{GENERATED}/GeneratedValues.kt"]
         self.assertNotIn("class ReadingView", values)
         self.assertFalse(any("ReadingBatch" in path for path in outputs))

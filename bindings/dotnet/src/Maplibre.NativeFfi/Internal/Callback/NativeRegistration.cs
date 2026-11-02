@@ -23,17 +23,12 @@ internal sealed unsafe class NativeRegistration
         this.releaseUserData = releaseUserData;
     }
 
-    /// <summary>The function pointer of the registration's callback at <paramref name="index"/>.</summary>
     internal void* Function(int index) => (void*)functions[index];
 
     internal void* UserData => (void*)userData;
 
     internal void* ReleaseUserData => (void*)releaseUserData;
 
-    /// <summary>
-    /// Consumes the registration for one call. A registration that an earlier call
-    /// consumed throws an invalid-state <see cref="MaplibreException"/>.
-    /// </summary>
     internal void Claim()
     {
         if (Interlocked.Exchange(ref consumed, 1) != 0)

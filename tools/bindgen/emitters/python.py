@@ -207,7 +207,6 @@ def method_name(plan: OperationPlan) -> str:
 
 
 def owner_name(handle: HandlePlan) -> str:
-    """The class that owns a public handle."""
     return pascal(handle.stem) + "Handle"
 
 

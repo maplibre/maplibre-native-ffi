@@ -1,7 +1,4 @@
-// A queue's release_abandoned_user_data: releasing the queue passes it the
-// user_data of each registration whose release_user_data, or whose completion
-// callback, the release abandons, once each and on the releasing thread, and
-// never one whose release ran or will run.
+// A queue's release_abandoned_user_data callback.
 
 #include "support/delivery.h"
 #include "support/resources.h"
@@ -11,7 +8,6 @@
 static MLN_TEST_THREAD_LOCAL bool on_case_thread;
 static atomic_int off_thread_reports;
 
-// Records 'a' with the abandoned user_data.
 static void record_abandoned(void* user_data) {
   if (!on_case_thread) {
     atomic_fetch_add(&off_thread_reports, 1);
@@ -78,7 +74,6 @@ static bool dispatched_release(void* context) {
   return mln_test_count_calls('r', wait->user_data) != 0;
 }
 
-// Dispatches queue as its wake pulses until user_data's release has run.
 static void dispatch_until_released(mln_delivery_queue queue, void* user_data) {
   release_wait wait = {
     .queue = queue, .user_data = user_data, .failure = MLN_STATUS_OK
@@ -89,11 +84,6 @@ static void dispatch_until_released(mln_delivery_queue queue, void* user_data) {
   MLN_TEST_OK(wait.failure);
 }
 
-// A live provider with a queued request, a retired transform whose release is
-// queued, a delivered completion, and a completion still in flight are each
-// reported once. A transform whose release already ran, and an event handler
-// without release_user_data, are not. Retiring or completing them after the
-// release reports nothing more.
 static void release_reports_each_abandoned_user_data_once(void) {
   start_case();
   static char live, retired, queued_release, delivered, pending, unreleased;
@@ -186,8 +176,6 @@ static void release_the_queue(
   mln_delivery_queue_release(call->queue);
 }
 
-// A call that releases its queue still runs its own release, and the release
-// reports the calls queued after it, on the dispatching thread.
 static void a_release_inside_dispatch_reports_the_calls_after_it(void) {
   start_case();
   static releasing_call first;

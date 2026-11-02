@@ -32,7 +32,6 @@ object AbandonedMapProbe {
   @JvmStatic
   fun main(args: Array<String>) {
     val reported = CountDownLatch(1)
-    // Prints each report with the thread that reported it.
     Thread.setDefaultUncaughtExceptionHandler { thread, error ->
       println("[${thread.name}] ${error.message}")
       if (error.message?.startsWith("Leaked MapHandle ") == true) reported.countDown()

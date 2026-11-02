@@ -68,9 +68,9 @@ static const cache_case cache_cases[] = {
   {"a zero budget", CHANGE_BUDGET, 0, 0, ENTRY_REMOVED},
 };
 
-// Loads the cached style on a new map. The runtime's default database is in
-// memory and lives only while something holds it, so a case keeps its first
-// map until the next load has read the cache.
+// The runtime's default database is in memory and lives only while something
+// holds it, so a case keeps its first map until the next load has read the
+// cache.
 static mln_map load_style(mln_runtime runtime) {
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, cached_style_url));
@@ -109,8 +109,6 @@ static void apply_change(mln_runtime runtime, const cache_case* row) {
   }
 }
 
-// Each maintenance operation and budget either keeps a cached entry, marks it
-// for revalidation, or removes it, which the next request for it shows.
 static void ambient_cache_changes_reach_the_next_request(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = cached_style_url,
@@ -267,8 +265,6 @@ static void touch_shared_cache(void* argument) {
   }
 }
 
-// Two runtimes on two threads open one cache database and run an operation on
-// it at the same time.
 static void two_runtimes_can_use_the_same_cache_database(void) {
   char cache_path[1024];
   mln_test_temp_path("shared-cache.db", cache_path, sizeof(cache_path));

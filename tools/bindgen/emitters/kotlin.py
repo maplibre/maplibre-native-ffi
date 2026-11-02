@@ -374,7 +374,6 @@ def companion(bound, plan) -> str:
 def lower(api: Api | BoundApi) -> Lowered:
     bound = compile_api(api, TARGETS)
     functions, unsupported, rendered, split, values, native = lowered(bound)
-    # The extensions that each platform source set declares.
     platform_extensions: dict[str, list[str]] = {}
     groups: dict[str | None, list[OperationPlan]] = {}
     # The common factories of each handle, which its owner's companion declares.

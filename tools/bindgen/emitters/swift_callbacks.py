@@ -21,7 +21,6 @@ def throws(callback):
 
 
 def alias(callback):
-    """The public type alias of a callback type."""
     return name(callback.native.removeprefix("mln_"))
 
 

@@ -17,7 +17,6 @@ internal static class TestWaits
 
     internal static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    /// <summary>Waits for a signal until the shared deadline, failing the test when it passes.</summary>
     internal static void Wait(SemaphoreSlim signal, Stopwatch elapsed, string what)
     {
         var remaining = Deadline - elapsed.Elapsed;
@@ -25,7 +24,6 @@ internal static class TestWaits
             throw new TimeoutException($"Timed out waiting for {what}.");
     }
 
-    /// <summary>Awaits a signal until the shared deadline, failing the test when it passes.</summary>
     internal static async Task WaitAsync(SemaphoreSlim signal, Stopwatch elapsed, string what)
     {
         var remaining = Deadline - elapsed.Elapsed;

@@ -74,8 +74,6 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void set_borrowed_textures(
     std::vector<MTL::Texture*> textures, mln::Size new_size
   );
-  // Lets go of the borrowed textures until set_borrowed_textures() hands over
-  // the next ring.
   void release_borrowed_textures();
   // The failure of the last command buffer a render submitted, if it failed,
   // which the next call no longer returns.
@@ -90,7 +88,6 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   // Recorded when this session took borrowed_textures_, which it does not
   // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
-  // The format of a session-owned ring's textures.
   MTL::PixelFormat owned_pixel_format_ = MTL::PixelFormatInvalid;
   RenderableSlotRing ring_;
   std::optional<CommandBufferFailure> command_buffer_failure_;

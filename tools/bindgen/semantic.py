@@ -135,7 +135,6 @@ class CallbackResponsePlan:
     methods: tuple[str, ...]
 
 
-# The shape of a value, which every emitter dispatches on.
 ValueKind = Literal[
     "scalar",
     "enum",
@@ -213,10 +212,8 @@ def plain_value(value: ValuePlan) -> bool:
     )
 
 
-# Field roles that hold control state: a struct's size, reserved space, an
-# array's count or stride, a presence mask, a union tag, a
-# callback context, a registration's release callback, and a registration's
-# delivery queue, which a binding runtime sets.
+# Field roles that hold control state, which a binding runtime sets rather than
+# a host.
 CONTROL_ROLES = frozenset(
     {
         "size",
@@ -280,10 +277,6 @@ def required_member(field: FieldPlan) -> bool:
 
 
 def required_callbacks(value: ValuePlan) -> tuple[FieldPlan, ...]:
-    """The callbacks that a registration requires of its host.
-
-    A callback that C does not mark nullable is required.
-    """
     if not value.registration:
         return ()
     return tuple(
@@ -503,14 +496,11 @@ class OperationPlan:
     # consumes its receiver, such as an answer, keeps its own name, and a
     # second call on the consumed receiver fails as on any released handle.
     release: bool = False
-    # The handle disposal, borrowed view scope, or delivery protocol that the
-    # operation backs.
     support: DisposeSupport | ViewSupport | DeliverySupport | None = None
     completion: CompletionPlan | None = None
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     view: BorrowedViewPlan | None = None
     scoped_receiver: str | None = None
-    # Whether the function returns the status enum.
     status: bool = False
     # The public name; see Binder.member.
     member: str = ""
@@ -592,7 +582,6 @@ class BoundApi:
 
     @functools.cached_property
     def event_sources(self) -> frozenset[str]:
-        """The handles that runtime events name as their source."""
         enum = self.source.enums_by_name.get(RUNTIME_EVENT_SOURCE)
         return frozenset(
             "mln_" + member.name.removeprefix(RUNTIME_EVENT_SOURCE_PREFIX).lower()
@@ -736,7 +725,6 @@ def output_member(name: str) -> str:
 
 
 def public_stem(native: str) -> str:
-    """A declaration's name without the C API's `mln_` namespace."""
     return native.removeprefix("mln_")
 
 
@@ -1469,7 +1457,7 @@ class Binder:
             )
         drain = None
         if absence and len(outputs) == 2:
-            # A drain publishes its owned batch with a slice view of it.
+
             def slice_record(parameter):
                 value = parameter.value
                 value = value.element if value.kind == "reference" else value

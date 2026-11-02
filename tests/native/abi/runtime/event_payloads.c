@@ -54,7 +54,6 @@ static const char tilejson[] =
   "{\"tilejson\":\"2.2.0\",\"tiles\":[\"test://tiles/{z}/{x}/{y}.pbf\"],"
   "\"attribution\":\"Served tiles\"}";
 
-// The test provider's answer to a URL it has no route for.
 static const char unrouted_message[] =
   "the test provider has no route for this URL";
 
@@ -236,7 +235,6 @@ typedef enum scenario {
   SCENARIO_UNREACHABLE,
 } scenario;
 
-// What a scenario created, for the rows that compare against it.
 typedef struct scenario_context {
   mln_runtime runtime;
   mln_map map;
@@ -355,7 +353,6 @@ static void check_glyphs(
   }
 }
 
-// The good sprite loads and the bad one fails, and each carries its own URL.
 static void check_sprite(
   const recorded_event* record, const scenario_context* context
 ) {
@@ -519,8 +516,6 @@ static void check_scenario_rows(
   }
 }
 
-// Each type in MLN_RUNTIME_EVENT_FLAG_ALL has one row, the table has no other
-// row, and a row with no scenario says why.
 static void every_event_type_has_one_payload_row(void) {
   size_t types = 0;
   for (uint32_t type = 0; type < 64; type += 1) {
@@ -578,7 +573,6 @@ static size_t log_next(
   return log->count;
 }
 
-// A jump reports an immediate change and an ease an animated one.
 static void camera_events_carry_their_change_mode(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -620,8 +614,7 @@ static void camera_events_carry_their_change_mode(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Renders one frame demand, drains its result, and, when `log` is set,
-// drains the runtime's events.
+// Drains the runtime's events too when `log` is set.
 static void render_one_frame(
   const mln_test_render_fixture* fixture, mln_runtime runtime, event_log* log
 ) {
@@ -637,7 +630,6 @@ static void render_one_frame(
   }
 }
 
-// Renders until `type` from `source` is in the log.
 static void render_until_logged(
   const mln_test_render_fixture* fixture, mln_runtime runtime, event_log* log,
   uint32_t type, uint64_t source
@@ -653,9 +645,6 @@ static void render_until_logged(
   mln_test_watchdog_note(NULL);
 }
 
-// Rendering a style to idle reports the loading and render lifecycle, tile
-// work on the GeoJSON source, and the icon the style never provides. A long
-// ease then reports the camera changing between frames.
 static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -681,8 +670,6 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
   submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 4.0, 0, 0.0);
   log_drain(runtime, log);
 
-  // The map rendered fully before it went idle, and the renderer's frame count
-  // grows from one finished frame to the next.
   bool full_render = false;
   int64_t frame_count = -1;
   for (size_t index = 0; index < log->count; index += 1) {
@@ -726,7 +713,6 @@ static mln_map create_static_map(mln_runtime runtime, uint64_t event_mask) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Requests a still image and services the session until it completes.
 static mln_status render_still_image(
   mln_test_render_fixture* fixture, mln_map map, char* out_diagnostic,
   size_t diagnostic_capacity
@@ -786,8 +772,6 @@ static void deny_requests(mln_runtime runtime) {
   ));
 }
 
-// A style that fails to parse reports the parser's exception with code 0. A
-// source whose data fails to load then fails the still image.
 static void failed_loads_report_their_text(void) {
   mln_runtime runtime = mln_test_create_runtime();
   deny_requests(runtime);
@@ -824,8 +808,6 @@ static void failed_loads_report_their_text(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An observed download reports its status changes and the error its style
-// request met, from the runtime rather than a map.
 static void an_observed_offline_download_reports_status_and_errors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   deny_requests(runtime);
@@ -887,7 +869,6 @@ static bool source_change_logged(void* context) {
          );
 }
 
-// Records the attribution one source query delivered.
 typedef struct attribution_probe {
   atomic_bool done;
   mln_status status;
@@ -909,8 +890,6 @@ static void copy_attribution(
   mln_test_flag_set(&probe->done);
 }
 
-// A source whose TileJSON arrives reports the change, and a source query
-// submitted after the event reads the attribution the TileJSON carried.
 static void a_source_reports_the_description_its_tilejson_brings(void) {
   mln_runtime runtime = mln_test_create_runtime();
   static const mln_test_provided_resource resources[] = {
@@ -956,8 +935,6 @@ static void a_source_reports_the_description_its_tilejson_brings(void) {
   mln_test_provider_destroy(provider);
 }
 
-// A style's sprites and glyph ranges report each request, load, and failure
-// with the resource that they name.
 static void sprites_and_glyphs_name_the_resource_they_report(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider* provider = mln_test_provider_create(
@@ -1005,8 +982,6 @@ static bool sprite_error_logged(void* context) {
          );
 }
 
-// A sprite that fails to load fails a pending still image with the text of its
-// error event, which names the sprite that failed.
 static void a_failed_sprite_names_itself_to_a_failed_still_image(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider* provider = mln_test_provider_create(NULL, 0);
@@ -1052,8 +1027,7 @@ static void a_failed_sprite_names_itself_to_a_failed_still_image(void) {
   mln_test_provider_destroy(provider);
 }
 
-// A map created with an empty mask queues nothing, through a camera change and
-// a rendered still image, whose completion fences the check.
+// The still image's completion fences the check.
 static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_FLAG_NONE);

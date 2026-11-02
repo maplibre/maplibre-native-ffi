@@ -52,8 +52,6 @@ function(mln_native_active_file_tags out_var)
   set(${out_var} ${tags} PARENT_SCOPE)
 endfunction()
 
-# Whether a test file builds on this target, judged by the tag its name ends
-# with.
 function(mln_native_file_selected relative active_tags out_var)
   get_filename_component(stem "${relative}" NAME_WE)
   string(REGEX MATCH "_([a-z0-9]+)$" tagged "${stem}")
@@ -303,7 +301,6 @@ function(mln_native_add_browser_abi_shards)
   endforeach()
 endfunction()
 
-# Environment every native test process gets from CTest.
 function(mln_native_test_environment out_environment out_modifications)
   get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
                       MLN_FFI_RUNTIME_DIRS)
@@ -334,8 +331,6 @@ function(mln_native_test_environment out_environment out_modifications)
   set(${out_modifications} ${modifications} PARENT_SCOPE)
 endfunction()
 
-# What both suites share: the harness and support sources, Unity, the render
-# fixture's graphics dependencies, and the warnings that enforce registration.
 function(mln_native_configure_suite target registry_dir)
   get_target_property(dependency_include_dirs mln_ffi_render_dependencies
                       MLN_FFI_INCLUDE_DIRS)

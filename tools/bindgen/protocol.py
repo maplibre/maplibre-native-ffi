@@ -22,7 +22,6 @@ COMPLETION_VALUE_COUNT = "value_count"
 COMPLETION_VALUE_SIZE = "value_size"
 BUFFER_VIEW = "mln_buffer_view"
 NOT_READY = "MLN_STATUS_NOT_READY"
-# The queue handle whose dispatch runs queued callback calls.
 DELIVERY_QUEUE = "mln_delivery_queue"
 # The query of the C ABI version, which every runtime's version check calls, so
 # calling it skips the check.
@@ -36,7 +35,6 @@ RENDER_ABANDON_RESULT = "mln_render_abandon_result"
 
 
 def declared_name(type_: CType) -> str:
-    """The declaration a type names, without qualifiers."""
     return type_.declaration or type_.spelling.removeprefix("const ")
 
 
@@ -45,7 +43,6 @@ def is_status(type_: CType | None) -> bool:
 
 
 def is_completion(type_: CType) -> bool:
-    """A `const mln_completion*` submission parameter."""
     return bool(
         type_.kind == "pointer"
         and type_.pointee

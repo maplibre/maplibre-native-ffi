@@ -1,8 +1,7 @@
 // The platform's resource transports: local files and PMTiles archives on
-// every target, and, against a loopback server, the HTTP client's handling of
-// statuses, redirects, revalidation, compression, byte ranges, and a request
-// that is still in flight when its map goes away. The browser's HTTP client
-// runs against the runner's routes in browser_http_emscripten.c instead.
+// every target, and the HTTP client against a loopback server. The browser's
+// HTTP client runs against the runner's routes in browser_http_emscripten.c
+// instead.
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -72,8 +71,6 @@ static void remove_path(const char* path) {
 #endif
 }
 
-// A file:// URL names its path percent-encoded, and the local file source
-// decodes it, including bytes beyond ASCII.
 static void a_percent_encoded_file_url_loads_its_file(void) {
   char path[1024];
   mln_test_temp_path("caf\xC3\xA9 style #1.json", path, sizeof(path));
@@ -105,8 +102,6 @@ static mln_map create_static_map(mln_runtime runtime) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Renders a raster source whose archive `archive_url` names, and reports the
-// still image's status.
 static mln_status render_pmtiles(mln_runtime runtime, const char* archive_url) {
   char style[2048];
   const int written = snprintf(
@@ -129,8 +124,6 @@ static mln_status render_pmtiles(mln_runtime runtime, const char* archive_url) {
   return status;
 }
 
-// A PMTiles archive on disk is read in ranges: its header, directory, and the
-// tile the map renders.
 static void a_local_pmtiles_archive_renders(void) {
   char path[1024];
   TEST_ASSERT_TRUE(mln_test_fixture_path(pmtiles_fixture, path, sizeof(path)));
@@ -193,8 +186,6 @@ static const transport_case transport_cases[] = {
   {"a gzipped body", "/gzipped.json", STYLE_LOADS, NULL, NULL},
 };
 
-// Each HTTP answer reaches the map as the status says: a style that loads,
-// through any redirects, or a loading failure that names the status.
 static void the_http_transport_follows_each_status(void) {
   mln_test_http_server* server = mln_test_http_server_start(
     transport_routes, sizeof(transport_routes) / sizeof(transport_routes[0])
@@ -232,9 +223,8 @@ static void the_http_transport_follows_each_status(void) {
   mln_test_http_server_stop(server);
 }
 
-// A port that nothing listens on refuses the connection, which reaches the map
-// as a loading failure rather than a hang. The port is one a server just gave
-// up, so nothing else on the host is listening there.
+// The port is one a server just gave up, so nothing else on the host is
+// listening there.
 static void a_refused_connection_fails_the_load(void) {
   mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
   char url[256];
@@ -252,8 +242,6 @@ static void a_refused_connection_fails_the_load(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A cached response that must be revalidated goes out again with its ETag, and
-// a 304 answer delivers the cached bytes.
 static void a_not_modified_response_revalidates_the_cached_style(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/revalidated.json",
@@ -291,8 +279,6 @@ static void a_not_modified_response_revalidates_the_cached_style(void) {
   mln_test_http_server_stop(server);
 }
 
-// A PMTiles archive over HTTP is read with Range requests, which the server
-// answers with the slices the archive's directory names.
 static void a_remote_pmtiles_archive_is_read_in_ranges(void) {
   size_t size = 0;
   uint8_t* archive = mln_test_read_fixture(pmtiles_fixture, &size);
@@ -324,9 +310,7 @@ static void a_remote_pmtiles_archive_is_read_in_ranges(void) {
   free(archive);
 }
 
-// Releasing a map whose style request the server is still holding completes
-// without waiting for the response. The server answers only afterwards, and
-// the runtime then closes with nothing left open. Nothing fences the transport
+// The server answers only after the release. Nothing fences the transport
 // thread against the late answer, so the case asserts no event for it.
 static void a_request_in_flight_does_not_hold_its_map_open(void) {
   static const mln_test_http_route routes[] = {

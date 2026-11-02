@@ -37,7 +37,6 @@ def union_name(records, value):
 
 
 def variant_name(union, variant):
-    """The Go type of one union variant."""
     return union + name(variant.name) + "Variant"
 
 
@@ -179,8 +178,6 @@ class Values:
         return value.native in self.api.returned
 
     def union_input(self, union, expr, dest, tag):
-        """Writes the variant `expr` of `union` into the storage `dest` and
-        its tag into `tag`."""
         arms = []
         for variant in union.fields:
             converter = self.converter(variant.value)

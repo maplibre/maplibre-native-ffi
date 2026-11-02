@@ -61,7 +61,6 @@ class Lowered:
     declined: bool = False
     # The record a borrowed view scopes, for a scoped view result.
     view: str | None = None
-    # The decoder that converts the completion's value, if any.
     decoder: str | None = None
     # Whether a discarding view of the receiver also calls the command.
     discardable: bool = False

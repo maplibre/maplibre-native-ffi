@@ -1,6 +1,4 @@
-// Map option commands: each one's committed value round-trips through the map
-// snapshot, each descriptor rejects what it cannot express, the extent changes
-// only through resize, and every commit publishes a generation of its own.
+// Map option commands, resize, and the generations their commits publish.
 
 #include <math.h>
 
@@ -44,10 +42,9 @@ static mln_map_snapshot settle_commit(
     snapshot = settle_commit(map, &completion, &previous, (label));  \
   } while (false)
 
-// Every command commits with a generation of its own, and the snapshot at or
-// past that generation carries the committed value. Every enum value is
-// committed once, so each mapping to MapLibre and back is exercised. The free
-// camera precedes the constraints, which would move its position.
+// Every enum value is committed once, so each mapping to MapLibre and back is
+// exercised. The free camera precedes the constraints, which would move its
+// position.
 static void every_option_command_round_trips_through_the_snapshot(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -75,7 +72,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     TEST_ASSERT_EQUAL(stats, snapshot.rendering_stats_view_enabled);
   }
 
-  // Each viewport enum field, then the frustum offset.
   static const struct {
     const char* label;
     uint32_t field;
@@ -168,7 +164,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     );
     TEST_ASSERT_EQUAL_DOUBLE(tile.lod_zoom_shift, snapshot.tile.lod_zoom_shift);
     TEST_ASSERT_EQUAL_UINT32(tile.lod_mode, snapshot.tile.lod_mode);
-    // Only the LOD mode changes in the second pass.
     tile.fields = MLN_MAP_TILE_OPTION_LOD_MODE;
     tile.lod_mode = MLN_TILE_LOD_MODE_DEFAULT;
   }
@@ -192,7 +187,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
       TEST_ASSERT_EQUAL_DOUBLE(0.25, snapshot.view.projection_mode.x_skew);
       TEST_ASSERT_EQUAL_DOUBLE(-0.125, snapshot.view.projection_mode.y_skew);
     }
-    // Then perspective.
     mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
     mode.axonometric = false;
   }
@@ -484,7 +478,6 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.view.extent.height);
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.view.extent.scale_factor);
 
-  // A resize to the current size publishes no render update.
   const uint64_t render_update = snapshot.latest_render_update_generation;
   MLN_TEST_AWAIT_OK(mln_map_resize(
     map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.1},
@@ -523,8 +516,6 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Resizes apply in acceptance order: each commits and publishes its own
-// generation, and the last one accepted sets the extent.
 static void resizes_apply_in_order_and_the_last_sets_the_extent(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -604,10 +595,6 @@ static int compare_generations(const void* left, const void* right) {
   return (a > b) - (a < b);
 }
 
-// Commands from several threads commit in one order: each commit carries a
-// generation no other commit shares, a thread's own commits carry increasing
-// generations, and a snapshot any of those threads reads after its commit
-// observes it.
 static void generations_increase_across_submitting_threads(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -656,8 +643,6 @@ static void generations_increase_across_submitting_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A creation descriptor whose extent has no area or no finite scale factor is
-// rejected before any map exists.
 static void map_creation_rejects_a_degenerate_extent(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();

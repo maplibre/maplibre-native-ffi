@@ -2,8 +2,8 @@
 
 A generated operation names its native function, its receiver access, and the
 binding value for each remaining native parameter. bindings/zig/src/call.zig
-passes native ids, encodes inputs,
-retains callback roots, and decodes outputs and completion results.
+passes native ids, encodes inputs, retains callback roots, and decodes outputs
+and completion results.
 """
 
 from dataclasses import replace

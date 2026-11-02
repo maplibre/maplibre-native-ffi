@@ -63,8 +63,6 @@ func await[T any](t *testing.T, future *Future[T]) T {
 	return value
 }
 
-// createMap creates a map and waits until it is ready, closing it if its
-// creation fails.
 func createMap(t *testing.T, runtime *RuntimeHandle, options MapOptions) *MapHandle {
 	t.Helper()
 	m, ready, err := runtime.CreateMap(options)
@@ -80,8 +78,6 @@ func createMap(t *testing.T, runtime *RuntimeHandle, options MapOptions) *MapHan
 	return m
 }
 
-// awaitFailure waits for a future and returns its *Error, failing unless the
-// future failed with one.
 func awaitFailure[T any](t *testing.T, future *Future[T]) *Error {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout())

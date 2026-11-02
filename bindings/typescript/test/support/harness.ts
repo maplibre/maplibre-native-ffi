@@ -202,7 +202,6 @@ export function watchCollection(target: object): () => boolean {
   return () => collected.has(key);
 }
 
-/** Runs a few rounds of forced collection and event loop turns. */
 export async function collectGarbage(): Promise<void> {
   for (let round = 0; round < 4; round++) {
     capabilities.forcedGc?.();

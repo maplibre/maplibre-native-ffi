@@ -3,9 +3,8 @@
 #include "support/frames.h"
 #include "support/test_support.h"
 
-// The contract a dedicated session offers a host: it creates its own context
-// from a descriptor that names no share context, renders through it, and leaves
-// it current so the next render costs no EGL call.
+// A dedicated session leaves its context current so the next render costs no
+// EGL call.
 static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -28,7 +27,6 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
 
   mln_test_dedicated_egl_surface_destroy(&fixture);
-  // Destroying the session releases the thread it had taken over.
   TEST_ASSERT_FALSE(mln_test_egl_context_is_current());
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -47,9 +45,6 @@ static void render_dedicated_frame(mln_test_render_fixture* fixture) {
   mln_render_frame_batch_release(batch);
 }
 
-// Each render makes the session's own context current again when something
-// else took the thread since the last one: another dedicated session, the
-// host's own context, or another session's teardown.
 static void dedicated_egl_surfaces_share_one_graphics_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map first_map = mln_test_create_map(runtime);
@@ -91,9 +86,8 @@ static void dedicated_egl_surfaces_share_one_graphics_thread(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A dedicated context stays current between renders, so releasing the target
-// moves the context off the surface that the host may then destroy. The
-// context itself stays current for the session's next render.
+// A dedicated context stays current between renders, so a release must move it
+// off the surface before the host destroys that surface.
 static void a_release_moves_a_dedicated_context_off_its_surface(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

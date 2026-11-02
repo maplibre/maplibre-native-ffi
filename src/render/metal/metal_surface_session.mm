@@ -76,8 +76,7 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
       setSize(size_);
     }
 
-    // Lets go of the layer, so the host may destroy it. set_layer() takes the
-    // next one.
+    // After this, the host may destroy the layer.
     void release_layer() {
       finish_committed();
       commandBuffer.reset();

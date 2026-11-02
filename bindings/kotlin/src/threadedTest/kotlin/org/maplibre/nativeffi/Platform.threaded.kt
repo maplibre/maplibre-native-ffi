@@ -11,7 +11,6 @@ internal expect class TestThread(block: () -> Unit) {
   fun join()
 }
 
-/** Runs [block] on a second native thread and waits for it to finish. */
 internal fun runOnBackgroundThread(block: () -> Unit) {
   TestThread(block).join()
 }

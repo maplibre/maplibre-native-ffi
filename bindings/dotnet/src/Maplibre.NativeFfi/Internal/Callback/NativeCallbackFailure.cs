@@ -2,11 +2,6 @@ namespace Maplibre.NativeFfi.Internal.Callback;
 
 internal static class NativeCallbackFailure
 {
-    /// <summary>
-    /// Reports an exception that the trampoline of <paramref name="callback" /> caught to each
-    /// <see cref="MaplibreNative.CallbackException" /> handler, or to standard error when there is none.
-    /// Reporting contains every handler exception before returning to native.
-    /// </summary>
     internal static void Report(string callback, Exception exception)
     {
         var handlers = MaplibreNative.CallbackExceptionHandlers;

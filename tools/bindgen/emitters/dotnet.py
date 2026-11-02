@@ -91,7 +91,6 @@ NOTES = {
 
 
 def doc(bound: BoundApi, native: str, indent: str = "") -> str:
-    """The XML doc comment of a declaration, or empty when it has none."""
     found = bound.doc(native)
     if found is not None and native in NOTES:
         found = replace(found, notes=(*found.notes, *NOTES[native]))
@@ -195,7 +194,6 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
 
 
 def declared_enums(bound: BoundApi, values: Values) -> set[str]:
-    """The public enums that the binding declares."""
     names = set()
     for value in bound.public_values.values():
         if value.kind == "enum":

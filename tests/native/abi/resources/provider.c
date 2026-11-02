@@ -1,6 +1,4 @@
-// The resource provider: registration and its user data, request handles and
-// their cancel callbacks, what a request tells the provider, and how a
-// provider's answer reaches the map, including through the ambient cache.
+// The resource provider.
 
 #include "support/map.h"
 #include "support/resources.h"
@@ -268,13 +266,10 @@ static void expect_dropped_request_fails(bool release_inline) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A provider that claims a request and releases it unanswered fails it, so the
-// load reports an error instead of waiting forever.
 static void releasing_a_claimed_request_without_a_response_fails_it(void) {
   expect_dropped_request_fails(false);
 }
 
-// The same holds when the provider releases the handle inside its callback.
 static void releasing_a_request_inside_its_callback_fails_it(void) {
   expect_dropped_request_fails(true);
 }
@@ -300,8 +295,6 @@ static void complete_inline(
   );
 }
 
-// Completing a request consumes its handle, so the style loads from the inline
-// answer and a later call through the handle finds it gone.
 static void a_request_completed_inside_its_callback_consumes_its_handle(void) {
   atomic_store(&completed_handle_reuse, MLN_STATUS_OK);
   mln_runtime runtime = mln_test_create_runtime();
@@ -318,10 +311,7 @@ static void a_request_completed_inside_its_callback_consumes_its_handle(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A resource request is not a child of its runtime. Releasing a claimed request
-// unanswered sends its failure to the map on the runtime's worker, and that
-// failure still being queued holds neither the map nor the runtime open: both
-// releases are accepted while the worker is parked in front of it.
+// A resource request is not a child of its runtime.
 static void a_released_request_does_not_hold_its_runtime_open(void) {
   dropped_request_probe probe = {0};
   // The case releases both handles itself, so it creates them untracked.
@@ -372,9 +362,6 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   mln_test_completion_destroy(&runtime_release);
 }
 
-// A claimed request that the provider keeps holding does not hold the map or
-// the runtime open either, and the provider can still release its handle
-// once both are gone.
 static void a_held_request_does_not_hold_its_runtime_open(void) {
   dropped_request_probe probe = {0};
   mln_runtime runtime = mln_test_create_runtime();
@@ -473,8 +460,6 @@ static void count_cancel_release(void* user_data) {
   mln_test_pulse();
 }
 
-// Each invalid handler fails without taking the request's one registration
-// or releasing its user data.
 static bool rejects_invalid_cancel_handlers(
   mln_resource_request handle, cancel_probe* probe
 ) {
@@ -545,9 +530,8 @@ static mln_map start_cancel_probe_request(
   return map;
 }
 
-// Destroying the map discards its pending style request. MapLibre then cancels
-// the handled request, which runs the registered callback once. The request
-// keeps that single registration, and rejects a late completion.
+// Destroying the map discards its pending style request, and MapLibre then
+// cancels the handled request.
 static void cancel_callback_runs_when_map_discards_request(void) {
   cancel_probe probe = {0};
   mln_runtime runtime = mln_test_create_runtime();
@@ -640,8 +624,6 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The callback runs unlocked, so releasing the cancelled handle from inside it
-// retires the request without deadlocking.
 static void cancel_callback_may_release_the_request(void) {
   cancel_probe probe = {0};
   mln_test_flag_set(&probe.release_inside_callback);
@@ -694,9 +676,7 @@ static void a_request_names_its_alias_and_its_resolved_url(void) {
   mln_test_provider_destroy(provider);
 }
 
-// A PMTiles source asks the provider for its archive with a byte range, the
-// header, while the style request carries none. The archive is unanswered, so
-// nothing past the header is asked for.
+// The archive is unanswered, so nothing past the header is asked for.
 static void a_pmtiles_request_carries_its_byte_range(void) {
   static const char style_url[] = "custom://pmtiles/style.json";
   static const char archive_url[] = "custom://pmtiles/archive.pmtiles";
@@ -771,9 +751,6 @@ static const tile_answer_case tile_answer_cases[] = {
    false},
 };
 
-// A provider's answer for a tile decides whether the map renders: a missing or
-// empty tile renders as nothing, and any other error, such as a server error,
-// fails the still image.
 static void a_tile_answer_decides_whether_the_map_renders(void) {
   for (size_t index = 0;
        index < sizeof(tile_answer_cases) / sizeof(tile_answer_cases[0]);
@@ -813,9 +790,6 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
   }
 }
 
-// A provider error for the style becomes the map's loading failure, carrying
-// the provider's message, or a generic one when it gave none. A response whose
-// fields carry an unknown bit is malformed, and fails the same way.
 static void a_style_error_reaches_the_loading_failure(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = "custom://described.json",
@@ -862,10 +836,8 @@ static void a_style_error_reaches_the_loading_failure(void) {
   mln_test_provider_destroy(provider);
 }
 
-// Loads `url` on a new map and waits for its style, which puts the provider's
-// answer in the runtime's ambient cache. The default cache is in memory and
-// lives only while something holds it, so a case keeps this map until its
-// next load has read the cache.
+// The default cache is in memory and lives only while something holds it, so a
+// case keeps this map until its next load has read the cache.
 static mln_map load_style(mln_runtime runtime, const char* url) {
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, url));
@@ -915,10 +887,8 @@ static void expect_revalidation_of_cached_style(
   );
 }
 
-// A provider answer's metadata goes into the ambient cache, and the next
-// request for the resource carries it back. An expired entry that must be
-// revalidated is withheld from the map until the provider answers, so the
-// request also carries its bytes, and NOT_MODIFIED delivers them.
+// An expired entry that must be revalidated is withheld from the map until the
+// provider answers, so the request also carries its bytes.
 static void a_not_modified_answer_delivers_the_cached_style(void) {
   const mln_test_provided_resource resources[] = {
     {.url = cached_style_url,
@@ -951,9 +921,6 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
   mln_test_provider_destroy(provider);
 }
 
-// An expired entry that need not be revalidated reaches the map straight from
-// the cache: the style loads while the provider still holds the revalidation,
-// which carries the entry's metadata but not its bytes.
 static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   const mln_test_provided_resource resources[] = {
     {.url = cached_style_url,

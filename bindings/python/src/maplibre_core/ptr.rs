@@ -38,8 +38,6 @@ pub unsafe fn strided_records<T: Copy>(
     }))
 }
 
-/// Borrows an initialized native array for the caller's borrow lifetime.
-///
 /// # Safety
 /// A nonempty pointer must address `count` initialized elements for that lifetime.
 pub unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> Result<&'a [T]> {

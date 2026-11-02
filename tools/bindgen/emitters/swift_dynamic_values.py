@@ -355,7 +355,6 @@ def union_default(values, union):
 
 
 def union_cases(values, union):
-    """The cases of a union's enum."""
     lines = [
         f"{doc(values.bound, f'{union.native}.{field.name}', '  ')}  case {identifier(camel(field.name))}({values.public(field.value)})"
         for field in union.fields
@@ -369,7 +368,6 @@ def union_cases(values, union):
 
 
 def union_encode(values, record, field, selector):
-    """Write the tag and the union storage of [record]'s union [field] from [selector]."""
     union = field.value
     raw = f"raw.{identifier(field.name)}"
     tag_value = next(f.value for f in record.fields if f.name == union.tag)

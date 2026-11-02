@@ -113,7 +113,6 @@ report_device_log() {
   tail -40 <<<"$log" >&2
 }
 
-# Names the adb call that failed and reports the state of the device it ran on.
 report_adb_failure() {
   echo "adb exited $2 during $1." >&2
   report_emulator_state

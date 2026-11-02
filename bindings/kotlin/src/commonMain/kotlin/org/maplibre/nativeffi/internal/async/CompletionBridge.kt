@@ -108,7 +108,6 @@ internal object CompletionBridge {
   /** The `value` pointer of the result at [result], which may be null. */
   fun valuePointer(result: Long): Long = readAddress(result + CompletionResultLayout.VALUE)
 
-  /** The `value_count` of the result at [result]. */
   fun valueCount(result: Long): ULong = readSize(result + CompletionResultLayout.VALUE_COUNT)
 
   /** The `value_size` of the result at [result]: the byte stride of its array. */

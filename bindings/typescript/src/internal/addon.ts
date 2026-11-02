@@ -54,7 +54,6 @@ export interface Addon extends NativeOperations {
   shutdownAtExit(): void;
 }
 
-/** How an entry point connects the runtime to its host. */
 export interface HostHooks {
   /** Runs `listener` synchronously when the process begins to exit. */
   onExit?: (listener: () => void) => void;

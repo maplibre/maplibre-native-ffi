@@ -22,6 +22,5 @@ internal actual object NativeRoots {
 
   actual fun release(token: Long): Any? = roots.remove(token)
 
-  /** Counts the roots that native holds tokens for and has not released. */
   fun countForTesting(): Int = roots.size
 }

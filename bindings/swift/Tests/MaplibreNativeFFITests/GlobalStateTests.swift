@@ -175,7 +175,6 @@ private struct RecordedHandle: NativeHandle {
   }
 }
 
-/// Drops handles whose disposal fails or succeeds.
 private func abandonInsideACallback() throws {
   Thread.current.threadDictionary["MaplibreNativeFFITests.callback"] = true
   defer {

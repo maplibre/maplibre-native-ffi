@@ -44,7 +44,6 @@ typedef struct mln_ts_export {
   napi_callback function;
 } mln_ts_export;
 
-/** The state of one generated export call. */
 typedef struct mln_ts_call {
   napi_env env;
   mln_ts_realm* realm;
@@ -58,7 +57,6 @@ typedef struct mln_ts_call {
   mln_ts_owner* owner;
 } mln_ts_call;
 
-/** Initializes the realm and defines the generated and runtime exports. */
 napi_value mln_ts_module_init(
   napi_env env, napi_value exports, const mln_ts_export* generated,
   size_t generated_count
@@ -107,7 +105,6 @@ bool mln_ts_reject_later(
 // JavaScript to C. Each reads one value and throws a TypeError or a RangeError
 // that names `path` when the value has the wrong shape.
 bool mln_ts_is_absent(mln_ts_call* call, napi_value value);
-/** Whether a value is an object, as a native registration is. */
 bool mln_ts_is_object(mln_ts_call* call, napi_value value);
 bool mln_ts_member(
   mln_ts_call* call, napi_value object, const char* key, napi_value* out

@@ -148,9 +148,8 @@ RESERVED = {
 # Names that generated method bodies bind, which a parameter cannot take.
 LOCALS = {"native", "handle", "registrations", "completion", "disposed", "result"}
 
-# Members of the owner base class that an operation cannot replace.
-# Members that every owner class defines: its handle, its state, its release,
-# and the constructor.
+# Members that every owner class defines, which an operation cannot replace:
+# its handle, its state, its release, and the constructor.
 OWNER_MEMBERS = {"id", "isClosed", "close", "constructor"}
 
 
@@ -466,8 +465,6 @@ class Values:
             # A record of only a union presents the union under its own name.
             self.used[field.value.native] = field.value
 
-    # -- TypeScript types ---------------------------------------------------
-
     def ts(self, value: ValuePlan) -> str:
         """The TypeScript type of a value, without its absence."""
         match value.kind:
@@ -495,7 +492,6 @@ class Values:
                 assert_never(value.kind)
 
     def callback_type(self, callback) -> str:
-        """The function type of a host callback."""
         parameters = []
         for parameter in callback.arguments:
             if self.owned_argument(callback, parameter):
@@ -538,8 +534,6 @@ class Values:
             # A copy leaves a registration unset.
             return True
         return record.native in self.inputs and self.omittable(record, field)
-
-    # -- Declarations -------------------------------------------------------
 
     def render(self) -> str:
         chunks = []

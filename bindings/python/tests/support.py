@@ -49,7 +49,6 @@ def result[T](future: Future[T]) -> T:
 
 
 def map_options(**fields: object) -> mln.MapOptions:
-    """Map options with a 256 by 256 extent at scale 1, and the given fields."""
     options = mln.MapOptions(initial_extent=mln.LogicalExtent(256, 256, 1.0))
     return replace(options, **fields)
 
@@ -57,7 +56,6 @@ def map_options(**fields: object) -> mln.MapOptions:
 def ready_map(
     runtime: mln.RuntimeHandle, options: mln.MapOptions | None = None
 ) -> mln.MapHandle:
-    """Create a map and wait until it is ready."""
     created = runtime.create_map(map_options() if options is None else options)
     result(created.ready)
     return created.map
@@ -187,7 +185,6 @@ class Harness:
 
 
 def close_if_live(owner: mln.MapHandle | mln.RuntimeHandle) -> None:
-    """Close a fixture owner unless native already retired it."""
     try:
         if isinstance(owner, mln.MapHandle):
             owner.get_snapshot()

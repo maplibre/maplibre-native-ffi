@@ -1,6 +1,4 @@
-// Standalone projections: a projection of a view converts as that view
-// describes, needs no map, converts synchronously on any thread, and reads its
-// scale at its own camera. The spherical Mercator helpers need no map at all.
+// Standalone projections and the spherical Mercator helpers.
 
 #include <math.h>
 
@@ -24,8 +22,6 @@ static void projection_outlives_its_source_map_and_runtime(void) {
 
   mln_map_projection_release(projection);
 
-  // A second release is a no-op, and every other call with the retired handle
-  // reports invalid state.
   mln_map_projection_release(projection);
   mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   MLN_TEST_INVALID_STATE(
@@ -166,7 +162,6 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
   TEST_ASSERT_GREATER_THAN_DOUBLE(centered.x + 1.0, northward.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, centered.y, northward.y);
 
-  // A projection created before the commands keeps the extent of its view.
   const mln_screen_point earlier = projected_pixel(before, center);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, initial.view.extent.width / 2.0, earlier.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, initial.view.extent.height / 2.0, earlier.y);
@@ -244,8 +239,6 @@ static mln_status submit_projection(
   return status;
 }
 
-// A view is complete: every field it carries is required, and each must be
-// one a transform can hold.
 static void creation_rejects_incomplete_or_invalid_views(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -284,8 +277,6 @@ static void creation_rejects_incomplete_or_invalid_views(void) {
   );
 }
 
-// A view carries no camera constraints, so a camera that the map's bounds
-// would clamp applies to the projection as it is.
 static void a_view_projection_ignores_the_maps_constraints(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -392,9 +383,6 @@ static void jump_to(mln_map map, double longitude, double zoom) {
   );
 }
 
-// A viewport wider than one world copy, or one across the antimeridian, shows
-// longitudes that the wrapped conversions fold into -180 to 180 and that the
-// unwrapped ones keep in the visible copy. Single and batch conversions agree.
 static void unwrapped_conversion_preserves_world_copies(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
@@ -481,9 +469,6 @@ static double snapshot_meters_per_pixel(mln_map map, double latitude) {
   return meters;
 }
 
-// A projection reads the scale at its own zoom: the map's scale when it was
-// created, the same scale after the map zooms, and a halved scale once the
-// projection's own camera zooms in by one.
 static void meters_per_pixel_follows_the_projection_camera(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -543,9 +528,7 @@ static void meters_per_pixel_follows_the_projection_camera(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The origin projects to zero, northing and easting take the signs of latitude
-// and longitude, and a coordinate converts back to itself. The scale is
-// MapLibre's own earth radius, so no case pins it.
+// The scale is MapLibre's own earth radius, so no case pins it.
 static void projected_meters_round_trip(void) {
   mln_projected_meters meters = {0};
   MLN_TEST_OK(
@@ -657,7 +640,6 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A rejected camera update leaves the projection's camera as it was.
 static void projection_setters_reject_invalid_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -679,9 +661,6 @@ static void projection_setters_reject_invalid_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Invalid inputs leave the output untouched. A batch validates its whole input
-// before it writes any output, so an invalid last element leaves every output
-// as it was.
 static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

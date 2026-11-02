@@ -70,7 +70,6 @@ void globs_match_the_documented_pattern_language() {
       pattern.c_str()
     );
   }
-  // Without the glob flag, metacharacters compare literally.
   const auto exact = mln::core::UrlPattern{
     MLN_RESOURCE_KIND_FLAG_ALL, MLN_URL_MATCH_EXACT, "**"
   };
@@ -84,7 +83,6 @@ auto table_of(mln_resource_route route) -> mln::core::RouteTable {
   return table;
 }
 
-// Routes compare the resolved URL and match the kinds that their masks name.
 void routes_match_resolved_urls_and_selected_kinds() {
   const auto resolved = table_of({
     .size = sizeof(mln_resource_route),
@@ -95,12 +93,10 @@ void routes_match_resolved_urls_and_selected_kinds() {
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, style_url));
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_SOURCE, style_url));
   TEST_ASSERT_FALSE(resolved.matches(MLN_RESOURCE_KIND_TILE, style_url));
-  // A kind past the mask's width never matches a route that names kinds.
   TEST_ASSERT_FALSE(
     resolved.matches(static_cast<mln_resource_kind>(UINT32_MAX), style_url)
   );
 
-  // Zero kinds select every kind.
   const auto every_kind = table_of({
     .size = sizeof(mln_resource_route),
     .kinds = 0,
@@ -112,7 +108,6 @@ void routes_match_resolved_urls_and_selected_kinds() {
         MLN_RESOURCE_KIND_TILE, MLN_RESOURCE_KIND_IMAGE}) {
     TEST_ASSERT_TRUE(every_kind.matches(kind, style_url));
   }
-  // Unknown kind bits stay rejected.
   auto rejected = mln::core::RouteTable{};
   const auto unknown_kind = mln_resource_route{
     .size = sizeof(mln_resource_route),
@@ -122,7 +117,6 @@ void routes_match_resolved_urls_and_selected_kinds() {
   };
   MLN_TEST_INVALID(mln::core::copy_routes(&unknown_kind, 1, rejected));
 
-  // A table without routes claims every request.
   TEST_ASSERT_TRUE(
     mln::core::RouteTable{}.matches(MLN_RESOURCE_KIND_STYLE, style_url)
   );

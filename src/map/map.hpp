@@ -484,7 +484,6 @@ auto map_lat_lng_bounds_for_camera_unwrapped_start(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion
 ) -> mln_status;
-// The view that a transform describes, for a snapshot or a rendered frame.
 auto map_view_from_transform(
   const mln::TransformState& transform, double scale_factor
 ) -> mln_map_view;

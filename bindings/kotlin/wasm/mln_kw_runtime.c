@@ -50,7 +50,6 @@ static void post(mln_kw_thread_start* start) {
   }
 }
 
-/** The delivery queue's wake, which asks the page to dispatch it. */
 static void wake(void* unused) {
   (void)unused;
   post(NULL);
@@ -95,9 +94,6 @@ EMSCRIPTEN_KEEPALIVE void* mln_kw_allocate(size_t size) {
 }
 
 EMSCRIPTEN_KEEPALIVE void mln_kw_free(void* address) { free(address); }
-
-// ---------------------------------------------------------------------------
-// Thread starts
 
 /** A thread start for the Kotlin waiter [token], or null without memory. */
 EMSCRIPTEN_KEEPALIVE mln_kw_thread_start* mln_kw_thread_start_create(

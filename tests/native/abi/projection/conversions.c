@@ -20,10 +20,6 @@ static mln_lat_lng coordinate_for(
   return coordinate;
 }
 
-// The camera's center lands on the middle of the map's extent and a point to
-// the north east lands up and to the right of it. A batch converts each
-// coordinate as the single call does, in input order, and both forms convert
-// back to the coordinates they came from.
 static void conversions_agree_singly_and_in_batches_and_invert(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
@@ -88,8 +84,6 @@ static void conversions_agree_singly_and_in_batches_and_invert(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An empty batch is valid in every direction, with null arrays, and converts
-// to an empty result.
 static void empty_batches_convert_to_empty_results(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

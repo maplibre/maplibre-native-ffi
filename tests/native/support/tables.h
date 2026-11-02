@@ -29,7 +29,6 @@ typedef struct mln_test_validation_case {
   const char* diagnostic;
 } mln_test_validation_case;
 
-// Submits one descriptor and reports the status, writing its diagnostic.
 typedef mln_status (*mln_test_validation_call)(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 );

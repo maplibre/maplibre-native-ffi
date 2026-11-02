@@ -10,7 +10,6 @@ import 'dart:ffi';
 
 import '../../render/native_pointer.dart';
 
-/// The function pointers, context, and release of one native registration.
 final class NativeRegistration {
   NativeRegistration(this.callbacks, this.userData, this.releaseUserData);
 

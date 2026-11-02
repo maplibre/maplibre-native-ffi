@@ -40,7 +40,6 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl<T: NativeHandle> HandleState<T> {
-    /// Records an owned id.
     pub fn new(raw: T, type_name: &'static str) -> super::Result<Self> {
         if raw.to_raw() == 0 {
             return Err(super::Error::invalid_argument(

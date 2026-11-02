@@ -35,7 +35,6 @@ def render_export(entry: Lowered) -> str:
 
 
 def render_view_scope(bound, begin: str, end: str) -> str:
-    """The exports that begin and end one borrowed view scope."""
     function = bound.source.functions_by_name[begin]
     handle = function.parameters[0].type.spelling
     return (

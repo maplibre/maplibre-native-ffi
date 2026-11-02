@@ -11,7 +11,6 @@ import org.maplibre.nativeffi.internal.memory.writeU32
  * right after on the same thread, so calls nested in callbacks during that call cannot clobber it.
  */
 internal object NativeDiagnostics {
-  /** `sizeof(mln_diagnostic)`, from the generated layout. */
   val SIZE: Int
     get() = DiagnosticLayout.SIZEOF
 

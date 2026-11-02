@@ -47,8 +47,6 @@
 #define MLN_TG_THREAD_LOCAL _Thread_local
 #endif
 
-// Errors and libraries
-
 static MLN_TG_THREAD_LOCAL char last_error[512];
 
 static void set_error(const char* format, ...) {
@@ -112,8 +110,6 @@ static void* library_open_first(
   set_error("could not load %s (%s)", what, failures);
   return NULL;
 }
-
-// Objects
 
 typedef struct vulkan_functions {
   PFN_vkGetInstanceProcAddr get_instance_proc_addr;
@@ -497,7 +493,6 @@ static void metal_texture_destroy(mln_test_graphics_texture* texture) {
   }
 }
 
-// Returns the queue that reads submit to, creating it on first use.
 static void* metal_queue(mln_test_graphics* graphics) {
   if (graphics->metal_queue == NULL) {
     graphics->metal_queue =
@@ -575,8 +570,6 @@ static void metal_surface_destroy(mln_test_graphics_surface* surface) {
 }
 
 #endif
-
-// Vulkan
 
 static const char* vulkan_loader_name(void) {
 #if defined(__APPLE__)
@@ -1613,8 +1606,6 @@ static bool gl_texture_read(
 
 #endif
 
-// EGL
-
 #if defined(MLN_TG_HAS_EGL)
 
 enum {
@@ -1879,8 +1870,6 @@ static void egl_surface_destroy(mln_test_graphics_surface* surface) {
 
 #endif
 
-// WGL
-
 #if defined(MLN_TG_HAS_WGL)
 
 static const char wgl_window_class[] = "MlnTestGraphicsWindow";
@@ -2088,8 +2077,6 @@ static void* gl_symbol(mln_test_graphics* graphics, const char* name) {
 }
 
 #endif
-
-// The public API
 
 static const char* backend_name(uint32_t backend) {
   switch (backend) {

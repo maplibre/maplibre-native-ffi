@@ -20,8 +20,8 @@ void record_end(void* user_data, const mln_camera_transition_end* end) {
   mln_test_record_call('e', user_data, MLN_STATUS_OK, end->outcome);
 }
 
-// End an accepted transition on the worker with allocations disabled. The
-// end call must precede the release even when its producer cannot allocate.
+// The end call must precede the release even when its producer cannot
+// allocate.
 void a_camera_end_reaches_its_queue_without_allocating() {
   auto queue = mln_test_delivery_queue{};
   mln_test_delivery_queue_create(&queue);

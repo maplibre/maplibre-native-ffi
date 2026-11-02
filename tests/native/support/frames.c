@@ -43,7 +43,6 @@ typedef struct results_wait {
   bool failed;
 } results_wait;
 
-// Holds once a drain yields results.
 static bool results_ready(void* context) {
   results_wait* wait = context;
   const mln_status status =
@@ -60,7 +59,6 @@ typedef struct result_list_wait {
   bool failed;
 } result_list_wait;
 
-// Holds once `count` results have arrived, copying each drain's in order.
 static bool result_list_ready(void* context) {
   result_list_wait* wait = context;
   mln_render_frame_batch batch = MLN_HANDLE_NULL;

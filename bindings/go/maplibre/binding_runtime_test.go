@@ -25,8 +25,6 @@ func TestByteInputsArePinnedAndBorrowed(t *testing.T) {
 	}
 }
 
-// expectBindingError runs call as a binding call and fails unless it fails
-// with want.
 func expectBindingError(t *testing.T, want error, what string, call func()) {
 	t.Helper()
 	if _, err := bindingCall(func() struct{} { call(); return struct{}{} }); !errors.Is(err, want) {

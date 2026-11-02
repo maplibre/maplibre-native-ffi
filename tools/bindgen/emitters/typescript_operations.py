@@ -178,7 +178,6 @@ def lower_receiver(call: Call, reference: bool) -> None:
 def lower_parameter(
     call: Call, parameter: Parameter, values: Values, natives: NativeValues
 ) -> None:
-    """Converts one argument after the receiver."""
     plan = call.lowered.plan
     locals_, body, args = call.lowered.c_locals, call.lowered.c_body, call.args
     # Counts that a sized input carries, by count parameter.
@@ -292,7 +291,6 @@ def lower_output(
 def lower_input(
     call: Call, parameter: Parameter, values: Values, natives: NativeValues
 ) -> None:
-    """Reads an input from its JavaScript argument."""
     lowered = call.lowered
     plan = lowered.plan
     function = plan.function
@@ -482,7 +480,6 @@ def lower_function(
         case "owned":
             return lower_owned(call, values, natives)
         case "call":
-            # Any other immediate call returns its outputs or its result.
             publish(call, values, natives, invoke(call, values))
             return call.lowered
         case unreachable:

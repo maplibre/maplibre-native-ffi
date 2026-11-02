@@ -63,7 +63,6 @@ class ZigEmitterTests(unittest.TestCase):
             "c.MLN_STATUS_NOT_READY);",
             source,
         )
-        # Neither the batch nor its view is public.
         self.assertNotIn("pub const ReadingBatch ", source)
         self.assertNotIn("ReadingView", source)
 

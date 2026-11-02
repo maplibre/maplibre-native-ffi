@@ -43,7 +43,6 @@ export class Registrations {
     return root;
   }
 
-  /** Roots the accepted values in `holder`, or in the realm. */
   commit(holder: RootHolder = realmRoots): void {
     for (const [root, value] of this.#entries) {
       holder.roots.set(root, value);
@@ -114,7 +113,6 @@ let pending = 0;
 // The completions and thread starts that wait for native code.
 let outstanding = 0;
 
-/** Holds the event loop open until the matching unhold(). */
 export function hold(): void {
   // Counts only a hold that took, so a call that throws here, such as a
   // browser page's call before loadModule(), leaves nothing held.
@@ -191,10 +189,6 @@ function invoke(
   return true;
 }
 
-/**
- * Reports an error that a host callback threw through the global
- * `reportError`, or the entry point's hook where the global scope has none.
- */
 function reportError(error: unknown): void {
   const report =
     (globalThis as { reportError?: (error: unknown) => void }).reportError ??
@@ -221,10 +215,6 @@ function reportLeak(name: string, handle: bigint): void {
   }
 }
 
-/**
- * Gives the addon this realm's registration, callback, release, error
- * factory, native registration taker, and leak report.
- */
 export function installRealm(addon: Addon): void {
   addon.install(
     register,

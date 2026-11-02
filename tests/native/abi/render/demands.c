@@ -1,7 +1,4 @@
-// Frame demands: result batches and the frame wake, the texture ring's
-// backpressure, barriers and resizes ordered with demands, demands past the
-// ring depth, the keep-alive demands a still image needs, demands that wait
-// for a map update, and the one frame that a burst of commands renders.
+// Frame demands and the results they produce.
 
 #include "support/frames.h"
 #include "support/test_support.h"
@@ -62,11 +59,6 @@ static bool frame_woke(void* context) {
   return atomic_load(&wait->fixture->frame_wakes) != wait->before;
 }
 
-// A drain of an empty result queue reports not ready, leaves its output null,
-// and clears a diagnostic left by an earlier failure. The frame wake runs when
-// the queue goes from empty to nonempty, and not again for a drain. A drained
-// batch is an owned handle: releasing it twice is a no-op, releasing the null
-// handle is a no-op, and a released handle names no batch.
 static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_runtime runtime;
   mln_map map;
@@ -91,7 +83,6 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
-  // A demand with an unknown flag is rejected and queues no result.
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = 1U << 8U;
   demand.token = 200;
@@ -123,8 +114,6 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   detach(runtime, map, &fixture);
 }
 
-// A barrier ends a parked demand while the host still owns both frames.
-// Detach refuses until the host releases the frames.
 static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   mln_runtime runtime;
   mln_map map;
@@ -163,8 +152,8 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   mln_test_render_release_frame(&first);
   first = mln_test_render_and_acquire(&fixture, 204);
 
-  // Park another demand behind a full ring, then release the frames and
-  // detach. The demand gets a result whichever operation reaches it first.
+  // The parked demand gets a result whichever of the release and the detach
+  // reaches it first.
   mln_test_render_request_forced(&fixture, 503);
   fence_driver(&fixture);
   mln_test_render_release_frame(&first);
@@ -187,9 +176,6 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   detach(runtime, map, &fixture);
 }
 
-// Demands keep rendering past the ring depth while the host acquires nothing:
-// each frame takes the slot of the oldest unacquired one, so the ring ends up
-// holding the newest frames, oldest first.
 static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
   enum { demand_count = 5 };
   mln_runtime runtime;
@@ -309,8 +295,6 @@ static void webgpu_a_demand_behind_unfinished_frames_wakes_the_driver(void) {
 }
 #endif
 
-// Resizes apply in order, preserve the scale factor, and publish target
-// generations.
 static void resizes_apply_in_order_and_publish_generations(void) {
   mln_runtime runtime;
   mln_map map;
@@ -385,9 +369,6 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   detach(runtime, map, &fixture);
 }
 
-// A session attached at a scale factor other than the map's resizes at its
-// own scale factor. The map keeps the one it was created with and takes only
-// the new width and height.
 static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   void
 ) {
@@ -428,8 +409,6 @@ static void expect_map_size(mln_map map, uint32_t width, uint32_t height) {
   TEST_ASSERT_EQUAL_UINT32(height, snapshot.view.extent.height);
 }
 
-// Attaching sizes the map to the target, so the first frame renders without
-// the host resizing the map.
 static void attaching_sizes_the_map_to_the_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
@@ -449,9 +428,6 @@ static void attaching_sizes_the_map_to_the_target(void) {
   detach(runtime, map, &fixture);
 }
 
-// A command group holds the new render update while resize still applies on
-// both the map and the driver. Later driver work and detach can run before
-// the group ends.
 static void a_resize_applies_while_a_command_group_holds_the_update(void) {
   mln_runtime runtime;
   mln_map map;
@@ -523,11 +499,10 @@ static bool still_completed_under_keepalive(void* context) {
   return wait->failed;
 }
 
-// A pending still image on a static map completes while the host keeps its
-// own render-if-needed demands in flight, which mostly resolve on the fast
-// path. Worker results and the observer delivery that completes the still run
-// on the session scheduler, so a demand that resolves without rendering still
-// drains that scheduler rather than strand them.
+// The host's render-if-needed demands mostly resolve on the fast path. Worker
+// results and the observer delivery that completes the still run on the
+// session scheduler, so a demand that resolves without rendering still drains
+// that scheduler rather than strand them.
 static void still_image_completes_under_if_needed_keepalive_demands(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
@@ -593,9 +568,6 @@ static void move_camera(mln_map map, double zoom) {
   );
 }
 
-// A demand that waits for a map update finds nothing to render on an idle
-// map and stays pending until the map publishes an update, which it then
-// renders without another demand.
 static void a_waiting_demand_renders_the_next_map_update(void) {
   mln_runtime runtime;
   mln_map map;
@@ -629,9 +601,6 @@ static const char eight_layer_style_json[] =
   "{\"id\":\"6\",\"type\":\"background\"},"
   "{\"id\":\"7\",\"type\":\"background\"}]}";
 
-// Commands that the runtime worker already holds announce their render
-// updates once, after the last of them, so a waiting demand renders them in
-// one frame rather than a frame for the first and another for the rest.
 static void a_burst_of_held_commands_renders_in_one_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -683,9 +652,6 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   detach(runtime, map, &fixture);
 }
 
-// A newer matching demand supersedes a waiting one, a barrier ends the wait
-// with no update, and detach ends it with target not ready. A demand that
-// waits must also render only if needed.
 static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   mln_runtime runtime;
   mln_map map;

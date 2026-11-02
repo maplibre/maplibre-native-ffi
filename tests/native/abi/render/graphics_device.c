@@ -134,8 +134,6 @@ static void render_red_frame(
   mln_render_frame_batch_release(batch);
 }
 
-// The session keeps its own reference, so the host may release the device
-// handle as soon as attach returns.
 static void device_texture_reads_back_after_the_handle_is_released(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -271,8 +269,6 @@ static void attach_rejects_what_a_device_texture_cannot_take(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Every platform lists at least one adapter, and the first one renders as
-// the default does.
 static void the_first_named_adapter_renders(void) {
   mln_graphics_device_options options = {
     .size = sizeof(mln_graphics_device_options)
@@ -296,8 +292,7 @@ static void the_first_named_adapter_renders(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The sessions of a single-context device render, and keep rendering after the
-// host releases the device. Only EGL takes turns; the others ignore the option.
+// Only EGL takes turns; the other backends ignore the option.
 static void sessions_render_on_a_single_context_device(void) {
   mln_graphics_device_options options = {
     .size = sizeof(mln_graphics_device_options)

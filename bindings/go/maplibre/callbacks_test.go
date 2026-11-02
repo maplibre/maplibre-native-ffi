@@ -12,7 +12,6 @@ import (
 	"weak"
 )
 
-// rootCount reports how many callback registrations owner roots.
 func rootCount(owner *bindingOwner) int {
 	owner.rootsMu.Lock()
 	defer owner.rootsMu.Unlock()
@@ -267,8 +266,6 @@ func TestCallbackErrorAnswersADeliberateStatusAndLogsOthers(t *testing.T) {
 	}
 }
 
-// callbackFailureLogHandler sends the error of each logged failure of
-// probe_callback.
 type callbackFailureLogHandler chan<- string
 
 func (callbackFailureLogHandler) Enabled(context.Context, slog.Level) bool   { return true }
@@ -306,13 +303,10 @@ func (failingPanicLogHandler) Handle(_ context.Context, record slog.Record) erro
 	return nil
 }
 
-// callbackPanic is one panic that the binding logged.
 type callbackPanic struct {
 	callback, panic string
 }
 
-// capturePanicLogs routes the default slog logger's callback panics to the
-// returned channel until the test ends.
 func capturePanicLogs(t *testing.T) <-chan callbackPanic {
 	panics := make(chan callbackPanic, 16)
 	previous := slog.Default()

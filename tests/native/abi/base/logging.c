@@ -71,8 +71,6 @@ LOG_STATE_CASE(log_callback_releases_owned_user_data) {
   TEST_ASSERT_EQUAL_INT(1, second_releases);
 }
 
-// A rejected handler leaves the installed one in place and releases neither
-// its own user data nor the installed handler's.
 LOG_STATE_CASE(a_rejected_handler_keeps_the_installed_one) {
   int installed_releases = 0;
   int rejected_releases = 0;
@@ -202,9 +200,6 @@ static void clear_from_log_release(void* user_data) {
   atomic_store(&probe->release_status, mln_log_clear_callback(NULL));
 }
 
-// A log callback and its release that call back into the C API get an
-// invalid-state status, and the handler stays installed until the host
-// replaces it.
 LOG_STATE_CASE(a_log_callback_cannot_call_back_into_the_c_api) {
   static reentry_probe probe;
   memset(&probe, 0, sizeof(probe));
@@ -260,7 +255,6 @@ typedef struct dump_probe {
   atomic_int unexpected;
   const void* command_thread;
   atomic_bool command_thread_recorded;
-  // How many records had arrived when the command's completion ran.
   atomic_int count_at_completion;
   atomic_bool completed;
 } dump_probe;
@@ -318,9 +312,7 @@ static void record_dump_completion(
   mln_test_flag_set(&probe->completed);
 }
 
-// Dumps a map's debug logs through a callback that records them, under
-// whatever async mask is in effect, and waits for the command and all three
-// records. The probe must outlive a failed case: a failed wait leaves the
+// The probe must outlive a failed case: a failed wait leaves the
 // callback registered until restoring_log_state() clears it, and a late
 // record or completion still writes to the probe.
 static void dump_debug_logs(dump_probe* probe) {
@@ -377,9 +369,6 @@ static void dump_debug_logs(dump_probe* probe) {
   }
 }
 
-// With info records synchronous, the dump reaches the callback on the thread
-// that runs the command, before the command completes. Consuming a record or
-// passing it on changes nothing about the next one.
 LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
   MLN_TEST_OK(
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ERROR, NULL)
@@ -394,8 +383,7 @@ LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
   }
 }
 
-// With info records asynchronous, MapLibre hands the dump to its log thread,
-// which delivers every record in order and none on the thread that logged it.
+// MapLibre delivers asynchronous records in order on its own log thread.
 LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
   MLN_TEST_OK(
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_INFO, NULL)
@@ -410,7 +398,6 @@ LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
   }
 }
 
-// Clearing the callback stops delivery: a later dump reaches it no more.
 LOG_STATE_CASE(a_cleared_callback_receives_no_more_records) {
   MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
   static dump_probe probe;

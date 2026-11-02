@@ -5,7 +5,6 @@ import java.io.File
 
 /** The C library in one install prefix, as this host's linker and JVM see it. */
 class MaplibreNativeCArtifact(val installDir: File) {
-  /** The directory that holds the shared libraries. */
   val runtimeLibraryDir: File
     get() = installDir.resolve(if (HostPlatform.current().isWindows) "bin" else "lib")
 

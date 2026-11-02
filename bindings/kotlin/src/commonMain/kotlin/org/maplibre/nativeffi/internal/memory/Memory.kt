@@ -71,7 +71,6 @@ internal fun writeAddress(address: Long, value: Long) {
   else NativeMemory.putInt(address, value.toInt())
 }
 
-/** Reads a `size_t`. */
 internal fun readSize(address: Long): ULong = readAddress(address).toULong()
 
 internal fun writeSize(address: Long, value: ULong) = writeAddress(address, value.toLong())
@@ -116,7 +115,6 @@ internal fun readViewString(address: Long): String = readView(address).decodeToS
 internal fun readViewStringOrNull(address: Long): String? =
   readViewOrNull(address)?.decodeToString()
 
-/** Copies [count] elements of [stride] bytes each, starting at [pointer]. */
 internal inline fun <T> readArray(
   pointer: Long,
   count: ULong,

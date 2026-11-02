@@ -10,7 +10,6 @@ use std::mem::MaybeUninit;
 pub use maplibre_native_ffi::{Error, Result, Status};
 use maplibre_native_ffi_sys as sys;
 
-/// Fails when the linked library has another C ABI version.
 pub fn validate_abi_version() -> Result<()> {
     // SAFETY: mln_c_version takes no arguments and returns the process-global C
     // ABI version for the linked native library.

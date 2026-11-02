@@ -1,9 +1,4 @@
-// Style replacement under rendering. A caller-driven host that re-arms a
-// waiting demand as each result arrives, and pauses its loop while it retains
-// its previous presentation: each style replacement revalidates the tile its
-// new source requests, and the host still reaches a full frame and an idle
-// map. A static map that reloads its style and adds a layer again renders that
-// layer each time.
+// Style replacement under rendering.
 
 #include "support/frames.h"
 #include "support/host_graphics.h"
@@ -231,7 +226,6 @@ static const char reload_base_style[] =
   "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"base\","
   "\"type\":\"background\",\"paint\":{\"background-color\":\"#000000\"}}]}";
 
-// Adds a point source at the map's center and a green circle layer over it.
 static void add_composed_circle(mln_map map) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
     map, MLN_BUFFER_LITERAL("composed-point"),
@@ -252,8 +246,6 @@ static void add_composed_circle(mln_map map) {
   ));
 }
 
-// Renders a still image and expects its center pixel to be the opaque green of
-// the composed circle.
 static void expect_green_center(
   const mln_test_render_fixture* fixture, mln_map map
 ) {

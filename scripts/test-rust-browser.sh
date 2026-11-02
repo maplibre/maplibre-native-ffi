@@ -22,7 +22,6 @@ emcc -pthread -fwasm-exceptions -c \
   "$MISE_MONOREPO_ROOT/bindings/rust/emscripten_proxy_main.c" \
   -o "$proxy_main_object"
 
-# Browser test harness options.
 harness_flags=(
   -sEXIT_RUNTIME=1
   "-sENVIRONMENT=web,worker"

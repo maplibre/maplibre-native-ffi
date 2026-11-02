@@ -159,7 +159,6 @@ static_assert(
   "the payload must stay the last member of mln_runtime_event"
 );
 
-// One relaxed load, one shift, one test, without a handle-table or queue lock.
 // Relaxed ordering is correct because the mask is policy rather than a
 // synchronisation edge: the documented semantics gate events queued after a
 // setter returns and say nothing about events already in flight.

@@ -138,8 +138,6 @@ void discarded_commands_keep_the_graph_alive_until_the_worker_drains() {
   TEST_ASSERT_TRUE(expired(weak));
 }
 
-// Disposal keeps queued commands and map cleanup running to completion: the
-// runtime retires only after the map's pool shuts down.
 void disposal_drains_queued_work_and_map_cleanup() {
   const auto runtime = create_runtime();
   const auto map = create_map(runtime);
@@ -680,7 +678,6 @@ void a_held_view_holds_the_release_of_its_disposed_sessions_map() {
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
 }
 
-// A core worker's driver call parks its session's retirement the same way.
 void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   const auto runtime = create_runtime();
   const auto busy_map = create_map(runtime);
@@ -745,7 +742,6 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
 }
 
-// So does a call that services a caller-driven session's driver work.
 void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   const auto runtime = create_runtime();
   const auto busy_map = create_map(runtime);
@@ -848,8 +844,6 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
 }
 
-// A query that fails admission returns its map lease, so the map's release
-// still completes.
 void map_query_admission_failure_releases_its_map_lease() {
   for (const auto query : {mln_map_get_camera, mln_map_get_style_url}) {
     const auto runtime = create_runtime();

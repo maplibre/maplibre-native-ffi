@@ -13,7 +13,6 @@ const Wake = @import("maplibre_native_ffi.zig").Wake;
 // owner dropped the future.
 const WakeSlot = enum(u8) { idle, armed, settled };
 
-/// Runs a wake the future took, then releases its context.
 fn fireWake(wake: Wake) void {
     // Native wakes report their errors the same way.
     if (wake.callback) |run| run(wake.context) catch |err| callback_scope.reportError("mln_wake_callback", err);
@@ -345,7 +344,6 @@ const FakeSubmission = struct {
     }
 };
 
-/// A terminal value that counts its disposals.
 const Tracked = struct {
     var disposals: usize = 0;
     payload: u32,
@@ -392,7 +390,6 @@ test "a completion delivers once, and a value that fails to convert reports the 
     try std.testing.expectError(error.AlreadyCompleted, failed.wait(null));
 }
 
-/// A copy context that counts how often the binding releases it.
 const CountedContext = struct {
     var releases: usize = 0;
     unused: u8 = 0,
@@ -431,8 +428,6 @@ test "a pending future polls without blocking and deinit abandons it" {
     try std.testing.expectEqual(@as(usize, 1), Tracked.disposals);
 }
 
-/// A wake context that counts its runs and releases, and records whether the
-/// future it watches was ready when the wake ran.
 const CountedWake = struct {
     watched: ?*const Future(u32) = null,
     runs: std.atomic.Value(usize) = .init(0),

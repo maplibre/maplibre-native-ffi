@@ -1,6 +1,4 @@
-//! The browser build's tests: a render smoke test on the build's backend, a
-//! completion on the browser's run loop, a resource provider callback, and a
-//! drop graph.
+//! The browser build's tests.
 //!
 //! Browser GPU contexts come from JavaScript, so these fixtures create their
 //! own rather than loading tests/graphics. scripts/test-rust-browser.sh runs

@@ -14,7 +14,6 @@ from tools.bindgen.schema import validate
 
 
 def verbatim(name):
-    """A resolver that spells every C identifier as itself."""
     return name
 
 

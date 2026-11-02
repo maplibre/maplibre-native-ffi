@@ -73,8 +73,6 @@ type bindingFlag struct {
 	name string
 }
 
-// bindingFlagString joins the names of the flags set in value with "|", and
-// appends any bits without a name in hex.
 func bindingFlagString(value uint64, flags []bindingFlag) string {
 	if value == 0 {
 		return "0"

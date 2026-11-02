@@ -9,8 +9,6 @@ from typing import Any, Self
 
 
 class NativeHandleMixin:
-    """Lifecycle methods that every handle shares."""
-
     _handle_name = "Handle"
     _native: Any
     _parent: NativeHandleMixin | None

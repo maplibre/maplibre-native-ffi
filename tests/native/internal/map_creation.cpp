@@ -46,8 +46,6 @@ void create_map_on_thread(void* context) {
   );
 }
 
-// The completion may run before the creating call returns, and the map it
-// reports ready is already in out_map when it does.
 void a_completion_before_return_reads_the_map() {
   const auto runtime = mln_test_create_runtime();
   auto sync_points = SyncPointScope{};

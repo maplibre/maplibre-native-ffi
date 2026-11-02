@@ -28,7 +28,6 @@ static uint32_t current_network_status(void) {
   return status;
 }
 
-// A value that names no status is rejected and leaves the status as it was.
 NETWORK_STATUS_CASE(the_network_status_rejects_a_value_that_names_no_status) {
   MLN_TEST_OK(mln_network_set_status(MLN_NETWORK_STATUS_OFFLINE, NULL));
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
@@ -59,9 +58,7 @@ static void load_style_with_cache(const char* url, const char* cache_path) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A style loaded online into a runtime's database file reloads from that file
-// in a later runtime while MapLibre is offline. The server is gone by then, so
-// only the database can answer.
+// The server is gone by the offline reload, so only the database can answer.
 NETWORK_STATUS_CASE(a_cached_style_reloads_from_the_database_while_offline) {
   static const mln_test_http_route routes[] = {
     {.path = "/cached.json",

@@ -53,8 +53,6 @@ class NativeValues:
         self.functions.update(other.functions)
         self.callbacks |= other.callbacks
 
-    # -- Initialization -----------------------------------------------------
-
     def init(self, value: ValuePlan, target: str) -> list[str]:
         """Statements that start a C record at its default: zero, with the size
         of the record and of each sized record that it embeds."""
@@ -76,7 +74,6 @@ class NativeValues:
     def read(
         self, value: ValuePlan, js: str, target: str, path: str, fail: str
     ) -> list[str]:
-        """Statements that read `js` into the C lvalue `target`."""
         if value.kind in {"scalar", "enum", "handle", "native_pointer"}:
             scalar = self.values.carrier(value)
             if value.kind == "native_pointer":
@@ -354,7 +351,6 @@ class NativeValues:
         ]
 
     def assign(self, field: FieldPlan, target: str) -> str:
-        """Sets a callback field to the trampoline of its callback type."""
         callback = self.bound.callbacks[field.value.native]
         return f"{target}.{field.name} = {self.trampoline(callback)};"
 
@@ -508,7 +504,6 @@ class NativeValues:
     # -- C to JavaScript ----------------------------------------------------
 
     def to_js(self, value: ValuePlan, source: str, size: str | None = None) -> str:
-        """An expression that converts the C value `source` to a napi_value."""
         if value.kind in {"scalar", "enum", "handle", "native_pointer"}:
             if value.kind == "native_pointer":
                 return f"mln_ts_u64(env, (uint64_t)(uintptr_t)({source}))"
@@ -705,7 +700,6 @@ class NativeValues:
         return name
 
     def decoder(self, result: ValuePlan) -> str:
-        """A completion decoder for a function's result value."""
         element = result.element if result.kind == "array" else result
         assert element is not None
         if element.kind == "handle":

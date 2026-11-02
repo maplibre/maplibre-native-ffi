@@ -17,7 +17,6 @@ import type { Registrations, RootHolder } from "./realm.ts";
 export const ADOPT: unique symbol = Symbol("adopt");
 export type AdoptKey = typeof ADOPT;
 
-/** Throws unless `key` is the API's own. */
 export function checkKey(key: AdoptKey): void {
   if (key !== ADOPT) {
     throw new TypeError("this object is created by the MapLibre Native API");

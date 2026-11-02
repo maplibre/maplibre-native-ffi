@@ -7,7 +7,6 @@ import '../../error/maplibre_exception.dart';
 import '../status/status.dart';
 import 'maplibre_native_c.g.dart' as generated;
 
-/// C ABI contract version supported by this generated binding.
 const int expectedCAbiVersion = generated.MLN_C_VERSION;
 
 /// The diagnostic that every status-returning call made from this isolate
@@ -68,7 +67,6 @@ void ensureAbiVersion() {
   _abiVersionChecked = true;
 }
 
-/// Validates a reported C ABI version before public handles are created.
 void validateCAbiVersion(int actualVersion) {
   if (actualVersion == expectedCAbiVersion) {
     return;

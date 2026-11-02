@@ -55,7 +55,6 @@ _SENTENCE_END_BEFORE_CODE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9`]|$)")
 
 
 def _comment_lines(raw: str) -> list[str]:
-    """The text lines of a C comment, without its markers."""
     text = raw.strip()
     if text.startswith("/*"):
         text = re.sub(r"^/\*[*!]?<?", "", text)
@@ -128,8 +127,6 @@ def reference_url(header: str) -> str:
 
 @dataclass(frozen=True)
 class Doc:
-    """The documentation that a binding declaration carries."""
-
     symbol: str
     summary: str
     url: str = ""
@@ -371,7 +368,6 @@ def _wrap(text: str, width: int) -> list[str]:
 def markdown_lines(
     doc: Doc | None, width: int, symbol: Symbol, escape=_escape_markdown
 ) -> list[str]:
-    """A Markdown doc comment's lines, wrapped to `width` columns of text."""
     if doc is None:
         return []
     text, notes = _paragraphs(doc, symbol)

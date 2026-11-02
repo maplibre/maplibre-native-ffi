@@ -31,7 +31,6 @@ MapOptions testMapOptions() => MapOptions(
   initialExtent: LogicalExtent(width: 256, height: 256, scaleFactor: 1),
 );
 
-/// The UTF-8 bytes of a JSON value, as a resource response carries them.
 Uint8List jsonBytes(Object? value) => utf8.encode(jsonEncode(value));
 
 /// A flag that a callback or wake sets, and that a test awaits with a
@@ -58,7 +57,6 @@ final class Signal {
   }
 }
 
-/// Awaits [future], failing the test when it does not finish in time.
 Future<T> within<T>(Future<T> future, String what) => future.timeout(
   waitDeadline,
   onTimeout: () => fail('timed out waiting for $what'),
@@ -112,7 +110,6 @@ final class RuntimeFixture {
     return map;
   }
 
-  /// Creates a map and loads [style] into it.
   Future<MapHandle> openStyledMap([Object? style = emptyStyle]) async {
     final map = await openMap();
     await expectCommitted(map.setStyleJson(style));
@@ -155,7 +152,6 @@ ResourceProvider routedProvider(
   ResourceProviderCallback callback,
 ) => ResourceProvider(callback: callback, routes: routes);
 
-/// A route that claims one style URL.
 ResourceRoute styleRoute(String url) =>
     ResourceRoute(kinds: ResourceKindFlag.style, url: url);
 

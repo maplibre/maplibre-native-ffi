@@ -20,8 +20,6 @@ typedef struct style_outcome {
   size_t capacity;
 } style_outcome;
 
-// Accepts the map's style-loaded event, or its loading failure with the
-// message copied out.
 static bool style_settled(const mln_runtime_event* event, void* context) {
   style_outcome* outcome = context;
   if (event->source != outcome->map) {
@@ -43,7 +41,6 @@ static bool style_settled(const mln_runtime_event* event, void* context) {
   return false;
 }
 
-// Waits for the style to load, or reports the failure the map produced instead.
 // A transport that never answers reports neither, so the timeout is the failure
 // this test catches.
 static bool wait_for_style_loaded(

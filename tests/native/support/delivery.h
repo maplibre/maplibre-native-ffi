@@ -17,8 +17,7 @@
 #include "unity.h"
 #include "wait.h"
 
-// A queue and what its wake observed. The wake runs on native threads, so the
-// counters are atomic.
+// The wake runs on native threads, so the counters are atomic.
 typedef struct mln_test_delivery_queue {
   mln_delivery_queue handle;
   atomic_int wakes;
@@ -153,7 +152,6 @@ static inline bool mln_test_dispatched_calls(void* context) {
   return mln_test_calls.count >= wait->count;
 }
 
-// Dispatches queue as its wake pulses until the log holds `count` calls.
 static inline void mln_test_dispatch_until_calls(
   mln_delivery_queue queue, size_t count
 ) {
@@ -170,8 +168,6 @@ static inline void mln_test_dispatch_until_calls(
   MLN_TEST_OK(wait.failure);
 }
 
-// A completion that queue dispatches to mln_test_record_completion with
-// user_data.
 static inline mln_completion mln_test_queue_completion(
   mln_delivery_queue queue, void* user_data
 ) {
@@ -183,8 +179,8 @@ static inline mln_completion mln_test_queue_completion(
   };
 }
 
-// Reports whether a map handle is still live. Disposal consumes a handle before
-// it returns, so a disposed map answers as stale at once.
+// Disposal consumes a handle before it returns, so a disposed map answers as
+// stale at once.
 static inline bool mln_test_map_is_live(mln_map map) {
   return mln_test_map_request_repaint(map) == MLN_STATUS_OK;
 }

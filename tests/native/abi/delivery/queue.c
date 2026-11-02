@@ -1,11 +1,8 @@
-// Delivery queues: the wake on each empty-to-nonempty transition, concurrent
-// dispatch, calls that outlive their producer, release, and handle validation.
+// Delivery queues.
 
 #include "support/delivery.h"
 #include "support/test_support.h"
 
-// Submits a runtime command whose completion queue dispatches to the call log
-// with user_data.
 static void submit_queued_command(
   mln_runtime runtime, mln_delivery_queue queue, void* user_data
 ) {
@@ -80,8 +77,6 @@ static void dispatch_until_all_seen(void* argument) {
   }
 }
 
-// Dispatches that race, each one BUSY while another runs, still run each call
-// exactly once.
 static void concurrent_dispatches_run_each_call_exactly_once(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -122,8 +117,6 @@ static void concurrent_dispatches_run_each_call_exactly_once(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A queued call belongs to the queue: releasing the runtime that produced it
-// leaves it to run.
 static void a_queued_call_outlives_its_runtime(void) {
   mln_test_calls_reset();
   mln_test_delivery_queue queue;
@@ -161,9 +154,6 @@ static void count_releasing_wake_release(void* user_data) {
   mln_test_pulse();
 }
 
-// Releasing the queue from inside its own wake returns at once, and no later
-// push starts a wake call. The wake's user data is released once the call that
-// released it returns.
 static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   static releasing_wake wake;
   atomic_store(&wake.calls, 0);
@@ -184,7 +174,6 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&wake.releases, 1));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&wake.calls));
 
-  // A submission that names the released queue is rejected.
   const mln_completion rejected = mln_test_queue_completion(wake.queue, NULL);
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
@@ -213,7 +202,6 @@ static void handles_report_their_status(void) {
   mln_delivery_queue occupied = queue;
   MLN_TEST_INVALID(mln_delivery_queue_create(&options, &occupied, NULL));
   mln_delivery_queue_release(queue);
-  // Release of a released handle is a no-op.
   mln_delivery_queue_release(queue);
 }
 

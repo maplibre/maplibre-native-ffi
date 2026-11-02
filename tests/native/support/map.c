@@ -15,8 +15,7 @@ typedef struct still_image_wait {
   mln_status failure;
 } still_image_wait;
 
-// Drains queued frame results, noting the still image's, and releases any
-// frame rendered meanwhile so the texture ring never fills.
+// Releases every frame rendered meanwhile so the texture ring never fills.
 static void collect_frames(still_image_wait* wait) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status drained = mln_test_drain_frame_results(
@@ -53,8 +52,6 @@ static void collect_frames(still_image_wait* wait) {
   }
 }
 
-// Holds once the still image has completed and the frame result of the demand
-// that rendered it has arrived. The request submits that demand itself.
 static bool still_image_settled(void* context) {
   still_image_wait* wait = context;
   collect_frames(wait);

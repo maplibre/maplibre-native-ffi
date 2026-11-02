@@ -46,7 +46,6 @@ unsafe extern "C" fn generated_dispatcher_wake(user_data: *mut c_void) {
 }
 
 impl GeneratedDispatcher {
-    /// Runs every call queued so far after each wake, until shutdown stops it.
     fn serve(&self) {
         loop {
             {

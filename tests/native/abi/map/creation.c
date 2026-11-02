@@ -59,8 +59,6 @@ static void a_creating_map_runs_accepted_work_once_it_is_ready(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Release accepts a creating map, which finishes creation and reports it
-// before the map retires.
 static void a_map_released_while_creating_reports_creation_first(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_gate gate;

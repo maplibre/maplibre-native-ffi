@@ -23,7 +23,6 @@ function isDumpRule(message: string): boolean {
   return message.startsWith("-----");
 }
 
-/** Installs a log callback that collects dump rules, and returns them. */
 function collectDumpRules(): [LogSeverity, LogEvent][] {
   const rules: [LogSeverity, LogEvent][] = [];
   setLogCallback((severity, event, _code, message) => {

@@ -94,8 +94,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// The one enabled backend feature, or none when the consumer takes the
-/// platform default.
 fn selected_backend() -> Result<Option<&'static str>, Box<dyn Error>> {
     let enabled: Vec<&'static str> = BACKENDS
         .into_iter()
@@ -116,8 +114,6 @@ fn selected_backend() -> Result<Option<&'static str>, Box<dyn Error>> {
     }
 }
 
-/// Checks the install prefix of a local build, which serves one target with its
-/// own backend unless a feature selects another.
 fn local_prefix(
     prefix: &Path,
     target: &str,
@@ -157,7 +153,6 @@ fn local_prefix(
     Ok(prefix.to_path_buf())
 }
 
-/// Describes a request for `target` with the `backend` selected for it.
 fn request(target: &str, backend: Option<&str>) -> String {
     match backend {
         Some(backend) => format!("{target} with the {backend} backend"),
@@ -282,7 +277,6 @@ mod download {
         artifacts: Vec<Artifact>,
     }
 
-    /// An archive of the release, with its digest.
     #[derive(Deserialize)]
     struct Artifact {
         platform: String,

@@ -60,10 +60,8 @@ static void number_format_keeps_defaults_and_honors_fraction_limits(void) {
   expect_formatted(",\"currency\":\"USD\",\"max-fraction-digits\":0", "$12");
 }
 
-// Renders one point feature per name in `names`, with ids `case-0`,
-// `case-1`, and so on, queries the source under `filter`, and returns a mask
-// of the indices it kept. A name and the filter may hold bytes that are not
-// valid UTF-8.
+// Returns a mask of the indices of the names that `filter` keeps. A name and
+// the filter may hold bytes that are not valid UTF-8.
 static uint32_t selected_names(
   const char* filter, const char* const* names, size_t count
 ) {

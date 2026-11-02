@@ -1,5 +1,3 @@
-"""Exception and status types for the Python binding."""
-
 from ._generated_values import Status
 
 

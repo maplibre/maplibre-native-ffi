@@ -1,6 +1,4 @@
-// The resource transform and the HTTP header transform: what their
-// registrations accept, and, against a loopback server, which requests they
-// change and how.
+// The resource transform and the HTTP header transform.
 
 #include "support/resources.h"
 #include "support/test_support.h"
@@ -258,9 +256,6 @@ static void load_from_server(
   mln_test_destroy_map(map);
 }
 
-// A transform's replacement URL is the one the transport fetches. Once the
-// transform is cleared, requests go out as the style names them, and the
-// transform is not called again.
 static void a_resource_transform_rewrites_until_cleared(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/b/first.json",
@@ -353,8 +348,6 @@ static mln_status record_image_header_kind(
 }
 #endif
 
-// An image source's URL reaches both transforms as MLN_RESOURCE_KIND_IMAGE,
-// through the resource loader and through the platform transport.
 static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
   image_kind_probe probe;
@@ -475,7 +468,6 @@ static bool request_carried_token(
          strcmp(value, token_value) == 0;
 }
 
-// The transform's headers go out on HTTP requests until it is cleared.
 static void a_header_transform_adds_headers_until_cleared(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/with-token.json",
@@ -540,8 +532,6 @@ static void a_header_transform_skips_requests_that_are_not_http(void) {
   (void)remove(path);
 }
 
-// A redirect to the same origin keeps the transform's headers, and one to
-// another origin drops them before the request leaves.
 static void a_redirect_keeps_headers_only_within_the_origin(void) {
   static const mln_test_http_route other_routes[] = {
     {.path = "/elsewhere.json",

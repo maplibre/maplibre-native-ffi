@@ -10,7 +10,6 @@ use crate::support::*;
 
 const EXTENT: LogicalExtent = LogicalExtent::new(32, 16, 1.0);
 
-/// A fixture whose map matches EXTENT, with the background style loaded.
 fn styled_fixture() -> Fixture {
     let fixture = Fixture::with_map_options(MapOptions::new(LogicalExtent::new(
         EXTENT.width,

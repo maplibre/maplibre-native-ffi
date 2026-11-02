@@ -9,7 +9,6 @@ namespace Maplibre.NativeFfi.Tests;
 /// <summary>Event batches laid out by hand, for the decoder that copies drained batches.</summary>
 internal static unsafe class EventBatches
 {
-    /// <summary>The event stride this binding compiled against.</summary>
     internal static uint Stride => (uint)Unsafe.SizeOf<mln_runtime_event>();
 
     /// <summary>
@@ -24,7 +23,6 @@ internal static unsafe class EventBatches
         return DecodeRecordBytes(records, (nuint)events.Length, eventSize);
     }
 
-    /// <summary>Decodes a batch whose event records the caller laid out byte by byte.</summary>
     internal static IReadOnlyList<RuntimeEvent> DecodeRecordBytes(
         byte[] records,
         nuint eventCount,

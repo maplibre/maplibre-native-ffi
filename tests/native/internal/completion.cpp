@@ -21,7 +21,6 @@
 
 namespace {
 
-// Counts what one completion descriptor did, and in which order.
 struct CompletionProbe {
   std::atomic_uint calls = 0;
   std::atomic_uint releases = 0;
@@ -78,7 +77,6 @@ auto create_queue() -> mln_delivery_queue {
   return queue;
 }
 
-// The completions that one dispatch of a queue ran.
 struct QueuedCompletions {
   std::size_t count = 0;
   mln_status status = MLN_STATUS_INVALID_STATE;
@@ -127,7 +125,6 @@ auto released_lease(mln::core::ControlState& control) -> bool {
   return control.notify_when_drained([](void*) noexcept {}, nullptr);
 }
 
-// Two terminal paths racing still deliver once, on one of their workers.
 void racing_resolutions_deliver_once() {
   for (auto iteration = 0; iteration < 100; ++iteration) {
     auto probe = CompletionProbe{};
@@ -144,8 +141,6 @@ void racing_resolutions_deliver_once() {
   }
 }
 
-// A delivery that throws before it reaches the sink still reports one result,
-// a native error, and then releases the user data.
 void a_throwing_delivery_reports_a_native_error() {
   auto probe = CompletionProbe{};
   auto completion = created(descriptor_for(probe));
@@ -159,9 +154,6 @@ void a_throwing_delivery_reports_a_native_error() {
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, probe.status.load());
 }
 
-// A queue item that cannot be allocated falls back to the one reserved at
-// submission, which reports a native error, and the completion still releases
-// its submission lease.
 void queue_resolution_falls_back_without_allocation() {
   const auto queue = create_queue();
   auto tag = 0;
@@ -224,8 +216,6 @@ void a_delivery_that_throws_after_the_sink_reports_once() {
   MLN_TEST_OK(probe.status.load());
 }
 
-// An abandoned queue completion pushes one cancellation before it releases its
-// submission lease.
 void abandoned_queue_completion_pushes_cancelled() {
   const auto queue = create_queue();
   auto control = mln::core::ControlState{};

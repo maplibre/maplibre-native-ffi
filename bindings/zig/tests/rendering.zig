@@ -16,8 +16,6 @@ fn createFixture() !*support.Fixture {
     return fixture;
 }
 
-/// Renders one frame, reads the texture back, and checks that the middle
-/// pixel holds the style's background color.
 fn renderAndReadBack(owned: *support.OwnedTexture) !void {
     const capabilities = try owned.session.getCapabilities(null);
     try testing.expect(capabilities.flags.readback);

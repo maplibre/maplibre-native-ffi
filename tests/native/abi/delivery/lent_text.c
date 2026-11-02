@@ -1,9 +1,7 @@
 // Text that native lends to the host is NUL-terminated after its bytes, and
-// its data is never null, even when the text is empty. These cases read
-// completion values and diagnostics in both modes, runtime event messages in
-// callback mode, and log callback messages. The suite's own helpers check the
-// same for queued events, query results, layer and source info, and provider
-// requests, and the transform and delivery cases check their URLs and
+// its data is never null, even when the text is empty. The suite's own helpers
+// check the same for queued events, query results, layer and source info, and
+// provider requests, and the transform and delivery cases check their URLs and
 // messages.
 
 #include <string.h>
@@ -101,7 +99,6 @@ static bool dispatched_lent(void* context) {
   return atomic_load(&wait->lent->done);
 }
 
-// The same, with the completion copied into queue and read in its dispatch.
 static lent_completion call_with_queue(
   mln_map map, mln_delivery_queue queue, map_query query
 ) {
@@ -122,9 +119,7 @@ static lent_completion call_with_queue(
   return lent;
 }
 
-// A style set from JSON has an empty URL, so the URL query lends empty text
-// and the JSON query lends the style. A success lends an empty diagnostic and
-// a failure lends its message.
+// A style set from JSON has an empty URL, so the URL query lends empty text.
 static void completions_lend_terminated_text(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
@@ -178,7 +173,6 @@ static void read_lent_events(
   }
 }
 
-// A callback handler borrows each event's message, empty or not, terminated.
 // The provider fails the style, whose failure event carries a message; the
 // events before it carry none.
 static void callback_events_lend_terminated_messages(void) {

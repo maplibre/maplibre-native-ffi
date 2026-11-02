@@ -167,8 +167,6 @@ class Unsupported(ValueError):
 
 @dataclass(frozen=True)
 class Lowered:
-    """One binding's output, lowered once from the bound API."""
-
     # The generated sources, by path from the repository root.
     files: dict[str, str]
     # The reason for each declaration that the binding cannot lower, by C name.

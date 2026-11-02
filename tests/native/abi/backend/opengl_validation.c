@@ -277,8 +277,6 @@ static void opengl_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The build reports the providers it carries, and refuses a well-formed
-// context of any other.
 static void only_the_builds_providers_attach(void) {
   TEST_ASSERT_EQUAL_HEX32(
     PRESET_PROVIDERS, mln_open_gl_supported_context_provider_mask()

@@ -18,7 +18,6 @@ import (
 	"unsafe"
 )
 
-// Backend names a graphics API that tests/graphics drives.
 type Backend uint32
 
 const (
@@ -60,7 +59,6 @@ func lastError() error {
 	return errors.New(C.GoString(C.mln_test_graphics_last_error()))
 }
 
-// NewGraphics creates a device or context for backend.
 func NewGraphics(backend Backend) (*Graphics, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()

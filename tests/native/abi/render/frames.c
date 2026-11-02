@@ -1,8 +1,4 @@
-// Rendered frames: readback, the pixel formats of an owned Metal ring, the
-// texture an acquired frame exposes through its backend's getter, the checks
-// every accessor and release makes, borrowed views and disposal, the texture
-// ring across a resize, physical sizes, and the updates a camera transition
-// publishes.
+// Rendered frames and the texture ring that holds them.
 
 #include <math.h>
 
@@ -45,9 +41,6 @@ static void detach_keeping_the_ring(
   detach(runtime, map, fixture);
 }
 
-// A readback is accepted before any frame renders, and its completion reports
-// that no frame is available. Once a frame renders, the readback is an ordered
-// operation whose result owns a copy of the pixels.
 static void texture_readback_copies_the_latest_rendered_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -83,8 +76,6 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-// A session-owned Metal ring renders in the pixel format it attached with, and
-// reads back RGBA8 in either.
 static void an_owned_metal_ring_renders_in_its_pixel_format(void) {
   // MTLPixelFormatRGBA8Unorm and MTLPixelFormatBGRA8Unorm.
   const uint64_t formats[] = {70, 80};
@@ -246,8 +237,6 @@ static uint64_t expect_preset_texture(
   return frame->frame_id;
 }
 
-// The getter of the session's backend describes the frame's texture, and
-// every other backend's refuses. Each acquisition names a frame of its own.
 static void only_the_sessions_backend_describes_its_frame_texture(void) {
   mln_runtime runtime;
   mln_map map;
@@ -339,13 +328,9 @@ static mln_status call_accessor(
   );
 }
 
-// A broken frame or output fails before an accessor looks at the frame's
-// backend: a released frame as invalid state, and anything else as an invalid
-// argument. Every accessor checks its own output and then leases the frame
-// through one shared check, so each runs both steps, and one runs the shared
-// check's every rule. Release takes a live frame and a sync record it
-// knows, and consumes the frame only when it succeeds, so a refused release
-// leaves the frame with the host.
+// Every accessor checks its own output and then leases the frame through one
+// shared check, so each runs both steps, and one runs the shared check's every
+// rule.
 static void accessors_and_release_reject_a_broken_frame_or_record(void) {
   mln_runtime runtime;
   mln_map map;
@@ -409,7 +394,6 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
     mln_acquired_frame_release(frame, &refused, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "gpu sync kind"));
-  // A known kind outside the session's consumer kinds is refused the same way.
   mln_render_session_capabilities capabilities = {
     .size = sizeof(mln_render_session_capabilities)
   };
@@ -429,7 +413,6 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
     MLN_STATUS_UNSUPPORTED,
     mln_acquired_frame_release(frame, &refused, MLN_TEST_DIAGNOSTIC)
   );
-  // The host still owns the frame and its accessors still answer.
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
   MLN_TEST_OK(mln_acquired_frame_get_result(frame, &result, NULL));
@@ -445,7 +428,7 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
 // still read the frame's texture, so abandon keeps the ring's backend. It
 // destroys a Vulkan or Metal renderer, whose objects the host never reads,
 // and keeps an OpenGL or WebGPU one, which only its graphics thread may
-// destroy. The frame then reports target loss, and releasing it is CPU-only.
+// destroy.
 static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_runtime runtime;
   mln_map map;
@@ -497,8 +480,6 @@ static void a_stale_release_during_detach_is_refused_before_its_sync(void) {
   detach(runtime, map, &fixture);
 }
 
-// Each scope holds the frame: an explicit release reports busy, and leaves
-// the caller the handle, until every scope has ended.
 static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   mln_runtime runtime;
   mln_map map;
@@ -553,12 +534,7 @@ static void expect_parked_demand(const mln_test_render_fixture* fixture) {
   );
 }
 
-// Disposing a frame, which a binding's finalizer uses in place of a
-// synchronized release, consumes it and quarantines its slot of the ring. The
-// session stays attached: a view already open on the disposed frame reads
-// until it ends, the other frame stays readable, and later frames render only
-// into the remaining slot. Detach still completes, keeping the quarantined
-// texture.
+// A binding's finalizer disposes a frame in place of a synchronized release.
 static void disposing_a_frame_quarantines_only_its_slot(void) {
   mln_runtime runtime;
   mln_map map;
@@ -607,9 +583,6 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   detach_keeping_the_ring(runtime, map, &fixture);
 }
 
-// Once disposed frames quarantine every slot, no frame can render again. Every
-// demand parked behind the full ring resolves as target-not-ready, frame
-// requests fail with an invalid-state status, and detach still completes.
 static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   mln_runtime runtime;
   mln_map map;
@@ -644,10 +617,8 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   detach_keeping_the_ring(runtime, map, &fixture);
 }
 
-// With both slots of the two-deep ring holding textures of the old size, a
-// resize retires each of them, so the next frame renders at the new size
-// whichever slot it lands in. Holding the first frame while the second renders
-// is what puts a texture in the second slot.
+// Holding the first frame while the second renders is what puts a texture in
+// the second slot of the two-deep ring.
 static void a_resize_retires_every_old_size_slot(void) {
   mln_runtime runtime;
   mln_map map;
@@ -691,8 +662,6 @@ typedef struct physical_row {
 #define EXTENT(w, h, scale) \
   ((mln_logical_extent){.width = (w), .height = (h), .scale_factor = (scale)})
 
-// Each physical dimension is the logical one times the scale factor, rounded
-// up, and must fit in 32 bits.
 static void physical_sizes_round_up_and_reject_overflow(void) {
   const physical_row rows[] = {
     {"a fractional product rounds up", EXTENT(3, 5, 1.5), MLN_STATUS_OK, 5, 8},

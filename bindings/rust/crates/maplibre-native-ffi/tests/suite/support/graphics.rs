@@ -160,7 +160,6 @@ impl Graphics {
         }
     }
 
-    /// Starts attaching a session-owned texture target to `map`.
     pub fn attach_owned_texture(
         &self,
         map: &MapHandle,

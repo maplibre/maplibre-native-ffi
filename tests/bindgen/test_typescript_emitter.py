@@ -257,7 +257,6 @@ class TypeScriptEmitterTests(unittest.TestCase):
             "return mln_ts_read_reading_view_readings(env, source);",
             outputs["bindings/typescript/native/generated_values.c"],
         )
-        # Neither the batch nor its view is public.
         self.assertNotIn("ReadingBatch", operations)
         self.assertNotIn(
             "ReadingView", outputs["bindings/typescript/src/generated_values.ts"]

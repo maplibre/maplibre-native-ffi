@@ -18,7 +18,6 @@ UNFORMATTED = patch.object(cli, "format_files", lambda _paths, _root: None)
 
 class GenerateCommandTests(unittest.TestCase):
     def generate(self, root, groups):
-        """Run generate under `root`, returning its status and diagnostics."""
         errors = io.StringIO()
         with (
             UNFORMATTED,
@@ -63,7 +62,6 @@ class GenerateCommandTests(unittest.TestCase):
                 "rust: 1 declarations require implementation", output.getvalue()
             )
             self.assertIn("mln_probe_roundtrip", output.getvalue())
-            # The previous run's outputs stay as they were.
             self.assertEqual((root / cli.MANIFEST).read_text(), manifest)
 
     def test_invalid_headers_fail_before_writing_output(self):

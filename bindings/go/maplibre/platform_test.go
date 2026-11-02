@@ -94,14 +94,11 @@ func TestCollectorDisposesAndLogsALeakedHandle(t *testing.T) {
 	}
 }
 
-// leakedHandle is one leak that the binding logged.
 type leakedHandle struct {
 	typeName string
 	handle   uint64
 }
 
-// captureLeakLogs routes the default slog logger's leak warnings to the
-// returned channel until the test ends.
 func captureLeakLogs(t *testing.T) <-chan leakedHandle {
 	leaks := make(chan leakedHandle, 64)
 	previous := slog.Default()

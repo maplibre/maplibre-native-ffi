@@ -1,6 +1,4 @@
-// Offline regions: definition validation, the region lifecycle from creation
-// to deletion, merging another database's regions, and a download that a
-// resource provider serves.
+// Offline regions, with downloads that a resource provider serves.
 
 #if defined(_WIN32)
 #include <io.h>
@@ -370,9 +368,7 @@ static mln_status get_region_status(
   return status;
 }
 
-// A region from creation through listing, lookup, a metadata update, and its
-// status to deletion, ending with the region gone and its status reporting
-// so. The download case covers observation, download state, and invalidation.
+// The download case covers observation, download state, and invalidation.
 static void an_offline_region_lives_from_creation_to_deletion(void) {
   static const uint8_t metadata[] = {1, 2, 3};
   static const uint8_t updated_metadata[] = {9, 8};
@@ -522,8 +518,6 @@ static const struct {
   {"invalidate", invalidate_missing},  {"delete", delete_missing},
 };
 
-// Every operation that names a region reports one that does not exist as
-// NOT_FOUND. A get reports it as an empty success instead.
 static void offline_operations_report_a_missing_region(void) {
   static const mln_offline_region_id missing = 987654321;
   mln_runtime runtime = mln_test_create_runtime();
@@ -663,8 +657,6 @@ static void remove_database(const char* path) {
   (void)remove(path);
 }
 
-// Writes a side database holding one region with `metadata`, through a runtime
-// whose cache lives at `path`. Returns the region's ID there.
 static mln_offline_region_id write_side_database(
   const char* path, const uint8_t* metadata, size_t metadata_size
 ) {
@@ -682,9 +674,8 @@ static mln_offline_region_id write_side_database(
   return id;
 }
 
-// A merge copies the side database's regions into the runtime's database and
-// reports them. The side database opens read-only, so a file the process
-// cannot write merges too, and its bytes are unchanged afterwards.
+// The side database opens read-only, so a file the process cannot write merges
+// too.
 static void offline_database_merge_copies_regions_from_a_read_only_file(void) {
   static const uint8_t metadata[] = {7, 7, 7};
   char side_path[1024];
@@ -740,9 +731,6 @@ static bool download_completed(const mln_runtime_event* event, void* context) {
   return watch->complete;
 }
 
-// An observed download fetches the region's style and tiles through the
-// provider, reports its progress until the region is complete, and leaves a
-// status that says so. Invalidating the region then expires what it stored.
 static void a_download_completes_from_provider_served_resources(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = offline_style_url,
@@ -937,9 +925,7 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An offline operation accepted before its runtime's release still runs and
-// completes after the release has retired the handle. When it is the runtime's
-// first offline operation, it opens the runtime's own database, so a region it
+// The runtime's first offline operation opens its database, so a region it
 // creates is there for the next runtime that opens the same cache.
 static void an_offline_operation_accepted_before_release_still_completes(void) {
   static const uint8_t metadata[] = {4, 2};

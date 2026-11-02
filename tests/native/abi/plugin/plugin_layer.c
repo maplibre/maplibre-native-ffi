@@ -94,7 +94,6 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
   TEST_ASSERT_EQUAL_UINT8(255, center[1]);
   TEST_ASSERT_EQUAL_UINT8(0, center[2]);
   TEST_ASSERT_EQUAL_UINT8(255, center[3]);
-  // The square stops short of the corner, which keeps the background.
   TEST_ASSERT_EQUAL_UINT8(255, pixels[0]);
   TEST_ASSERT_EQUAL_UINT8(0, pixels[1]);
   TEST_ASSERT_EQUAL_UINT8(0, pixels[2]);

@@ -90,7 +90,6 @@ def format_files(paths: list[str], root: Path) -> None:
 
 
 def previous_outputs(root: Path) -> set[str]:
-    """Read the outputs that the last run recorded in its manifest."""
     manifest = root / MANIFEST
     if not manifest.is_file():
         return set()

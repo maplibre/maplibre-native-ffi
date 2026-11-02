@@ -786,7 +786,6 @@ def callback_scoped(value):
 
 
 def number_literal(number, carrier_type):
-    """A literal of the callback result's [carrier_type] for the integer [number]."""
     if carrier_type == "Long":
         return f"{number}L"
     return str(number if number <= 0x7FFFFFFF else number - (1 << 32))

@@ -230,7 +230,6 @@ final class _NativeViewScope {
     return value;
   }
 
-  /// Opens the scope, runs [callback] with it, and closes it.
   T use<T>(T Function(_NativeViewScope scope) callback) =>
       withNativeArena((arena) {
         final token = arena<Pointer<Void>>();

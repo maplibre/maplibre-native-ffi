@@ -381,7 +381,6 @@ def completion_decode(value, values):
 
 
 def operation(plan, values, native, *, discard=False):
-    """The common Kotlin method for [plan]."""
     from . import kotlin_callbacks
 
     callback = kotlin_callbacks.operation(plan, values, native)

@@ -172,7 +172,6 @@ func withMapFixture<Result>(
   }
 }
 
-/// Expects `body` to throw a ``MaplibreError`` of `kind`, and returns it.
 @discardableResult
 func expectMaplibreError(
   _ kind: Status,

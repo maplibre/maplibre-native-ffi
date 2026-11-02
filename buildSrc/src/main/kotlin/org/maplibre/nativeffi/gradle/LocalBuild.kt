@@ -17,7 +17,6 @@ const val LOCAL_BUILD_PROPERTY = "maplibre.localBuild"
 
 internal const val NATIVE_DESCRIPTOR_PATH = "share/maplibre-native-c/artifact.json"
 
-/** The local build that [LOCAL_BUILD_PROPERTY] names, or null when it is unset. */
 private val Project.localBuild: File?
   get() = providers.gradleProperty(LOCAL_BUILD_PROPERTY).map(rootProject::file).orNull
 
@@ -138,7 +137,6 @@ private fun readDescriptor(prefix: File): Map<*, *> =
 private val Map<*, *>.platform: Map<*, *>
   get() = this["platform"] as? Map<*, *> ?: emptyMap<Any, Any>()
 
-/** The native target platform of a Kotlin/Native target. */
 fun kotlinNativeTargetPlatform(kotlinTarget: String): String =
   AndroidTarget.entries.firstOrNull { it.kotlinNativeTarget == kotlinTarget }?.targetPlatform
     ?: when (kotlinTarget) {
@@ -154,7 +152,6 @@ fun kotlinNativeTargetPlatform(kotlinTarget: String): String =
       else -> error("No native target platform for Kotlin/Native target $kotlinTarget")
     }
 
-/** Registers a task that fails with [install]'s problem, if it has one. */
 fun Project.registerLocalBuildVerification(
   taskName: String,
   install: NativeInstall,

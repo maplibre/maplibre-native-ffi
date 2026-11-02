@@ -43,7 +43,6 @@ class Declarations:
         return list(self.api.public_functions)
 
     def type(self, ctype: CType, pointee: bool = False, field: bool = False) -> str:
-        """The C# spelling of one C type at a field, parameter, or result."""
         if ctype.kind == "pointer" and ctype.pointee is not None:
             return self.pointer(ctype.pointee)
         if ctype.kind == "array" and ctype.element is not None:
