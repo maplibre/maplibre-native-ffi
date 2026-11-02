@@ -124,8 +124,12 @@ typedef enum mln_runtime_event_type : uint32_t {
   /** A resource that the region needs failed to download. */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
   /**
-   * The region stopped downloading Mapbox tiles because offline regions hold
-   * as many as the limit allows.
+   * The region's download became inactive because the cache file's offline
+   * regions reached their limit of 6000 tiles from MapLibre's demo tile server.
+   *
+   * Only tiles of sources on the demo server count toward the limit: sources
+   * with a `maplibre://` URL, which resolves to https://demotiles.maplibre.org.
+   * Tiles from other servers never count.
    */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
   MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
@@ -454,7 +458,10 @@ typedef struct mln_runtime_event_offline_region_response_error {
  */
 typedef struct mln_runtime_event_offline_region_tile_count_limit {
   mln_offline_region_id region_id;
-  /** The number of Mapbox tiles that offline regions may hold. */
+  /**
+   * The number of demo server tiles that the cache file's offline regions may
+   * hold together.
+   */
   uint64_t limit;
 } mln_runtime_event_offline_region_tile_count_limit;
 

@@ -231,6 +231,11 @@ public value class GesturePhase(public val rawValue: UInt) {
 /**
  * How one side waits for the other's GPU work on a shared texture.
  *
+ * A sync file descriptor or an OpenGL fence signals once, so when `AcquiredFrameHandle.release()`
+ * succeeds, the session takes the one you pass. A Vulkan timeline semaphore, Metal shared event, or
+ * D3D12 fence counts up with each frame, so the one you pass stays yours. Keep it valid until a
+ * detach or disposal of the session completes.
+ *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_gpu_sync_kind` in the
@@ -1301,8 +1306,11 @@ public value class RuntimeEventType(public val rawValue: UInt) {
     /** A resource that the region needs failed to download. */
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(18u)
     /**
-     * The region stopped downloading Mapbox tiles because offline regions hold as many as the limit
-     * allows.
+     * The region's download became inactive because the cache file's offline regions reached their
+     * limit of 6000 tiles from MapLibre's demo tile server.
+     *
+     * Only tiles of sources on the demo server count toward the limit: sources with a `maplibre://`
+     * URL, which resolves to https://demotiles.maplibre.org. Tiles from other servers never count.
      */
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(19u)
     public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(20u)
@@ -3124,7 +3132,12 @@ public data class RenderSessionCapabilities(
   public val flags: RenderSessionCapabilityFlag,
   /** The kind of `GpuSync` that `AcquiredFrameHandle.withProducerSync()` reports. */
   public val producerSyncKind: GpuSyncKind,
-  /** The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts. */
+  /**
+   * The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
+   *
+   * They depend on the target and on what the device supports, so read this field instead of
+   * assuming a kind.
+   */
   public val consumerSyncKinds: GpuSyncKindFlag,
 )
 
@@ -3569,7 +3582,7 @@ public data class RuntimeEventOfflineRegionResponseError(
  */
 public data class RuntimeEventOfflineRegionTileCountLimit(
   public val regionId: Long,
-  /** The number of Mapbox tiles that offline regions may hold. */
+  /** The number of demo server tiles that the cache file's offline regions may hold together. */
   public val limit: ULong,
 )
 

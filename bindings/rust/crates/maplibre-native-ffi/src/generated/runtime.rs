@@ -284,6 +284,9 @@ impl RuntimeHandle {
     ///
     /// - `Status::InvalidArgument` when `side_database_path` isn't a readable
     ///   database file.
+    /// - `Status::NativeError` when the merge would exceed the limit on tiles
+    ///   from MapLibre's demo tile server that
+    ///   `RuntimeEventType::OfflineRegionTileCountLimitExceeded` describes.
     pub fn merge_offline_regions(
         &self,
         side_database_path: &str,

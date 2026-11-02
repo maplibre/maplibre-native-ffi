@@ -74,7 +74,15 @@ typedef struct mln_queue_lock {
   "kind=callback_registration;release=release_user_data"
 );
 
-/** How one side waits for the other's GPU work on a shared texture. */
+/**
+ * How one side waits for the other's GPU work on a shared texture.
+ *
+ * A sync file descriptor or an OpenGL fence signals once, so when
+ * mln_acquired_frame_release() succeeds, the session takes the one you pass. A
+ * Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up with
+ * each frame, so the one you pass stays yours. Keep it valid until a detach or
+ * disposal of the session completes.
+ */
 typedef enum mln_gpu_sync_kind : uint32_t {
   /** The work has already finished, so there is nothing to wait for. */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
@@ -155,7 +163,12 @@ typedef struct mln_render_session_capabilities {
    * reports.
    */
   mln_gpu_sync_kind producer_sync_kind;
-  /** The kinds of mln_gpu_sync that mln_acquired_frame_release() accepts. */
+  /**
+   * The kinds of mln_gpu_sync that mln_acquired_frame_release() accepts.
+   *
+   * They depend on the target and on what the device supports, so read this
+   * field instead of assuming a kind.
+   */
   mln_gpu_sync_kind_flags consumer_sync_kinds;
 } mln_render_session_capabilities;
 

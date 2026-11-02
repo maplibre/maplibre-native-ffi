@@ -17,8 +17,10 @@ namespace Maplibre.NativeFfi;
 /// <c>AcquiredFrameHandle.WithProducerSync()</c> reports.
 /// </param>
 /// <param name="ConsumerSyncKinds">
-/// The kinds of <c>GpuSync</c> that <c>AcquiredFrameHandle.Release()</c>
-/// accepts.
+/// <para>The kinds of <c>GpuSync</c> that <c>AcquiredFrameHandle.Release()</c>
+/// accepts.</para>
+/// <para>They depend on the target and on what the device supports, so read
+/// this field instead of assuming a kind.</para>
 /// </param>
 public readonly partial record struct RenderSessionCapabilities(
     RenderDriverKind Driver,

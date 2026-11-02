@@ -1926,8 +1926,9 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidState` when the style or one of its sources or sprites
-    ///   is still loading.
+    /// - `Status::InvalidState` until the map has parsed its style, which
+    ///   `RuntimeEventType::MapStyleLoaded` reports, and again while it loads a
+    ///   new style URL.
     pub fn set_global_state_property(
         &self,
         property_name: &str,

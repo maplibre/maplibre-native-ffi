@@ -5474,8 +5474,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidState` when the style or one of its sources or sprites is
-  ///   still loading.
+  /// - `Status.invalidState` until the map has parsed its style, which
+  ///   `RuntimeEventType.mapStyleLoaded` reports, and again while it loads a
+  ///   new style URL.
   Future<CommandCompletion> setGlobalStateProperty(
     String propertyName,
     Object? value,
@@ -7244,6 +7245,9 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.invalidArgument` when `sideDatabasePath` isn't a readable
   ///   database file.
+  /// - `Status.nativeError` when the merge would exceed the limit on tiles from
+  ///   MapLibre's demo tile server that
+  ///   `RuntimeEventType.offlineRegionTileCountLimitExceeded` describes.
   Future<List<OfflineRegionInfo>> mergeOfflineRegions(
     String sideDatabasePath,
   ) => _queryList(

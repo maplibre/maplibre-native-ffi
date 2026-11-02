@@ -1315,7 +1315,8 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
   Sendable
 {
   public var regionId: Int64
-  /// The number of Mapbox tiles that offline regions may hold.
+  /// The number of demo server tiles that the cache file's offline regions may
+  /// hold together.
   public var limit: UInt64
   public init(regionId: Int64 = 0, limit: UInt64 = 0) {
     self.regionId = regionId
@@ -1502,8 +1503,13 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   /// A resource that the region needs failed to download.
   public static let offlineRegionResponseError: RuntimeEventType =
     .init(rawValue: 18)
-  /// The region stopped downloading Mapbox tiles because offline regions hold
-  /// as many as the limit allows.
+  /// The region's download became inactive because the cache file's offline
+  /// regions reached their limit of 6000 tiles from MapLibre's demo tile
+  /// server.
+  ///
+  /// Only tiles of sources on the demo server count toward the limit: sources
+  /// with a `maplibre://` URL, which resolves to
+  /// https://demotiles.maplibre.org. Tiles from other servers never count.
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 19)
   public static let mapGlyphsRequested: RuntimeEventType = .init(rawValue: 20)

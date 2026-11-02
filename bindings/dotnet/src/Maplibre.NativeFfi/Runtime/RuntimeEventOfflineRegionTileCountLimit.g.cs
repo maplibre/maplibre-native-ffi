@@ -10,7 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Limit">
-/// The number of Mapbox tiles that offline regions may hold.
+/// The number of demo server tiles that the cache file's offline regions may
+/// hold together.
 /// </param>
 public readonly partial record struct RuntimeEventOfflineRegionTileCountLimit(
     long RegionId,

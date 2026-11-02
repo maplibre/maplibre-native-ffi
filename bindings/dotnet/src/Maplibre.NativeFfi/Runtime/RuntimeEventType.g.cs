@@ -57,9 +57,15 @@ public enum RuntimeEventType : uint
     OfflineRegionResponseError = 18,
 
     /// <summary>
-    /// The region stopped downloading Mapbox tiles because offline regions hold
-    /// as many as the limit allows.
+    /// The region's download became inactive because the cache file's offline
+    /// regions reached their limit of 6000 tiles from MapLibre's demo tile
+    /// server.
     /// </summary>
+    /// <remarks>
+    /// Only tiles of sources on the demo server count toward the limit: sources
+    /// with a <c>maplibre://</c> URL, which resolves to
+    /// https://demotiles.maplibre.org. Tiles from other servers never count.
+    /// </remarks>
     OfflineRegionTileCountLimitExceeded = 19,
     MapGlyphsRequested = 20,
     MapGlyphsLoaded = 21,
