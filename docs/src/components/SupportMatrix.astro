@@ -19,16 +19,15 @@ function siteStatus(status: string): Status {
     : "unsupported";
 }
 
-const sourceRoot = "https://github.com/maplibre/maplibre-native-ffi/tree/main";
 const issueRoot = "https://github.com/maplibre/maplibre-native-ffi/issues";
 const bindings = supportMatrix.bindings;
 
 // Backends of one architecture share a row when every binding gives them the
 // same status.
-const groups = supportMatrix.platforms.map((platform) => {
+const groups = supportMatrix.platforms.map((platform, platformIndex) => {
   // A label such as `Linux (GNU)` names a platform and its variant.
   const parts = /^(.*) \((.*)\)$/.exec(platform.label);
-  const rows = platform.architectures.flatMap((arch) => {
+  const rows = platform.architectures.flatMap((arch, archIndex) => {
     const merged = new Map<string, { backends: string[]; cells: Status[] }>();
     for (const backend of arch.backends) {
       const cells = backend.cells.map((cell) => siteStatus(cell.status));
@@ -41,6 +40,7 @@ const groups = supportMatrix.platforms.map((platform) => {
       ...row,
       arch: arch.arch,
       variant,
+      archGroup: `arch-${platformIndex}-${archIndex}`,
       archSpan: index === 0 ? merged.size : 0,
     }));
   });
@@ -52,14 +52,25 @@ const groups = supportMatrix.platforms.map((platform) => {
   };
 });
 
-// Hovering a binding's header or cell highlights its column.
-const columnHighlight = bindings
-  .map((_, index) => {
-    const table = `.support-matrix table:has(.col-${index}:hover)`;
-    return `${table} .col-${index} { background: var(--sl-color-gray-6); }
-${table} th.col-${index} a { color: var(--sl-color-text-accent); }`;
-  })
-  .join("\n");
+// Hovering a binding's header or cell highlights its column, and hovering any
+// part of an architecture that spans rows highlights all of them.
+const table = ".support-matrix table";
+const highlight = [
+  ...bindings.map(
+    (_, index) =>
+      `${table}:has(.col-${index}:hover) .col-${index} { background: var(--sl-color-gray-6); }
+${table}:has(.col-${index}:hover) th.col-${index} a { color: var(--sl-color-text-accent); }`,
+  ),
+  ...groups.flatMap((platform) =>
+    platform.rows
+      .filter((row) => row.archSpan > 1)
+      .map(
+        ({ archGroup: group }) =>
+          `${table}:has(tr.${group}:hover) th.${group},
+${table}:has(th.${group}:hover) tr.${group} > * { background: var(--sl-color-gray-6); }`,
+      ),
+  ),
+].join("\n");
 
 function cellLabel(
   binding: string,
@@ -72,7 +83,7 @@ function cellLabel(
 ---
 
 <div class="not-content support-matrix">
-  <style is:inline set:html={columnHighlight} />
+  <style is:inline set:html={highlight} />
   <p class="legend">
     {statuses.map((row) => (
       <span>
@@ -92,13 +103,7 @@ function cellLabel(
           <th scope="col">Backend</th>
           {bindings.map((binding, index) => (
             <th scope="col" class={`binding col-${index}`}>
-              <a
-                href={`${sourceRoot}/${binding.sourceDirectory}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {binding.label}
-              </a>
+              <a href={binding.installPage}>{binding.label}</a>
             </th>
           ))}
         </tr>
@@ -106,7 +111,7 @@ function cellLabel(
       {groups.map((platform) => (
         <tbody>
           {platform.rows.map((row, rowIndex) => (
-            <tr>
+            <tr class={row.archGroup}>
               {rowIndex === 0 && (
                 <th
                   scope="rowgroup"
@@ -120,7 +125,11 @@ function cellLabel(
                 </th>
               )}
               {row.archSpan > 0 && (
-                <th scope="row" rowspan={row.archSpan} class="secondary">
+                <th
+                  scope="row"
+                  rowspan={row.archSpan}
+                  class={`secondary ${row.archGroup}`}
+                >
                   {row.arch}
                   {row.variant && <span class="variant">{row.variant}</span>}
                 </th>
@@ -137,7 +146,6 @@ function cellLabel(
                   <td class={`col-${index}`}>
                     <span
                       class={`cell ${status}`}
-                      title={label}
                       aria-label={label}
                       role="img"
                     >
@@ -244,14 +252,20 @@ tbody > tr:last-child > * {
   padding-bottom: 0.25rem;
 }
 td {
+  /* Lets a cell's badge fill the row's height. */
+  height: 1px;
   padding: 1px;
-  text-align: center;
-  vertical-align: top;
 }
-tr:hover > td {
+td > .cell {
+  display: flex;
+  height: 100%;
+  min-height: 1.25rem;
+}
+tr:hover > *,
+tbody:hover > tr > th.platform,
+tbody:has(th.platform:hover) > tr > * {
   background: var(--sl-color-gray-6);
 }
-tr:hover > th.secondary,
 tbody:hover > tr > th.platform {
   color: var(--sl-color-text-accent);
 }

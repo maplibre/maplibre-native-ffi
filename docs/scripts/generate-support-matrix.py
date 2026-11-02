@@ -121,9 +121,8 @@ def support_matrix() -> dict[str, Any]:
             {
                 "id": name,
                 "label": label,
-                "sourceDirectory": (
-                    "include" if name == "c" else f"bindings/{name.split('-', 1)[0]}"
-                ),
+                # A language's columns, such as `kotlin-jvm`, share its page.
+                "installPage": f"/maplibre-native-ffi/install/{name.split('-', 1)[0]}/",
             }
             for name, label in BINDING_LABELS.items()
         ],
