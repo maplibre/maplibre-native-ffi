@@ -34,6 +34,19 @@ internal readonly unsafe ref partial struct NativeCallScope
         return argument.State.Handle;
     }
 
+    /// <summary>
+    /// Keeps an owner argument reachable for this call and returns its raw id,
+    /// or the null handle when the argument is null.
+    /// </summary>
+    internal T UseOptional<T>(INativeOwner<T>? argument)
+        where T : unmanaged, IMlnHandle
+    {
+        if (argument is null)
+            return default;
+        state.arguments.Add(argument);
+        return argument.State.Handle;
+    }
+
     // Native releases accepted registrations when their callbacks are quiescent.
     internal Task<T> Accepted<T>(Task<T> task)
     {

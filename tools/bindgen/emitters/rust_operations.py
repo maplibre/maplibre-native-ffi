@@ -296,8 +296,15 @@ def convert(plan: OperationPlan, value_types, body: Body, receiver: str | None):
             public = value_types.handle_types.get(value_plan.native)
             if not public:
                 raise Unsupported(f"{value_plan.native}: owner runtime unavailable")
-            body.signature.append(f"{local}: &{public}")
-            body.prelude.append(f"let {local} = {local}.inner.native();")
+            if value_plan.nullable:
+                body.signature.append(f"{local}: Option<&{public}>")
+                body.prelude.append(
+                    f"let {local} = {local}.map_or(sys::{value_plan.native}(0), "
+                    f"|{local}| {local}.inner.native());"
+                )
+            else:
+                body.signature.append(f"{local}: &{public}")
+                body.prelude.append(f"let {local} = {local}.inner.native();")
             body.args.append(local)
         elif value_plan and value_plan.kind in {"scalar", "native_pointer"}:
             body.signature.append(f"{local}: {value_types.public(value_plan)}")

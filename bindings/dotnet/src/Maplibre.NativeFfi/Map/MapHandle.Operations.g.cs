@@ -368,47 +368,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Attaches a render session that draws the map into a texture on
-    /// <c>device</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para><c>options</c> must select <c>RenderDriverKind.CoreWorker</c>.
-    /// Read the frames back with
-    /// <c>RenderSessionHandle.ReadTextureAsync()</c>.</para>
-    /// <para>See <c>mln_map_attach_graphics_device_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when the map already has a
-    /// render session.</description></item>
-    /// </list>
-    /// </remarks>
-    public RenderSessionHandle AttachGraphicsDeviceTexture(
-        GraphicsDeviceHandle device,
-        GraphicsDeviceTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeGraphicsDeviceTextureDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_graphics_device_texture(
-            Handle,
-            scope.Use(device),
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     /// </summary>
@@ -523,6 +482,54 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             &nativeDescriptor,
             &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
+    /// Attaches a render session that renders the map offscreen.
+    /// </summary>
+    /// <remarks>
+    /// <para>Read each image's pixels with
+    /// <c>RenderSessionHandle.ReadTextureAsync()</c>. <c>options</c> must
+    /// select <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>The session renders on <c>device</c>. When <c>device</c> is null,
+    /// the session creates a device with the default options, and releases it
+    /// when the session ends.</para>
+    /// <para>See <c>mln_map_attach_offscreen</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> when the map already has a
+    /// render session.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when <c>device</c> is null
+    /// and this build's render backend can't create a
+    /// device.</description></item>
+    /// <item><description><c>Status.NativeError</c> when <c>device</c> is null
+    /// and the platform can't create a device.</description></item>
+    /// </list>
+    /// </remarks>
+    public RenderSessionHandle AttachOffscreen(
+        OffscreenDescriptor descriptor,
+        RenderSessionAttachOptions options,
+        OffscreenDeviceHandle? device = null
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeOffscreenDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_offscreen(
+            Handle,
+            &nativeDescriptor,
+            &nativeOptions,
+            scope.UseOptional(device),
             &outSession,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic

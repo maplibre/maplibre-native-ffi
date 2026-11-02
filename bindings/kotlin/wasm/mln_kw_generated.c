@@ -139,19 +139,6 @@ void mln_kw_mln_geo_json_source_data_release(int64_t data) {
   mln_geo_json_source_data_release((mln_geo_json_source_data)data);
 }
 
-int32_t mln_kw_mln_graphics_device_create(
-  uintptr_t options, uintptr_t out_device, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_graphics_device_create(
-    (const mln_graphics_device_options*)options,
-    (mln_graphics_device*)out_device, (mln_diagnostic*)out_diagnostic
-  );
-}
-
-void mln_kw_mln_graphics_device_release(int64_t device) {
-  mln_graphics_device_release((mln_graphics_device)device);
-}
-
 int32_t mln_kw_mln_http_header_transform_response_set_header(
   uintptr_t response, uintptr_t name, uintptr_t value, uintptr_t out_diagnostic
 ) {
@@ -303,19 +290,6 @@ int32_t mln_kw_mln_map_apply_camera_delta(
   );
 }
 
-int32_t mln_kw_mln_map_attach_graphics_device_texture(
-  int64_t map, int64_t device, uintptr_t descriptor, uintptr_t options,
-  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_attach_graphics_device_texture(
-    (mln_map)map, (mln_graphics_device)device,
-    (const mln_graphics_device_texture_descriptor*)descriptor,
-    (const mln_render_session_attach_options*)options,
-    (mln_render_session*)out_session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_attach_metal_borrowed_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
@@ -349,6 +323,18 @@ int32_t mln_kw_mln_map_attach_metal_surface(
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_attach_offscreen(
+  int64_t map, uintptr_t descriptor, uintptr_t options, int64_t device,
+  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_attach_offscreen(
+    (mln_map)map, (const mln_offscreen_descriptor*)descriptor,
+    (const mln_render_session_attach_options*)options,
+    (mln_offscreen_device)device, (mln_render_session*)out_session,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1254,6 +1240,19 @@ int32_t mln_kw_mln_network_set_status(
   return (int32_t)mln_network_set_status(
     (mln_network_status)status, (mln_diagnostic*)out_diagnostic
   );
+}
+
+int32_t mln_kw_mln_offscreen_device_create(
+  uintptr_t options, uintptr_t out_device, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_offscreen_device_create(
+    (const mln_offscreen_device_options*)options,
+    (mln_offscreen_device*)out_device, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+void mln_kw_mln_offscreen_device_release(int64_t device) {
+  mln_offscreen_device_release((mln_offscreen_device)device);
 }
 
 int32_t mln_kw_mln_open_gl_supported_context_provider_mask(void) {

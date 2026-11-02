@@ -838,9 +838,14 @@ def converted(op: Operation) -> Call:
             parameters.append(f"NativePointer {name}")
             args.append(f"(void*){name}.Address")
         elif value_plan and value_plan.kind == "handle" and value_plan.native in owners:
-            parameters.append(f"{owners[value_plan.native]} {name}")
             scoped = True
-            args.append(f"scope.Use({name})")
+            if value_plan.nullable:
+                parameters.append(f"{owners[value_plan.native]}? {name}")
+                omittable.add(name)
+                args.append(f"scope.UseOptional({name})")
+            else:
+                parameters.append(f"{owners[value_plan.native]} {name}")
+                args.append(f"scope.Use({name})")
         elif value_plan and value_plan.kind == "enum":
             values.supported(value_plan)
             parameters.append(f"{public_type(value_plan.native)} {name}")

@@ -33,7 +33,7 @@ enum class HandleKind : std::uint8_t {
   GeoJsonSourceData = 22,
   DeliveryQueue = 23,
   StyleExpression = 25,
-  GraphicsDevice = 26,
+  OffscreenDevice = 26,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

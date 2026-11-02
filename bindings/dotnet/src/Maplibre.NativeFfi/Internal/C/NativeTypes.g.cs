@@ -9,11 +9,11 @@ internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnGeoJsonSourceData(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnGraphicsDevice(ulong Value) : IMlnHandle;
-
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMapProjection(ulong Value) : IMlnHandle;
+
+internal readonly record struct MlnOffscreenDevice(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnRenderFrameBatch(ulong Value) : IMlnHandle;
 
@@ -283,20 +283,6 @@ internal unsafe struct mln_gpu_sync
     public ulong value;
 }
 
-internal unsafe struct mln_graphics_device_options
-{
-    public uint size;
-    public mln_graphics_device_option_field fields;
-    public uint adapter_index;
-    public byte single_context;
-}
-
-internal unsafe struct mln_graphics_device_texture_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-}
-
 internal unsafe struct mln_http_header
 {
     public mln_buffer_view name;
@@ -549,6 +535,20 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
     public double max_zoom;
     public float pixel_ratio;
     public byte include_ideographs;
+}
+
+internal unsafe struct mln_offscreen_descriptor
+{
+    public uint size;
+    public mln_logical_extent extent;
+}
+
+internal unsafe struct mln_offscreen_device_options
+{
+    public uint size;
+    public mln_offscreen_device_option_field fields;
+    public uint adapter_index;
+    public byte single_context;
 }
 
 internal unsafe struct mln_open_gl_borrowed_texture
@@ -1460,12 +1460,6 @@ internal enum mln_gpu_sync_kind_flag : uint
     MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE = 64,
 }
 
-internal enum mln_graphics_device_option_field : uint
-{
-    MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1,
-    MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT = 2,
-}
-
 internal enum mln_log_event : uint
 {
     MLN_LOG_EVENT_GENERAL = 0,
@@ -1569,6 +1563,12 @@ internal enum mln_offline_region_download_state : uint
 {
     MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0,
     MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
+}
+
+internal enum mln_offscreen_device_option_field : uint
+{
+    MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1,
+    MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 2,
 }
 
 internal enum mln_open_gl_client_api : uint

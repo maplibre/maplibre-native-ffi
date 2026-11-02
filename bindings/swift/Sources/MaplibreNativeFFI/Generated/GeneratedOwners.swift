@@ -106,56 +106,6 @@ public final class GeoJsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
-struct NativeGraphicsDeviceHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_graphics_device_release(raw); return true
-  }
-}
-
-/// A GPU device that the library creates to render maps into textures.
-///
-/// See `mln_graphics_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class GraphicsDeviceHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
-  let handle: NativeHandleState<NativeGraphicsDeviceHandle>
-  init(adopting raw: mln_graphics_device) throws {
-    handle = try NativeHandleState(
-      typeName: "GraphicsDeviceHandle",
-      handle: NativeGraphicsDeviceHandle(raw: raw)
-    )
-  }
-
-  /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: GraphicsDeviceHandle,
-                         rhs: GraphicsDeviceHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
-}
-
 struct NativeMapHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
     mln_map_dispose(
@@ -250,6 +200,56 @@ public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver,
 
   public static func == (lhs: MapProjectionHandle,
                          rhs: MapProjectionHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+}
+
+struct NativeOffscreenDeviceHandle: NativeHandle {
+  let raw: UInt64; func disposeAbandoned()
+    -> Bool
+  {
+    mln_offscreen_device_release(raw); return true
+  }
+}
+
+/// A GPU device that the library creates to render maps offscreen.
+///
+/// See `mln_offscreen_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public final class OffscreenDeviceHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
+  let handle: NativeHandleState<NativeOffscreenDeviceHandle>
+  init(adopting raw: mln_offscreen_device) throws {
+    handle = try NativeHandleState(
+      typeName: "OffscreenDeviceHandle",
+      handle: NativeOffscreenDeviceHandle(raw: raw)
+    )
+  }
+
+  /// The native handle, which no later handle in the process reuses.
+  /// It stays valid after the handle closes.
+  public var id: UInt64 {
+    handle.value.raw
+  }
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  public var isClosed: Bool {
+    handle.isClosed
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: OffscreenDeviceHandle,
+                         rhs: OffscreenDeviceHandle) -> Bool
   {
     lhs.id == rhs.id
   }

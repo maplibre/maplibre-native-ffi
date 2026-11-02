@@ -43,31 +43,18 @@ Future<MapHandle> openRenderMap(Object? style) async {
   return map;
 }
 
-/// Creates a graphics device, which a teardown releases.
-GraphicsDeviceHandle openGraphicsDevice() {
-  final device = GraphicsDeviceHandle.create();
+/// Creates an offscreen device, which a teardown releases.
+OffscreenDeviceHandle openOffscreenDevice() {
+  final device = OffscreenDeviceHandle.create();
   addTearDown(device.close);
   return device;
 }
 
-/// Attaches a texture of the render extent on a new graphics device. The
-/// session keeps its own reference to the device, so the device handle closes
-/// before this returns.
-NewRenderSession attachDeviceTexture(
+/// Attaches an offscreen session of the render extent, on a device of its own.
+NewRenderSession attachOffscreenSession(
   MapHandle map,
   RenderSessionAttachOptions options,
-) {
-  final device = GraphicsDeviceHandle.create();
-  try {
-    return map.attachGraphicsDeviceTexture(
-      device,
-      GraphicsDeviceTextureDescriptor(extent: _extent),
-      options,
-    );
-  } finally {
-    device.close();
-  }
-}
+) => map.attachOffscreen(OffscreenDescriptor(extent: _extent), options);
 
 /// A session driven by its core worker, which a teardown closes before the
 /// map and any graphics context it uses.
@@ -78,9 +65,9 @@ final class WorkerSession {
   final _frames = Signal();
   var _nextToken = 1;
 
-  /// Attaches a graphics device texture on [map], which grants readback.
+  /// Attaches an offscreen session on [map], which grants readback.
   static Future<WorkerSession> attach(MapHandle map) =>
-      _attach((options) => attachDeviceTexture(map, options));
+      _attach((options) => attachOffscreenSession(map, options));
 
   /// Attaches an owned texture on [map] in a context from `tests/graphics`,
   /// which exposes its frames on Metal and Vulkan.

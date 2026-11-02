@@ -44,14 +44,12 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
     // #endregion style
 
     // #region attach
-    // null options select the default adapter.
-    var device = try maplibre.GraphicsDevice.create(null, null);
-
-    var attached = try map.attachGraphicsDeviceTexture(
-        device,
+    var attached = try map.attachOffscreen(
         .{ .extent = map_options.initial_extent },
         // The library renders on its own thread.
         .{ .driver = .core_worker },
+        // With no device, the session creates its own.
+        null,
         null,
     );
     defer attached.ready.deinit();
@@ -82,7 +80,6 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
     // #endregion read
 
     try session.dispose(null);
-    device.release();
 
     var map_released = try map.release(null);
     defer map_released.deinit();

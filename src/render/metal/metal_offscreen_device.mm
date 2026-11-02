@@ -12,16 +12,16 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
-#include "render/graphics_device.hpp"
 #include "render/metal/metal_texture_session.hpp"
+#include "render/offscreen_device.hpp"
 #include "render/render_session_common.hpp"
 
 namespace mln::core {
 namespace {
 
-class MetalGraphicsDevice final : public GraphicsDevice {
+class MetalOffscreenDevice final : public OffscreenDevice {
  public:
-  explicit MetalGraphicsDevice(NS::SharedPtr<MTL::Device> device)
+  explicit MetalOffscreenDevice(NS::SharedPtr<MTL::Device> device)
       : device_(std::move(device)) {}
 
   auto create_texture_backend(
@@ -63,12 +63,12 @@ auto named_device(uint32_t index, NS::SharedPtr<MTL::Device>& out_device)
 
 }  // namespace
 
-auto create_backend_graphics_device(
-  const mln_graphics_device_options& options,
-  std::shared_ptr<GraphicsDevice>& out_device
+auto create_backend_offscreen_device(
+  const mln_offscreen_device_options& options,
+  std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status {
   auto device = NS::SharedPtr<MTL::Device>{};
-  if ((options.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX) != 0U) {
+  if ((options.fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) != 0U) {
     const auto status = named_device(options.adapter_index, device);
     if (status != MLN_STATUS_OK) {
       return status;
@@ -81,10 +81,10 @@ auto create_backend_graphics_device(
     return MLN_STATUS_NATIVE_ERROR;
   }
   mln::Log::Info(
-    mln::Event::Render, std::string{"graphics device uses Metal device "} +
+    mln::Event::Render, std::string{"offscreen device uses Metal device "} +
                           device->name()->utf8String()
   );
-  out_device = std::make_shared<MetalGraphicsDevice>(std::move(device));
+  out_device = std::make_shared<MetalOffscreenDevice>(std::move(device));
   return MLN_STATUS_OK;
 }
 

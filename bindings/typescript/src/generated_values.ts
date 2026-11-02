@@ -665,34 +665,6 @@ export const GpuSyncKindFlag = {
 export type GpuSyncKindFlag = number;
 
 /**
- * Options for `GraphicsDeviceHandle.create()`.
- *
- * See `mln_graphics_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
- */
-export interface GraphicsDeviceOptions {
-  /**
-   * The GPU to use, as an index into the platform's list of GPUs.
-   */
-  adapterIndex?: number;
-  /**
-   * Whether the device's texture sessions take turns in one OpenGL context
-   * instead of having one each. Only an EGL device reads it.
-   */
-  singleContext?: boolean;
-}
-
-/**
- * The texture that `MapHandle.attachGraphicsDeviceTexture()` draws into.
- *
- * See `mln_graphics_device_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
- */
-export interface GraphicsDeviceTextureDescriptor {
-  extent: LogicalExtent;
-}
-
-/**
  * An HTTP header.
  *
  * See `mln_http_header` in the
@@ -1324,6 +1296,34 @@ export interface OfflineTilePyramidRegionDefinition {
    * Whether the region holds the glyphs of CJK ideographs.
    */
   includeIdeographs?: boolean;
+}
+
+/**
+ * The image that `MapHandle.attachOffscreen()` renders.
+ *
+ * See `mln_offscreen_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ */
+export interface OffscreenDescriptor {
+  extent: LogicalExtent;
+}
+
+/**
+ * Options for `OffscreenDeviceHandle.create()`.
+ *
+ * See `mln_offscreen_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ */
+export interface OffscreenDeviceOptions {
+  /**
+   * The GPU to use, as an index into the platform's list of GPUs.
+   */
+  adapterIndex?: number;
+  /**
+   * Whether the device's sessions take turns in one OpenGL context instead of
+   * having one each. Only an EGL device reads it.
+   */
+  singleContext?: boolean;
 }
 
 /**

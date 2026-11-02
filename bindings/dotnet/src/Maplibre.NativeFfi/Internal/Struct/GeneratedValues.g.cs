@@ -608,37 +608,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_graphics_device_options NativeGraphicsDeviceOptions(
-        GraphicsDeviceOptions value
-    )
-    {
-        var native = new mln_graphics_device_options();
-        native.fields = 0;
-        native.size = (uint)sizeof(mln_graphics_device_options);
-        native.fields |= Put(
-            value.AdapterIndex,
-            ref native.adapter_index,
-            MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX
-        );
-        native.fields |= Put(
-            value.SingleContext,
-            ref native.single_context,
-            MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT,
-            static present => (byte)(present ? 1 : 0)
-        );
-        return native;
-    }
-
-    internal static mln_graphics_device_texture_descriptor NativeGraphicsDeviceTextureDescriptor(
-        GraphicsDeviceTextureDescriptor value
-    )
-    {
-        var native = new mln_graphics_device_texture_descriptor();
-        native.size = (uint)sizeof(mln_graphics_device_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
-        return native;
-    }
-
     internal static mln_http_header NativeHttpHeader(HttpHeader value, NativeCallScope scope)
     {
         Required(value.Name, "HttpHeader.Name must not be null.");
@@ -1192,6 +1161,35 @@ internal static unsafe class GeneratedValues
         native.max_zoom = value.MaxZoom;
         native.pixel_ratio = value.PixelRatio;
         native.include_ideographs = (byte)(value.IncludeIdeographs ? 1 : 0);
+        return native;
+    }
+
+    internal static mln_offscreen_descriptor NativeOffscreenDescriptor(OffscreenDescriptor value)
+    {
+        var native = new mln_offscreen_descriptor();
+        native.size = (uint)sizeof(mln_offscreen_descriptor);
+        native.extent = NativeLogicalExtent(value.Extent);
+        return native;
+    }
+
+    internal static mln_offscreen_device_options NativeOffscreenDeviceOptions(
+        OffscreenDeviceOptions value
+    )
+    {
+        var native = new mln_offscreen_device_options();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_offscreen_device_options);
+        native.fields |= Put(
+            value.AdapterIndex,
+            ref native.adapter_index,
+            MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX
+        );
+        native.fields |= Put(
+            value.SingleContext,
+            ref native.single_context,
+            MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT,
+            static present => (byte)(present ? 1 : 0)
+        );
         return native;
     }
 

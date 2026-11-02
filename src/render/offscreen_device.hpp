@@ -15,14 +15,14 @@ class TextureSessionBackend;
 // immutable after creation, so any thread may read them. The last owner
 // destroys them: the handle table, or the backend of the last texture session
 // that renders on them.
-class GraphicsDevice {
+class OffscreenDevice {
  public:
-  GraphicsDevice() = default;
-  GraphicsDevice(const GraphicsDevice&) = delete;
-  auto operator=(const GraphicsDevice&) -> GraphicsDevice& = delete;
-  GraphicsDevice(GraphicsDevice&&) = delete;
-  auto operator=(GraphicsDevice&&) -> GraphicsDevice& = delete;
-  virtual ~GraphicsDevice() = default;
+  OffscreenDevice() = default;
+  OffscreenDevice(const OffscreenDevice&) = delete;
+  auto operator=(const OffscreenDevice&) -> OffscreenDevice& = delete;
+  OffscreenDevice(OffscreenDevice&&) = delete;
+  auto operator=(OffscreenDevice&&) -> OffscreenDevice& = delete;
+  virtual ~OffscreenDevice() = default;
 
   // Makes the backend of a readback-only session with a one-slot ring on
   // this device. Runs on the session's core worker.
@@ -31,31 +31,30 @@ class GraphicsDevice {
   ) -> mln_status = 0;
 };
 
-struct GraphicsDeviceObject {
-  std::shared_ptr<GraphicsDevice> device;
+struct OffscreenDeviceObject {
+  std::shared_ptr<OffscreenDevice> device;
 };
 
 template <>
-struct HandleTraits<GraphicsDeviceObject> {
-  static constexpr auto kind = HandleKind::GraphicsDevice;
+struct HandleTraits<OffscreenDeviceObject> {
+  static constexpr auto kind = HandleKind::OffscreenDevice;
   static constexpr auto leasable = true;
 };
 
 // Each backend defines this, and gets validated options. A backend that
 // creates no device reports MLN_STATUS_UNSUPPORTED.
-auto create_backend_graphics_device(
-  const mln_graphics_device_options& options,
-  std::shared_ptr<GraphicsDevice>& out_device
+auto create_backend_offscreen_device(
+  const mln_offscreen_device_options& options,
+  std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status;
 
-auto graphics_device_create(
-  const mln_graphics_device_options* options, mln_graphics_device* out_device
+auto offscreen_device_create(
+  const mln_offscreen_device_options* options, mln_offscreen_device* out_device
 ) -> mln_status;
-auto graphics_device_release(mln_graphics_device device) -> void;
-auto graphics_device_texture_attach_start(
-  mln_map map, mln_graphics_device device,
-  const mln_graphics_device_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
+auto offscreen_device_release(mln_offscreen_device device) -> void;
+auto offscreen_attach_start(
+  mln_map map, const mln_offscreen_descriptor* descriptor,
+  const mln_render_session_attach_options* options, mln_offscreen_device device,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 

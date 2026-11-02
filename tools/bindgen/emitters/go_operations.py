@@ -77,7 +77,8 @@ def argument(values, value, expr):
     if value.kind == "record":
         return f"native{public(value.native)}({expr}, arena)"
     if value.kind == "handle":
-        return f"C.{value.native}(arena.lease({expr}.owner()))"
+        lease = "leaseOptional" if value.nullable else "lease"
+        return f"C.{value.native}(arena.{lease}({expr}.owner()))"
     if value.kind == "reference":
         if value.nullable:
             return f"bindingStoreOptional({expr}, arena, {converter(values, value.element)})"

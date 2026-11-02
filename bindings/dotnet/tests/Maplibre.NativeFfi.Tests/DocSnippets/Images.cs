@@ -37,11 +37,8 @@ internal static class Images
         // #endregion style
 
         // #region attach
-        var device = GraphicsDeviceHandle.Create();
-
-        var session = map.AttachGraphicsDeviceTexture(
-            device,
-            new GraphicsDeviceTextureDescriptor(extent),
+        var session = map.AttachOffscreen(
+            new OffscreenDescriptor(extent),
             // The library renders on its own thread.
             new RenderSessionAttachOptions
             {
@@ -73,7 +70,6 @@ internal static class Images
         // #endregion read
 
         session.Dispose();
-        device.Dispose();
         await map.CloseAsync();
     }
 

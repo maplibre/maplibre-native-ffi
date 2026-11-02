@@ -13,16 +13,16 @@ internal object GeneratedOwnerDisposal {
     C.mln_geo_json_source_data_release(handle)
   }
 
-  fun graphicsDevice(handle: Long) {
-    C.mln_graphics_device_release(handle)
-  }
-
   fun map(handle: Long) {
     NativeDiagnostics.check { diagnostic -> C.mln_map_dispose(handle, diagnostic) }
   }
 
   fun mapProjection(handle: Long) {
     C.mln_map_projection_release(handle)
+  }
+
+  fun offscreenDevice(handle: Long) {
+    C.mln_offscreen_device_release(handle)
   }
 
   fun renderSession(handle: Long) {

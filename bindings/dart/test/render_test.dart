@@ -1,5 +1,5 @@
-// Render sessions on a core worker: rendering and readback on a graphics
-// device, teardown before the device goes, and the scope of a borrowed frame
+// Render sessions on a core worker: rendering and readback offscreen,
+// teardown before the device goes, and the scope of a borrowed frame
 // view of an owned texture.
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
@@ -20,7 +20,7 @@ const _redStyle = {
   ],
 };
 
-final _descriptor = GraphicsDeviceTextureDescriptor(
+final _descriptor = OffscreenDescriptor(
   extent: LogicalExtent(width: renderSize, height: renderSize, scaleFactor: 1),
 );
 
@@ -39,24 +39,29 @@ final Object _openGlFrameSkip = buildExposesCoreWorkerFrames
     : 'An OpenGL core-worker session exposes no frames to view';
 
 void main() {
-  test('a device texture renders a frame that reads back as pixels', () async {
-    final map = await openRenderMap(_redStyle);
-    final worker = await WorkerSession.attach(map);
+  test(
+    'an offscreen session renders a frame that reads back as pixels',
+    () async {
+      final map = await openRenderMap(_redStyle);
+      final worker = await WorkerSession.attach(map);
 
-    final result = await worker.renderFrame();
-    expect(result.frameGeneration, greaterThan(0));
-    _expectRed(await within(worker.session.readTexture(), 'texture readback'));
-  });
+      final result = await worker.renderFrame();
+      expect(result.frameGeneration, greaterThan(0));
+      _expectRed(
+        await within(worker.session.readTexture(), 'texture readback'),
+      );
+    },
+  );
 
   test(
     'a disposed attached session lets its map release before its device goes',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final device = openGraphicsDevice();
-      final attachment = map.attachGraphicsDeviceTexture(
-        device,
+      final device = openOffscreenDevice();
+      final attachment = map.attachOffscreen(
         _descriptor,
         const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
+        device: device,
       );
       addTearDown(() => releaseSession(attachment.session));
       await within(attachment.ready, 'attachment');

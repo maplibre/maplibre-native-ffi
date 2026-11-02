@@ -1594,44 +1594,6 @@ class GpuSync:
 
 
 @dataclass(frozen=True, slots=True)
-class GraphicsDeviceOptions:
-    """Options for `GraphicsDeviceHandle.create()`.
-
-    See `mln_graphics_device_options` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-    """
-
-    adapter_index: int | None = None
-    """The GPU to use, as an index into the platform's list of GPUs."""
-
-    single_context: bool | None = None
-    """Whether the device's texture sessions take turns in one OpenGL context
-    instead of having one each. Only an EGL device reads it.
-    """
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            adapter_index=raw["adapter_index"], single_context=raw["single_context"]
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class GraphicsDeviceTextureDescriptor:
-    """The texture that `MapHandle.attach_graphics_device_texture()` draws into.
-
-    See `mln_graphics_device_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-    """
-
-    extent: LogicalExtent
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(extent=LogicalExtent._from_native(raw["extent"]))
-
-
-@dataclass(frozen=True, slots=True)
 class HttpHeader:
     """An HTTP header.
 
@@ -2352,6 +2314,44 @@ class OfflineTilePyramidRegionDefinition:
             max_zoom=raw["max_zoom"],
             pixel_ratio=raw["pixel_ratio"],
             include_ideographs=raw["include_ideographs"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OffscreenDescriptor:
+    """The image that `MapHandle.attach_offscreen()` renders.
+
+    See `mln_offscreen_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    """
+
+    extent: LogicalExtent
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(extent=LogicalExtent._from_native(raw["extent"]))
+
+
+@dataclass(frozen=True, slots=True)
+class OffscreenDeviceOptions:
+    """Options for `OffscreenDeviceHandle.create()`.
+
+    See `mln_offscreen_device_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    """
+
+    adapter_index: int | None = None
+    """The GPU to use, as an index into the platform's list of GPUs."""
+
+    single_context: bool | None = None
+    """Whether the device's sessions take turns in one OpenGL context instead of
+    having one each. Only an EGL device reads it.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            adapter_index=raw["adapter_index"], single_context=raw["single_context"]
         )
 
 

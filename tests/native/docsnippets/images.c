@@ -79,12 +79,8 @@ void mln_doc_images(mln_runtime runtime) {
   // #endregion style
 
   // #region attach
-  // NULL options select the default adapter.
-  mln_graphics_device device = MLN_HANDLE_NULL;
-  mln_graphics_device_create(NULL, &device, NULL);
-
-  mln_graphics_device_texture_descriptor texture = {
-    .size = sizeof(mln_graphics_device_texture_descriptor),
+  mln_offscreen_descriptor offscreen = {
+    .size = sizeof(mln_offscreen_descriptor),
     .extent = map_options.initial_extent,
   };
   mln_render_session_attach_options attach_options = {
@@ -93,9 +89,11 @@ void mln_doc_images(mln_runtime runtime) {
     .driver = MLN_RENDER_DRIVER_CORE_WORKER,
   };
 
+  // With no device, the session creates its own.
   mln_render_session session = MLN_HANDLE_NULL;
-  mln_map_attach_graphics_device_texture(
-    map, device, &texture, &attach_options, &session, &done, NULL
+  mln_map_attach_offscreen(
+    map, &offscreen, &attach_options, MLN_HANDLE_NULL, &session,
+    &done, NULL
   );
   // #endregion attach
   wait_for_done();
@@ -127,7 +125,6 @@ void mln_doc_images(mln_runtime runtime) {
   wait_for_done();
 
   mln_render_session_dispose(session, NULL, NULL);
-  mln_graphics_device_release(device);
   mln_map_release(map, &done, NULL);
   wait_for_done();
 }

@@ -27,7 +27,7 @@ import org.maplibre.nativeffi.native
 import org.maplibre.nativeffi.render.RED_BACKGROUND_STYLE
 import org.maplibre.nativeffi.render.TestBackend
 import org.maplibre.nativeffi.render.TestGraphics
-import org.maplibre.nativeffi.render.attachDeviceTexture
+import org.maplibre.nativeffi.render.attachOffscreenSession
 import org.maplibre.nativeffi.render.withRenderSession
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
@@ -53,7 +53,7 @@ class NativeRegistrationTest {
             // The fixture renders when its frame wake runs, which now only the native wake does.
             fixtureWake = options.frameWake.callback!!
             val frameWake = Wake.native(host.call, host.userData, host.release)
-            attachDeviceTexture(map, WIDTH, HEIGHT, options.copy(frameWake = frameWake))
+            attachOffscreenSession(map, WIDTH, HEIGHT, options.copy(frameWake = frameWake))
           },
         ) {
           setStyle(RED_BACKGROUND_STYLE)
@@ -77,12 +77,12 @@ class NativeRegistrationTest {
           )
         // Native rejects a zero width.
         assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-          attachDeviceTexture(map, 0, HEIGHT, options)
+          attachOffscreenSession(map, 0, HEIGHT, options)
         }
         assertEquals(1, host.releases.load())
         // Native would accept this attach, so only the binding refuses it.
         assertFailsWith<IllegalStateException> {
-          attachDeviceTexture(map, WIDTH, HEIGHT, options)
+          attachOffscreenSession(map, WIDTH, HEIGHT, options)
         }
       }
       assertEquals(0, host.calls.load())

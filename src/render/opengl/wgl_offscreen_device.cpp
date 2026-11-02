@@ -6,7 +6,7 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
-#include "render/graphics_device.hpp"
+#include "render/offscreen_device.hpp"
 #include "render/opengl/opengl_texture_session.hpp"
 #include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
@@ -14,7 +14,7 @@
 namespace mln::core {
 namespace {
 
-constexpr auto window_class_name = "mln_graphics_device";
+constexpr auto window_class_name = "mln_offscreen_device";
 
 // The module that holds this code, so the window class belongs to the library
 // whether it is linked as a DLL or into the host's executable.
@@ -65,7 +65,7 @@ class HiddenWindow {
     }();
     if (!registered) {
       set_thread_error(
-        "RegisterClassExA failed for the graphics device window"
+        "RegisterClassExA failed for the offscreen device window"
       );
       return MLN_STATUS_NATIVE_ERROR;
     }
@@ -96,7 +96,7 @@ class HiddenWindow {
       format == 0 ||
       SetPixelFormat(device_context_, format, &pixel_format) == FALSE
     ) {
-      set_windows_error("setting the graphics device window's pixel format");
+      set_windows_error("setting the offscreen device window's pixel format");
       return MLN_STATUS_NATIVE_ERROR;
     }
     return MLN_STATUS_OK;
@@ -109,7 +109,7 @@ class HiddenWindow {
   HDC device_context_ = nullptr;
 };
 
-class WglGraphicsDevice final : public GraphicsDevice {
+class WglOffscreenDevice final : public OffscreenDevice {
  public:
   auto create_texture_backend(
     mln::Size size, std::unique_ptr<TextureSessionBackend>& out_backend
@@ -135,12 +135,12 @@ class WglGraphicsDevice final : public GraphicsDevice {
 
 }  // namespace
 
-auto create_backend_graphics_device(
-  const mln_graphics_device_options& options,
-  std::shared_ptr<GraphicsDevice>& out_device
+auto create_backend_offscreen_device(
+  const mln_offscreen_device_options& options,
+  std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status {
   if (
-    (options.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX) != 0U &&
+    (options.fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) != 0U &&
     options.adapter_index != 0
   ) {
     const auto message = "adapter_index " +
@@ -156,8 +156,8 @@ auto create_backend_graphics_device(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  mln::Log::Info(mln::Event::Render, "graphics device uses WGL");
-  out_device = std::make_shared<WglGraphicsDevice>();
+  mln::Log::Info(mln::Event::Render, "offscreen device uses WGL");
+  out_device = std::make_shared<WglOffscreenDevice>();
   return MLN_STATUS_OK;
 }
 

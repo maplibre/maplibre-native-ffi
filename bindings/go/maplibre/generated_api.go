@@ -2449,43 +2449,6 @@ func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 	return raw
 }
 
-// GraphicsDeviceOptions corresponds to mln_graphics_device_options. Options for
-// NewGraphicsDevice().
-//
-// See mln_graphics_device_options in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
-type GraphicsDeviceOptions struct {
-	// The GPU to use, as an index into the platform's list of GPUs.
-	AdapterIndex *uint32
-	// Whether the device's texture sessions take turns in one OpenGL context
-	// instead of having one each. Only an EGL device reads it.
-	SingleContext *bool
-}
-
-func nativeGraphicsDeviceOptions(input GraphicsDeviceOptions, arena *bindingArena) C.mln_graphics_device_options {
-	raw := C.mln_graphics_device_options{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, input.SingleContext, arena, bindingBool[bool, C.bool])
-	return raw
-}
-
-// GraphicsDeviceTextureDescriptor corresponds to
-// mln_graphics_device_texture_descriptor. The texture that
-// MapHandle.AttachGraphicsDeviceTexture() draws into.
-//
-// See mln_graphics_device_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
-type GraphicsDeviceTextureDescriptor struct{ Extent LogicalExtent }
-
-func nativeGraphicsDeviceTextureDescriptor(input GraphicsDeviceTextureDescriptor, arena *bindingArena) C.mln_graphics_device_texture_descriptor {
-	raw := C.mln_graphics_device_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	return raw
-}
-
 // HttpHeader corresponds to mln_http_header. An HTTP header.
 //
 // name follows the rules of HttpHeaderTransformResponseScope.SetHeader().
@@ -3251,6 +3214,42 @@ func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefi
 	raw.max_zoom = C.double(input.MaxZoom)
 	raw.pixel_ratio = C.float(input.PixelRatio)
 	raw.include_ideographs = C.bool(input.IncludeIdeographs)
+	return raw
+}
+
+// OffscreenDescriptor corresponds to mln_offscreen_descriptor. The image that
+// MapHandle.AttachOffscreen() renders.
+//
+// See mln_offscreen_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
+type OffscreenDescriptor struct{ Extent LogicalExtent }
+
+func nativeOffscreenDescriptor(input OffscreenDescriptor, arena *bindingArena) C.mln_offscreen_descriptor {
+	raw := C.mln_offscreen_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
+	return raw
+}
+
+// OffscreenDeviceOptions corresponds to mln_offscreen_device_options. Options
+// for NewOffscreenDevice().
+//
+// See mln_offscreen_device_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
+type OffscreenDeviceOptions struct {
+	// The GPU to use, as an index into the platform's list of GPUs.
+	AdapterIndex *uint32
+	// Whether the device's sessions take turns in one OpenGL context instead of
+	// having one each. Only an EGL device reads it.
+	SingleContext *bool
+}
+
+func nativeOffscreenDeviceOptions(input OffscreenDeviceOptions, arena *bindingArena) C.mln_offscreen_device_options {
+	raw := C.mln_offscreen_device_options{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, input.SingleContext, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
@@ -5360,38 +5359,6 @@ func (handle *GeoJsonSourceDataHandle) String() string {
 	return bindingDescribe("GeoJsonSourceDataHandle", handle.owner())
 }
 
-// GraphicsDeviceHandle corresponds to mln_graphics_device. A GPU device that
-// the library creates to render maps into textures.
-//
-// See mln_graphics_device in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type GraphicsDeviceHandle struct{ *bindingOwner }
-
-func adoptGraphicsDeviceHandle(raw uint64, parent any) *GraphicsDeviceHandle {
-	owner := &GraphicsDeviceHandle{bindingAdopt(raw, parent, "GraphicsDeviceHandle", func(raw uint64) { C.mln_graphics_device_release(C.mln_graphics_device(raw)) })}
-	return owner
-}
-
-func (handle *GraphicsDeviceHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-// Id returns the native handle value. It stays readable after the handle
-// closes.
-func (handle *GraphicsDeviceHandle) Id() uint64 { return handle.owner().id() }
-
-// IsClosed reports whether the binding has accepted a release, dispose, or
-// discard of the handle. A nil handle is closed.
-func (handle *GraphicsDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
-
-// String formats the handle as GraphicsDeviceHandle(id=0x<hex>, closed=<true|false>).
-func (handle *GraphicsDeviceHandle) String() string {
-	return bindingDescribe("GraphicsDeviceHandle", handle.owner())
-}
-
 // MapHandle corresponds to mln_map. A map, with its style and camera.
 //
 // See mln_map in the C API reference:
@@ -5452,6 +5419,38 @@ func (handle *MapProjectionHandle) IsClosed() bool { return handle.owner().isClo
 // String formats the handle as MapProjectionHandle(id=0x<hex>, closed=<true|false>).
 func (handle *MapProjectionHandle) String() string {
 	return bindingDescribe("MapProjectionHandle", handle.owner())
+}
+
+// OffscreenDeviceHandle corresponds to mln_offscreen_device. A GPU device that
+// the library creates to render maps offscreen.
+//
+// See mln_offscreen_device in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type OffscreenDeviceHandle struct{ *bindingOwner }
+
+func adoptOffscreenDeviceHandle(raw uint64, parent any) *OffscreenDeviceHandle {
+	owner := &OffscreenDeviceHandle{bindingAdopt(raw, parent, "OffscreenDeviceHandle", func(raw uint64) { C.mln_offscreen_device_release(C.mln_offscreen_device(raw)) })}
+	return owner
+}
+
+func (handle *OffscreenDeviceHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// Id returns the native handle value. It stays readable after the handle
+// closes.
+func (handle *OffscreenDeviceHandle) Id() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *OffscreenDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as OffscreenDeviceHandle(id=0x<hex>, closed=<true|false>).
+func (handle *OffscreenDeviceHandle) String() string {
+	return bindingDescribe("OffscreenDeviceHandle", handle.owner())
 }
 
 // RenderSessionHandle corresponds to mln_render_session. A render session draws
@@ -5781,41 +5780,6 @@ func (receiver *GeoJsonSourceDataHandle) Close() error {
 	return err
 }
 
-// NewGraphicsDevice creates a GPU device for rendering maps into textures.
-//
-// Render sessions on several maps can share one device.
-//
-// See mln_graphics_device_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
-//
-// Errors:
-//   - StatusUnsupported when this build's render backend can't create a device.
-//   - StatusNativeError when adapter_index names no GPU, or the platform can't
-//     create the device.
-func NewGraphicsDevice(options *GraphicsDeviceOptions) (*GraphicsDeviceHandle, error) {
-	var outDevice C.mln_graphics_device
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_graphics_device_create(bindingStoreOptional(options, arena, nativeGraphicsDeviceOptions), &outDevice, diagnostic))
-	}, func(arena *bindingArena) *GraphicsDeviceHandle {
-		adopted := adoptGraphicsDeviceHandle(uint64(outDevice), nil)
-		return adopted
-	})
-}
-
-// Close releases a graphics device.
-//
-// Render sessions on the device keep working until they detach.
-//
-// See mln_graphics_device_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
-func (receiver *GraphicsDeviceHandle) Close() error {
-	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_graphics_device_release(C.mln_graphics_device(raw))
-		return struct{}{}
-	})
-	return err
-}
-
 // SetHeader sets a header on the request that an HTTP header transform callback
 // handles.
 //
@@ -6050,21 +6014,27 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	}, completionCommand)
 }
 
-// AttachGraphicsDeviceTexture attaches a render session that draws the map into
-// a texture on device.
+// AttachOffscreen attaches a render session that renders the map offscreen.
 //
-// options must select RenderDriverKindCoreWorker. Read the frames back with
-// RenderSessionHandle.ReadTexture().
+// Read each image's pixels with RenderSessionHandle.ReadTexture(). options must
+// select RenderDriverKindCoreWorker.
 //
-// See mln_map_attach_graphics_device_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html
+// The session renders on device. When device is null, the session creates a
+// device with the default options, and releases it when the session ends.
+//
+// See mln_map_attach_offscreen in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
 //
 // Errors:
 //   - StatusInvalidState when the map already has a render session.
-func (receiver *MapHandle) AttachGraphicsDeviceTexture(device *GraphicsDeviceHandle, descriptor GraphicsDeviceTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+//   - StatusUnsupported when device is null and this build's render backend
+//     can't create a device.
+//   - StatusNativeError when device is null and the platform can't create a
+//     device.
+func (receiver *MapHandle) AttachOffscreen(descriptor OffscreenDescriptor, options RenderSessionAttachOptions, device *OffscreenDeviceHandle) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_graphics_device_texture(C.mln_map(raw), C.mln_graphics_device(arena.lease(device.owner())), bindingStore(nativeGraphicsDeviceTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+		return int32(C.mln_map_attach_offscreen(C.mln_map(raw), bindingStore(nativeOffscreenDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), C.mln_offscreen_device(arena.leaseOptional(device.owner())), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -7373,6 +7343,42 @@ func SetNetworkStatus(status NetworkStatus) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_network_set_status(C.mln_network_status(status), diagnostic))
 	})
+}
+
+// NewOffscreenDevice creates a GPU device for rendering maps offscreen.
+//
+// MapHandle.AttachOffscreen() creates a device of its own when it gets none.
+// Create one to share it among the sessions on many maps, or to pick a GPU.
+//
+// See mln_offscreen_device_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
+//
+// Errors:
+//   - StatusUnsupported when this build's render backend can't create a device.
+//   - StatusNativeError when adapter_index names no GPU, or the platform can't
+//     create the device.
+func NewOffscreenDevice(options *OffscreenDeviceOptions) (*OffscreenDeviceHandle, error) {
+	var outDevice C.mln_offscreen_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_offscreen_device_create(bindingStoreOptional(options, arena, nativeOffscreenDeviceOptions), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *OffscreenDeviceHandle {
+		adopted := adoptOffscreenDeviceHandle(uint64(outDevice), nil)
+		return adopted
+	})
+}
+
+// Close releases an offscreen device.
+//
+// Render sessions on the device keep working until they detach.
+//
+// See mln_offscreen_device_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
+func (receiver *OffscreenDeviceHandle) Close() error {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_offscreen_device_release(C.mln_offscreen_device(raw))
+		return struct{}{}
+	})
+	return err
 }
 
 // OpenGlSupportedContextProviderMask reports the OpenGL context platforms that

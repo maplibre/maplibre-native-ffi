@@ -190,6 +190,9 @@ def prepare(plan: OperationPlan, value_types) -> Call:
             else:
                 declarations.append(f"{label}: {public}")
                 arguments.append(f"arena.store({converted.replace('$0', local)})")
+        elif value_plan and value_plan.kind == "handle" and value_plan.nullable:
+            declarations.append(f"{label}: {value_types.public(value_plan)}? = nil")
+            arguments.append(f"{local}.map {{ arena.use($0.handle) }} ?? 0")
         elif value_plan and value_plan.kind == "handle":
             declarations.append(f"{label}: {value_types.public(value_plan)}")
             arguments.append(f"arena.use({local}.handle)")

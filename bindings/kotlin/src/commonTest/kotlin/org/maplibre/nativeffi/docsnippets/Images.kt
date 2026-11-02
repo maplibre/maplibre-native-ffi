@@ -6,12 +6,11 @@ package org.maplibre.nativeffi.docsnippets
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
-import org.maplibre.nativeffi.GraphicsDeviceHandle
-import org.maplibre.nativeffi.GraphicsDeviceTextureDescriptor
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.MapOptions
+import org.maplibre.nativeffi.OffscreenDescriptor
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RuntimeHandle
@@ -40,12 +39,9 @@ private suspend fun images(runtime: RuntimeHandle) {
   // #endregion style
 
   // #region attach
-  val device = GraphicsDeviceHandle.create()
-
   val (session, sessionReady) =
-    map.attachGraphicsDeviceTexture(
-      device,
-      GraphicsDeviceTextureDescriptor(extent),
+    map.attachOffscreen(
+      OffscreenDescriptor(extent),
       // The library renders on its own thread.
       RenderSessionAttachOptions(
         driver = RenderDriverKind.CORE_WORKER,
@@ -75,7 +71,6 @@ private suspend fun images(runtime: RuntimeHandle) {
   // #endregion read
 
   session.close()
-  device.close()
   map.release().await()
 }
 

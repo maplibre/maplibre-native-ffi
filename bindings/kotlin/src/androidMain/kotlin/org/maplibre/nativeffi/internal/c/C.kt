@@ -96,15 +96,6 @@ internal actual object C {
   @JvmStatic actual external fun mln_geo_json_source_data_release(data: Long): Unit
 
   @JvmStatic
-  actual external fun mln_graphics_device_create(
-    options: Long,
-    outDevice: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic actual external fun mln_graphics_device_release(device: Long): Unit
-
-  @JvmStatic
   actual external fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -220,17 +211,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_attach_graphics_device_texture(
-    map: Long,
-    device: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_attach_metal_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -255,6 +235,17 @@ internal actual object C {
     map: Long,
     descriptor: Long,
     options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_attach_offscreen(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    device: Long,
     outSession: Long,
     completion: Long,
     outDiagnostic: Long,
@@ -968,6 +959,15 @@ internal actual object C {
   @JvmStatic actual external fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int
 
   @JvmStatic actual external fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
+
+  @JvmStatic
+  actual external fun mln_offscreen_device_create(
+    options: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic actual external fun mln_offscreen_device_release(device: Long): Unit
 
   @JvmStatic actual external fun mln_open_gl_supported_context_provider_mask(): Int
 

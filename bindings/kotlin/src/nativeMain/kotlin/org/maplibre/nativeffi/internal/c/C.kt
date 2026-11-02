@@ -143,17 +143,6 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_geo_json_source_data_release(data.toULong())
   }
 
-  actual fun mln_graphics_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_graphics_device_create(
-      options.toCPointer(),
-      outDevice.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_graphics_device_release(device: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_graphics_device_release(device.toULong())
-  }
-
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -349,25 +338,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_graphics_device_texture(
-    map: Long,
-    device: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_graphics_device_texture(
-      map.toULong(),
-      device.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_attach_metal_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -414,6 +384,25 @@ internal actual object C {
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),
+      outSession.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_attach_offscreen(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    device: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_offscreen(
+      map.toULong(),
+      descriptor.toCPointer(),
+      options.toCPointer(),
+      device.toULong(),
       outSession.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
@@ -1565,6 +1554,17 @@ internal actual object C {
       status.toUInt(),
       outDiagnostic.toCPointer(),
     )
+
+  actual fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_offscreen_device_create(
+      options.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_offscreen_device_release(device: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_offscreen_device_release(device.toULong())
+  }
 
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_open_gl_supported_context_provider_mask().toInt()

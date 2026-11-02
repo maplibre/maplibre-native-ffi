@@ -42,19 +42,14 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #endregion style
 
 	// #region attach
-	// nil options select the default adapter.
-	device, err := maplibre.NewGraphicsDevice(nil)
-	if err != nil {
-		return err
-	}
-
-	session, attached, err := m.AttachGraphicsDeviceTexture(
-		device,
-		maplibre.GraphicsDeviceTextureDescriptor{Extent: extent},
+	session, attached, err := m.AttachOffscreen(
+		maplibre.OffscreenDescriptor{Extent: extent},
 		// The library renders on its own thread.
 		maplibre.RenderSessionAttachOptions{
 			Driver: maplibre.RenderDriverKindCoreWorker,
 		},
+		// With no device, the session creates its own.
+		nil,
 	)
 	if err != nil {
 		return err
@@ -97,9 +92,6 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #endregion read
 
 	if err := session.Dispose(); err != nil {
-		return err
-	}
-	if err := device.Close(); err != nil {
 		return err
 	}
 

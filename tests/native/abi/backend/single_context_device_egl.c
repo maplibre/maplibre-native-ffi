@@ -1,4 +1,4 @@
-// Texture sessions that take turns rendering in a single-context EGL device.
+// Offscreen sessions that take turns rendering in a single-context EGL device.
 
 #include "support/frames.h"
 #include "support/test_support.h"
@@ -25,25 +25,25 @@ static const char fill_style_json[] =
   "{\"id\":\"square\",\"type\":\"fill\",\"source\":\"square\","
   "\"paint\":{\"fill-color\":\"#0080ff\"}}]}";
 
-static mln_graphics_device create_device(bool single_context) {
-  mln_graphics_device_options options = {
-    .size = sizeof(mln_graphics_device_options)
+static mln_offscreen_device create_device(bool single_context) {
+  mln_offscreen_device_options options = {
+    .size = sizeof(mln_offscreen_device_options)
   };
-  options.fields = MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
+  options.fields = MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
   options.single_context = single_context;
-  mln_graphics_device device = MLN_HANDLE_NULL;
+  mln_offscreen_device device = MLN_HANDLE_NULL;
   MLN_TEST_OK(
-    mln_graphics_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+    mln_offscreen_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
   );
   return device;
 }
 
-static mln_test_render_fixture attach_device_texture(
-  mln_map map, mln_graphics_device device
+static mln_test_render_fixture attach_offscreen_session(
+  mln_map map, mln_offscreen_device device
 ) {
   mln_test_render_fixture fixture = {.driver = MLN_RENDER_DRIVER_CORE_WORKER};
-  mln_graphics_device_texture_descriptor descriptor = {
-    .size = sizeof(mln_graphics_device_texture_descriptor)
+  mln_offscreen_descriptor descriptor = {
+    .size = sizeof(mln_offscreen_descriptor)
   };
   descriptor.extent = (mln_logical_extent){
     .width = extent, .height = extent, .scale_factor = 1.0
@@ -53,8 +53,8 @@ static mln_test_render_fixture attach_device_texture(
   };
   options.driver = fixture.driver;
   mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_attach_graphics_device_texture(
-    map, device, &descriptor, &options, &fixture.session, &attach.descriptor,
+  MLN_TEST_OK(mln_map_attach_offscreen(
+    map, &descriptor, &options, device, &fixture.session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
@@ -62,7 +62,7 @@ static mln_test_render_fixture attach_device_texture(
   return fixture;
 }
 
-static void detach_device_texture(mln_test_render_fixture* fixture) {
+static void detach_offscreen_session(mln_test_render_fixture* fixture) {
   mln_test_completion detach = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_detach(
     fixture->session, &detach.descriptor, MLN_TEST_DIAGNOSTIC
@@ -108,13 +108,13 @@ static void render_again(
 static void render_alone(
   mln_runtime runtime, mln_buffer_view style, uint8_t* pixels
 ) {
-  mln_graphics_device device = create_device(false);
+  mln_offscreen_device device = create_device(false);
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = attach_device_texture(map, device);
+  mln_test_render_fixture fixture = attach_offscreen_session(map, device);
   render_style(runtime, map, &fixture, style, pixels);
-  detach_device_texture(&fixture);
+  detach_offscreen_session(&fixture);
   mln_test_destroy_map(map);
-  mln_graphics_device_release(device);
+  mln_offscreen_device_release(device);
 }
 
 static void sessions_that_take_turns_render_as_alone(void) {
@@ -130,12 +130,12 @@ static void sessions_that_take_turns_render_as_alone(void) {
   }
   TEST_ASSERT_NOT_EQUAL_INT(0, memcmp(expected[0], expected[1], pixel_bytes));
 
-  mln_graphics_device device = create_device(true);
+  mln_offscreen_device device = create_device(true);
   mln_map maps[2];
   mln_test_render_fixture fixtures[2];
   for (size_t index = 0; index < 2; index += 1) {
     maps[index] = mln_test_create_map(runtime);
-    fixtures[index] = attach_device_texture(maps[index], device);
+    fixtures[index] = attach_offscreen_session(maps[index], device);
   }
 
   for (size_t index = 0; index < 2; index += 1) {
@@ -151,10 +151,10 @@ static void sessions_that_take_turns_render_as_alone(void) {
   }
 
   for (size_t index = 0; index < 2; index += 1) {
-    detach_device_texture(&fixtures[index]);
+    detach_offscreen_session(&fixtures[index]);
     mln_test_destroy_map(maps[index]);
   }
-  mln_graphics_device_release(device);
+  mln_offscreen_device_release(device);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -163,11 +163,11 @@ static void sessions_detach_while_others_render(void) {
   static uint8_t fill[pixel_bytes];
   static uint8_t actual[pixel_bytes];
   mln_runtime runtime = mln_test_create_runtime();
-  mln_graphics_device device = create_device(true);
+  mln_offscreen_device device = create_device(true);
   mln_map first_map = mln_test_create_map(runtime);
   mln_map second_map = mln_test_create_map(runtime);
-  mln_test_render_fixture first = attach_device_texture(first_map, device);
-  mln_test_render_fixture second = attach_device_texture(second_map, device);
+  mln_test_render_fixture first = attach_offscreen_session(first_map, device);
+  mln_test_render_fixture second = attach_offscreen_session(second_map, device);
   render_style(
     runtime, first_map, &first, MLN_BUFFER_LITERAL(circle_style_json), circle
   );
@@ -175,14 +175,14 @@ static void sessions_detach_while_others_render(void) {
     runtime, second_map, &second, MLN_BUFFER_LITERAL(fill_style_json), fill
   );
 
-  detach_device_texture(&first);
+  detach_offscreen_session(&first);
   mln_test_destroy_map(first_map);
   render_again(&second, 31, actual);
   TEST_ASSERT_EQUAL_MEMORY(fill, actual, pixel_bytes);
 
   mln_map third_map = mln_test_create_map(runtime);
-  mln_test_render_fixture third = attach_device_texture(third_map, device);
-  mln_graphics_device_release(device);
+  mln_test_render_fixture third = attach_offscreen_session(third_map, device);
+  mln_offscreen_device_release(device);
   render_style(
     runtime, third_map, &third, MLN_BUFFER_LITERAL(circle_style_json), actual
   );
@@ -190,8 +190,8 @@ static void sessions_detach_while_others_render(void) {
   render_again(&second, 32, actual);
   TEST_ASSERT_EQUAL_MEMORY(fill, actual, pixel_bytes);
 
-  detach_device_texture(&second);
-  detach_device_texture(&third);
+  detach_offscreen_session(&second);
+  detach_offscreen_session(&third);
   mln_test_destroy_map(third_map);
   mln_test_destroy_map(second_map);
   mln_test_destroy_runtime(runtime);

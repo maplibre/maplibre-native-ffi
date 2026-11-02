@@ -19,13 +19,15 @@ as in [Create a map](/maplibre-native-ffi/guides/create-a-map/#set-a-style).
 
 <Snippet page="images" region="map" />
 
-## Attach a texture
+## Render offscreen
 
-Maps render on your GPU, so you need a graphics context to render a map. If your
-app doesn't have a GPU context, the library can create one for you with
-[](api:mln_graphics_device). Attach a texture on that device to the map with
-[](api:mln_map_attach_graphics_device_texture), at the map's size. Use the
-render session it returns. Close the device after you close the session.
+Attach an offscreen render session to the map with
+[](api:mln_map_attach_offscreen), at the map's size. It renders on a GPU device
+that the library creates, so your app doesn't need a graphics context. Use the
+render session it returns.
+
+To share one device among the sessions of many maps, or to pick a GPU, create an
+[](api:mln_offscreen_device) and pass it when you attach.
 
 <Snippet page="images" region="attach" />
 

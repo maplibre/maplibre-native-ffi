@@ -58,10 +58,6 @@ internal actual object C {
     )
   private val mln_geo_json_source_data_release =
     Ffm.downcall("mln_geo_json_source_data_release", null, JAVA_LONG)
-  private val mln_graphics_device_create =
-    Ffm.downcall("mln_graphics_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_graphics_device_release =
-    Ffm.downcall("mln_graphics_device_release", null, JAVA_LONG)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -180,18 +176,6 @@ internal actual object C {
     )
   private val mln_map_apply_camera_delta =
     Ffm.downcall("mln_map_apply_camera_delta", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_attach_graphics_device_texture =
-    Ffm.downcall(
-      "mln_map_attach_graphics_device_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_attach_metal_borrowed_texture =
     Ffm.downcall(
       "mln_map_attach_metal_borrowed_texture",
@@ -218,6 +202,18 @@ internal actual object C {
     Ffm.downcall(
       "mln_map_attach_metal_surface",
       JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_attach_offscreen =
+    Ffm.downcall(
+      "mln_map_attach_offscreen",
+      JAVA_INT,
+      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
@@ -885,6 +881,10 @@ internal actual object C {
     Ffm.downcall("mln_network_get_status", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_network_set_status =
     Ffm.downcall("mln_network_set_status", JAVA_INT, JAVA_INT, JAVA_LONG)
+  private val mln_offscreen_device_create =
+    Ffm.downcall("mln_offscreen_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_offscreen_device_release =
+    Ffm.downcall("mln_offscreen_device_release", null, JAVA_LONG)
   private val mln_open_gl_supported_context_provider_mask =
     Ffm.downcall("mln_open_gl_supported_context_provider_mask", JAVA_INT)
   private val mln_plugin_get_register_function_v1 =
@@ -1358,13 +1358,6 @@ internal actual object C {
     mln_geo_json_source_data_release.invoke(data)
   }
 
-  actual fun mln_graphics_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    mln_graphics_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
-
-  actual fun mln_graphics_device_release(device: Long) {
-    mln_graphics_device_release.invoke(device)
-  }
-
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -1548,25 +1541,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_map_apply_camera_delta.invokeExact(map, delta, completion, outDiagnostic) as Int
 
-  actual fun mln_map_attach_graphics_device_texture(
-    map: Long,
-    device: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_graphics_device_texture.invokeExact(
-      map,
-      device,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_attach_metal_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -1613,6 +1587,25 @@ internal actual object C {
       map,
       descriptor,
       options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_attach_offscreen(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    device: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_offscreen.invokeExact(
+      map,
+      descriptor,
+      options,
+      device,
       outSession,
       completion,
       outDiagnostic,
@@ -2599,6 +2592,13 @@ internal actual object C {
 
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_network_set_status.invokeExact(status, outDiagnostic) as Int
+
+  actual fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_offscreen_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
+
+  actual fun mln_offscreen_device_release(device: Long) {
+    mln_offscreen_device_release.invoke(device)
+  }
 
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     mln_open_gl_supported_context_provider_mask.invokeExact() as Int

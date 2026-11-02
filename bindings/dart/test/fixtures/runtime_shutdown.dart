@@ -46,9 +46,9 @@ Future<void> abandonHandles() async {
   print('ABANDONED_HANDLES');
 }
 
-/// Leaves a session attached on its core worker after it rendered, with its
-/// runtime, map, and graphics device, for the isolate's shutdown to finalize
-/// while the process exits.
+/// Leaves an offscreen session attached on its core worker after it rendered,
+/// with its runtime and map, for the isolate's shutdown to finalize while the
+/// process exits.
 Future<void> abandonSession() async {
   final extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
   final runtime = RuntimeHandle.create(RuntimeOptions());
@@ -68,10 +68,8 @@ Future<void> abandonSession() async {
     ],
   });
   var frames = Completer<void>();
-  final device = GraphicsDeviceHandle.create();
-  final attachment = map.attachGraphicsDeviceTexture(
-    device,
-    GraphicsDeviceTextureDescriptor(extent: extent),
+  final attachment = map.attachOffscreen(
+    OffscreenDescriptor(extent: extent),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
       requestedTextureRingDepth: 1,

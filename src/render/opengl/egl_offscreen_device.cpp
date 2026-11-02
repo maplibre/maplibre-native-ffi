@@ -12,7 +12,7 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
-#include "render/graphics_device.hpp"
+#include "render/offscreen_device.hpp"
 #include "render/opengl/egl_context.hpp"
 #include "render/opengl/opengl_texture_session.hpp"
 #include "render/render_session_common.hpp"
@@ -230,9 +230,9 @@ auto create_single_context(
 // display for every request with the same platform and device, so the host's
 // own code, or a later device, may be using it: terminating it would end their
 // contexts too.
-class EglGraphicsDevice final : public GraphicsDevice {
+class EglOffscreenDevice final : public OffscreenDevice {
  public:
-  EglGraphicsDevice(
+  EglOffscreenDevice(
     const DisplayChoice& choice,
     std::shared_ptr<opengl::EglSingleContext> single
   )
@@ -270,12 +270,12 @@ class EglGraphicsDevice final : public GraphicsDevice {
 
 }  // namespace
 
-auto create_backend_graphics_device(
-  const mln_graphics_device_options& options,
-  std::shared_ptr<GraphicsDevice>& out_device
+auto create_backend_offscreen_device(
+  const mln_offscreen_device_options& options,
+  std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status {
   auto choice = DisplayChoice{};
-  if ((options.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX) == 0U) {
+  if ((options.fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) == 0U) {
     choice = default_display();
     if (choice.display == EGL_NO_DISPLAY) {
       const auto message =
@@ -315,10 +315,10 @@ auto create_backend_graphics_device(
     }
   }
   mln::Log::Info(
-    mln::Event::Render,
-    std::string{"graphics device uses the EGL "} + choice.platform + " platform"
+    mln::Event::Render, std::string{"offscreen device uses the EGL "} +
+                          choice.platform + " platform"
   );
-  out_device = std::make_shared<EglGraphicsDevice>(choice, std::move(single));
+  out_device = std::make_shared<EglOffscreenDevice>(choice, std::move(single));
   return MLN_STATUS_OK;
 }
 

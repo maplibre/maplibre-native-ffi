@@ -30,12 +30,9 @@ Future<void> images(RuntimeHandle runtime) async {
   // #endregion style
 
   // #region attach
-  final device = GraphicsDeviceHandle.create();
-
   final NewRenderSession(:session, ready: sessionReady) = map
-      .attachGraphicsDeviceTexture(
-        device,
-        const GraphicsDeviceTextureDescriptor(extent: extent),
+      .attachOffscreen(
+        const OffscreenDescriptor(extent: extent),
         // The library renders on its own thread.
         const RenderSessionAttachOptions(
           driver: RenderDriverKind.coreWorker,
@@ -64,7 +61,6 @@ Future<void> images(RuntimeHandle runtime) async {
   // #endregion read
 
   session.dispose();
-  device.close();
   await map.close();
 }
 

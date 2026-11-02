@@ -6,38 +6,38 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A GPU device that the library creates to render maps into textures.
+/// A GPU device that the library creates to render maps offscreen.
 /// </summary>
 /// <remarks>
-/// See <c>mln_graphics_device</c> in the <see
+/// See <c>mln_offscreen_device</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
 /// </remarks>
-public sealed unsafe partial class GraphicsDeviceHandle
+public sealed unsafe partial class OffscreenDeviceHandle
     : IDisposable,
-        INativeOwner<MlnGraphicsDevice>
+        INativeOwner<MlnOffscreenDevice>
 {
-    private readonly NativeHandleState<MlnGraphicsDevice> state;
+    private readonly NativeHandleState<MlnOffscreenDevice> state;
 
-    internal GraphicsDeviceHandle(MlnGraphicsDevice handle)
+    internal OffscreenDeviceHandle(MlnOffscreenDevice handle)
     {
-        state = new(handle, Abandon, nameof(GraphicsDeviceHandle), Abandon);
+        state = new(handle, Abandon, nameof(OffscreenDeviceHandle), Abandon);
     }
 
-    internal static GraphicsDeviceHandle Adopt(MlnGraphicsDevice handle) =>
-        NativeHandleState<MlnGraphicsDevice>.Adopt(
+    internal static OffscreenDeviceHandle Adopt(MlnOffscreenDevice handle) =>
+        NativeHandleState<MlnOffscreenDevice>.Adopt(
             handle,
-            () => new GraphicsDeviceHandle(handle),
+            () => new OffscreenDeviceHandle(handle),
             Abandon
         );
 
-    private static mln_status Abandon(MlnGraphicsDevice live, mln_diagnostic* diagnostic)
+    private static mln_status Abandon(MlnOffscreenDevice live, mln_diagnostic* diagnostic)
     {
-        NativeMethods.mln_graphics_device_release(live);
+        NativeMethods.mln_offscreen_device_release(live);
         return mln_status.MLN_STATUS_OK;
     }
 
-    NativeHandleState<MlnGraphicsDevice> INativeOwner<MlnGraphicsDevice>.State => state;
-    internal MlnGraphicsDevice Handle => state.Handle;
+    NativeHandleState<MlnOffscreenDevice> INativeOwner<MlnOffscreenDevice>.State => state;
+    internal MlnOffscreenDevice Handle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after close.
@@ -60,12 +60,14 @@ public sealed unsafe partial class GraphicsDeviceHandle
     }
 
     /// <summary>
-    /// Creates a GPU device for rendering maps into textures.
+    /// Creates a GPU device for rendering maps offscreen.
     /// </summary>
     /// <remarks>
-    /// <para>Render sessions on several maps can share one device.</para>
-    /// <para>See <c>mln_graphics_device_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html">C API reference</see>.</para>
+    /// <para><c>MapHandle.AttachOffscreen()</c> creates a device of its own
+    /// when it gets none. Create one to share it among the sessions on many
+    /// maps, or to pick a GPU.</para>
+    /// <para>See <c>mln_offscreen_device_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when this build's render
@@ -75,20 +77,20 @@ public sealed unsafe partial class GraphicsDeviceHandle
     /// device.</description></item>
     /// </list>
     /// </remarks>
-    public static GraphicsDeviceHandle Create(GraphicsDeviceOptions? options = null)
+    public static OffscreenDeviceHandle Create(OffscreenDeviceOptions? options = null)
     {
         using var call = Enter(null);
         var nativeOptions = options is null
-            ? default(mln_graphics_device_options)
-            : NativeGraphicsDeviceOptions(options);
-        MlnGraphicsDevice outDevice = default;
+            ? default(mln_offscreen_device_options)
+            : NativeOffscreenDeviceOptions(options);
+        MlnOffscreenDevice outDevice = default;
         Check(
-            NativeMethods.mln_graphics_device_create(
+            NativeMethods.mln_offscreen_device_create(
                 options is null ? null : &nativeOptions,
                 &outDevice,
                 Diagnostic
             )
         );
-        return GraphicsDeviceHandle.Adopt(outDevice);
+        return OffscreenDeviceHandle.Adopt(outDevice);
     }
 }

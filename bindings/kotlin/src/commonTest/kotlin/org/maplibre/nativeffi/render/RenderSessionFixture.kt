@@ -11,13 +11,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
-import org.maplibre.nativeffi.GraphicsDeviceHandle
-import org.maplibre.nativeffi.GraphicsDeviceTextureDescriptor
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.NewRenderSession
+import org.maplibre.nativeffi.OffscreenDescriptor
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderFrameResult
 import org.maplibre.nativeffi.RenderSessionAttachOptions
@@ -199,12 +198,11 @@ internal suspend fun <T> withOwnedTexture(
   }
 
 /**
- * Runs [block] against a map with an attached session that a core worker renders into a texture of
- * [width] x [height] on a graphics device, and abandons and closes the session afterwards. Browser
- * builds create no device. The map's runtime is created from [runtimeOptions], and [onFrameWake]
- * runs on each frame wake.
+ * Runs [block] against a map with an attached offscreen session of [width] x [height] that a core
+ * worker renders, and abandons and closes the session afterwards. Browser builds create no device.
+ * The map's runtime is created from [runtimeOptions], and [onFrameWake] runs on each frame wake.
  */
-internal suspend fun <T> withDeviceTexture(
+internal suspend fun <T> withOffscreenSession(
   width: Int = 32,
   height: Int = 16,
   mapMode: MapMode = MapMode.STATIC,
@@ -219,29 +217,23 @@ internal suspend fun <T> withDeviceTexture(
   ) {
     withRenderSession(
       RenderDriverKind.CORE_WORKER,
-      attach = { options -> attachDeviceTexture(map, width, height, options) },
+      attach = { options -> attachOffscreenSession(map, width, height, options) },
       onFrameWake = onFrameWake,
       block = block,
     )
   }
 
-/**
- * Submits an attach of a [width] x [height] texture on a graphics device of its own. The session
- * keeps the device, so its handle is released before this returns.
- */
-internal fun attachDeviceTexture(
+/** Submits an attach of a [width] x [height] offscreen session on a device of its own. */
+internal fun attachOffscreenSession(
   map: MapHandle,
   width: Int,
   height: Int,
   options: RenderSessionAttachOptions,
 ): NewRenderSession =
-  GraphicsDeviceHandle.create().use { device ->
-    map.attachGraphicsDeviceTexture(
-      device,
-      GraphicsDeviceTextureDescriptor(LogicalExtent(width.toUInt(), height.toUInt(), 1.0)),
-      options,
-    )
-  }
+  map.attachOffscreen(
+    OffscreenDescriptor(LogicalExtent(width.toUInt(), height.toUInt(), 1.0)),
+    options,
+  )
 
 /**
  * Runs [block] against a session of this map that [attach] submits on [TestGraphics.thread] with

@@ -284,45 +284,6 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a render session that draws the map into a texture on `device`.
-    ///
-    /// `options` must select `RenderDriverKind::CoreWorker`. Read the frames
-    /// back with `RenderSessionHandle::read_texture()`.
-    ///
-    /// See `mln_map_attach_graphics_device_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::InvalidState` when the map already has a render session.
-    pub fn attach_graphics_device_texture(
-        &self,
-        device: &GraphicsDeviceHandle,
-        descriptor: &GraphicsDeviceTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call();
-        let device = device.inner.native();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_graphics_device_texture(
-                    map,
-                    device,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session)?, future))
-    }
-
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     ///
@@ -446,6 +407,53 @@ impl MapHandle {
                     map,
                     descriptor,
                     options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
+    /// Attaches a render session that renders the map offscreen.
+    ///
+    /// Read each image's pixels with `RenderSessionHandle::read_texture()`.
+    /// `options` must select `RenderDriverKind::CoreWorker`.
+    ///
+    /// The session renders on `device`. When `device` is null, the session
+    /// creates a device with the default options, and releases it when the
+    /// session ends.
+    ///
+    /// See `mln_map_attach_offscreen` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the map already has a render session.
+    /// - `Status::Unsupported` when `device` is null and this build's render
+    ///   backend can't create a device.
+    /// - `Status::NativeError` when `device` is null and the platform can't
+    ///   create a device.
+    pub fn attach_offscreen(
+        &self,
+        descriptor: &OffscreenDescriptor,
+        options: &RenderSessionAttachOptions,
+        device: Option<&OffscreenDeviceHandle>,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_offscreen_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_offscreen(
+                    map,
+                    descriptor,
+                    options,
+                    device,
                     &mut out_session,
                     completion,
                     out_diagnostic,

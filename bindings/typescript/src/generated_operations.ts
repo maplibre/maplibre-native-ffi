@@ -17,8 +17,6 @@ import type {
   FreeCameraOptions,
   GeoJsonSourceOptions,
   GpuSync,
-  GraphicsDeviceOptions,
-  GraphicsDeviceTextureDescriptor,
   HttpHeaderTransform,
   LatLng,
   LatLngBounds,
@@ -40,6 +38,8 @@ import type {
   OfflineRegionDownloadState,
   OfflineRegionInfo,
   OfflineRegionStatus,
+  OffscreenDescriptor,
+  OffscreenDeviceOptions,
   OpenGlBorrowedTextureDescriptor,
   OpenGlContextProviderFlag,
   OpenGlOwnedTextureDescriptor,
@@ -543,72 +543,6 @@ export class GeoJsonSourceDataHandle extends Owner {
 defineDisposers(GeoJsonSourceDataHandle, undefined, "close");
 
 /**
- * A GPU device that the library creates to render maps into textures.
- *
- * See `mln_graphics_device` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-export class GraphicsDeviceHandle extends Owner {
-  /**
-   * Created by the API, which passes a key that only it holds.
-   *
-   * @internal
-   */
-  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "GraphicsDeviceHandle", { registrations });
-  }
-  /**
-   * Calls `close()`, for `await using`.
-   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.asyncDispose]: () => Promise<void>;
-  /**
-   * Calls `close()`, for `using`.
-   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.dispose]: () => void;
-
-  /**
-   * Releases a graphics device.
-   *
-   * Render sessions on the device keep working until they detach.
-   *
-   * See `mln_graphics_device_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_graphics_device_release(handle, token),
-    );
-  }
-
-  /**
-   * Creates a GPU device for rendering maps into textures.
-   *
-   * Render sessions on several maps can share one device.
-   *
-   * See `mln_graphics_device_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when this build's render backend can't create a
-   *   device.
-   * - `Status.nativeError` when `adapter_index` names no GPU, or the platform
-   *   can't create the device.
-   */
-  static create(options?: GraphicsDeviceOptions): GraphicsDeviceHandle {
-    const handle = native.mln_graphics_device_create(options);
-    return adopt(
-      handle,
-      () => new GraphicsDeviceHandle(ADOPT, handle),
-      (disposed) => native.mln_graphics_device_release(disposed, undefined),
-    );
-  }
-}
-defineDisposers(GraphicsDeviceHandle, undefined, "close");
-
-/**
  * A map, with its style and camera.
  *
  * See `mln_map` in the
@@ -903,46 +837,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Attaches a render session that draws the map into a texture on `device`.
-   *
-   * `options` must select `RenderDriverKind.coreWorker`. Read the frames back
-   * with `RenderSessionHandle.readTexture()`.
-   *
-   * See `mln_map_attach_graphics_device_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidState` when the map already has a render session.
-   */
-  attachGraphicsDeviceTexture(
-    device: GraphicsDeviceHandle,
-    descriptor: GraphicsDeviceTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_graphics_device_texture(
-            this.id,
-            device.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
    * Creates a session that renders the map into a ring of your Metal textures.
    *
    * See `mln_map_attach_metal_borrowed_texture` in the
@@ -1038,6 +932,53 @@ export class MapHandle extends Owner {
             this.id,
             descriptor,
             options,
+            completion,
+          ),
+        (handle) =>
+          adopt(
+            handle,
+            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined, undefined),
+          ),
+      );
+      return { session, ready };
+    });
+  }
+
+  /**
+   * Attaches a render session that renders the map offscreen.
+   *
+   * Read each image's pixels with `RenderSessionHandle.readTexture()`.
+   * `options` must select `RenderDriverKind.coreWorker`.
+   *
+   * The session renders on `device`. When `device` is null, the session creates
+   * a device with the default options, and releases it when the session ends.
+   *
+   * See `mln_map_attach_offscreen` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the map already has a render session.
+   * - `Status.unsupported` when `device` is null and this build's render
+   *   backend can't create a device.
+   * - `Status.nativeError` when `device` is null and the platform can't create
+   *   a device.
+   */
+  attachOffscreen(
+    descriptor: OffscreenDescriptor,
+    options: RenderSessionAttachOptions,
+    device?: OffscreenDeviceHandle,
+  ): NewRenderSession {
+    return withRegistrations((registrations) => {
+      const [session, ready] = attach(
+        (completion) =>
+          native.mln_map_attach_offscreen(
+            this.id,
+            descriptor,
+            options,
+            device?.id,
             completion,
           ),
         (handle) =>
@@ -3739,6 +3680,74 @@ export class MapProjectionHandle extends Owner {
   }
 }
 defineDisposers(MapProjectionHandle, undefined, "close");
+
+/**
+ * A GPU device that the library creates to render maps offscreen.
+ *
+ * See `mln_offscreen_device` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export class OffscreenDeviceHandle extends Owner {
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
+    super(key, handle, "OffscreenDeviceHandle", { registrations });
+  }
+  /**
+   * Calls `close()`, for `await using`.
+   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.asyncDispose]: () => Promise<void>;
+  /**
+   * Calls `close()`, for `using`.
+   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.dispose]: () => void;
+
+  /**
+   * Releases an offscreen device.
+   *
+   * Render sessions on the device keep working until they detach.
+   *
+   * See `mln_offscreen_device_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   */
+  close(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_offscreen_device_release(handle, token),
+    );
+  }
+
+  /**
+   * Creates a GPU device for rendering maps offscreen.
+   *
+   * `MapHandle.attachOffscreen()` creates a device of its own when it gets
+   * none. Create one to share it among the sessions on many maps, or to pick a
+   * GPU.
+   *
+   * See `mln_offscreen_device_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when this build's render backend can't create a
+   *   device.
+   * - `Status.nativeError` when `adapter_index` names no GPU, or the platform
+   *   can't create the device.
+   */
+  static create(options?: OffscreenDeviceOptions): OffscreenDeviceHandle {
+    const handle = native.mln_offscreen_device_create(options);
+    return adopt(
+      handle,
+      () => new OffscreenDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_offscreen_device_release(disposed, undefined),
+    );
+  }
+}
+defineDisposers(OffscreenDeviceHandle, undefined, "close");
 
 /**
  * A render session draws a map into a surface or a texture.

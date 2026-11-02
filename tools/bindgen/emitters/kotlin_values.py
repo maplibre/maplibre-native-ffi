@@ -597,6 +597,8 @@ class Values:
         if callback is not None:
             return callback
         if value.kind == "handle":
+            if value.nullable:
+                return f"{expression}?.let {{ argument(it, it.binding) }} ?: 0L"
             return f"argument({expression}, {expression}.binding)"
         if value.kind == "native_pointer":
             return f"{expression}.address"

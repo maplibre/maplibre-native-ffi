@@ -214,8 +214,9 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         values.add(target if target.kind == "handle" else value)
         # A consuming call closes the caller's value, so it takes a pointer.
         pointer = "*" if name == receiver_name and plan.consumes else ""
+        optional = "?" if target.kind == "handle" and value.nullable else ""
         signature.append(
-            f"{local}: {pointer}{values.public(target if target.kind == 'handle' else value)}"
+            f"{local}: {pointer}{optional}{values.public(target if target.kind == 'handle' else value)}"
         )
         if name == receiver_name:
             continue
