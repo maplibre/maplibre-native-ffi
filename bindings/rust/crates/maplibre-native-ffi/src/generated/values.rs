@@ -5316,7 +5316,9 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
 /// The Vulkan device and queue that a render session uses.
 ///
 /// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns.
+/// completes, or an abandon of it returns. If you discarded a frame of a ring
+/// that the session creates, or abandon the session while you hold a frame,
+/// keep them alive until the process exits instead.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

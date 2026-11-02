@@ -178,7 +178,9 @@ typedef struct mln_metal_context_descriptor {
  * The Vulkan device and queue that a render session uses.
  *
  * Keep these objects alive until a detach or disposal of the session
- * completes, or an abandon of it returns.
+ * completes, or an abandon of it returns. If you discarded a frame of a ring
+ * that the session creates, or abandon the session while you hold a frame,
+ * keep them alive until the process exits instead.
  */
 typedef struct mln_vulkan_context_descriptor {
   /** A `VkInstance`. */
