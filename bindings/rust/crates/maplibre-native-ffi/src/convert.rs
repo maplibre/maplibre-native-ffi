@@ -551,13 +551,6 @@ mod tests {
     use super::*;
     use crate::{CanonicalTileId, CustomGeometrySourceOptions};
 
-    struct DropCount(Arc<AtomicUsize>);
-    impl Drop for DropCount {
-        fn drop(&mut self) {
-            self.0.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-
     #[test]
     fn input_arrays_preserve_empty_presence_and_retain_moved_storage() {
         let mut arena = InputArena::default();
@@ -570,15 +563,12 @@ mod tests {
     }
 
     #[test]
-    fn generated_registration_transfers_only_after_acceptance_and_contains_panics() {
-        let drops = Arc::new(AtomicUsize::new(0));
+    fn an_accepted_generated_registration_runs_and_contains_panics() {
         let calls = Arc::new(AtomicUsize::new(0));
         let tile = CanonicalTileId::new(3, 4, 5);
         for accepted in [false, true] {
-            let capture = DropCount(Arc::clone(&drops));
             let seen = Arc::clone(&calls);
             let options = CustomGeometrySourceOptions::new(move |received| {
-                let _ = &capture;
                 assert_eq!(received, tile);
                 seen.fetch_add(1, Ordering::SeqCst);
                 panic!("contained callback panic");
@@ -592,7 +582,6 @@ mod tests {
             }
             drop(arena);
             if accepted {
-                assert_eq!(drops.load(Ordering::SeqCst), 1);
                 let native = to_native(&tile, &mut InputArena::default()).unwrap();
                 // SAFETY: accepted registration retains its generated root until release.
                 unsafe {
@@ -602,8 +591,8 @@ mod tests {
             }
         }
         assert_eq!(calls.load(Ordering::SeqCst), 1);
-        assert_eq!(drops.load(Ordering::SeqCst), 2);
     }
+
     #[test]
     fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
         // A batch from a newer library: each event record is longer than this

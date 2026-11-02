@@ -46,9 +46,9 @@ Test behavior that callers can observe, not implementation details. Add a test
 only when it would catch a regression in that behavior. Don't test what the
 compiler, the generator, or another test already checks. Keep tests fast and
 deterministic: wait for events instead of sleeping, and don't depend on timing
-or test order. Don't assert that an object was garbage-collected, finalized, or
-deallocated. Scratch checks that you ran while working don't need to be
-committed.
+or test order. A binding test doesn't assert that an object was
+garbage-collected, finalized, or deallocated. Scratch checks that you ran while
+working don't need to be committed.
 
 Only the target or the build decides whether a test is skipped, never the
 environment. If a test fails in CI because of the environment, fix the

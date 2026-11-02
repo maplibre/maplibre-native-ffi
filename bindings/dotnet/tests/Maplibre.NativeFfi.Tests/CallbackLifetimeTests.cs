@@ -52,7 +52,6 @@ public sealed class CallbackLifetimeTests
 
         Gc.Collect();
 
-        Assert.True(map.IsAlive);
         await ((MapHandle)map.Target!).CloseAsync();
         await runtime.CloseAsync();
     }
