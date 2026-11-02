@@ -32,6 +32,20 @@ const languageRules = [
   )
   .join("\n");
 
+// Gives each element tagged with a language its logo, which the sidebar shows.
+const logoRules = languages
+  .map(({ id, logo }) => `[data-logo="${id}"] { --logo: url("${logo}"); }`)
+  .join("\n");
+
+// A sidebar link to a language's API reference, which opens in a new tab.
+function reference(id: string, label: string, link: string) {
+  return {
+    label,
+    link,
+    attrs: { target: "_blank", rel: "noopener noreferrer", "data-logo": id },
+  };
+}
+
 // https://astro.build/config
 export default defineConfig({
   site,
@@ -62,7 +76,7 @@ export default defineConfig({
       },
       customCss: ["./src/styles/custom.css"],
       head: [
-        { tag: "style", content: languageRules },
+        { tag: "style", content: languageRules + "\n" + logoRules },
         // Restores the reader's language before the page draws.
         {
           tag: "script",
@@ -110,56 +124,24 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
-            {
-              label: "C API",
-              link: "/reference/c/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Rust API",
-              link: "/reference/rust/maplibre_native_ffi/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Zig API",
-              link: "/reference/zig/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Kotlin API",
-              link: "/reference/kotlin/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Dart API",
-              link: "/reference/dart/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Python API",
-              link: "/reference/python/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: ".NET API",
-              link: "/reference/dotnet/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Go API",
-              link: "/reference/go/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Swift API",
-              link: "/reference/swift/documentation/maplibrenativeffi/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "TypeScript API",
-              link: "/reference/typescript/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
+            reference("c", "C API", "/reference/c/"),
+            reference(
+              "rust",
+              "Rust API",
+              "/reference/rust/maplibre_native_ffi/",
+            ),
+            reference("zig", "Zig API", "/reference/zig/"),
+            reference("kotlin", "Kotlin API", "/reference/kotlin/"),
+            reference("dart", "Dart API", "/reference/dart/"),
+            reference("python", "Python API", "/reference/python/"),
+            reference("dotnet", ".NET API", "/reference/dotnet/"),
+            reference("go", "Go API", "/reference/go/"),
+            reference(
+              "swift",
+              "Swift API",
+              "/reference/swift/documentation/maplibrenativeffi/",
+            ),
+            reference("typescript", "TypeScript API", "/reference/typescript/"),
           ],
         },
         {
