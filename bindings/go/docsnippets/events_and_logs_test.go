@@ -34,17 +34,22 @@ func eventsAndLogs(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 		}
 	}
 
-	err := runtime.Discarding().SetEventHandler(maplibre.RuntimeEventHandler{Callback: handleEvents})
+	err := runtime.Discarding().SetEventHandler(
+		maplibre.RuntimeEventHandler{Callback: handleEvents},
+	)
 	if err != nil {
 		return err
 	}
 	// #endregion handler
 
 	// #region mask
-	mask := maplibre.RuntimeEventFlagMapStyleLoaded | maplibre.RuntimeEventFlagMapLoadingFailed
+	mask := maplibre.RuntimeEventFlagMapStyleLoaded |
+		maplibre.RuntimeEventFlagMapLoadingFailed
 	m, created, err := runtime.CreateMap(maplibre.MapOptions{
-		InitialExtent: maplibre.LogicalExtent{Width: 512, Height: 512, ScaleFactor: 1},
-		EventMask:     &mask,
+		InitialExtent: maplibre.LogicalExtent{
+			Width: 512, Height: 512, ScaleFactor: 1,
+		},
+		EventMask: &mask,
 	})
 	if err != nil {
 		return err
@@ -57,9 +62,15 @@ func eventsAndLogs(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #region logs
 	err = maplibre.SetLogCallback(maplibre.LogHandler{
 		// Runs on a library thread, and can't call the library.
-		Callback: func(severity maplibre.LogSeverity, _ maplibre.LogEvent, _ int64, message string) bool {
+		Callback: func(
+			severity maplibre.LogSeverity,
+			_ maplibre.LogEvent,
+			_ int64,
+			message string,
+		) bool {
 			writeLog(severity, message)
-			// Consume the record. Return false to let the platform logger print it too.
+			// Consume the record. Return false to let the platform logger
+			// print it too.
 			return true
 		},
 	})

@@ -40,15 +40,20 @@ Future<void> renderToTexture(
   // #region attach-owned
   final texture = VulkanOwnedTextureDescriptor(
     // The texture's size in logical pixels, and its scale factor.
-    extent: const LogicalExtent(width: 800, height: 600, scaleFactor: 2),
-    // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+    extent: const LogicalExtent(
+      width: 800,
+      height: 600,
+      scaleFactor: 2,
+    ),
+    // Your VkInstance, VkPhysicalDevice,
+    // VkDevice, and graphics VkQueue.
     context: vulkan,
   );
   final options = RenderSessionAttachOptions(
     driver: RenderDriverKind.coreWorker,
     frameWake: const Wake(callback: onFrameWake),
-    // Only if your renderer also submits to the graphics queue. The lock and
-    // unlock are native function pointers.
+    // Only if your renderer also submits to the graphics queue. The
+    // lock and unlock are native function pointers.
     queueLock: QueueLock.native(lock: lockQueue, unlock: unlockQueue),
   );
 
@@ -62,7 +67,11 @@ Future<void> renderToTexture(
 
   // #region attach-borrowed
   var ring = VulkanBorrowedTextureDescriptor(
-    extent: const LogicalExtent(width: 800, height: 600, scaleFactor: 2),
+    extent: const LogicalExtent(
+      width: 800,
+      height: 600,
+      scaleFactor: 2,
+    ),
     // The size of your textures in device pixels.
     physicalWidth: 1600,
     physicalHeight: 1200,
@@ -76,12 +85,15 @@ Future<void> renderToTexture(
     finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
   );
 
-  // The same attach options as for an owned ring. A queue lock serves one
-  // attach, so pass a new one.
+  // The same attach options as for an owned ring. A queue lock serves
+  // one attach, so pass a new one.
   final borrowed = map.attachVulkanBorrowedTexture(
     ring,
     options.copyWith(
-      queueLock: QueueLock.native(lock: lockQueue, unlock: unlockQueue),
+      queueLock: QueueLock.native(
+        lock: lockQueue,
+        unlock: unlockQueue,
+      ),
     ),
   );
   session = borrowed.session;
@@ -90,17 +102,28 @@ Future<void> renderToTexture(
 
   // #region resize-borrowed
   ring = ring.copyWith(
-    extent: const LogicalExtent(width: 1024, height: 768, scaleFactor: 2),
+    extent: const LogicalExtent(
+      width: 1024,
+      height: 768,
+      scaleFactor: 2,
+    ),
     physicalWidth: 2048,
     physicalHeight: 1536,
     // Your new textures, at the new size.
     textures: [
-      VulkanBorrowedTexture(image: newImages[0], imageView: newViews[0]),
-      VulkanBorrowedTexture(image: newImages[1], imageView: newViews[1]),
+      VulkanBorrowedTexture(
+        image: newImages[0],
+        imageView: newViews[0],
+      ),
+      VulkanBorrowedTexture(
+        image: newImages[1],
+        imageView: newViews[1],
+      ),
     ],
   );
 
   await session.setVulkanBorrowedTextureTarget(ring);
-  destroyTextures(images, views); // vkDestroyImageView and vkDestroyImage
+  // vkDestroyImageView and vkDestroyImage
+  destroyTextures(images, views);
   // #endregion resize-borrowed
 }

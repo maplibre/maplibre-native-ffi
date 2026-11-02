@@ -1,5 +1,5 @@
-// Snippets for the docs site's Network page. They compile with the native
-// tests, which never run them.
+// Snippets for the docs site's Network page. They compile with the
+// native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stddef.h>
@@ -17,9 +17,12 @@ static mln_buffer_view with_api_key(
     return url;
   }
   memcpy(buffer, url.data, url.size);
-  buffer[url.size] = memchr(url.data, '?', url.size) == NULL ? '?' : '&';
+  buffer[url.size] =
+    memchr(url.data, '?', url.size) == NULL ? '?' : '&';
   memcpy(buffer + url.size + 1, api_key_parameter, key_size);
-  return (mln_buffer_view){.data = buffer, .size = url.size + 1 + key_size};
+  return (mln_buffer_view){
+    .data = buffer, .size = url.size + 1 + key_size
+  };
 }
 
 static mln_buffer_view find_tile(mln_buffer_view url) {
@@ -59,7 +62,9 @@ static void serve_tile(
   (void)user_data;
   mln_buffer_view tile = find_tile(request->requested_url);
 
-  mln_resource_response response = {.size = sizeof(mln_resource_response)};
+  mln_resource_response response = {
+    .size = sizeof(mln_resource_response)
+  };
   if (tile.size > 0) {
     response.status = MLN_RESOURCE_RESPONSE_STATUS_OK;
     response.bytes = tile.data;
@@ -68,7 +73,10 @@ static void serve_tile(
     response.status = MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT;
   }
 
-  if (mln_resource_request_complete(handle, &response, NULL) != MLN_STATUS_OK) {
+  if (
+    mln_resource_request_complete(handle, &response, NULL) !=
+    MLN_STATUS_OK
+  ) {
     mln_resource_request_release(handle);
   }
 }
@@ -96,7 +104,8 @@ void mln_doc_network(mln_runtime runtime, mln_map map) {
     const mln_http_header_rule rule = {
       .size = sizeof(mln_http_header_rule),
       .flags = MLN_URL_MATCH_GLOB,
-      .url = mln_buffer_view_from_cstr("https://tiles.example.com/**"),
+      .url =
+        mln_buffer_view_from_cstr("https://tiles.example.com/**"),
       .headers = &header,
       .header_count = 1,
     };
@@ -106,7 +115,9 @@ void mln_doc_network(mln_runtime runtime, mln_map map) {
       .rule_count = 1,
     };
 
-    mln_runtime_set_http_header_transform(runtime, &transform, NULL, NULL);
+    mln_runtime_set_http_header_transform(
+      runtime, &transform, NULL, NULL
+    );
     // #endregion headers
   }
 
@@ -117,7 +128,9 @@ void mln_doc_network(mln_runtime runtime, mln_map map) {
       .callback = add_api_key,
     };
 
-    mln_runtime_set_resource_transform(runtime, &transform, NULL, NULL);
+    mln_runtime_set_resource_transform(
+      runtime, &transform, NULL, NULL
+    );
     // #endregion rewrite
   }
 

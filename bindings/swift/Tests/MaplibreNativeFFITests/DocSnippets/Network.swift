@@ -1,4 +1,5 @@
-// Snippets for the docs site's Network page. They compile with the tests,
+// Snippets for the docs site's Network page. They compile with the
+// tests,
 // which never run them.
 
 import Foundation
@@ -18,13 +19,17 @@ private func geojsonForTile(_: CanonicalTileId) -> String {
 
 private func network(runtime: RuntimeHandle, map: MapHandle) throws {
   // #region headers
-  try runtime.discarding.setHttpHeaderTransform(HttpHeaderTransform(rules: [
-    HttpHeaderRule(
-      flags: .glob,
-      url: "https://tiles.example.com/**",
-      headers: [HttpHeader(name: "Authorization", value: "Bearer my-token")]
-    ),
-  ]))
+  try runtime.discarding
+    .setHttpHeaderTransform(HttpHeaderTransform(rules: [
+      HttpHeaderRule(
+        flags: .glob,
+        url: "https://tiles.example.com/**",
+        headers: [HttpHeader(
+          name: "Authorization",
+          value: "Bearer my-token"
+        )]
+      ),
+    ]))
   // #endregion headers
 
   // #region rewrite
@@ -54,7 +59,11 @@ private func network(runtime: RuntimeHandle, map: MapHandle) throws {
         handle.close()
       }
     },
-    routes: [ResourceRoute(kinds: .tile, flags: .glob, url: "app://tiles/**")]
+    routes: [ResourceRoute(
+      kinds: .tile,
+      flags: .glob,
+      url: "app://tiles/**"
+    )]
   ))
   // #endregion provider
 

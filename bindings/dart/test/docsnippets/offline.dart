@@ -6,7 +6,12 @@ import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
-void recordProgress(int regionId, int completed, int required, bool complete) {}
+void recordProgress(
+  int regionId,
+  int completed,
+  int required,
+  bool complete,
+) {}
 
 void recordError(int regionId, String message) {}
 
@@ -24,14 +29,17 @@ Future<void> offline() async {
     for (final RuntimeEvent(:payload, :message) in events) {
       switch (payload) {
         case RuntimeEventPayloadOfflineRegionStatus(:final value):
-          final RuntimeEventOfflineRegionStatus(:regionId, :status) = value;
+          final RuntimeEventOfflineRegionStatus(:regionId, :status) =
+              value;
           recordProgress(
             regionId,
             status.completedResourceCount,
             status.requiredResourceCount,
             status.complete,
           );
-        case RuntimeEventPayloadOfflineRegionResponseError(:final value):
+        case RuntimeEventPayloadOfflineRegionResponseError(
+          :final value,
+        ):
           recordError(value.regionId, message);
         default:
       }

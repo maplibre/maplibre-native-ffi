@@ -22,7 +22,9 @@ var paused = false;
 
 void requestFrame() {
   session.requestFrame(
-    FrameDemand(flags: FrameDemandFlag.present | FrameDemandFlag.waitForUpdate),
+    FrameDemand(
+      flags: FrameDemandFlag.present | FrameDemandFlag.waitForUpdate,
+    ),
   );
 }
 
@@ -31,7 +33,9 @@ void drainFrameResults() {
   if (results.isEmpty) {
     return;
   }
-  if (results.any((result) => result.disposition == RenderResult.failed)) {
+  if (results.any(
+    (result) => result.disposition == RenderResult.failed,
+  )) {
     replaceSession(); // Close the session and attach a new one.
   } else if (!paused) {
     atNextRefresh(requestFrame);
@@ -40,7 +44,8 @@ void drainFrameResults() {
 // #endregion frame-loop
 
 // #region frame-wake
-// The binding calls the wake in this isolate, so it can drain right away.
+// The binding calls the wake in this
+// isolate, so it can drain right away.
 void onFrameWake() {
   drainFrameResults();
 }
@@ -69,7 +74,11 @@ Future<void> surfaceRestored(
   // #region lost-surface
   await session.setVulkanSurfaceTarget(
     VulkanSurfaceDescriptor(
-      extent: const LogicalExtent(width: 800, height: 600, scaleFactor: 2),
+      extent: const LogicalExtent(
+        width: 800,
+        height: 600,
+        scaleFactor: 2,
+      ),
       context: vulkan,
       surface: newSurface,
     ),
@@ -89,8 +98,13 @@ Future<void> renderToWindow(
   final attachment = map.attachVulkanSurface(
     VulkanSurfaceDescriptor(
       // The window's size in logical pixels, and its scale factor.
-      extent: const LogicalExtent(width: 800, height: 600, scaleFactor: 2),
-      // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+      extent: const LogicalExtent(
+        width: 800,
+        height: 600,
+        scaleFactor: 2,
+      ),
+      // Your VkInstance, VkPhysicalDevice,
+      // VkDevice, and graphics VkQueue.
       context: vulkan,
       // Your VkSurfaceKHR.
       surface: windowSurface,
@@ -108,10 +122,10 @@ Future<void> renderToWindow(
   onWindowResized(1024, 768);
 
   // #region service
-  // An isolate can't service the session, because it can resume on another
-  // thread after any await. Your native wake schedules
-  // mln_render_session_service_driver_work on your graphics thread, with the
-  // session's id.
+  // An isolate can't service the session, because it can resume on
+  // another thread after any await. Your native wake schedules
+  // mln_render_session_service_driver_work on your graphics thread,
+  // with the session's id.
   final graphicsThreadOptions = RenderSessionAttachOptions(
     driver: RenderDriverKind.callerGraphicsThread,
     frameWake: const Wake(callback: onFrameWake),
@@ -119,9 +133,7 @@ Future<void> renderToWindow(
   );
   // #endregion service
 
-  // #region close
   paused = true;
   await session.close();
   destroySurface();
-  // #endregion close
 }

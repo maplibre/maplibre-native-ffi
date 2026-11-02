@@ -1,5 +1,5 @@
-// Snippets for the docs site's Offline page. They compile with the native
-// tests, which never run them.
+// Snippets for the docs site's Offline page. They compile with the
+// native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -8,7 +8,9 @@
 
 static atomic_bool finished;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -20,8 +22,8 @@ static void wait_for_done(void) {
 }
 
 static void record_progress(
-  mln_offline_region_id region_id, uint64_t completed, uint64_t required,
-  bool complete
+  mln_offline_region_id region_id, uint64_t completed,
+  uint64_t required, bool complete
 ) {
   (void)region_id;
   (void)completed;
@@ -37,7 +39,8 @@ static void record_error(
 }
 
 static void record_region(
-  mln_offline_region_id region_id, const uint8_t* metadata, size_t size
+  mln_offline_region_id region_id, const uint8_t* metadata,
+  size_t size
 ) {
   (void)region_id;
   (void)metadata;
@@ -57,7 +60,9 @@ static void on_region_created(
 // #endregion download
 
 // #region progress
-static void on_events(void* user_data, const mln_event_batch_view* batch) {
+static void on_events(
+  void* user_data, const mln_event_batch_view* batch
+) {
   (void)user_data;
   const uint8_t* bytes = (const uint8_t*)batch->events;
   for (size_t i = 0; i < batch->event_count; i += 1) {
@@ -65,16 +70,22 @@ static void on_events(void* user_data, const mln_event_batch_view* batch) {
     const mln_runtime_event* event =
       (const mln_runtime_event*)(bytes + i * batch->event_size);
 
-    if (event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED) {
+    if (
+      event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED
+    ) {
       const mln_runtime_event_offline_region_status* payload =
         &event->payload.offline_region_status;
       record_progress(
         payload->region_id, payload->status.completed_resource_count,
-        payload->status.required_resource_count, payload->status.complete
+        payload->status.required_resource_count,
+        payload->status.complete
       );
-    } else if (event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR) {
+    } else if (
+      event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR
+    ) {
       record_error(
-        event->payload.offline_region_response_error.region_id, event->message
+        event->payload.offline_region_response_error.region_id,
+        event->message
       );
     }
   }
@@ -82,14 +93,19 @@ static void on_events(void* user_data, const mln_event_batch_view* batch) {
 // #endregion progress
 
 // #region manage
-static void on_regions(void* user_data, const mln_completion_result* result) {
+static void on_regions(
+  void* user_data, const mln_completion_result* result
+) {
   if (result->status == MLN_STATUS_OK) {
     const uint8_t* bytes = result->value;
     for (size_t i = 0; i < result->value_count; i += 1) {
       // Step by value_size, not by sizeof(mln_offline_region_info).
       const mln_offline_region_info* region =
-        (const mln_offline_region_info*)(bytes + i * result->value_size);
-      record_region(region->id, region->metadata, region->metadata_size);
+        (const mln_offline_region_info*)(bytes +
+                                         i * result->value_size);
+      record_region(
+        region->id, region->metadata, region->metadata_size
+      );
     }
   }
   on_done(user_data, result);
@@ -139,8 +155,9 @@ void mln_doc_offline(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .style_url =
-        mln_buffer_view_from_cstr("https://demotiles.maplibre.org/style.json"),
+      .style_url = mln_buffer_view_from_cstr(
+        "https://demotiles.maplibre.org/style.json"
+      ),
       .bounds =
         {
           .southwest = {.latitude = 47.5, .longitude = -122.5},
@@ -160,14 +177,16 @@ void mln_doc_offline(void) {
     .user_data = &region_id,
   };
   mln_runtime_create_offline_region(
-    runtime, &definition, metadata, sizeof(metadata) - 1, &created, NULL
+    runtime, &definition, metadata, sizeof(metadata) - 1, &created,
+    NULL
   );
   // #endregion download
   wait_for_done();
 
   // #region download
   mln_runtime_set_offline_region_download_state(
-    runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &done, NULL
+    runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &done,
+    NULL
   );
   // #endregion download
   wait_for_done();
@@ -190,13 +209,16 @@ void mln_doc_offline(void) {
   // #region manage
   // Resume a download that stopped when the runtime closed.
   mln_runtime_set_offline_region_download_state(
-    runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &done, NULL
+    runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &done,
+    NULL
   );
   // #endregion manage
   wait_for_done();
 
   // #region manage
-  mln_runtime_invalidate_offline_region(runtime, region_id, &done, NULL);
+  mln_runtime_invalidate_offline_region(
+    runtime, region_id, &done, NULL
+  );
   // #endregion manage
   wait_for_done();
 

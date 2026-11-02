@@ -39,7 +39,8 @@ paused = False
 def request_frame() -> None:
     session.request_frame(
         mln.FrameDemand(
-            flags=mln.FrameDemandFlag.PRESENT | mln.FrameDemandFlag.WAIT_FOR_UPDATE
+            flags=mln.FrameDemandFlag.PRESENT
+            | mln.FrameDemandFlag.WAIT_FOR_UPDATE
         )
     )
 
@@ -48,7 +49,10 @@ def drain_frame_results() -> None:
     results = session.drain_frame_results()
     if not results:
         return
-    if any(result.disposition == mln.RenderResult.FAILED for result in results):
+    if any(
+        result.disposition == mln.RenderResult.FAILED
+        for result in results
+    ):
         replace_session()  # Close the session and attach a new one.
     elif not paused:
         run_at_next_refresh(request_frame)
@@ -70,7 +74,9 @@ def on_frame_wake() -> None:
 def on_window_resized(width: int, height: int) -> None:
     # The scale factor the session has now.
     session.discarding.resize(
-        mln.LogicalExtent(width=width, height=height, scale_factor=2.0)
+        mln.LogicalExtent(
+            width=width, height=height, scale_factor=2.0
+        )
     )
 
 
@@ -99,12 +105,16 @@ def surface_lost() -> None:
     # #endregion lost-surface
 
 
-def surface_restored(vulkan: mln.VulkanContextDescriptor, new_surface: int) -> None:
+def surface_restored(
+    vulkan: mln.VulkanContextDescriptor, new_surface: int
+) -> None:
     global paused
     # #region lost-surface
     session.set_vulkan_surface_target(
         mln.VulkanSurfaceDescriptor(
-            extent=mln.LogicalExtent(width=800, height=600, scale_factor=2.0),
+            extent=mln.LogicalExtent(
+                width=800, height=600, scale_factor=2.0
+            ),
             context=vulkan,
             surface=new_surface,
         )
@@ -123,9 +133,13 @@ def render_to_window(
     # #region attach
     session, ready = map_handle.attach_vulkan_surface(
         mln.VulkanSurfaceDescriptor(
-            # The window's size in logical pixels, and its scale factor.
-            extent=mln.LogicalExtent(width=800, height=600, scale_factor=2.0),
-            # Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+            # The window's size in logical
+            # pixels, and its scale factor.
+            extent=mln.LogicalExtent(
+                width=800, height=600, scale_factor=2.0
+            ),
+            # Your VkInstance, VkPhysicalDevice,
+            # VkDevice, and graphics VkQueue.
             context=vulkan,
             # Your VkSurfaceKHR.
             surface=window_surface,
@@ -150,8 +164,6 @@ def render_to_window(
     # #endregion service
     del graphics_thread_options
 
-    # #region close
     paused = True
     session.close().result()
     destroy_surface()  # For example, with vkDestroySurfaceKHR.
-    # #endregion close

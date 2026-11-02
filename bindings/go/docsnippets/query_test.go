@@ -12,13 +12,18 @@ func useFeature(geojson string) {}
 
 func query(ctx context.Context, session *maplibre.RenderSessionHandle, point maplibre.ScreenPoint) error {
 	// #region rendered
-	box := maplibre.RenderedQueryGeometryBoxVariant{Value: maplibre.ScreenBox{
-		Min: maplibre.ScreenPoint{X: point.X - 5, Y: point.Y - 5},
-		Max: maplibre.ScreenPoint{X: point.X + 5, Y: point.Y + 5},
-	}}
-	rendered, err := session.QueryRenderedFeatures(box, &maplibre.RenderedFeatureQueryOptions{
-		LayerIds: []string{"poi"},
-	})
+	box := maplibre.RenderedQueryGeometryBoxVariant{
+		Value: maplibre.ScreenBox{
+			Min: maplibre.ScreenPoint{X: point.X - 5, Y: point.Y - 5},
+			Max: maplibre.ScreenPoint{X: point.X + 5, Y: point.Y + 5},
+		},
+	}
+	rendered, err := session.QueryRenderedFeatures(
+		box,
+		&maplibre.RenderedFeatureQueryOptions{
+			LayerIds: []string{"poi"},
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -33,11 +38,14 @@ func query(ctx context.Context, session *maplibre.RenderSessionHandle, point map
 	// #endregion rendered
 
 	// #region source
-	source, err := session.QuerySourceFeatures("openmaptiles", &maplibre.SourceFeatureQueryOptions{
-		SourceLayerIds: []string{"transportation"},
-		// A filter from the MapLibre style spec, as JSON.
-		Filter: `["==", ["get", "class"], "motorway"]`,
-	})
+	source, err := session.QuerySourceFeatures(
+		"openmaptiles",
+		&maplibre.SourceFeatureQueryOptions{
+			SourceLayerIds: []string{"transportation"},
+			// A filter from the MapLibre style spec, as JSON.
+			Filter: `["==", ["get", "class"], "motorway"]`,
+		},
+	)
 	if err != nil {
 		return err
 	}

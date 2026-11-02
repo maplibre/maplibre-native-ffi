@@ -21,7 +21,9 @@ function drawImage(_imageId: string): PremultipliedRgba8Image {
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 export function style(map: MapHandle, pixels: Uint8Array): void {
   // #region load
-  map.discarding.setStyleUrl("https://demotiles.maplibre.org/style.json");
+  map.discarding.setStyleUrl(
+    "https://demotiles.maplibre.org/style.json",
+  );
   // #endregion load
 
   // #region add
@@ -59,16 +61,16 @@ export function style(map: MapHandle, pixels: Uint8Array): void {
   // #region set-property
   // Show both changes in the same frame.
   map.discarding.beginCommandGroup();
-  map.discarding.setStyleLayerProperty("satellite", "visibility", "none");
-  map.discarding.setStyleLayerProperty("countries-boundary", "line-color", [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    5,
-    "#9cf",
-    12,
-    "#06c",
-  ]);
+  map.discarding.setStyleLayerProperty(
+    "satellite",
+    "visibility",
+    "none",
+  );
+  map.discarding.setStyleLayerProperty(
+    "countries-boundary",
+    "line-color",
+    ["interpolate", ["linear"], ["zoom"], 5, "#9cf", 12, "#06c"],
+  );
   map.discarding.endCommandGroup();
   // #endregion set-property
 
@@ -93,7 +95,10 @@ export function style(map: MapHandle, pixels: Uint8Array): void {
   // #endregion image
 }
 
-export function styleEvents(runtime: RuntimeHandle, map: MapHandle): void {
+export function styleEvents(
+  runtime: RuntimeHandle,
+  map: MapHandle,
+): void {
   // #region missing-image
   // The handler runs on this thread. The binding queues each call.
   runtime.discarding.setEventHandler((events) => {
@@ -105,7 +110,10 @@ export function styleEvents(runtime: RuntimeHandle, map: MapHandle): void {
         continue;
       }
       // The message holds the image's ID.
-      map.discarding.setStyleImage(event.message, drawImage(event.message));
+      map.discarding.setStyleImage(
+        event.message,
+        drawImage(event.message),
+      );
     }
   });
   // #endregion missing-image

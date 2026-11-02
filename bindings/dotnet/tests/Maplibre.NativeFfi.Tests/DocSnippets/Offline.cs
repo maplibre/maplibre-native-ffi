@@ -16,7 +16,10 @@ internal static class Offline
 
     private static void RecordError(long regionId, string message) { }
 
-    private static void RecordRegion(long regionId, ImmutableArray<byte> metadata) { }
+    private static void RecordRegion(
+        long regionId,
+        ImmutableArray<byte> metadata
+    ) { }
 
     // #region progress
     // Runs on a library thread.
@@ -26,7 +29,10 @@ internal static class Offline
         {
             switch (e.Payload)
             {
-                case RuntimeEvent.PayloadValue.OfflineRegionStatus { Value: var progress }:
+                case RuntimeEvent.PayloadValue.OfflineRegionStatus
+                {
+                    Value: var progress
+                }:
                     RecordProgress(
                         progress.RegionId,
                         progress.Status.CompletedResourceCount,
@@ -34,7 +40,10 @@ internal static class Offline
                         progress.Status.Complete
                     );
                     break;
-                case RuntimeEvent.PayloadValue.OfflineRegionResponseError { Value: var error }:
+                case RuntimeEvent.PayloadValue.OfflineRegionResponseError
+                {
+                    Value: var error
+                }:
                     RecordError(error.RegionId, e.Message);
                     break;
             }
@@ -46,31 +55,46 @@ internal static class Offline
     internal static async Task Run()
     {
         // #region cache-file
-        var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = "maplibre-cache.db" });
+        var runtime = RuntimeHandle.Create(
+            new RuntimeOptions { CachePath = "maplibre-cache.db" }
+        );
         // #endregion cache-file
 
         // #region progress
-        runtime.Discarding.SetEventHandler(new RuntimeEventHandler(OnEvents));
+        runtime.Discarding.SetEventHandler(
+            new RuntimeEventHandler(OnEvents)
+        );
         // #endregion progress
 
         // #region ambient
         // 50 MiB
-        await runtime.SetMaximumAmbientCacheSizeAsync(50 * 1024 * 1024);
-        await runtime.RunAmbientCacheOperationAsync(AmbientCacheOperation.Clear);
+        await runtime.SetMaximumAmbientCacheSizeAsync(
+            50 * 1024 * 1024
+        );
+        await runtime.RunAmbientCacheOperationAsync(
+            AmbientCacheOperation.Clear
+        );
         // #endregion ambient
 
         // #region download
         var definition = new OfflineRegionDefinition.TilePyramid(
             new OfflineTilePyramidRegionDefinition
             {
-                StyleUrl = "https://demotiles.maplibre.org/style.json",
-                Bounds = new LatLngBounds(new LatLng(47.5, -122.5), new LatLng(47.8, -122.2)),
+                StyleUrl =
+                    "https://demotiles.maplibre.org/style.json",
+                Bounds = new LatLngBounds(
+                    new LatLng(47.5, -122.5),
+                    new LatLng(47.8, -122.2)
+                ),
                 MinZoom = 0,
                 MaxZoom = 6,
                 PixelRatio = 1,
             }
         );
-        var region = await runtime.CreateOfflineRegionAsync(definition, "Seattle"u8);
+        var region = await runtime.CreateOfflineRegionAsync(
+            definition,
+            "Seattle"u8
+        );
 
         await runtime.SetOfflineRegionDownloadStateAsync(
             region.Id,
@@ -83,7 +107,9 @@ internal static class Offline
         // #endregion progress
 
         // #region manage
-        foreach (var stored in await runtime.ListOfflineRegionsAsync())
+        foreach (
+            var stored in await runtime.ListOfflineRegionsAsync()
+        )
         {
             RecordRegion(stored.Id, stored.Metadata);
         }

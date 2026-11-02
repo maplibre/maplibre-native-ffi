@@ -5,9 +5,12 @@ namespace Maplibre.NativeFfi.Tests.DocSnippets;
 
 internal static class CreateAMap
 {
-    // Attaches a render target, as the Rendering guides show.
-    private static Task<RenderSessionHandle> AttachTarget(MapHandle map) =>
-        throw new NotImplementedException();
+    private static void ReportFailure(MaplibreException error) { }
+
+    // Attaches a render target, as the render target guides show.
+    private static Task<RenderSessionHandle> AttachTarget(
+        MapHandle map
+    ) => throw new NotImplementedException();
 
     internal static async Task Run()
     {
@@ -26,11 +29,42 @@ internal static class CreateAMap
         await map.Ready;
         // #endregion map
 
+        // #region style
+        map.Discarding.SetStyleUrl(
+            "https://demotiles.maplibre.org/style.json"
+        );
+        // #endregion style
+
+        var update = new CameraUpdate
+        {
+            Mode = CameraUpdateMode.Jump,
+            Camera = new CameraOptions { Zoom = 3 },
+        };
+
+        // #region wait
+        await map.UpdateCameraAsync(update);
+
+        // Use the discarding variant to ignore the result.
+        map.Discarding.UpdateCamera(update);
+        // #endregion wait
+
+        // #region errors
+        try
+        {
+            await map.UpdateCameraAsync(update);
+        }
+        catch (MaplibreException error)
+        {
+            // Its message describes the failure.
+            ReportFailure(error);
+        }
+        // #endregion errors
+
         var session = await AttachTarget(map);
 
         // #region close
         session.Dispose();
-        await map.CloseAsync();
+        map.Dispose();
         await runtime.CloseAsync();
         // #endregion close
     }

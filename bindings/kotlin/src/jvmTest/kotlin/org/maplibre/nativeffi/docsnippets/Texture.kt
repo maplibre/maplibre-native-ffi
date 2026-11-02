@@ -1,4 +1,5 @@
-// Snippets for the docs site's Render to a texture page. They compile with the tests, which never
+// Snippets for the docs site's Render to a texture page. They compile
+// with the tests, which never
 // run them.
 package org.maplibre.nativeffi.docsnippets
 
@@ -27,7 +28,10 @@ private fun onFrameWake() {}
 // The host's draw, which samples the image view.
 private fun drawMap(imageView: ULong) {}
 
-private fun destroyTextures(images: List<ULong>, views: List<ULong>) {}
+private fun destroyTextures(
+  images: List<ULong>,
+  views: List<ULong>,
+) {}
 
 private fun drawFrame() {
   // #region acquire
@@ -40,7 +44,8 @@ private fun drawFrame() {
   // #endregion acquire
 }
 
-// queueMutex is the lock your renderer takes around its own calls on the graphics queue.
+// queueMutex is the lock your renderer takes around its own calls on
+// the graphics queue.
 private suspend fun renderToTexture(
   map: MapHandle,
   vulkan: VulkanContextDescriptor,
@@ -54,8 +59,10 @@ private suspend fun renderToTexture(
   val texture =
     VulkanOwnedTextureDescriptor(
       // The texture's size in logical pixels, and its scale factor.
-      extent = LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
-      // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+      extent =
+        LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
+      // Your VkInstance, VkPhysicalDevice,
+      // VkDevice, and graphics VkQueue.
       context = vulkan,
     )
   val options =
@@ -63,7 +70,11 @@ private suspend fun renderToTexture(
       driver = RenderDriverKind.CORE_WORKER,
       frameWake = Wake(::onFrameWake),
       // Only if your renderer also submits to the graphics queue.
-      queueLock = QueueLock(lock = { queueMutex.lock() }, unlock = { queueMutex.unlock() }),
+      queueLock =
+        QueueLock(
+          lock = { queueMutex.lock() },
+          unlock = { queueMutex.unlock() },
+        ),
     )
 
   val owned = map.attachVulkanOwnedTexture(texture, options)
@@ -77,7 +88,8 @@ private suspend fun renderToTexture(
   // #region attach-borrowed
   var ring =
     VulkanBorrowedTextureDescriptor(
-      extent = LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
+      extent =
+        LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
       // The size of your textures in device pixels.
       physicalWidth = 1600u,
       physicalHeight = 1200u,
@@ -85,8 +97,14 @@ private suspend fun renderToTexture(
       // Your VkImage and VkImageView for each texture of the ring.
       textures =
         listOf(
-          VulkanBorrowedTexture(image = images[0], imageView = views[0]),
-          VulkanBorrowedTexture(image = images[1], imageView = views[1]),
+          VulkanBorrowedTexture(
+            image = images[0],
+            imageView = views[0],
+          ),
+          VulkanBorrowedTexture(
+            image = images[1],
+            imageView = views[1],
+          ),
         ),
       format = 37u, // VK_FORMAT_R8G8B8A8_UNORM
       finalLayout = 5u, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
@@ -101,18 +119,30 @@ private suspend fun renderToTexture(
   // #region resize-borrowed
   ring =
     ring.copy(
-      extent = LogicalExtent(width = 1024u, height = 768u, scaleFactor = 2.0),
+      extent =
+        LogicalExtent(
+          width = 1024u,
+          height = 768u,
+          scaleFactor = 2.0,
+        ),
       physicalWidth = 2048u,
       physicalHeight = 1536u,
       // Your new textures, at the new size.
       textures =
         listOf(
-          VulkanBorrowedTexture(image = newImages[0], imageView = newViews[0]),
-          VulkanBorrowedTexture(image = newImages[1], imageView = newViews[1]),
+          VulkanBorrowedTexture(
+            image = newImages[0],
+            imageView = newViews[0],
+          ),
+          VulkanBorrowedTexture(
+            image = newImages[1],
+            imageView = newViews[1],
+          ),
         ),
     )
 
   session.setVulkanBorrowedTextureTarget(ring).await()
-  destroyTextures(images, views) // vkDestroyImageView and vkDestroyImage
+  // vkDestroyImageView and vkDestroyImage
+  destroyTextures(images, views)
   // #endregion resize-borrowed
 }

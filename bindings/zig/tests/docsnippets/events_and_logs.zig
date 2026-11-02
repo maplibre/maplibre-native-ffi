@@ -17,7 +17,10 @@ fn onLoadingFailed(_: []const u8) void {}
 fn writeLog(_: maplibre.LogSeverity, _: []const u8) void {}
 
 // #region handler
-fn onEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void {
+fn onEvents(
+    _: ?*anyopaque,
+    events: []const maplibre.RuntimeEvent,
+) anyerror!void {
     for (events) |event| {
         if (event.source != map.id()) continue;
 
@@ -33,13 +36,23 @@ fn onEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void
 
 fn eventsHandler(runtime: maplibre.Runtime) !void {
     // #region handler
-    try runtime.discarding().setEventHandler(.{ .callback = onEvents }, null);
+    try runtime.discarding().setEventHandler(
+        .{ .callback = onEvents },
+        null,
+    );
     // #endregion handler
 
     // #region mask
     var created = try runtime.createMap(.{
-        .initial_extent = .{ .width = 512, .height = 512, .scale_factor = 1.0 },
-        .event_mask = .{ .map_style_loaded = true, .map_loading_failed = true },
+        .initial_extent = .{
+            .width = 512,
+            .height = 512,
+            .scale_factor = 1.0,
+        },
+        .event_mask = .{
+            .map_style_loaded = true,
+            .map_loading_failed = true,
+        },
     }, null);
     defer created.ready.deinit();
     map = created.map;
@@ -47,10 +60,17 @@ fn eventsHandler(runtime: maplibre.Runtime) !void {
 }
 
 // #region logs
-fn onLog(_: ?*anyopaque, severity: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, message: []const u8) anyerror!bool {
+fn onLog(
+    _: ?*anyopaque,
+    severity: maplibre.LogSeverity,
+    _: maplibre.LogEvent,
+    _: i64,
+    message: []const u8,
+) anyerror!bool {
     // The message is valid only during this callback.
     writeLog(severity, message);
-    // Consume the record. Return false to let the platform logger print it too.
+    // Consume the record. Return false to let the platform logger
+    // print it too.
     return true;
 }
 // #endregion logs

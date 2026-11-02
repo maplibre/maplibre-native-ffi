@@ -6,7 +6,9 @@ description: Present a map to a window or view.
 # graphics thread.
 ---
 
-import Snippet from "../../../../components/Snippet.astro";
+import { Aside } from "@astrojs/starlight/components";
+
+import Snippet from "../../../components/Snippet.astro";
 
 This guide presents a continuous map to a window or view that you create, and
 keeps it updated as the map changes. It starts from a runtime and a map in
@@ -15,7 +17,7 @@ continuous mode. To create them, see
 
 ## Attach a surface
 
-Create the window with your platform or windowing library. Then get its surface
+Create the window with your platform or windowing library, then get its surface
 handle for your backend:
 
 - Metal: a
@@ -23,29 +25,45 @@ handle for your backend:
 - Vulkan: a
   [`VkSurfaceKHR`](https://registry.khronos.org/vulkan/specs/latest/man/html/VkSurfaceKHR.html)
 - OpenGL: an
-  [EGL window surface](https://registry.khronos.org/EGL/sdk/docs/man/html/eglCreateWindowSurface.xhtml),
-  or an `HDC` with WGL
+  [`EGLSurface`](https://registry.khronos.org/EGL/sdk/docs/man/html/eglCreateWindowSurface.xhtml)
+  with EGL, or an
+  [`HDC`](https://learn.microsoft.com/en-us/windows/win32/gdi/device-contexts)
+  with WGL
+- WebGL: a
+  [`<canvas>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/canvas),
+  either through a WebGL context that you create on it with
+  [`emscripten_webgl_create_context`](https://emscripten.org/docs/api_reference/html5.h.html#c.emscripten_webgl_create_context),
+  or by its selector, which the library
+  [transfers](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen)
+  to a worker
 - WebGPU: a
-  [canvas](https://developer.mozilla.org/en-US/docs/Web/API/GPUCanvasContext)
+  [`WGPUSurface`](https://webgpu-native.github.io/webgpu-headers/Surfaces.html),
+  which a browser creates from a
+  [`<canvas>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/canvas)
 
-The snippets use Vulkan and start from that handle.
+<Aside type="note">
+  The snippets below use Vulkan. For another backend, attach and replace the
+  surface with that backend's calls. The other steps are the same.
+</Aside>
 
-Attach the surface to the map at the window's size and scale factor. Pass a
-frame wake. The next section uses it. Wait for the attach to finish.
+Attach the surface to the map at the window's size and scale factor, and wait
+for the attach to finish. Keep the surface until the session closes. Also pass
+the frame wake that [Render frames](#render-frames) uses.
 
-Use the library thread as the driver, unless your backend needs your graphics
-thread. See
-[Choose a render target](/maplibre-native-ffi/guides/rendering/choose-a-target/#pick-a-driver).
+The driver runs the session's graphics work. Use the library thread unless the
+surface uses your OpenGL context or WebGPU in a browser, and use your graphics
+thread for those. See
+[Render on your graphics thread](#render-on-your-graphics-thread).
 
 <Snippet page="window" region="attach" />
 
 ## Render frames
 
 Ask for one frame at a time, starting after the attach finishes. Ask the frame
-to present, and to wait for the map's next update. An idle map then renders
-nothing.
+to present and to wait for the map's next update, so that an idle map renders
+nothing. Stop asking before you close the session.
 
-The frame wake can run on a library thread. Have it schedule a drain of the
+The frame wake can run on a library thread, so have it schedule a drain of the
 frame results on your event loop.
 
 <Snippet page="window" region="frame-wake" />
@@ -59,9 +77,9 @@ When a frame fails, close the session and attach a new one.
 
 ## Resize the window
 
-When the window's size changes, resize the session to the new width and height.
-The session resizes the map too. Keep asking for frames. Frames render at the
-new size once the map has applied it.
+When the window's size changes, resize the session to the new width and height,
+and it resizes the map too. Keep asking for frames, and they render at the new
+size once the map has applied it.
 
 To change the scale factor, or if the platform gives you a new surface for the
 new size, set the surface as the session's target instead. See the next section.
@@ -88,17 +106,8 @@ there first.
 
 Pass a driver work wake when you attach. Each time it fires, schedule a service
 of the session on your graphics thread, even while you ask for no frames.
-Attaching, detaching, and releasing the target finish only through service.
+Attaching, detaching, and releasing the target finish only through service. To
+close the session, detach it first, and keep servicing until the detach
+finishes.
 
 <Snippet page="window" region="service" />
-
-## Close the session
-
-Stop asking for frames. Close the session, and wait for it to finish. With the
-graphics-thread driver, detach the session first, and keep servicing it until
-the detach finishes.
-
-Destroy the surface after the session closes. Then close the map and the
-runtime, as in [Create a map](/maplibre-native-ffi/guides/create-a-map/#close).
-
-<Snippet page="window" region="close" />

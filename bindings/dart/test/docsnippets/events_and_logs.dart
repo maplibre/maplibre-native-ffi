@@ -37,7 +37,8 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
         scaleFactor: 1,
       ),
       eventMask:
-          RuntimeEventFlag.mapStyleLoaded | RuntimeEventFlag.mapLoadingFailed,
+          RuntimeEventFlag.mapStyleLoaded |
+          RuntimeEventFlag.mapLoadingFailed,
     ),
   );
   // #endregion mask

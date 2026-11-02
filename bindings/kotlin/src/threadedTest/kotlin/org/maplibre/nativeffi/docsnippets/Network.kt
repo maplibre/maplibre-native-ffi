@@ -1,4 +1,5 @@
-// Snippets for the docs site's Network page. They compile with the tests, which never run them.
+// Snippets for the docs site's Network page. They compile with the
+// tests, which never run them.
 package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.CanonicalTileId
@@ -36,7 +37,13 @@ private fun network(runtime: RuntimeHandle, map: MapHandle) {
           HttpHeaderRule(
             flags = UrlMatchFlag.GLOB,
             url = "https://tiles.example.com/**",
-            headers = listOf(HttpHeader(name = "Authorization", value = "Bearer my-token")),
+            headers =
+              listOf(
+                HttpHeader(
+                  name = "Authorization",
+                  value = "Bearer my-token",
+                ),
+              ),
           ),
         ),
     ),
@@ -45,7 +52,9 @@ private fun network(runtime: RuntimeHandle, map: MapHandle) {
 
   // #region rewrite
   runtime.discarding.setResourceTransform(
-    ResourceTransform { _, url, request -> request.complete(withApiKey(url)) },
+    ResourceTransform { _, url, request ->
+      request.complete(withApiKey(url))
+    },
   )
   // #endregion rewrite
 
@@ -66,7 +75,10 @@ private fun network(runtime: RuntimeHandle, map: MapHandle) {
         if (tile == null) {
           ResourceResponse(status = ResourceResponseStatus.NO_CONTENT)
         } else {
-          ResourceResponse(status = ResourceResponseStatus.OK, bytes = tile)
+          ResourceResponse(
+            status = ResourceResponseStatus.OK,
+            bytes = tile,
+          )
         },
       )
     },
@@ -78,7 +90,11 @@ private fun network(runtime: RuntimeHandle, map: MapHandle) {
     "app-data",
     CustomGeometrySourceOptions(
       fetchTile = { tile ->
-        map.discarding.setCustomGeometrySourceTileData("app-data", tile, geojsonForTile(tile))
+        map.discarding.setCustomGeometrySourceTileData(
+          "app-data",
+          tile,
+          geojsonForTile(tile),
+        )
       },
     ),
   )

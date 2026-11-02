@@ -31,7 +31,8 @@ var paused bool
 
 func requestFrame() error {
 	return session.RequestFrame(maplibre.FrameDemand{
-		Flags: maplibre.FrameDemandFlagPresent | maplibre.FrameDemandFlagWaitForUpdate,
+		Flags: maplibre.FrameDemandFlagPresent |
+			maplibre.FrameDemandFlagWaitForUpdate,
 	})
 }
 
@@ -77,8 +78,8 @@ func onWindowResized(width, height uint32) error {
 // #endregion resize
 
 // #region service
-// Your graphics context is current on this thread. Its goroutine holds
-// runtime.LockOSThread.
+// Your graphics context is current on this thread.
+// Its goroutine holds runtime.LockOSThread.
 func serviceSession() error {
 	return session.ServiceDriverWork()
 }
@@ -106,11 +107,14 @@ func surfaceLost(ctx context.Context) error {
 
 func surfaceRestored(ctx context.Context, vulkan maplibre.VulkanContextDescriptor, newSurface uint64) error {
 	// #region lost-surface
-	restored, err := session.SetVulkanSurfaceTarget(maplibre.VulkanSurfaceDescriptor{
-		Extent:  maplibre.LogicalExtent{Width: 800, Height: 600, ScaleFactor: 2},
+	surface := maplibre.VulkanSurfaceDescriptor{
+		Extent: maplibre.LogicalExtent{
+			Width: 800, Height: 600, ScaleFactor: 2,
+		},
 		Context: vulkan,
 		Surface: newSurface,
-	})
+	}
+	restored, err := session.SetVulkanSurfaceTarget(surface)
 	if err != nil {
 		return err
 	}
@@ -126,8 +130,11 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	// #region attach
 	surface := maplibre.VulkanSurfaceDescriptor{
 		// The window's size in logical pixels, and its scale factor.
-		Extent: maplibre.LogicalExtent{Width: 800, Height: 600, ScaleFactor: 2},
-		// Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+		Extent: maplibre.LogicalExtent{
+			Width: 800, Height: 600, ScaleFactor: 2,
+		},
+		// Your VkInstance, VkPhysicalDevice,
+		// VkDevice, and graphics VkQueue.
 		Context: vulkan,
 		// Your VkSurfaceKHR.
 		Surface: windowSurface,
@@ -163,7 +170,6 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	// #endregion service
 	_ = graphicsThreadOptions
 
-	// #region close
 	paused = true
 	closed, err := session.Close()
 	if err != nil {
@@ -174,7 +180,6 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	}
 
 	destroySurface() // For example, with vkDestroySurfaceKHR.
-	// #endregion close
 	return nil
 }
 

@@ -6,6 +6,7 @@ const maplibre = @import("maplibre_native_ffi");
 
 comptime {
     _ = &images;
+    _ = &imagesTile;
 }
 
 /// The center of tile z/x/y. The snippet leaves the tile math to the reader.
@@ -18,11 +19,15 @@ fn copyPixels(data: []const u8, stride: u32) void {
     _ = .{ data, stride };
 }
 
-fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime, z: u32, x: u32, y: u32) !void {
+fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
     // #region map
     const map_options = maplibre.MapOptions{
-        .initial_extent = .{ .width = 512, .height = 512, .scale_factor = 1.0 },
-        .map_mode = .tile,
+        .initial_extent = .{
+            .width = 800,
+            .height = 600,
+            .scale_factor = 2.0,
+        },
+        .map_mode = .static,
     };
 
     var created = try runtime.createMap(map_options, null);
@@ -32,7 +37,10 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime, z: u32, x: u3
     // #endregion map
 
     // #region style
-    try map.discarding().setStyleUrl("https://demotiles.maplibre.org/style.json", null);
+    try map.discarding().setStyleUrl(
+        "https://demotiles.maplibre.org/style.json",
+        null,
+    );
     // #endregion style
 
     // #region attach
@@ -54,7 +62,10 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime, z: u32, x: u3
     // #region image
     try map.discarding().updateCamera(.{
         .mode = .jump,
-        .camera = .{ .center = tileCenter(z, x, y), .zoom = @floatFromInt(z) },
+        .camera = .{
+            .center = .{ .latitude = 48.8566, .longitude = 2.3522 },
+            .zoom = 4,
+        },
     }, null);
 
     var still = try map.requestStillImage(null);
@@ -70,12 +81,39 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime, z: u32, x: u3
     copyPixels(image.value.data, image.value.info.stride);
     // #endregion read
 
-    // #region close
     try session.dispose(null);
     device.release();
 
     var map_released = try map.release(null);
     defer map_released.deinit();
     try map_released.wait(null);
-    // #endregion close
+}
+
+fn imagesTile(runtime: maplibre.Runtime, z: u32, x: u32, y: u32) !void {
+    // #region tile
+    var created = try runtime.createMap(.{
+        .initial_extent = .{
+            .width = 512,
+            .height = 512,
+            .scale_factor = 1.0,
+        },
+        .map_mode = .tile,
+    }, null);
+    defer created.ready.deinit();
+    var map = created.map;
+    try created.ready.wait(null);
+
+    try map.discarding().updateCamera(.{
+        .mode = .jump,
+        .camera = .{
+            .center = tileCenter(z, x, y),
+            // A 512-pixel map shows tile z/x/y at zoom z.
+            .zoom = @floatFromInt(z),
+        },
+    }, null);
+    // #endregion tile
+
+    var map_released = try map.release(null);
+    defer map_released.deinit();
+    try map_released.wait(null);
 }

@@ -7,7 +7,10 @@ internal static class Query
 {
     private static void UseFeature(string feature) { }
 
-    internal static async Task Run(RenderSessionHandle session, ScreenPoint point)
+    internal static async Task Run(
+        RenderSessionHandle session,
+        ScreenPoint point
+    )
     {
         // #region rendered
         var box = new ScreenBox(

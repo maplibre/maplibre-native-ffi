@@ -24,15 +24,21 @@ function geojsonForTile(_tile: CanonicalTileId): unknown {
   return { type: "FeatureCollection", features: [] };
 }
 
-export function network(runtime: RuntimeHandle, map: MapHandle): void {
+export function network(
+  runtime: RuntimeHandle,
+  map: MapHandle,
+): void {
   // #region headers
-  // This binding takes rules only, because it can't answer on a library thread.
+  // This binding takes rules only, because
+  // it can't answer on a library thread.
   runtime.discarding.setHttpHeaderTransform({
     rules: [
       {
         flags: UrlMatchFlag.glob,
         url: "https://tiles.example.com/**",
-        headers: [{ name: "Authorization", value: "Bearer my-token" }],
+        headers: [
+          { name: "Authorization", value: "Bearer my-token" },
+        ],
       },
     ],
   });

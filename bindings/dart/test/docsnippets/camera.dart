@@ -108,7 +108,9 @@ Future<void> camera(MapHandle map) async {
   endGesture(map);
 
   // #region convert
-  final projection = MapProjectionHandle.create(map.getSnapshot().view);
+  final projection = MapProjectionHandle.create(
+    map.getSnapshot().view,
+  );
 
   final coordinate = projection.latLngForPixel(
     const ScreenPoint(x: 100, y: 200),

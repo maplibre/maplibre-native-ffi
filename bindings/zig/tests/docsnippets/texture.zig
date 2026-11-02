@@ -29,7 +29,8 @@ fn destroyTextures(images: [2]u64, views: [2]u64) void {
 
 fn drawFrame() !void {
     // #region acquire
-    var frame = (try session.acquireFrame(null)) orelse return; // No new frame yet.
+    // Return when there's no new frame yet.
+    var frame = (try session.acquireFrame(null)) orelse return;
 
     // Sample the texture, and wait for those reads to finish.
     try frame.getVulkanTexture({}, drawMap, null);
@@ -50,8 +51,13 @@ fn renderToTexture(
     // #region attach-owned
     const texture = maplibre.VulkanOwnedTextureDescriptor{
         // The texture's size in logical pixels, and its scale factor.
-        .extent = .{ .width = 800, .height = 600, .scale_factor = 2.0 },
-        // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+        .extent = .{
+            .width = 800,
+            .height = 600,
+            .scale_factor = 2.0,
+        },
+        // Your VkInstance, VkPhysicalDevice,
+        // VkDevice, and graphics VkQueue.
         .context = vulkan,
     };
     const options = maplibre.RenderSessionAttachOptions{
@@ -61,7 +67,8 @@ fn renderToTexture(
         .queue_lock = .{ .lock = lockQueue, .unlock = unlockQueue },
     };
 
-    var owned = try map.attachVulkanOwnedTexture(texture, options, null);
+    var owned =
+        try map.attachVulkanOwnedTexture(texture, options, null);
     defer owned.ready.deinit();
     session = owned.session;
     try owned.ready.wait(null);
@@ -79,7 +86,11 @@ fn renderToTexture(
         .{ .image = images[1], .image_view = views[1] },
     };
     var ring = maplibre.VulkanBorrowedTextureDescriptor{
-        .extent = .{ .width = 800, .height = 600, .scale_factor = 2.0 },
+        .extent = .{
+            .width = 800,
+            .height = 600,
+            .scale_factor = 2.0,
+        },
         // The size of your textures in device pixels.
         .physical_width = 1600,
         .physical_height = 1200,
@@ -90,7 +101,12 @@ fn renderToTexture(
     };
 
     // The same attach options as for an owned ring.
-    var borrowed = try map.attachVulkanBorrowedTexture(allocator, ring, options, null);
+    var borrowed = try map.attachVulkanBorrowedTexture(
+        allocator,
+        ring,
+        options,
+        null,
+    );
     defer borrowed.ready.deinit();
     session = borrowed.session;
     try borrowed.ready.wait(null);
@@ -102,15 +118,24 @@ fn renderToTexture(
         .{ .image = new_images[0], .image_view = new_views[0] },
         .{ .image = new_images[1], .image_view = new_views[1] },
     };
-    ring.extent = .{ .width = 1024, .height = 768, .scale_factor = 2.0 };
+    ring.extent = .{
+        .width = 1024,
+        .height = 768,
+        .scale_factor = 2.0,
+    };
     ring.physical_width = 2048;
     ring.physical_height = 1536;
     ring.textures = &new_textures;
 
-    var replaced = try session.setVulkanBorrowedTextureTarget(allocator, ring, null);
+    var replaced = try session.setVulkanBorrowedTextureTarget(
+        allocator,
+        ring,
+        null,
+    );
     defer replaced.deinit();
     try replaced.wait(null);
 
-    destroyTextures(images, views); // vkDestroyImageView and vkDestroyImage
+    // vkDestroyImageView and vkDestroyImage
+    destroyTextures(images, views);
     // #endregion resize-borrowed
 }

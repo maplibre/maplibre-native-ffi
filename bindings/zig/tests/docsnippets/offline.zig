@@ -15,7 +15,10 @@ fn recordError(_: i64, _: []const u8) void {}
 fn recordRegion(_: i64, _: []const u8) void {}
 
 // #region progress
-fn onEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void {
+fn onEvents(
+    _: ?*anyopaque,
+    events: []const maplibre.RuntimeEvent,
+) anyerror!void {
     for (events) |event| {
         switch (event.payload) {
             .offline_region_status => |payload| recordProgress(
@@ -24,7 +27,10 @@ fn onEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void
                 payload.status.required_resource_count,
                 payload.status.complete,
             ),
-            .offline_region_response_error => |payload| recordError(payload.region_id, event.message),
+            .offline_region_response_error => |payload| recordError(
+                payload.region_id,
+                event.message,
+            ),
             else => {},
         }
     }
@@ -33,16 +39,25 @@ fn onEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void
 
 fn offline(allocator: std.mem.Allocator) !void {
     // #region cache-file
-    var runtime = try maplibre.Runtime.create(.{ .cache_path = "maplibre-cache.db" }, null);
+    var runtime = try maplibre.Runtime.create(
+        .{ .cache_path = "maplibre-cache.db" },
+        null,
+    );
     // #endregion cache-file
 
     // #region progress
-    try runtime.discarding().setEventHandler(.{ .callback = onEvents }, null);
+    try runtime.discarding().setEventHandler(
+        .{ .callback = onEvents },
+        null,
+    );
     // #endregion progress
 
     // #region ambient
     // 50 MiB
-    var resized = try runtime.setMaximumAmbientCacheSize(50 * 1024 * 1024, null);
+    var resized = try runtime.setMaximumAmbientCacheSize(
+        50 * 1024 * 1024,
+        null,
+    );
     defer resized.deinit();
     try resized.wait(null);
 
@@ -52,27 +67,38 @@ fn offline(allocator: std.mem.Allocator) !void {
     // #endregion ambient
 
     // #region download
-    var created = try runtime.createOfflineRegion(allocator, .{ .tile_pyramid = .{
-        .style_url = "https://demotiles.maplibre.org/style.json",
-        .bounds = .{
-            .southwest = .{ .latitude = 47.5, .longitude = -122.5 },
-            .northeast = .{ .latitude = 47.8, .longitude = -122.2 },
+    const bounds = maplibre.LatLngBounds{
+        .southwest = .{ .latitude = 47.5, .longitude = -122.5 },
+        .northeast = .{ .latitude = 47.8, .longitude = -122.2 },
+    };
+    var created = try runtime.createOfflineRegion(allocator, .{
+        .tile_pyramid = .{
+            .style_url = "https://demotiles.maplibre.org/style.json",
+            .bounds = bounds,
+            .min_zoom = 0,
+            .max_zoom = 6,
+            .pixel_ratio = 1,
         },
-        .min_zoom = 0,
-        .max_zoom = 6,
-        .pixel_ratio = 1,
-    } }, "Seattle", null);
+    }, "Seattle", null);
     defer created.deinit();
     var region = try created.wait(null);
     defer region.deinit();
 
-    var activated = try runtime.setOfflineRegionDownloadState(region.value.id, .active, null);
+    var activated = try runtime.setOfflineRegionDownloadState(
+        region.value.id,
+        .active,
+        null,
+    );
     defer activated.deinit();
     try activated.wait(null);
     // #endregion download
 
     // #region progress
-    var observed = try runtime.setOfflineRegionObserved(region.value.id, true, null);
+    var observed = try runtime.setOfflineRegionObserved(
+        region.value.id,
+        true,
+        null,
+    );
     defer observed.deinit();
     try observed.wait(null);
     // #endregion progress
@@ -82,18 +108,26 @@ fn offline(allocator: std.mem.Allocator) !void {
     defer listed.deinit();
     var regions = try listed.wait(null);
     defer regions.deinit();
-    for (regions.value) |stored| recordRegion(stored.id, stored.metadata);
+    for (regions.value) |stored| {
+        recordRegion(stored.id, stored.metadata);
+    }
 
     // Resume a download that stopped when the runtime closed.
-    var resumed = try runtime.setOfflineRegionDownloadState(region.value.id, .active, null);
+    var resumed = try runtime.setOfflineRegionDownloadState(
+        region.value.id,
+        .active,
+        null,
+    );
     defer resumed.deinit();
     try resumed.wait(null);
 
-    var invalidated = try runtime.invalidateOfflineRegion(region.value.id, null);
+    var invalidated =
+        try runtime.invalidateOfflineRegion(region.value.id, null);
     defer invalidated.deinit();
     try invalidated.wait(null);
 
-    var deleted = try runtime.deleteOfflineRegion(region.value.id, null);
+    var deleted =
+        try runtime.deleteOfflineRegion(region.value.id, null);
     defer deleted.deinit();
     try deleted.wait(null);
     // #endregion manage

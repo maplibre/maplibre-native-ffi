@@ -1,4 +1,5 @@
-// Snippets for the docs site's Query page. They compile with the tests, which never run them.
+// Snippets for the docs site's Query page. They compile with the
+// tests, which never run them.
 package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.RenderSessionHandle
@@ -10,7 +11,10 @@ import org.maplibre.nativeffi.SourceFeatureQueryOptions
 
 private fun useFeature(feature: String) {}
 
-private suspend fun query(session: RenderSessionHandle, point: ScreenPoint) {
+private suspend fun query(
+  session: RenderSessionHandle,
+  point: ScreenPoint,
+) {
   // #region rendered
   val hits =
     session

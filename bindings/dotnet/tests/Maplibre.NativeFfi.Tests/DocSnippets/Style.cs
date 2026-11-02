@@ -7,27 +7,39 @@ namespace Maplibre.NativeFfi.Tests.DocSnippets;
 
 internal static class Style
 {
-    private static PremultipliedRgba8Image DrawImage(string imageId) =>
-        new(1, 1, 4, [255, 0, 0, 255]);
+    private static PremultipliedRgba8Image DrawImage(
+        string imageId
+    ) => new(1, 1, 4, [255, 0, 0, 255]);
 
     // pixels holds 16 x 16 premultiplied RGBA pixels.
-    internal static void Run(MapHandle map, ImmutableArray<byte> pixels)
+    internal static void Run(
+        MapHandle map,
+        ImmutableArray<byte> pixels
+    )
     {
         // #region load
-        map.Discarding.SetStyleUrl("https://demotiles.maplibre.org/style.json");
+        map.Discarding.SetStyleUrl(
+            "https://demotiles.maplibre.org/style.json"
+        );
         // #endregion load
 
         // #region add
         map.Discarding.AddStyleSourceJson(
             "satellite",
             """
-            {"type":"raster","tileSize":256,"tiles":["https://tiles.example.com/{z}/{x}/{y}.png"]}
+            {
+              "type": "raster",
+              "tileSize": 256,
+              "tiles": ["https://tiles.example.com/{z}/{x}/{y}.png"]
+            }
             """
         );
 
         // Draw the layer under the "countries-label" layer.
         map.Discarding.AddStyleLayerJson(
-            """{"id":"satellite","type":"raster","source":"satellite"}""",
+            """
+            {"id":"satellite","type":"raster","source":"satellite"}
+            """,
             "countries-label"
         );
         // #endregion add
@@ -51,29 +63,46 @@ internal static class Style
         // #region set-property
         // Show both changes in the same frame.
         map.Discarding.BeginCommandGroup();
-        map.Discarding.SetStyleLayerProperty("satellite", "visibility", "\"none\"");
+        map.Discarding.SetStyleLayerProperty(
+            "satellite",
+            "visibility",
+            "\"none\""
+        );
         map.Discarding.SetStyleLayerProperty(
             "countries-boundary",
             "line-color",
-            """["interpolate",["linear"],["zoom"],5,"#9cf",12,"#06c"]"""
+            """
+            ["interpolate",["linear"],["zoom"],5,"#9cf",12,"#06c"]
+            """
         );
         map.Discarding.EndCommandGroup();
         // #endregion set-property
 
         // #region image
-        map.Discarding.SetStyleImage("marker", new PremultipliedRgba8Image(16, 16, 16 * 4, pixels));
+        map.Discarding.SetStyleImage(
+            "marker",
+            new PremultipliedRgba8Image(16, 16, 16 * 4, pixels)
+        );
 
         // An empty layer ID draws the layer on top.
         map.Discarding.AddStyleLayerJson(
             """
-            {"id":"markers","type":"symbol","source":"points","layout":{"icon-image":"marker"}}
+            {
+              "id": "markers",
+              "type": "symbol",
+              "source": "points",
+              "layout": {"icon-image": "marker"}
+            }
             """,
             ""
         );
         // #endregion image
     }
 
-    internal static void RunEvents(RuntimeHandle runtime, MapHandle map)
+    internal static void RunEvents(
+        RuntimeHandle runtime,
+        MapHandle map
+    )
     {
         // #region missing-image
         // Runs on a library thread.
@@ -82,11 +111,18 @@ internal static class Style
             {
                 foreach (var e in events)
                 {
-                    if (e.Source != map.Id || e.Type != RuntimeEventType.MapStyleImageMissing)
+                    if (
+                        e.Source != map.Id
+                        || e.Type
+                            != RuntimeEventType.MapStyleImageMissing
+                    )
                         continue;
 
                     // The message holds the image's ID.
-                    map.Discarding.SetStyleImage(e.Message, DrawImage(e.Message));
+                    map.Discarding.SetStyleImage(
+                        e.Message,
+                        DrawImage(e.Message)
+                    );
                 }
             })
         );

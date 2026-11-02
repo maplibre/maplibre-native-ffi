@@ -7,7 +7,10 @@ use maplibre_native_ffi::*;
 
 fn use_feature(_json: &str) {}
 
-async fn query(session: &RenderSessionHandle, point: ScreenPoint) -> Result<()> {
+async fn query(
+    session: &RenderSessionHandle,
+    point: ScreenPoint,
+) -> Result<()> {
     // #region rendered
     let area = RenderedQueryGeometry::Box(ScreenBox {
         min: ScreenPoint::new(point.x - 5.0, point.y - 5.0),

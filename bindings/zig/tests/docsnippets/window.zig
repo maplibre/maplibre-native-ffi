@@ -38,7 +38,9 @@ var session: maplibre.RenderSession = undefined;
 var paused = false;
 
 fn requestFrame() !void {
-    try session.requestFrame(.{ .flags = .{ .present = true, .wait_for_update = true } }, null);
+    try session.requestFrame(.{
+        .flags = .{ .present = true, .wait_for_update = true },
+    }, null);
 }
 
 fn drainFrameResults() !void {
@@ -48,7 +50,8 @@ fn drainFrameResults() !void {
 
     for (results.value) |result| {
         if (result.disposition == .failed) {
-            return replaceSession(); // Dispose the session and attach a new one.
+            // Dispose the session and attach a new one.
+            return replaceSession();
         }
     }
     if (!paused) runAtNextRefresh(requestFrame);
@@ -97,7 +100,11 @@ fn surfaceLost() !void {
 fn surfaceRestored(vulkan: maplibre.VulkanContextDescriptor, new_surface: u64) !void {
     // #region lost-surface
     var replaced = try session.setVulkanSurfaceTarget(.{
-        .extent = .{ .width = 800, .height = 600, .scale_factor = 2.0 },
+        .extent = .{
+            .width = 800,
+            .height = 600,
+            .scale_factor = 2.0,
+        },
         .context = vulkan,
         .surface = new_surface,
     }, null);
@@ -113,8 +120,13 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
     // #region attach
     var attached = try map.attachVulkanSurface(.{
         // The window's size in logical pixels, and its scale factor.
-        .extent = .{ .width = 800, .height = 600, .scale_factor = 2.0 },
-        // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+        .extent = .{
+            .width = 800,
+            .height = 600,
+            .scale_factor = 2.0,
+        },
+        // Your VkInstance, VkPhysicalDevice,
+        // VkDevice, and graphics VkQueue.
         .context = vulkan,
         // Your VkSurfaceKHR.
         .surface = window_surface,
@@ -131,15 +143,15 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
     try onWindowResized(1024, 768);
 
     // #region service
-    const graphics_thread_options = maplibre.RenderSessionAttachOptions{
-        .driver = .caller_graphics_thread,
-        .frame_wake = .{ .callback = onFrameWake },
-        .driver_work_wake = .{ .callback = onDriverWorkWake },
-    };
+    const graphics_thread_options =
+        maplibre.RenderSessionAttachOptions{
+            .driver = .caller_graphics_thread,
+            .frame_wake = .{ .callback = onFrameWake },
+            .driver_work_wake = .{ .callback = onDriverWorkWake },
+        };
     // #endregion service
     _ = graphics_thread_options;
 
-    // #region close
     paused = true;
 
     var closed = try session.release(null);
@@ -147,5 +159,4 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
     try closed.wait(null);
 
     destroySurface(); // For example, with vkDestroySurfaceKHR.
-    // #endregion close
 }

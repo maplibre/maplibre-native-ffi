@@ -1,5 +1,5 @@
-// Snippets for the docs site's Camera page. They compile with the native
-// tests, which never run them.
+// Snippets for the docs site's Camera page. They compile with the
+// native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -10,7 +10,9 @@
 static atomic_bool finished;
 static mln_camera_options fitted;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -26,7 +28,9 @@ static void use_camera(const mln_camera* camera) { (void)camera; }
 static void fly_ended(bool completed) { (void)completed; }
 
 // #region read
-static void on_camera(void* user_data, const mln_completion_result* result) {
+static void on_camera(
+  void* user_data, const mln_completion_result* result
+) {
   if (result->status == MLN_STATUS_OK) {
     const mln_camera_query_result* query = result->value;
     use_camera(&query->camera);
@@ -36,7 +40,9 @@ static void on_camera(void* user_data, const mln_completion_result* result) {
 // #endregion read
 
 // #region animate
-static void on_fly_end(void* user_data, const mln_camera_transition_end* end) {
+static void on_fly_end(
+  void* user_data, const mln_camera_transition_end* end
+) {
   (void)user_data;
   // Runs on a library thread.
   fly_ended(end->outcome == MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
@@ -44,7 +50,9 @@ static void on_fly_end(void* user_data, const mln_camera_transition_end* end) {
 // #endregion animate
 
 // #region fit
-static void on_fit(void* user_data, const mln_completion_result* result) {
+static void on_fit(
+  void* user_data, const mln_completion_result* result
+) {
   if (result->status == MLN_STATUS_OK) {
     // The result is valid only during this callback.
     const mln_camera_options* camera = result->value;
@@ -75,7 +83,9 @@ static void apply_drag(mln_map map, mln_screen_point movement) {
   mln_map_apply_camera_delta(map, &drag, NULL, NULL);
 }
 
-static void apply_pinch(mln_map map, double scale, mln_screen_point center) {
+static void apply_pinch(
+  mln_map map, double scale, mln_screen_point center
+) {
   const mln_camera_delta pinch = {
     .size = sizeof(mln_camera_delta),
     .fields = MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR,
@@ -162,7 +172,9 @@ void mln_doc_camera(mln_map map) {
     .size = sizeof(mln_camera_update),
     .mode = MLN_CAMERA_UPDATE_MODE_EASE,
     .camera = fitted,
-    .animation = {.fields = MLN_ANIMATION_OPTION_DURATION, .duration_ms = 500},
+    .animation = {
+      .fields = MLN_ANIMATION_OPTION_DURATION, .duration_ms = 500
+    },
   };
   mln_map_update_camera(map, &ease, NULL, NULL);
   // #endregion fit
@@ -193,11 +205,14 @@ void mln_doc_camera(mln_map map) {
 
   mln_lat_lng coordinate;
   mln_map_projection_lat_lng_for_pixel(
-    projection, (mln_screen_point){.x = 100, .y = 200}, &coordinate, NULL
+    projection, (mln_screen_point){.x = 100, .y = 200}, &coordinate,
+    NULL
   );
 
   mln_screen_point point;
-  mln_map_projection_pixel_for_lat_lng(projection, coordinate, &point, NULL);
+  mln_map_projection_pixel_for_lat_lng(
+    projection, coordinate, &point, NULL
+  );
 
   mln_map_projection_release(projection);
   // #endregion convert

@@ -28,14 +28,16 @@ func drawFrame() error {
 	}
 
 	// Sample the texture, and wait for those reads to finish.
-	err = frame.WithVulkanTexture(func(texture maplibre.VulkanTextureFrameView) error {
-		imageView, err := texture.ImageView()
-		if err != nil {
-			return err
-		}
-		drawMap(imageView)
-		return nil
-	})
+	err = frame.WithVulkanTexture(
+		func(texture maplibre.VulkanTextureFrameView) error {
+			imageView, err := texture.ImageView()
+			if err != nil {
+				return err
+			}
+			drawMap(imageView)
+			return nil
+		},
+	)
 
 	return errors.Join(err, frame.Close(nil))
 	// #endregion acquire
@@ -51,16 +53,21 @@ func renderToTexture(
 	// #region attach-owned
 	texture := maplibre.VulkanOwnedTextureDescriptor{
 		// The texture's size in logical pixels, and its scale factor.
-		Extent: maplibre.LogicalExtent{Width: 800, Height: 600, ScaleFactor: 2},
-		// Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+		Extent: maplibre.LogicalExtent{
+			Width: 800, Height: 600, ScaleFactor: 2,
+		},
+		// Your VkInstance, VkPhysicalDevice,
+		// VkDevice, and graphics VkQueue.
 		Context: vulkan,
 	}
 	options := maplibre.RenderSessionAttachOptions{
 		Driver:    maplibre.RenderDriverKindCoreWorker,
 		FrameWake: maplibre.Wake{Callback: onFrameWake},
-		// Only if your renderer also submits to the graphics queue, under the
-		// same mutex.
-		QueueLock: maplibre.QueueLock{Lock: queue.Lock, Unlock: queue.Unlock},
+		// Only if your renderer also submits to the graphics queue, under
+		// the same mutex.
+		QueueLock: maplibre.QueueLock{
+			Lock: queue.Lock, Unlock: queue.Unlock,
+		},
 	}
 
 	owned, ready, err := m.AttachVulkanOwnedTexture(texture, options)
@@ -86,7 +93,9 @@ func renderToTexture(
 
 	// #region attach-borrowed
 	ring := maplibre.VulkanBorrowedTextureDescriptor{
-		Extent: maplibre.LogicalExtent{Width: 800, Height: 600, ScaleFactor: 2},
+		Extent: maplibre.LogicalExtent{
+			Width: 800, Height: 600, ScaleFactor: 2,
+		},
 		// The size of your textures in device pixels.
 		PhysicalWidth:  1600,
 		PhysicalHeight: 1200,
@@ -112,7 +121,9 @@ func renderToTexture(
 	// #endregion attach-borrowed
 
 	// #region resize-borrowed
-	ring.Extent = maplibre.LogicalExtent{Width: 1024, Height: 768, ScaleFactor: 2}
+	ring.Extent = maplibre.LogicalExtent{
+		Width: 1024, Height: 768, ScaleFactor: 2,
+	}
 	ring.PhysicalWidth = 2048
 	ring.PhysicalHeight = 1536
 	// Your new textures, at the new size.
@@ -128,7 +139,8 @@ func renderToTexture(
 	if _, err := retargeted.Await(ctx); err != nil {
 		return err
 	}
-	destroyTextures(images, views) // vkDestroyImageView and vkDestroyImage
+	// vkDestroyImageView and vkDestroyImage
+	destroyTextures(images, views)
 	// #endregion resize-borrowed
 	return nil
 }

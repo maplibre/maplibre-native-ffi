@@ -22,16 +22,26 @@ fn geojsonForTile(_: maplibre.CanonicalTileId) []const u8 {
 }
 
 // #region rewrite
-fn addApiKey(_: ?*anyopaque, _: maplibre.ResourceKind, url: []const u8, request: maplibre.ResourceTransformRequest) anyerror!void {
+fn addApiKey(
+    _: ?*anyopaque,
+    _: maplibre.ResourceKind,
+    url: []const u8,
+    request: maplibre.ResourceTransformRequest,
+) anyerror!void {
     var owned = request;
     var buffer: [4096]u8 = undefined;
-    // Returning an error releases the request, which keeps the old URL.
+    // Returning an error releases the
+    // request, which keeps the old URL.
     try owned.complete(try withApiKey(url, &buffer), null);
 }
 // #endregion rewrite
 
 // #region provider
-fn serveTile(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) anyerror!void {
+fn serveTile(
+    _: ?*anyopaque,
+    request: maplibre.ResourceRequestInfo,
+    handle: maplibre.ResourceRequest,
+) anyerror!void {
     var owned = handle;
     if (findTile(request.requested_url)) |tile| {
         try owned.complete(.{ .status = .ok, .bytes = tile }, null);
@@ -42,22 +52,38 @@ fn serveTile(_: ?*anyopaque, request: maplibre.ResourceRequestInfo, handle: mapl
 // #endregion provider
 
 // #region custom-source
-fn fetchTile(map: *const maplibre.Map, tile: maplibre.CanonicalTileId) !void {
-    try map.discarding().setCustomGeometrySourceTileData("app-data", tile, geojsonForTile(tile), null);
+fn fetchTile(
+    map: *const maplibre.Map,
+    tile: maplibre.CanonicalTileId,
+) !void {
+    try map.discarding().setCustomGeometrySourceTileData(
+        "app-data",
+        tile,
+        geojsonForTile(tile),
+        null,
+    );
 }
 // #endregion custom-source
 
 fn network(allocator: std.mem.Allocator, runtime: maplibre.Runtime, map: *const maplibre.Map) !void {
     // #region headers
-    try runtime.discarding().setHttpHeaderTransform(allocator, .{ .rules = &.{.{
-        .flags = .{ .glob = true },
-        .url = "https://tiles.example.com/**",
-        .headers = &.{.{ .name = "Authorization", .value = "Bearer my-token" }},
-    }} }, null);
+    try runtime.discarding().setHttpHeaderTransform(allocator, .{
+        .rules = &.{.{
+            .flags = .{ .glob = true },
+            .url = "https://tiles.example.com/**",
+            .headers = &.{.{
+                .name = "Authorization",
+                .value = "Bearer my-token",
+            }},
+        }},
+    }, null);
     // #endregion headers
 
     // #region rewrite
-    try runtime.discarding().setResourceTransform(.{ .callback = addApiKey }, null);
+    try runtime.discarding().setResourceTransform(
+        .{ .callback = addApiKey },
+        null,
+    );
     // #endregion rewrite
 
     // #region provider
@@ -72,8 +98,13 @@ fn network(allocator: std.mem.Allocator, runtime: maplibre.Runtime, map: *const 
     // #endregion provider
 
     // #region custom-source
-    // The source calls fetchTile with map, which must outlive the source.
-    try map.discarding().addCustomGeometrySource("app-data", .init(map, fetchTile, null, null), null);
+    // The source calls fetchTile with
+    // map, which must outlive the source.
+    try map.discarding().addCustomGeometrySource(
+        "app-data",
+        .init(map, fetchTile, null, null),
+        null,
+    );
     // #endregion custom-source
 
     // #region status

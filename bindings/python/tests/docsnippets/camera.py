@@ -20,9 +20,13 @@ def begin_gesture(map_handle: mln.MapHandle) -> None:
     )
 
 
-def apply_drag(map_handle: mln.MapHandle, movement: mln.ScreenPoint) -> None:
+def apply_drag(
+    map_handle: mln.MapHandle, movement: mln.ScreenPoint
+) -> None:
     map_handle.discarding.apply_camera_delta(
-        mln.CameraDelta(offset=movement, gesture_phase=mln.GesturePhase.UPDATE)
+        mln.CameraDelta(
+            offset=movement, gesture_phase=mln.GesturePhase.UPDATE
+        )
     )
 
 
@@ -31,7 +35,9 @@ def apply_pinch(
 ) -> None:
     map_handle.discarding.apply_camera_delta(
         mln.CameraDelta(
-            scale=scale, anchor=center, gesture_phase=mln.GesturePhase.UPDATE
+            scale=scale,
+            anchor=center,
+            gesture_phase=mln.GesturePhase.UPDATE,
         )
     )
 
@@ -59,7 +65,8 @@ def camera(map_handle: mln.MapHandle) -> None:
         mln.CameraUpdate(
             mode=mln.CameraUpdateMode.JUMP,
             camera=mln.CameraOptions(
-                center=mln.LatLng(latitude=48.8566, longitude=2.3522), zoom=12
+                center=mln.LatLng(latitude=48.8566, longitude=2.3522),
+                zoom=12,
             ),
         )
     )
@@ -68,13 +75,18 @@ def camera(map_handle: mln.MapHandle) -> None:
     # #region animate
     # Runs on the binding's dispatcher thread.
     def on_fly_end(end: mln.CameraTransitionEnd) -> None:
-        fly_ended(end.outcome == mln.CameraTransitionOutcome.COMPLETED)
+        fly_ended(
+            end.outcome == mln.CameraTransitionOutcome.COMPLETED
+        )
 
     map_handle.discarding.update_camera(
         mln.CameraUpdate(
             mode=mln.CameraUpdateMode.FLY,
             camera=mln.CameraOptions(
-                center=mln.LatLng(latitude=40.7128, longitude=-74.006), zoom=10
+                center=mln.LatLng(
+                    latitude=40.7128, longitude=-74.006
+                ),
+                zoom=10,
             ),
             animation=mln.AnimationOptions(
                 duration_ms=3000,
@@ -112,8 +124,12 @@ def camera(map_handle: mln.MapHandle) -> None:
     end_gesture(map_handle)
 
     # #region convert
-    with mln.MapProjectionHandle.create(map_handle.get_snapshot().view) as projection:
-        coordinate = projection.lat_lng_for_pixel(mln.ScreenPoint(x=100, y=200))
+    with mln.MapProjectionHandle.create(
+        map_handle.get_snapshot().view
+    ) as projection:
+        coordinate = projection.lat_lng_for_pixel(
+            mln.ScreenPoint(x=100, y=200)
+        )
         point = projection.pixel_for_lat_lng(coordinate)
     # #endregion convert
     del point

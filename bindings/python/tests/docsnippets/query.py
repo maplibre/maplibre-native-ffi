@@ -10,7 +10,9 @@ def use_feature(feature: Any) -> None:
     pass
 
 
-def query(session: mln.RenderSessionHandle, point: mln.ScreenPoint) -> None:
+def query(
+    session: mln.RenderSessionHandle, point: mln.ScreenPoint
+) -> None:
     # #region rendered
     hits = session.query_rendered_features(
         mln.RenderedQueryGeometryBoxVariant(

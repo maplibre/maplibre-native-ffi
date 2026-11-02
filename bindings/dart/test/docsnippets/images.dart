@@ -10,17 +10,23 @@ LatLng tileCenter(int z, int x, int y) => const LatLng();
 
 void copyPixels(Uint8List data, int stride) {}
 
-Future<void> images(RuntimeHandle runtime, int z, int x, int y) async {
+Future<void> images(RuntimeHandle runtime) async {
   // #region map
-  const extent = LogicalExtent(width: 512, height: 512, scaleFactor: 1);
+  const extent = LogicalExtent(
+    width: 800,
+    height: 600,
+    scaleFactor: 2,
+  );
   final NewMap(:map, ready: mapReady) = runtime.createMap(
-    const MapOptions(initialExtent: extent, mapMode: MapMode.tile),
+    const MapOptions(initialExtent: extent, mapMode: MapMode.static),
   );
   await mapReady;
   // #endregion map
 
   // #region style
-  map.discarding.setStyleUrl('https://demotiles.maplibre.org/style.json');
+  map.discarding.setStyleUrl(
+    'https://demotiles.maplibre.org/style.json',
+  );
   // #endregion style
 
   // #region attach
@@ -31,16 +37,21 @@ Future<void> images(RuntimeHandle runtime, int z, int x, int y) async {
         device,
         const GraphicsDeviceTextureDescriptor(extent: extent),
         // The library renders on its own thread.
-        const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
+        const RenderSessionAttachOptions(
+          driver: RenderDriverKind.coreWorker,
+        ),
       );
   await sessionReady;
   // #endregion attach
 
   // #region image
   map.discarding.updateCamera(
-    CameraUpdate(
+    const CameraUpdate(
       mode: CameraUpdateMode.jump,
-      camera: CameraOptions(center: tileCenter(z, x, y), zoom: z.toDouble()),
+      camera: CameraOptions(
+        center: LatLng(latitude: 48.8566, longitude: 2.3522),
+        zoom: 4,
+      ),
     ),
   );
 
@@ -52,9 +63,41 @@ Future<void> images(RuntimeHandle runtime, int z, int x, int y) async {
   copyPixels(image.data, image.info.stride);
   // #endregion read
 
-  // #region close
   session.dispose();
   device.close();
   await map.close();
-  // #endregion close
+}
+
+Future<void> imagesTile(
+  RuntimeHandle runtime,
+  int z,
+  int x,
+  int y,
+) async {
+  // #region tile
+  final NewMap(:map, :ready) = runtime.createMap(
+    const MapOptions(
+      initialExtent: LogicalExtent(
+        width: 512,
+        height: 512,
+        scaleFactor: 1,
+      ),
+      mapMode: MapMode.tile,
+    ),
+  );
+  await ready;
+
+  map.discarding.updateCamera(
+    CameraUpdate(
+      mode: CameraUpdateMode.jump,
+      camera: CameraOptions(
+        center: tileCenter(z, x, y),
+        // A 512-pixel map shows tile z/x/y at zoom z.
+        zoom: z.toDouble(),
+      ),
+    ),
+  );
+  // #endregion tile
+
+  await map.close();
 }

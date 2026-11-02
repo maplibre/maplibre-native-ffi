@@ -1,4 +1,5 @@
-// Snippets for the docs site's Style page. They compile with the tests, which
+// Snippets for the docs site's Style page. They compile with the
+// tests, which
 // never run them.
 
 import Foundation
@@ -16,7 +17,8 @@ private func drawImage(_: String) -> PremultipliedRgba8Image {
 /// pixels holds 16 x 16 premultiplied RGBA pixels.
 private func style(map: MapHandle, pixels: Data) throws {
   // #region load
-  try map.discarding.setStyleUrl("https://demotiles.maplibre.org/style.json")
+  try map.discarding
+    .setStyleUrl("https://demotiles.maplibre.org/style.json")
   // #endregion load
 
   // #region add
@@ -92,19 +94,24 @@ private func style(map: MapHandle, pixels: Data) throws {
   // #endregion image
 }
 
-private func styleEvents(runtime: RuntimeHandle, map: MapHandle) throws {
+private func styleEvents(
+  runtime: RuntimeHandle,
+  map: MapHandle
+) throws {
   // #region missing-image
   // Runs on a library thread.
-  try runtime.discarding.setEventHandler(RuntimeEventHandler { events in
-    for event in events
-      where event.source == map.id && event.type == .mapStyleImageMissing
-    {
-      // The message holds the image's ID.
-      try? map.discarding.setStyleImage(
-        event.message,
-        image: drawImage(event.message)
-      )
-    }
-  })
+  try runtime.discarding
+    .setEventHandler(RuntimeEventHandler { events in
+      for event in events
+        where event.source == map.id && event
+        .type == .mapStyleImageMissing
+      {
+        // The message holds the image's ID.
+        try? map.discarding.setStyleImage(
+          event.message,
+          image: drawImage(event.message)
+        )
+      }
+    })
   // #endregion missing-image
 }

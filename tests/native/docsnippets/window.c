@@ -1,5 +1,5 @@
-// Snippets for the docs site's Render to a window page. They compile with the
-// native tests, which never run them.
+// Snippets for the docs site's Render to a window page. They compile
+// with the native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -9,7 +9,9 @@
 
 static atomic_bool finished;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -24,7 +26,8 @@ static const mln_completion done = {
   .size = sizeof(mln_completion), .callback = on_done
 };
 
-// Stand-ins for the host's event loop, display timer, and graphics thread.
+// Stand-ins for the host's event loop, display timer, and graphics
+// thread.
 static void run_on_event_loop(void (*task)(void)) { (void)task; }
 
 static void run_at_next_refresh(void (*task)(void)) { (void)task; }
@@ -46,7 +49,8 @@ static bool paused = false;
 static void request_frame(void) {
   const mln_frame_demand demand = {
     .size = sizeof(mln_frame_demand),
-    .flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
+    .flags =
+      MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
   };
   mln_render_session_request_frame(session, &demand, NULL);
 }
@@ -57,8 +61,9 @@ static void drain_frame_results(void) {
     .size = sizeof(mln_render_frame_batch_view)
   };
   if (
-    mln_render_session_drain_frame_results(session, &batch, &view, NULL) !=
-    MLN_STATUS_OK
+    mln_render_session_drain_frame_results(
+      session, &batch, &view, NULL
+    ) != MLN_STATUS_OK
   ) {
     return;  // No results yet.
   }
@@ -68,7 +73,8 @@ static void drain_frame_results(void) {
     // Step by result_size, not by the size of the struct.
     const mln_render_frame_result* result =
       (const void*)((const char*)view.results + i * view.result_size);
-    if (result->disposition == MLN_RENDER_RESULT_FAILED) failed = true;
+    if (result->disposition == MLN_RENDER_RESULT_FAILED)
+      failed = true;
   }
   mln_render_frame_batch_release(batch);
 
@@ -163,7 +169,8 @@ void mln_doc_window(
     .size = sizeof(mln_vulkan_surface_descriptor),
     // The window's size in logical pixels, and its scale factor.
     .extent = {.width = 800, .height = 600, .scale_factor = 2.0},
-    // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+    // Your VkInstance, VkPhysicalDevice,
+    // VkDevice, and graphics VkQueue.
     .context = vulkan,
     // Your VkSurfaceKHR.
     .surface = window_surface,
@@ -174,7 +181,9 @@ void mln_doc_window(
     .frame_wake = {.callback = on_frame_wake},
   };
 
-  mln_map_attach_vulkan_surface(map, &surface, &options, &session, &done, NULL);
+  mln_map_attach_vulkan_surface(
+    map, &surface, &options, &session, &done, NULL
+  );
   // #endregion attach
   wait_for_done();
 
@@ -191,13 +200,9 @@ void mln_doc_window(
   // #endregion service
   (void)graphics_thread_options;
 
-  // #region close
   paused = true;
   mln_render_session_dispose(session, &done, NULL);
-  // #endregion close
   wait_for_done();
 
-  // #region close
   destroy_surface();  // For example, with vkDestroySurfaceKHR.
-  // #endregion close
 }

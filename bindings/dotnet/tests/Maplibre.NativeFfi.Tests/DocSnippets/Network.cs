@@ -27,7 +27,13 @@ internal static class Network
                     {
                         Flags = UrlMatchFlag.Glob,
                         Url = "https://tiles.example.com/**",
-                        Headers = [new HttpHeader("Authorization", "Bearer my-token")],
+                        Headers =
+                        [
+                            new HttpHeader(
+                                "Authorization",
+                                "Bearer my-token"
+                            ),
+                        ],
                     },
                 ],
             }
@@ -37,7 +43,9 @@ internal static class Network
         // #region rewrite
         // Runs on a library thread.
         runtime.Discarding.SetResourceTransform(
-            new ResourceTransform((_, url, request) => request.Complete(WithApiKey(url)))
+            new ResourceTransform(
+                (_, url, request) => request.Complete(WithApiKey(url))
+            )
         );
         // #endregion rewrite
 
@@ -63,7 +71,11 @@ internal static class Network
                                 Status = ResourceResponseStatus.Ok,
                                 Bytes = tile,
                             }
-                            : new ResourceResponse { Status = ResourceResponseStatus.NoContent }
+                            : new ResourceResponse
+                            {
+                                Status =
+                                    ResourceResponseStatus.NoContent,
+                            }
                     ),
             }
         );

@@ -13,27 +13,37 @@ def copy_pixels(data: bytes, stride: int) -> None:
     pass
 
 
-def images(runtime: mln.RuntimeHandle, z: int, x: int, y: int) -> None:
+def images(runtime: mln.RuntimeHandle) -> None:
     # #region map
-    extent = mln.LogicalExtent(width=512, height=512, scale_factor=1.0)
+    extent = mln.LogicalExtent(
+        width=800, height=600, scale_factor=2.0
+    )
     map_handle, map_ready = runtime.create_map(
-        mln.MapOptions(initial_extent=extent, map_mode=mln.MapMode.TILE)
+        mln.MapOptions(
+            initial_extent=extent, map_mode=mln.MapMode.STATIC
+        )
     )
     map_ready.result()
     # #endregion map
 
     # #region style
-    map_handle.discarding.set_style_url("https://demotiles.maplibre.org/style.json")
+    map_handle.discarding.set_style_url(
+        "https://demotiles.maplibre.org/style.json"
+    )
     # #endregion style
 
     # #region attach
     device = mln.GraphicsDeviceHandle.create()
 
-    session, session_ready = map_handle.attach_graphics_device_texture(
-        device,
-        mln.GraphicsDeviceTextureDescriptor(extent=extent),
-        # The library renders on its own thread.
-        mln.RenderSessionAttachOptions(driver=mln.RenderDriverKind.CORE_WORKER),
+    session, session_ready = (
+        map_handle.attach_graphics_device_texture(
+            device,
+            mln.GraphicsDeviceTextureDescriptor(extent=extent),
+            # The library renders on its own thread.
+            mln.RenderSessionAttachOptions(
+                driver=mln.RenderDriverKind.CORE_WORKER
+            ),
+        )
     )
     session_ready.result()
     # #endregion attach
@@ -42,7 +52,10 @@ def images(runtime: mln.RuntimeHandle, z: int, x: int, y: int) -> None:
     map_handle.discarding.update_camera(
         mln.CameraUpdate(
             mode=mln.CameraUpdateMode.JUMP,
-            camera=mln.CameraOptions(center=tile_center(z, x, y), zoom=z),
+            camera=mln.CameraOptions(
+                center=mln.LatLng(latitude=48.8566, longitude=2.3522),
+                zoom=4,
+            ),
         )
     )
 
@@ -54,8 +67,34 @@ def images(runtime: mln.RuntimeHandle, z: int, x: int, y: int) -> None:
     copy_pixels(image.data, image.info.stride)
     # #endregion read
 
-    # #region close
     session.dispose()
     device.close()
     map_handle.close().result()
-    # #endregion close
+
+
+def images_tile(
+    runtime: mln.RuntimeHandle, z: int, x: int, y: int
+) -> None:
+    # #region tile
+    map_handle, ready = runtime.create_map(
+        mln.MapOptions(
+            initial_extent=mln.LogicalExtent(
+                width=512, height=512, scale_factor=1.0
+            ),
+            map_mode=mln.MapMode.TILE,
+        )
+    )
+    ready.result()
+
+    map_handle.discarding.update_camera(
+        mln.CameraUpdate(
+            mode=mln.CameraUpdateMode.JUMP,
+            # A 512-pixel map shows tile z/x/y at zoom z.
+            camera=mln.CameraOptions(
+                center=tile_center(z, x, y), zoom=z
+            ),
+        )
+    )
+    # #endregion tile
+
+    map_handle.close().result()

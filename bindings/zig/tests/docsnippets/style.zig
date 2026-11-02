@@ -20,20 +20,32 @@ fn drawImage(_: []const u8) maplibre.PremultipliedRgba8Image {
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 fn style(pixels: []const u8) !void {
     // #region load
-    try map.discarding().setStyleUrl("https://demotiles.maplibre.org/style.json", null);
+    try map.discarding().setStyleUrl(
+        "https://demotiles.maplibre.org/style.json",
+        null,
+    );
     // #endregion load
 
     // #region add
     try map.discarding().addStyleSourceJson(
         "satellite",
-        "{\"type\":\"raster\",\"tileSize\":256," ++
-            "\"tiles\":[\"https://tiles.example.com/{z}/{x}/{y}.png\"]}",
+        \\{
+        \\  "type": "raster",
+        \\  "tileSize": 256,
+        \\  "tiles": ["https://tiles.example.com/{z}/{x}/{y}.png"]
+        \\}
+    ,
         null,
     );
 
     // Draw the layer under the "countries-label" layer.
     try map.discarding().addStyleLayerJson(
-        "{\"id\":\"satellite\",\"type\":\"raster\",\"source\":\"satellite\"}",
+        \\{
+        \\  "id": "satellite",
+        \\  "type": "raster",
+        \\  "source": "satellite"
+        \\}
+    ,
         "countries-label",
         null,
     );
@@ -62,11 +74,17 @@ fn style(pixels: []const u8) !void {
     // #region set-property
     // Show both changes in the same frame.
     try map.discarding().beginCommandGroup(null);
-    try map.discarding().setStyleLayerProperty("satellite", "visibility", "\"none\"", null);
+    try map.discarding().setStyleLayerProperty(
+        "satellite",
+        "visibility",
+        "\"none\"",
+        null,
+    );
     try map.discarding().setStyleLayerProperty(
         "countries-boundary",
         "line-color",
-        "[\"interpolate\",[\"linear\"],[\"zoom\"],5,\"#9cf\",12,\"#06c\"]",
+        \\["interpolate", ["linear"], ["zoom"], 5, "#9cf", 12, "#06c"]
+    ,
         null,
     );
     try map.discarding().endCommandGroup(null);
@@ -82,8 +100,13 @@ fn style(pixels: []const u8) !void {
 
     // An empty layer ID draws the layer on top.
     try map.discarding().addStyleLayerJson(
-        "{\"id\":\"markers\",\"type\":\"symbol\",\"source\":\"points\"," ++
-            "\"layout\":{\"icon-image\":\"marker\"}}",
+        \\{
+        \\  "id": "markers",
+        \\  "type": "symbol",
+        \\  "source": "points",
+        \\  "layout": {"icon-image": "marker"}
+        \\}
+    ,
         "",
         null,
     );
@@ -92,11 +115,21 @@ fn style(pixels: []const u8) !void {
 
 // #region missing-image
 // Runs on a library thread.
-fn onEvents(_: ?*anyopaque, events: []const maplibre.RuntimeEvent) anyerror!void {
+fn onEvents(
+    _: ?*anyopaque,
+    events: []const maplibre.RuntimeEvent,
+) anyerror!void {
     for (events) |event| {
-        if (event.source != map.id() or event.type != .map_style_image_missing) continue;
+        if (event.source != map.id()) continue;
+        if (event.type != .map_style_image_missing) continue;
         // The message holds the image's ID.
-        try map.discarding().setStyleImage(allocator, event.message, drawImage(event.message), null, null);
+        try map.discarding().setStyleImage(
+            allocator,
+            event.message,
+            drawImage(event.message),
+            null,
+            null,
+        );
     }
 }
 // #endregion missing-image

@@ -1,4 +1,5 @@
-// Snippets for the docs site's Render to a texture page. They compile with the
+// Snippets for the docs site's Render to a texture page. They compile
+// with the
 // tests, which never run them.
 
 #if os(Android) || os(Linux) || os(macOS) || os(Windows)
@@ -26,7 +27,8 @@
     }
 
     // Sample the texture, and wait for those reads to finish.
-    try frame.withVulkanTexture { texture in try drawMap(texture.imageView) }
+    try frame
+      .withVulkanTexture { texture in try drawMap(texture.imageView) }
 
     try frame.release(consumerCompletion: nil)
     // #endregion acquire
@@ -44,7 +46,8 @@
     let texture = VulkanOwnedTextureDescriptor(
       // The texture's size in logical pixels, and its scale factor.
       extent: LogicalExtent(width: 800, height: 600, scaleFactor: 2),
-      // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+      // Your VkInstance, VkPhysicalDevice,
+      // VkDevice, and graphics VkQueue.
       context: vulkan
     )
     let options = RenderSessionAttachOptions(
@@ -91,17 +94,28 @@
     // #endregion attach-borrowed
 
     // #region resize-borrowed
-    ring.extent = LogicalExtent(width: 1024, height: 768, scaleFactor: 2)
+    ring.extent = LogicalExtent(
+      width: 1024,
+      height: 768,
+      scaleFactor: 2
+    )
     ring.physicalWidth = 2048
     ring.physicalHeight = 1536
     // Your new textures, at the new size.
     ring.textures = [
-      VulkanBorrowedTexture(image: newImages[0], imageView: newViews[0]),
-      VulkanBorrowedTexture(image: newImages[1], imageView: newViews[1]),
+      VulkanBorrowedTexture(
+        image: newImages[0],
+        imageView: newViews[0]
+      ),
+      VulkanBorrowedTexture(
+        image: newImages[1],
+        imageView: newViews[1]
+      ),
     ]
 
     try await session.setVulkanBorrowedTextureTarget(descriptor: ring)
-    destroyTextures(images, views) // vkDestroyImageView and vkDestroyImage
+    // vkDestroyImageView and vkDestroyImage
+    destroyTextures(images, views)
     // #endregion resize-borrowed
   }
 #endif

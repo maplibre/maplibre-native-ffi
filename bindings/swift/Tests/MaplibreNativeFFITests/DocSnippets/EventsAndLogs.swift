@@ -1,4 +1,5 @@
-// Snippets for the docs site's Events and logs page. They compile with the
+// Snippets for the docs site's Events and logs page. They compile
+// with the
 // tests, which never run them.
 
 import MaplibreNativeFFI
@@ -28,18 +29,25 @@ private func writeLog(_: LogSeverity, _: String) {}
 
 // #endregion handler
 
-@MainActor private func eventsAndLogs(runtime: RuntimeHandle) async throws {
+@MainActor private func eventsAndLogs(
+  runtime: RuntimeHandle
+) async throws {
   // #region handler
-  // The handler runs on a library thread. It hands each batch to the main
-  // actor.
-  try runtime.discarding.setEventHandler(RuntimeEventHandler { events in
-    Task { @MainActor in handleEvents(events) }
-  })
+  // The handler runs on a library thread.
+  // It hands each batch to the main actor.
+  try runtime.discarding
+    .setEventHandler(RuntimeEventHandler { events in
+      Task { @MainActor in handleEvents(events) }
+    })
   // #endregion handler
 
   // #region mask
   let created = try runtime.createMap(options: MapOptions(
-    initialExtent: LogicalExtent(width: 512, height: 512, scaleFactor: 1),
+    initialExtent: LogicalExtent(
+      width: 512,
+      height: 512,
+      scaleFactor: 1
+    ),
     eventMask: [.mapStyleLoaded, .mapLoadingFailed]
   ))
   // #endregion mask
@@ -50,7 +58,8 @@ private func writeLog(_: LogSeverity, _: String) {}
   // Runs on a library thread, and can't call the library.
   try setLogCallback(handler: LogHandler { severity, _, _, message in
     writeLog(severity, message)
-    // Consume the record. Return false to let the platform logger print it too.
+    // Consume the record. Return false to let the platform logger
+    // print it too.
     return true
   })
   // #endregion logs

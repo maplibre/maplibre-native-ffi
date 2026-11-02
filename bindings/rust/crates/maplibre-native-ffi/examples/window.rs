@@ -33,7 +33,8 @@ struct MapWindow {
 impl MapWindow {
     fn request_frame(&mut self) -> Result<()> {
         self.session.request_frame(&FrameDemand {
-            flags: FrameDemandFlag::PRESENT | FrameDemandFlag::WAIT_FOR_UPDATE,
+            flags: FrameDemandFlag::PRESENT
+                | FrameDemandFlag::WAIT_FOR_UPDATE,
             ..Default::default()
         })
     }
@@ -47,7 +48,8 @@ impl MapWindow {
             .iter()
             .any(|result| result.disposition == RenderResult::Failed)
         {
-            self.replace_session(); // Close the session and attach a new one.
+            // Close the session and attach a new one.
+            self.replace_session();
         } else if !self.paused {
             run_at_next_refresh(MapWindow::request_frame);
         }
@@ -65,7 +67,11 @@ fn on_frame_wake() {
 
 // #region resize
 impl MapWindow {
-    fn on_window_resized(&mut self, width: u32, height: u32) -> Result<()> {
+    fn on_window_resized(
+        &mut self,
+        width: u32,
+        height: u32,
+    ) -> Result<()> {
         // The scale factor the session has now.
         let extent = LogicalExtent::new(width, height, 2.0);
         self.session.discarding().resize(extent)
@@ -110,9 +116,11 @@ async fn surface_restored(
 ) -> Result<()> {
     // #region lost-surface
     let extent = LogicalExtent::new(800, 600, 2.0);
-    let surface = VulkanSurfaceDescriptor::new(extent, vulkan, new_surface);
+    let surface =
+        VulkanSurfaceDescriptor::new(extent, vulkan, new_surface);
     // SAFETY: the surface and the Vulkan objects outlive the session.
-    unsafe { window.session.set_vulkan_surface_target(&surface)? }.await?;
+    unsafe { window.session.set_vulkan_surface_target(&surface)? }
+        .await?;
 
     window.paused = false;
     window.request_frame()?;
@@ -137,18 +145,22 @@ async fn render_to_window(
     let surface = VulkanSurfaceDescriptor {
         // The window's size in logical pixels, and its scale factor.
         extent: LogicalExtent::new(800, 600, 2.0),
-        // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+        // Your VkInstance, VkPhysicalDevice,
+        // VkDevice, and graphics VkQueue.
         context: vulkan,
         // Your VkSurfaceKHR.
         surface: window_surface,
     };
     let options = RenderSessionAttachOptions {
         frame_wake: Wake::new(on_frame_wake),
-        ..RenderSessionAttachOptions::new(RenderDriverKind::CoreWorker)
+        ..RenderSessionAttachOptions::new(
+            RenderDriverKind::CoreWorker,
+        )
     };
 
     // SAFETY: the surface and the Vulkan objects outlive the session.
-    let (session, attached) = unsafe { map.attach_vulkan_surface(&surface, &options)? };
+    let (session, attached) =
+        unsafe { map.attach_vulkan_surface(&surface, &options)? };
     attached.await?;
 
     let mut window = MapWindow {
@@ -164,12 +176,13 @@ async fn render_to_window(
     let graphics_thread_options = RenderSessionAttachOptions {
         frame_wake: Wake::new(on_frame_wake),
         driver_work_wake: Wake::new(on_driver_work_wake),
-        ..RenderSessionAttachOptions::new(RenderDriverKind::CallerGraphicsThread)
+        ..RenderSessionAttachOptions::new(
+            RenderDriverKind::CallerGraphicsThread,
+        )
     };
     // #endregion service
     drop(graphics_thread_options);
 
-    // #region close
     window.paused = true;
     window
         .session
@@ -177,7 +190,6 @@ async fn render_to_window(
         .map_err(|(_, error)| error)?
         .await?;
     destroy_surface(); // For example, with vkDestroySurfaceKHR.
-    // #endregion close
 
     Ok(())
 }

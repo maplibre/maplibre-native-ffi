@@ -37,7 +37,11 @@ function drainFrameResults(): void {
   if (results.length === 0) {
     return;
   }
-  if (results.some(({ disposition }) => disposition === RenderResult.failed)) {
+  if (
+    results.some(
+      ({ disposition }) => disposition === RenderResult.failed,
+    )
+  ) {
     replaceSession(); // Close the session and attach a new one.
   } else if (!paused) {
     atNextRefresh(requestFrame);
@@ -46,7 +50,8 @@ function drainFrameResults(): void {
 // #endregion frame-loop
 
 // #region frame-wake
-// The binding calls the wake on the JS thread, so it can drain right away.
+// The binding calls the wake on the JS
+// thread, so it can drain right away.
 function onFrameWake(): void {
   drainFrameResults();
 }
@@ -60,8 +65,8 @@ function onWindowResized(width: number, height: number): void {
 // #endregion resize
 
 // #region service
-// The binding calls the wake on the JS thread. Your graphics context is current
-// there.
+// The binding calls the wake on the JS thread. Your graphics context
+// is current there.
 function onDriverWorkWake(): void {
   session.serviceDriverWork();
 }
@@ -99,7 +104,8 @@ export async function renderToWindow(
     {
       // The window's size in logical pixels, and its scale factor.
       extent: { width: 800, height: 600, scaleFactor: 2 },
-      // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+      // Your VkInstance, VkPhysicalDevice,
+      // VkDevice, and graphics VkQueue.
       context: vulkan,
       // Your VkSurfaceKHR.
       surface: windowSurface,
@@ -122,9 +128,7 @@ export async function renderToWindow(
   // #endregion service
   void graphicsThreadOptions;
 
-  // #region close
   paused = true;
   await session.close();
   destroySurface();
-  // #endregion close
 }

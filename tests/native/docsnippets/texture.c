@@ -1,5 +1,5 @@
-// Snippets for the docs site's Render to a texture page. They compile with the
-// native tests, which never run them.
+// Snippets for the docs site's Render to a texture page. They compile
+// with the native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -8,7 +8,9 @@
 
 static atomic_bool finished;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -50,12 +52,15 @@ static void draw_frame(void) {
   // #region acquire
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   if (
-    mln_render_session_acquire_frame(session, &frame, NULL) != MLN_STATUS_OK
+    mln_render_session_acquire_frame(session, &frame, NULL) !=
+    MLN_STATUS_OK
   ) {
     return;  // No new frame yet.
   }
 
-  mln_vulkan_texture_frame texture = {.size = sizeof(mln_vulkan_texture_frame)};
+  mln_vulkan_texture_frame texture = {
+    .size = sizeof(mln_vulkan_texture_frame)
+  };
   mln_acquired_frame_get_vulkan_texture(frame, &texture, NULL);
 
   // Sample the texture, and wait for those reads to finish.
@@ -85,7 +90,8 @@ void mln_doc_texture(
     .size = sizeof(mln_vulkan_owned_texture_descriptor),
     // The texture's size in logical pixels, and its scale factor.
     .extent = {.width = 800, .height = 600, .scale_factor = 2.0},
-    // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+    // Your VkInstance, VkPhysicalDevice,
+    // VkDevice, and graphics VkQueue.
     .context = vulkan,
   };
   const mln_render_session_attach_options options = {
@@ -139,8 +145,9 @@ void mln_doc_texture(
     {.image = new_images[0], .image_view = new_views[0]},
     {.image = new_images[1], .image_view = new_views[1]},
   };
-  ring.extent =
-    (mln_logical_extent){.width = 1024, .height = 768, .scale_factor = 2.0};
+  ring.extent = (mln_logical_extent){
+    .width = 1024, .height = 768, .scale_factor = 2.0
+  };
   ring.physical_width = 2048;
   ring.physical_height = 1536;
   ring.textures = new_textures;
@@ -152,6 +159,7 @@ void mln_doc_texture(
   wait_for_done();
 
   // #region resize-borrowed
-  destroy_textures(images, views);  // vkDestroyImageView and vkDestroyImage
+  // vkDestroyImageView and vkDestroyImage
+  destroy_textures(images, views);
   // #endregion resize-borrowed
 }

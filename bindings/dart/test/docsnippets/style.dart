@@ -5,17 +5,20 @@ import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
-PremultipliedRgba8Image drawImage(String imageId) => PremultipliedRgba8Image(
-  width: 1,
-  height: 1,
-  stride: 4,
-  pixels: Uint8List.fromList([255, 0, 0, 255]),
-);
+PremultipliedRgba8Image drawImage(String imageId) =>
+    PremultipliedRgba8Image(
+      width: 1,
+      height: 1,
+      stride: 4,
+      pixels: Uint8List.fromList([255, 0, 0, 255]),
+    );
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 void style(MapHandle map, Uint8List pixels) {
   // #region load
-  map.discarding.setStyleUrl('https://demotiles.maplibre.org/style.json');
+  map.discarding.setStyleUrl(
+    'https://demotiles.maplibre.org/style.json',
+  );
   // #endregion load
 
   // #region add
@@ -54,16 +57,24 @@ void style(MapHandle map, Uint8List pixels) {
   // #region set-property
   // Show both changes in the same frame.
   map.discarding.beginCommandGroup();
-  map.discarding.setStyleLayerProperty('satellite', 'visibility', 'none');
-  map.discarding.setStyleLayerProperty('countries-boundary', 'line-color', [
-    'interpolate',
-    ['linear'],
-    ['zoom'],
-    5,
-    '#9cf',
-    12,
-    '#06c',
-  ]);
+  map.discarding.setStyleLayerProperty(
+    'satellite',
+    'visibility',
+    'none',
+  );
+  map.discarding.setStyleLayerProperty(
+    'countries-boundary',
+    'line-color',
+    [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      5,
+      '#9cf',
+      12,
+      '#06c',
+    ],
+  );
   map.discarding.endCommandGroup();
   // #endregion set-property
 
@@ -98,7 +109,10 @@ void styleEvents(RuntimeHandle runtime, MapHandle map) {
         continue;
       }
       // The message holds the image's ID.
-      map.discarding.setStyleImage(event.message, drawImage(event.message));
+      map.discarding.setStyleImage(
+        event.message,
+        drawImage(event.message),
+      );
     }
   });
   // #endregion missing-image

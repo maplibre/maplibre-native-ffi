@@ -5,8 +5,12 @@
 
 use maplibre_native_ffi::*;
 
-// Attaches a render target, as the Rendering guides show.
-async fn attach_target(_map: &MapHandle) -> Result<RenderSessionHandle> {
+fn report_failure(_error: &Error) {}
+
+// Attaches a render target, as the render target guides show.
+async fn attach_target(
+    _map: &MapHandle,
+) -> Result<RenderSessionHandle> {
     unimplemented!()
 }
 
@@ -25,11 +29,45 @@ async fn create_a_map() -> Result<()> {
     created.await?;
     // #endregion map
 
+    // #region style
+    map.discarding()
+        .set_style_url("https://demotiles.maplibre.org/style.json")?;
+    // #endregion style
+
+    let update = CameraUpdate {
+        mode: CameraUpdateMode::Jump,
+        camera: CameraOptions {
+            zoom: Some(3.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // #region wait
+    map.update_camera(&update)?.await?;
+
+    // Use the discarding variant to ignore the result.
+    map.discarding().update_camera(&update)?;
+    // #endregion wait
+
+    // #region errors
+    match map.update_camera(&update) {
+        // The call failed right away.
+        Err(error) => report_failure(&error),
+        Ok(completion) => {
+            // The result reports a failure.
+            if let Err(error) = completion.await {
+                report_failure(&error);
+            }
+        }
+    }
+    // #endregion errors
+
     let session = attach_target(&map).await?;
 
     // #region close
     drop(session);
-    map.release().map_err(|(_, error)| error)?.await?;
+    drop(map);
     runtime.release().map_err(|(_, error)| error)?.await?;
     // #endregion close
 

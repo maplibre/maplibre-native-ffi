@@ -17,7 +17,8 @@ Object? geojsonForTile(CanonicalTileId tile) => {
 
 void network(RuntimeHandle runtime, MapHandle map) {
   // #region headers
-  // This binding takes rules only, because it can't answer on a library thread.
+  // This binding takes rules only, because
+  // it can't answer on a library thread.
   runtime.discarding.setHttpHeaderTransform(
     HttpHeaderTransform(
       rules: [
@@ -25,7 +26,10 @@ void network(RuntimeHandle runtime, MapHandle map) {
           flags: UrlMatchFlag.glob,
           url: 'https://tiles.example.com/**',
           headers: [
-            HttpHeader(name: 'Authorization', value: 'Bearer my-token'),
+            HttpHeader(
+              name: 'Authorization',
+              value: 'Bearer my-token',
+            ),
           ],
         ),
       ],
@@ -53,7 +57,9 @@ void network(RuntimeHandle runtime, MapHandle map) {
         final tile = findTile(request.requestedUrl);
         handle.complete(
           tile == null
-              ? ResourceResponse(status: ResourceResponseStatus.noContent)
+              ? ResourceResponse(
+                  status: ResourceResponseStatus.noContent,
+                )
               : ResourceResponse(
                   status: ResourceResponseStatus.ok,
                   bytes: tile,

@@ -1,5 +1,5 @@
-// Snippets for the docs site's Query page. They compile with the native
-// tests, which never run them.
+// Snippets for the docs site's Query page. They compile with the
+// native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -8,7 +8,9 @@
 
 static atomic_bool finished;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -22,7 +24,9 @@ static void wait_for_done(void) {
 static void copy_feature(mln_buffer_view json) { (void)json; }
 
 // #region rendered
-static void on_rendered(void* user_data, const mln_completion_result* result) {
+static void on_rendered(
+  void* user_data, const mln_completion_result* result
+) {
   if (result->status == MLN_STATUS_OK) {
     const uint8_t* values = result->value;
     for (size_t i = 0; i < result->value_count; i++) {
@@ -38,7 +42,9 @@ static void on_rendered(void* user_data, const mln_completion_result* result) {
 // #endregion rendered
 
 // #region source
-static void on_source(void* user_data, const mln_completion_result* result) {
+static void on_source(
+  void* user_data, const mln_completion_result* result
+) {
   if (result->status == MLN_STATUS_OK) {
     const uint8_t* values = result->value;
     for (size_t i = 0; i < result->value_count; i++) {
@@ -51,9 +57,13 @@ static void on_source(void* user_data, const mln_completion_result* result) {
 }
 // #endregion source
 
-void mln_doc_query(mln_render_session session, mln_screen_point point);
+void mln_doc_query(
+  mln_render_session session, mln_screen_point point
+);
 
-void mln_doc_query(mln_render_session session, mln_screen_point point) {
+void mln_doc_query(
+  mln_render_session session, mln_screen_point point
+) {
   // #region rendered
   const mln_rendered_query_geometry box = {
     .size = sizeof(mln_rendered_query_geometry),
@@ -89,15 +99,16 @@ void mln_doc_query(mln_render_session session, mln_screen_point point) {
     .source_layer_ids = source_layers,
     .source_layer_id_count = 1,
     // A filter from the MapLibre style spec, as JSON.
-    .filter =
-      mln_buffer_view_from_cstr("[\"==\", [\"get\", \"class\"], \"motorway\"]"),
+    .filter = mln_buffer_view_from_cstr(
+      "[\"==\", [\"get\", \"class\"], \"motorway\"]"
+    ),
   };
   const mln_completion source = {
     .size = sizeof(mln_completion), .callback = on_source
   };
   mln_render_session_query_source_features(
-    session, mln_buffer_view_from_cstr("openmaptiles"), &source_options,
-    &source, NULL
+    session, mln_buffer_view_from_cstr("openmaptiles"),
+    &source_options, &source, NULL
   );
   // #endregion source
   wait_for_done();

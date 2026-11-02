@@ -8,6 +8,7 @@ import starlightLinksValidator from "starlight-links-validator";
 import starlightLlmsTxt from "starlight-llms-txt";
 
 import { externalLinksPlugin } from "./src/integrations/external-links";
+import { mermaidPlugin } from "./src/integrations/mermaid";
 import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
 import { versionsPlugin } from "./src/integrations/versions";
 import { languageStorageKey } from "./src/languages";
@@ -21,7 +22,7 @@ export default defineConfig({
   base,
   markdown: {
     processor: satteri({
-      mdastPlugins: [versionsPlugin],
+      mdastPlugins: [mermaidPlugin, versionsPlugin],
       hastPlugins: [externalLinksPlugin(site + base)],
     }),
   },
@@ -40,6 +41,7 @@ export default defineConfig({
       routeMiddleware: "./src/banner.ts",
       components: {
         EditLink: "./src/components/EditLink.astro",
+        MarkdownContent: "./src/components/MarkdownContent.astro",
         SocialIcons: "./src/components/SocialIcons.astro",
       },
       customCss: ["./src/styles/custom.css"],
@@ -69,7 +71,6 @@ export default defineConfig({
       ],
       sidebar: [
         { label: "Overview", link: "/" },
-        { label: "Concepts", slug: "concepts" },
         {
           label: "Install",
           items: [{ autogenerate: { directory: "install" } }],
@@ -78,15 +79,10 @@ export default defineConfig({
           label: "Guides",
           items: [
             "guides/create-a-map",
-            {
-              label: "Rendering",
-              items: [
-                "guides/rendering/choose-a-target",
-                "guides/rendering/window",
-                "guides/rendering/texture",
-                "guides/rendering/images",
-              ],
-            },
+            "guides/choose-a-target",
+            "guides/images",
+            "guides/window",
+            "guides/texture",
             "guides/camera",
             "guides/style",
             "guides/query",

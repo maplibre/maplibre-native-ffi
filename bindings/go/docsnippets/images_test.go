@@ -15,12 +15,14 @@ func tileCenter(z, x, y uint32) maplibre.LatLng {
 
 func copyPixels(data []byte, stride uint32) {}
 
-func images(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32) error {
+func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #region map
-	extent := maplibre.LogicalExtent{Width: 512, Height: 512, ScaleFactor: 1}
+	extent := maplibre.LogicalExtent{
+		Width: 800, Height: 600, ScaleFactor: 2,
+	}
 	m, created, err := runtime.CreateMap(maplibre.MapOptions{
 		InitialExtent: extent,
-		MapMode:       maplibre.MapModeTile,
+		MapMode:       maplibre.MapModeStatic,
 	})
 	if err != nil {
 		return err
@@ -31,7 +33,10 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32
 	// #endregion map
 
 	// #region style
-	if err := m.Discarding().SetStyleUrl("https://demotiles.maplibre.org/style.json"); err != nil {
+	err = m.Discarding().SetStyleUrl(
+		"https://demotiles.maplibre.org/style.json",
+	)
+	if err != nil {
 		return err
 	}
 	// #endregion style
@@ -47,7 +52,9 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32
 		device,
 		maplibre.GraphicsDeviceTextureDescriptor{Extent: extent},
 		// The library renders on its own thread.
-		maplibre.RenderSessionAttachOptions{Driver: maplibre.RenderDriverKindCoreWorker},
+		maplibre.RenderSessionAttachOptions{
+			Driver: maplibre.RenderDriverKindCoreWorker,
+		},
 	)
 	if err != nil {
 		return err
@@ -58,7 +65,8 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32
 	// #endregion attach
 
 	// #region image
-	center, zoom := tileCenter(z, x, y), float64(z)
+	center := maplibre.LatLng{Latitude: 48.8566, Longitude: 2.3522}
+	zoom := 4.0
 	err = m.Discarding().UpdateCamera(maplibre.CameraUpdate{
 		Mode:   maplibre.CameraUpdateModeJump,
 		Camera: maplibre.CameraOptions{Center: &center, Zoom: &zoom},
@@ -88,7 +96,6 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32
 	copyPixels(image.Data, image.Info.Stride)
 	// #endregion read
 
-	// #region close
 	if err := session.Dispose(); err != nil {
 		return err
 	}
@@ -103,11 +110,46 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32
 	if _, err := closed.Await(ctx); err != nil {
 		return err
 	}
-	// #endregion close
 	return nil
+}
+
+func imagesTile(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y uint32) error {
+	// #region tile
+	m, created, err := runtime.CreateMap(maplibre.MapOptions{
+		InitialExtent: maplibre.LogicalExtent{
+			Width: 512, Height: 512, ScaleFactor: 1,
+		},
+		MapMode: maplibre.MapModeTile,
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := created.Await(ctx); err != nil {
+		return err
+	}
+
+	// A 512-pixel map shows tile z/x/y at zoom z.
+	center, zoom := tileCenter(z, x, y), float64(z)
+	err = m.Discarding().UpdateCamera(maplibre.CameraUpdate{
+		Mode:   maplibre.CameraUpdateModeJump,
+		Camera: maplibre.CameraOptions{Center: &center, Zoom: &zoom},
+	})
+	if err != nil {
+		return err
+	}
+	// #endregion tile
+
+	closed, err := m.Close()
+	if err != nil {
+		return err
+	}
+	_, err = closed.Await(ctx)
+	return err
 }
 
 // An example without an output comment compiles but never runs.
 func Example_images() {
-	_ = images(context.Background(), nil, 0, 0, 0)
+	ctx := context.Background()
+	_ = images(ctx, nil)
+	_ = imagesTile(ctx, nil, 0, 0, 0)
 }

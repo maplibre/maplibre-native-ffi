@@ -1,4 +1,5 @@
-// Snippets for the docs site's Offline page. They compile with the tests,
+// Snippets for the docs site's Offline page. They compile with the
+// tests,
 // which never run them.
 
 import Foundation
@@ -23,23 +24,24 @@ private func offline() async throws {
   // #endregion cache-file
 
   // #region progress
-  try runtime.discarding.setEventHandler(RuntimeEventHandler { events in
-    for event in events {
-      switch event.payload {
-      case let .offlineRegionStatus(payload):
-        recordProgress(
-          payload.regionId,
-          completed: payload.status.completedResourceCount,
-          required: payload.status.requiredResourceCount,
-          complete: payload.status.complete
-        )
-      case let .offlineRegionResponseError(payload):
-        recordError(payload.regionId, event.message)
-      default:
-        break
+  try runtime.discarding
+    .setEventHandler(RuntimeEventHandler { events in
+      for event in events {
+        switch event.payload {
+        case let .offlineRegionStatus(payload):
+          recordProgress(
+            payload.regionId,
+            completed: payload.status.completedResourceCount,
+            required: payload.status.requiredResourceCount,
+            complete: payload.status.complete
+          )
+        case let .offlineRegionResponseError(payload):
+          recordError(payload.regionId, event.message)
+        default:
+          break
+        }
       }
-    }
-  })
+    })
   // #endregion progress
 
   // #region ambient
@@ -63,11 +65,17 @@ private func offline() async throws {
     metadata: Data("Seattle".utf8)
   )
 
-  try await runtime.setOfflineRegionDownloadState(region.id, state: .active)
+  try await runtime.setOfflineRegionDownloadState(
+    region.id,
+    state: .active
+  )
   // #endregion download
 
   // #region progress
-  try await runtime.setOfflineRegionObserved(region.id, observed: true)
+  try await runtime.setOfflineRegionObserved(
+    region.id,
+    observed: true
+  )
   // #endregion progress
 
   // #region manage
@@ -76,7 +84,10 @@ private func offline() async throws {
   }
 
   // Resume a download that stopped when the runtime closed.
-  try await runtime.setOfflineRegionDownloadState(region.id, state: .active)
+  try await runtime.setOfflineRegionDownloadState(
+    region.id,
+    state: .active
+  )
 
   try await runtime.invalidateOfflineRegion(region.id)
 

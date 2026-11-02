@@ -16,7 +16,10 @@ function recordProgress(
 
 function recordError(_regionId: bigint, _message: string): void {}
 
-function recordRegion(_regionId: bigint, _metadata: Uint8Array): void {}
+function recordRegion(
+  _regionId: bigint,
+  _metadata: Uint8Array,
+): void {}
 
 export async function offline(): Promise<void> {
   // #region cache-file

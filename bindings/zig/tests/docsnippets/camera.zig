@@ -13,7 +13,10 @@ fn flyEnded(_: bool) void {}
 
 // #region animate
 // Runs on a library thread.
-fn onFlyEnd(_: ?*anyopaque, end: maplibre.CameraTransitionEnd) anyerror!void {
+fn onFlyEnd(
+    _: ?*anyopaque,
+    end: maplibre.CameraTransitionEnd,
+) anyerror!void {
     flyEnded(end.outcome == .completed);
 }
 // #endregion animate
@@ -21,17 +24,27 @@ fn onFlyEnd(_: ?*anyopaque, end: maplibre.CameraTransitionEnd) anyerror!void {
 // #region gesture
 fn beginGesture(map: maplibre.Map) !void {
     try map.discarding().cancelTransitions(null);
-    try map.discarding().applyCameraDelta(.{ .gesture_phase = .begin }, null);
+    try map.discarding().applyCameraDelta(
+        .{ .gesture_phase = .begin },
+        null,
+    );
 }
 
-fn applyDrag(map: maplibre.Map, movement: maplibre.ScreenPoint) !void {
+fn applyDrag(
+    map: maplibre.Map,
+    movement: maplibre.ScreenPoint,
+) !void {
     try map.discarding().applyCameraDelta(.{
         .offset = movement,
         .gesture_phase = .update,
     }, null);
 }
 
-fn applyPinch(map: maplibre.Map, scale: f64, center: maplibre.ScreenPoint) !void {
+fn applyPinch(
+    map: maplibre.Map,
+    scale: f64,
+    center: maplibre.ScreenPoint,
+) !void {
     try map.discarding().applyCameraDelta(.{
         .scale = scale,
         .anchor = center,
@@ -40,7 +53,10 @@ fn applyPinch(map: maplibre.Map, scale: f64, center: maplibre.ScreenPoint) !void
 }
 
 fn endGesture(map: maplibre.Map) !void {
-    try map.discarding().applyCameraDelta(.{ .gesture_phase = .end }, null);
+    try map.discarding().applyCameraDelta(
+        .{ .gesture_phase = .end },
+        null,
+    );
 }
 // #endregion gesture
 
@@ -58,15 +74,24 @@ fn camera(map: maplibre.Map) !void {
     // #region jump
     try map.discarding().updateCamera(.{
         .mode = .jump,
-        .camera = .{ .center = .{ .latitude = 48.8566, .longitude = 2.3522 }, .zoom = 12 },
+        .camera = .{
+            .center = .{ .latitude = 48.8566, .longitude = 2.3522 },
+            .zoom = 12,
+        },
     }, null);
     // #endregion jump
 
     // #region animate
     try map.discarding().updateCamera(.{
         .mode = .fly,
-        .camera = .{ .center = .{ .latitude = 40.7128, .longitude = -74.0060 }, .zoom = 10 },
-        .animation = .{ .duration_ms = 3000, .end_handler = .{ .callback = onFlyEnd } },
+        .camera = .{
+            .center = .{ .latitude = 40.7128, .longitude = -74.0060 },
+            .zoom = 10,
+        },
+        .animation = .{
+            .duration_ms = 3000,
+            .end_handler = .{ .callback = onFlyEnd },
+        },
     }, null);
     // #endregion animate
 
@@ -88,7 +113,11 @@ fn camera(map: maplibre.Map) !void {
     // #endregion fit
 
     // #region limit
-    try map.discarding().setBounds(.{ .bounds = bounds, .min_zoom = 5, .max_zoom = 16 }, null);
+    try map.discarding().setBounds(.{
+        .bounds = bounds,
+        .min_zoom = 5,
+        .max_zoom = 16,
+    }, null);
     // #endregion limit
 
     try beginGesture(map);
@@ -97,10 +126,12 @@ fn camera(map: maplibre.Map) !void {
     try endGesture(map);
 
     // #region convert
-    var projection = try maplibre.MapProjection.create((try map.getSnapshot(null)).view, null);
+    const view = (try map.getSnapshot(null)).view;
+    var projection = try maplibre.MapProjection.create(view, null);
     defer projection.release();
 
-    const coordinate = try projection.latLngForPixel(.{ .x = 100, .y = 200 }, null);
+    const coordinate =
+        try projection.latLngForPixel(.{ .x = 100, .y = 200 }, null);
     const point = try projection.pixelForLatLng(coordinate, null);
     // #endregion convert
     _ = point;

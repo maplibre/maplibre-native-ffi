@@ -1,4 +1,5 @@
-// Snippets for the docs site's Camera page. They compile with the tests, which
+// Snippets for the docs site's Camera page. They compile with the
+// tests, which
 // never run them.
 
 import MaplibreNativeFFI
@@ -11,10 +12,14 @@ private func flyEnded(_: Bool) {}
 
 private func beginGesture(_ map: MapHandle) throws {
   try map.discarding.cancelTransitions()
-  try map.discarding.applyCameraDelta(CameraDelta(gesturePhase: .begin))
+  try map.discarding
+    .applyCameraDelta(CameraDelta(gesturePhase: .begin))
 }
 
-private func applyDrag(_ map: MapHandle, movement: ScreenPoint) throws {
+private func applyDrag(
+  _ map: MapHandle,
+  movement: ScreenPoint
+) throws {
   try map.discarding.applyCameraDelta(
     CameraDelta(offset: movement, gesturePhase: .update)
   )

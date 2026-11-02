@@ -60,18 +60,24 @@ async fn render_to_texture(
     let texture = VulkanOwnedTextureDescriptor {
         // The texture's size in logical pixels, and its scale factor.
         extent: LogicalExtent::new(800, 600, 2.0),
-        // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+        // Your VkInstance, VkPhysicalDevice,
+        // VkDevice, and graphics VkQueue.
         context: vulkan,
     };
     let options = RenderSessionAttachOptions {
         frame_wake: Wake::new(on_frame_wake),
         // Only if your renderer also submits to the graphics queue.
-        queue_lock: QueueLock::new(lock_queue).with_unlock(unlock_queue),
-        ..RenderSessionAttachOptions::new(RenderDriverKind::CoreWorker)
+        queue_lock: QueueLock::new(lock_queue)
+            .with_unlock(unlock_queue),
+        ..RenderSessionAttachOptions::new(
+            RenderDriverKind::CoreWorker,
+        )
     };
 
     // SAFETY: the Vulkan objects outlive the session.
-    let (session, attached) = unsafe { map.attach_vulkan_owned_texture(&texture, &options)? };
+    let (session, attached) = unsafe {
+        map.attach_vulkan_owned_texture(&texture, &options)?
+    };
     attached.await?;
     // #endregion attach-owned
 
@@ -95,9 +101,11 @@ async fn render_to_texture(
         owner: VulkanImageOwner::GraphicsQueue,
     };
 
-    // The same attach options as for an owned ring.
-    // SAFETY: the textures and the Vulkan objects outlive the session.
-    let (session, attached) = unsafe { map.attach_vulkan_borrowed_texture(&ring, &options)? };
+    // The same attach options as for an owned ring. SAFETY: the
+    // textures and the Vulkan objects outlive the session.
+    let (session, attached) = unsafe {
+        map.attach_vulkan_borrowed_texture(&ring, &options)?
+    };
     attached.await?;
     // #endregion attach-borrowed
 
@@ -115,8 +123,10 @@ async fn render_to_texture(
     };
 
     // SAFETY: the new textures outlive the session.
-    unsafe { session.set_vulkan_borrowed_texture_target(&ring)? }.await?;
-    destroy_textures(images, views); // vkDestroyImageView and vkDestroyImage
+    unsafe { session.set_vulkan_borrowed_texture_target(&ring)? }
+        .await?;
+    // vkDestroyImageView and vkDestroyImage
+    destroy_textures(images, views);
     // #endregion resize-borrowed
 
     Ok(())

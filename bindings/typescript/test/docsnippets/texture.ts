@@ -52,15 +52,19 @@ export async function renderToTexture(
   const texture: VulkanOwnedTextureDescriptor = {
     // The texture's size in logical pixels, and its scale factor.
     extent: { width: 800, height: 600, scaleFactor: 2 },
-    // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+    // Your VkInstance, VkPhysicalDevice,
+    // VkDevice, and graphics VkQueue.
     context: vulkan,
   };
   const options: RenderSessionAttachOptions = {
     driver: RenderDriverKind.coreWorker,
     frameWake: onFrameWake,
-    // Only if your renderer also submits to the graphics queue. The lock and
-    // unlock are native function pointers.
-    queueLock: QueueLock.native({ lock: lockQueue, unlock: unlockQueue }),
+    // Only if your renderer also submits to the graphics queue. The
+    // lock and unlock are native function pointers.
+    queueLock: QueueLock.native({
+      lock: lockQueue,
+      unlock: unlockQueue,
+    }),
   };
 
   const owned = map.attachVulkanOwnedTexture(texture, options);
@@ -87,11 +91,14 @@ export async function renderToTexture(
     finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
   };
 
-  // The same attach options as for an owned ring. A queue lock serves one
-  // attach, so pass a new one.
+  // The same attach options as for an owned ring. A queue lock serves
+  // one attach, so pass a new one.
   const borrowed = map.attachVulkanBorrowedTexture(ring, {
     ...options,
-    queueLock: QueueLock.native({ lock: lockQueue, unlock: unlockQueue }),
+    queueLock: QueueLock.native({
+      lock: lockQueue,
+      unlock: unlockQueue,
+    }),
   });
   session = borrowed.session;
   await borrowed.ready;
@@ -111,6 +118,7 @@ export async function renderToTexture(
   };
 
   await session.setVulkanBorrowedTextureTarget(ring);
-  destroyTextures(images, views); // vkDestroyImageView and vkDestroyImage
+  // vkDestroyImageView and vkDestroyImage
+  destroyTextures(images, views);
   // #endregion resize-borrowed
 }

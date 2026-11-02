@@ -1,4 +1,5 @@
-// Snippets for the docs site's Query page. They compile with the tests, which
+// Snippets for the docs site's Query page. They compile with the
+// tests, which
 // never run them.
 
 import MaplibreNativeFFI

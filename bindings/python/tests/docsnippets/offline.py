@@ -29,23 +29,31 @@ def offline() -> None:
     def on_events(events: tuple[mln.RuntimeEvent, ...]) -> None:
         for event in events:
             match event.payload:
-                case mln.RuntimeEventOfflineRegionStatusVariant(value=update):
+                case mln.RuntimeEventOfflineRegionStatusVariant(
+                    value=update
+                ):
                     record_progress(
                         update.region_id,
                         update.status.completed_resource_count,
                         update.status.required_resource_count,
                         update.status.complete,
                     )
-                case mln.RuntimeEventOfflineRegionResponseErrorVariant(value=error):
+                case mln.RuntimeEventOfflineRegionResponseErrorVariant(
+                    value=error
+                ):
                     record_error(error.region_id, event.message)
 
-    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(on_events))
+    runtime.discarding.set_event_handler(
+        mln.RuntimeEventHandler(on_events)
+    )
     # #endregion progress
 
     # #region ambient
     # 50 MiB
     runtime.set_maximum_ambient_cache_size(50 * 1024 * 1024).result()
-    runtime.run_ambient_cache_operation(mln.AmbientCacheOperation.CLEAR).result()
+    runtime.run_ambient_cache_operation(
+        mln.AmbientCacheOperation.CLEAR
+    ).result()
     # #endregion ambient
 
     # #region download
@@ -54,8 +62,12 @@ def offline() -> None:
             mln.OfflineTilePyramidRegionDefinition(
                 style_url="https://demotiles.maplibre.org/style.json",
                 bounds=mln.LatLngBounds(
-                    southwest=mln.LatLng(latitude=47.5, longitude=-122.5),
-                    northeast=mln.LatLng(latitude=47.8, longitude=-122.2),
+                    southwest=mln.LatLng(
+                        latitude=47.5, longitude=-122.5
+                    ),
+                    northeast=mln.LatLng(
+                        latitude=47.8, longitude=-122.2
+                    ),
                 ),
                 min_zoom=0,
                 max_zoom=6,

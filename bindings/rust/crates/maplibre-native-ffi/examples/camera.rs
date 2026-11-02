@@ -26,7 +26,11 @@ fn apply_drag(map: &MapHandle, movement: ScreenPoint) -> Result<()> {
     })
 }
 
-fn apply_pinch(map: &MapHandle, scale: f64, center: ScreenPoint) -> Result<()> {
+fn apply_pinch(
+    map: &MapHandle,
+    scale: f64,
+    center: ScreenPoint,
+) -> Result<()> {
     map.discarding().apply_camera_delta(&CameraDelta {
         scale: Some(scale),
         anchor: Some(center),
@@ -76,7 +80,9 @@ async fn camera(map: &MapHandle) -> Result<()> {
             duration_ms: Some(3000.0),
             // Runs on a library thread.
             end_handler: CameraTransitionHandler::new(|end| {
-                fly_ended(end.outcome == CameraTransitionOutcome::Completed);
+                fly_ended(
+                    end.outcome == CameraTransitionOutcome::Completed,
+                );
             }),
             ..Default::default()
         },
@@ -118,9 +124,11 @@ async fn camera(map: &MapHandle) -> Result<()> {
     end_gesture(map)?;
 
     // #region convert
-    let projection = MapProjectionHandle::create(&map.get_snapshot()?.view)?;
+    let projection =
+        MapProjectionHandle::create(&map.get_snapshot()?.view)?;
 
-    let coordinate = projection.lat_lng_for_pixel(ScreenPoint::new(100.0, 200.0))?;
+    let coordinate = projection
+        .lat_lng_for_pixel(ScreenPoint::new(100.0, 200.0))?;
     let point = projection.pixel_for_lat_lng(coordinate)?;
 
     drop(projection);

@@ -1,0 +1,77 @@
+---
+title: Render to a texture
+description: Share rendered frames with your renderer.
+# Scope: owned and borrowed textures, and acquiring frames. Reading pixels back
+# belongs in Render images. Running driver work on your graphics thread belongs
+# in Render to a window.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+import Snippet from "../../../components/Snippet.astro";
+
+This guide renders a continuous map into textures that your renderer draws, such
+as a UI framework, a game engine, or a compositor. It uses the frame loop from
+[Render to a window](/maplibre-native-ffi/guides/window/#render-frames).
+
+## Attach a texture ring
+
+The session renders into a ring of textures, so your renderer can draw one frame
+while the session renders the next.
+
+Let the session create the ring on your GPU device. If your framework hands you
+the textures to render into, attach those as a borrowed ring instead.
+
+<Aside type="note">
+  The snippets below use Vulkan. For another backend, use that backend's calls
+  to attach and replace the texture ring, and to get each frame's texture. The
+  other steps are the same.
+</Aside>
+
+Pass your graphics context, such as your device and queue. On Vulkan, if your
+renderer also submits to that queue, pass a lock, and take the same lock around
+your own calls on the queue.
+
+Use the library thread as the driver unless the texture uses your OpenGL context
+or WebGPU in a browser, and use your graphics thread for those. See
+[Render on your graphics thread](/maplibre-native-ffi/guides/window/#render-on-your-graphics-thread).
+
+<Snippet page="texture" region="attach-owned" />
+
+For a borrowed ring, pass your textures and their size in device pixels, and
+destroy them only after the session closes.
+
+<Snippet page="texture" region="attach-borrowed" />
+
+## Draw each frame
+
+Render frames with the same loop as for a window, without asking to present.
+
+When a frame renders, acquire it, and get its texture for your backend. The
+frame's rendering has already finished, so your renderer can read the texture
+right away.
+
+Release the frame after your reads finish. The session renders into that texture
+again only after the release. Release every acquired frame before you close the
+session. To sync on the GPU instead, see the GPU sync kinds in the
+[API reference](/maplibre-native-ffi/reference/c/render__target_8h.html).
+
+Keep at most one frame acquired while the next renders. If every texture in the
+ring is acquired, the next frame waits.
+
+If your renderer already runs a loop every frame, as a game engine does, you can
+drain the frame results there instead of using the frame wake.
+
+<Snippet page="texture" region="acquire" />
+
+## Resize the textures
+
+Release every acquired frame first.
+
+For an owned ring, resize the session, as for a
+[window](/maplibre-native-ffi/guides/window/#resize-the-window).
+
+For a borrowed ring, create textures at the new size and set them as the
+session's target, then destroy the old textures after that finishes.
+
+<Snippet page="texture" region="resize-borrowed" />

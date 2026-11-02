@@ -5,7 +5,9 @@ namespace Maplibre.NativeFfi.Tests.DocSnippets;
 
 internal static class Camera
 {
-    private static void UseCamera(Maplibre.NativeFfi.Camera camera) { }
+    private static void UseCamera(
+        Maplibre.NativeFfi.Camera camera
+    ) { }
 
     private static void FlyEnded(bool completed) { }
 
@@ -13,17 +15,27 @@ internal static class Camera
     private static void BeginGesture(MapHandle map)
     {
         map.Discarding.CancelTransitions();
-        map.Discarding.ApplyCameraDelta(new CameraDelta { GesturePhase = GesturePhase.Begin });
+        map.Discarding.ApplyCameraDelta(
+            new CameraDelta { GesturePhase = GesturePhase.Begin }
+        );
     }
 
     private static void ApplyDrag(MapHandle map, ScreenPoint movement)
     {
         map.Discarding.ApplyCameraDelta(
-            new CameraDelta { Offset = movement, GesturePhase = GesturePhase.Update }
+            new CameraDelta
+            {
+                Offset = movement,
+                GesturePhase = GesturePhase.Update,
+            }
         );
     }
 
-    private static void ApplyPinch(MapHandle map, double scale, ScreenPoint center)
+    private static void ApplyPinch(
+        MapHandle map,
+        double scale,
+        ScreenPoint center
+    )
     {
         map.Discarding.ApplyCameraDelta(
             new CameraDelta
@@ -37,7 +49,9 @@ internal static class Camera
 
     private static void EndGesture(MapHandle map)
     {
-        map.Discarding.ApplyCameraDelta(new CameraDelta { GesturePhase = GesturePhase.End });
+        map.Discarding.ApplyCameraDelta(
+            new CameraDelta { GesturePhase = GesturePhase.End }
+        );
     }
 
     // #endregion gesture
@@ -57,7 +71,11 @@ internal static class Camera
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
-                Camera = new CameraOptions { Center = new LatLng(48.8566, 2.3522), Zoom = 12 },
+                Camera = new CameraOptions
+                {
+                    Center = new LatLng(48.8566, 2.3522),
+                    Zoom = 12,
+                },
             }
         );
         // #endregion jump
@@ -67,13 +85,20 @@ internal static class Camera
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Fly,
-                Camera = new CameraOptions { Center = new LatLng(40.7128, -74.0060), Zoom = 10 },
+                Camera = new CameraOptions
+                {
+                    Center = new LatLng(40.7128, -74.0060),
+                    Zoom = 10,
+                },
                 Animation = new AnimationOptions
                 {
                     DurationMs = 3000,
                     // Runs on a library thread.
                     EndHandler = new CameraTransitionHandler(end =>
-                        FlyEnded(end.Outcome == CameraTransitionOutcome.Completed)
+                        FlyEnded(
+                            end.Outcome
+                                == CameraTransitionOutcome.Completed
+                        )
                     ),
                 },
             }
@@ -81,7 +106,10 @@ internal static class Camera
         // #endregion animate
 
         // #region fit
-        var bounds = new LatLngBounds(new LatLng(45.8, 5.9), new LatLng(47.8, 10.5));
+        var bounds = new LatLngBounds(
+            new LatLng(45.8, 5.9),
+            new LatLng(47.8, 10.5)
+        );
         var fitted = await map.CameraForLatLngBoundsAsync(bounds);
 
         map.Discarding.UpdateCamera(
@@ -111,9 +139,15 @@ internal static class Camera
         EndGesture(map);
 
         // #region convert
-        using (var projection = MapProjectionHandle.Create(map.GetSnapshot().View))
+        using (
+            var projection = MapProjectionHandle.Create(
+                map.GetSnapshot().View
+            )
+        )
         {
-            var coordinate = projection.LatLngForPixel(new ScreenPoint(100, 200));
+            var coordinate = projection.LatLngForPixel(
+                new ScreenPoint(100, 200)
+            );
             var point = projection.PixelForLatLng(coordinate);
         }
         // #endregion convert

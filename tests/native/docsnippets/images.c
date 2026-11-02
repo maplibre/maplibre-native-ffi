@@ -1,5 +1,5 @@
-// Snippets for the docs site's Render images page. They compile with the
-// native tests, which never run them.
+// Snippets for the docs site's Render images page. They compile with
+// the native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -8,7 +8,9 @@
 
 static atomic_bool finished;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -19,7 +21,8 @@ static void wait_for_done(void) {
   }
 }
 
-// The center of tile z/x/y. The snippet leaves the tile math to the reader.
+// The center of tile z/x/y. The snippet leaves the tile math to the
+// reader.
 static mln_lat_lng tile_center(uint32_t z, uint32_t x, uint32_t y) {
   (void)z;
   (void)x;
@@ -33,7 +36,9 @@ static void copy_pixels(mln_buffer_view data, uint32_t stride) {
 }
 
 // #region read
-static void on_pixels(void* user_data, const mln_completion_result* result) {
+static void on_pixels(
+  void* user_data, const mln_completion_result* result
+) {
   if (result->status == MLN_STATUS_OK) {
     const mln_texture_readback_result* readback = result->value;
     // readback->data is valid only during this callback.
@@ -43,9 +48,9 @@ static void on_pixels(void* user_data, const mln_completion_result* result) {
 }
 // #endregion read
 
-void mln_doc_images(mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y);
+void mln_doc_images(mln_runtime runtime);
 
-void mln_doc_images(mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y) {
+void mln_doc_images(mln_runtime runtime) {
   const mln_completion done = {
     .size = sizeof(mln_completion), .callback = on_done
   };
@@ -53,8 +58,9 @@ void mln_doc_images(mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y) {
   // #region map
   mln_map_options map_options = {
     .size = sizeof(mln_map_options),
-    .initial_extent = {.width = 512, .height = 512, .scale_factor = 1.0},
-    .map_mode = MLN_MAP_MODE_TILE,
+    .initial_extent =
+      {.width = 800, .height = 600, .scale_factor = 2.0},
+    .map_mode = MLN_MAP_MODE_STATIC,
   };
 
   mln_map map = MLN_HANDLE_NULL;
@@ -64,7 +70,10 @@ void mln_doc_images(mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y) {
 
   // #region style
   mln_map_set_style_url(
-    map, mln_buffer_view_from_cstr("https://demotiles.maplibre.org/style.json"),
+    map,
+    mln_buffer_view_from_cstr(
+      "https://demotiles.maplibre.org/style.json"
+    ),
     NULL, NULL
   );
   // #endregion style
@@ -98,8 +107,8 @@ void mln_doc_images(mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y) {
     .camera = {
       .size = sizeof(mln_camera_options),
       .fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM,
-      .center = tile_center(z, x, y),
-      .zoom = z,
+      .center = {.latitude = 48.8566, .longitude = 2.3522},
+      .zoom = 4,
     },
   };
   mln_map_update_camera(map, &update, NULL, NULL);
@@ -117,10 +126,50 @@ void mln_doc_images(mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y) {
   // #endregion read
   wait_for_done();
 
-  // #region close
   mln_render_session_dispose(session, NULL, NULL);
   mln_graphics_device_release(device);
   mln_map_release(map, &done, NULL);
-  // #endregion close
+  wait_for_done();
+}
+
+void mln_doc_images_tile(
+  mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y
+);
+
+void mln_doc_images_tile(
+  mln_runtime runtime, uint32_t z, uint32_t x, uint32_t y
+) {
+  const mln_completion done = {
+    .size = sizeof(mln_completion), .callback = on_done
+  };
+
+  // #region tile
+  mln_map_options map_options = {
+    .size = sizeof(mln_map_options),
+    .initial_extent =
+      {.width = 512, .height = 512, .scale_factor = 1.0},
+    .map_mode = MLN_MAP_MODE_TILE,
+  };
+  mln_map map = MLN_HANDLE_NULL;
+  mln_runtime_create_map(runtime, &map_options, &map, &done, NULL);
+  // #endregion tile
+  wait_for_done();
+
+  // #region tile
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .mode = MLN_CAMERA_UPDATE_MODE_JUMP,
+    .camera = {
+      .size = sizeof(mln_camera_options),
+      .fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM,
+      .center = tile_center(z, x, y),
+      // A 512-pixel map shows tile z/x/y at zoom z.
+      .zoom = z,
+    },
+  };
+  mln_map_update_camera(map, &update, NULL, NULL);
+  // #endregion tile
+
+  mln_map_release(map, &done, NULL);
   wait_for_done();
 }

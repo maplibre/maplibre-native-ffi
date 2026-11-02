@@ -8,7 +8,9 @@ import (
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
-// Attaches a render target, as the Rendering guides show.
+func reportFailure(err error) {}
+
+// Attaches a render target, as the render target guides show.
 func attachTarget(m *maplibre.MapHandle) (*maplibre.RenderSessionHandle, error) {
 	return nil, nil
 }
@@ -23,8 +25,10 @@ func createAMap(ctx context.Context) error {
 
 	// #region map
 	m, created, err := runtime.CreateMap(maplibre.MapOptions{
-		InitialExtent: maplibre.LogicalExtent{Width: 800, Height: 600, ScaleFactor: 2},
-		MapMode:       maplibre.MapModeContinuous,
+		InitialExtent: maplibre.LogicalExtent{
+			Width: 800, Height: 600, ScaleFactor: 2,
+		},
+		MapMode: maplibre.MapModeContinuous,
 	})
 	if err != nil {
 		return err
@@ -33,6 +37,47 @@ func createAMap(ctx context.Context) error {
 		return err
 	}
 	// #endregion map
+
+	// #region style
+	err = m.Discarding().SetStyleUrl(
+		"https://demotiles.maplibre.org/style.json",
+	)
+	if err != nil {
+		return err
+	}
+	// #endregion style
+
+	zoom := 3.0
+	update := maplibre.CameraUpdate{
+		Mode:   maplibre.CameraUpdateModeJump,
+		Camera: maplibre.CameraOptions{Zoom: &zoom},
+	}
+
+	// #region wait
+	moved, err := m.UpdateCamera(update)
+	if err != nil {
+		return err
+	}
+	if _, err := moved.Await(ctx); err != nil {
+		return err
+	}
+
+	// Use the discarding variant to ignore the result.
+	if err := m.Discarding().UpdateCamera(update); err != nil {
+		return err
+	}
+	// #endregion wait
+
+	// #region errors
+	jumped, err := m.UpdateCamera(update)
+	if err != nil {
+		// The call failed right away.
+		reportFailure(err)
+	} else if _, err := jumped.Await(ctx); err != nil {
+		// The result reports a failure.
+		reportFailure(err)
+	}
+	// #endregion errors
 
 	session, err := attachTarget(m)
 	if err != nil {
@@ -43,15 +88,9 @@ func createAMap(ctx context.Context) error {
 	if err := session.Dispose(); err != nil {
 		return err
 	}
-
-	mapClosed, err := m.Close()
-	if err != nil {
+	if err := m.Dispose(); err != nil {
 		return err
 	}
-	if _, err := mapClosed.Await(ctx); err != nil {
-		return err
-	}
-
 	runtimeClosed, err := runtime.Close()
 	if err != nil {
 		return err

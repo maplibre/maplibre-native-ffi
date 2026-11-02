@@ -43,10 +43,9 @@ API, with bindings for Dart, Go, Kotlin, .NET, Python, Rust, Swift, TypeScript,
 and Zig. Use it to build map components for a UI framework, or to render maps on
 a server.
 
-To start, read the
-[concepts](https://maplibre.org/maplibre-native-ffi/concepts/), then
-[install](https://maplibre.org/maplibre-native-ffi/install/) the package for
-your language.
+To start, [install](https://maplibre.org/maplibre-native-ffi/install/) the
+package for your language, then
+[create a map](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/).
 
 ## Used by
 

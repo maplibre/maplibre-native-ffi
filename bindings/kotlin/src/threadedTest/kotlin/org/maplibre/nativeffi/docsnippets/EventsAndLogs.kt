@@ -1,4 +1,5 @@
-// Snippets for the docs site's Events and logs page. They compile with the tests, which never run
+// Snippets for the docs site's Events and logs page. They compile
+// with the tests, which never run
 // them.
 package org.maplibre.nativeffi.docsnippets
 
@@ -29,7 +30,8 @@ private fun handleEvents(events: List<RuntimeEvent>) {
 
     when (event.type) {
       RuntimeEventType.MAP_STYLE_LOADED -> onStyleLoaded()
-      RuntimeEventType.MAP_LOADING_FAILED -> onLoadingFailed(event.message)
+      RuntimeEventType.MAP_LOADING_FAILED ->
+        onLoadingFailed(event.message)
     }
   }
 }
@@ -39,15 +41,24 @@ private fun handleEvents(events: List<RuntimeEvent>) {
 private suspend fun eventsAndLogs(runtime: RuntimeHandle) {
   // #region handler
   // Runs on a library thread.
-  runtime.discarding.setEventHandler(RuntimeEventHandler(::handleEvents))
+  runtime.discarding.setEventHandler(
+    RuntimeEventHandler(::handleEvents),
+  )
   // #endregion handler
 
   // #region mask
   val (created, ready) =
     runtime.createMap(
       MapOptions(
-        initialExtent = LogicalExtent(width = 512u, height = 512u, scaleFactor = 1.0),
-        eventMask = RuntimeEventFlag.MAP_STYLE_LOADED or RuntimeEventFlag.MAP_LOADING_FAILED,
+        initialExtent =
+          LogicalExtent(
+            width = 512u,
+            height = 512u,
+            scaleFactor = 1.0,
+          ),
+        eventMask =
+          RuntimeEventFlag.MAP_STYLE_LOADED or
+            RuntimeEventFlag.MAP_LOADING_FAILED,
       ),
     )
   // #endregion mask
@@ -59,7 +70,8 @@ private suspend fun eventsAndLogs(runtime: RuntimeHandle) {
   setLogCallback(
     LogHandler { severity, _, _, message ->
       writeLog(severity, message)
-      // Consume the record. Return false to let the platform logger print it too.
+      // Consume the record. Return false to let the platform logger
+      // print it too.
       true
     },
   )

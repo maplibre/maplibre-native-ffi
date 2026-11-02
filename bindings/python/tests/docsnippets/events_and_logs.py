@@ -32,13 +32,17 @@ def events_and_logs(runtime: mln.RuntimeHandle) -> None:
                     on_loading_failed(event.message)
 
     # The handler runs on the binding's dispatcher thread.
-    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(on_events))
+    runtime.discarding.set_event_handler(
+        mln.RuntimeEventHandler(on_events)
+    )
     # #endregion handler
 
     # #region mask
     map_handle, ready = runtime.create_map(
         mln.MapOptions(
-            initial_extent=mln.LogicalExtent(width=512, height=512, scale_factor=1.0),
+            initial_extent=mln.LogicalExtent(
+                width=512, height=512, scale_factor=1.0
+            ),
             event_mask=mln.RuntimeEventFlag.MAP_STYLE_LOADED
             | mln.RuntimeEventFlag.MAP_LOADING_FAILED,
         )
@@ -49,7 +53,10 @@ def events_and_logs(runtime: mln.RuntimeHandle) -> None:
     # #region logs
     # The callback runs on the binding's dispatcher thread.
     def on_log(
-        severity: mln.LogSeverity, event: mln.LogEvent, code: int, message: str
+        severity: mln.LogSeverity,
+        event: mln.LogEvent,
+        code: int,
+        message: str,
     ) -> None:
         write_log(severity, message)
 

@@ -20,13 +20,16 @@ func drawImage(imageID string) maplibre.PremultipliedRgba8Image {
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 func style(m *maplibre.MapHandle, pixels []byte) error {
 	// #region load
-	if err := m.Discarding().SetStyleUrl("https://demotiles.maplibre.org/style.json"); err != nil {
+	err := m.Discarding().SetStyleUrl(
+		"https://demotiles.maplibre.org/style.json",
+	)
+	if err != nil {
 		return err
 	}
 	// #endregion load
 
 	// #region add
-	err := m.Discarding().AddStyleSourceJson("satellite", `{
+	err = m.Discarding().AddStyleSourceJson("satellite", `{
 		"type": "raster",
 		"tileSize": 256,
 		"tiles": ["https://tiles.example.com/{z}/{x}/{y}.png"]
@@ -46,23 +49,29 @@ func style(m *maplibre.MapHandle, pixels []byte) error {
 	// #endregion add
 
 	// #region geojson
-	data, err := maplibre.NewGeoJsonSourceData(`{"type": "Point", "coordinates": [-122.4, 37.8]}`, nil)
+	data, err := maplibre.NewGeoJsonSourceData(
+		`{"type": "Point", "coordinates": [-122.4, 37.8]}`, nil,
+	)
 	if err != nil {
 		return err
 	}
 	// The source keeps its own reference to the data.
 	defer data.Close()
-	if err := m.Discarding().AddGeoJsonSourceData("points", data); err != nil {
+	err = m.Discarding().AddGeoJsonSourceData("points", data)
+	if err != nil {
 		return err
 	}
 
 	// Later, prepare new data with the same options, and set it.
-	next, err := maplibre.NewGeoJsonSourceData(`{"type": "Point", "coordinates": [2.35, 48.86]}`, nil)
+	next, err := maplibre.NewGeoJsonSourceData(
+		`{"type": "Point", "coordinates": [2.35, 48.86]}`, nil,
+	)
 	if err != nil {
 		return err
 	}
 	defer next.Close()
-	if err := m.Discarding().SetGeoJsonSourceData("points", next); err != nil {
+	err = m.Discarding().SetGeoJsonSourceData("points", next)
+	if err != nil {
 		return err
 	}
 	// #endregion geojson
@@ -72,11 +81,17 @@ func style(m *maplibre.MapHandle, pixels []byte) error {
 	if err := m.Discarding().BeginCommandGroup(); err != nil {
 		return err
 	}
-	if err := m.Discarding().SetStyleLayerProperty("satellite", "visibility", `"none"`); err != nil {
+	err = m.Discarding().SetStyleLayerProperty(
+		"satellite", "visibility", `"none"`,
+	)
+	if err != nil {
 		return err
 	}
-	err = m.Discarding().SetStyleLayerProperty("countries-boundary", "line-color",
-		`["interpolate", ["linear"], ["zoom"], 5, "#9cf", 12, "#06c"]`)
+	err = m.Discarding().SetStyleLayerProperty(
+		"countries-boundary",
+		"line-color",
+		`["interpolate", ["linear"], ["zoom"], 5, "#9cf", 12, "#06c"]`,
+	)
 	if err != nil {
 		return err
 	}
@@ -86,8 +101,11 @@ func style(m *maplibre.MapHandle, pixels []byte) error {
 	// #endregion set-property
 
 	// #region image
-	image := maplibre.PremultipliedRgba8Image{Width: 16, Height: 16, Stride: 16 * 4, Pixels: pixels}
-	if err := m.Discarding().SetStyleImage("marker", image, nil); err != nil {
+	image := maplibre.PremultipliedRgba8Image{
+		Width: 16, Height: 16, Stride: 16 * 4, Pixels: pixels,
+	}
+	err = m.Discarding().SetStyleImage("marker", image, nil)
+	if err != nil {
 		return err
 	}
 
@@ -107,21 +125,26 @@ func style(m *maplibre.MapHandle, pixels []byte) error {
 
 func styleEvents(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	// #region missing-image
-	err := runtime.Discarding().SetEventHandler(maplibre.RuntimeEventHandler{
-		// Runs on a library thread.
-		Callback: func(events []maplibre.RuntimeEvent) {
-			for _, event := range events {
-				if event.Source != m.Id() || event.Type != maplibre.RuntimeEventTypeMapStyleImageMissing {
-					continue
-				}
-				// The message holds the image's ID.
-				err := m.Discarding().SetStyleImage(event.Message, drawImage(event.Message), nil)
-				if err != nil {
-					log.Print(err)
-				}
+	// Runs on a library thread.
+	handleEvents := func(events []maplibre.RuntimeEvent) {
+		for _, event := range events {
+			if event.Source != m.Id() {
+				continue
 			}
-		},
-	})
+			if event.Type != maplibre.RuntimeEventTypeMapStyleImageMissing {
+				continue
+			}
+			// The message holds the image's ID.
+			image := drawImage(event.Message)
+			err := m.Discarding().SetStyleImage(event.Message, image, nil)
+			if err != nil {
+				log.Print(err)
+			}
+		}
+	}
+	err := runtime.Discarding().SetEventHandler(
+		maplibre.RuntimeEventHandler{Callback: handleEvents},
+	)
 	if err != nil {
 		return err
 	}

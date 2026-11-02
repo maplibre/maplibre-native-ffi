@@ -1,4 +1,5 @@
-// Snippets for the docs site's Camera page. They compile with the tests, which never run them.
+// Snippets for the docs site's Camera page. They compile with the
+// tests, which never run them.
 package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.AnimationOptions
@@ -26,23 +27,38 @@ private fun flyEnded(completed: Boolean) {}
 // #region gesture
 private fun beginGesture(map: MapHandle) {
   map.discarding.cancelTransitions()
-  map.discarding.applyCameraDelta(CameraDelta(gesturePhase = GesturePhase.BEGIN))
+  map.discarding.applyCameraDelta(
+    CameraDelta(gesturePhase = GesturePhase.BEGIN),
+  )
 }
 
 private fun applyDrag(map: MapHandle, movement: ScreenPoint) {
   map.discarding.applyCameraDelta(
-    CameraDelta(offset = movement, gesturePhase = GesturePhase.UPDATE),
+    CameraDelta(
+      offset = movement,
+      gesturePhase = GesturePhase.UPDATE,
+    ),
   )
 }
 
-private fun applyPinch(map: MapHandle, scale: Double, center: ScreenPoint) {
+private fun applyPinch(
+  map: MapHandle,
+  scale: Double,
+  center: ScreenPoint,
+) {
   map.discarding.applyCameraDelta(
-    CameraDelta(scale = scale, anchor = center, gesturePhase = GesturePhase.UPDATE),
+    CameraDelta(
+      scale = scale,
+      anchor = center,
+      gesturePhase = GesturePhase.UPDATE,
+    ),
   )
 }
 
 private fun endGesture(map: MapHandle) {
-  map.discarding.applyCameraDelta(CameraDelta(gesturePhase = GesturePhase.END))
+  map.discarding.applyCameraDelta(
+    CameraDelta(gesturePhase = GesturePhase.END),
+  )
 }
 
 // #endregion gesture
@@ -60,7 +76,11 @@ private suspend fun camera(map: MapHandle) {
   map.discarding.updateCamera(
     CameraUpdate(
       mode = CameraUpdateMode.JUMP,
-      camera = CameraOptions(center = LatLng(latitude = 48.8566, longitude = 2.3522), zoom = 12.0),
+      camera =
+        CameraOptions(
+          center = LatLng(latitude = 48.8566, longitude = 2.3522),
+          zoom = 12.0,
+        ),
     ),
   )
   // #endregion jump
@@ -69,14 +89,21 @@ private suspend fun camera(map: MapHandle) {
   map.discarding.updateCamera(
     CameraUpdate(
       mode = CameraUpdateMode.FLY,
-      camera = CameraOptions(center = LatLng(latitude = 40.7128, longitude = -74.006), zoom = 10.0),
+      camera =
+        CameraOptions(
+          center = LatLng(latitude = 40.7128, longitude = -74.006),
+          zoom = 10.0,
+        ),
       animation =
         AnimationOptions(
           durationMs = 3000.0,
-          // Runs after the animation ends, on a library thread, or on the page in Kotlin/Wasm.
+          // Runs after the animation ends, on a library thread, or on
+          // the page in Kotlin/Wasm.
           endHandler =
             CameraTransitionHandler { end ->
-              flyEnded(end.outcome == CameraTransitionOutcome.COMPLETED)
+              flyEnded(
+                end.outcome == CameraTransitionOutcome.COMPLETED,
+              )
             },
         ),
     ),
@@ -101,7 +128,9 @@ private suspend fun camera(map: MapHandle) {
   // #endregion fit
 
   // #region limit
-  map.discarding.setBounds(BoundOptions(bounds = bounds, minZoom = 5.0, maxZoom = 16.0))
+  map.discarding.setBounds(
+    BoundOptions(bounds = bounds, minZoom = 5.0, maxZoom = 16.0),
+  )
   // #endregion limit
 
   beginGesture(map)
@@ -112,7 +141,8 @@ private suspend fun camera(map: MapHandle) {
   // #region convert
   val projection = MapProjectionHandle.create(map.getSnapshot().view)
 
-  val coordinate = projection.latLngForPixel(ScreenPoint(x = 100.0, y = 200.0))
+  val coordinate =
+    projection.latLngForPixel(ScreenPoint(x = 100.0, y = 200.0))
   val point = projection.pixelForLatLng(coordinate)
 
   projection.close()

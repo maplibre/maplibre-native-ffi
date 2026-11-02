@@ -24,7 +24,10 @@ internal static class Texture
     // The host's draw, which samples the image view.
     private static void DrawMap(ulong imageView) { }
 
-    private static void DestroyTextures(ulong[] images, ulong[] views) { }
+    private static void DestroyTextures(
+        ulong[] images,
+        ulong[] views
+    ) { }
 
     private static void DrawFrame()
     {
@@ -34,7 +37,9 @@ internal static class Texture
             return; // No new frame yet.
 
         // Sample the texture, and wait for those reads to finish.
-        frame.WithVulkanTexture(texture => DrawMap(texture.ImageView));
+        frame.WithVulkanTexture(texture =>
+            DrawMap(texture.ImageView)
+        );
 
         frame.Release(null);
         // #endregion acquire
@@ -52,16 +57,19 @@ internal static class Texture
         // #region attach-owned
         var texture = new VulkanOwnedTextureDescriptor
         {
-            // The texture's size in logical pixels, and its scale factor.
+            // The texture's size in logical
+            // pixels, and its scale factor.
             Extent = new LogicalExtent(800, 600, 2),
-            // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+            // Your VkInstance, VkPhysicalDevice,
+            // VkDevice, and graphics VkQueue.
             Context = vulkan,
         };
         var options = new RenderSessionAttachOptions
         {
             Driver = RenderDriverKind.CoreWorker,
             FrameWake = new Wake(OnFrameWake),
-            // Only if your renderer also submits to the graphics queue.
+            // Only if your renderer also
+            // submits to the graphics queue.
             QueueLock = new QueueLock(LockQueue, UnlockQueue),
         };
 
@@ -80,14 +88,17 @@ internal static class Texture
             PhysicalWidth = 1600,
             PhysicalHeight = 1200,
             Context = vulkan,
-            // Your VkImage and VkImageView for each texture of the ring.
+            // Your VkImage and VkImageView
+            // for each texture of the ring.
             Textures =
             [
                 new VulkanBorrowedTexture(images[0], views[0]),
                 new VulkanBorrowedTexture(images[1], views[1]),
             ],
-            Format = 37, // VK_FORMAT_R8G8B8A8_UNORM
-            FinalLayout = 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            // VK_FORMAT_R8G8B8A8_UNORM
+            Format = 37,
+            // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            FinalLayout = 5,
         };
 
         // The same attach options as for an owned ring.
@@ -110,7 +121,8 @@ internal static class Texture
         };
 
         await session.SetVulkanBorrowedTextureTargetAsync(ring);
-        DestroyTextures(images, views); // vkDestroyImageView and vkDestroyImage
+        // vkDestroyImageView and vkDestroyImage
+        DestroyTextures(images, views);
         // #endregion resize-borrowed
     }
 }

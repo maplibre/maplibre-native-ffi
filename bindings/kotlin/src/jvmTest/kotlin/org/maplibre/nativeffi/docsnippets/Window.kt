@@ -1,4 +1,5 @@
-// Snippets for the docs site's Render to a window page. They compile with the tests, which never
+// Snippets for the docs site's Render to a window page. They compile
+// with the tests, which never
 // run them.
 package org.maplibre.nativeffi.docsnippets
 
@@ -16,7 +17,8 @@ import org.maplibre.nativeffi.Wake
 import org.maplibre.nativeffi.attachVulkanSurface
 import org.maplibre.nativeffi.setVulkanSurfaceTarget
 
-// Stand-ins for the host's event loop, display timer, and graphics thread.
+// Stand-ins for the host's event loop, display timer, and graphics
+// thread.
 private fun runOnEventLoop(task: () -> Unit) {}
 
 private fun runAtNextRefresh(task: () -> Unit) {}
@@ -39,7 +41,10 @@ private var paused = false
 
 private fun requestFrame() {
   session.requestFrame(
-    FrameDemand(flags = FrameDemandFlag.PRESENT or FrameDemandFlag.WAIT_FOR_UPDATE),
+    FrameDemand(
+      flags =
+        FrameDemandFlag.PRESENT or FrameDemandFlag.WAIT_FOR_UPDATE,
+    ),
   )
 }
 
@@ -67,7 +72,9 @@ private fun onFrameWake() {
 // #region resize
 private fun onWindowResized(width: UInt, height: UInt) {
   // The scale factor the session has now.
-  session.discarding.resize(LogicalExtent(width = width, height = height, scaleFactor = 2.0))
+  session.discarding.resize(
+    LogicalExtent(width = width, height = height, scaleFactor = 2.0),
+  )
 }
 
 // #endregion resize
@@ -92,12 +99,20 @@ private suspend fun surfaceLost() {
   // #endregion lost-surface
 }
 
-private suspend fun surfaceRestored(vulkan: VulkanContextDescriptor, newSurface: ULong) {
+private suspend fun surfaceRestored(
+  vulkan: VulkanContextDescriptor,
+  newSurface: ULong,
+) {
   // #region lost-surface
   session
     .setVulkanSurfaceTarget(
       VulkanSurfaceDescriptor(
-        extent = LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
+        extent =
+          LogicalExtent(
+            width = 800u,
+            height = 600u,
+            scaleFactor = 2.0,
+          ),
         context = vulkan,
         surface = newSurface,
       ),
@@ -118,8 +133,14 @@ private suspend fun renderToWindow(
     map.attachVulkanSurface(
       VulkanSurfaceDescriptor(
         // The window's size in logical pixels, and its scale factor.
-        extent = LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
-        // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+        extent =
+          LogicalExtent(
+            width = 800u,
+            height = 600u,
+            scaleFactor = 2.0,
+          ),
+        // Your VkInstance, VkPhysicalDevice,
+        // VkDevice, and graphics VkQueue.
         context = vulkan,
         // Your VkSurfaceKHR.
         surface = windowSurface,
@@ -146,9 +167,7 @@ private suspend fun renderToWindow(
   // #endregion service
   useOptions(graphicsThreadOptions)
 
-  // #region close
   paused = true
   session.release().await()
   destroySurface() // For example, with vkDestroySurfaceKHR.
-  // #endregion close
 }

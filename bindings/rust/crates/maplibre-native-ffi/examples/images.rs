@@ -12,11 +12,11 @@ fn tile_center(_z: u32, _x: u32, _y: u32) -> LatLng {
 
 fn copy_pixels(_data: &[u8], _stride: u32) {}
 
-async fn images(runtime: &RuntimeHandle, z: u32, x: u32, y: u32) -> Result<()> {
+async fn images(runtime: &RuntimeHandle) -> Result<()> {
     // #region map
-    let extent = LogicalExtent::new(512, 512, 1.0);
+    let extent = LogicalExtent::new(800, 600, 2.0);
     let map_options = MapOptions {
-        map_mode: MapMode::Tile,
+        map_mode: MapMode::Static,
         ..MapOptions::new(extent)
     };
 
@@ -35,10 +35,14 @@ async fn images(runtime: &RuntimeHandle, z: u32, x: u32, y: u32) -> Result<()> {
 
     let texture = GraphicsDeviceTextureDescriptor::new(extent);
     // The library renders on its own thread.
-    let attach_options = RenderSessionAttachOptions::new(RenderDriverKind::CoreWorker);
+    let attach_options =
+        RenderSessionAttachOptions::new(RenderDriverKind::CoreWorker);
 
-    let (session, attached) =
-        map.attach_graphics_device_texture(&device, &texture, &attach_options)?;
+    let (session, attached) = map.attach_graphics_device_texture(
+        &device,
+        &texture,
+        &attach_options,
+    )?;
     attached.await?;
     // #endregion attach
 
@@ -46,8 +50,8 @@ async fn images(runtime: &RuntimeHandle, z: u32, x: u32, y: u32) -> Result<()> {
     map.discarding().update_camera(&CameraUpdate {
         mode: CameraUpdateMode::Jump,
         camera: CameraOptions {
-            center: Some(tile_center(z, x, y)),
-            zoom: Some(f64::from(z)),
+            center: Some(LatLng::new(48.8566, 2.3522)),
+            zoom: Some(4.0),
             ..Default::default()
         },
         ..Default::default()
@@ -61,11 +65,40 @@ async fn images(runtime: &RuntimeHandle, z: u32, x: u32, y: u32) -> Result<()> {
     copy_pixels(&image.data, image.info.stride);
     // #endregion read
 
-    // #region close
     drop(session);
     drop(device);
     map.release().map_err(|(_, error)| error)?.await?;
-    // #endregion close
+
+    Ok(())
+}
+
+async fn images_tile(
+    runtime: &RuntimeHandle,
+    z: u32,
+    x: u32,
+    y: u32,
+) -> Result<()> {
+    // #region tile
+    let map_options = MapOptions {
+        map_mode: MapMode::Tile,
+        ..MapOptions::new(LogicalExtent::new(512, 512, 1.0))
+    };
+    let (map, created) = runtime.create_map(&map_options)?;
+    created.await?;
+
+    map.discarding().update_camera(&CameraUpdate {
+        mode: CameraUpdateMode::Jump,
+        camera: CameraOptions {
+            center: Some(tile_center(z, x, y)),
+            // A 512-pixel map shows tile z/x/y at zoom z.
+            zoom: Some(f64::from(z)),
+            ..Default::default()
+        },
+        ..Default::default()
+    })?;
+    // #endregion tile
+
+    map.release().map_err(|(_, error)| error)?.await?;
 
     Ok(())
 }

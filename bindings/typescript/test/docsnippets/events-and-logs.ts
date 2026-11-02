@@ -16,7 +16,9 @@ function onLoadingFailed(_message: string): void {}
 
 function writeLog(_severity: LogSeverity, _message: string): void {}
 
-export async function eventsAndLogs(runtime: RuntimeHandle): Promise<void> {
+export async function eventsAndLogs(
+  runtime: RuntimeHandle,
+): Promise<void> {
   let map: MapHandle | undefined;
 
   // #region handler
@@ -41,7 +43,8 @@ export async function eventsAndLogs(runtime: RuntimeHandle): Promise<void> {
   const created = runtime.createMap({
     initialExtent: { width: 512, height: 512, scaleFactor: 1 },
     eventMask:
-      RuntimeEventFlag.mapStyleLoaded | RuntimeEventFlag.mapLoadingFailed,
+      RuntimeEventFlag.mapStyleLoaded |
+      RuntimeEventFlag.mapLoadingFailed,
   });
   // #endregion mask
   map = created.map;

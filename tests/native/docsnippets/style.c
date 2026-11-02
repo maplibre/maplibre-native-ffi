@@ -1,5 +1,5 @@
-// Snippets for the docs site's Style page. They compile with the native tests,
-// which never run them.
+// Snippets for the docs site's Style page. They compile with the
+// native tests, which never run them.
 
 #include <maplibre_native_c.h>
 #include <stddef.h>
@@ -7,7 +7,9 @@
 
 static mln_map map = MLN_HANDLE_NULL;
 
-static mln_premultiplied_rgba8_image draw_image(mln_buffer_view image_id) {
+static mln_premultiplied_rgba8_image draw_image(
+  mln_buffer_view image_id
+) {
   (void)image_id;
   static const uint8_t pixel[4] = {255, 0, 0, 255};
   const mln_premultiplied_rgba8_image image = {
@@ -27,7 +29,10 @@ void mln_doc_style(const uint8_t* pixels);
 void mln_doc_style(const uint8_t* pixels) {
   // #region load
   mln_map_set_style_url(
-    map, mln_buffer_view_from_cstr("https://demotiles.maplibre.org/style.json"),
+    map,
+    mln_buffer_view_from_cstr(
+      "https://demotiles.maplibre.org/style.json"
+    ),
     NULL, NULL
   );
   // #endregion load
@@ -46,7 +51,8 @@ void mln_doc_style(const uint8_t* pixels) {
   mln_map_add_style_layer_json(
     map,
     mln_buffer_view_from_cstr(
-      "{\"id\":\"satellite\",\"type\":\"raster\",\"source\":\"satellite\"}"
+      "{\"id\":\"satellite\",\"type\":\"raster\",\"source\":"
+      "\"satellite\"}"
     ),
     mln_buffer_view_from_cstr("countries-label"), NULL, NULL
   );
@@ -81,7 +87,8 @@ void mln_doc_style(const uint8_t* pixels) {
   // #endregion geojson
 
   // #region set-property
-  const mln_buffer_view satellite = mln_buffer_view_from_cstr("satellite");
+  const mln_buffer_view satellite =
+    mln_buffer_view_from_cstr("satellite");
   const mln_buffer_view boundaries =
     mln_buffer_view_from_cstr("countries-boundary");
 
@@ -94,7 +101,8 @@ void mln_doc_style(const uint8_t* pixels) {
   mln_map_set_style_layer_property(
     map, boundaries, mln_buffer_view_from_cstr("line-color"),
     mln_buffer_view_from_cstr(
-      "[\"interpolate\",[\"linear\"],[\"zoom\"],5,\"#9cf\",12,\"#06c\"]"
+      "[\"interpolate\",[\"linear\"],[\"zoom\"],5,\"#9cf\",12,\"#"
+      "06c\"]"
     ),
     NULL, NULL
   );
@@ -126,11 +134,14 @@ void mln_doc_style(const uint8_t* pixels) {
 }
 
 // #region missing-image
-static void on_events(void* user_data, const mln_event_batch_view* batch) {
+static void on_events(
+  void* user_data, const mln_event_batch_view* batch
+) {
   (void)user_data;
   for (size_t i = 0; i < batch->event_count; i++) {
-    const mln_runtime_event* event =
-      MLN_STRIDED_AT(mln_runtime_event, batch->events, batch->event_size, i);
+    const mln_runtime_event* event = MLN_STRIDED_AT(
+      mln_runtime_event, batch->events, batch->event_size, i
+    );
     if (
       event->source != map ||
       event->type != MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING
@@ -138,8 +149,11 @@ static void on_events(void* user_data, const mln_event_batch_view* batch) {
       continue;
     }
     // The message holds the image's ID.
-    const mln_premultiplied_rgba8_image image = draw_image(event->message);
-    mln_map_set_style_image(map, event->message, &image, NULL, NULL, NULL);
+    const mln_premultiplied_rgba8_image image =
+      draw_image(event->message);
+    mln_map_set_style_image(
+      map, event->message, &image, NULL, NULL, NULL
+    );
   }
 }
 // #endregion missing-image

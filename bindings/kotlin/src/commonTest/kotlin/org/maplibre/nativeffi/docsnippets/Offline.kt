@@ -1,4 +1,5 @@
-// Snippets for the docs site's Offline page. They compile with the tests, which never run them.
+// Snippets for the docs site's Offline page. They compile with the
+// tests, which never run them.
 package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.AmbientCacheOperation
@@ -12,7 +13,12 @@ import org.maplibre.nativeffi.RuntimeEventPayload
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.RuntimeOptions
 
-private fun recordProgress(regionId: Long, completed: ULong, required: ULong, complete: Boolean) {}
+private fun recordProgress(
+  regionId: Long,
+  completed: ULong,
+  required: ULong,
+  complete: Boolean,
+) {}
 
 private fun recordError(regionId: Long, message: String) {}
 
@@ -20,7 +26,10 @@ private fun recordRegion(regionId: Long, metadata: ByteArray) {}
 
 private suspend fun offline() {
   // #region cache-file
-  val runtime = RuntimeHandle.create(RuntimeOptions(cachePath = "maplibre-cache.db"))
+  val runtime =
+    RuntimeHandle.create(
+      RuntimeOptions(cachePath = "maplibre-cache.db"),
+    )
   // #endregion cache-file
 
   // #region progress
@@ -49,7 +58,9 @@ private suspend fun offline() {
   // #region ambient
   // 50 MiB
   runtime.setMaximumAmbientCacheSize(50uL * 1024uL * 1024uL).await()
-  runtime.runAmbientCacheOperation(AmbientCacheOperation.CLEAR).await()
+  runtime
+    .runAmbientCacheOperation(AmbientCacheOperation.CLEAR)
+    .await()
   // #endregion ambient
 
   // #region download
@@ -61,8 +72,10 @@ private suspend fun offline() {
             styleUrl = "https://demotiles.maplibre.org/style.json",
             bounds =
               LatLngBounds(
-                southwest = LatLng(latitude = 47.5, longitude = -122.5),
-                northeast = LatLng(latitude = 47.8, longitude = -122.2),
+                southwest =
+                  LatLng(latitude = 47.5, longitude = -122.5),
+                northeast =
+                  LatLng(latitude = 47.8, longitude = -122.2),
               ),
             minZoom = 0.0,
             maxZoom = 6.0,
@@ -73,7 +86,12 @@ private suspend fun offline() {
       )
       .await()
 
-  runtime.setOfflineRegionDownloadState(region.id, OfflineRegionDownloadState.ACTIVE).await()
+  runtime
+    .setOfflineRegionDownloadState(
+      region.id,
+      OfflineRegionDownloadState.ACTIVE,
+    )
+    .await()
   // #endregion download
 
   // #region progress
@@ -86,7 +104,12 @@ private suspend fun offline() {
   }
 
   // Resume a download that stopped when the runtime closed.
-  runtime.setOfflineRegionDownloadState(region.id, OfflineRegionDownloadState.ACTIVE).await()
+  runtime
+    .setOfflineRegionDownloadState(
+      region.id,
+      OfflineRegionDownloadState.ACTIVE,
+    )
+    .await()
 
   runtime.invalidateOfflineRegion(region.id).await()
 

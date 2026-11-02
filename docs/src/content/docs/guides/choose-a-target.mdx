@@ -1,0 +1,47 @@
+---
+title: Choose a render target
+description: Pick the render target, and the guide, for how you show the map.
+# Scope: picking a map mode and a render target. How to use each target
+# belongs on its own page.
+---
+
+import { LinkCard } from "@astrojs/starlight/components";
+
+A render session draws one map into one target: a surface that presents to a
+window, or a texture that your code reads or draws. The map's mode decides when
+it renders: continuously as it changes, or once for each image you request.
+
+```mermaid
+flowchart TD
+  accTitle: How to pick a render target
+  animated{Is the map animated?}
+  animated -->|No| images[Render images]
+  animated -->|Yes| frames{Where do the frames go?}
+  frames -->|A window or view| window[Render to a window]
+  frames -->|Another renderer| texture[Render to a texture]
+  click images "/maplibre-native-ffi/guides/images/"
+  click window "/maplibre-native-ffi/guides/window/"
+  click texture "/maplibre-native-ffi/guides/texture/"
+```
+
+<LinkCard
+  title="Render images"
+  href="/maplibre-native-ffi/guides/images/"
+  description="For a map that doesn't move, create it in static mode for a region you choose, or in tile mode for map tiles. The library creates a GPU device and a texture on it, and you read the pixels."
+/>
+
+<LinkCard
+  title="Render to a window"
+  href="/maplibre-native-ffi/guides/window/"
+  description="For an animated map in a window or view, create it in continuous mode and attach a surface. The session presents each frame to it."
+/>
+
+<LinkCard
+  title="Render to a texture"
+  href="/maplibre-native-ffi/guides/texture/"
+  description="For an animated map in another renderer, such as a UI framework, a game engine, or a compositor, create it in continuous mode and attach a texture. Your renderer draws each frame from it."
+/>
+
+Surfaces and textures use your graphics objects, for the graphics backend you
+chose when you installed the library. See
+[Install](/maplibre-native-ffi/install/#choose-a-backend).

@@ -8,22 +8,32 @@ namespace Maplibre.NativeFfi.Tests.DocSnippets;
 internal static class Images
 {
     // The center of tile z/x/y. The snippet leaves the tile math to the reader.
-    private static LatLng TileCenter(uint z, uint x, uint y) => default;
+    private static LatLng TileCenter(uint z, uint x, uint y) =>
+        default;
 
-    private static void CopyPixels(ImmutableArray<byte> data, uint stride) { }
+    private static void CopyPixels(
+        ImmutableArray<byte> data,
+        uint stride
+    ) { }
 
-    internal static async Task Run(RuntimeHandle runtime, uint z, uint x, uint y)
+    internal static async Task Run(RuntimeHandle runtime)
     {
         // #region map
-        var extent = new LogicalExtent(512, 512, 1);
+        var extent = new LogicalExtent(800, 600, 2);
         var map = runtime.CreateMap(
-            new MapOptions { InitialExtent = extent, MapMode = MapMode.Tile }
+            new MapOptions
+            {
+                InitialExtent = extent,
+                MapMode = MapMode.Static,
+            }
         );
         await map.Ready;
         // #endregion map
 
         // #region style
-        map.Discarding.SetStyleUrl("https://demotiles.maplibre.org/style.json");
+        map.Discarding.SetStyleUrl(
+            "https://demotiles.maplibre.org/style.json"
+        );
         // #endregion style
 
         // #region attach
@@ -33,7 +43,10 @@ internal static class Images
             device,
             new GraphicsDeviceTextureDescriptor(extent),
             // The library renders on its own thread.
-            new RenderSessionAttachOptions { Driver = RenderDriverKind.CoreWorker }
+            new RenderSessionAttachOptions
+            {
+                Driver = RenderDriverKind.CoreWorker,
+            }
         );
         await session.Ready;
         // #endregion attach
@@ -43,7 +56,11 @@ internal static class Images
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
-                Camera = new CameraOptions { Center = TileCenter(z, x, y), Zoom = z },
+                Camera = new CameraOptions
+                {
+                    Center = new LatLng(48.8566, 2.3522),
+                    Zoom = 4,
+                },
             }
         );
 
@@ -55,10 +72,42 @@ internal static class Images
         CopyPixels(image.Data, image.Info.Stride);
         // #endregion read
 
-        // #region close
         session.Dispose();
         device.Dispose();
         await map.CloseAsync();
-        // #endregion close
+    }
+
+    internal static async Task RunTile(
+        RuntimeHandle runtime,
+        uint z,
+        uint x,
+        uint y
+    )
+    {
+        // #region tile
+        var map = runtime.CreateMap(
+            new MapOptions
+            {
+                InitialExtent = new LogicalExtent(512, 512, 1),
+                MapMode = MapMode.Tile,
+            }
+        );
+        await map.Ready;
+
+        map.Discarding.UpdateCamera(
+            new CameraUpdate
+            {
+                Mode = CameraUpdateMode.Jump,
+                Camera = new CameraOptions
+                {
+                    Center = TileCenter(z, x, y),
+                    // A 512-pixel map shows tile z/x/y at zoom z.
+                    Zoom = z,
+                },
+            }
+        );
+        // #endregion tile
+
+        await map.CloseAsync();
     }
 }

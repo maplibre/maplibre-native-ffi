@@ -23,14 +23,18 @@ func beginGesture(m *maplibre.MapHandle) error {
 	})
 }
 
-func applyDrag(m *maplibre.MapHandle, movement maplibre.ScreenPoint) error {
+func applyDrag(
+	m *maplibre.MapHandle, movement maplibre.ScreenPoint,
+) error {
 	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
 		Offset:       &movement,
 		GesturePhase: maplibre.GesturePhaseUpdate,
 	})
 }
 
-func applyPinch(m *maplibre.MapHandle, scale float64, center maplibre.ScreenPoint) error {
+func applyPinch(
+	m *maplibre.MapHandle, scale float64, center maplibre.ScreenPoint,
+) error {
 	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
 		Scale:        &scale,
 		Anchor:       &center,
@@ -92,7 +96,9 @@ func camera(ctx context.Context, m *maplibre.MapHandle) error {
 			EndHandler: maplibre.CameraTransitionHandler{
 				// Runs on a library thread.
 				Callback: func(end maplibre.CameraTransitionEnd) {
-					flyEnded(end.Outcome == maplibre.CameraTransitionOutcomeCompleted)
+					flyEnded(
+						end.Outcome == maplibre.CameraTransitionOutcomeCompleted,
+					)
 				},
 			},
 		},
@@ -161,7 +167,9 @@ func camera(ctx context.Context, m *maplibre.MapHandle) error {
 	}
 	defer projection.Close()
 
-	coordinate, err := projection.LatLngForPixel(maplibre.ScreenPoint{X: 100, Y: 200})
+	coordinate, err := projection.LatLngForPixel(
+		maplibre.ScreenPoint{X: 100, Y: 200},
+	)
 	if err != nil {
 		return err
 	}

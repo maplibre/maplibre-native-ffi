@@ -6,20 +6,21 @@ description: Receive map events and library logs.
 
 import Snippet from "../../../components/Snippet.astro";
 
-This guide receives map events and the library's logs. For what events are, see
-[Concepts](/maplibre-native-ffi/concepts/#changes-are-asynchronous).
+Events report what you didn't ask for, such as a style that finished loading or
+a tile that failed to load. This guide receives map events and the library's
+logs.
 
 ## Set an event handler
 
-Set one event handler on the runtime. It receives the events of every map on
-that runtime. Set it before you create a map, so that it receives the map's
-first events.
+Set one event handler on the runtime to receive the events of every map on that
+runtime. Set it before you create a map, so that it receives the map's first
+events.
 
 Each event names its type and the map that sent it. Compare that map with the
 maps you hold.
 
-The handler runs on a library thread, where it must return quickly. See
-[Concepts](/maplibre-native-ffi/concepts/#threads-and-callbacks).
+The handler runs on a library thread, where it must return quickly. Hand longer
+work to another thread.
 
 <Snippet page="events-and-logs" region="handler" />
 
@@ -35,7 +36,7 @@ reference lists them.
 
 ## Capture logs
 
-Set a log callback to send the library's logs to your own logger. One callback
+Set a log callback to send the library's logs to your logger. One callback
 receives the logs of every runtime in the process.
 
 The callback runs on a library thread, and it can't call the library.

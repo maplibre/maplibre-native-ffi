@@ -11,7 +11,10 @@ internal static class EventsAndLogs
 
     private static void OnLoadingFailed(string message) { }
 
-    private static void WriteLog(LogSeverity severity, string message) { }
+    private static void WriteLog(
+        LogSeverity severity,
+        string message
+    ) { }
 
     // #region handler
     // Runs on a library thread.
@@ -39,7 +42,9 @@ internal static class EventsAndLogs
     internal static async Task Run(RuntimeHandle runtime)
     {
         // #region handler
-        runtime.Discarding.SetEventHandler(new RuntimeEventHandler(OnEvents));
+        runtime.Discarding.SetEventHandler(
+            new RuntimeEventHandler(OnEvents)
+        );
         // #endregion handler
 
         // #region mask
@@ -47,7 +52,9 @@ internal static class EventsAndLogs
             new MapOptions
             {
                 InitialExtent = new LogicalExtent(512, 512, 1),
-                EventMask = RuntimeEventFlag.MapStyleLoaded | RuntimeEventFlag.MapLoadingFailed,
+                EventMask =
+                    RuntimeEventFlag.MapStyleLoaded
+                    | RuntimeEventFlag.MapLoadingFailed,
             }
         );
         // #endregion mask
@@ -60,8 +67,8 @@ internal static class EventsAndLogs
                 (severity, _, _, message) =>
                 {
                     WriteLog(severity, message);
-                    // Consume the record. Return false to let the platform
-                    // logger print it too.
+                    // Consume the record. Return false to let the
+                    // platform logger print it too.
                     return true;
                 }
             )

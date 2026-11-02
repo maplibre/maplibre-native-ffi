@@ -13,7 +13,9 @@ def draw_image(image_id: str) -> mln.PremultipliedRgba8Image:
 # pixels holds 16 x 16 premultiplied RGBA pixels.
 def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #region load
-    map_handle.discarding.set_style_url("https://demotiles.maplibre.org/style.json")
+    map_handle.discarding.set_style_url(
+        "https://demotiles.maplibre.org/style.json"
+    )
     # #endregion load
 
     # #region add
@@ -34,7 +36,8 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #endregion add
 
     # #region geojson
-    # The source keeps its own reference to the data, so the block can close it.
+    # The source keeps its own reference to
+    # the data, so the block can close it.
     with mln.GeoJsonSourceDataHandle.create(
         {"type": "Point", "coordinates": [-122.4, 37.8]}
     ) as data:
@@ -50,7 +53,9 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #region set-property
     # Show both changes in the same frame.
     map_handle.discarding.begin_command_group()
-    map_handle.discarding.set_style_layer_property("satellite", "visibility", "none")
+    map_handle.discarding.set_style_layer_property(
+        "satellite", "visibility", "none"
+    )
     map_handle.discarding.set_style_layer_property(
         "countries-boundary",
         "line-color",
@@ -62,7 +67,9 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #region image
     map_handle.discarding.set_style_image(
         "marker",
-        mln.PremultipliedRgba8Image(width=16, height=16, stride=16 * 4, pixels=pixels),
+        mln.PremultipliedRgba8Image(
+            width=16, height=16, stride=16 * 4, pixels=pixels
+        ),
     )
 
     # An empty layer ID draws the layer on top.
@@ -78,14 +85,17 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #endregion image
 
 
-def style_events(runtime: mln.RuntimeHandle, map_handle: mln.MapHandle) -> None:
+def style_events(
+    runtime: mln.RuntimeHandle, map_handle: mln.MapHandle
+) -> None:
     # #region missing-image
     # Runs on the binding's dispatcher thread.
     def on_events(events: tuple[mln.RuntimeEvent, ...]) -> None:
         for event in events:
             if (
                 event.source != map_handle.id
-                or event.type != mln.RuntimeEventType.MAP_STYLE_IMAGE_MISSING
+                or event.type
+                != mln.RuntimeEventType.MAP_STYLE_IMAGE_MISSING
             ):
                 continue
             # The message holds the image's ID.
@@ -93,5 +103,7 @@ def style_events(runtime: mln.RuntimeHandle, map_handle: mln.MapHandle) -> None:
                 event.message, draw_image(event.message)
             )
 
-    runtime.discarding.set_event_handler(mln.RuntimeEventHandler(on_events))
+    runtime.discarding.set_event_handler(
+        mln.RuntimeEventHandler(on_events)
+    )
     # #endregion missing-image

@@ -18,9 +18,12 @@ def geojson_for_tile(tile: mln.CanonicalTileId) -> Any:
     return {"type": "FeatureCollection", "features": []}
 
 
-def network(runtime: mln.RuntimeHandle, map_handle: mln.MapHandle) -> None:
+def network(
+    runtime: mln.RuntimeHandle, map_handle: mln.MapHandle
+) -> None:
     # #region headers
-    # This binding takes rules only, because it can't answer on a library thread.
+    # This binding takes rules only, because
+    # it can't answer on a library thread.
     runtime.discarding.set_http_header_transform(
         mln.HttpHeaderTransform(
             rules=[
@@ -28,7 +31,10 @@ def network(runtime: mln.RuntimeHandle, map_handle: mln.MapHandle) -> None:
                     flags=mln.UrlMatchFlag.GLOB,
                     url="https://tiles.example.com/**",
                     headers=[
-                        mln.HttpHeader(name="Authorization", value="Bearer my-token")
+                        mln.HttpHeader(
+                            name="Authorization",
+                            value="Bearer my-token",
+                        )
                     ],
                 )
             ]
@@ -38,25 +44,34 @@ def network(runtime: mln.RuntimeHandle, map_handle: mln.MapHandle) -> None:
 
     # #region rewrite
     def add_api_key(
-        kind: mln.ResourceKind, url: str, request: mln.ResourceTransformRequestHandle
+        kind: mln.ResourceKind,
+        url: str,
+        request: mln.ResourceTransformRequestHandle,
     ) -> None:
         request.complete(with_api_key(url))
 
-    runtime.discarding.set_resource_transform(mln.ResourceTransform(add_api_key))
+    runtime.discarding.set_resource_transform(
+        mln.ResourceTransform(add_api_key)
+    )
     # #endregion rewrite
 
     # #region provider
     def serve_tile(
-        request: mln.ResourceRequestInfo, handle: mln.ResourceRequestHandle
+        request: mln.ResourceRequestInfo,
+        handle: mln.ResourceRequestHandle,
     ) -> None:
         tile = find_tile(request.requested_url)
         if tile is None:
             handle.complete(
-                mln.ResourceResponse(status=mln.ResourceResponseStatus.NO_CONTENT)
+                mln.ResourceResponse(
+                    status=mln.ResourceResponseStatus.NO_CONTENT
+                )
             )
         else:
             handle.complete(
-                mln.ResourceResponse(status=mln.ResourceResponseStatus.OK, bytes=tile)
+                mln.ResourceResponse(
+                    status=mln.ResourceResponseStatus.OK, bytes=tile
+                )
             )
 
     runtime.discarding.set_resource_provider(
@@ -80,7 +95,8 @@ def network(runtime: mln.RuntimeHandle, map_handle: mln.MapHandle) -> None:
         )
 
     map_handle.discarding.add_custom_geometry_source(
-        "app-data", mln.CustomGeometrySourceOptions(fetch_tile=fetch_tile)
+        "app-data",
+        mln.CustomGeometrySourceOptions(fetch_tile=fetch_tile),
     )
     # #endregion custom-source
 

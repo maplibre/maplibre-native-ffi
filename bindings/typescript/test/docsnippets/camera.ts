@@ -18,7 +18,9 @@ function flyEnded(_completed: boolean): void {}
 // #region gesture
 function beginGesture(map: MapHandle): void {
   map.discarding.cancelTransitions();
-  map.discarding.applyCameraDelta({ gesturePhase: GesturePhase.begin });
+  map.discarding.applyCameraDelta({
+    gesturePhase: GesturePhase.begin,
+  });
 }
 
 function applyDrag(map: MapHandle, movement: ScreenPoint): void {
@@ -28,7 +30,11 @@ function applyDrag(map: MapHandle, movement: ScreenPoint): void {
   });
 }
 
-function applyPinch(map: MapHandle, scale: number, center: ScreenPoint): void {
+function applyPinch(
+  map: MapHandle,
+  scale: number,
+  center: ScreenPoint,
+): void {
   map.discarding.applyCameraDelta({
     scale,
     anchor: center,
@@ -53,14 +59,20 @@ export async function camera(map: MapHandle): Promise<void> {
   // #region jump
   map.discarding.updateCamera({
     mode: CameraUpdateMode.jump,
-    camera: { center: { latitude: 48.8566, longitude: 2.3522 }, zoom: 12 },
+    camera: {
+      center: { latitude: 48.8566, longitude: 2.3522 },
+      zoom: 12,
+    },
   });
   // #endregion jump
 
   // #region animate
   map.discarding.updateCamera({
     mode: CameraUpdateMode.fly,
-    camera: { center: { latitude: 40.7128, longitude: -74.006 }, zoom: 10 },
+    camera: {
+      center: { latitude: 40.7128, longitude: -74.006 },
+      zoom: 10,
+    },
     animation: {
       durationMs: 3000,
       // Runs on this thread, after the animation ends.
@@ -95,7 +107,9 @@ export async function camera(map: MapHandle): Promise<void> {
   endGesture(map);
 
   // #region convert
-  const projection = MapProjectionHandle.create(map.getSnapshot().view);
+  const projection = MapProjectionHandle.create(
+    map.getSnapshot().view,
+  );
 
   const coordinate = projection.latLngForPixel({ x: 100, y: 200 });
   const point = projection.pixelForLatLng(coordinate);

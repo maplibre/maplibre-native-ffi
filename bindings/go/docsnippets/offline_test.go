@@ -16,31 +16,34 @@ func recordRegion(regionID int64, metadata []byte) {}
 
 func offline(ctx context.Context) error {
 	// #region cache-file
-	runtime, err := maplibre.NewRuntime(maplibre.RuntimeOptions{CachePath: "maplibre-cache.db"})
+	runtime, err := maplibre.NewRuntime(maplibre.RuntimeOptions{
+		CachePath: "maplibre-cache.db",
+	})
 	if err != nil {
 		return err
 	}
 	// #endregion cache-file
 
 	// #region progress
-	err = runtime.Discarding().SetEventHandler(maplibre.RuntimeEventHandler{
-		Callback: func(events []maplibre.RuntimeEvent) {
-			for _, event := range events {
-				switch payload := event.Payload.(type) {
-				case maplibre.RuntimeEventPayloadOfflineRegionStatusVariant:
-					status := payload.Value.Status
-					recordProgress(
-						payload.Value.RegionId,
-						status.CompletedResourceCount,
-						status.RequiredResourceCount,
-						status.Complete,
-					)
-				case maplibre.RuntimeEventPayloadOfflineRegionResponseErrorVariant:
-					recordError(payload.Value.RegionId, event.Message)
-				}
+	handleEvents := func(events []maplibre.RuntimeEvent) {
+		for _, event := range events {
+			switch payload := event.Payload.(type) {
+			case maplibre.RuntimeEventPayloadOfflineRegionStatusVariant:
+				status := payload.Value.Status
+				recordProgress(
+					payload.Value.RegionId,
+					status.CompletedResourceCount,
+					status.RequiredResourceCount,
+					status.Complete,
+				)
+			case maplibre.RuntimeEventPayloadOfflineRegionResponseErrorVariant:
+				recordError(payload.Value.RegionId, event.Message)
 			}
-		},
-	})
+		}
+	}
+	err = runtime.Discarding().SetEventHandler(
+		maplibre.RuntimeEventHandler{Callback: handleEvents},
+	)
 	if err != nil {
 		return err
 	}
@@ -56,7 +59,9 @@ func offline(ctx context.Context) error {
 		return err
 	}
 
-	cleared, err := runtime.RunAmbientCacheOperation(maplibre.AmbientCacheOperationClear)
+	cleared, err := runtime.RunAmbientCacheOperation(
+		maplibre.AmbientCacheOperationClear,
+	)
 	if err != nil {
 		return err
 	}
@@ -79,7 +84,9 @@ func offline(ctx context.Context) error {
 		},
 	}
 
-	created, err := runtime.CreateOfflineRegion(definition, []byte("Seattle"))
+	created, err := runtime.CreateOfflineRegion(
+		definition, []byte("Seattle"),
+	)
 	if err != nil {
 		return err
 	}
@@ -88,7 +95,9 @@ func offline(ctx context.Context) error {
 		return err
 	}
 
-	activated, err := runtime.SetOfflineRegionDownloadState(region.Id, maplibre.OfflineRegionDownloadStateActive)
+	activated, err := runtime.SetOfflineRegionDownloadState(
+		region.Id, maplibre.OfflineRegionDownloadStateActive,
+	)
 	if err != nil {
 		return err
 	}
@@ -121,7 +130,9 @@ func offline(ctx context.Context) error {
 	}
 
 	// Resume a download that stopped when the runtime closed.
-	resumed, err := runtime.SetOfflineRegionDownloadState(region.Id, maplibre.OfflineRegionDownloadStateActive)
+	resumed, err := runtime.SetOfflineRegionDownloadState(
+		region.Id, maplibre.OfflineRegionDownloadStateActive,
+	)
 	if err != nil {
 		return err
 	}

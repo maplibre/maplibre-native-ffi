@@ -20,7 +20,10 @@ fn geojson_for_tile(_tile: CanonicalTileId) -> String {
     r#"{"type":"FeatureCollection","features":[]}"#.to_owned()
 }
 
-fn network(runtime: &RuntimeHandle, map: &Arc<MapHandle>) -> Result<()> {
+fn network(
+    runtime: &RuntimeHandle,
+    map: &Arc<MapHandle>,
+) -> Result<()> {
     // #region headers
     let rule = HttpHeaderRule {
         flags: UrlMatchFlag::GLOB,
@@ -32,21 +35,22 @@ fn network(runtime: &RuntimeHandle, map: &Arc<MapHandle>) -> Result<()> {
         ..Default::default()
     };
 
-    runtime
-        .discarding()
-        .set_http_header_transform(HttpHeaderTransform {
+    runtime.discarding().set_http_header_transform(
+        HttpHeaderTransform {
             rules: vec![rule],
             ..Default::default()
-        })?;
+        },
+    )?;
     // #endregion headers
 
     // #region rewrite
-    runtime
-        .discarding()
-        .set_resource_transform(ResourceTransform::new(|_kind, url, request| {
-            // Dropping the request without an answer keeps the old URL.
+    runtime.discarding().set_resource_transform(
+        ResourceTransform::new(|_kind, url, request| {
+            // Dropping the request without
+            // an answer keeps the old URL.
             let _ = request.complete(&with_api_key(url));
-        }))?;
+        }),
+    )?;
     // #endregion rewrite
 
     // #region provider
@@ -85,7 +89,9 @@ fn network(runtime: &RuntimeHandle, map: &Arc<MapHandle>) -> Result<()> {
             let data = geojson_for_tile(tile);
             let _ = map
                 .discarding()
-                .set_custom_geometry_source_tile_data("app-data", tile, &data);
+                .set_custom_geometry_source_tile_data(
+                    "app-data", tile, &data,
+                );
         }
     });
 

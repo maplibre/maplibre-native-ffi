@@ -12,10 +12,15 @@ fn useFeature(_: []const u8) void {}
 
 fn query(allocator: std.mem.Allocator, session: maplibre.RenderSession, point: maplibre.ScreenPoint) !void {
     // #region rendered
-    var rendered = try session.queryRenderedFeatures(allocator, .{ .box = .{
-        .min = .{ .x = point.x - 5, .y = point.y - 5 },
-        .max = .{ .x = point.x + 5, .y = point.y + 5 },
-    } }, .{ .layer_ids = &.{"poi"} }, null);
+    var rendered = try session.queryRenderedFeatures(
+        allocator,
+        .{ .box = .{
+            .min = .{ .x = point.x - 5, .y = point.y - 5 },
+            .max = .{ .x = point.x + 5, .y = point.y + 5 },
+        } },
+        .{ .layer_ids = &.{"poi"} },
+        null,
+    );
     defer rendered.deinit();
     var hits = try rendered.wait(null);
     defer hits.deinit();
@@ -27,11 +32,16 @@ fn query(allocator: std.mem.Allocator, session: maplibre.RenderSession, point: m
     // #endregion rendered
 
     // #region source
-    var source = try session.querySourceFeatures(allocator, "openmaptiles", .{
-        .source_layer_ids = &.{"transportation"},
-        // A filter from the MapLibre style spec, as JSON.
-        .filter = "[\"==\", [\"get\", \"class\"], \"motorway\"]",
-    }, null);
+    var source = try session.querySourceFeatures(
+        allocator,
+        "openmaptiles",
+        .{
+            .source_layer_ids = &.{"transportation"},
+            // A filter from the MapLibre style spec, as JSON.
+            .filter = "[\"==\", [\"get\", \"class\"], \"motorway\"]",
+        },
+        null,
+    );
     defer source.deinit();
     var features = try source.wait(null);
     defer features.deinit();

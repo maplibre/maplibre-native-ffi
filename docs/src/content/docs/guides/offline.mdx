@@ -35,10 +35,10 @@ Define the region: the style URL, the bounds, the zoom range, and the pixel
 ratio. To follow a shape, give a GeoJSON geometry in place of the bounds. Each
 zoom level has four times the tiles of the one before.
 
-You can store your own bytes with the region as metadata, such as its name.
+You can store any bytes with the region as metadata, such as its name.
 
 Create the region, then set its download active. Maps on the runtime use the
-region's resources when they load the same style URL. They need no other setup.
+region's resources when they load the same style URL, with no other setup.
 
 <Snippet page="offline" region="download" />
 
@@ -55,8 +55,8 @@ download.
 
 ## Update and delete regions
 
-List the regions in the cache file. A download stops when the runtime closes.
-Set the download active again to resume it. It skips the resources it already
+List the regions in the cache file. A download stops when the runtime closes. To
+resume it, set the download active again, and it skips the resources it already
 has.
 
 When the server's data changes, invalidate the region. Maps then check each of

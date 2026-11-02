@@ -33,7 +33,12 @@ internal static class Window
 
     private static void RequestFrame() =>
         session.RequestFrame(
-            new FrameDemand { Flags = FrameDemandFlag.Present | FrameDemandFlag.WaitForUpdate }
+            new FrameDemand
+            {
+                Flags =
+                    FrameDemandFlag.Present
+                    | FrameDemandFlag.WaitForUpdate,
+            }
         );
 
     private static void DrainFrameResults()
@@ -42,8 +47,13 @@ internal static class Window
         if (results.Length == 0)
             return; // No results yet.
 
-        if (results.Any(result => result.Disposition == RenderResult.Failed))
-            ReplaceSession(); // Close the session and attach a new one.
+        if (
+            results.Any(result =>
+                result.Disposition == RenderResult.Failed
+            )
+        )
+            // Close the session and attach a new one.
+            ReplaceSession();
         else if (!paused)
             RunAtNextRefresh(RequestFrame);
     }
@@ -52,7 +62,8 @@ internal static class Window
 
     // #region frame-wake
     // Runs on a library thread.
-    private static void OnFrameWake() => RunOnEventLoop(DrainFrameResults);
+    private static void OnFrameWake() =>
+        RunOnEventLoop(DrainFrameResults);
 
     // #endregion frame-wake
 
@@ -60,17 +71,21 @@ internal static class Window
     private static void OnWindowResized(uint width, uint height)
     {
         // The scale factor the session has now.
-        session.Discarding.Resize(new LogicalExtent(width, height, 2));
+        session.Discarding.Resize(
+            new LogicalExtent(width, height, 2)
+        );
     }
 
     // #endregion resize
 
     // #region service
     // Your graphics context is current on this thread.
-    private static void ServiceSession() => session.ServiceDriverWork();
+    private static void ServiceSession() =>
+        session.ServiceDriverWork();
 
     // Runs on a library thread.
-    private static void OnDriverWorkWake() => RunOnGraphicsThread(ServiceSession);
+    private static void OnDriverWorkWake() =>
+        RunOnGraphicsThread(ServiceSession);
 
     // #endregion service
 
@@ -82,7 +97,10 @@ internal static class Window
         // #endregion lost-surface
     }
 
-    internal static async Task SurfaceRestored(VulkanContextDescriptor vulkan, ulong newSurface)
+    internal static async Task SurfaceRestored(
+        VulkanContextDescriptor vulkan,
+        ulong newSurface
+    )
     {
         // #region lost-surface
         await session.SetVulkanSurfaceTargetAsync(
@@ -108,9 +126,11 @@ internal static class Window
         session = map.AttachVulkanSurface(
             new VulkanSurfaceDescriptor
             {
-                // The window's size in logical pixels, and its scale factor.
+                // The window's size in logical
+                // pixels, and its scale factor.
                 Extent = new LogicalExtent(800, 600, 2),
-                // Your VkInstance, VkPhysicalDevice, VkDevice, and graphics VkQueue.
+                // Your VkInstance, VkPhysicalDevice,
+                // VkDevice, and graphics VkQueue.
                 Context = vulkan,
                 // Your VkSurfaceKHR.
                 Surface = windowSurface,
@@ -137,10 +157,8 @@ internal static class Window
         // #endregion service
         _ = graphicsThreadOptions;
 
-        // #region close
         paused = true;
         await session.CloseAsync();
         DestroySurface(); // For example, with vkDestroySurfaceKHR.
-        // #endregion close
     }
 }

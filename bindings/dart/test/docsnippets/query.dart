@@ -5,7 +5,10 @@ import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
 void useFeature(Object? feature) {}
 
-Future<void> query(RenderSessionHandle session, ScreenPoint point) async {
+Future<void> query(
+  RenderSessionHandle session,
+  ScreenPoint point,
+) async {
   // #region rendered
   final hits = await session.queryRenderedFeatures(
     RenderedQueryGeometry.box(
