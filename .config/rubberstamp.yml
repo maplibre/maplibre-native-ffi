@@ -181,7 +181,18 @@ ci:
         Builds the Astro docs site, which hygiene only formats, and generates
         each binding's API reference with its own tool (Doxygen, Dokka, DocC,
         DocFX, dart doc, and others) from the C headers and binding sources.
-      rules: [{ if: { files: ["docs/**"] }, then: apply }]
+      rules:
+        - if: { files: ["docs/**"] }
+          then: apply
+        # Pages show regions of these files, and the build fails on a missing
+        # region.
+        - if:
+            files:
+              - tests/native/docsnippets/**
+              - bindings/**/docsnippets/**
+              - bindings/**/DocSnippets/**
+              - bindings/rust/crates/maplibre-native-ffi/examples/**
+          then: apply
     support-matrix:
       covers: >-
         Renders the support tracking issue's body from the CI targets, the

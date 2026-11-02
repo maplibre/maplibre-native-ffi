@@ -1,0 +1,26 @@
+---
+// Starlight's page content, plus Mermaid diagrams on pages that have them.
+import Default from "@astrojs/starlight/components/MarkdownContent.astro";
+---
+
+<Default><slot /></Default>
+
+<script>
+// Mermaid is large, so it loads only on pages with a diagram.
+if (document.querySelector(".mermaid-diagram")) {
+  const { drawDiagrams } = await import("../mermaid");
+  await drawDiagrams();
+  new MutationObserver(() => void drawDiagrams()).observe(
+    document.documentElement,
+    { attributeFilter: ["data-theme"] },
+  );
+}
+</script>
+
+<style is:global>
+.mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  margin-block: 1.5rem;
+}
+</style>

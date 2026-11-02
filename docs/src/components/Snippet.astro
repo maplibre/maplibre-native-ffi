@@ -1,0 +1,65 @@
+---
+/**
+ * Shows one region of a page's snippets. Every language renders, each with a
+ * picker in its header, and CSS shows the language in the root element's
+ * `data-language`. The head script in `astro.config.mts` restores the reader's
+ * pick before the page draws. A file without the region fails the build.
+ */
+import { Code } from "@astrojs/starlight/components";
+
+import { defaultLanguage, languages } from "../languages";
+import { snippetSource } from "../snippet-files";
+import { region as extract } from "../snippets";
+
+interface Props {
+  page: string;
+  region: string;
+}
+
+const { page, region } = Astro.props;
+
+// Each language's blocks show only when it is picked, and the default shows
+// before any pick.
+const rules = [
+  "[data-snippet-language] { display: none; }",
+  ...languages.map(
+    ({ id }) =>
+      `:root[data-language="${id}"] [data-snippet-language="${id}"] { display: block; }`,
+  ),
+  `:root:not([data-language]) [data-snippet-language="${defaultLanguage}"] { display: block; }`,
+].join("\n");
+---
+
+<style is:inline set:html={rules} />
+
+{languages.map((language) => {
+  const source = snippetSource(language.id, page);
+  return (
+    <div data-snippet-language={language.id}>
+      {source === undefined ? <p>No {language.label} example yet.</p> : (
+         <Code
+           code={extract(source, region)}
+           lang={language.lang}
+           title={language.title}
+           meta={`picker=${language.id}`}
+         />
+       )}
+    </div>
+  );
+})}
+
+<script>
+import { languageStorageKey } from "../languages";
+
+for (const select of document.querySelectorAll<HTMLSelectElement>(
+  ".language-picker select",
+)) {
+  select.addEventListener("change", () => {
+    const picked = select.value;
+    // This block hides, so put its picker back on its own language.
+    select.value = select.dataset.current ?? picked;
+    document.documentElement.dataset.language = picked;
+    localStorage.setItem(languageStorageKey, picked);
+  });
+}
+</script>

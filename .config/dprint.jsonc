@@ -31,23 +31,35 @@
     // dart-format glob did.
     "../tests/bindgen/fixtures/probes/dart/**",
   ],
+  // Docs snippets wrap at 70 columns, so they fit the docs site's code
+  // blocks. Go and Zig formatters don't wrap lines.
   "oxc": {
     "experimentalSortImports": { "newlinesBetween": true },
     "lineWidth": 80,
     "proseWrap": "always",
     "sortPackageJson": false,
+    "overrides": [{ "files": "**/docsnippets/**", "lineWidth": 70 }],
   },
   // Prettier is the last plugin, so it formats only the types that no plugin
   // above claims, MDX among them.
   "prettier": { "proseWrap": "always" },
-  "ruff": { "indentWidth": 4, "lineLength": 88 },
-  "ktfmt": { "style": "google", "lineWidth": 100 },
+  "ruff": {
+    "indentWidth": 4,
+    "lineLength": 88,
+    "overrides": [{ "files": "**/docsnippets/**", "lineLength": 70 }],
+  },
+  "ktfmt": {
+    "style": "google",
+    "lineWidth": 100,
+    "overrides": [{ "files": "**/docsnippets/**", "lineWidth": 70 }],
+  },
   "googleJavaFormat": { "lineWidth": 100 },
   "csharpier": {
     // Bindgen formats the C# it generates as `*.g.cs`.
     "includeGenerated": true,
     "csharp.lineWidth": 100,
     "csharp.indentWidth": 4,
+    "overrides": [{ "files": "**/DocSnippets/**", "csharp.lineWidth": 70 }],
     "associations": [
       "!**/*.csproj",
       "!**/*.props",
@@ -74,6 +86,7 @@
     "UseTab": "Never",
     "AlignAfterOpenBracket": "BlockIndent",
     "IncludeBlocks": "Regroup",
+    "overrides": [{ "files": "**/docsnippets/**", "ColumnLimit": 70 }],
     "IncludeCategories": [
       { "Regex": "^<[a-zA-Z0-9_]+>$", "Priority": -100 },
       { "Regex": "^<mln/.*>$", "Priority": -60 },
@@ -82,7 +95,28 @@
     ],
   },
   "exec": {
+    // Only the first matching command formats a file, so the docs snippet
+    // commands come before the general ones.
+    "associations": [
+      "**/*.zig",
+      "**/*.zon",
+      "**/*.dart",
+      "**/*.rs",
+      "**/*.swift",
+    ],
     "commands": [
+      {
+        "command": "rustfmt --edition 2024 --config max_width=70",
+        "associations": ["**/maplibre-native-ffi/examples/**/*.rs"],
+      },
+      {
+        "command": "bash .mise/bin/dprint-dart format --output=show --page-width=70 --stdin-name={{file_path}}",
+        "associations": ["**/docsnippets/**/*.dart"],
+      },
+      {
+        "command": "swiftformat stdin --stdin-path {{file_path}} --indent {{indent_width}} --max-width 70 --quiet",
+        "associations": ["**/DocSnippets/**/*.swift"],
+      },
       { "command": "zig fmt --stdin", "exts": ["zig"] },
       { "command": "zig fmt --stdin --zon", "exts": ["zon"] },
       {

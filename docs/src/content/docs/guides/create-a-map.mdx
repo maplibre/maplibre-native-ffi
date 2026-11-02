@@ -1,50 +1,96 @@
 ---
 title: Create a map
-description: Create a runtime and map, then release both in order.
-sidebar:
-  order: 1
+description: Create a runtime and a map, and close them.
+# Scope: what a runtime and a map are, creating them, how calls complete and
+# fail, and closing in order. Render targets belong in their own guides.
 ---
 
-import { Code } from "@astrojs/starlight/components";
-import { region } from "../../../snippets";
+import { Aside } from "@astrojs/starlight/components";
 
-import createMap from "../../../../snippets/c/create-map.c?raw";
+import Snippet from "../../../components/Snippet.astro";
 
-A map belongs to a runtime. One runtime serves several maps and shares their
-scheduler, event handler, network services, and cache database.
+You work with three objects. A runtime holds what its maps share, such as the
+network and the cache. A map belongs to a runtime, and holds a style, a camera,
+and data. A render session belongs to a map, and draws it into a target, such as
+a window.
 
-Set an event handler to receive events from the runtime and its maps.
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes callback
-and delivery queue registration.
+```mermaid
+sequenceDiagram
+  accTitle: The lifecycle of a runtime, a map, and a render session
+  participant App as Your code
+  participant Lib as Library
+  App->>Lib: Create a runtime
+  App->>Lib: Create a map
+  Lib-->>App: Map created
+  App->>Lib: Set a style
+  App->>Lib: Attach a render target
+  Lib-->>App: Render session attached
+  Note over App,Lib: Render frames and change the map
+  App->>Lib: Close the render session
+  App->>Lib: Close the map
+  App->>Lib: Close the runtime
+  Lib-->>App: Runtime closed
+```
 
-<Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
+This guide creates a runtime and a map, closes them, and covers how calls
+complete and fail.
+[Choose a render target](/maplibre-native-ffi/guides/choose-a-target/) covers
+the target.
 
-A browser host creates the runtime on a Web Worker.
+## Create a runtime
 
-Map creation returns the map at once, and its completion reports when the map is
-ready. Commands sent before then run once the map is ready, but attaching a
-render target waits for the completion.
+Create a runtime with the default options. One runtime can serve all your maps.
+To set a cache file, see [Offline](/maplibre-native-ffi/guides/offline/).
 
-## Choose the initial map state
+<Snippet page="create-a-map" region="runtime" />
 
-Set the logical width, height, and display scale factor. The scale factor stays
-fixed for the map's lifetime.
+## Create a map
 
-Use continuous mode for an interactive map, static mode for one image per
-request, and tile mode for an image of a single tile.
+Create a map on the runtime, and give it a size in logical pixels, a scale
+factor, and a map mode. The scale factor and the mode can't change later. For
+the mode, see
+[Choose a render target](/maplibre-native-ffi/guides/choose-a-target/).
 
-<Code code={region(createMap, "map")} lang="c" title="create-map.c" />
+Wait for the map to be created before you attach a render target.
 
-Enable FastPFOR decoding when your MapLibre Tiles sources use that encoding.
+<Snippet page="create-a-map" region="map" />
 
-## Release in order
+## Set a style
 
-Detach any render session, then release the map and the runtime. Wait for the
-runtime's release to complete before you destroy state that its callbacks use.
+Set the map's style by URL. You don't need to wait for it to load. To load style
+JSON or change the style, see [Style](/maplibre-native-ffi/guides/style/).
 
-<Code code={region(createMap, "release")} lang="c" title="create-map.c" />
+<Snippet page="create-a-map" region="style" />
 
-The [runtime reference](/maplibre-native-ffi/reference/c/runtime_8h.html) and
-[map reference](/maplibre-native-ffi/reference/c/map_8h.html) define creation
-and release contracts. Continue with
-[Load a style](/maplibre-native-ffi/guides/load-a-style/).
+## Wait for results
+
+Most calls return before their work is done. The library does the work later, in
+the order you sent it, and then reports the result. Wait for the result when
+your next step depends on it, or ignore it.
+
+<Snippet page="create-a-map" region="wait" />
+
+The library reports what you didn't ask for, such as a style that finished
+loading, as events. See
+[Events and logs](/maplibre-native-ffi/guides/events-and-logs/).
+
+## Handle errors
+
+A call fails in one of two ways. Either it fails right away when an argument or
+the object's state is wrong, or it starts and its result reports a failure. Each
+binding reports both with its language's own errors, and every failure has a
+message that describes it.
+
+<Snippet page="create-a-map" region="errors" />
+
+## Close
+
+Close the render session, the map, and the runtime, in that order. Wait only for
+the runtime: it finishes closing after its maps.
+
+<Aside type="note">
+  Even in a language with a garbage collector, close them yourself. The binding
+  reports a leak if the collector finds one still open.
+</Aside>
+
+<Snippet page="create-a-map" region="close" />

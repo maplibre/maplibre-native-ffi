@@ -7,12 +7,13 @@ tasks.
 
 Read these when the task needs them:
 
-- [Concepts](docs/src/content/docs/concepts.md): how the library works.
-- [Overview](docs/src/content/docs/development/overview.md): setup, everyday
+- [Guides](docs/src/content/docs/guides/): how to use the library, starting with
+  [Create a map](docs/src/content/docs/guides/create-a-map.mdx).
+- [Overview](docs/src/content/docs/development/overview.mdx): setup, everyday
   commands, other targets such as Windows under Wine, engine patches, CI, and
   releases.
-- [Guidelines](docs/src/content/docs/development/guidelines.md): read before you
-  change the public API or documentation.
+- [Guidelines](docs/src/content/docs/development/guidelines.mdx): read before
+  you change the public API or documentation.
 
 ## Priorities
 

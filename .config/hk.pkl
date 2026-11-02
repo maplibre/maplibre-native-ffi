@@ -68,12 +68,6 @@ steps {
     check = "pnpm exec vp check --no-fmt {{files}}"
     fix = "pnpm exec vp check --no-fmt --fix {{files}}"
   }
-  // The guides embed these snippets verbatim. Header changes are in the glob so
-  // an API change that invalidates a documented snippet fails here first.
-  ["docs-snippets"] {
-    glob = List("docs/snippets/c/**/*.c", "include/**/*.h")
-    check = "mise run //docs:check-snippets"
-  }
   // dprint's ruff plugin formats; this step only lints.
   ["ruff"] {
     glob = List("**/*.py", "**/*.pyi")
@@ -82,7 +76,11 @@ steps {
     fix = "uv run --no-sync ruff check --fix {{files}}"
   }
   ["ty"] {
-    glob = List("bindings/python/python/**/*.py", "docs/scripts/**/*.py")
+    glob = List(
+      "bindings/python/python/**/*.py",
+      "bindings/python/tests/docsnippets/**/*.py",
+      "docs/scripts/**/*.py",
+    )
     check = "uv run --no-sync ty check --error-on-warning {{files}}"
   }
   // The generator ignores no diagnostic. The Python emitters wait for their
