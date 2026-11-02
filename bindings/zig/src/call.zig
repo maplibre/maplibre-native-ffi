@@ -212,13 +212,16 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             if (offset == 1) {
                 native[0] = if (access == .scoped) self.receiver.native else self.receiver.raw;
             }
+            if (comptime hasText(Args)) self.text_storage = try self.inputAllocator().alloc(u8, 256);
             inline for (fields, 0..) |Field, index| {
                 const Parameter = Param(function, offset + index);
                 const input = args[index];
                 if (comptime isHandle(Field)) {
                     native[offset + index] = input.raw;
-                } else if (comptime marks(Field, "caller_sized_text") or marks(Field, "text_capacity")) {
-                    // Set below, once the text has storage.
+                } else if (comptime marks(Field, "caller_sized_text")) {
+                    native[offset + index] = @ptrCast(self.text_storage.ptr);
+                } else if (comptime marks(Field, "text_capacity")) {
+                    native[offset + index] = self.text_storage.len;
                 } else if (comptime marks(Field, "text_length")) {
                     native[offset + index] = &self.text_length;
                 } else if (comptime isOutput(Field)) {
@@ -240,10 +243,6 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                 } else {
                     native[offset + index] = try self.encode(Parameter, input);
                 }
-            }
-            if (comptime hasText(Args)) {
-                self.text_storage = try self.inputAllocator().alloc(u8, 256);
-                self.passText(&native);
             }
             return native;
         }

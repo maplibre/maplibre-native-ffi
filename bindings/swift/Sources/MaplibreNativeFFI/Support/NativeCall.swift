@@ -59,10 +59,7 @@ extension NativeReceiver {
   ) throws -> T? {
     var present = true
     return try nativeInvoke({ raw, arena, diagnostic in
-      let status = try call(raw, arena, diagnostic)
-      guard status == absent else { return status }
-      present = false
-      return MLN_STATUS_OK
+      try presence(of: call(raw, arena, diagnostic), absent, &present)
     }) { present ? try result() : nil }
   }
 
@@ -234,11 +231,20 @@ func nativeInvoke<T>(
 ) throws -> T? {
   var present = true
   return try nativeInvoke(owner: owner, { raw, arena, diagnostic in
-    let status = try call(raw, arena, diagnostic)
-    guard status == absent else { return status }
-    present = false
-    return MLN_STATUS_OK
+    try presence(of: call(raw, arena, diagnostic), absent, &present)
   }) { present ? try result() : nil }
+}
+
+/// Reads `absent` as a call that succeeded without publishing its output, which
+/// clears `present`.
+private func presence(
+  of status: mln_status,
+  _ absent: mln_status,
+  _ present: inout Bool
+) -> mln_status {
+  guard status == absent else { return status }
+  present = false
+  return MLN_STATUS_OK
 }
 
 func nativeStart<T: Sendable>(
