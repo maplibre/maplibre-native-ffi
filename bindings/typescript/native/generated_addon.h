@@ -604,6 +604,10 @@ bool mln_ts_write_resource_response(
 bool mln_ts_write_resource_route(
   mln_ts_call* call, napi_value value, mln_resource_route* out, const char* path
 );
+bool mln_ts_write_resource_transform_error(
+  mln_ts_call* call, napi_value value, mln_resource_transform_error* out,
+  const char* path
+);
 bool mln_ts_write_runtime_options(
   mln_ts_call* call, napi_value value, mln_runtime_options* out,
   const char* path

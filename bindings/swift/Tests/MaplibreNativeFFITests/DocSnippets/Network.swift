@@ -37,7 +37,7 @@ private func network(runtime: RuntimeHandle, map: MapHandle) throws {
     do {
       try request.complete(url: withApiKey(url))
     } catch {
-      // Releasing the request without an answer keeps the old URL.
+      // Releasing the request without an answer fails it.
       request.close()
     }
   }

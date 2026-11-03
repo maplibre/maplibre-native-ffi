@@ -1600,6 +1600,12 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_resource_transform_request_complete(request, word(url), word(outDiagnostic))
 
+  actual fun mln_resource_transform_request_fail(
+    request: Long,
+    error: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_resource_transform_request_fail(request, word(error), word(outDiagnostic))
+
   actual fun mln_resource_transform_request_release(request: Long) {
     mln_kw_mln_resource_transform_request_release(request)
   }
@@ -3085,6 +3091,11 @@ private fun mln_kw_mln_resource_request_set_cancel_callback(
 private fun mln_kw_mln_resource_transform_request_complete(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_transform_request_complete(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_resource_transform_request_fail(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_transform_request_fail(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_resource_transform_request_release(p0: Long): Unit =

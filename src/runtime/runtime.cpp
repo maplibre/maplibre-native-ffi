@@ -1018,7 +1018,7 @@ auto delete_header_rules(void* table) noexcept -> void {
 }
 
 // Queues a copy of the URL with its request handle. A request the queue
-// refuses keeps its URL.
+// refuses fails.
 auto queue_resource_transform(
   void* registration, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request

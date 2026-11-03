@@ -48,7 +48,7 @@ static void add_api_key(
     mln_resource_transform_request_complete(request, new_url, NULL) !=
     MLN_STATUS_OK
   ) {
-    // Releasing the request without an answer keeps the old URL.
+    // Releasing the request without an answer fails it.
     mln_resource_transform_request_release(request);
   }
 }

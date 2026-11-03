@@ -696,8 +696,7 @@ class Values:
         reaches that zone instead of native code. An owner adopts an owned
         handle before the callback runs; closing it after a failure, or when
         the registration's owner is gone, releases the unanswered request,
-        which native then settles: a provider request fails, and a transform
-        keeps its URL.
+        which native then fails.
         """
         public = public_name(callback.native)
         parameters, result = self.native_signature(callback)

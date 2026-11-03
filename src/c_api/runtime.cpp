@@ -107,6 +107,15 @@ auto mln_resource_transform_request_complete(
   });
 }
 
+auto mln_resource_transform_request_fail(
+  mln_resource_transform_request request,
+  const mln_resource_transform_error* error, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::fail_resource_transform_request(request, error);
+  });
+}
+
 auto mln_resource_transform_request_release(
   mln_resource_transform_request request
 ) noexcept -> void {

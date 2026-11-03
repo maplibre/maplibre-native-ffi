@@ -78,4 +78,25 @@ public sealed unsafe partial class ResourceTransformRequestHandle
             idempotent: false
         );
     }
+
+    /// <summary>
+    /// Fails a resource transform request without sending it.
+    /// </summary>
+    /// <remarks>
+    /// <para>The library retries a request that failed for a reason it retries,
+    /// such as <c>ResourceErrorReason.Connection</c>, and the retry calls the
+    /// transform again.</para>
+    /// <para>See <c>mln_resource_transform_request_fail</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
+    /// </remarks>
+    public void Fail(ResourceTransformError error)
+    {
+        using var scope = new NativeCallScope();
+        var nativeError = scope.Value(NativeResourceTransformError(error, scope));
+        state.Release(
+            (live, diagnostic) =>
+                NativeMethods.mln_resource_transform_request_fail(live, nativeError, diagnostic),
+            idempotent: false
+        );
+    }
 }

@@ -5749,6 +5749,40 @@ bool mln_ts_write_resource_route(
   return true;
 }
 
+bool mln_ts_write_resource_transform_error(
+  mln_ts_call* call, napi_value value, mln_resource_transform_error* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "reason", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "reason");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->reason = (mln_resource_error_reason)number;
+  }
+  if (!mln_ts_member(call, value, "message", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "message");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->message, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "retryAfterUnixMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "retryAfterUnixMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_i64(call, member, &number, child)) return false;
+      out->retry_after_unix_ms = (int64_t)number;
+    }
+    out->fields |= MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
+  }
+  return true;
+}
+
 bool mln_ts_write_runtime_options(
   mln_ts_call* call, napi_value value, mln_runtime_options* out,
   const char* path

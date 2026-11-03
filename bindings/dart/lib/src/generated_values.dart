@@ -5328,6 +5328,45 @@ final class ResourceResponse extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
 
+/// Why a resource transform fails a request.
+///
+/// See `mln_resource_transform_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceTransformError extends _Value {
+  const ResourceTransformError({
+    required this.reason,
+    this.message = '',
+    this.retryAfterUnixMs,
+  });
+
+  /// Must not be `ResourceErrorReason.none`.
+  final ResourceErrorReason reason;
+  final String message;
+
+  /// When to retry, for `ResourceErrorReason.rateLimit`.
+  final int? retryAfterUnixMs;
+
+  /// A copy of this value with the given members replaced.
+  ResourceTransformError copyWith({
+    ResourceErrorReason? reason,
+    String? message,
+    int? retryAfterUnixMs,
+  }) => ResourceTransformError(
+    reason: reason ?? this.reason,
+    message: message ?? this.message,
+    retryAfterUnixMs: retryAfterUnixMs ?? this.retryAfterUnixMs,
+  );
+
+  @override
+  List<Object?> get _members => [reason, message, retryAfterUnixMs];
+  @override
+  String toString() => _describe('ResourceTransformError', const [
+    'reason',
+    'message',
+    'retryAfterUnixMs',
+  ]);
+}
+
 /// Options for `RuntimeHandle.create()`.
 ///
 /// See `mln_runtime_options` in the
@@ -6262,8 +6301,10 @@ final class ResourceProvider {
 /// Rewrites the URL of a network request before the library sends it.
 ///
 /// The request waits until you answer with
-/// `ResourceTransformRequestHandle.complete()` or release `request` to keep
-/// `url`. You can answer now or later, from any thread.
+/// `ResourceTransformRequestHandle.complete()` or
+/// `ResourceTransformRequestHandle.fail()`. To keep `url`, complete with it.
+/// Releasing `request` without an answer fails the request. You can answer now
+/// or later, from any thread.
 ///
 /// See `mln_resource_transform_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

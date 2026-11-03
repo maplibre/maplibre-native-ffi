@@ -3531,6 +3531,31 @@ class ResourceTransform:
 
 
 @dataclass(frozen=True, slots=True)
+class ResourceTransformError:
+    """Why a resource transform fails a request.
+
+    See `mln_resource_transform_error` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    reason: ResourceErrorReason
+    """Must not be `ResourceErrorReason.NONE`."""
+
+    message: str = ""
+
+    retry_after_unix_ms: int | None = None
+    """When to retry, for `ResourceErrorReason.RATE_LIMIT`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            reason=ResourceErrorReason(raw["reason"]),
+            message=raw["message"],
+            retry_after_unix_ms=raw["retry_after_unix_ms"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeEvent:
     """An event that a runtime or one of its maps raised.
 
@@ -4869,8 +4894,10 @@ class ResourceTransformCallback(Protocol):
     """Rewrites the URL of a network request before the library sends it.
 
     The request waits until you answer with
-    `ResourceTransformRequestHandle.complete()` or release `request` to keep
-    `url`. You can answer now or later, from any thread.
+    `ResourceTransformRequestHandle.complete()` or
+    `ResourceTransformRequestHandle.fail()`. To keep `url`, complete with it.
+    Releasing `request` without an answer fails the request. You can answer
+    now or later, from any thread.
 
     See `mln_resource_transform_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

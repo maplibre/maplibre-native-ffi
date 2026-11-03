@@ -31,7 +31,7 @@ fn addApiKey(
     var owned = request;
     var buffer: [4096]u8 = undefined;
     // Returning an error releases the
-    // request, which keeps the old URL.
+    // request, which fails it.
     try owned.complete(try withApiKey(url, &buffer), null);
 }
 // #endregion rewrite

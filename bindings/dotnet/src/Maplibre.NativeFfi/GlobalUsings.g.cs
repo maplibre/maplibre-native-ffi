@@ -20,6 +20,7 @@ global using static Maplibre.NativeFfi.Internal.C.mln_projection_mode_option_fie
 global using static Maplibre.NativeFfi.Internal.C.mln_rendered_feature_query_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_resource_request_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_resource_response_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_resource_transform_error_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_source_feature_query_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_expression_input_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_expression_option_field;

@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "support/delivery.h"
 #include "support/test_support.h"
@@ -245,47 +246,116 @@ static void the_host_answers_a_dispatched_transform_later(void) {
   mln_test_http_server_stop(server);
 }
 
-static void an_unanswered_transform_keeps_its_url(void) {
+static void the_host_fails_a_dispatched_transform(void) {
   static const mln_test_http_route routes[] = {
-    {.path = "/abandoned.json",
-     .body = empty_style_json,
-     .body_size = sizeof(empty_style_json) - 1},
-    {.path = "/released.json",
+    {.path = "/rewritten.json",
      .body = empty_style_json,
      .body_size = sizeof(empty_style_json) - 1},
   };
-  mln_test_http_server* server = mln_test_http_server_start(routes, 2);
-  char abandoned[256];
-  char released[256];
+  mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+  char original[256];
+  char rewritten[256];
   mln_test_http_server_url(
-    server, "/abandoned.json", abandoned, sizeof(abandoned)
+    server, "/original.json", original, sizeof(original)
   );
   mln_test_http_server_url(
+    server, "/rewritten.json", rewritten, sizeof(rewritten)
+  );
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  int tag = 0;
+  const mln_resource_transform transform = queue_transform(queue.handle, &tag);
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, original));
+  const mln_resource_transform_request request =
+    await_transform(queue.handle, &tag);
+
+  mln_resource_transform_error error = {
+    .size = sizeof(mln_resource_transform_error),
+    .reason = MLN_RESOURCE_ERROR_REASON_NONE,
+  };
+  MLN_TEST_INVALID(mln_resource_transform_request_fail(request, NULL, NULL));
+  MLN_TEST_INVALID(mln_resource_transform_request_fail(request, &error, NULL));
+  error.reason = MLN_RESOURCE_ERROR_REASON_RATE_LIMIT;
+  error.fields = 1U << 31U;
+  MLN_TEST_INVALID(mln_resource_transform_request_fail(request, &error, NULL));
+  // A retry time in the past retries now instead of after the default delay.
+  error.fields = MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
+  error.retry_after_unix_ms = (int64_t)time(NULL) * 1000;
+  error.message = mln_buffer_view_from_cstr("no credential yet");
+  MLN_TEST_OK(mln_resource_transform_request_fail(request, &error, NULL));
+  MLN_TEST_INVALID_STATE(
+    mln_resource_transform_request_fail(request, &error, NULL)
+  );
+  char message[512];
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "no credential yet"));
+
+  // The retry asks the transform again for the original URL.
+  const mln_resource_transform_request retry =
+    await_transform(queue.handle, &tag);
+  TEST_ASSERT_EQUAL_STRING(original, kept.url);
+  MLN_TEST_OK(mln_resource_transform_request_complete(
+    retry, mln_buffer_view_from_cstr(rewritten), NULL
+  ));
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  TEST_ASSERT_EQUAL_INT(
+    1, mln_test_http_server_requests(server, "/rewritten.json")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/original.json")
+  );
+
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_delivery_queue_release(&queue);
+  mln_test_http_server_stop(server);
+}
+
+static void an_unanswered_transform_fails_its_request(void) {
+  mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
+  char released[256];
+  char abandoned[256];
+  mln_test_http_server_url(
     server, "/released.json", released, sizeof(released)
+  );
+  mln_test_http_server_url(
+    server, "/abandoned.json", abandoned, sizeof(abandoned)
   );
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_transform transform = queue_transform(queue.handle, NULL);
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  char message[512];
 
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_test_map_set_style_url(map, released));
   mln_resource_transform_request_release(await_transform(queue.handle, NULL));
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
-  TEST_ASSERT_EQUAL_INT(
-    1, mln_test_http_server_requests(server, "/released.json")
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
   );
   mln_test_destroy_map(map);
 
+  // Releasing the queue releases the request it never dispatched.
   map = mln_test_create_map(runtime);
   const int wakes = atomic_load(&queue.wakes);
   MLN_TEST_OK(mln_test_map_set_style_url(map, abandoned));
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, wakes + 1));
   mln_test_delivery_queue_release(&queue);
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
   TEST_ASSERT_EQUAL_INT(
-    1, mln_test_http_server_requests(server, "/abandoned.json")
+    0, mln_test_http_server_requests(server, "/released.json")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/abandoned.json")
   );
 
   MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
@@ -320,7 +390,9 @@ static void the_release_follows_the_last_transform(void) {
   TEST_ASSERT_EQUAL_CHAR('r', mln_test_call_at(1)->kind);
   TEST_ASSERT_EQUAL_PTR(&tag, mln_test_call_at(1)->user_data);
   // The clear leaves a request already dispatched waiting for its answer.
-  mln_resource_transform_request_release(request);
+  MLN_TEST_OK(mln_resource_transform_request_complete(
+    request, mln_buffer_view_from_cstr(url), NULL
+  ));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -495,7 +567,8 @@ MLN_TEST_GROUP {
   RUN_TEST(rule_registrations_reject_an_invalid_rule);
 #if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(the_host_answers_a_dispatched_transform_later);
-  RUN_TEST(an_unanswered_transform_keeps_its_url);
+  RUN_TEST(the_host_fails_a_dispatched_transform);
+  RUN_TEST(an_unanswered_transform_fails_its_request);
   RUN_TEST(the_release_follows_the_last_transform);
 #endif
 #if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED

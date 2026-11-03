@@ -4301,6 +4301,29 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 	return raw
 }
 
+// ResourceTransformError corresponds to mln_resource_transform_error. Why a
+// resource transform fails a request.
+//
+// See mln_resource_transform_error in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceTransformError struct {
+	// Must not be ResourceErrorReasonNone.
+	Reason  ResourceErrorReason
+	Message string
+	// When to retry, for ResourceErrorReasonRateLimit.
+	RetryAfterUnixMs *int64
+}
+
+func nativeResourceTransformError(input ResourceTransformError, arena *bindingArena) C.mln_resource_transform_error {
+	raw := C.mln_resource_transform_error{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	raw.reason = C.mln_resource_error_reason(input.Reason)
+	raw.message = C.mln_buffer_view{data: arena.bytes([]byte(input.Message)), size: C.size_t(len(input.Message))}
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
+	return raw
+}
+
 // RuntimeEvent corresponds to mln_runtime_event. An event that a runtime or one
 // of its maps raised.
 //
@@ -8263,7 +8286,22 @@ func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
 	})
 }
 
+// Fail fails a resource transform request without sending it.
+//
+// The library retries a request that failed for a reason it retries, such as
+// ResourceErrorReasonConnection, and the retry calls the transform again.
+//
+// See mln_resource_transform_request_fail in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *ResourceTransformRequestHandle) Fail(error ResourceTransformError) error {
+	return bindingDo(bindingAnswering(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_transform_request_fail(C.mln_resource_transform_request(raw), bindingStore(nativeResourceTransformError(error, arena), arena), diagnostic))
+	})
+}
+
 // Close releases a resource transform request.
+//
+// Releasing a request without an answer fails it with ResourceErrorReasonOther.
 //
 // See mln_resource_transform_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html

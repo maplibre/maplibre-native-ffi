@@ -1066,6 +1066,8 @@ internal actual object C {
       mln_buffer_view,
       JAVA_LONG,
     )
+  private val mln_resource_transform_request_fail =
+    Ffm.downcall("mln_resource_transform_request_fail", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_resource_transform_request_release =
     Ffm.downcall("mln_resource_transform_request_release", null, JAVA_LONG)
   private val mln_runtime_clear_event_handler =
@@ -2913,6 +2915,12 @@ internal actual object C {
       Ffm.value(url, mln_buffer_view),
       outDiagnostic,
     ) as Int
+
+  actual fun mln_resource_transform_request_fail(
+    request: Long,
+    error: Long,
+    outDiagnostic: Long,
+  ): Int = mln_resource_transform_request_fail.invokeExact(request, error, outDiagnostic) as Int
 
   actual fun mln_resource_transform_request_release(request: Long) {
     mln_resource_transform_request_release.invoke(request)

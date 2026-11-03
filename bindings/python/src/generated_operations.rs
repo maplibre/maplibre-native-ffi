@@ -2717,6 +2717,24 @@ fn generated_input_mln_resource_transform<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_resource_transform_error<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_resource_transform_error> {
+    let mut raw: sys::mln_resource_transform_error = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_resource_transform_error>() as _;
+    raw.fields = 0;
+    raw.reason = value
+        .getattr("reason")?
+        .extract::<sys::mln_resource_error_reason>()?;
+    raw.message = storage.buffer(value.getattr("message")?, true)?;
+    if let Some(field) = generated_present(value, "retry_after_unix_ms")? {
+        raw.retry_after_unix_ms = field.extract::<i64>()?;
+        raw.fields |= sys::MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_runtime_event_handler<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -7539,6 +7557,23 @@ impl ResourceTransformRequestHandle {
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_transform_request_complete(handle, url_value, diagnostic)
+            })
+        }?;
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = (error))]
+    fn fail(&self, py: Python<'_>, error: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let error_value = generated_input_mln_resource_transform_error(&error.clone(), storage)?;
+        let Some(mut reservation) = self.reserve(false)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_resource_transform_request_fail(handle, &error_value, diagnostic)
             })
         }?;
         reservation.commit();

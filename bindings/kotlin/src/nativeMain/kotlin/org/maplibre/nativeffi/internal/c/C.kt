@@ -1956,6 +1956,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_resource_transform_request_fail(
+    request: Long,
+    error: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_resource_transform_request_fail(
+      request.toULong(),
+      error.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_resource_transform_request_release(request: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_resource_transform_request_release(
       request.toULong(),

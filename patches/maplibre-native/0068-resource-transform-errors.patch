@@ -1,0 +1,212 @@
+Lets a resource transform fail a request instead of returning a URL. A
+transform that adds a credential or routes through a proxy had no way to stop
+a request when it couldn't do that, so the request went out with its original
+URL (https://github.com/maplibre/maplibre-native-ffi/issues/779). A failed
+request is never sent. When the error's reason allows a retry, the retry calls
+the transform again instead of loading the original URL.
+Upstream: not proposed
+
+diff --git a/include/mln/storage/resource_transform.hpp b/include/mln/storage/resource_transform.hpp
+index 0770fd1..84a14d7 100644
+--- a/include/mln/storage/resource_transform.hpp
++++ b/include/mln/storage/resource_transform.hpp
+@@ -1,6 +1,8 @@
+ #pragma once
+ 
+ #include <mln/storage/resource.hpp>
++#include <mln/storage/response.hpp>
++#include <mln/util/expected.hpp>
+ 
+ #include <functional>
+ #include <string>
+@@ -9,7 +11,11 @@ namespace mln {
+ 
+ class ResourceTransform {
+ public:
+-    using FinishedCallback = std::function<void(const std::string&)>;
++    // The URL to load instead, or the error to fail the request with. A failed
++    // request is never sent. When the error's reason allows a retry, the retry
++    // calls the transform again.
++    using Result = expected<std::string, Response::Error>;
++    using FinishedCallback = std::function<void(Result)>;
+     using TransformCallback = std::function<void(Resource::Kind kind, const std::string& url, FinishedCallback)>;
+ 
+     ResourceTransform(TransformCallback = {});
+diff --git a/platform/default/src/mln/storage/online_file_source.cpp b/platform/default/src/mln/storage/online_file_source.cpp
+index 67d9762..a839355 100644
+--- a/platform/default/src/mln/storage/online_file_source.cpp
++++ b/platform/default/src/mln/storage/online_file_source.cpp
+@@ -47,7 +47,7 @@ struct OnlineFileRequest {
+     void schedule(Duration timeout);
+     void completed(Response);
+ 
+-    void setTransformedURL(const std::string& url);
++    void setTransformResult(ResourceTransform::Result result);
+     ActorRef<OnlineFileRequest> actor();
+     void onCancel(std::function<void()>);
+ 
+@@ -71,6 +71,12 @@ struct OnlineFileRequest {
+     uint32_t failedRequests = 0;
+     Response::Error::Reason failedRequestReason = Response::Error::Reason::Success;
+     std::optional<Timestamp> retryAfter;
++
++    // Whether the resource transform is computing the URL to load.
++    bool transforming = false;
++    // Whether the resource transform failed the request. A retry calls the
++    // transform again instead of loading the original URL.
++    bool transformFailed = false;
+ };
+ 
+ class OnlineFileSourceThread {
+@@ -101,13 +107,19 @@ public:
+ 
+     void add(OnlineFileRequest* req) {
+         allRequests.insert(req);
++        transform(req);
++    }
++
++    void transform(OnlineFileRequest* req) {
++        req->transformFailed = false;
+         if (resourceTransform) {
+             // Request the ResourceTransform actor a new url and replace the
+             // resource url with the transformed one before proceeding to
+             // schedule the request.
++            req->transforming = true;
+             resourceTransform.transform(
+-                req->resource.kind, req->resource.url, [ref = req->actor()](const std::string& url) {
+-                    ref.invoke(&OnlineFileRequest::setTransformedURL, url);
++                req->resource.kind, req->resource.url, [ref = req->actor()](ResourceTransform::Result result) {
++                    ref.invoke(&OnlineFileRequest::setTransformResult, std::move(result));
+                 });
+         } else {
+             req->activate();
+@@ -485,7 +497,7 @@ void OnlineFileRequest::activate() {
+ }
+ 
+ void OnlineFileRequest::schedule(Duration timeout) {
+-    if (impl.isPending(this) || impl.isActive(this)) {
++    if (transforming || impl.isPending(this) || impl.isActive(this)) {
+         // There's already a request in progress; don't start another one.
+         return;
+     }
+@@ -503,7 +515,13 @@ void OnlineFileRequest::schedule(Duration timeout) {
+         timeout = Duration::max();
+     }
+ 
+-    timer.start(timeout, Duration::zero(), [&] { impl.activateOrQueueRequest(this); });
++    timer.start(timeout, Duration::zero(), [&] {
++        if (transformFailed) {
++            impl.transform(this);
++        } else {
++            impl.activateOrQueueRequest(this);
++        }
++    });
+ }
+ 
+ Duration OnlineFileRequest::getUpdateInterval(std::optional<Timestamp> expires) const {
+@@ -592,9 +610,18 @@ void OnlineFileRequest::networkIsReachableAgain() {
+     }
+ }
+ 
+-void OnlineFileRequest::setTransformedURL(const std::string& url) {
+-    resource.url = url;
+-    activate();
++void OnlineFileRequest::setTransformResult(ResourceTransform::Result result) {
++    transforming = false;
++    if (result) {
++        resource.url = std::move(*result);
++        activate();
++        return;
++    }
++
++    transformFailed = true;
++    Response response;
++    response.error = std::make_unique<Response::Error>(std::move(result.error()));
++    completed(std::move(response));
+ }
+ 
+ ActorRef<OnlineFileRequest> OnlineFileRequest::actor() {
+diff --git a/test/storage/online_file_source.test.cpp b/test/storage/online_file_source.test.cpp
+index bf290a7..bab01a0 100644
+--- a/test/storage/online_file_source.test.cpp
++++ b/test/storage/online_file_source.test.cpp
+@@ -2,6 +2,7 @@
+ #include <mln/storage/online_file_source.hpp>
+ #include <mln/storage/resource.hpp>
+ #include <mln/storage/resource_options.hpp>
++#include <mln/storage/resource_transform.hpp>
+ #include <mln/test/util.hpp>
+ #include <mln/util/chrono.hpp>
+ #include <mln/util/constants.hpp>
+@@ -11,6 +12,8 @@
+ 
+ #include <gtest/gtest.h>
+ 
++#include <atomic>
++
+ using namespace mln;
+ 
+ #ifdef WIN32
+@@ -630,3 +633,62 @@ TEST(OnlineFileSource, TEST_REQUIRES_SERVER(RequestSameUrlMultipleTimes)) {
+ 
+     loop.run();
+ }
++
++TEST(OnlineFileSource, FailedResourceTransform) {
++    util::RunLoop loop;
++    std::unique_ptr<FileSource> fs = std::make_unique<OnlineFileSource>(ResourceOptions::Default(), ClientOptions());
++    fs->setResourceTransform(
++        {[](Resource::Kind, const std::string&, ResourceTransform::FinishedCallback finished) {
++            finished(unexpected<Response::Error>(Response::Error{Response::Error::Reason::Other, "No credential"}));
++        }});
++
++    auto req = fs->request({Resource::Unknown, "http://127.0.0.1:3000/test"}, [&](Response res) {
++        ASSERT_NE(nullptr, res.error);
++        EXPECT_EQ(Response::Error::Reason::Other, res.error->reason);
++        EXPECT_EQ("No credential", res.error->message);
++        EXPECT_FALSE(bool(res.data));
++        loop.stop();
++    });
++
++    loop.run();
++}
++
++// A retry of a request that the resource transform failed asks the transform
++// again instead of loading the original URL.
++TEST(OnlineFileSource, TEST_REQUIRES_SERVER(RetryFailedResourceTransform)) {
++    util::RunLoop loop;
++    std::unique_ptr<FileSource> fs = std::make_unique<OnlineFileSource>(ResourceOptions::Default(), ClientOptions());
++
++    std::atomic<int> transforms = 0;
++    fs->setResourceTransform(
++        {[&](Resource::Kind, const std::string& url, ResourceTransform::FinishedCallback finished) {
++            EXPECT_EQ("http://127.0.0.1:3000/delayed", url);
++            if (transforms++ == 0) {
++                finished(unexpected<Response::Error>(Response::Error{Response::Error::Reason::Connection, "Offline"}));
++            } else {
++                finished(std::string("http://127.0.0.1:3000/test"));
++            }
++        }});
++
++    int responses = 0;
++    auto req = fs->request({Resource::Unknown, "http://127.0.0.1:3000/delayed"}, [&](Response res) {
++        switch (responses++) {
++            case 0:
++                ASSERT_NE(nullptr, res.error);
++                EXPECT_EQ(Response::Error::Reason::Connection, res.error->reason);
++                EXPECT_EQ("Offline", res.error->message);
++                // Retry now instead of after the backoff.
++                NetworkStatus::Reachable();
++                break;
++            case 1:
++                EXPECT_EQ(nullptr, res.error);
++                ASSERT_TRUE(res.data.get());
++                EXPECT_EQ("Hello World!", *res.data);
++                EXPECT_EQ(2, transforms);
++                loop.stop();
++                break;
++        }
++    });
++
++    loop.run();
++}

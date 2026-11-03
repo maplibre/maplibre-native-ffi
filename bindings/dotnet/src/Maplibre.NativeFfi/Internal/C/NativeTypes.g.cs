@@ -928,6 +928,15 @@ internal unsafe struct mln_resource_transform
     public MlnDeliveryQueue queue;
 }
 
+internal unsafe struct mln_resource_transform_error
+{
+    public uint size;
+    public mln_resource_transform_error_field fields;
+    public mln_resource_error_reason reason;
+    public mln_buffer_view message;
+    public long retry_after_unix_ms;
+}
+
 internal unsafe struct mln_runtime_event
 {
     public mln_runtime_event_type type;
@@ -1833,6 +1842,11 @@ internal enum mln_resource_storage_policy : uint
 {
     MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0,
     MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1,
+}
+
+internal enum mln_resource_transform_error_field : uint
+{
+    MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER = 1,
 }
 
 internal enum mln_resource_usage : uint

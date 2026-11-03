@@ -25,7 +25,32 @@ public extension ResourceTransformRequestHandle {
 }
 
 public extension ResourceTransformRequestHandle {
+  /// Fails a resource transform request without sending it.
+  ///
+  /// The library retries a request that failed for a reason it retries, such as
+  /// `ResourceErrorReason.connection`, and the retry calls the transform again.
+  ///
+  /// See `mln_resource_transform_request_fail` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func fail(error: ResourceTransformError) throws {
+    let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
+    try handle.closeOnce(idempotent: false) { live in
+      let raw = live.raw
+      try checkStatus { diagnostic in try mln_resource_transform_request_fail(
+        raw,
+        arena.store(error.nativeValue(arena: arena)),
+        diagnostic
+      ) }
+    }
+  }
+}
+
+public extension ResourceTransformRequestHandle {
   /// Releases a resource transform request.
+  ///
+  /// Releasing a request without an answer fails it with
+  /// `ResourceErrorReason.other`.
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

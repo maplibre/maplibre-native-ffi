@@ -25,8 +25,8 @@ using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
 // The styles these cases request never reach a network: a provider answers
-// them with an error, or a transform keeps the custom scheme, which the HTTP
-// stack rejects without a connection.
+// them with an error, or a transform releases them unanswered, which fails
+// them.
 //
 // A map's style request reaches a file source thread wherever a live map may
 // overlap the callback. The teardown cases download the style for an offline

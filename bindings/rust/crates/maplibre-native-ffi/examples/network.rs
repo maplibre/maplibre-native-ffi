@@ -47,7 +47,7 @@ fn network(
     runtime.discarding().set_resource_transform(
         ResourceTransform::new(|_kind, url, request| {
             // Dropping the request without
-            // an answer keeps the old URL.
+            // an answer fails it.
             let _ = request.complete(&with_api_key(url));
         }),
     )?;

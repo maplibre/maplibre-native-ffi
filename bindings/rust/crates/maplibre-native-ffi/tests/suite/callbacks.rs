@@ -81,8 +81,8 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     assert!(calls.load(Ordering::SeqCst) > 0);
 
-    // A transform that panics drops its request, which keeps its URL instead
-    // of leaving MapLibre waiting.
+    // A transform that panics drops its request, which fails it instead of
+    // leaving MapLibre waiting.
     let deny = denying_provider().callback;
     wait_for(
         fixture
@@ -106,7 +106,6 @@ fn a_failing_callback_is_contained_and_its_error_is_reported() {
         .discarding()
         .set_style_url("custom://transformed.json")
         .unwrap();
-    // The online source cannot load the untransformed URL.
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     wait_for(fixture.runtime().clear_resource_transform());
 

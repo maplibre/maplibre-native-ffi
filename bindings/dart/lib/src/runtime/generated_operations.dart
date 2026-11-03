@@ -2090,6 +2090,22 @@ _prepareResourceRequestCancelHandler(
   }
 }
 
+Pointer<raw.mln_resource_transform_error> _writeResourceTransformError(
+  ResourceTransformError value,
+  Allocator arena, {
+  Pointer<raw.mln_resource_transform_error>? into,
+}) {
+  final result = into ?? arena<raw.mln_resource_transform_error>();
+  result.ref.size = sizeOf<raw.mln_resource_transform_error>();
+  result.ref.reason = value.reason.rawValue;
+  result.ref.message = nativeStringView(value.message, arena).value;
+  if (value.retryAfterUnixMs != null) {
+    result.ref.fields |= raw.MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
+    result.ref.retry_after_unix_ms = value.retryAfterUnixMs!;
+  }
+  return result;
+}
+
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
   Allocator arena, {
@@ -7076,7 +7092,27 @@ final class ResourceTransformRequestHandle implements Finalizable {
     ),
   );
 
+  /// Fails a resource transform request without sending it.
+  ///
+  /// The library retries a request that failed for a reason it retries, such as
+  /// `ResourceErrorReason.connection`, and the retry calls the transform again.
+  ///
+  /// See `mln_resource_transform_request_fail` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  void fail(ResourceTransformError error) => _state.answer(
+    (handle) => withNativeArena(
+      (arena) => raw.mln_resource_transform_request_fail(
+        handle.raw,
+        _writeResourceTransformError(error, arena),
+        nativeDiagnostic,
+      ),
+    ),
+  );
+
   /// Releases a resource transform request.
+  ///
+  /// Releasing a request without an answer fails it with
+  /// `ResourceErrorReason.other`.
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

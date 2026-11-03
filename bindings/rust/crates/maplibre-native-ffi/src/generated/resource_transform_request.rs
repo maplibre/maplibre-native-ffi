@@ -30,7 +30,31 @@ impl ResourceTransformRequestHandle {
         })
     }
 
+    /// Fails a resource transform request without sending it.
+    ///
+    /// The library retries a request that failed for a reason it retries, such
+    /// as `ResourceErrorReason::Connection`, and the retry calls the transform
+    /// again.
+    ///
+    /// See `mln_resource_transform_request_fail` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn fail(
+        self,
+        error: &ResourceTransformError<'_>,
+    ) -> std::result::Result<(), (Self, Error)> {
+        self.consume(|request| {
+            let mut call = Call::new(request);
+            let error = call.reference(&error)?;
+            call.status(|request, out_diagnostic| unsafe {
+                sys::mln_resource_transform_request_fail(request, error, out_diagnostic)
+            })
+        })
+    }
+
     /// Releases a resource transform request.
+    ///
+    /// Releasing a request without an answer fails it with
+    /// `ResourceErrorReason::Other`.
     ///
     /// See `mln_resource_transform_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
