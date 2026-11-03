@@ -113,13 +113,13 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "source already exists",
+    MLN_STATUS_ALREADY_EXISTS, "source already exists",
     mln_map_add_geo_json_source_url(
       map, taken, geojson_url, NULL, &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "source already exists",
+    MLN_STATUS_ALREADY_EXISTS, "source already exists",
     mln_map_add_image_source_url(
       map, taken, corners, 4, png, &completion.descriptor, NULL
     )

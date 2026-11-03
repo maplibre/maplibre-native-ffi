@@ -1372,6 +1372,7 @@ public value class Status(public val rawValue: Int) {
       -7 -> "BUSY"
       -8 -> "TARGET_LOST"
       -10 -> "NOT_FOUND"
+      -11 -> "ALREADY_EXISTS"
       else -> "Status($rawValue)"
     }
 
@@ -1397,6 +1398,8 @@ public value class Status(public val rawValue: Int) {
     public val TARGET_LOST: Status = Status(-8)
     /** Nothing has the given ID. */
     public val NOT_FOUND: Status = Status(-10)
+    /** Something already has the given ID. */
+    public val ALREADY_EXISTS: Status = Status(-11)
   }
 }
 

@@ -491,7 +491,7 @@ typedef struct mln_style_transition_options {
  * [source](https://maplibre.org/maplibre-style-spec/sources/) object.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  */
 MLN_BINDING("execution=command")
@@ -549,7 +549,7 @@ MLN_API mln_status mln_map_list_style_sources(
  * Adds a GeoJSON source that loads its data from `url`.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  */
 MLN_BINDING("execution=command")
@@ -594,7 +594,7 @@ MLN_API void mln_geo_json_source_data_release(
  * released once this function returns.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  */
 MLN_BINDING("execution=command")
@@ -656,7 +656,7 @@ MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
  * Adds a source whose GeoJSON tiles come from callbacks.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  *
  * Lifetimes:
@@ -736,7 +736,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * Adds a source whose vector tiles come from callbacks.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  *
  * Lifetimes:
@@ -836,7 +836,7 @@ MLN_API mln_status mln_map_get_style_image(
  * `coordinates` are the image's four corners, clockwise from the top left.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  */
 MLN_BINDING("execution=command")
@@ -853,7 +853,7 @@ MLN_API mln_status mln_map_add_image_source_url(
  * `coordinates` are the image's four corners, clockwise from the top left.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a source named
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
  */
 MLN_BINDING("execution=command")
@@ -935,7 +935,7 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no layer named `before_layer_id`,
  *   or no source with the ID that the layer uses.
- * - MLN_STATUS_INVALID_ARGUMENT when the style already has a layer with the new
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a layer with the new
  *   layer's ID.
  */
 MLN_BINDING("execution=command")

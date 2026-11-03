@@ -86,7 +86,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>
@@ -116,7 +116,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>
@@ -148,7 +148,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>
@@ -177,7 +177,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>
@@ -213,7 +213,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>
@@ -251,7 +251,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>
@@ -293,7 +293,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <item><description><c>Status.NotFound</c> when the style has no layer
     /// named <c>beforeLayerId</c>, or no source with the ID that the layer
     /// uses.</description></item>
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a layer with the new layer's ID.</description></item>
     /// </list>
     /// </remarks>
@@ -322,7 +322,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when the style already
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// </list>
     /// </remarks>

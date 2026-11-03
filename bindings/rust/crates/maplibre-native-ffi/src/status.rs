@@ -27,6 +27,8 @@ pub enum Status {
     TargetLost,
     /// Nothing has the given ID.
     NotFound,
+    /// Something already has the given ID.
+    AlreadyExists,
     Unknown(i32),
 }
 impl Status {
@@ -42,6 +44,7 @@ impl Status {
             -7 => Self::Busy,
             -8 => Self::TargetLost,
             -10 => Self::NotFound,
+            -11 => Self::AlreadyExists,
             value => Self::Unknown(value),
         }
     }
@@ -57,6 +60,7 @@ impl Status {
             Self::Busy => -7,
             Self::TargetLost => -8,
             Self::NotFound => -10,
+            Self::AlreadyExists => -11,
             Self::Unknown(value) => value,
         }
     }
@@ -79,6 +83,7 @@ impl std::fmt::Display for Status {
             Self::Busy => f.write_str("BUSY"),
             Self::TargetLost => f.write_str("TARGET_LOST"),
             Self::NotFound => f.write_str("NOT_FOUND"),
+            Self::AlreadyExists => f.write_str("ALREADY_EXISTS"),
             Self::Unknown(value) => write!(f, "UNKNOWN({value})"),
         }
     }

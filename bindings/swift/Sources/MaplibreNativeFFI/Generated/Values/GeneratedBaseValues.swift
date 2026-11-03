@@ -56,6 +56,8 @@ public struct Status: RawRepresentable, CustomStringConvertible,
   public static let targetLost: Status = .init(rawValue: -8)
   /// Nothing has the given ID.
   public static let notFound: Status = .init(rawValue: -10)
+  /// Something already has the given ID.
+  public static let alreadyExists: Status = .init(rawValue: -11)
   public var description: String {
     switch rawValue {
     case 0: return "ok"
@@ -68,6 +70,7 @@ public struct Status: RawRepresentable, CustomStringConvertible,
     case -7: return "busy"
     case -8: return "targetLost"
     case -10: return "notFound"
+    case -11: return "alreadyExists"
     default: return "Status(\(rawValue))"
     }
   }

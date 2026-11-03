@@ -1122,6 +1122,9 @@ final class Status extends _Enum {
 
   /// Nothing has the given ID.
   static const notFound = Status.fromRawValue(-10);
+
+  /// Something already has the given ID.
+  static const alreadyExists = Status.fromRawValue(-11);
   @override
   String toString() => switch (rawValue) {
     0 => 'Status.ok',
@@ -1134,6 +1137,7 @@ final class Status extends _Enum {
     -7 => 'Status.busy',
     -8 => 'Status.targetLost',
     -10 => 'Status.notFound',
+    -11 => 'Status.alreadyExists',
     _ => 'Status($rawValue)',
   };
 }

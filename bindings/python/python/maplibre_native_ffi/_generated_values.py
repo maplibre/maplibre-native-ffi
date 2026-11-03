@@ -804,6 +804,7 @@ class Status(UnknownIntEnum):
     BUSY = -7
     TARGET_LOST = -8
     NOT_FOUND = -10
+    ALREADY_EXISTS = -11
 
 
 class StyleExpressionTypeKind(UnknownIntEnum):

@@ -227,7 +227,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addCustomGeometrySource(self: Map, source_id: []const u8, options: CustomGeometrySourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_custom_geometry_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
@@ -240,7 +240,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addCustomVectorSource(self: Map, source_id: []const u8, options: CustomVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_custom_vector_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
@@ -256,7 +256,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
@@ -269,7 +269,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addGeoJsonSourceUrl(self: Map, source_id: []const u8, url: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_geo_json_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url, options });
@@ -284,7 +284,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addImageSourceImage(self: Map, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_image_source_image", .handle, self, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, image });
@@ -299,7 +299,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addImageSourceUrl(self: Map, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_image_source_url", .handle, self, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
@@ -319,7 +319,7 @@ pub const Map = struct {
     ///
     /// - `error.NotFound` when the style has no layer named `before_layer_id`, or
     ///   no source with the ID that the layer uses.
-    /// - `error.InvalidArgument` when the style already has a layer with the new
+    /// - `error.AlreadyExists` when the style already has a layer with the new
     ///   layer's ID.
     pub fn addStyleLayerJson(self: Map, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_style_layer_json", .handle, self, call.command, null, diagnostic, .{ layer_json, before_layer_id });
@@ -335,7 +335,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when the style already has a source named
+    /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn addStyleSourceJson(self: Map, source_id: []const u8, source_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_style_source_json", .handle, self, call.command, null, diagnostic, .{ source_id, source_json });
@@ -6726,6 +6726,8 @@ pub const Status = enum(i32) {
     target_lost = -8,
     /// Nothing has the given ID.
     not_found = -10,
+    /// Something already has the given ID.
+    already_exists = -11,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;

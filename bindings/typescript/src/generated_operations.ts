@@ -639,7 +639,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addCustomGeometrySource(
@@ -667,7 +667,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addCustomVectorSource(
@@ -698,7 +698,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addGeoJsonSourceData(
@@ -723,7 +723,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addGeoJsonSourceUrl(
@@ -752,7 +752,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addImageSourceImage(
@@ -781,7 +781,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addImageSourceUrl(
@@ -815,7 +815,7 @@ export class MapHandle extends Owner {
    *
    * - `Status.notFound` when the style has no layer named `beforeLayerId`, or
    *   no source with the ID that the layer uses.
-   * - `Status.invalidArgument` when the style already has a layer with the new
+   * - `Status.alreadyExists` when the style already has a layer with the new
    *   layer's ID.
    */
   addStyleLayerJson(
@@ -843,7 +843,7 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when the style already has a source named
+   * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    */
   addStyleSourceJson(
