@@ -732,6 +732,9 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
     fixture.session, &queued.descriptor, NULL
   ));
   MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
+  // A caller driver detaches at its next service, which completes the queued
+  // command as abandoned first.
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
   // A core worker may run the command before it sees the disposal.
   const mln_status queued_status = mln_test_completion_settle(&queued);
   TEST_ASSERT_TRUE(
@@ -786,7 +789,7 @@ static void dispose_completes_once_the_session_has_retired(
   MLN_TEST_INVALID_STATE(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
-  MLN_TEST_OK(mln_test_completion_settle(&disposed));
+  MLN_TEST_OK(mln_test_render_fixture_finish_disposal(&fixture, &disposed));
   mln_test_render_fixture_destroy(&fixture);
 
   mln_test_render_fixture other = {0};
@@ -1122,6 +1125,127 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Set from MapLibre's logging threads, so it lives in static storage that
+// outlives any registration a failing case leaves behind.
+static atomic_bool render_warning_logged;
+
+static bool record_render_warning(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  mln_buffer_view message
+) {
+  (void)user_data;
+  (void)code;
+  (void)message;
+  if (severity == MLN_LOG_SEVERITY_WARNING && event == MLN_LOG_EVENT_RENDER) {
+    mln_test_flag_set(&render_warning_logged);
+  }
+  return false;
+}
+
+static bool driver_woken(void* context) {
+  const mln_test_render_fixture* fixture = context;
+  return atomic_load(&fixture->driver_wakes) != 0;
+}
+
+// Installs a log callback that flags render warnings, such as one that
+// reports quarantined graphics objects, and attaches a caller-driven session
+// to `map`, which renders one frame.
+static void attach_caller_driven_with_warnings(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  atomic_store(&render_warning_logged, false);
+  const mln_log_handler handler = {
+    .size = sizeof(mln_log_handler), .callback = record_render_warning
+  };
+  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
+  mln_test_render_prepare_map(map);
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed_ring(
+    map, fixture, 2, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+  ));
+  mln_test_render_demand_forced(fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(fixture));
+}
+
+// Disposal hands an attached caller-driven session's detach to its driver and
+// wakes it. The next service detaches the session on the host's thread, which
+// frees its graphics objects rather than quarantining them, and the handle is
+// stale once the session retires.
+static void a_disposed_caller_driven_session_detaches_at_its_next_service(
+  void
+) {
+  // The log callback belongs to the process, so a failed assertion still
+  // clears it.
+  if (TEST_PROTECT()) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    mln_test_render_fixture fixture = {0};
+    attach_caller_driven_with_warnings(map, &fixture);
+    // A service leaves no wake pending, so the next wake is the disposal's.
+    MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
+    atomic_store(&fixture.driver_wakes, 0U);
+
+    mln_test_completion disposed = mln_test_completion_default(0);
+    MLN_TEST_OK(
+      mln_render_session_dispose(fixture.session, &disposed.descriptor, NULL)
+    );
+    TEST_ASSERT_TRUE(mln_test_await(
+      driver_woken, &fixture, mln_test_deadline_default(),
+      "the disposal's driver wake"
+    ));
+    TEST_ASSERT_FALSE_MESSAGE(
+      mln_test_completion_poll(&disposed),
+      "a caller-driven session retired before its detach was serviced"
+    );
+    MLN_TEST_OK(mln_render_session_service_driver_work(fixture.session, NULL));
+    MLN_TEST_OK(mln_test_completion_settle(&disposed));
+    MLN_TEST_INVALID_STATE(
+      mln_render_session_service_driver_work(fixture.session, NULL)
+    );
+    TEST_ASSERT_FALSE_MESSAGE(
+      atomic_load(&render_warning_logged),
+      "disposal quarantined graphics objects"
+    );
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
+  (void)mln_log_clear_callback(NULL);
+}
+
+// A host that stops servicing still gets its map back: the map's release
+// abandons the disposed session, and the abandon logs what it keeps.
+static void a_disposed_caller_driven_session_is_abandoned_when_its_map_releases(
+  void
+) {
+  if (TEST_PROTECT()) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    mln_test_render_fixture fixture = {0};
+    attach_caller_driven_with_warnings(map, &fixture);
+    mln_test_completion disposed = mln_test_completion_default(0);
+    MLN_TEST_OK(
+      mln_render_session_dispose(fixture.session, &disposed.descriptor, NULL)
+    );
+    mln_test_completion released = {0};
+    MLN_TEST_OK(mln_test_map_start_close(map, &released));
+    MLN_TEST_OK(mln_test_completion_settle(&disposed));
+    MLN_TEST_OK(mln_test_completion_settle(&released));
+    MLN_TEST_INVALID_STATE(
+      mln_render_session_service_driver_work(fixture.session, NULL)
+    );
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) || defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+    // Only the driver thread may destroy these backends' objects.
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_wait_for_flag(&render_warning_logged),
+      "the abandon quarantined graphics objects without a warning"
+    );
+#endif
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_runtime(runtime);
+  }
+  (void)mln_log_clear_callback(NULL);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(an_attached_session_holds_its_map);
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
@@ -1141,4 +1265,6 @@ MLN_TEST_GROUP {
   RUN_TEST(wakes_may_call_back_into_the_session);
   RUN_TEST(attach_checks_the_queue_lock);
   RUN_TEST(attach_picks_a_producer_sync_kind);
+  RUN_TEST(a_disposed_caller_driven_session_detaches_at_its_next_service);
+  RUN_TEST(a_disposed_caller_driven_session_is_abandoned_when_its_map_releases);
 }

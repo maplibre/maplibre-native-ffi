@@ -188,13 +188,15 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
     def dispose(self) -> None:
         """Releases the session in any state.
 
-        An attached session driven by `RenderDriverKind.CORE_WORKER` detaches
-        first unless you hold one of its frames. Any other session is
-        abandoned as `RenderSessionHandle.abandon()` does. To free the
-        graphics objects of a session driven by
-        `RenderDriverKind.CALLER_GRAPHICS_THREAD`, detach it before you
-        dispose it. Once the disposal completes, the library no longer uses
-        your graphics objects.
+        An attached session detaches first, and frees its graphics objects,
+        unless you hold one of its frames. A session driven by
+        `RenderDriverKind.CALLER_GRAPHICS_THREAD` detaches at your next
+        `RenderSessionHandle.service_driver_work()`, so keep servicing it
+        until the disposal completes. If you release or dispose its map
+        before that service, the session is abandoned instead. Any other
+        session is abandoned as `RenderSessionHandle.abandon()` does. Once
+        the disposal completes, the library no longer uses your graphics
+        objects.
 
         See `mln_render_session_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

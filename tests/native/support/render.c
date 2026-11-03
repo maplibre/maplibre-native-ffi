@@ -146,7 +146,61 @@ mln_status mln_test_render_session_failure(
   return snapshot.failure_status;
 }
 
+typedef struct disposal_state {
+  mln_render_session session;
+  bool service;
+  mln_test_completion* completion;
+} disposal_state;
+
+// A disposed caller-driven session detaches at its next service, and its
+// handle goes stale once it retires, which ends the servicing.
+static bool disposal_settled(void* context) {
+  disposal_state* state = context;
+  if (
+    state->service &&
+    mln_render_session_service_driver_work(state->session, NULL) !=
+      MLN_STATUS_OK
+  ) {
+    state->service = false;
+  }
+  return mln_test_completion_poll(state->completion);
+}
+
+static mln_status finish_disposal(
+  mln_render_session session, bool caller_driven,
+  mln_test_completion* completion
+) {
+  disposal_state state = {
+    .session = session,
+    .service = caller_driven,
+    .completion = completion,
+  };
+  if (!mln_test_await_on_event_loop(
+        disposal_settled, &state, mln_test_deadline_default(),
+        "a render session disposal"
+      )) {
+    return MLN_TEST_RENDER_TIMED_OUT;
+  }
+  return mln_test_completion_settle(completion);
+}
+
+mln_status mln_test_render_fixture_finish_disposal(
+  const mln_test_render_fixture* fixture, mln_test_completion* completion
+) {
+  return finish_disposal(
+    fixture->session,
+    fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, completion
+  );
+}
+
 mln_status mln_test_render_session_dispose(mln_render_session session) {
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  const bool caller_driven =
+    mln_render_session_get_capabilities(session, &capabilities, NULL) ==
+      MLN_STATUS_OK &&
+    capabilities.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status = mln_render_session_dispose(
     session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
@@ -156,7 +210,7 @@ mln_status mln_test_render_session_dispose(mln_render_session session) {
     mln_test_completion_destroy(&completion);
     return status;
   }
-  return mln_test_completion_settle(&completion);
+  return finish_disposal(session, caller_driven, &completion);
 }
 
 // Set only while create_fixture() attaches a ring of another depth.

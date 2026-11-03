@@ -513,6 +513,9 @@ class OperationPlan:
     # What an immediate call waits for before it returns, such as a native
     # thread start, which some host threads cannot wait for.
     blocks: str | None = None
+    # Whether the call stays valid on its receiver after native accepted the
+    # receiver's release, until the handle retires.
+    after_release: bool = False
     # The root handle that this receiverless call creates, which bindings
     # present as a factory on that handle's type, or None.
     factory: str | None = None
@@ -1535,6 +1538,7 @@ class Binder:
             drain=drain,
             absence=absence,
             blocks=metadata.get("blocks"),
+            after_release=metadata.get("after_release") == "true",
             factory=factory,
             unchecked=function.name == ABI_VERSION,
         )

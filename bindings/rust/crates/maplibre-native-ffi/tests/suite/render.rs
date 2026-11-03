@@ -108,6 +108,40 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     session.close();
 }
 
+// A released caller-driven session detaches at its next service, so a host
+// that keeps servicing it through what the release returns sees the release
+// complete.
+#[test]
+fn a_released_caller_driven_session_retires_while_the_host_services_it() {
+    let graphics = Graphics::new();
+    let ring = [host_texture(&graphics)];
+    let fixture = styled_fixture();
+    let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
+    let session = Session::finish_attach(
+        graphics
+            .attach_borrowed_texture(fixture.map(), SIZE, &ring, &options)
+            .unwrap(),
+        wakes,
+    );
+    assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
+
+    let Session { handle, wakes } = session;
+    let (released, retiring) = handle.release().map_err(|(_, error)| error).unwrap();
+    let mut serviced = 0;
+    drive(&wakes.signal, released, || {
+        if retiring.service_driver_work().is_ok() {
+            serviced += 1;
+        }
+    })
+    .unwrap();
+    assert!(serviced > 0, "the release completed without a service");
+    // Once the session retires, native reports its handle stale.
+    assert_eq!(
+        retiring.service_driver_work().unwrap_err().status(),
+        Status::InvalidState
+    );
+}
+
 #[test]
 fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let _global = global_state();

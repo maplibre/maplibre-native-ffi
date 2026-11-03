@@ -210,6 +210,31 @@ mln_status mln_start(mln_map *out_map BIND("direction=out"), mln_diagnostic *out
         with self.assertRaisesRegex(ModelError, "unsupported blocks='lock'"):
             self.parse(source.replace("thread_start", "lock"))
 
+    def test_after_release_belongs_to_an_immediate_call_on_a_released_handle(self):
+        handle = """
+typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_release");
+void mln_session_release(mln_session session);
+"""
+        validate(
+            self.parse(
+                handle
+                + 'BIND("after_release=true")\n'
+                + "mln_status mln_session_service(mln_session session, mln_diagnostic *out_diagnostic);"
+            )
+        )
+        for function in (
+            "mln_status mln_tick(mln_diagnostic *out_diagnostic);",
+            "void mln_session_poke(mln_session session);",
+            "mln_status mln_count(unsigned count, mln_diagnostic *out_diagnostic);",
+        ):
+            with (
+                self.subTest(function=function),
+                self.assertRaisesRegex(
+                    ModelError, "after_release requires an immediate function"
+                ),
+            ):
+                validate(self.parse(handle + 'BIND("after_release=true")\n' + function))
+
     def test_duplicate_metadata_is_rejected_at_the_declaration(self):
         with self.assertRaisesRegex(
             ModelError, "duplicate binding metadata 'execution'"

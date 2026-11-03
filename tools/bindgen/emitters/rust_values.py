@@ -13,6 +13,9 @@ class Values:
         # The module and the public type of each owned handle, by C name.
         self.owners: dict[str, str] = {}
         self.handle_types: dict[str, str] = {}
+        # The value that each handle's release returns to keep its
+        # after-release functions callable, by handle.
+        self.retiring: dict[str, str] = {}
         self.borrowed = borrowed_records(bound)
         # The lifetime that a borrowed record's type names: elided where a
         # signature uses it, and the record's own inside its declaration.

@@ -3733,6 +3733,25 @@ auto begin_map_retirement(RetirementTask* task) noexcept -> void {
   );
 }
 
+// The hook a disposed render session left for the map's close, which runs
+// once the map's locks are released.
+struct RenderSessionCloseHook {
+  RenderSessionMapClose run_hook = nullptr;
+  mln_render_session session = MLN_HANDLE_NULL;
+
+  auto run() const noexcept -> void {
+    if (run_hook != nullptr) run_hook(session);
+  }
+};
+
+auto take_render_session_close_hook_locked(MapObject& live) noexcept
+  -> RenderSessionCloseHook {
+  return RenderSessionCloseHook{
+    std::exchange(live.render_target_session_on_close, nullptr),
+    std::exchange(live.render_target_session_handle, MLN_HANDLE_NULL)
+  };
+}
+
 auto retire_map(
   std::shared_ptr<MapObject> owned, std::shared_ptr<Completion> completion
 ) noexcept -> void {
@@ -3753,6 +3772,7 @@ auto retire_map(
 auto dispose_map(mln_map map) -> mln_status {
   auto owned = handle_table<MapObject>().lease(map);
   if (owned == nullptr) return recorded_handle_fault_status();
+  auto close_hook = RenderSessionCloseHook{};
   {
     const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
     if (handle_table<MapObject>().resolve_locked(map) != owned.get())
@@ -3760,7 +3780,9 @@ auto dispose_map(mln_map map) -> mln_status {
     const auto status = owned->control.begin_close(true);
     if (status != MLN_STATUS_OK) return status;
     owned->disposal_requested = true;
+    close_hook = take_render_session_close_hook_locked(*owned);
   }
+  close_hook.run();
   retire_map(std::move(owned), nullptr);
   return MLN_STATUS_OK;
 }
@@ -3775,6 +3797,7 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   }
   auto owned = handle_table<MapObject>().lease(map);
   if (owned == nullptr) return recorded_handle_fault_status();
+  auto close_hook = RenderSessionCloseHook{};
   {
     const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
     if (handle_table<MapObject>().resolve_locked(map) != owned.get()) {
@@ -3796,8 +3819,10 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
       return close_status;
     }
     owned->disposal_requested = true;
+    close_hook = take_render_session_close_hook_locked(*owned);
   }
   release_completion->accept();
+  close_hook.run();
   retire_map(std::move(owned), std::move(release_completion));
   return MLN_STATUS_OK;
 }
@@ -4064,18 +4089,33 @@ auto map_detach_render_target_session(mln_map map, void* session)
     }
     live->render_target_session = nullptr;
     live->render_target_session_disposed = false;
+    live->render_target_session_on_close = nullptr;
+    live->render_target_session_handle = MLN_HANDLE_NULL;
   }
   live->control.release_child();
   return MLN_STATUS_OK;
 }
 
-auto map_dispose_render_target_session(mln_map map, void* session) noexcept
-  -> void {
+auto map_dispose_render_target_session(
+  mln_map map, void* session, RenderSessionMapClose on_close,
+  mln_render_session handle
+) noexcept -> void {
   const auto live = handle_table<MapObject>().try_lease(map);
-  if (live == nullptr) return;
-  const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
-  if (live->render_target_session == session && session != nullptr)
-    live->render_target_session_disposed = true;
+  auto run_now = on_close != nullptr;
+  if (live != nullptr) {
+    const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
+    if (live->render_target_session == session && session != nullptr) {
+      live->render_target_session_disposed = true;
+      // begin_close() runs under this same lock, so a close either finds the
+      // hook here or has already begun.
+      if (run_now && !live->control.is_closing()) {
+        live->render_target_session_on_close = on_close;
+        live->render_target_session_handle = handle;
+        run_now = false;
+      }
+    }
+  }
+  if (run_now) on_close(handle);
 }
 
 auto map_set_style_url(MapObject& live, const char* url) -> mln_status {

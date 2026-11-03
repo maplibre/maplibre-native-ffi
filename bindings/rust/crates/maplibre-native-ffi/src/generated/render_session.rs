@@ -23,6 +23,12 @@ impl RenderSessionHandle {
     /// and you can attach another session to the map. Dispose the session
     /// afterward.
     ///
+    /// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
+    /// keeps them until the process exits, reports how many it kept, and logs a
+    /// warning. Detach the session instead to free them. A disposal that
+    /// another thread starts first retires the session itself, and the abandon
+    /// then fails as it does for any released session.
+    ///
     /// See `mln_render_session_abandon` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn abandon(&self) -> Result<RenderAbandonResult> {
@@ -163,16 +169,20 @@ impl RenderSessionHandle {
 
     /// Releases the session in any state.
     ///
-    /// An attached session driven by `RenderDriverKind::CoreWorker` detaches
-    /// first unless you hold one of its frames. Any other session is abandoned
-    /// as `RenderSessionHandle::abandon()` does. To free the graphics objects
-    /// of a session driven by `RenderDriverKind::CallerGraphicsThread`, detach
-    /// it before you dispose it. Once the disposal completes, the library no
-    /// longer uses your graphics objects.
+    /// An attached session detaches first, and frees its graphics objects,
+    /// unless you hold one of its frames. A session driven by
+    /// `RenderDriverKind::CallerGraphicsThread` detaches at your next
+    /// `RenderSessionHandle::service_driver_work()`, so keep servicing it until
+    /// the disposal completes. If you release or dispose its map before that
+    /// service, the session is abandoned instead. Any other session is
+    /// abandoned as `RenderSessionHandle::abandon()` does. Once the disposal
+    /// completes, the library no longer uses your graphics objects.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+    pub fn release(
+        self,
+    ) -> std::result::Result<(NativeFuture<()>, RetiringRenderSession), (Self, Error)> {
         self.consume(|session| {
             let call = Call::new(session);
             call.complete(
@@ -181,26 +191,30 @@ impl RenderSessionHandle {
                 },
                 completion::unit,
             )
+            .map(|value| (value, RetiringRenderSession(session)))
         })
     }
 
     /// Releases the session in any state.
     ///
-    /// An attached session driven by `RenderDriverKind::CoreWorker` detaches
-    /// first unless you hold one of its frames. Any other session is abandoned
-    /// as `RenderSessionHandle::abandon()` does. To free the graphics objects
-    /// of a session driven by `RenderDriverKind::CallerGraphicsThread`, detach
-    /// it before you dispose it. Once the disposal completes, the library no
-    /// longer uses your graphics objects.
+    /// An attached session detaches first, and frees its graphics objects,
+    /// unless you hold one of its frames. A session driven by
+    /// `RenderDriverKind::CallerGraphicsThread` detaches at your next
+    /// `RenderSessionHandle::service_driver_work()`, so keep servicing it until
+    /// the disposal completes. If you release or dispose its map before that
+    /// service, the session is abandoned instead. Any other session is
+    /// abandoned as `RenderSessionHandle::abandon()` does. Once the disposal
+    /// completes, the library no longer uses your graphics objects.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
+    pub fn dispose(self) -> std::result::Result<RetiringRenderSession, (Self, Error)> {
         self.consume(|session| {
             let call = Call::new(session);
             call.discard(|session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_dispose(session, completion, out_diagnostic)
             })
+            .map(|()| RetiringRenderSession(session))
         })
     }
 
@@ -512,8 +526,11 @@ impl RenderSessionHandle {
     /// Use it with `RenderDriverKind::CallerGraphicsThread`, and call it from
     /// the same thread every time. Call it each time
     /// `RenderSessionAttachOptions::driver_work_wake` is called, even while you
-    /// demand no frames, and until a detach completes. It returns once no work
-    /// is ready.
+    /// demand no frames, and until a detach or disposal completes. It returns
+    /// once no work is ready.
+    ///
+    /// It accepts a disposed session until the session retires. The service
+    /// after the disposal detaches the session and frees its graphics objects.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -818,6 +835,40 @@ impl RenderSessionHandle {
             },
             completion::unit,
         )
+    }
+}
+
+/// What a release of [`RenderSessionHandle`] leaves while native retires the
+/// handle. Its functions stay callable until the handle retires, and
+/// fail with `Status::InvalidState` afterwards. It owns nothing, so
+/// dropping it changes nothing.
+#[derive(Debug)]
+pub struct RetiringRenderSession(sys::mln_render_session);
+impl RetiringRenderSession {
+    /// Returns the native handle value.
+    pub fn id(&self) -> u64 {
+        self.0.0
+    }
+
+    /// Runs the session's ready graphics work on your graphics thread.
+    ///
+    /// Use it with `RenderDriverKind::CallerGraphicsThread`, and call it from
+    /// the same thread every time. Call it each time
+    /// `RenderSessionAttachOptions::driver_work_wake` is called, even while you
+    /// demand no frames, and until a detach or disposal completes. It returns
+    /// once no work is ready.
+    ///
+    /// It accepts a disposed session until the session retires. The service
+    /// after the disposal detaches the session and frees its graphics objects.
+    ///
+    /// See `mln_render_session_service_driver_work` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn service_driver_work(&self) -> Result<()> {
+        let mut call = Call::new(self.0);
+        call.status(|session, out_diagnostic| unsafe {
+            sys::mln_render_session_service_driver_work(session, out_diagnostic)
+        })?;
+        Ok(())
     }
 }
 

@@ -103,6 +103,11 @@ public sealed unsafe partial class RenderSessionHandle
     /// <c>RenderResult.TargetNotReady</c>. Once the call returns, the library
     /// no longer uses your graphics objects, and you can attach another session
     /// to the map. Dispose the session afterward.</para>
+    /// <para>Only the driver thread can destroy OpenGL and WebGPU objects, so
+    /// abandon keeps them until the process exits, reports how many it kept,
+    /// and logs a warning. Detach the session instead to free them. A disposal
+    /// that another thread starts first retires the session itself, and the
+    /// abandon then fails as it does for any released session.</para>
     /// <para>See <c>mln_render_session_abandon</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -264,13 +269,15 @@ public sealed unsafe partial class RenderSessionHandle
     /// Releases the session in any state.
     /// </summary>
     /// <remarks>
-    /// <para>An attached session driven by <c>RenderDriverKind.CoreWorker</c>
-    /// detaches first unless you hold one of its frames. Any other session is
-    /// abandoned as <c>RenderSessionHandle.Abandon()</c> does. To free the
-    /// graphics objects of a session driven by
-    /// <c>RenderDriverKind.CallerGraphicsThread</c>, detach it before you
-    /// dispose it. Once the disposal completes, the library no longer uses your
-    /// graphics objects.</para>
+    /// <para>An attached session detaches first, and frees its graphics
+    /// objects, unless you hold one of its frames. A session driven by
+    /// <c>RenderDriverKind.CallerGraphicsThread</c> detaches at your next
+    /// <c>RenderSessionHandle.ServiceDriverWork()</c>, so keep servicing it
+    /// until the disposal completes. If you release or dispose its map before
+    /// that service, the session is abandoned instead. Any other session is
+    /// abandoned as <c>RenderSessionHandle.Abandon()</c> does. Once the
+    /// disposal completes, the library no longer uses your graphics
+    /// objects.</para>
     /// <para>See <c>mln_render_session_dispose</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -683,8 +690,11 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it with <c>RenderDriverKind.CallerGraphicsThread</c>, and call
     /// it from the same thread every time. Call it each time
     /// <c>RenderSessionAttachOptions.DriverWorkWake</c> is called, even while
-    /// you demand no frames, and until a detach completes. It returns once no
-    /// work is ready.</para>
+    /// you demand no frames, and until a detach or disposal completes. It
+    /// returns once no work is ready.</para>
+    /// <para>It accepts a disposed session until the session retires. The
+    /// service after the disposal detaches the session and frees its graphics
+    /// objects.</para>
     /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
     /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
     /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics

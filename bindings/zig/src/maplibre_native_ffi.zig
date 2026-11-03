@@ -1492,6 +1492,12 @@ pub const RenderSession = struct {
     /// returns, the library no longer uses your graphics objects, and you can
     /// attach another session to the map. Dispose the session afterward.
     ///
+    /// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
+    /// keeps them until the process exits, reports how many it kept, and logs a
+    /// warning. Detach the session instead to free them. A disposal that another
+    /// thread starts first retires the session itself, and the abandon then fails
+    /// as it does for any released session.
+    ///
     /// See `mln_render_session_abandon` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn abandon(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderAbandonResult {
@@ -1593,12 +1599,14 @@ pub const RenderSession = struct {
 
     /// Releases the session in any state.
     ///
-    /// An attached session driven by `RenderDriverKind.core_worker` detaches first
-    /// unless you hold one of its frames. Any other session is abandoned as
-    /// `RenderSession.abandon()` does. To free the graphics objects of a session
-    /// driven by `RenderDriverKind.caller_graphics_thread`, detach it before you
-    /// dispose it. Once the disposal completes, the library no longer uses your
-    /// graphics objects.
+    /// An attached session detaches first, and frees its graphics objects, unless
+    /// you hold one of its frames. A session driven by
+    /// `RenderDriverKind.caller_graphics_thread` detaches at your next
+    /// `RenderSession.serviceDriverWork()`, so keep servicing it until the disposal
+    /// completes. If you release or dispose its map before that service, the
+    /// session is abandoned instead. Any other session is abandoned as
+    /// `RenderSession.abandon()` does. Once the disposal completes, the library no
+    /// longer uses your graphics objects.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1610,12 +1618,14 @@ pub const RenderSession = struct {
 
     /// Releases the session in any state.
     ///
-    /// An attached session driven by `RenderDriverKind.core_worker` detaches first
-    /// unless you hold one of its frames. Any other session is abandoned as
-    /// `RenderSession.abandon()` does. To free the graphics objects of a session
-    /// driven by `RenderDriverKind.caller_graphics_thread`, detach it before you
-    /// dispose it. Once the disposal completes, the library no longer uses your
-    /// graphics objects.
+    /// An attached session detaches first, and frees its graphics objects, unless
+    /// you hold one of its frames. A session driven by
+    /// `RenderDriverKind.caller_graphics_thread` detaches at your next
+    /// `RenderSession.serviceDriverWork()`, so keep servicing it until the disposal
+    /// completes. If you release or dispose its map before that service, the
+    /// session is abandoned instead. Any other session is abandoned as
+    /// `RenderSession.abandon()` does. Once the disposal completes, the library no
+    /// longer uses your graphics objects.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1786,8 +1796,11 @@ pub const RenderSession = struct {
     /// Use it with `RenderDriverKind.caller_graphics_thread`, and call it from the
     /// same thread every time. Call it each time
     /// `RenderSessionAttachOptions.driver_work_wake` is called, even while you
-    /// demand no frames, and until a detach completes. It returns once no work is
-    /// ready.
+    /// demand no frames, and until a detach or disposal completes. It returns once
+    /// no work is ready.
+    ///
+    /// It accepts a disposed session until the session retires. The service after
+    /// the disposal detaches the session and frees its graphics objects.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

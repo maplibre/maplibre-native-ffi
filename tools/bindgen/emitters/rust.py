@@ -308,6 +308,16 @@ def lower(api: Api | BoundApi) -> Lowered:
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
+    # A handle with functions that stay callable after its release returns a
+    # value from the release that keeps them reachable.
+    retiring_plans = defaultdict(list)
+    for plan in bound.operations:
+        if plan.after_release and (native := receiver_native(plan)) in owners:
+            retiring_plans[native].append(plan)
+    value_types.retiring = {
+        native: "Retiring" + pascal(native.removeprefix("mln_"))
+        for native in retiring_plans
+    }
     for plan in bound.operations:
         function = plan.function
         previous_values = dict(value_types.used)
@@ -355,6 +365,10 @@ def lower(api: Api | BoundApi) -> Lowered:
             and p.completion.discardable
             and any(i.name == p.receiver and i.value.native == native for i in p.inputs)
         ]
+        if native in retiring_plans:
+            files[f"{root}/{module}.rs"] += retiring_value(
+                bound, value_types, native, retiring_plans[native]
+            )
         if views := chunks.pop(f"view:{native}", []):
             files[f"{root}/{module}.rs"] += rust_owners.view_guard(bound, handle, views)
         if commands:
@@ -398,6 +412,35 @@ def lower(api: Api | BoundApi) -> Lowered:
         {f"{DIRECTORY}/{path}": source for path, source in files.items()},
         unsupported,
         generated,
+    )
+
+
+def retiring_value(bound, value_types, native: str, plans) -> str:
+    """The value that a handle's release returns, which names the retiring
+    handle without owning it, so its after-release functions stay callable
+    until native retires the handle and reports it stale."""
+    from . import rust_owners
+    from .rust_operations import operation
+
+    owner = rust_owners.owner_name(native)
+    name = value_types.retiring[native]
+    return (
+        f"\n/// What a release of [`{owner}`] leaves while native retires the\n"
+        "/// handle. Its functions stay callable until the handle retires, and\n"
+        "/// fail with `Status::InvalidState` afterwards. It owns nothing, so\n"
+        "/// dropping it changes nothing.\n"
+        "#[derive(Debug)]\n"
+        f"pub struct {name}(sys::{native});\n"
+        f"impl {name} {{\n"
+        "    /// Returns the native handle value.\n"
+        "    pub fn id(&self) -> u64 {\n"
+        "        self.0.0\n"
+        "    }\n\n"
+        + "\n".join(
+            gated(plan, operation(plan, value_types, retiring=True)[1])
+            for plan in plans
+        )
+        + "}\n"
     )
 
 

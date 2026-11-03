@@ -76,6 +76,29 @@ public sealed class RenderTests
         );
     }
 
+    [Theory]
+    [MemberData(nameof(Backends))]
+    public void AClosedCallerDrivenSessionRetiresWhileItsThreadServicesIt(
+        TestGraphicsBackend backend
+    )
+    {
+        RenderFixture.Run(
+            backend,
+            fixture =>
+            {
+                var session = fixture.Session;
+                fixture.Await(session.Ready, "the session to be ready");
+                Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
+
+                // The closed session detaches at a service, so the close completes only after
+                // one ran.
+                Assert.True(fixture.CloseSession() > 0);
+                var stale = Assert.Throws<MaplibreException>(session.ServiceDriverWork);
+                Assert.Equal(Status.InvalidState, stale.Status);
+            }
+        );
+    }
+
     [Fact]
     public void AScopeDisposesAnAttachedSessionSoItsMapCanRelease()
     {
