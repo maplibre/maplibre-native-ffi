@@ -9,7 +9,9 @@
 # The port renders through wgpu: Vulkan on Linux, and in the browser WebGPU
 # through emdawnwebgpu (the port's wgpu custom backend over webgpu.h), so the
 # build takes Linux with the vulkan backend and Emscripten with the webgpu
-# backend. It installs nothing yet.
+# backend. It installs the static library, the headers and the descriptors
+# (artifact.json and, in the browser, emscripten-link-flags.txt), as the C++
+# build's static archive does.
 
 # Checks the configuration and finds the headers that still come from MapLibre
 # Native: the plugin header that include/maplibre_native_c/plugin.h includes,
@@ -171,3 +173,65 @@ function(mln_ffi_add_maplibre_native_next_tests out_tests)
   endforeach()
   set(${out_tests} next/c_api PARENT_SCOPE)
 endfunction()
+
+# Installs `target`'s static library as libmaplibre-native-c, the public
+# headers (with the plugin header from MapLibre Native that plugin.h includes),
+# artifact.json and, under Emscripten, the link options a consumer's final link
+# needs (emscripten-link-flags.txt).
+function(mln_ffi_install_maplibre_native_next_library target)
+  set(MLN_FFI_NATIVE_COMPONENT native)
+  get_target_property(library ${target} IMPORTED_LOCATION)
+  install(
+    FILES "${library}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RENAME
+      "${CMAKE_STATIC_LIBRARY_PREFIX}maplibre-native-c${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  install(
+    DIRECTORY "${PROJECT_SOURCE_DIR}/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
+    FILES_MATCHING
+    PATTERN "*.h")
+  install(
+    FILES "${MLN_FFI_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mln/plugin"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  install(
+    FILES "${PROJECT_SOURCE_DIR}/LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+
+  mln_ffi_c_version(MLN_FFI_SCHEMA_VERSION)
+  set(MLN_FFI_ANDROID_JSON null)
+  mln_ffi_install_emscripten_options()
+  # The libraries the archive needs from the platform: the Rust standard
+  # library's and zlib natively, the link options above in the browser.
+  set(MLN_FFI_STATIC_LINK_LIBRARIES_JSON "")
+  if(NOT EMSCRIPTEN)
+    mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON pthread dl m
+                              z)
+  endif()
+  set(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON "")
+  set(artifact_file
+      "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c-artifact.json")
+  configure_file("${PROJECT_SOURCE_DIR}/cmake/artifact.json.in"
+                 "${artifact_file}.in" @ONLY)
+  find_package(Git QUIET)
+  # The commit is read at build time, as for the C++ build.
+  add_custom_target(
+    ${target}_artifact_descriptor ALL
+    COMMAND
+      "${CMAKE_COMMAND}" "-DGIT=${GIT_EXECUTABLE}"
+      "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}" "-DINPUT=${artifact_file}.in"
+      "-DOUTPUT=${artifact_file}" -P
+      "${PROJECT_SOURCE_DIR}/cmake/mln_ffi_artifact_commit.cmake"
+    BYPRODUCTS "${artifact_file}"
+    VERBATIM)
+  install(
+    FILES "${artifact_file}"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
+    RENAME artifact.json
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+endfunction()
+
