@@ -407,9 +407,6 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionAttachOptions: Sendable {
   public var driver: RenderDriverKind
-  /// How many textures a ring that the session creates has, up to 8. Zero picks
-  /// a default.
-  public var requestedTextureRingDepth: UInt32
   /// The kinds of `GpuSync` that you can wait on before you read an acquired
   /// frame. The session uses one of them that its target supports. Zero lets
   /// the session pick a kind that names no object to wait on.
@@ -426,14 +423,12 @@ public struct RenderSessionAttachOptions: Sendable {
   public var queueLock: QueueLock
   public init(
     driver: RenderDriverKind,
-    requestedTextureRingDepth: UInt32 = 0,
     producerSyncKinds: GpuSyncKindFlag = .init(rawValue: 0),
     frameWake: Wake = .init(),
     driverWorkWake: Wake = .init(),
     queueLock: QueueLock = .init()
   ) {
     self.driver = driver
-    self.requestedTextureRingDepth = requestedTextureRingDepth
     self.producerSyncKinds = producerSyncKinds
     self.frameWake = frameWake
     self.driverWorkWake = driverWorkWake
@@ -445,7 +440,6 @@ public struct RenderSessionAttachOptions: Sendable {
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     driver = RenderDriverKind(rawValue: raw.driver.rawValue)
-    requestedTextureRingDepth = raw.requested_texture_ring_depth
     producerSyncKinds = GpuSyncKindFlag(rawValue: raw.producer_sync_kinds)
     frameWake = Wake()
     driverWorkWake = Wake()
@@ -458,7 +452,6 @@ public struct RenderSessionAttachOptions: Sendable {
     var raw = mln_render_session_attach_options()
     raw.size = UInt32(MemoryLayout<mln_render_session_attach_options>.size)
     raw.driver = mln_render_driver_kind(rawValue: driver.rawValue)
-    raw.requested_texture_ring_depth = requestedTextureRingDepth
     raw.producer_sync_kinds = producerSyncKinds.rawValue
     raw.frame_wake = try frameWake.nativeValue(arena: arena)
     raw.driver_work_wake = try driverWorkWake.nativeValue(arena: arena)
@@ -533,9 +526,7 @@ public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
 /// The Vulkan device and queue that a render session uses.
 ///
 /// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns. If you discarded a frame of a ring
-/// that the session creates, or abandon the session while you hold a frame,
-/// keep them alive until the process exits instead.
+/// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

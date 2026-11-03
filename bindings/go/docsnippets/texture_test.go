@@ -50,7 +50,7 @@ func renderToTexture(
 	queue *sync.Mutex,
 	images, views, newImages, newViews [2]uint64,
 ) error {
-	// #region attach-owned
+	// #region attach-options
 	options := maplibre.RenderSessionAttachOptions{
 		Driver:    maplibre.RenderDriverKindCoreWorker,
 		FrameWake: maplibre.Wake{Callback: onFrameWake},
@@ -60,7 +60,7 @@ func renderToTexture(
 			Lock: queue.Lock, Unlock: queue.Unlock,
 		},
 	}
-	// #endregion attach-owned
+	// #endregion attach-options
 
 	// #region attach-borrowed
 	ring := maplibre.VulkanBorrowedTextureDescriptor{

@@ -189,12 +189,10 @@
 /dotnet/src/Maplibre.NativeFfi/Surface/VulkanSurfaceDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/MetalBorrowedTexture.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/MetalBorrowedTextureDescriptor.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Texture/MetalOwnedTextureDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/MetalTextureFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/MetalTextureFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/OpenGlBorrowedTexture.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/OpenGlBorrowedTextureDescriptor.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Texture/OpenGlOwnedTextureDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/OpenGlTextureFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/OpenGlTextureFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/TextureImageInfo.g.cs linguist-generated=true
@@ -202,7 +200,6 @@
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanBorrowedTexture.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanBorrowedTextureDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanImageOwner.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Texture/VulkanOwnedTextureDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/Wake.g.cs linguist-generated=true

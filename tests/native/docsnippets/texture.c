@@ -85,15 +85,7 @@ void mln_doc_texture(
   const mln_vulkan_non_dispatchable_handle new_images[2],
   const mln_vulkan_non_dispatchable_handle new_views[2]
 ) {
-  // #region attach-owned
-  const mln_vulkan_owned_texture_descriptor texture = {
-    .size = sizeof(mln_vulkan_owned_texture_descriptor),
-    // The texture's size in logical pixels, and its scale factor.
-    .extent = {.width = 800, .height = 600, .scale_factor = 2.0},
-    // Your VkInstance, VkPhysicalDevice,
-    // VkDevice, and graphics VkQueue.
-    .context = vulkan,
-  };
+  // #region attach-options
   const mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
     .driver = MLN_RENDER_DRIVER_CORE_WORKER,
@@ -101,17 +93,7 @@ void mln_doc_texture(
     // Only if your renderer also submits to the graphics queue.
     .queue_lock = {.lock = lock_queue, .unlock = unlock_queue},
   };
-
-  mln_map_attach_vulkan_owned_texture(
-    map, &texture, &options, &session, &done, NULL
-  );
-  // #endregion attach-owned
-  wait_for_done();
-
-  draw_frame();
-  mln_render_session_dispose(session, &done, NULL);
-  session = MLN_HANDLE_NULL;
-  wait_for_done();
+  // #endregion attach-options
 
   // #region attach-borrowed
   // Your VkImage and VkImageView for each texture of the ring.
@@ -132,12 +114,13 @@ void mln_doc_texture(
     .final_layout = 5,  // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
   };
 
-  // The same attach options as for an owned ring.
   mln_map_attach_vulkan_borrowed_texture(
     map, &ring, &options, &session, &done, NULL
   );
   // #endregion attach-borrowed
   wait_for_done();
+
+  draw_frame();
 
   // #region resize-borrowed
   // Your new textures, at the new size.

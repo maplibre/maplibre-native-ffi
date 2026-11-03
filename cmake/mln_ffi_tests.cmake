@@ -354,7 +354,9 @@ function(mln_native_configure_suite target registry_dir)
     set(render_backend_files "render_${MLN_FFI_RENDER_BACKEND}.c")
   else()
     set(render_backend_files "render_graphics.c")
-    if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    # Only an EGL context has a dedicated surface fixture.
+    if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl"
+       AND NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER MATCHES "^(wgl|webgl)$")
       list(APPEND render_backend_files "render_dedicated.c")
     endif()
   endif()

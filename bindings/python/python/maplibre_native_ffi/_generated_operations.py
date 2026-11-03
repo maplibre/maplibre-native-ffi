@@ -39,7 +39,6 @@ from ._generated_values import (
     MapView,
     MapViewportOptions,
     MetalBorrowedTextureDescriptor,
-    MetalOwnedTextureDescriptor,
     MetalSurfaceDescriptor,
     MetalTextureFrame,
     NetworkStatus,
@@ -51,7 +50,6 @@ from ._generated_values import (
     OffscreenDeviceOptions,
     OpenGlBorrowedTextureDescriptor,
     OpenGlContextProviderFlag,
-    OpenGlOwnedTextureDescriptor,
     OpenGlSurfaceDescriptor,
     OpenGlTextureFrame,
     PremultipliedRgba8Image,
@@ -87,7 +85,6 @@ from ._generated_values import (
     StyleVectorTileEncoding,
     TextureReadbackResult,
     VulkanBorrowedTextureDescriptor,
-    VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
     VulkanTextureFrame,
     _maybe,
@@ -117,11 +114,6 @@ class MapAttachMetalBorrowedTextureResult(NamedTuple):
     ready: Future[None]
 
 
-class MapAttachMetalOwnedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
 class MapAttachMetalSurfaceResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
@@ -137,22 +129,12 @@ class MapAttachOpenGlBorrowedTextureResult(NamedTuple):
     ready: Future[None]
 
 
-class MapAttachOpenGlOwnedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
 class MapAttachOpenGlSurfaceResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
 
 class MapAttachVulkanBorrowedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachVulkanOwnedTextureResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
@@ -508,29 +490,6 @@ class _MapHandleOperations(GeneratedOperations):
             ready=raw["ready"],
         )
 
-    def attach_metal_owned_texture(
-        self,
-        descriptor: MetalOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> MapAttachMetalOwnedTextureResult:
-        """Creates a session that renders the map into a ring of new Metal
-        textures.
-
-        See `mln_map_attach_metal_owned_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-
-        Errors:
-
-        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
-          `RenderBackendFlag.METAL`, or when the target supports none of the
-          `producer_sync_kinds` in `options`.
-        """
-        raw = self._native.attach_metal_owned_texture(descriptor, options)
-        return MapAttachMetalOwnedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachMetalSurfaceResult:
@@ -608,37 +567,6 @@ class _MapHandleOperations(GeneratedOperations):
             ready=raw["ready"],
         )
 
-    def attach_open_gl_owned_texture(
-        self,
-        descriptor: OpenGlOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> MapAttachOpenGlOwnedTextureResult:
-        """Creates a session that renders the map into a ring of new OpenGL
-        textures.
-
-        With `OpenGlContextOwnership.SHARED`, the session needs
-        `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and the textures are in
-        your context's share group. With `OpenGlContextOwnership.DEDICATED`,
-        the session needs `RenderDriverKind.CORE_WORKER` and renders in a
-        context of its own. You can't acquire its frames, but
-        `RenderSessionHandle.read_texture()` reads them.
-
-        See `mln_map_attach_open_gl_owned_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-
-        Errors:
-
-        - `Status.UNSUPPORTED` when
-          `open_gl_supported_context_provider_mask()` lacks the context's
-          platform, or when the target supports none of the
-          `producer_sync_kinds` in `options`.
-        """
-        raw = self._native.attach_open_gl_owned_texture(descriptor, options)
-        return MapAttachOpenGlOwnedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
     def attach_open_gl_surface(
         self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachOpenGlSurfaceResult:
@@ -682,29 +610,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         raw = self._native.attach_vulkan_borrowed_texture(descriptor, options)
         return MapAttachVulkanBorrowedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
-    def attach_vulkan_owned_texture(
-        self,
-        descriptor: VulkanOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> MapAttachVulkanOwnedTextureResult:
-        """Creates a session that renders the map into a ring of new Vulkan
-        images.
-
-        See `mln_map_attach_vulkan_owned_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-
-        Errors:
-
-        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
-          `RenderBackendFlag.VULKAN`, or when the target supports none of the
-          `producer_sync_kinds` in `options`.
-        """
-        raw = self._native.attach_vulkan_owned_texture(descriptor, options)
-        return MapAttachVulkanOwnedTextureResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
@@ -2100,8 +2005,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.UNSUPPORTED` when the session renders into a ring that it
-          created.
+        - `Status.UNSUPPORTED` when the session renders offscreen.
         - `Status.UNSUPPORTED` when the target is a WebGL canvas.
         - `Status.TARGET_LOST` when the session loses its target before the
           release runs.

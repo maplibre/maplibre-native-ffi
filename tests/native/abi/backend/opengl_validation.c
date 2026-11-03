@@ -60,8 +60,6 @@ static void clear_shared_context(mln_open_gl_context_descriptor* context) {
 
 MLN_TEST_DESCRIPTOR_EDITS(opengl_surface, mln_open_gl_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(opengl_surface)
-MLN_TEST_DESCRIPTOR_EDITS(opengl_owned, mln_open_gl_owned_texture_descriptor)
-MLN_TEST_OVERFLOW_EDIT(opengl_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
   opengl_borrowed, mln_open_gl_borrowed_texture_descriptor
 )
@@ -69,9 +67,6 @@ MLN_TEST_BORROWED_EDITS(opengl_borrowed, opengl)
 
 static mln_open_gl_surface_descriptor* surface_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_surface;
-}
-static mln_open_gl_owned_texture_descriptor* owned_of(void* call) {
-  return &((mln_test_target_call*)call)->descriptor.opengl_owned;
 }
 static mln_open_gl_borrowed_texture_descriptor* borrowed_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_borrowed;
@@ -111,12 +106,12 @@ static void webgl_surface_with_surface_handle(void* call) {
   surface_of(call)->surface = MLN_TEST_FAKE_HANDLE;
 }
 #endif
-static void owned_without_shared_context(void* call) {
-  clear_shared_context(&owned_of(call)->context);
+static void borrowed_without_shared_context(void* call) {
+  clear_shared_context(&borrowed_of(call)->context);
 }
 #if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-static void owned_without_egl_display(void* call) {
-  owned_of(call)->context.data.egl.display = NULL;
+static void borrowed_without_egl_display(void* call) {
+  borrowed_of(call)->context.data.egl.display = NULL;
 }
 #endif
 static void borrowed_without_target(void* call) {
@@ -142,9 +137,6 @@ static void borrowed_without_physical_width(void* call) {
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_open_gl_surface)
 MLN_TEST_ATTACH_SUBMITTER(
-  submit_owned_attach, mln_map_attach_open_gl_owned_texture
-)
-MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_open_gl_borrowed_texture
 )
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
@@ -166,17 +158,6 @@ static mln_open_gl_surface_descriptor surface_descriptor(void) {
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
   descriptor.surface = MLN_TEST_FAKE_HANDLE;
 #endif
-  return descriptor;
-}
-
-static mln_open_gl_owned_texture_descriptor owned_descriptor(
-  uint32_t platform
-) {
-  mln_open_gl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_owned_texture_descriptor)
-  };
-  descriptor.extent = mln_test_target_extent();
-  descriptor.context = fake_context(platform);
   return descriptor;
 }
 
@@ -234,30 +215,16 @@ static void opengl_attach_rejects_malformed_calls(void) {
     sizeof(surface_rows) / sizeof(surface_rows[0])
   );
 
-  call.descriptor.opengl_owned = owned_descriptor(PRESET_PLATFORM);
-  static const mln_test_validation_case owned_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(opengl_owned),
-    MLN_TEST_OVERFLOW_CASE(opengl_owned),
-    {"no shared context", owned_without_shared_context,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-#if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-    {"no EGL display", owned_without_egl_display, MLN_STATUS_INVALID_ARGUMENT,
-     "EGL display and config must not be null"},
-#endif
-#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
-  };
-  mln_test_run_attach_table(
-    submit_owned_attach, &call, owned_rows,
-    sizeof(owned_rows) / sizeof(owned_rows[0])
-  );
-
   describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed),
     MLN_TEST_BORROWED_CASES(opengl_borrowed),
+    {"no shared context", borrowed_without_shared_context,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+#if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+    {"no EGL display", borrowed_without_egl_display,
+     MLN_STATUS_INVALID_ARGUMENT, "EGL display and config must not be null"},
+#endif
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero target", borrowed_without_target, MLN_STATUS_INVALID_ARGUMENT,
      "target must be specified"},
@@ -300,10 +267,12 @@ static void only_the_builds_providers_attach(void) {
     mln_test_target_call call = mln_test_target_call_default(
       map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
     );
-    call.descriptor.opengl_owned = owned_descriptor(providers[index].platform);
+    describe_borrowed(&call);
+    call.descriptor.opengl_borrowed.context =
+      fake_context(providers[index].platform);
     MLN_TEST_STATUS(
       MLN_STATUS_UNSUPPORTED,
-      submit_owned_attach(NULL, &call, MLN_TEST_DIAGNOSTIC)
+      submit_borrowed_attach(NULL, &call, MLN_TEST_DIAGNOSTIC)
     );
     TEST_ASSERT_NOT_NULL_MESSAGE(
       strstr(mln_test_last_error(), "not supported"), mln_test_last_error()

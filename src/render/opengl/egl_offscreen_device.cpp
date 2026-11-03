@@ -246,20 +246,16 @@ class EglOffscreenDevice final : public OffscreenDevice {
     std::shared_ptr<opengl::EglSingleContext> single
   )
       : single_(std::move(single)),
-        descriptor_{
-          .size = sizeof(mln_open_gl_owned_texture_descriptor),
-          .extent = {},
-          .context = {
-            .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
-            .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
-            .data = {
-              .egl = {
-                .display = choice.display,
-                .config = choice.config,
-                .share_context = nullptr,
-                .client_api = client_api,
-                .get_proc_address = nullptr,
-              },
+        context_{
+          .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
+          .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
+          .data = {
+            .egl = {
+              .display = choice.display,
+              .config = choice.config,
+              .share_context = nullptr,
+              .client_api = client_api,
+              .get_proc_address = nullptr,
             },
           },
         } {}
@@ -267,14 +263,14 @@ class EglOffscreenDevice final : public OffscreenDevice {
   auto create_texture_backend(
     mln::Size size, std::unique_ptr<TextureSessionBackend>& out_backend
   ) -> mln_status override {
-    return create_opengl_owned_texture_backend(
-      descriptor_, size, 1, out_backend, single_
+    return create_opengl_offscreen_texture_backend(
+      context_, size, out_backend, single_
     );
   }
 
  private:
   std::shared_ptr<opengl::EglSingleContext> single_;
-  mln_open_gl_owned_texture_descriptor descriptor_;
+  mln_open_gl_context_descriptor context_;
 };
 
 }  // namespace

@@ -14,20 +14,6 @@
     }
   }
 
-  public extension MetalOwnedTextureDescriptor {
-    init(
-      extent: LogicalExtent,
-      context: MetalContextDescriptor,
-      pixelFormat: MTLPixelFormat
-    ) {
-      self.init(
-        extent: extent,
-        context: context,
-        pixelFormat: UInt64(pixelFormat.rawValue)
-      )
-    }
-  }
-
   public extension MetalBorrowedTexture {
     /// One texture of a borrowed ring. Native doesn't retain it, so the host
     /// keeps it alive until a target replacement replaces it, a detach

@@ -627,16 +627,6 @@ final class mln_metal_context_descriptor extends Struct {
   external Pointer<Void> device;
 }
 
-final class mln_metal_owned_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_metal_context_descriptor context;
-  @Uint64()
-  external int pixel_format;
-  external Pointer<Void> command_queue;
-}
-
 final class mln_metal_surface_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -789,13 +779,6 @@ final class mln_open_gl_context_descriptor_data extends Union {
   external mln_web_gl_context_descriptor web_gl;
 }
 
-final class mln_open_gl_owned_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_open_gl_context_descriptor context;
-}
-
 final class mln_open_gl_surface_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -823,12 +806,6 @@ final class mln_open_gl_texture_frame extends Struct {
   external int texture;
   @Uint32()
   external int target;
-  @Uint32()
-  external int internal_format;
-  @Uint32()
-  external int format;
-  @Uint32()
-  external int type;
 }
 
 final class mln_premultiplied_rgba8_image extends Struct {
@@ -929,8 +906,6 @@ final class mln_render_session_attach_options extends Struct {
   external int size;
   @Uint32()
   external int driver;
-  @Uint32()
-  external int requested_texture_ring_depth;
   @Uint32()
   external int producer_sync_kinds;
   external mln_wake frame_wake;
@@ -1500,13 +1475,6 @@ final class mln_vulkan_context_descriptor extends Struct {
   external Pointer<Void> get_device_proc_addr;
 }
 
-final class mln_vulkan_owned_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_vulkan_context_descriptor context;
-}
-
 final class mln_vulkan_surface_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -1583,13 +1551,6 @@ final class mln_web_gpu_context_descriptor extends Struct {
   external Pointer<Void> instance;
   external Pointer<Void> device;
   external Pointer<Void> queue;
-}
-
-final class mln_web_gpu_owned_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_web_gpu_context_descriptor context;
 }
 
 final class mln_web_gpu_surface_descriptor extends Struct {
@@ -2611,25 +2572,6 @@ external int mln_map_attach_metal_borrowed_texture(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_metal_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_metal_owned_texture(
-  int map,
-  Pointer<mln_metal_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
     Pointer<mln_metal_surface_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
@@ -2689,25 +2631,6 @@ external int mln_map_attach_open_gl_borrowed_texture(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_open_gl_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_open_gl_owned_texture(
-  int map,
-  Pointer<mln_open_gl_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
     Pointer<mln_open_gl_surface_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
@@ -2737,25 +2660,6 @@ external int mln_map_attach_open_gl_surface(
 external int mln_map_attach_vulkan_borrowed_texture(
   int map,
   Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_vulkan_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_vulkan_owned_texture(
-  int map,
-  Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,

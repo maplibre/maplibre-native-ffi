@@ -56,7 +56,7 @@ async fn render_to_texture(
     new_images: [u64; 2],
     new_views: [u64; 2],
 ) -> Result<()> {
-    // #region attach-owned
+    // #region attach-options
     let options = RenderSessionAttachOptions {
         frame_wake: Wake::new(on_frame_wake),
         // Only if your renderer also submits to the graphics queue.
@@ -66,7 +66,7 @@ async fn render_to_texture(
             RenderDriverKind::CoreWorker,
         )
     };
-    // #endregion attach-owned
+    // #endregion attach-options
 
     // #region attach-borrowed
     let ring = VulkanBorrowedTextureDescriptor {

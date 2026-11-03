@@ -864,26 +864,25 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The ring counts as the session's alone even when the host released its frame
-// just before abandon, so the driver may not have run the release yet:
-// CPU_COMPLETE attests that the host's GPU read is done.
-static void abandon_destroys_an_owned_texture_ring(void) {
+// A borrowed ring's images belong to the host, so abandon destroys every
+// object the session created even while the host holds a frame.
+static void abandon_destroys_a_borrowed_rings_objects_under_a_held_frame(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_vulkan_owned_texture(
-      map, &fixture, counting_wrap, NULL
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      map, &fixture, 1, counting_wrap, NULL, NULL
     ),
     mln_test_graphics_last_error()
   );
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
-  TEST_ASSERT_GREATER_THAN_INT(0, atomic_load(&live_objects[COUNTED_IMAGE]));
-  MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
+  TEST_ASSERT_GREATER_THAN_INT(0, live_object_total());
 
   abandon_destroying_everything(fixture.session);
+  mln_test_render_release_frame(&frame);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -943,7 +942,7 @@ MLN_TEST_GROUP {
   RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
   RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
   RUN_TEST(abandon_drains_under_the_host_queue_lock_and_releases_it);
-  RUN_TEST(abandon_destroys_an_owned_texture_ring);
+  RUN_TEST(abandon_destroys_a_borrowed_rings_objects_under_a_held_frame);
   RUN_TEST(abandon_destroys_a_surface_swapchain);
   RUN_TEST(detach_destroys_a_borrowed_ring_with_a_disposed_frame);
 }

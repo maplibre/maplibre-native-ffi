@@ -187,17 +187,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_metal_owned_texture =
-    Ffm.downcall(
-      "mln_map_attach_metal_owned_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_attach_metal_surface =
     Ffm.downcall(
       "mln_map_attach_metal_surface",
@@ -232,17 +221,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_open_gl_owned_texture =
-    Ffm.downcall(
-      "mln_map_attach_open_gl_owned_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_attach_open_gl_surface =
     Ffm.downcall(
       "mln_map_attach_open_gl_surface",
@@ -265,17 +243,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_attach_vulkan_owned_texture =
-    Ffm.downcall(
-      "mln_map_attach_vulkan_owned_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_attach_vulkan_surface =
     Ffm.downcall(
       "mln_map_attach_vulkan_surface",
@@ -290,17 +257,6 @@ internal actual object C {
   private val mln_map_attach_web_gpu_borrowed_texture =
     Ffm.downcall(
       "mln_map_attach_web_gpu_borrowed_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_web_gpu_owned_texture =
-    Ffm.downcall(
-      "mln_map_attach_web_gpu_owned_texture",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -1558,23 +1514,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_metal_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_metal_owned_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_attach_metal_surface(
     map: Long,
     descriptor: Long,
@@ -1628,23 +1567,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_open_gl_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_open_gl_owned_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
@@ -1679,23 +1601,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_attach_vulkan_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_vulkan_owned_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_attach_vulkan_surface(
     map: Long,
     descriptor: Long,
@@ -1722,23 +1627,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_map_attach_web_gpu_borrowed_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_web_gpu_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_web_gpu_owned_texture.invokeExact(
       map,
       descriptor,
       options,

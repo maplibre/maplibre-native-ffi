@@ -337,8 +337,7 @@ MLN_API mln_status mln_render_session_resize(
  * destroy the old target.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the session renders into a ring that it
- *   created.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas.

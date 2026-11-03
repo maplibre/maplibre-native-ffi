@@ -14,7 +14,6 @@ public readonly partial record struct RenderSessionAttachOptions
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public RenderSessionAttachOptions(
         RenderDriverKind Driver,
-        uint RequestedTextureRingDepth,
         GpuSyncKindFlag ProducerSyncKinds,
         Wake FrameWake,
         Wake DriverWorkWake,
@@ -22,7 +21,6 @@ public readonly partial record struct RenderSessionAttachOptions
     )
     {
         this.Driver = Driver;
-        this.RequestedTextureRingDepth = RequestedTextureRingDepth;
         this.ProducerSyncKinds = ProducerSyncKinds;
         this.FrameWake = FrameWake;
         this.DriverWorkWake = DriverWorkWake;
@@ -30,12 +28,6 @@ public readonly partial record struct RenderSessionAttachOptions
     }
 
     public required RenderDriverKind Driver { get; init; }
-
-    /// <summary>
-    /// How many textures a ring that the session creates has, up to 8. Zero
-    /// picks a default.
-    /// </summary>
-    public uint RequestedTextureRingDepth { get; init; }
 
     /// <summary>
     /// The kinds of <c>GpuSync</c> that you can wait on before you read an

@@ -1,8 +1,8 @@
 #ifndef MLN_NATIVE_TESTS_HOST_GRAPHICS_H
 #define MLN_NATIVE_TESTS_HOST_GRAPHICS_H
 
-// The tests/graphics objects behind a native target's borrowed, owned, and
-// surface fixtures, and the fixtures that only native targets have: a
+// The tests/graphics objects behind a native target's borrowed and surface
+// fixtures, and the fixtures that only native targets have: a
 // presentation surface, and variants of the others for the preset's backend.
 // The browser presets have none, because their contexts come from JavaScript.
 
@@ -25,19 +25,11 @@ extern "C" {
 // The size of every fixture target, in pixels, at a scale factor of 1.
 #define MLN_TEST_HOST_TARGET_SIZE 64U
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-// mln_test_render_fixture_create_owned() for a ring of `pixel_format`, an
-// MTLPixelFormat value.
-bool mln_test_render_fixture_create_metal_owned_texture(
-  mln_map map, mln_test_render_fixture* fixture, uint64_t pixel_format
-);
-#endif
-
-// Attaches the preset's owned texture target, or a borrowed ring of one
-// texture, whose attach options accept `producer_sync_kinds`. A Metal target
-// that accepts queue order names the graphics object's command queue.
+// Attaches a borrowed ring of one texture, whose attach options accept
+// `producer_sync_kinds`. A Metal target that accepts queue order names the
+// graphics object's command queue.
 bool mln_test_render_fixture_create_synced(
-  mln_map map, mln_test_render_fixture* fixture, bool borrowed,
+  mln_map map, mln_test_render_fixture* fixture,
   mln_gpu_sync_kind_flags producer_sync_kinds
 );
 
@@ -81,14 +73,6 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner
 );
 
-// mln_test_render_fixture_create_owned() for a session whose context names
-// `wrap`'s vkGetDeviceProcAddr, when `wrap` is non-null, and with the host
-// queue lock `queue_lock`, when that is non-null.
-bool mln_test_render_fixture_create_vulkan_owned_texture(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_vulkan_device_proc_addr_wrap wrap, const mln_queue_lock* queue_lock
-);
-
 // mln_test_render_fixture_create_surface() for a session whose context names
 // `wrap`'s vkGetDeviceProcAddr.
 bool mln_test_render_fixture_create_vulkan_surface(
@@ -118,8 +102,8 @@ void mln_test_render_fixture_keep_graphics_until_exit(
   const mln_test_render_fixture* fixture
 );
 
-// The graphics object whose context a borrowed, owned, or surface fixture
-// attached with, or null for an offscreen fixture.
+// The graphics object whose context a borrowed or surface fixture attached
+// with, or null for an offscreen fixture.
 mln_test_graphics* mln_test_render_fixture_graphics(
   const mln_test_render_fixture* fixture
 );

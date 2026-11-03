@@ -3,11 +3,6 @@
 
 #include "render.h"
 
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/proxying.h>
-#include <emscripten/threading.h>
-#endif
-
 #include "env.h"
 #include "render_backend.h"
 #include "status.h"
@@ -72,38 +67,15 @@ void mln_test_render_count_wake(void* user_data) {
   mln_test_pulse();
 }
 
-typedef struct service_call {
-  const mln_test_render_fixture* fixture;
-  mln_status status;
-} service_call;
-
-static void service_here(void* context) {
-  service_call* call = context;
-  call->status = mln_render_session_service_driver_work(
-    call->fixture->session, MLN_TEST_DIAGNOSTIC
-  );
-}
-
 mln_status mln_test_render_fixture_service(
   const mln_test_render_fixture* fixture
 ) {
   if (fixture->driver != MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     return MLN_STATUS_OK;
   }
-  service_call call = {.fixture = fixture, .status = MLN_STATUS_NATIVE_ERROR};
-#if defined(__EMSCRIPTEN__)
-  if (fixture->serviced_on_main_thread) {
-    if (!emscripten_proxy_sync(
-          emscripten_proxy_get_system_queue(),
-          emscripten_main_runtime_thread_id(), service_here, &call
-        )) {
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-    return call.status;
-  }
-#endif
-  service_here(&call);
-  return call.status;
+  return mln_render_session_service_driver_work(
+    fixture->session, MLN_TEST_DIAGNOSTIC
+  );
 }
 
 typedef struct step_state {
@@ -170,15 +142,11 @@ mln_status mln_test_render_session_dispose(mln_render_session session) {
   return mln_test_completion_settle(&completion);
 }
 
-size_t mln_test_render_ring_depth(
-  const mln_render_session_attach_options* options
-) {
-  const uint32_t requested = options->requested_texture_ring_depth;
-  if (requested == 0) {
-    return 2;
-  }
-  return requested < MLN_TEXTURE_RING_MAX_DEPTH ? requested
-                                                : MLN_TEXTURE_RING_MAX_DEPTH;
+// Set only while create_fixture() attaches a ring of another depth.
+static MLN_TEST_THREAD_LOCAL size_t attach_ring_depth = 0;
+
+size_t mln_test_render_ring_depth(void) {
+  return attach_ring_depth != 0 ? attach_ring_depth : 2;
 }
 
 // An offscreen session creates its own device, so the fixture holds no state.
@@ -203,12 +171,11 @@ static bool attach_offscreen(
   return true;
 }
 
-// Attaches with `attach` on `driver`, asking for a ring of `ring_depth`
-// textures, where zero takes the default.
+// Attaches with `attach` on `driver`. A borrowed attach makes a ring of
+// `ring_depth` textures, where zero takes two.
 static bool create_fixture(
   mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach, uint32_t driver, uint32_t ring_depth,
-  bool serviced_on_main_thread
+  mln_test_backend_attach_fn attach, uint32_t driver, size_t ring_depth
 ) {
   if (map == MLN_HANDLE_NULL || fixture == NULL) {
     return false;
@@ -216,12 +183,10 @@ static bool create_fixture(
   mln_test_render_reserve_session();
   *fixture = (mln_test_render_fixture){0};
   fixture->driver = driver;
-  fixture->serviced_on_main_thread = serviced_on_main_thread;
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = fixture->driver;
-  options.requested_texture_ring_depth = ring_depth;
   options.frame_wake = (mln_wake){
     .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes
   };
@@ -230,10 +195,13 @@ static bool create_fixture(
   };
   mln_test_completion completion = mln_test_completion_default(0);
   mln_status status = MLN_STATUS_INVALID_STATE;
-  if (!attach(
-        map, &options, &fixture->backend_state, &fixture->session,
-        &completion.descriptor, &status
-      )) {
+  attach_ring_depth = ring_depth;
+  const bool submitted = attach(
+    map, &options, &fixture->backend_state, &fixture->session,
+    &completion.descriptor, &status
+  );
+  attach_ring_depth = 0;
+  if (!submitted) {
     mln_test_completion_reject(&completion);
     mln_test_completion_destroy(&completion);
     *fixture = (mln_test_render_fixture){0};
@@ -286,27 +254,14 @@ bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
 ) {
-  return create_fixture(
-    map, fixture, attach, mln_test_backend_driver(), 0, false
-  );
+  return create_fixture(map, fixture, attach, mln_test_backend_driver(), 0);
 }
-
-#if defined(__EMSCRIPTEN__)
-bool mln_test_render_fixture_create_serviced_on_main_thread(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach
-) {
-  return create_fixture(
-    map, fixture, attach, mln_test_backend_driver(), 0, true
-  );
-}
-#endif
 
 bool mln_test_render_fixture_create_offscreen(
   mln_map map, mln_test_render_fixture* fixture
 ) {
   return create_fixture(
-    map, fixture, attach_offscreen, MLN_RENDER_DRIVER_CORE_WORKER, 0, false
+    map, fixture, attach_offscreen, MLN_RENDER_DRIVER_CORE_WORKER, 0
   );
 }
 
@@ -326,16 +281,7 @@ bool mln_test_render_fixture_create_borrowed_ring(
   }
   return create_fixture(
     map, fixture, mln_test_backend_attach_borrowed,
-    driver == MLN_TEST_PRESET_DRIVER ? mln_test_backend_driver() : driver,
-    (uint32_t)depth, false
-  );
-}
-
-bool mln_test_render_fixture_create_owned(
-  mln_map map, mln_test_render_fixture* fixture
-) {
-  return mln_test_render_fixture_create_with(
-    map, fixture, mln_test_backend_attach_owned
+    driver == MLN_TEST_PRESET_DRIVER ? mln_test_backend_driver() : driver, depth
   );
 }
 

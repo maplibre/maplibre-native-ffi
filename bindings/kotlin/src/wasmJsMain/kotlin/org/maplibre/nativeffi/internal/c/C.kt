@@ -285,23 +285,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_metal_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_metal_owned_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
   actual fun mln_map_attach_metal_surface(
     map: Long,
     descriptor: Long,
@@ -355,23 +338,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_open_gl_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_open_gl_owned_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
   actual fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
@@ -406,23 +372,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_attach_vulkan_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_vulkan_owned_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
   actual fun mln_map_attach_vulkan_surface(
     map: Long,
     descriptor: Long,
@@ -449,23 +398,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_map_attach_web_gpu_borrowed_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_web_gpu_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_web_gpu_owned_texture(
       map,
       word(descriptor),
       word(options),
@@ -2131,18 +2063,6 @@ private fun mln_kw_mln_map_attach_metal_borrowed_texture(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_metal_borrowed_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_metal_owned_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_metal_owned_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
 private fun mln_kw_mln_map_attach_metal_surface(
   p0: Long,
   p1: Int,
@@ -2180,18 +2100,6 @@ private fun mln_kw_mln_map_attach_open_gl_borrowed_texture(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_borrowed_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_open_gl_owned_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_owned_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
 private fun mln_kw_mln_map_attach_open_gl_surface(
   p0: Long,
   p1: Int,
@@ -2216,18 +2124,6 @@ private fun mln_kw_mln_map_attach_vulkan_borrowed_texture(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_vulkan_borrowed_texture(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_attach_vulkan_owned_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_vulkan_owned_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
 private fun mln_kw_mln_map_attach_vulkan_surface(
   p0: Long,
   p1: Int,
@@ -2250,18 +2146,6 @@ private fun mln_kw_mln_map_attach_web_gpu_borrowed_texture(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_borrowed_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_web_gpu_owned_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_owned_texture(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_attach_web_gpu_surface(

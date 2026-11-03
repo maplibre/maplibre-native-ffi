@@ -410,48 +410,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Creates a session that renders the map into a ring of new Metal
-    /// textures.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_metal_owned_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Metal</c>, or when the target supports none of the
-    /// <c>producer_sync_kinds</c> in <c>options</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
-    public RenderSessionHandle AttachMetalOwnedTexture(
-        MetalOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeMetalOwnedTextureDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_metal_owned_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
     /// Creates a session that renders the map to a Metal layer.
     /// </summary>
     /// <remarks>
@@ -577,51 +535,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Creates a session that renders the map into a ring of new OpenGL
-    /// textures.
-    /// </summary>
-    /// <remarks>
-    /// <para>With <c>OpenGlContextOwnership.Shared</c>, the session needs
-    /// <c>RenderDriverKind.CallerGraphicsThread</c>, and the textures are in
-    /// your context's share group. With
-    /// <c>OpenGlContextOwnership.Dedicated</c>, the session needs
-    /// <c>RenderDriverKind.CoreWorker</c> and renders in a context of its own.
-    /// You can't acquire its frames, but
-    /// <c>RenderSessionHandle.ReadTextureAsync()</c> reads them.</para>
-    /// <para>See <c>mln_map_attach_open_gl_owned_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.OpenGlSupportedContextProviderMask()</c> lacks the
-    /// context's platform, or when the target supports none of the
-    /// <c>producer_sync_kinds</c> in <c>options</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    public RenderSessionHandle AttachOpenGlOwnedTexture(
-        OpenGlOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenGlOwnedTextureDescriptor(descriptor, scope);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_open_gl_owned_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
     /// Creates a session that renders the map to an OpenGL surface.
     /// </summary>
     /// <remarks>
@@ -691,47 +604,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_attach_vulkan_borrowed_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of new Vulkan images.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_vulkan_owned_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Vulkan</c>, or when the target supports none of the
-    /// <c>producer_sync_kinds</c> in <c>options</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public RenderSessionHandle AttachVulkanOwnedTexture(
-        VulkanOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeVulkanOwnedTextureDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_vulkan_owned_texture(
             Handle,
             &nativeDescriptor,
             &nativeOptions,

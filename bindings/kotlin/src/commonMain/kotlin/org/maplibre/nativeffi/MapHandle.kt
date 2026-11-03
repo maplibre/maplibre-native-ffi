@@ -366,47 +366,6 @@ internal constructor(
     }
 
   /**
-   * Creates a session that renders the map into a ring of new OpenGL textures.
-   *
-   * With `OpenGlContextOwnership.SHARED`, the session needs
-   * `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and the textures are in your context's share group.
-   * With `OpenGlContextOwnership.DEDICATED`, the session needs `RenderDriverKind.CORE_WORKER` and
-   * renders in a context of its own. You can't acquire its frames, but
-   * `RenderSessionHandle.readTexture()` reads them.
-   *
-   * See `mln_map_attach_open_gl_owned_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
-   *   platform, or when the target supports none of the `producer_sync_kinds` in `options`.
-   */
-  public fun attachOpenGlOwnedTexture(
-    descriptor: OpenGlOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): NewRenderSession =
-    nativeCall(this, binding) {
-      attach(
-        { out, completion ->
-          C.mln_map_attach_open_gl_owned_texture(
-            handle,
-            writeOpenGlOwnedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::NewRenderSession,
-      )
-    }
-
-  /**
    * Creates a session that renders the map to an OpenGL surface.
    *
    * The session needs `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, and

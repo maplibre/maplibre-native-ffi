@@ -2038,42 +2038,6 @@ class MetalContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class MetalOwnedTextureDescriptor:
-    """A ring of Metal textures that the session creates, for
-    `MapHandle.attach_metal_owned_texture()`.
-
-    See `mln_metal_owned_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    extent: LogicalExtent
-
-    pixel_format: int
-    """The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-    MTLPixelFormatBGRA8Unorm.
-    """
-
-    context: MetalContextDescriptor = field(
-        default_factory=lambda: MetalContextDescriptor()
-    )
-    """Names the MTLDevice that creates the textures."""
-
-    command_queue: int = 0
-    """Your MTLCommandQueue on the same device, or null for a queue of the
-    session's own. With your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
-    """
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
-            context=MetalContextDescriptor._from_native(raw["context"]),
-            pixel_format=raw["pixel_format"],
-            command_queue=raw["command_queue"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class MetalSurfaceDescriptor:
     """A Metal layer to render to, for `MapHandle.attach_metal_surface()` and
     `RenderSessionHandle.set_metal_surface_target()`.
@@ -2124,9 +2088,7 @@ class MetalTextureFrame:
     frame_id: int
 
     slot: int
-    """The texture's index in the ring. For a borrowed ring, it indexes the
-    descriptor's `textures`.
-    """
+    """The texture's index in the descriptor's `textures`."""
 
     texture: int
     """The MTLTexture."""
@@ -2467,27 +2429,6 @@ class OpenGlContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGlOwnedTextureDescriptor:
-    """A ring of OpenGL textures that the session creates, for
-    `MapHandle.attach_open_gl_owned_texture()`.
-
-    See `mln_open_gl_owned_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    extent: LogicalExtent
-
-    context: OpenGlContextDescriptor
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
-            context=OpenGlContextDescriptor._from_native(raw["context"]),
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class OpenGlSurfaceDescriptor:
     """An OpenGL surface to present to, for `MapHandle.attach_open_gl_surface()`
     and `RenderSessionHandle.set_open_gl_surface_target()`.
@@ -2535,22 +2476,11 @@ class OpenGlTextureFrame:
     frame_id: int
 
     slot: int
-    """The texture's index in the ring. For a borrowed ring, it indexes the
-    descriptor's `textures`.
-    """
+    """The texture's index in the descriptor's `textures`."""
 
     texture: int
 
     target: int
-
-    internal_format: int
-    """The texture's internal format, or 0 for a borrowed ring."""
-
-    format: int
-    """The texture's pixel format, or 0 for a borrowed ring."""
-
-    type: int
-    """The texture's pixel type, or 0 for a borrowed ring."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2563,9 +2493,6 @@ class OpenGlTextureFrame:
             slot=raw["slot"],
             texture=raw["texture"],
             target=raw["target"],
-            internal_format=raw["internal_format"],
-            format=raw["format"],
-            type=raw["type"],
         )
 
 
@@ -2789,11 +2716,6 @@ class RenderSessionAttachOptions:
 
     driver: RenderDriverKind
 
-    requested_texture_ring_depth: int = 0
-    """How many textures a ring that the session creates has, up to 8. Zero
-    picks a default.
-    """
-
     producer_sync_kinds: GpuSyncKindFlag = field(
         default_factory=lambda: GpuSyncKindFlag(0)
     )
@@ -2821,7 +2743,6 @@ class RenderSessionAttachOptions:
     def _from_native(cls, raw):
         return cls(
             driver=RenderDriverKind(raw["driver"]),
-            requested_texture_ring_depth=raw["requested_texture_ring_depth"],
             producer_sync_kinds=GpuSyncKindFlag(raw["producer_sync_kinds"]),
             frame_wake=Wake(),
             driver_work_wake=Wake(),
@@ -4184,9 +4105,7 @@ class VulkanContextDescriptor:
     """The Vulkan device and queue that a render session uses.
 
     Keep these objects alive until a detach or disposal of the session
-    completes, or an abandon of it returns. If you discarded a frame of a
-    ring that the session creates, or abandon the session while you hold a
-    frame, keep them alive until the process exits instead.
+    completes, or an abandon of it returns.
 
     See `mln_vulkan_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -4224,31 +4143,6 @@ class VulkanContextDescriptor:
             graphics_queue_family_index=raw["graphics_queue_family_index"],
             get_instance_proc_addr=raw["get_instance_proc_addr"],
             get_device_proc_addr=raw["get_device_proc_addr"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class VulkanOwnedTextureDescriptor:
-    """A ring of Vulkan images that the session creates, for
-    `MapHandle.attach_vulkan_owned_texture()`.
-
-    Each frame leaves its image in the layout that
-    `VulkanTextureFrame.layout` reports, owned by the queue family of
-    `graphics_queue_family_index`.
-
-    See `mln_vulkan_owned_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    extent: LogicalExtent
-
-    context: VulkanContextDescriptor
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
-            context=VulkanContextDescriptor._from_native(raw["context"]),
         )
 
 
@@ -4302,9 +4196,7 @@ class VulkanTextureFrame:
     frame_id: int
 
     slot: int
-    """The image's index in the ring. For a borrowed ring, it indexes the
-    descriptor's `textures`.
-    """
+    """The image's index in the descriptor's `textures`."""
 
     image: int
     """The VkImage."""

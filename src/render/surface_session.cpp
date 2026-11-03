@@ -23,11 +23,6 @@ auto validate_metal_surface_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
-  const auto context_status =
-    validate_metal_context(descriptor->context, false);
-  if (context_status != MLN_STATUS_OK) {
-    return context_status;
-  }
   if (descriptor->layer == nullptr) {
     set_thread_error("Metal surface layer must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;

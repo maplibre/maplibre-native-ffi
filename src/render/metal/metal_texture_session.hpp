@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <memory>
 
 #include <mln/util/size.hpp>
@@ -13,9 +12,9 @@ namespace mln::core {
 
 class TextureSessionBackend;
 
-// The backend of a session-owned RGBA8 Metal texture ring on `device`.
-auto create_metal_owned_texture_backend(
-  MTL::Device* device, mln::Size size, std::size_t ring_depth
-) -> std::unique_ptr<TextureSessionBackend>;
+// The backend of an offscreen session, which renders into one RGBA8 texture
+// that it creates on `device`.
+auto create_metal_offscreen_texture_backend(MTL::Device* device, mln::Size size)
+  -> std::unique_ptr<TextureSessionBackend>;
 
 }  // namespace mln::core

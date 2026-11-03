@@ -892,15 +892,6 @@ pub struct mln_metal_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_metal_owned_texture_descriptor {
-    pub size: u32,
-    pub extent: mln_logical_extent,
-    pub context: mln_metal_context_descriptor,
-    pub pixel_format: u64,
-    pub command_queue: *mut std::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_metal_surface_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
@@ -1023,13 +1014,6 @@ pub union mln_open_gl_context_descriptor_data {
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct mln_open_gl_owned_texture_descriptor {
-    pub size: u32,
-    pub extent: mln_logical_extent,
-    pub context: mln_open_gl_context_descriptor,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub struct mln_open_gl_surface_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
@@ -1048,9 +1032,6 @@ pub struct mln_open_gl_texture_frame {
     pub slot: u32,
     pub texture: u32,
     pub target: u32,
-    pub internal_format: u32,
-    pub format: u32,
-    pub type_: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1127,7 +1108,6 @@ pub struct mln_render_frame_result {
 pub struct mln_render_session_attach_options {
     pub size: u32,
     pub driver: mln_render_driver_kind,
-    pub requested_texture_ring_depth: u32,
     pub producer_sync_kinds: mln_gpu_sync_kind_flags,
     pub frame_wake: mln_wake,
     pub driver_work_wake: mln_wake,
@@ -1584,13 +1564,6 @@ pub struct mln_vulkan_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_owned_texture_descriptor {
-    pub size: u32,
-    pub extent: mln_logical_extent,
-    pub context: mln_vulkan_context_descriptor,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_surface_descriptor {
     pub size: u32,
     pub extent: mln_logical_extent,
@@ -1652,13 +1625,6 @@ pub struct mln_web_gpu_context_descriptor {
     pub instance: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
     pub queue: *mut std::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_web_gpu_owned_texture_descriptor {
-    pub size: u32,
-    pub extent: mln_logical_extent,
-    pub context: mln_web_gpu_context_descriptor,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2013,14 +1979,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_metal_owned_texture(
-        map: mln_map,
-        descriptor: *const mln_metal_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_attach_metal_surface(
         map: mln_map,
         descriptor: *const mln_metal_surface_descriptor,
@@ -2046,14 +2004,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_open_gl_owned_texture(
-        map: mln_map,
-        descriptor: *const mln_open_gl_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_attach_open_gl_surface(
         map: mln_map,
         descriptor: *const mln_open_gl_surface_descriptor,
@@ -2070,14 +2020,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_vulkan_owned_texture(
-        map: mln_map,
-        descriptor: *const mln_vulkan_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_attach_vulkan_surface(
         map: mln_map,
         descriptor: *const mln_vulkan_surface_descriptor,
@@ -2089,14 +2031,6 @@ unsafe extern "C" {
     pub fn mln_map_attach_web_gpu_borrowed_texture(
         map: mln_map,
         descriptor: *const mln_web_gpu_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_web_gpu_owned_texture(
-        map: mln_map,
-        descriptor: *const mln_web_gpu_owned_texture_descriptor,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,

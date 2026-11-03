@@ -69,8 +69,7 @@ typedef struct webgl_state {
 } webgl_state;
 
 // What a fixture holds: the textures of a borrowed ring, which live in the
-// thread's context, or a transferred canvas. An owned target holds nothing,
-// because the thread's context outlives it.
+// thread's context, or a transferred canvas.
 typedef struct webgl_fixture_state {
   bool transferred;
   GLuint textures[MLN_TEXTURE_RING_MAX_DEPTH];
@@ -182,29 +181,6 @@ uint32_t mln_test_backend_driver(void) {
   return MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
 }
 
-bool mln_test_backend_attach_owned(
-  mln_map map, const mln_render_session_attach_options* options,
-  void** out_state, mln_render_session* out_session,
-  const mln_completion* completion, mln_status* out_status
-) {
-  mln_open_gl_context_descriptor context = {0};
-  if (!thread_context(&context)) {
-    return false;
-  }
-  *out_state = NULL;
-  mln_open_gl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_owned_texture_descriptor)
-  };
-  descriptor.extent.width = 64;
-  descriptor.extent.height = 64;
-  descriptor.extent.scale_factor = 1.0;
-  descriptor.context = context;
-  *out_status = mln_map_attach_open_gl_owned_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-  return true;
-}
-
 // The textures live in the thread's context, which the session renders in
 // when it services on this thread.
 bool mln_test_backend_attach_borrowed(
@@ -212,7 +188,7 @@ bool mln_test_backend_attach_borrowed(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  const size_t depth = mln_test_render_ring_depth(options);
+  const size_t depth = mln_test_render_ring_depth();
   mln_open_gl_context_descriptor context = {0};
   if (!thread_context(&context)) {
     return false;
@@ -257,10 +233,8 @@ bool mln_test_backend_attach_borrowed(
   descriptor.texture_count = depth;
   descriptor.target = GL_TEXTURE_2D;
   *out_state = state;
-  mln_render_session_attach_options attach = *options;
-  attach.requested_texture_ring_depth = 0;
   *out_status = mln_map_attach_open_gl_borrowed_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
 }

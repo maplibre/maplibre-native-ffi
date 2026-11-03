@@ -10,17 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Slot">
-/// The texture's index in the ring. For a borrowed ring, it indexes the
-/// descriptor's <c>textures</c>.
-/// </param>
-/// <param name="InternalFormat">
-/// The texture's internal format, or 0 for a borrowed ring.
-/// </param>
-/// <param name="Format">
-/// The texture's pixel format, or 0 for a borrowed ring.
-/// </param>
-/// <param name="Type">
-/// The texture's pixel type, or 0 for a borrowed ring.
+/// The texture's index in the descriptor's <c>textures</c>.
 /// </param>
 public readonly partial record struct OpenGlTextureFrame(
     ulong Generation,
@@ -30,8 +20,5 @@ public readonly partial record struct OpenGlTextureFrame(
     ulong FrameId,
     uint Slot,
     uint Texture,
-    uint Target,
-    uint InternalFormat,
-    uint Format,
-    uint Type
+    uint Target
 );

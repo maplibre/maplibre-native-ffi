@@ -9,11 +9,6 @@ struct mln_render_session_object;
 
 namespace mln::core {
 
-// The MTLPixelFormat values a session-owned Metal ring accepts. Builds without
-// Metal validate them too; the Metal build asserts that they match.
-inline constexpr uint64_t metal_rgba8_unorm = 70;
-inline constexpr uint64_t metal_bgra8_unorm = 80;
-
 auto supported_render_backend_mask() noexcept -> uint32_t;
 auto validate_texture(
   mln_render_session texture, mln_render_session_object*& out_texture
@@ -24,36 +19,18 @@ auto validate_live_attached_texture(
 // Validate descriptor shape even in unsupported builds, so malformed input
 // reports the same error on every backend. Provider support is checked only
 // where an OpenGL context can be created.
-auto validate_metal_owned_texture_descriptor(
-  const mln_metal_owned_texture_descriptor* descriptor
-) -> mln_status;
 auto validate_metal_borrowed_texture_descriptor(
   const mln_metal_borrowed_texture_descriptor* descriptor
 ) -> mln_status;
-auto validate_vulkan_owned_texture_descriptor(
-  const mln_vulkan_owned_texture_descriptor* descriptor
-) -> mln_status;
 auto validate_vulkan_borrowed_texture_descriptor(
   const mln_vulkan_borrowed_texture_descriptor* descriptor
-) -> mln_status;
-auto validate_opengl_owned_texture_descriptor(
-  const mln_open_gl_owned_texture_descriptor* descriptor,
-  bool require_supported_provider
 ) -> mln_status;
 auto validate_opengl_borrowed_texture_descriptor(
   const mln_open_gl_borrowed_texture_descriptor* descriptor,
   bool require_supported_provider
 ) -> mln_status;
-auto validate_webgpu_owned_texture_descriptor(
-  const mln_web_gpu_owned_texture_descriptor* descriptor
-) -> mln_status;
 auto validate_webgpu_borrowed_texture_descriptor(
   const mln_web_gpu_borrowed_texture_descriptor* descriptor
-) -> mln_status;
-auto webgpu_owned_texture_attach_start(
-  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto webgpu_borrowed_texture_attach_start(
   mln_map map, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
@@ -65,28 +42,13 @@ auto webgpu_borrowed_texture_set_target_start(
   const mln_web_gpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status;
-auto metal_owned_texture_attach_start(
-  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status;
 auto metal_borrowed_texture_attach_start(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
-auto vulkan_owned_texture_attach_start(
-  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status;
 auto vulkan_borrowed_texture_attach_start(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status;
-auto opengl_owned_texture_attach_start(
-  mln_map map, const mln_open_gl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;

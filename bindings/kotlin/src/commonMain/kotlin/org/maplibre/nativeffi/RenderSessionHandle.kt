@@ -402,7 +402,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.UNSUPPORTED` when the session renders into a ring that it created.
+   * - `Status.UNSUPPORTED` when the session renders offscreen.
    * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */

@@ -1765,9 +1765,7 @@ public class MetalTextureFrame(
   public val height: UInt,
   public val scaleFactor: Double,
   public val frameId: ULong,
-  /**
-   * The texture's index in the ring. For a borrowed ring, it indexes the descriptor's `textures`.
-   */
+  /** The texture's index in the descriptor's `textures`. */
   public val slot: UInt,
   /** The MTLTexture. */
   texture: NativePointer,
@@ -1804,18 +1802,10 @@ public class OpenGlTextureFrame(
   public val height: UInt,
   public val scaleFactor: Double,
   public val frameId: ULong,
-  /**
-   * The texture's index in the ring. For a borrowed ring, it indexes the descriptor's `textures`.
-   */
+  /** The texture's index in the descriptor's `textures`. */
   public val slot: UInt,
   texture: UInt,
   public val target: UInt,
-  /** The texture's internal format, or 0 for a borrowed ring. */
-  public val internalFormat: UInt,
-  /** The texture's pixel format, or 0 for a borrowed ring. */
-  public val format: UInt,
-  /** The texture's pixel type, or 0 for a borrowed ring. */
-  public val type: UInt,
 ) {
   internal var bindingScope: ViewScope? = null
   private val storedTexture: UInt = texture
@@ -1975,7 +1965,7 @@ public class VulkanTextureFrame(
   public val height: UInt,
   public val scaleFactor: Double,
   public val frameId: ULong,
-  /** The image's index in the ring. For a borrowed ring, it indexes the descriptor's `textures`. */
+  /** The image's index in the descriptor's `textures`. */
   public val slot: UInt,
   /** The VkImage. */
   image: ULong,
@@ -2023,9 +2013,7 @@ public class WebGpuTextureFrame(
   public val height: UInt,
   public val scaleFactor: Double,
   public val frameId: ULong,
-  /**
-   * The texture's index in the ring. For a borrowed ring, it indexes the descriptor's `textures`.
-   */
+  /** The texture's index in the descriptor's `textures`. */
   public val slot: UInt,
   /** The WGPUTexture. */
   texture: NativePointer,
@@ -2336,8 +2324,6 @@ public data class MetalBorrowedTextureDescriptor(
  */
 public data class RenderSessionAttachOptions(
   public val driver: RenderDriverKind,
-  /** How many textures a ring that the session creates has, up to 8. Zero picks a default. */
-  public val requestedTextureRingDepth: UInt = 0u,
   /**
    * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
    * one of them that its target supports. Zero lets the session pick a kind that names no object to
@@ -2367,25 +2353,6 @@ public data class RenderSessionAttachOptions(
 public data class MetalContextDescriptor(
   /** An `MTLDevice`. */
   public val device: NativePointer,
-)
-
-/**
- * A ring of Metal textures that the session creates, for `MapHandle.attachMetalOwnedTexture()`.
- *
- * See `mln_metal_owned_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalOwnedTextureDescriptor(
-  public val extent: LogicalExtent,
-  /** Names the MTLDevice that creates the textures. */
-  public val context: MetalContextDescriptor,
-  /** The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or MTLPixelFormatBGRA8Unorm. */
-  public val pixelFormat: ULong,
-  /**
-   * Your MTLCommandQueue on the same device, or null for a queue of the session's own. With your
-   * queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
-   */
-  public val commandQueue: NativePointer,
 )
 
 /**
@@ -2530,17 +2497,6 @@ public data class OpenGlBorrowedTextureDescriptor(
 )
 
 /**
- * A ring of OpenGL textures that the session creates, for `MapHandle.attachOpenGlOwnedTexture()`.
- *
- * See `mln_open_gl_owned_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlOwnedTextureDescriptor(
-  public val extent: LogicalExtent,
-  public val context: OpenGlContextDescriptor,
-)
-
-/**
  * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
  * `RenderSessionHandle.setOpenGlSurfaceTarget()`.
  *
@@ -2561,8 +2517,7 @@ public data class OpenGlSurfaceDescriptor(
  * The Vulkan device and queue that a render session uses.
  *
  * Keep these objects alive until a detach or disposal of the session completes, or an abandon of it
- * returns. If you discarded a frame of a ring that the session creates, or abandon the session
- * while you hold a frame, keep them alive until the process exits instead.
+ * returns.
  *
  * See `mln_vulkan_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2624,20 +2579,6 @@ public data class VulkanBorrowedTextureDescriptor(
   /** The VkImageLayout that each frame leaves its image in. */
   public val finalLayout: UInt,
   public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
-)
-
-/**
- * A ring of Vulkan images that the session creates, for `MapHandle.attachVulkanOwnedTexture()`.
- *
- * Each frame leaves its image in the layout that `VulkanTextureFrame.layout` reports, owned by the
- * queue family of `graphics_queue_family_index`.
- *
- * See `mln_vulkan_owned_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanOwnedTextureDescriptor(
-  public val extent: LogicalExtent,
-  public val context: VulkanContextDescriptor,
 )
 
 /**
@@ -2710,17 +2651,6 @@ public data class WebGpuBorrowedTextureDescriptor(
   public val textures: List<WebGpuBorrowedTexture>,
   /** The textures' WGPUTextureFormat. */
   public val format: UInt,
-)
-
-/**
- * A ring of WebGPU textures that the session creates, for `MapHandle.attachWebGpuOwnedTexture()`.
- *
- * See `mln_web_gpu_owned_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuOwnedTextureDescriptor(
-  public val extent: LogicalExtent,
-  public val context: WebGpuContextDescriptor,
 )
 
 /**

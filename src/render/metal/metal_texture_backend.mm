@@ -91,7 +91,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
   }
 
   void bind() override {
-    // mbgl's offscreen texture is RGBA8 only, so a session-owned ring makes
+    // mbgl's offscreen texture is RGBA8 only, so an offscreen session makes
     // its own color texture, on the first draw as mbgl's would.
     if (borrowedTexture == nullptr && !ownedTexture) {
       auto descriptor = NS::RetainPtr(

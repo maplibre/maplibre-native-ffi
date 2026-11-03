@@ -957,14 +957,6 @@ auto every_slot_quarantined_locked(const mln_render_session_object& session)
          });
 }
 
-auto any_slot_quarantined_locked(const mln_render_session_object& session)
-  -> bool {
-  const auto& slots = session.texture.slots;
-  return std::any_of(slots.begin(), slots.end(), [](const auto& slot) {
-    return slot.quarantined;
-  });
-}
-
 // Retires every published frame that no host holds, so none can be acquired
 // after the target it was rendered into changes.
 void invalidate_unacquired_texture_frames_locked(
@@ -1712,15 +1704,7 @@ auto start_attach_render_session(
   session->capabilities.producer_sync_kind = *producer_sync_kind;
   session->capabilities.consumer_sync_kinds = consumer_sync_kinds;
   if (kind == RenderSessionKind::Texture) {
-    // A borrowed ring's depth is the texture count its descriptor validated.
-    const auto depth = session->texture.mode == TextureSessionMode::Owned
-                         ? std::clamp(
-                             capabilities.texture_ring_depth, 1u,
-                             static_cast<uint32_t>(max_texture_ring_depth)
-                           )
-                         : capabilities.texture_ring_depth;
-    session->capabilities.texture_ring_depth = depth;
-    session->texture.slots.resize(depth);
+    session->texture.slots.resize(capabilities.texture_ring_depth);
   }
   session->capabilities.driver = options->driver;
   session->frame_wake = frame_wake;
@@ -1984,9 +1968,8 @@ auto retarget_kind_status(
   return session.texture.mode == TextureSessionMode::Borrowed
            ? MLN_STATUS_OK
            : unsupported_retarget(
-               "a session-owned texture is sized and "
-               "replaced by its session; "
-               "resize it instead"
+               "an offscreen session has no target to replace; resize it "
+               "instead"
              );
 }
 
@@ -2267,8 +2250,7 @@ auto render_session_release_target_start(
             live.texture.mode != TextureSessionMode::Borrowed
           ) {
             set_thread_error(
-              "a session-owned texture ring has no target for the host to "
-              "release"
+              "an offscreen session has no target for the host to release"
             );
             return MLN_STATUS_UNSUPPORTED;
           }
@@ -2459,8 +2441,8 @@ auto render_session_render_update_on_driver(
       return after_status;
     }
     if (!frame_rendered) {
-      // A Metal owned-texture session can finish a pass before its texture
-      // exists while the map is still loading. The target is valid, so this is
+      // A Metal offscreen session can finish a pass before its texture exists
+      // while the map is still loading. The target is valid, so this is
       // map-update driven rather than target-not-ready.
       *out_result = MLN_RENDER_RESULT_NO_UPDATE;
       return MLN_STATUS_OK;
@@ -2488,17 +2470,6 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
   }
 
   live->scheduler.set_work_available_callback({});
-  // A quarantined slot's texture may still be in use by the host's GPU, and
-  // nothing tells native when that use ends. A backend that owns such a
-  // texture is released and never destroyed, as abandon does. A borrowed
-  // ring's textures belong to the host, so its backend is destroyed.
-  auto quarantine = false;
-  {
-    const auto lock = std::scoped_lock{live->control_mutex};
-    quarantine = live->texture.mode == TextureSessionMode::Owned &&
-                 any_slot_quarantined_locked(*live);
-  }
-  TextureSessionBackend* quarantined_texture = nullptr;
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
@@ -2510,18 +2481,9 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
     live->renderer.reset();
     reset_pushed_feature_state(*live);
     live->surface.backend.reset();
-    if (quarantine)
-      quarantined_texture = live->texture.backend.release();
-    else
-      live->texture.backend.reset();
+    live->texture.backend.reset();
     // Anything enqueued during teardown targets something already gone.
     live->scheduler.discard();
-  }
-  if (quarantined_texture != nullptr) {
-    // Tile workers can still hold graphics objects of the released backend,
-    // and the host may destroy its device once detach completes.
-    map_quiesce_render_workers(live->map);
-    quarantined_texture->quarantine();
   }
 
   const auto detach_status = map_detach_render_target_session(live->map, live);
@@ -4377,11 +4339,8 @@ struct AbandonedObjects {
   std::unique_ptr<TextureSessionBackend> texture;
 };
 
-// `keep_ring` says the host's GPU may still read a texture of the session's
-// ring, which lives in the texture backend. The renderer goes either way, as
-// it does when detach keeps a ring: the host's GPU never reads its objects.
 auto retire_abandoned_objects(
-  mln_render_session_object& session, AbandonedObjects& objects, bool keep_ring
+  mln_render_session_object& session, AbandonedObjects& objects
 ) -> uint32_t {
   const auto teardown_allowed = [&] {
     if (objects.surface != nullptr)
@@ -4410,7 +4369,7 @@ auto retire_abandoned_objects(
     // The renderer draws through the backend, so it goes first.
     objects.renderer.reset();
     objects.surface.reset();
-    if (!keep_ring) objects.texture.reset();
+    objects.texture.reset();
     session.scheduler.discard();
     return MLN_STATUS_OK;
   };
@@ -4427,7 +4386,6 @@ auto abandon_render_session(
   auto driver_wake = std::shared_ptr<Wake>{};
   auto queue_lock = std::shared_ptr<QueueLock>{};
   auto objects = AbandonedObjects{};
-  auto keep_ring = false;
   {
     // Declared before the lock, so the wakes owed by the results published
     // below run after it is released and before the wakes are dropped.
@@ -4521,21 +4479,6 @@ auto abandon_render_session(
   for (auto& item : discarded) {
     item.complete_failure();
   }
-  // The host's GPU may still read the texture of a session-owned slot that a
-  // frame holds or that a disposed frame quarantined, and nothing tells native
-  // when that read ends, so such a ring is kept. This reads the slots after
-  // the loop above, which ran the releases still queued for the driver. A
-  // release with CPU_COMPLETE, by which the host attests that its GPU read is
-  // done, lets go of its slot. A release with a GPU wait quarantines its slot
-  // instead, because abandon never runs that wait: one can arrive between
-  // taking the backend and this read, when no backend checks its kind.
-  {
-    const auto lock = std::scoped_lock{live->control_mutex};
-    keep_ring = live->texture.mode == TextureSessionMode::Owned &&
-                std::ranges::any_of(live->texture.slots, [](const auto& slot) {
-                  return slot.acquired || slot.quarantined;
-                });
-  }
   live->scheduler.set_work_available_callback({});
   live->scheduler.discard();
   // Tile workers can still hold the renderer's atlas, which holds the host's
@@ -4546,7 +4489,7 @@ auto abandon_render_session(
   // the map's forwarding observer, as detach explains.
   const auto kept = graphics == AbandonedGraphics::Keep
                       ? objects.keep()
-                      : retire_abandoned_objects(*live, objects, keep_ring);
+                      : retire_abandoned_objects(*live, objects);
   static_cast<void>(map_detach_render_target_session(live->map, live.get()));
   live->map_object = nullptr;
   {

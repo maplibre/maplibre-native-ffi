@@ -187,7 +187,7 @@ auto offscreen_attach_start(
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->texture.mode = TextureSessionMode::Owned;
+  session->texture.mode = TextureSessionMode::Offscreen;
   session->initialize_backend =
     [shared =
        object != nullptr ? object->device : std::shared_ptr<OffscreenDevice>{}](

@@ -17,27 +17,6 @@
 extern "C" {
 #endif
 
-/**
- * A ring of Metal textures that the session creates, for
- * mln_map_attach_metal_owned_texture().
- */
-typedef struct mln_metal_owned_texture_descriptor {
-  uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
-  /** Names the MTLDevice that creates the textures. */
-  mln_metal_context_descriptor context;
-  /**
-   * The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-   * MTLPixelFormatBGRA8Unorm.
-   */
-  uint64_t pixel_format MLN_BINDING("required=true");
-  /**
-   * Your MTLCommandQueue on the same device, or null for a queue of the
-   * session's own. With your queue, frames can use MLN_GPU_SYNC_QUEUE_ORDER.
-   */
-  void* command_queue;
-} mln_metal_owned_texture_descriptor;
-
 /** A Metal texture of a borrowed ring. */
 typedef struct mln_metal_borrowed_texture {
   /** Your MTLTexture. */
@@ -82,10 +61,7 @@ typedef struct mln_metal_texture_frame {
   uint32_t height;
   double scale_factor;
   uint64_t frame_id;
-  /**
-   * The texture's index in the ring. For a borrowed ring, it indexes the
-   * descriptor's `textures`.
-   */
+  /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
   /** The MTLTexture. */
   void* texture MLN_BINDING("lifetime=owner");
@@ -94,20 +70,6 @@ typedef struct mln_metal_texture_frame {
   /** The texture's MTLPixelFormat. */
   uint64_t pixel_format;
 } mln_metal_texture_frame;
-
-/**
- * A ring of Vulkan images that the session creates, for
- * mln_map_attach_vulkan_owned_texture().
- *
- * Each frame leaves its image in the layout that
- * mln_vulkan_texture_frame.layout reports, owned by the queue family of
- * `graphics_queue_family_index`.
- */
-typedef struct mln_vulkan_owned_texture_descriptor {
-  uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
-  mln_vulkan_context_descriptor context;
-} mln_vulkan_owned_texture_descriptor;
 
 /** A Vulkan image of a borrowed ring. */
 typedef struct mln_vulkan_borrowed_texture {
@@ -171,10 +133,7 @@ typedef struct mln_vulkan_texture_frame {
   uint32_t height;
   double scale_factor;
   uint64_t frame_id;
-  /**
-   * The image's index in the ring. For a borrowed ring, it indexes the
-   * descriptor's `textures`.
-   */
+  /** The image's index in the descriptor's `textures`. */
   uint32_t slot;
   /** The VkImage. */
   mln_vulkan_non_dispatchable_handle image MLN_BINDING("lifetime=owner");
@@ -187,16 +146,6 @@ typedef struct mln_vulkan_texture_frame {
   /** The VkImageLayout that the frame left the image in. */
   uint32_t layout;
 } mln_vulkan_texture_frame;
-
-/**
- * A ring of OpenGL textures that the session creates, for
- * mln_map_attach_open_gl_owned_texture().
- */
-typedef struct mln_open_gl_owned_texture_descriptor {
-  uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
-  mln_open_gl_context_descriptor context;
-} mln_open_gl_owned_texture_descriptor;
 
 /** An OpenGL texture of a borrowed ring. */
 typedef struct mln_open_gl_borrowed_texture {
@@ -231,16 +180,6 @@ typedef struct mln_open_gl_borrowed_texture_descriptor {
   /** The textures' target. It must be GL_TEXTURE_2D. */
   uint32_t target MLN_BINDING("required=true");
 } mln_open_gl_borrowed_texture_descriptor;
-
-/**
- * A ring of WebGPU textures that the session creates, for
- * mln_map_attach_web_gpu_owned_texture().
- */
-typedef struct mln_web_gpu_owned_texture_descriptor {
-  uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
-  mln_web_gpu_context_descriptor context;
-} mln_web_gpu_owned_texture_descriptor;
 
 /** A WebGPU texture of a borrowed ring. */
 typedef struct mln_web_gpu_borrowed_texture {
@@ -286,10 +225,7 @@ typedef struct mln_web_gpu_texture_frame {
   uint32_t height;
   double scale_factor;
   uint64_t frame_id;
-  /**
-   * The texture's index in the ring. For a borrowed ring, it indexes the
-   * descriptor's `textures`.
-   */
+  /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
   /** The WGPUTexture. */
   void* texture MLN_BINDING("lifetime=owner");
@@ -309,19 +245,10 @@ typedef struct mln_open_gl_texture_frame {
   uint32_t height;
   double scale_factor;
   uint64_t frame_id;
-  /**
-   * The texture's index in the ring. For a borrowed ring, it indexes the
-   * descriptor's `textures`.
-   */
+  /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
   uint32_t texture MLN_BINDING("lifetime=owner");
   uint32_t target;
-  /** The texture's internal format, or 0 for a borrowed ring. */
-  uint32_t internal_format;
-  /** The texture's pixel format, or 0 for a borrowed ring. */
-  uint32_t format;
-  /** The texture's pixel type, or 0 for a borrowed ring. */
-  uint32_t type;
 } mln_open_gl_texture_frame;
 
 /** The layout of the pixels that mln_render_session_read_texture() reads. */
@@ -344,22 +271,6 @@ typedef struct mln_texture_readback_result {
 } mln_texture_readback_result;
 
 /**
- * Creates a session that renders the map into a ring of new Metal textures.
- *
- * Returns:
- * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
- *   MLN_RENDER_BACKEND_FLAG_METAL, or when the target supports none of the
- *   `producer_sync_kinds` in `options`.
- */
-MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
-MLN_API mln_status mln_map_attach_metal_owned_texture(
-  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session MLN_BINDING("direction=out"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Creates a session that renders the map into a ring of your Metal textures.
  *
  * Returns:
@@ -370,24 +281,6 @@ MLN_API mln_status mln_map_attach_metal_owned_texture(
 MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_map_attach_metal_borrowed_texture(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session MLN_BINDING("direction=out"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Creates a session that renders the map into a ring of new Vulkan images.
- *
- * Returns:
- * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
- *   MLN_RENDER_BACKEND_FLAG_VULKAN, or when the target supports none of the
- *   `producer_sync_kinds` in `options`.
- */
-MLN_BINDING(
-  "execution=lifecycle;platforms=android,freebsd,linux,macos,ohos,windows"
-)
-MLN_API mln_status mln_map_attach_vulkan_owned_texture(
-  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -412,29 +305,6 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
 ) MLN_NOEXCEPT;
 
 /**
- * Creates a session that renders the map into a ring of new OpenGL textures.
- *
- * With MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED, the session needs
- * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and the textures are in your
- * context's share group. With MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED, the
- * session needs MLN_RENDER_DRIVER_CORE_WORKER and renders in a context of its
- * own. You can't acquire its frames, but mln_render_session_read_texture()
- * reads them.
- *
- * Returns:
- * - MLN_STATUS_UNSUPPORTED when mln_open_gl_supported_context_provider_mask()
- *   lacks the context's platform, or when the target supports none of the
- *   `producer_sync_kinds` in `options`.
- */
-MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_map_attach_open_gl_owned_texture(
-  mln_map map, const mln_open_gl_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session MLN_BINDING("direction=out"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Creates a session that renders the map into a ring of your OpenGL textures.
  *
  * The session needs MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
@@ -447,24 +317,6 @@ MLN_API mln_status mln_map_attach_open_gl_owned_texture(
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_map_attach_open_gl_borrowed_texture(
   mln_map map, const mln_open_gl_borrowed_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session MLN_BINDING("direction=out"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Creates a session that renders the map into a ring of new WebGPU textures.
- *
- * The session needs MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
- *
- * Returns:
- * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
- *   MLN_RENDER_BACKEND_FLAG_WEB_GPU, or when the target supports none of the
- *   `producer_sync_kinds` in `options`.
- */
-MLN_BINDING("execution=lifecycle;platforms=web")
-MLN_API mln_status mln_map_attach_web_gpu_owned_texture(
-  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic

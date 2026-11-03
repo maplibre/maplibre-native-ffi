@@ -581,7 +581,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the session renders
-    /// into a ring that it created.</description></item>
+    /// offscreen.</description></item>
     /// <item><description><c>Status.Unsupported</c> when the target is a WebGL
     /// canvas.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session loses its

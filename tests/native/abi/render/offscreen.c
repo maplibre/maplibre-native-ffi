@@ -3,6 +3,9 @@
 // for a session that attaches without one, and reports that it cannot create
 // one for the caller, after it validates the call.
 
+#include <stdatomic.h>
+#include <string.h>
+
 #include "support/frames.h"
 #include "support/map.h"
 #include "support/test_support.h"
@@ -245,6 +248,84 @@ static void disposing_a_session_without_a_device_ends_it(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// One completion's delivery, numbered among the case's deliveries in the order
+// the session made them, with the center pixel of a readback.
+typedef struct ordered_delivery {
+  atomic_int* sequence;
+  int position;
+  mln_status status;
+  uint8_t center[4];
+  atomic_bool delivered;
+} ordered_delivery;
+
+static void record_delivery(
+  void* user_data, const mln_completion_result* result
+) {
+  ordered_delivery* delivery = user_data;
+  delivery->position = atomic_fetch_add(delivery->sequence, 1);
+  delivery->status = (mln_status)result->status;
+  const mln_texture_readback_result* readback = result->value;
+  if (result->status == MLN_STATUS_OK && readback != NULL) {
+    const size_t center = (size_t)32 * readback->info.stride + (size_t)32 * 4;
+    if (readback->data.size >= center + 4) {
+      memcpy(delivery->center, (const uint8_t*)readback->data.data + center, 4);
+    }
+  }
+  mln_test_flag_set(&delivery->delivered);
+}
+
+static mln_completion ordered_completion(ordered_delivery* delivery) {
+  return (mln_completion){
+    .size = sizeof(mln_completion),
+    .callback = record_delivery,
+    .user_data = delivery,
+  };
+}
+
+// A WebGPU readback finishes only once its buffer map does, so the work
+// submitted behind it waits for it.
+static void work_behind_a_readback_runs_after_it(void) {
+  static const uint8_t red[4] = {255, 0, 0, 255};
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture =
+    attach_offscreen_session(map, MLN_HANDLE_NULL);
+  render_red_frame(map, &fixture, 1);
+
+  atomic_int sequence = 0;
+  ordered_delivery first = {.sequence = &sequence};
+  ordered_delivery second = {.sequence = &sequence};
+  ordered_delivery fence = {.sequence = &sequence};
+  const mln_completion first_completion = ordered_completion(&first);
+  const mln_completion second_completion = ordered_completion(&second);
+  const mln_completion fence_completion = ordered_completion(&fence);
+  MLN_TEST_OK(
+    mln_render_session_read_texture(fixture.session, &first_completion, NULL)
+  );
+  MLN_TEST_OK(
+    mln_render_session_read_texture(fixture.session, &second_completion, NULL)
+  );
+  MLN_TEST_OK(
+    mln_render_session_dump_debug_logs(fixture.session, &fence_completion, NULL)
+  );
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&fence.delivered));
+
+  TEST_ASSERT_TRUE(atomic_load(&first.delivered));
+  TEST_ASSERT_TRUE(atomic_load(&second.delivered));
+  MLN_TEST_OK(first.status);
+  MLN_TEST_OK(second.status);
+  MLN_TEST_OK(fence.status);
+  TEST_ASSERT_EQUAL_INT(0, first.position);
+  TEST_ASSERT_EQUAL_INT(1, second.position);
+  TEST_ASSERT_EQUAL_INT(2, fence.position);
+  TEST_ASSERT_EQUAL_HEX8_ARRAY(red, first.center, 4);
+  TEST_ASSERT_EQUAL_HEX8_ARRAY(red, second.center, 4);
+
+  detach_offscreen_session(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 #if defined(DEVICE_SUPPORTED)
 static void expect_attach_status(
   mln_status expected, mln_map map, mln_offscreen_device device,
@@ -432,6 +513,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_session_without_a_device_renders_still_images_in_turn);
   RUN_TEST(a_session_without_a_device_renders_a_demand_after_a_still_image);
   RUN_TEST(disposing_a_session_without_a_device_ends_it);
+  RUN_TEST(work_behind_a_readback_runs_after_it);
 #if defined(DEVICE_SUPPORTED)
   RUN_TEST(a_session_reads_back_after_its_device_is_released);
   RUN_TEST(sessions_on_two_maps_take_turns_on_one_device);

@@ -549,7 +549,6 @@ static void abandon_from_an_attach_completion_is_busy(void) {
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.requested_texture_ring_depth = 2;
   options.frame_wake = mln_test_pulse_wake();
   options.driver_work_wake = mln_test_pulse_wake();
   const mln_completion completion = {
@@ -597,7 +596,6 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = count_nothing,
     .user_data = &released,
@@ -644,7 +642,6 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = count_nothing,
     .user_data = &released,
@@ -1005,7 +1002,6 @@ static void attach_reentrant_host(
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = drain_inside_frame_wake,
     .user_data = &reentrant,

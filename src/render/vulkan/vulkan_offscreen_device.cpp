@@ -122,12 +122,7 @@ class VulkanOffscreenDevice final : public OffscreenDevice {
   auto create_texture_backend(
     mln::Size size, std::unique_ptr<TextureSessionBackend>& out_backend
   ) -> mln_status override {
-    const auto descriptor = mln_vulkan_owned_texture_descriptor{
-      .size = sizeof(mln_vulkan_owned_texture_descriptor),
-      .extent = {},
-      .context = context_,
-    };
-    out_backend = create_vulkan_owned_texture_backend(descriptor, size, 1);
+    out_backend = create_vulkan_offscreen_texture_backend(context_, size);
     return MLN_STATUS_OK;
   }
 

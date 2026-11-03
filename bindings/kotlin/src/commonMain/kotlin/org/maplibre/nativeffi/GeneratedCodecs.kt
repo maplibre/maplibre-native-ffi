@@ -289,32 +289,16 @@ internal fun NativeCall.putRenderSessionAttachOptions(
   target: Long,
   value: RenderSessionAttachOptions,
 ) {
-  writeU32(target, w(80, 112, 72).toUInt())
+  writeU32(target, w(80, 112, 68).toUInt())
   writeU32(target + 4, value.driver.rawValue)
-  writeU32(target + 8, value.requestedTextureRingDepth)
-  writeU32(target + 12, value.producerSyncKinds.rawValue)
-  putWake(target + 16, value.frameWake)
-  putWake(target + w(40, 48, 36), value.driverWorkWake)
-  putQueueLock(target + w(64, 80, 56), value.queueLock)
+  writeU32(target + 8, value.producerSyncKinds.rawValue)
+  putWake(target + w(16, 16, 12), value.frameWake)
+  putWake(target + w(40, 48, 32), value.driverWorkWake)
+  putQueueLock(target + w(64, 80, 52), value.queueLock)
 }
 
 internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
-  allocate(w(80, 112, 72), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
-
-internal fun NativeArena.putMetalOwnedTextureDescriptor(
-  target: Long,
-  value: MetalOwnedTextureDescriptor,
-) {
-  writeU32(target, w(48, 48, 36).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putMetalContextDescriptor(target + w(24, 24, 20), value.context)
-  writeU64(target + w(32, 32, 24), value.pixelFormat)
-  writeAddress(target + w(40, 40, 32), value.commandQueue.address)
-}
-
-internal fun NativeArena.writeMetalOwnedTextureDescriptor(
-  value: MetalOwnedTextureDescriptor,
-): Long = allocate(w(48, 48, 36), w(8, 8, 4)).also { putMetalOwnedTextureDescriptor(it, value) }
+  allocate(w(80, 112, 68), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
 
 internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
   writeU32(target, w(32, 40, 28).toUInt())
@@ -356,19 +340,6 @@ internal fun NativeArena.writeOpenGlBorrowedTextureDescriptor(
 ): Long =
   allocate(w(72, 104, 68), w(8, 8, 4)).also { putOpenGlBorrowedTextureDescriptor(it, value) }
 
-internal fun NativeArena.putOpenGlOwnedTextureDescriptor(
-  target: Long,
-  value: OpenGlOwnedTextureDescriptor,
-) {
-  writeU32(target, w(56, 72, 48).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putOpenGlContextDescriptor(target + w(24, 24, 20), value.context)
-}
-
-internal fun NativeArena.writeOpenGlOwnedTextureDescriptor(
-  value: OpenGlOwnedTextureDescriptor,
-): Long = allocate(w(56, 72, 48), w(8, 8, 4)).also { putOpenGlOwnedTextureDescriptor(it, value) }
-
 internal fun NativeArena.putOpenGlSurfaceDescriptor(target: Long, value: OpenGlSurfaceDescriptor) {
   writeU32(target, w(56, 80, 52).toUInt())
   putLogicalExtent(target + w(8, 8, 4), value.extent)
@@ -403,19 +374,6 @@ internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
 ): Long =
   allocate(w(80, 120, 76), w(8, 8, 4)).also { putVulkanBorrowedTextureDescriptor(it, value) }
 
-internal fun NativeArena.putVulkanOwnedTextureDescriptor(
-  target: Long,
-  value: VulkanOwnedTextureDescriptor,
-) {
-  writeU32(target, w(56, 80, 48).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putVulkanContextDescriptor(target + w(24, 24, 20), value.context)
-}
-
-internal fun NativeArena.writeVulkanOwnedTextureDescriptor(
-  value: VulkanOwnedTextureDescriptor,
-): Long = allocate(w(56, 80, 48), w(8, 8, 4)).also { putVulkanOwnedTextureDescriptor(it, value) }
-
 internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanSurfaceDescriptor) {
   writeU32(target, w(64, 88, 56).toUInt())
   putLogicalExtent(target + w(8, 8, 4), value.extent)
@@ -446,19 +404,6 @@ internal fun NativeArena.putWebGpuBorrowedTextureDescriptor(
 internal fun NativeArena.writeWebGpuBorrowedTextureDescriptor(
   value: WebGpuBorrowedTextureDescriptor,
 ): Long = allocate(w(56, 80, 52), w(8, 8, 4)).also { putWebGpuBorrowedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putWebGpuOwnedTextureDescriptor(
-  target: Long,
-  value: WebGpuOwnedTextureDescriptor,
-) {
-  writeU32(target, w(40, 48, 32).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putWebGpuContextDescriptor(target + w(24, 24, 20), value.context)
-}
-
-internal fun NativeArena.writeWebGpuOwnedTextureDescriptor(
-  value: WebGpuOwnedTextureDescriptor,
-): Long = allocate(w(40, 48, 32), w(8, 8, 4)).also { putWebGpuOwnedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putWebGpuSurfaceDescriptor(target: Long, value: WebGpuSurfaceDescriptor) {
   writeU32(target, w(48, 64, 40).toUInt())
@@ -1057,9 +1002,6 @@ internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): Ope
       slot = readU32(source + w(40, 40, 36)),
       texture = readU32(source + w(44, 44, 40)),
       target = readU32(source + w(48, 48, 44)),
-      internalFormat = readU32(source + w(52, 52, 48)),
-      format = readU32(source + w(56, 56, 52)),
-      type = readU32(source + w(60, 60, 56)),
     )
     .also { it.bindingScope = scope }
 

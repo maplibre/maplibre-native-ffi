@@ -65,41 +65,6 @@ public fun MapHandle.attachMetalBorrowedTexture(
   }
 
 /**
- * Creates a session that renders the map into a ring of new Metal textures.
- *
- * See `mln_map_attach_metal_owned_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.METAL`, or
- *   when the target supports none of the `producer_sync_kinds` in `options`.
- */
-public fun MapHandle.attachMetalOwnedTexture(
-  descriptor: MetalOwnedTextureDescriptor,
-  options: RenderSessionAttachOptions,
-): NewRenderSession =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_metal_owned_texture(
-          handle,
-          writeMetalOwnedTextureDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachMetalOwnedTexture) },
-      { it.bindingCallbacks },
-      { it.dispose() },
-      ::NewRenderSession,
-    )
-  }
-
-/**
  * Creates a session that renders the map to a Metal layer.
  *
  * See `mln_map_attach_metal_surface` in the

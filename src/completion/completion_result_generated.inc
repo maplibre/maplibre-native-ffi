@@ -4,10 +4,6 @@ struct CompletionResult<&mln_map_attach_metal_borrowed_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_metal_owned_texture> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_map_attach_metal_surface> {
   static constexpr bool has_value = false;
 };
@@ -20,10 +16,6 @@ struct CompletionResult<&mln_map_attach_open_gl_borrowed_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_open_gl_owned_texture> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_map_attach_open_gl_surface> {
   static constexpr bool has_value = false;
 };
@@ -32,19 +24,11 @@ struct CompletionResult<&mln_map_attach_vulkan_borrowed_texture> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_map_attach_vulkan_owned_texture> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_map_attach_vulkan_surface> {
   static constexpr bool has_value = false;
 };
 template <>
 struct CompletionResult<&mln_map_attach_web_gpu_borrowed_texture> {
-  static constexpr bool has_value = false;
-};
-template <>
-struct CompletionResult<&mln_map_attach_web_gpu_owned_texture> {
   static constexpr bool has_value = false;
 };
 template <>

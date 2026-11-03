@@ -2120,46 +2120,6 @@ impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
     }
 }
 
-/// A ring of Metal textures that the session creates, for
-/// `MapHandle::attach_metal_owned_texture()`.
-///
-/// See `mln_metal_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MetalOwnedTextureDescriptor {
-    pub extent: LogicalExtent,
-    /// Names the MTLDevice that creates the textures.
-    pub context: MetalContextDescriptor,
-    /// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-    /// MTLPixelFormatBGRA8Unorm.
-    pub pixel_format: u64,
-    /// Your MTLCommandQueue on the same device, or null for a queue of the
-    /// session's own. With your queue, frames can use
-    /// `GpuSyncKind::QueueOrder`.
-    pub command_queue: *mut std::ffi::c_void,
-}
-impl MetalOwnedTextureDescriptor {
-    pub fn new(extent: LogicalExtent, pixel_format: u64) -> Self {
-        Self {
-            extent,
-            context: Default::default(),
-            pixel_format,
-            command_queue: Default::default(),
-        }
-    }
-}
-impl ToNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDescriptor {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_metal_owned_texture_descriptor> {
-        let mut raw: sys::mln_metal_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_metal_owned_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
-        raw.context = to_native(&self.context, arena)?;
-        raw.pixel_format = self.pixel_format;
-        raw.command_queue = self.command_queue;
-        Ok(raw)
-    }
-}
-
 /// A Metal layer to render to, for `MapHandle::attach_metal_surface()` and
 /// `RenderSessionHandle::set_metal_surface_target()`.
 ///
@@ -2208,8 +2168,7 @@ pub struct MetalTextureFrame {
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
-    /// The texture's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The texture's index in the descriptor's `textures`.
     pub slot: u32,
     /// The MTLTexture.
     pub texture: *mut std::ffi::c_void,
@@ -2744,34 +2703,6 @@ pub struct OpenGlContextProviderFlag: u32 {
 }
 }
 
-/// A ring of OpenGL textures that the session creates, for
-/// `MapHandle::attach_open_gl_owned_texture()`.
-///
-/// See `mln_open_gl_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, PartialEq)]
-pub struct OpenGlOwnedTextureDescriptor<'a> {
-    pub extent: LogicalExtent,
-    pub context: OpenGlContextDescriptor<'a>,
-}
-impl<'a> OpenGlOwnedTextureDescriptor<'a> {
-    pub fn new(extent: LogicalExtent, context: OpenGlContextDescriptor<'a>) -> Self {
-        Self { extent, context }
-    }
-}
-impl<'a> ToNative<sys::mln_open_gl_owned_texture_descriptor> for OpenGlOwnedTextureDescriptor<'a> {
-    fn to_native(
-        &self,
-        arena: &mut InputArena,
-    ) -> Result<sys::mln_open_gl_owned_texture_descriptor> {
-        let mut raw: sys::mln_open_gl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_open_gl_owned_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
-        raw.context = to_native(&self.context, arena)?;
-        Ok(raw)
-    }
-}
-
 /// An OpenGL surface to present to, for `MapHandle::attach_open_gl_surface()`
 /// and `RenderSessionHandle::set_open_gl_surface_target()`.
 ///
@@ -2819,17 +2750,10 @@ pub struct OpenGlTextureFrame {
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
-    /// The texture's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The texture's index in the descriptor's `textures`.
     pub slot: u32,
     pub texture: u32,
     pub target: u32,
-    /// The texture's internal format, or 0 for a borrowed ring.
-    pub internal_format: u32,
-    /// The texture's pixel format, or 0 for a borrowed ring.
-    pub format: u32,
-    /// The texture's pixel type, or 0 for a borrowed ring.
-    pub r#type: u32,
 }
 impl FromNative<sys::mln_open_gl_texture_frame> for OpenGlTextureFrame {
     unsafe fn from_native(raw: sys::mln_open_gl_texture_frame) -> Result<Self> {
@@ -2842,9 +2766,6 @@ impl FromNative<sys::mln_open_gl_texture_frame> for OpenGlTextureFrame {
             slot: raw.slot,
             texture: raw.texture,
             target: raw.target,
-            internal_format: raw.internal_format,
-            format: raw.format,
-            r#type: raw.type_,
         })
     }
 }
@@ -3217,9 +3138,6 @@ impl Default for RenderResult {
 #[derive(Debug, Clone)]
 pub struct RenderSessionAttachOptions {
     pub driver: RenderDriverKind,
-    /// How many textures a ring that the session creates has, up to 8. Zero
-    /// picks a default.
-    pub requested_texture_ring_depth: u32,
     /// The kinds of `GpuSync` that you can wait on before you read an acquired
     /// frame. The session uses one of them that its target supports. Zero lets
     /// the session pick a kind that names no object to wait on.
@@ -3239,7 +3157,6 @@ impl RenderSessionAttachOptions {
     pub fn new(driver: RenderDriverKind) -> Self {
         Self {
             driver,
-            requested_texture_ring_depth: Default::default(),
             producer_sync_kinds: Default::default(),
             frame_wake: Default::default(),
             driver_work_wake: Default::default(),
@@ -3252,7 +3169,6 @@ impl ToNative<sys::mln_render_session_attach_options> for RenderSessionAttachOpt
         let mut raw: sys::mln_render_session_attach_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_render_session_attach_options>() as _;
         raw.driver = to_native(&self.driver, arena)?;
-        raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
         raw.producer_sync_kinds = to_native(&self.producer_sync_kinds, arena)?;
         raw.frame_wake = to_native(&self.frame_wake, arena)?;
         raw.driver_work_wake = to_native(&self.driver_work_wake, arena)?;
@@ -5341,9 +5257,7 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
 /// The Vulkan device and queue that a render session uses.
 ///
 /// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns. If you discarded a frame of a ring
-/// that the session creates, or abandon the session while you hold a frame,
-/// keep them alive until the process exits instead.
+/// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -5420,37 +5334,6 @@ impl Default for VulkanImageOwner {
     }
 }
 
-/// A ring of Vulkan images that the session creates, for
-/// `MapHandle::attach_vulkan_owned_texture()`.
-///
-/// Each frame leaves its image in the layout that `VulkanTextureFrame::layout`
-/// reports, owned by the queue family of `graphics_queue_family_index`.
-///
-/// See `mln_vulkan_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct VulkanOwnedTextureDescriptor {
-    pub extent: LogicalExtent,
-    pub context: VulkanContextDescriptor,
-}
-impl VulkanOwnedTextureDescriptor {
-    pub fn new(extent: LogicalExtent, context: VulkanContextDescriptor) -> Self {
-        Self { extent, context }
-    }
-}
-impl ToNative<sys::mln_vulkan_owned_texture_descriptor> for VulkanOwnedTextureDescriptor {
-    fn to_native(
-        &self,
-        arena: &mut InputArena,
-    ) -> Result<sys::mln_vulkan_owned_texture_descriptor> {
-        let mut raw: sys::mln_vulkan_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
-        raw.context = to_native(&self.context, arena)?;
-        Ok(raw)
-    }
-}
-
 /// A Vulkan surface to present to, for `MapHandle::attach_vulkan_surface()` and
 /// `RenderSessionHandle::set_vulkan_surface_target()`.
 ///
@@ -5500,8 +5383,7 @@ pub struct VulkanTextureFrame {
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
-    /// The image's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The image's index in the descriptor's `textures`.
     pub slot: u32,
     /// The VkImage.
     pub image: u64,
@@ -5753,34 +5635,6 @@ impl ToNative<sys::mln_web_gpu_context_descriptor> for WebGpuContextDescriptor {
     }
 }
 
-/// A ring of WebGPU textures that the session creates, for
-/// `MapHandle::attach_web_gpu_owned_texture()`.
-///
-/// See `mln_web_gpu_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct WebGpuOwnedTextureDescriptor {
-    pub extent: LogicalExtent,
-    pub context: WebGpuContextDescriptor,
-}
-impl WebGpuOwnedTextureDescriptor {
-    pub fn new(extent: LogicalExtent, context: WebGpuContextDescriptor) -> Self {
-        Self { extent, context }
-    }
-}
-impl ToNative<sys::mln_web_gpu_owned_texture_descriptor> for WebGpuOwnedTextureDescriptor {
-    fn to_native(
-        &self,
-        arena: &mut InputArena,
-    ) -> Result<sys::mln_web_gpu_owned_texture_descriptor> {
-        let mut raw: sys::mln_web_gpu_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_web_gpu_owned_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
-        raw.context = to_native(&self.context, arena)?;
-        Ok(raw)
-    }
-}
-
 /// A WebGPU surface to present to, for `MapHandle::attach_web_gpu_surface()`
 /// and `RenderSessionHandle::set_web_gpu_surface_target()`.
 ///
@@ -5837,8 +5691,7 @@ pub struct WebGpuTextureFrame {
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
-    /// The texture's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The texture's index in the descriptor's `textures`.
     pub slot: u32,
     /// The WGPUTexture.
     pub texture: *mut std::ffi::c_void,

@@ -125,11 +125,6 @@ typedef struct mln_render_session_attach_options {
   uint32_t size;
   mln_render_driver_kind driver MLN_BINDING("required=true");
   /**
-   * How many textures a ring that the session creates has, up to 8. Zero picks
-   * a default.
-   */
-  uint32_t requested_texture_ring_depth;
-  /**
    * The kinds of mln_gpu_sync that you can wait on before you read an acquired
    * frame. The session uses one of them that its target supports. Zero lets the
    * session pick a kind that names no object to wait on.
@@ -191,9 +186,7 @@ typedef struct mln_metal_context_descriptor {
  * The Vulkan device and queue that a render session uses.
  *
  * Keep these objects alive until a detach or disposal of the session
- * completes, or an abandon of it returns. If you discarded a frame of a ring
- * that the session creates, or abandon the session while you hold a frame,
- * keep them alive until the process exits instead.
+ * completes, or an abandon of it returns.
  */
 typedef struct mln_vulkan_context_descriptor {
   /** A `VkInstance`. */

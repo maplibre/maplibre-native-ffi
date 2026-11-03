@@ -34,6 +34,9 @@ typedef struct host_state {
   mln_test_graphics_surface* surface;
   mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
   mln_test_graphics_surface* extra_surfaces[EXTRA_TARGETS];
+  // The Metal command queue that the session attached with, or null. A Metal
+  // texture target must name the same one.
+  void* command_queue;
   bool keep_until_exit;
 } host_state;
 
@@ -53,13 +56,6 @@ static mln_vulkan_image_owner attach_vulkan_owner =
 // Set only while mln_test_render_fixture_create_synced() attaches. A Metal
 // fixture that accepts queue order also names the graphics object's queue.
 static mln_gpu_sync_kind_flags attach_sync_kinds = 0;
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-// MTLPixelFormatRGBA8Unorm, the format a fixture attaches with by default.
-#define DEFAULT_METAL_PIXEL_FORMAT UINT64_C(70)
-// Set only while mln_test_render_fixture_create_metal_owned_texture()
-// attaches; zero selects DEFAULT_METAL_PIXEL_FORMAT.
-static uint64_t attach_pixel_format = 0;
-#endif
 
 static void host_state_free(host_state* state) {
   if (state->owns_graphics) {
@@ -123,14 +119,6 @@ uint32_t mln_test_backend_driver(void) {
 
 void mln_test_release_thread_gpu_resources(void) {}
 
-static mln_logical_extent host_extent(void) {
-  return (mln_logical_extent){
-    .width = MLN_TEST_HOST_TARGET_SIZE,
-    .height = MLN_TEST_HOST_TARGET_SIZE,
-    .scale_factor = 1.0,
-  };
-}
-
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 static mln_metal_context_descriptor host_context(
   const mln_test_graphics_context* context
@@ -193,61 +181,6 @@ static mln_open_gl_context_descriptor host_context(
   };
 }
 #endif
-
-bool mln_test_backend_attach_owned(
-  mln_map map, const mln_render_session_attach_options* options,
-  void** out_state, mln_render_session* out_session,
-  const mln_completion* completion, mln_status* out_status
-) {
-  host_state* state = host_state_create();
-  if (state == NULL) {
-    return false;
-  }
-  *out_state = state;
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_metal_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_metal_owned_texture_descriptor)
-  };
-  descriptor.extent = host_extent();
-  descriptor.context = host_context(&state->context);
-  descriptor.pixel_format =
-    attach_pixel_format != 0 ? attach_pixel_format : DEFAULT_METAL_PIXEL_FORMAT;
-  if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
-    descriptor.command_queue =
-      mln_test_graphics_metal_command_queue(state->graphics);
-  mln_render_session_attach_options attach = *options;
-  attach.producer_sync_kinds |= attach_sync_kinds;
-  *out_status = mln_map_attach_metal_owned_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_vulkan_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_owned_texture_descriptor)
-  };
-  descriptor.extent = host_extent();
-  descriptor.context = host_context(&state->context);
-  mln_render_session_attach_options attach = *options;
-  attach.producer_sync_kinds |= attach_sync_kinds;
-  if (attach_queue_lock != NULL) {
-    attach.queue_lock = *attach_queue_lock;
-  }
-  *out_status = mln_map_attach_vulkan_owned_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#else
-  mln_open_gl_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_owned_texture_descriptor)
-  };
-  descriptor.extent = host_extent();
-  descriptor.context = host_context(&state->context);
-  mln_render_session_attach_options attach = *options;
-  attach.producer_sync_kinds |= attach_sync_kinds;
-  *out_status = mln_map_attach_open_gl_owned_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#endif
-  return true;
-}
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 typedef mln_metal_borrowed_texture_descriptor borrowed_descriptor;
@@ -356,7 +289,7 @@ bool mln_test_backend_attach_borrowed(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  const size_t depth = mln_test_render_ring_depth(options);
+  const size_t depth = mln_test_render_ring_depth();
   host_state* state = host_state_create();
   if (state == NULL) {
     return false;
@@ -382,12 +315,12 @@ bool mln_test_backend_attach_borrowed(
   }
   *out_state = state;
   mln_render_session_attach_options attach = *options;
-  attach.requested_texture_ring_depth = 0;
   attach.producer_sync_kinds |= attach_sync_kinds;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
-    descriptor.command_queue =
+    state->command_queue =
       mln_test_graphics_metal_command_queue(state->graphics);
+  descriptor.command_queue = state->command_queue;
   *out_status = mln_map_attach_metal_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -444,27 +377,14 @@ static bool attach_surface(
   return true;
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-bool mln_test_render_fixture_create_metal_owned_texture(
-  mln_map map, mln_test_render_fixture* fixture, uint64_t pixel_format
-) {
-  attach_pixel_format = pixel_format;
-  const bool attached = mln_test_render_fixture_create_owned(map, fixture);
-  attach_pixel_format = 0;
-  return attached;
-}
-#endif
-
 bool mln_test_render_fixture_create_synced(
-  mln_map map, mln_test_render_fixture* fixture, bool borrowed,
+  mln_map map, mln_test_render_fixture* fixture,
   mln_gpu_sync_kind_flags producer_sync_kinds
 ) {
   attach_sync_kinds = producer_sync_kinds;
-  const bool attached = borrowed
-                          ? mln_test_render_fixture_create_borrowed_ring(
-                              map, fixture, 1, MLN_TEST_PRESET_DRIVER
-                            )
-                          : mln_test_render_fixture_create_owned(map, fixture);
+  const bool attached = mln_test_render_fixture_create_borrowed_ring(
+    map, fixture, 1, MLN_TEST_PRESET_DRIVER
+  );
   attach_sync_kinds = 0;
   return attached;
 }
@@ -499,18 +419,6 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   );
   attach_vulkan_owner = MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE;
   attach_sync_kinds = 0;
-  return attached;
-}
-
-bool mln_test_render_fixture_create_vulkan_owned_texture(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_vulkan_device_proc_addr_wrap wrap, const mln_queue_lock* queue_lock
-) {
-  wrap_device_proc_addr = wrap;
-  attach_queue_lock = queue_lock;
-  const bool attached = mln_test_render_fixture_create_owned(map, fixture);
-  wrap_device_proc_addr = NULL;
-  attach_queue_lock = NULL;
   return attached;
 }
 
@@ -688,6 +596,8 @@ mln_status mln_test_render_fixture_set_textures(
     return MLN_STATUS_NATIVE_ERROR;
   }
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  const host_state* state = fixture->backend_state;
+  descriptor.command_queue = state == NULL ? NULL : state->command_queue;
   return mln_render_session_set_metal_borrowed_texture_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );

@@ -32,15 +32,14 @@ using mln::core::VulkanBorrowedTarget;
 static_assert(VK_FORMAT_UNDEFINED == 0);
 static_assert(VK_IMAGE_LAYOUT_UNDEFINED == 0);
 
-auto validate_vulkan_handles(
-  const mln_vulkan_owned_texture_descriptor& descriptor
-) -> mln_status {
-  auto* const instance = static_cast<VkInstance>(descriptor.context.instance);
+auto validate_vulkan_handles(const mln_vulkan_context_descriptor& context)
+  -> mln_status {
+  auto* const instance = static_cast<VkInstance>(context.instance);
   auto* const physical_device =
-    static_cast<VkPhysicalDevice>(descriptor.context.physical_device);
+    static_cast<VkPhysicalDevice>(context.physical_device);
 
-  auto dispatcher = mln::core::vulkan_dispatch_loader(descriptor.context);
-  mln::core::vulkan_init_instance_dispatch(dispatcher, descriptor.context);
+  auto dispatcher = mln::core::vulkan_dispatch_loader(context);
+  mln::core::vulkan_init_instance_dispatch(dispatcher, context);
   if (
     dispatcher.vkEnumeratePhysicalDevices == nullptr ||
     dispatcher.vkGetPhysicalDeviceQueueFamilyProperties == nullptr
@@ -87,7 +86,7 @@ auto validate_vulkan_handles(
   dispatcher.vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, nullptr
   );
-  if (descriptor.context.graphics_queue_family_index >= queue_family_count) {
+  if (context.graphics_queue_family_index >= queue_family_count) {
     mln::core::set_thread_error(
       "Vulkan graphics_queue_family_index is out of range"
     );
@@ -100,7 +99,7 @@ auto validate_vulkan_handles(
     physical_device, &queue_family_count, queue_families.data()
   );
   const auto& queue_family =
-    queue_families.at(descriptor.context.graphics_queue_family_index);
+    queue_families.at(context.graphics_queue_family_index);
   if (
     (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0 ||
     queue_family.queueCount == 0
@@ -238,11 +237,10 @@ class VulkanTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   VulkanTextureSessionBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth,
+    const mln_vulkan_context_descriptor& context, mln::Size size,
     std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : backend_(descriptor, size, ring_depth, std::move(queue_lock)) {}
+      : backend_(context, size, std::move(queue_lock)) {}
 
   VulkanTextureSessionBackend(
     const VulkanBorrowedTarget& target, mln::Size size,
@@ -390,78 +388,10 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_VULKAN;
 }
 
-auto create_vulkan_owned_texture_backend(
-  const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-  std::size_t ring_depth
+auto create_vulkan_offscreen_texture_backend(
+  const mln_vulkan_context_descriptor& context, mln::Size size
 ) -> std::unique_ptr<TextureSessionBackend> {
-  return std::make_unique<VulkanTextureSessionBackend>(
-    descriptor, size, ring_depth, nullptr
-  );
-}
-
-auto vulkan_owned_texture_attach_start(
-  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status {
-  MapObject* live_map = nullptr;
-  const auto map_status = validate_map_live(map, live_map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_vulkan_owned_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-
-  auto session = std::make_shared<mln_render_session_object>();
-  session->map = map;
-  set_session_extent(*session, descriptor->extent);
-  session->texture.mode = TextureSessionMode::Owned;
-  session->accepts_queue_lock = true;
-  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
-  session->probe_sync_kinds = [context = descriptor->context] {
-    return vulkan_sync_support(context);
-  };
-  const auto copied = *descriptor;
-  const auto ring_depth = attach_ring_depth(options);
-  session->initialize_backend =
-    [copied, ring_depth](mln_render_session_object& target) {
-      const auto handles_status = validate_vulkan_handles(copied);
-      if (handles_status != MLN_STATUS_OK) {
-        return handles_status;
-      }
-      auto backend = std::make_unique<VulkanTextureSessionBackend>(
-        copied, mln::Size{target.physical_width, target.physical_height},
-        ring_depth, target.queue_lock
-      );
-      backend->set_producer_sync_kind(target.producer_sync_kind);
-      target.texture.backend = std::move(backend);
-      return MLN_STATUS_OK;
-    };
-  const auto capabilities = mln_render_session_capabilities{
-    .size = sizeof(mln_render_session_capabilities),
-    .driver = {},
-    .texture_ring_depth = ring_depth,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_READBACK,
-    .producer_sync_kind = {},
-    .consumer_sync_kinds =
-      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER,
-  };
-  return start_attach_render_session(
-    std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, completion,
-    valueless_completion<&mln_map_attach_vulkan_owned_texture>()
-  );
+  return std::make_unique<VulkanTextureSessionBackend>(context, size, nullptr);
 }
 
 auto vulkan_borrowed_texture_attach_start(
@@ -501,12 +431,8 @@ auto vulkan_borrowed_texture_attach_start(
   session->initialize_backend = [target = VulkanBorrowedTarget{*descriptor}](
                                   mln_render_session_object& live
                                 ) {
-    const auto handles = mln_vulkan_owned_texture_descriptor{
-      .size = sizeof(mln_vulkan_owned_texture_descriptor),
-      .extent = target.descriptor.extent,
-      .context = target.descriptor.context,
-    };
-    const auto handles_status = validate_vulkan_handles(handles);
+    const auto handles_status =
+      validate_vulkan_handles(target.descriptor.context);
     if (handles_status != MLN_STATUS_OK) {
       return handles_status;
     }

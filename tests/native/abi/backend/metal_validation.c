@@ -13,23 +13,11 @@
 
 MLN_TEST_DESCRIPTOR_EDITS(metal_surface, mln_metal_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(metal_surface)
-MLN_TEST_DESCRIPTOR_EDITS(metal_owned, mln_metal_owned_texture_descriptor)
-MLN_TEST_OVERFLOW_EDIT(metal_owned)
 MLN_TEST_DESCRIPTOR_EDITS(metal_borrowed, mln_metal_borrowed_texture_descriptor)
 MLN_TEST_BORROWED_EDITS(metal_borrowed, metal)
 
 static void surface_without_layer(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_surface.layer = NULL;
-}
-static void owned_without_device(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_owned.context.device = NULL;
-}
-static void owned_without_pixel_format(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_owned.pixel_format = 0;
-}
-static void owned_with_another_pixel_format(void* call) {
-  // MTLPixelFormatRGBA16Float.
-  ((mln_test_target_call*)call)->descriptor.metal_owned.pixel_format = 115;
 }
 static void borrowed_without_texture(void* call) {
   mln_test_target_call* edited = call;
@@ -96,9 +84,6 @@ static void borrowed_with_another_depth(void* call) {
 #endif
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_metal_surface)
-MLN_TEST_ATTACH_SUBMITTER(
-  submit_owned_attach, mln_map_attach_metal_owned_texture
-)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_metal_borrowed_texture
 )
@@ -170,31 +155,6 @@ static void metal_attach_rejects_malformed_calls(void) {
   mln_test_run_attach_table(
     submit_surface_attach, &call, surface_rows,
     sizeof(surface_rows) / sizeof(surface_rows[0])
-  );
-
-  call.descriptor.metal_owned = (mln_metal_owned_texture_descriptor){
-    .size = sizeof(mln_metal_owned_texture_descriptor)
-  };
-  call.descriptor.metal_owned.extent = mln_test_target_extent();
-  call.descriptor.metal_owned.context.device = MLN_TEST_FAKE_HANDLE;
-  // MTLPixelFormatRGBA8Unorm.
-  call.descriptor.metal_owned.pixel_format = 70;
-  static const mln_test_validation_case owned_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(metal_owned),
-    MLN_TEST_OVERFLOW_CASE(metal_owned),
-    {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"zero pixel format", owned_without_pixel_format,
-     MLN_STATUS_INVALID_ARGUMENT, "RGBA8Unorm or BGRA8Unorm"},
-    {"an unaccepted pixel format", owned_with_another_pixel_format,
-     MLN_STATUS_INVALID_ARGUMENT, "RGBA8Unorm or BGRA8Unorm"},
-#if !defined(MLN_FFI_TEST_BACKEND_METAL)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
-  };
-  mln_test_run_attach_table(
-    submit_owned_attach, &call, owned_rows,
-    sizeof(owned_rows) / sizeof(owned_rows[0])
   );
 
   call =

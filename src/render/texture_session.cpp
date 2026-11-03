@@ -53,26 +53,6 @@ auto validate_borrowed_textures(
 
 }  // namespace
 
-auto validate_webgpu_owned_texture_descriptor(
-  const mln_web_gpu_owned_texture_descriptor* descriptor
-) -> mln_status {
-  if (descriptor == nullptr) {
-    set_thread_error("texture descriptor must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (descriptor->size < sizeof(mln_web_gpu_owned_texture_descriptor)) {
-    set_thread_error("mln_web_gpu_owned_texture_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  return validate_webgpu_context(descriptor->context);
-}
-
 auto validate_webgpu_borrowed_texture_descriptor(
   const mln_web_gpu_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
@@ -118,35 +98,6 @@ auto validate_webgpu_borrowed_texture_descriptor(
   return MLN_STATUS_OK;
 }
 
-auto validate_metal_owned_texture_descriptor(
-  const mln_metal_owned_texture_descriptor* descriptor
-) -> mln_status {
-  if (descriptor == nullptr) {
-    set_thread_error("texture descriptor must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (descriptor->size < sizeof(mln_metal_owned_texture_descriptor)) {
-    set_thread_error("mln_metal_owned_texture_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  if (
-    descriptor->pixel_format != metal_rgba8_unorm &&
-    descriptor->pixel_format != metal_bgra8_unorm
-  ) {
-    set_thread_error(
-      "Metal texture pixel format must be RGBA8Unorm or BGRA8Unorm"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return validate_metal_context(descriptor->context, true);
-}
-
 auto validate_metal_borrowed_texture_descriptor(
   const mln_metal_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
@@ -168,28 +119,6 @@ auto validate_metal_borrowed_texture_descriptor(
     descriptor->textures, descriptor->texture_count,
     [](const mln_metal_borrowed_texture& entry) { return entry.texture; },
     "Metal texture must not be null"
-  );
-}
-
-auto validate_vulkan_owned_texture_descriptor(
-  const mln_vulkan_owned_texture_descriptor* descriptor
-) -> mln_status {
-  if (descriptor == nullptr) {
-    set_thread_error("texture descriptor must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (descriptor->size < sizeof(mln_vulkan_owned_texture_descriptor)) {
-    set_thread_error("mln_vulkan_owned_texture_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  return validate_vulkan_context(
-    descriptor->context, "Vulkan handles must not be null"
   );
 }
 
@@ -260,29 +189,6 @@ auto validate_borrowed_texture_ownership(
     "a borrowed OpenGL texture requires a context shared with its host owner"
   );
   return MLN_STATUS_INVALID_ARGUMENT;
-}
-
-auto validate_opengl_owned_texture_descriptor(
-  const mln_open_gl_owned_texture_descriptor* descriptor,
-  bool require_supported_provider
-) -> mln_status {
-  if (descriptor == nullptr) {
-    set_thread_error("texture descriptor must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (descriptor->size < sizeof(mln_open_gl_owned_texture_descriptor)) {
-    set_thread_error("mln_open_gl_owned_texture_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  return validate_opengl_context(
-    descriptor->context, require_supported_provider
-  );
 }
 
 auto validate_opengl_borrowed_texture_descriptor(
@@ -383,7 +289,7 @@ auto prepare_readback(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (live->texture.mode != TextureSessionMode::Owned) {
+  if (live->texture.mode != TextureSessionMode::Offscreen) {
     set_thread_error("texture session does not support CPU readback");
     return MLN_STATUS_UNSUPPORTED;
   }

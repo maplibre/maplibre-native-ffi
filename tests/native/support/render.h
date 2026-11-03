@@ -27,10 +27,6 @@ typedef struct mln_test_render_fixture {
   uint32_t driver;
   bool observed_attaching;
   bool observed_driver_ready;
-  // Set in the browser to service the session on the browser main thread
-  // instead of the calling thread, which returns to the main thread's event
-  // loop after each service.
-  bool serviced_on_main_thread;
   // Counted by the fixture's frame and driver-work wakes, which also pulse.
   atomic_uint frame_wakes;
   atomic_uint driver_wakes;
@@ -61,19 +57,11 @@ bool mln_test_render_fixture_create_borrowed_ring(
   mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
 );
 
-// Attaches the preset's owned texture target on the preset's driver: a ring of
-// two textures that the session allocates on the fixture's host device. Only
-// the cases that check owned textures themselves use it.
-bool mln_test_render_fixture_create_owned(
-  mln_map map, mln_test_render_fixture* fixture
-);
-
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
 // Submits a borrowed attach with the caller's options, whose driver it
 // replaces with the preset's, and the caller's completion, and returns without
-// waiting for the attach. The ring has as many textures as the options'
-// requested_texture_ring_depth, or two for zero. Returns the submission's
+// waiting for the attach. The ring has two textures. Returns the submission's
 // status, or MLN_STATUS_NATIVE_ERROR, submitting nothing, when the backend
 // cannot create the ring. On MLN_STATUS_OK the fixture holds the attaching
 // session, which the case retires; mln_test_render_fixture_destroy() then
@@ -148,34 +136,6 @@ void* mln_test_webgpu_ring_texture(
   const mln_test_render_fixture* fixture, size_t index
 );
 
-// A WebGPU device that the browser main thread creates and owns, for a
-// session that the main thread services while the suite's thread waits.
-typedef struct mln_test_webgpu_main_thread_device {
-  mln_web_gpu_context_descriptor context;
-  atomic_bool created;
-  atomic_bool lost;
-} mln_test_webgpu_main_thread_device;
-
-// Creates the device on the browser main thread. Returns false, holding
-// nothing, when the main thread gets no device.
-bool mln_test_webgpu_main_thread_device_create(
-  mln_test_webgpu_main_thread_device* device
-);
-
-// Destroys the device on the browser main thread and waits until the main
-// thread reports it lost, which settles the runtime keepalive the device held
-// there. Every session on the device must be gone first.
-void mln_test_webgpu_main_thread_device_destroy(
-  mln_test_webgpu_main_thread_device* device
-);
-
-// Attaches a 64x64 owned texture on `device`, serviced on the browser main
-// thread.
-bool mln_test_webgpu_main_thread_fixture_create(
-  mln_map map, const mln_test_webgpu_main_thread_device* device,
-  mln_test_render_fixture* fixture
-);
-
 // Copies the ring texture at `index` into a buffer on the device's queue, maps
 // that buffer, and writes its tightly packed RGBA8 pixels to `pixels`, which
 // holds at least `size` bytes. Returns false when the texture, the copy, or
@@ -204,16 +164,6 @@ bool mln_test_dedicated_egl_surface_is_current(
 bool mln_test_dedicated_egl_make_host_context_current(
   mln_test_render_fixture* fixture
 );
-#endif
-
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-// Attaches a private 64x64 OpenGL owned texture target whose context and
-// driver both belong to the native core worker. The EGL display and config, or
-// the WGL device context, come from tests/graphics.
-bool mln_test_dedicated_texture_create(
-  mln_map map, mln_test_render_fixture* fixture
-);
-void mln_test_dedicated_texture_destroy(mln_test_render_fixture* fixture);
 #endif
 
 #ifdef __cplusplus

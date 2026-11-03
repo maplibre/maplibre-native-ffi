@@ -85,14 +85,13 @@ class WebGLOffscreenDevice final : public OffscreenDevice {
       return MLN_STATUS_NATIVE_ERROR;
     }
     auto context = std::make_shared<OffscreenWebGLContext>(handle);
-    auto descriptor = mln_open_gl_owned_texture_descriptor{};
-    descriptor.size = sizeof(descriptor);
-    descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-    descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
-    descriptor.context.data.web_gl.kind = MLN_WEB_GL_CONTEXT_EXISTING;
-    descriptor.context.data.web_gl.context = static_cast<int32_t>(handle);
+    auto descriptor = mln_open_gl_context_descriptor{};
+    descriptor.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
+    descriptor.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
+    descriptor.data.web_gl.kind = MLN_WEB_GL_CONTEXT_EXISTING;
+    descriptor.data.web_gl.context = static_cast<int32_t>(handle);
     const auto status =
-      create_opengl_owned_texture_backend(descriptor, size, 1, out_backend);
+      create_opengl_offscreen_texture_backend(descriptor, size, out_backend);
     if (out_backend != nullptr) {
       out_backend->retain(std::move(context));
     }

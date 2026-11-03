@@ -85,7 +85,6 @@ final class WorkerSession {
     final attachment = attach(
       RenderSessionAttachOptions(
         driver: RenderDriverKind.coreWorker,
-        requestedTextureRingDepth: 1,
         frameWake: Wake(callback: () => worker._frames.notify()),
       ),
     );

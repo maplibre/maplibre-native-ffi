@@ -998,19 +998,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_metal_owned_texture_descriptor NativeMetalOwnedTextureDescriptor(
-        MetalOwnedTextureDescriptor value
-    )
-    {
-        var native = new mln_metal_owned_texture_descriptor();
-        native.size = (uint)sizeof(mln_metal_owned_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
-        native.context = NativeMetalContextDescriptor(value.Context);
-        native.pixel_format = value.PixelFormat;
-        native.command_queue = (void*)value.CommandQueue.Address;
-        return native;
-    }
-
     internal static mln_metal_surface_descriptor NativeMetalSurfaceDescriptor(
         MetalSurfaceDescriptor value
     )
@@ -1255,18 +1242,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_open_gl_owned_texture_descriptor NativeOpenGlOwnedTextureDescriptor(
-        OpenGlOwnedTextureDescriptor value,
-        NativeCallScope scope
-    )
-    {
-        var native = new mln_open_gl_owned_texture_descriptor();
-        native.size = (uint)sizeof(mln_open_gl_owned_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
-        native.context = NativeOpenGlContextDescriptor(value.Context, scope);
-        return native;
-    }
-
     internal static mln_open_gl_surface_descriptor NativeOpenGlSurfaceDescriptor(
         OpenGlSurfaceDescriptor value,
         NativeCallScope scope
@@ -1289,10 +1264,7 @@ internal static unsafe class GeneratedValues
             value.frame_id,
             value.slot,
             value.texture,
-            value.target,
-            value.internal_format,
-            value.format,
-            value.type
+            value.target
         );
 
     internal static mln_premultiplied_rgba8_image NativePremultipliedRgba8Image(
@@ -1461,7 +1433,6 @@ internal static unsafe class GeneratedValues
         var native = new mln_render_session_attach_options();
         native.size = (uint)sizeof(mln_render_session_attach_options);
         native.driver = (mln_render_driver_kind)value.Driver;
-        native.requested_texture_ring_depth = value.RequestedTextureRingDepth;
         native.producer_sync_kinds = (uint)value.ProducerSyncKinds;
         native.frame_wake = NativeWake(value.FrameWake, scope);
         native.driver_work_wake = NativeWake(value.DriverWorkWake, scope);
@@ -2347,17 +2318,6 @@ internal static unsafe class GeneratedValues
         native.graphics_queue_family_index = value.GraphicsQueueFamilyIndex;
         native.get_instance_proc_addr = (void*)value.GetInstanceProcAddr.Address;
         native.get_device_proc_addr = (void*)value.GetDeviceProcAddr.Address;
-        return native;
-    }
-
-    internal static mln_vulkan_owned_texture_descriptor NativeVulkanOwnedTextureDescriptor(
-        VulkanOwnedTextureDescriptor value
-    )
-    {
-        var native = new mln_vulkan_owned_texture_descriptor();
-        native.size = (uint)sizeof(mln_vulkan_owned_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
-        native.context = NativeVulkanContextDescriptor(value.Context);
         return native;
     }
 

@@ -339,20 +339,6 @@ static jint mln_map_attach_metal_borrowed_texture_jni(
   );
 }
 
-static jint mln_map_attach_metal_owned_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_metal_owned_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_metal_owned_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_attach_metal_surface_jni(
   JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
   jlong out_session, jlong completion, jlong out_diagnostic
@@ -395,20 +381,6 @@ static jint mln_map_attach_open_gl_borrowed_texture_jni(
   );
 }
 
-static jint mln_map_attach_open_gl_owned_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_open_gl_owned_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_open_gl_owned_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_attach_open_gl_surface_jni(
   JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
   jlong out_session, jlong completion, jlong out_diagnostic
@@ -437,20 +409,6 @@ static jint mln_map_attach_vulkan_borrowed_texture_jni(
   );
 }
 
-static jint mln_map_attach_vulkan_owned_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_vulkan_owned_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_vulkan_owned_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_attach_vulkan_surface_jni(
   JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
   jlong out_session, jlong completion, jlong out_diagnostic
@@ -472,20 +430,6 @@ static jint mln_map_attach_web_gpu_borrowed_texture_jni(
   return (jint)mln_map_attach_web_gpu_borrowed_texture(
     (mln_map)map,
     MLN_JNI_POINTER(const mln_web_gpu_borrowed_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_web_gpu_owned_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_web_gpu_owned_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_web_gpu_owned_texture_descriptor*, descriptor),
     MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
     MLN_JNI_POINTER(mln_render_session*, out_session),
     MLN_JNI_POINTER(const mln_completion*, completion),
@@ -2227,28 +2171,20 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_apply_camera_delta_jni},
   {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_borrowed_texture_jni},
-  {"mln_map_attach_metal_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_metal_owned_texture_jni},
   {"mln_map_attach_metal_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_surface_jni},
   {"mln_map_attach_offscreen", "(JJJJJJJ)I",
    (void*)mln_map_attach_offscreen_jni},
   {"mln_map_attach_open_gl_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_open_gl_borrowed_texture_jni},
-  {"mln_map_attach_open_gl_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_open_gl_owned_texture_jni},
   {"mln_map_attach_open_gl_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_open_gl_surface_jni},
   {"mln_map_attach_vulkan_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_vulkan_borrowed_texture_jni},
-  {"mln_map_attach_vulkan_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_vulkan_owned_texture_jni},
   {"mln_map_attach_vulkan_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_vulkan_surface_jni},
   {"mln_map_attach_web_gpu_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_web_gpu_borrowed_texture_jni},
-  {"mln_map_attach_web_gpu_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_web_gpu_owned_texture_jni},
   {"mln_map_attach_web_gpu_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_web_gpu_surface_jni},
   {"mln_map_begin_command_group", "(JJJ)I",
@@ -2591,28 +2527,20 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_apply_camera_delta_jni},
   {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_borrowed_texture_jni},
-  {"mln_map_attach_metal_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_metal_owned_texture_jni},
   {"mln_map_attach_metal_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_surface_jni},
   {"mln_map_attach_offscreen", "(JJJJJJJ)I",
    (void*)mln_map_attach_offscreen_jni},
   {"mln_map_attach_open_gl_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_open_gl_borrowed_texture_jni},
-  {"mln_map_attach_open_gl_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_open_gl_owned_texture_jni},
   {"mln_map_attach_open_gl_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_open_gl_surface_jni},
   {"mln_map_attach_vulkan_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_vulkan_borrowed_texture_jni},
-  {"mln_map_attach_vulkan_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_vulkan_owned_texture_jni},
   {"mln_map_attach_vulkan_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_vulkan_surface_jni},
   {"mln_map_attach_web_gpu_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_web_gpu_borrowed_texture_jni},
-  {"mln_map_attach_web_gpu_owned_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_web_gpu_owned_texture_jni},
   {"mln_map_attach_web_gpu_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_web_gpu_surface_jni},
   {"mln_map_begin_command_group", "(JJJ)I",

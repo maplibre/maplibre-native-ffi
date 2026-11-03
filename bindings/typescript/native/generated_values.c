@@ -1489,19 +1489,6 @@ napi_value mln_ts_read_open_gl_texture_frame(
         env, result, "target", mln_ts_number(env, (double)(source->target))
       ))
     return NULL;
-  if (!mln_ts_set(
-        env, result, "internalFormat",
-        mln_ts_number(env, (double)(source->internal_format))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "format", mln_ts_number(env, (double)(source->format))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "type", mln_ts_number(env, (double)(source->type))
-      ))
-    return NULL;
   return result;
 }
 
@@ -4625,48 +4612,6 @@ bool mln_ts_write_metal_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_metal_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_metal_owned_texture_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "extent", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "extent");
-  memset(&out->extent, 0, sizeof out->extent);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->context, 0, sizeof out->context);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_metal_context_descriptor(
-          call, member, &out->context, child
-        ))
-      return false;
-  }
-  if (!mln_ts_member(call, value, "pixelFormat", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "pixelFormat");
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->pixel_format = (uint64_t)number;
-  }
-  if (!mln_ts_member(call, value, "commandQueue", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "commandQueue");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->command_queue = (void*)(uintptr_t)number;
-    }
-  }
-  return true;
-}
-
 bool mln_ts_write_metal_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_metal_surface_descriptor* out,
   const char* path
@@ -5059,30 +5004,6 @@ bool mln_ts_write_open_gl_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_open_gl_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_open_gl_owned_texture_descriptor* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "extent", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "extent");
-  memset(&out->extent, 0, sizeof out->extent);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_open_gl_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
-  return true;
-}
-
 bool mln_ts_write_open_gl_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_open_gl_surface_descriptor* out,
   const char* path
@@ -5287,17 +5208,6 @@ bool mln_ts_write_render_session_attach_options(
     if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
       return false;
     out->driver = (mln_render_driver_kind)number;
-  }
-  if (!mln_ts_member(call, value, "requestedTextureRingDepth", &member))
-    return false;
-  mln_ts_path(child, sizeof child, path, "requestedTextureRingDepth");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->requested_texture_ring_depth = (uint32_t)number;
-    }
   }
   if (!mln_ts_member(call, value, "producerSyncKinds", &member)) return false;
   mln_ts_path(child, sizeof child, path, "producerSyncKinds");
@@ -6275,30 +6185,6 @@ bool mln_ts_write_vulkan_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_vulkan_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_vulkan_owned_texture_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "extent", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "extent");
-  memset(&out->extent, 0, sizeof out->extent);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_vulkan_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
-  return true;
-}
-
 bool mln_ts_write_vulkan_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_vulkan_surface_descriptor* out,
   const char* path
@@ -6484,30 +6370,6 @@ bool mln_ts_write_web_gpu_context_descriptor(
       out->queue = (void*)(uintptr_t)number;
     }
   }
-  return true;
-}
-
-bool mln_ts_write_web_gpu_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_web_gpu_owned_texture_descriptor* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "extent", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "extent");
-  memset(&out->extent, 0, sizeof out->extent);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_web_gpu_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
   return true;
 }
 
