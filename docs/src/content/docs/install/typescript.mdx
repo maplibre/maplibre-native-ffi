@@ -66,17 +66,18 @@ host also calls `mln_android_init` before it creates a runtime.
 
 ## OpenHarmony
 
-Add one backend package from
-[OHPM](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl):
-`@maplibre/native-ffi-opengl` or `@maplibre/native-ffi-vulkan`. On OpenHarmony,
-the backend package holds the binding too, so import from it.
+Add the binding and one backend package from
+[OHPM](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi):
 
 ```bash frame="terminal"
-ohpm install @maplibre/native-ffi-opengl
+ohpm install @maplibre/native-ffi @maplibre/native-ffi-opengl
 ```
 
+For Vulkan, replace `@maplibre/native-ffi-opengl` with
+`@maplibre/native-ffi-vulkan`. Keep both packages on the same version.
+
 ```ts title="Index.ets"
-import { RuntimeHandle } from "@maplibre/native-ffi-opengl";
+import { RuntimeHandle } from "@maplibre/native-ffi";
 
 const runtime = await RuntimeHandle.create();
 ```
@@ -91,9 +92,9 @@ mise run //bindings/typescript:pack linux-gnu-x64-vulkan
 npm install path/to/maplibre-native-ffi/bindings/typescript/build/npm/*.tgz
 ```
 
-For OpenHarmony, pack and install the HAR instead:
+For OpenHarmony, pack and install both HARs instead:
 
 ```bash frame="terminal"
 mise -E ohos run //bindings/typescript:pack-ohpm ohos-arm64-egl
-ohpm install path/to/maplibre-native-ffi/bindings/typescript/build/ohpm/native-ffi-opengl-0.0.0.har
+ohpm install path/to/maplibre-native-ffi/bindings/typescript/build/ohpm/*.har
 ```

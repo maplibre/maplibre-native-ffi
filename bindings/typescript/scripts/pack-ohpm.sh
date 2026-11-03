@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Packs the OHPM package of each backend that the OpenHarmony presets name:
+# Packs the OHPM facade and the backends that the OpenHarmony presets name:
 #
 #   pack-ohpm.sh [--version <version>] <out dir> <preset>...
 #
-# A user installs one package, such as @maplibre/native-ffi-opengl. OHPM has
-# no per-platform packages, so a backend's HAR holds the files in ohpm/package,
-# the manifest in ohpm/oh-package.json, the bundled ArkTS entry, and, for each
-# ABI that a preset names, the addon, shared C library, and shared C++ runtime
-# that the build task installed. The C headers live under include/. Every
-# package takes the same version, 0.0.0 unless --version names one.
+# A user installs @maplibre/native-ffi and one backend package. The facade
+# holds the ArkTS entry and the addon's type declarations. A backend HAR
+# holds the addon, shared C library, and shared C++ runtime for every ABI
+# that its presets name, plus the C headers and native licenses.
 set -euo pipefail
 
 usage="usage: pack-ohpm.sh [--version <version>] <out dir> <preset>..."
@@ -37,6 +35,40 @@ mkdir -p "$out"
   MAPLIBRE_NATIVE_FFI_OHPM_BUNDLE="$staging/bundle" pnpm exec vp pack >/dev/null
 )
 
+# HARs carry the merged module manifest that hvigor normally generates,
+# including the API floor it checks when merging a dependency into a HAP.
+prepare_package() {
+  local kind=$1 name=$2 package="$staging/$1/package"
+  mkdir -p "$package/src/main"
+  cp "$binding/ohpm/package/README.md" "$binding/ohpm/package/CHANGELOG.md" \
+    "$binding/../../LICENSE" "$package/"
+  jq --arg name "$name" --arg version "$version" --arg kind "$kind" \
+    --argjson api "$api" '
+      .name = $name | .version = $version | .compatibleSdkVersion = $api
+      | if $kind == "facade" then del(.nativeComponents)
+        else del(.main, .dependencies)
+          | .description = ("The " + $kind + " backend of @maplibre/native-ffi on OpenHarmony.")
+          | .nativeComponents[].compatibleSdkVersion = $api
+        end' "$binding/ohpm/oh-package.json" >"$package/oh-package.json5"
+  jq --arg kind "$kind" --argjson api "$api" '
+      .app = {minAPIVersion: $api, targetAPIVersion: $api, apiReleaseType: "Release"}
+      | .module.name += ("_" + $kind)' \
+    "$binding/ohpm/package/src/main/module.json" >"$package/src/main/module.json"
+  if [[ $kind != facade ]]; then
+    # OHPM requires an entry declaration even for a package of native libraries.
+    printf 'export {};\n' >"$package/index.d.ts"
+  fi
+  # OHPM's review rejects a package whose changelog does not name its version.
+  printf '\n## %s\n\nSee the [release notes](%s/v%s).\n' "$version" \
+    https://github.com/maplibre/maplibre-native-ffi/releases/tag "$version" \
+    >>"$package/CHANGELOG.md"
+}
+
+prepare_package facade @maplibre/native-ffi
+facade="$staging/facade/package"
+cp -R "$staging/bundle/." "$facade/"
+cp -R "$binding/ohpm/package/src/main/cpp" "$facade/src/main/"
+
 for preset in "$@"; do
   case "$preset" in
     ohos-arm64-egl) abi=arm64-v8a backend=opengl ;;
@@ -50,40 +82,28 @@ for preset in "$@"; do
   esac
   package="$staging/$backend/package"
   if [[ ! -d $package ]]; then
-    mkdir -p "$package"
-    cp -R "$binding/ohpm/package/." "$staging/bundle/." "$package/"
-    cp "$binding/../../LICENSE" "$package/"
-    # The formatter writes a .json5 file in JSON5's own style, which jq cannot
-    # read, so the manifest is kept as JSON, which JSON5 readers accept too.
-    jq --arg name "@maplibre/native-ffi-$backend" --arg version "$version" \
-      --argjson api "$api" \
-      '.name = $name | .version = $version | .compatibleSdkVersion = $api
-        | .nativeComponents[].compatibleSdkVersion = $api' \
-      "$binding/ohpm/oh-package.json" >"$package/oh-package.json5"
-    # OHPM's review rejects a package whose changelog does not name its version.
-    printf '\n## %s\n\nSee the [release notes](%s/v%s).\n' "$version" \
-      https://github.com/maplibre/maplibre-native-ffi/releases/tag "$version" \
-      >>"$package/CHANGELOG.md"
+    prepare_package "$backend" "@maplibre/native-ffi-$backend"
   fi
-  # Every ABI of a backend carries the same headers and licenses.
   install="$binding/native/build/$preset/install"
   mkdir -p "$package/libs/$abi"
   cp "$install/libmaplibre_native_ffi.so" "$install/libmaplibre-native-c.so" \
-    "$install/libc++_shared.so" \
-    "$package/libs/$abi/"
+    "$install/libc++_shared.so" "$package/libs/$abi/"
   cp -R "$install/include" "$install/licenses" "$package/"
   mkdir -p "$staging/$backend/inventories"
   cp "$install/sbom/maplibre-native-ffi.cdx.json" "$staging/$backend/inventories/$preset.json"
 done
 
 for package in "$staging"/*/package; do
-  backend="$(basename "$(dirname "$package")")"
+  kind="$(basename "$(dirname "$package")")"
+  name=$(jq -er .name "$package/oh-package.json5")
   sbom_inputs=()
-  for inventory in "$staging/$backend/inventories"/*.json; do
-    sbom_inputs+=(--input "$inventory")
-  done
+  if [[ $kind != facade ]]; then
+    for inventory in "$staging/$kind/inventories"/*.json; do
+      sbom_inputs+=(--input "$inventory")
+    done
+  fi
   python3 "$binding/../../tools/release/binding_sbom.py" package \
-    --name "@maplibre/native-ffi-$backend" --version "$version" --ecosystem generic \
+    --name "$name" --version "$version" --ecosystem generic \
     --output "$package/sbom/maplibre-native-ffi.cdx.json" "${sbom_inputs[@]}"
-  tar -czf "$out/native-ffi-$backend-$version.har" -C "$(dirname "$package")" package
+  tar -czf "$out/${name#@maplibre/}-$version.har" -C "$(dirname "$package")" package
 done
