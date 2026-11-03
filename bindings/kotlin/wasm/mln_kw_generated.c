@@ -660,15 +660,6 @@ int32_t mln_kw_mln_map_lat_lng_bounds_for_camera(
   );
 }
 
-int32_t mln_kw_mln_map_lat_lng_bounds_for_camera_unwrapped(
-  int64_t map, uintptr_t camera, uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_lat_lng_bounds_for_camera_unwrapped(
-    (mln_map)map, (const mln_camera_options*)camera,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_list_style_layers(
   int64_t map, uintptr_t completion, uintptr_t out_diagnostic
 ) {

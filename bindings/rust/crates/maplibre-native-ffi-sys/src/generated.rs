@@ -2263,12 +2263,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_lat_lng_bounds_for_camera_unwrapped(
-        map: mln_map,
-        camera: *const mln_camera_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_list_style_layers(
         map: mln_map,
         completion: *const mln_completion,

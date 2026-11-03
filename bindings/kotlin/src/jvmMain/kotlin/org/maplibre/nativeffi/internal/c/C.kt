@@ -442,15 +442,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_lat_lng_bounds_for_camera_unwrapped =
-    Ffm.downcall(
-      "mln_map_lat_lng_bounds_for_camera_unwrapped",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_list_style_layers =
     Ffm.downcall("mln_map_list_style_layers", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_list_style_sources =
@@ -1904,15 +1895,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_map_lat_lng_bounds_for_camera.invokeExact(map, camera, completion, outDiagnostic) as Int
-
-  actual fun mln_map_lat_lng_bounds_for_camera_unwrapped(
-    map: Long,
-    camera: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_lat_lng_bounds_for_camera_unwrapped.invokeExact(map, camera, completion, outDiagnostic)
-      as Int
 
   actual fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_list_style_layers.invokeExact(map, completion, outDiagnostic) as Int

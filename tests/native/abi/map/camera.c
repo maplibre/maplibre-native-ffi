@@ -614,16 +614,12 @@ static mln_camera_options camera_for_bounds(
 }
 
 static mln_lat_lng_bounds bounds_for_camera(
-  mln_map map, const mln_camera_options* camera, bool unwrapped
+  mln_map map, const mln_camera_options* camera
 ) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_lat_lng_bounds));
   MLN_TEST_OK(
-    unwrapped
-      ? mln_map_lat_lng_bounds_for_camera_unwrapped(
-          map, camera, &query.descriptor, NULL
-        )
-      : mln_map_lat_lng_bounds_for_camera(map, camera, &query.descriptor, NULL)
+    mln_map_lat_lng_bounds_for_camera(map, camera, &query.descriptor, NULL)
   );
   mln_lat_lng_bounds bounds = {0};
   MLN_TEST_OK(
@@ -645,7 +641,7 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   TEST_ASSERT_TRUE(fitted.fields & MLN_CAMERA_OPTION_ZOOM);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, -122.5, fitted.center.longitude);
 
-  const mln_lat_lng_bounds visible = bounds_for_camera(map, &fitted, false);
+  const mln_lat_lng_bounds visible = bounds_for_camera(map, &fitted);
   TEST_ASSERT_TRUE(
     visible.southwest.latitude <= region.southwest.latitude + 1e-6
   );
@@ -726,18 +722,41 @@ static void visible_bounds_unwrap_across_the_antimeridian(void) {
   camera.zoom = 1.0;
 
   // At zoom 1 the world is 1024 pixels wide, so 512 pixels span 180 degrees.
-  const mln_lat_lng_bounds hull = bounds_for_camera(map, &camera, true);
+  const mln_lat_lng_bounds hull = bounds_for_camera(map, &camera);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 80.0, hull.southwest.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 260.0, hull.northeast.longitude);
 
-  const mln_lat_lng_bounds wrapped = bounds_for_camera(map, &camera, false);
-  TEST_ASSERT_TRUE(wrapped.southwest.longitude >= -180.0);
-  TEST_ASSERT_TRUE(wrapped.northeast.longitude <= 180.0);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void visible_bounds_hold_every_corner_of_a_rotated_view(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_square_map(runtime, 512);
+  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
+                  MLN_CAMERA_OPTION_BEARING;
+  camera.center = (mln_lat_lng){.latitude = 0.0, .longitude = 0.0};
+  camera.zoom = 3.0;
+  camera.bearing = 0.0;
+  const mln_lat_lng_bounds upright = bounds_for_camera(map, &camera);
+
+  // At zoom 3 the world is 4096 pixels wide, so 512 pixels span 45 degrees.
+  // Turned 45 degrees, the square view's corners reach sqrt(2) times as far.
+  camera.bearing = 45.0;
+  const mln_lat_lng_bounds rotated = bounds_for_camera(map, &camera);
   TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, hull.southwest.latitude, wrapped.southwest.latitude
+    1e-6, 45.0, upright.northeast.longitude - upright.southwest.longitude
   );
   TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, hull.northeast.latitude, wrapped.northeast.latitude
+    1e-6, 45.0 * sqrt(2.0),
+    rotated.northeast.longitude - rotated.southwest.longitude
+  );
+  TEST_ASSERT_GREATER_THAN_DOUBLE(
+    upright.northeast.latitude, rotated.northeast.latitude
+  );
+  TEST_ASSERT_LESS_THAN_DOUBLE(
+    upright.southwest.latitude, rotated.southwest.latitude
   );
 
   mln_test_destroy_map(map);
@@ -827,14 +846,11 @@ static void camera_calls_reject_what_they_cannot_express(void) {
     MLN_TEST_INVALID(
       mln_map_lat_lng_bounds_for_camera(map, NULL, &operation, NULL)
     );
-    MLN_TEST_INVALID(
-      mln_map_lat_lng_bounds_for_camera_unwrapped(map, NULL, &operation, NULL)
-    );
     mln_camera_options undersized = {.size = sizeof(mln_camera_options)};
     undersized.size -= 1;
-    MLN_TEST_INVALID(mln_map_lat_lng_bounds_for_camera_unwrapped(
-      map, &undersized, &operation, NULL
-    ));
+    MLN_TEST_INVALID(
+      mln_map_lat_lng_bounds_for_camera(map, &undersized, &operation, NULL)
+    );
   }
   {
     mln_bound_options options = {.size = sizeof(mln_bound_options)};
@@ -986,5 +1002,6 @@ MLN_TEST_GROUP {
   RUN_TEST(an_immediate_anchored_pan_keeps_the_dragged_coordinate);
   RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
   RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
+  RUN_TEST(visible_bounds_hold_every_corner_of_a_rotated_view);
   RUN_TEST(unbounded_and_world_bounds_stay_distinct);
 }

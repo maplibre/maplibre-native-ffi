@@ -740,17 +740,6 @@ static jint mln_map_lat_lng_bounds_for_camera_jni(
   );
 }
 
-static jint mln_map_lat_lng_bounds_for_camera_unwrapped_jni(
-  JNIEnv* env, jclass type, jlong map, jlong camera, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_lat_lng_bounds_for_camera_unwrapped(
-    (mln_map)map, MLN_JNI_POINTER(const mln_camera_options*, camera),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_list_style_layers_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
@@ -2239,8 +2228,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_invalidate_custom_vector_source_tile_jni},
   {"mln_map_lat_lng_bounds_for_camera", "(JJJJ)I",
    (void*)mln_map_lat_lng_bounds_for_camera_jni},
-  {"mln_map_lat_lng_bounds_for_camera_unwrapped", "(JJJJ)I",
-   (void*)mln_map_lat_lng_bounds_for_camera_unwrapped_jni},
   {"mln_map_list_style_layers", "(JJJ)I", (void*)mln_map_list_style_layers_jni},
   {"mln_map_list_style_sources", "(JJJ)I",
    (void*)mln_map_list_style_sources_jni},
@@ -2594,8 +2581,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_invalidate_custom_vector_source_tile_jni},
   {"mln_map_lat_lng_bounds_for_camera", "(JJJJ)I",
    (void*)mln_map_lat_lng_bounds_for_camera_jni},
-  {"mln_map_lat_lng_bounds_for_camera_unwrapped", "(JJJJ)I",
-   (void*)mln_map_lat_lng_bounds_for_camera_unwrapped_jni},
   {"mln_map_list_style_layers", "(JJJ)I", (void*)mln_map_list_style_layers_jni},
   {"mln_map_list_style_sources", "(JJJ)I",
    (void*)mln_map_list_style_sources_jni},

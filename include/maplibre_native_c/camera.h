@@ -172,24 +172,11 @@ MLN_API mln_status mln_map_camera_for_geometry(
  * Computes the area that the map would show with `camera`.
  *
  * Camera fields that `camera` doesn't set come from the map's camera. The
- * longitudes stay between -180 and 180.
- */
-MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
-MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
-  mln_map map, const mln_camera_options* camera,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Computes the area that the map would show with `camera`, without wrapping
- * longitudes.
- *
- * Camera fields that `camera` doesn't set come from the map's camera. The
  * longitudes can fall outside -180 to 180, so a view across the antimeridian
  * gives one continuous range.
  */
 MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
-MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
+MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

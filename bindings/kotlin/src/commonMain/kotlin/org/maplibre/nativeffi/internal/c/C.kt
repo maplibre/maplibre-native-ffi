@@ -353,13 +353,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_lat_lng_bounds_for_camera_unwrapped(
-    map: Long,
-    camera: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int

@@ -656,19 +656,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_lat_lng_bounds_for_camera_unwrapped(
-    map: Long,
-    camera: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_lat_lng_bounds_for_camera_unwrapped(
-      map,
-      word(camera),
-      word(completion),
-      word(outDiagnostic),
-    )
-
   actual fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_map_list_style_layers(map, word(completion), word(outDiagnostic))
 
@@ -2343,16 +2330,6 @@ private fun mln_kw_mln_map_invalidate_custom_vector_source_tile(
 private fun mln_kw_mln_map_lat_lng_bounds_for_camera(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_lat_lng_bounds_for_camera(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_map_lat_lng_bounds_for_camera_unwrapped(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_lat_lng_bounds_for_camera_unwrapped(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_list_style_layers(p0: Long, p1: Int, p2: Int): Int =

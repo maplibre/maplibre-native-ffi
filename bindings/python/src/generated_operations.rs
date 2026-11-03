@@ -4901,35 +4901,6 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (camera=None))]
-    fn lat_lng_bounds_for_camera_unwrapped(
-        &self,
-        py: Python<'_>,
-        camera: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let camera = camera.unwrap_or_else(|| py.None().into_bound(py));
-        let camera_value = generated_input_mln_camera_options(&camera.clone(), storage)?;
-        let handle = self.input();
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            let value = completion_value::<sys::mln_lat_lng_bounds>(result)?;
-            generated_copy_mln_lat_lng_bounds(py, &value)
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
-                        handle,
-                        &camera_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
     #[pyo3(signature = ())]
     fn list_style_layers(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);

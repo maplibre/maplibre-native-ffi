@@ -6599,28 +6599,14 @@ func (receiver *MapHandle) InvalidateCustomVectorSourceTile(sourceId string, til
 // LatLngBoundsForCamera computes the area that the map would show with camera.
 //
 // Camera fields that camera doesn't set come from the map's camera. The
-// longitudes stay between -180 and 180.
+// longitudes can fall outside -180 to 180, so a view across the antimeridian
+// gives one continuous range.
 //
 // See mln_map_lat_lng_bounds_for_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 func (receiver *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (*Future[LatLngBounds], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_lat_lng_bounds_for_camera(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
-	}, completionOf(copyLatLngBounds))
-}
-
-// LatLngBoundsForCameraUnwrapped computes the area that the map would show with
-// camera, without wrapping longitudes.
-//
-// Camera fields that camera doesn't set come from the map's camera. The
-// longitudes can fall outside -180 to 180, so a view across the antimeridian
-// gives one continuous range.
-//
-// See mln_map_lat_lng_bounds_for_camera_unwrapped in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (*Future[LatLngBounds], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
 	}, completionOf(copyLatLngBounds))
 }
 

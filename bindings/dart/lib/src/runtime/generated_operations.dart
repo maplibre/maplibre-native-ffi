@@ -4885,7 +4885,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Computes the area that the map would show with `camera`.
   ///
   /// Camera fields that `camera` doesn't set come from the map's camera. The
-  /// longitudes stay between -180 and 180.
+  /// longitudes can fall outside -180 to 180, so a view across the antimeridian
+  /// gives one continuous range.
   ///
   /// See `mln_map_lat_lng_bounds_for_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -4898,26 +4899,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       nativeDiagnostic,
     ),
   );
-
-  /// Computes the area that the map would show with `camera`, without wrapping
-  /// longitudes.
-  ///
-  /// Camera fields that `camera` doesn't set come from the map's camera. The
-  /// longitudes can fall outside -180 to 180, so a view across the antimeridian
-  /// gives one continuous range.
-  ///
-  /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<LatLngBounds> latLngBoundsForCameraUnwrapped(CameraOptions camera) =>
-      _query(
-        _resultLatLngBounds,
-        (arena, completion) => raw.mln_map_lat_lng_bounds_for_camera_unwrapped(
-          _handle.raw,
-          _writeCameraOptions(camera, arena),
-          completion,
-          nativeDiagnostic,
-        ),
-      );
 
   /// Lists the layers of the map's style, from bottom to top.
   ///

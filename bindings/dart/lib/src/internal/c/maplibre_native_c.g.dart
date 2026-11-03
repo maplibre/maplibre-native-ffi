@@ -3105,21 +3105,6 @@ external int mln_map_lat_lng_bounds_for_camera(
 );
 
 @Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_camera_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_lat_lng_bounds_for_camera_unwrapped(
-  int map,
-  Pointer<mln_camera_options> camera,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_list_style_layers(

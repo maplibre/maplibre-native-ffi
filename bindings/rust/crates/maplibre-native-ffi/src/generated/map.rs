@@ -1199,7 +1199,8 @@ impl MapHandle {
     /// Computes the area that the map would show with `camera`.
     ///
     /// Camera fields that `camera` doesn't set come from the map's camera. The
-    /// longitudes stay between -180 and 180.
+    /// longitudes can fall outside -180 to 180, so a view across the
+    /// antimeridian gives one continuous range.
     ///
     /// See `mln_map_lat_lng_bounds_for_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1212,34 +1213,6 @@ impl MapHandle {
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_lat_lng_bounds_for_camera(map, camera, completion, out_diagnostic)
-            },
-            completion::value::<sys::mln_lat_lng_bounds, _>,
-        )
-    }
-
-    /// Computes the area that the map would show with `camera`, without
-    /// wrapping longitudes.
-    ///
-    /// Camera fields that `camera` doesn't set come from the map's camera. The
-    /// longitudes can fall outside -180 to 180, so a view across the
-    /// antimeridian gives one continuous range.
-    ///
-    /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn lat_lng_bounds_for_camera_unwrapped(
-        &self,
-        camera: &CameraOptions,
-    ) -> Result<NativeFuture<LatLngBounds>> {
-        let mut call = self.inner.call();
-        let camera = call.reference(&camera)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
-                    map,
-                    camera,
-                    completion,
-                    out_diagnostic,
-                )
             },
             completion::value::<sys::mln_lat_lng_bounds, _>,
         )
