@@ -64,7 +64,6 @@ MLN_TEST_DESCRIPTOR_EDITS(
   opengl_borrowed, mln_open_gl_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(opengl_borrowed, opengl)
-#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 MLN_TEST_DESCRIPTOR_EDITS(
   opengl_surface_replacement, mln_open_gl_surface_replacement
 )
@@ -72,7 +71,6 @@ MLN_TEST_DESCRIPTOR_EDITS(
   opengl_borrowed_replacement, mln_open_gl_borrowed_texture_replacement
 )
 MLN_TEST_BORROWED_EDITS(opengl_borrowed_replacement, opengl)
-#endif
 
 static mln_open_gl_surface_descriptor* surface_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_surface;
@@ -135,11 +133,16 @@ static void borrowed_without_physical_width(void* call) {
   borrowed_of(call)->physical_width = 0;
 }
 
-#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 static mln_open_gl_borrowed_texture_replacement* replacement_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_borrowed_replacement;
 }
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+#if defined(MLN_FFI_TEST_OPENGL_WEBGL)
+// A WebGL context names its canvas, so a replacement names no surface.
+static void replacement_with_surface(void* call) {
+  ((mln_test_target_call*)call)->descriptor.opengl_surface_replacement.surface =
+    MLN_TEST_FAKE_HANDLE;
+}
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
 // WGL and EGL present to a surface, which the replacement names.
 static void replacement_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.opengl_surface_replacement.surface =
@@ -161,13 +164,11 @@ static void replacement_without_texture(void* call) {
 static void replacement_without_physical_width(void* call) {
   replacement_of(call)->physical_width = 0;
 }
-#endif
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_open_gl_surface)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_open_gl_borrowed_texture
 )
-#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_surface_set_target, mln_render_session_set_open_gl_surface_target
 )
@@ -175,7 +176,6 @@ MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target,
   mln_render_session_set_open_gl_borrowed_texture_target
 )
-#endif
 
 static mln_open_gl_surface_descriptor surface_descriptor(void) {
   mln_open_gl_surface_descriptor descriptor = {
@@ -310,7 +310,6 @@ static void only_the_builds_providers_attach(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 // A ring of one replacement texture, whose entry is in the call's storage.
 static void describe_borrowed_replacement(mln_test_target_call* call) {
   call->textures.opengl[0] = (mln_open_gl_borrowed_texture){.texture = 1};
@@ -325,50 +324,55 @@ static void describe_borrowed_replacement(mln_test_target_call* call) {
 }
 
 // set_target checks its replacement, so these rows cover a row for each
-// pointer and handle it reads, and its own steps. It checks the session before
-// the replacement, and a build without OpenGL reports the missing backend
-// last, so there the rows name no session. An OpenGL build submits them for a
-// live session of the replacement's kind; a WebGL build has no host graphics
-// for one.
+// pointer and handle it reads, and its own steps.
 static void opengl_set_target_rejects_malformed_replacements(void) {
-  mln_test_target_call call = mln_test_target_call_default(
-    MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
-  );
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_surface(map, &fixture),
-    mln_test_graphics_last_error()
-  );
-  call.session = fixture.session;
-#endif
+  mln_test_target_call call =
+    mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
+  call.session = mln_test_create_disposed_session(map);
   call.descriptor.opengl_surface_replacement =
     (mln_open_gl_surface_replacement){
       .size = sizeof(mln_open_gl_surface_replacement),
       .logical_size = mln_test_target_size(),
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
       .surface = MLN_TEST_FAKE_HANDLE,
-  };
-  static const mln_test_validation_case surface_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(opengl_surface_replacement),
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
-    {"no surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
-     "must not be null"},
-#else
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
 #endif
   };
-  mln_test_run_validation_table(
-    surface_rows, sizeof(surface_rows) / sizeof(surface_rows[0]), &call,
-    sizeof(call), submit_surface_set_target, NULL
+  static const mln_test_validation_case surface_rows[] = {
+    MLN_TEST_DESCRIPTOR_CASES(opengl_surface_replacement),
+#if defined(MLN_FFI_TEST_OPENGL_WEBGL)
+    {"a surface beside a WebGL context", replacement_with_surface,
+     MLN_STATUS_INVALID_ARGUMENT, "WebGL surface must be null"},
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
+    {"no surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
+     "must not be null"},
+#endif
+  };
+  mln_test_run_set_target_table(
+    submit_surface_set_target, &call, surface_rows,
+    sizeof(surface_rows) / sizeof(surface_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_OPEN_GL
   );
 
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  mln_test_render_fixture_destroy(&fixture);
+  describe_borrowed_replacement(&call);
+  static const mln_test_validation_case borrowed_rows[] = {
+    MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed_replacement),
+    MLN_TEST_BORROWED_CASES(opengl_borrowed_replacement),
+    {"no texture", replacement_without_texture, MLN_STATUS_INVALID_ARGUMENT,
+     NULL},
+    {"zero physical width", replacement_without_physical_width,
+     MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
+  };
+  mln_test_run_set_target_table(
+    submit_borrowed_set_target, &call, borrowed_rows,
+    sizeof(borrowed_rows) / sizeof(borrowed_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_OPEN_GL
+  );
+
+  // A WebGL build has no host graphics for a ring of its own.
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+  mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_borrowed_ring(
       map, &fixture, 1, MLN_TEST_PRESET_DRIVER
@@ -376,41 +380,22 @@ static void opengl_set_target_rejects_malformed_replacements(void) {
     mln_test_graphics_last_error()
   );
   call.session = fixture.session;
-#endif
-  describe_borrowed_replacement(&call);
-  static const mln_test_validation_case borrowed_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed_replacement),
-    MLN_TEST_BORROWED_CASES(opengl_borrowed_replacement),
-    {"no texture", replacement_without_texture, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-    {"zero physical width", replacement_without_physical_width,
-     MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  static const mln_test_validation_case session_rows[] = {
     {"more textures than the session's ring has slots",
      replacement_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
-#else
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
   };
   mln_test_run_validation_table(
-    borrowed_rows, sizeof(borrowed_rows) / sizeof(borrowed_rows[0]), &call,
+    session_rows, sizeof(session_rows) / sizeof(session_rows[0]), &call,
     sizeof(call), submit_borrowed_set_target, NULL
   );
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
   mln_test_render_fixture_destroy(&fixture);
+#endif
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-#endif
 }
-#endif
 
 MLN_TEST_GROUP {
   RUN_TEST(opengl_attach_rejects_malformed_calls);
   RUN_TEST(only_the_builds_providers_attach);
-#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
   RUN_TEST(opengl_set_target_rejects_malformed_replacements);
-#endif
 }

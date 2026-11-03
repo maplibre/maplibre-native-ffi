@@ -149,16 +149,19 @@ typedef struct accessor_entry {
   bool answers;
 } accessor_entry;
 
-// The texture getters come first, indexed by frame_backend.
 static const accessor_entry accessors[] = {
-  {"metal texture", get_metal, sizeof(mln_metal_texture_frame),
-   PRESET_FRAME_BACKEND == METAL},
-  {"vulkan texture", get_vulkan, sizeof(mln_vulkan_texture_frame),
-   PRESET_FRAME_BACKEND == VULKAN},
-  {"opengl texture", get_opengl, sizeof(mln_open_gl_texture_frame),
-   PRESET_FRAME_BACKEND == OPENGL},
-  {"webgpu texture", get_webgpu, sizeof(mln_web_gpu_texture_frame),
-   PRESET_FRAME_BACKEND == WEBGPU},
+  [METAL] =
+    {"metal texture", get_metal, sizeof(mln_metal_texture_frame),
+     PRESET_FRAME_BACKEND == METAL},
+  [VULKAN] =
+    {"vulkan texture", get_vulkan, sizeof(mln_vulkan_texture_frame),
+     PRESET_FRAME_BACKEND == VULKAN},
+  [OPENGL] =
+    {"opengl texture", get_opengl, sizeof(mln_open_gl_texture_frame),
+     PRESET_FRAME_BACKEND == OPENGL},
+  [WEBGPU] =
+    {"webgpu texture", get_webgpu, sizeof(mln_web_gpu_texture_frame),
+     PRESET_FRAME_BACKEND == WEBGPU},
   {"result", get_result, sizeof(mln_render_frame_result), true},
   {"producer sync", get_producer_sync, sizeof(mln_gpu_sync), true},
 };

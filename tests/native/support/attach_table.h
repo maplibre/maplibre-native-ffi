@@ -13,6 +13,8 @@
 
 #include "env.h"
 #include "maplibre_native_c.h"
+#include "render.h"
+#include "status.h"
 #include "tables.h"
 #include "unity.h"
 #include "wait.h"
@@ -176,6 +178,53 @@ static inline void mln_test_run_attach_table(
   );
   mln_test_run_validation_table(
     rows, row_count, call, sizeof(*call), submit, NULL
+  );
+}
+
+// A handle that names a session the call attaches to `map` and then disposes.
+// A backend's set_target reports it as MLN_STATUS_INVALID_STATE.
+static inline mln_render_session mln_test_create_disposed_session(mln_map map) {
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  const mln_render_session session = fixture.session;
+  MLN_TEST_OK(mln_test_render_session_dispose(session));
+  mln_test_render_fixture_destroy(&fixture);
+  return session;
+}
+
+// Runs the row every set_target checks itself, then the backend's `rows`, then
+// the defaults in `call` unchanged. The defaults name a session from
+// mln_test_create_disposed_session() and a well-formed replacement. Every
+// build checks a replacement before the session and the completion, so each
+// row gets its edit's status whatever the session's state, never the disposed
+// session's. The defaults reach the session in a build that carries `backend`,
+// one of the MLN_RENDER_BACKEND_FLAG_* values, and the missing backend in any
+// other. A row that depends on the session's state names a live one instead.
+static inline void mln_test_run_set_target_table(
+  mln_test_validation_call submit, const mln_test_target_call* call,
+  const mln_test_validation_case* rows, size_t row_count, uint32_t backend
+) {
+  static const mln_test_validation_case null_replacement = {
+    "null replacement", mln_test_call_without_descriptor,
+    MLN_STATUS_INVALID_ARGUMENT, NULL
+  };
+  const mln_test_validation_case well_formed =
+    (mln_supported_render_backend_mask() & backend) != 0
+      ? (
+          mln_test_validation_case
+        ){"a well-formed replacement", NULL, MLN_STATUS_INVALID_STATE, "stale"}
+      : (mln_test_validation_case){
+          "a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
+          "not supported by this build"
+        };
+  mln_test_run_validation_table(
+    &null_replacement, 1, call, sizeof(*call), submit, NULL
+  );
+  mln_test_run_validation_table(
+    rows, row_count, call, sizeof(*call), submit, NULL
+  );
+  mln_test_run_validation_table(
+    &well_formed, 1, call, sizeof(*call), submit, NULL
   );
 }
 

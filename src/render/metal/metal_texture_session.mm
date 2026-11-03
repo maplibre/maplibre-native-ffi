@@ -337,16 +337,16 @@ auto metal_borrowed_texture_set_target_start(
   const mln_metal_borrowed_texture_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
+  const auto replacement_status = validate_borrowed_texture(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
+  }
   auto checked_completion = std::shared_ptr<Completion>{};
   const auto submission_status = validate_render_session_retarget_submission(
     session, RetargetTargetKind::BorrowedTexture, completion, checked_completion
   );
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
-  }
-  const auto replacement_status = validate_borrowed_texture(replacement);
-  if (replacement_status != MLN_STATUS_OK) {
-    return replacement_status;
   }
   auto target = MetalBorrowedTextures{*replacement};
   auto identity = render_target_identity(std::span{target.textures});

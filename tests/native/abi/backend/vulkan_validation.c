@@ -232,55 +232,27 @@ static void vulkan_attach_rejects_malformed_calls(void) {
 }
 
 // set_target checks its replacement, so these rows cover a row for each
-// pointer and handle it reads, and its own steps. It checks the session before
-// the replacement, and a build without Vulkan reports the missing backend
-// last, so there the rows name no session. A Vulkan build submits them for a
-// live session of the replacement's kind.
+// pointer and handle it reads, and its own steps.
 static void vulkan_set_target_rejects_malformed_replacements(void) {
-  mln_test_target_call call = mln_test_target_call_default(
-    MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
-  );
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_surface(map, &fixture),
-    mln_test_graphics_last_error()
-  );
-  call.session = fixture.session;
-#endif
+  mln_test_target_call call =
+    mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
+  call.session = mln_test_create_disposed_session(map);
   call.descriptor.vulkan_surface_replacement = surface_replacement();
   static const mln_test_validation_case surface_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(vulkan_surface_replacement),
     {"null surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
-#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
   };
-  mln_test_run_validation_table(
-    surface_rows, sizeof(surface_rows) / sizeof(surface_rows[0]), &call,
-    sizeof(call), submit_surface_set_target, NULL
+  mln_test_run_set_target_table(
+    submit_surface_set_target, &call, surface_rows,
+    sizeof(surface_rows) / sizeof(surface_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_VULKAN
   );
 
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_test_render_fixture_destroy(&fixture);
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_borrowed_ring(
-      map, &fixture, 1, MLN_TEST_PRESET_DRIVER
-    ),
-    mln_test_graphics_last_error()
-  );
-  call.session = fixture.session;
-#endif
   describe_borrowed_replacement(&call);
   static const mln_test_validation_case borrowed_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed_replacement),
     MLN_TEST_BORROWED_CASES(vulkan_borrowed_replacement),
     {"null image", replacement_without_image, MLN_STATUS_INVALID_ARGUMENT,
@@ -289,23 +261,34 @@ static void vulkan_set_target_rejects_malformed_replacements(void) {
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", replacement_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
+  };
+  mln_test_run_set_target_table(
+    submit_borrowed_set_target, &call, borrowed_rows,
+    sizeof(borrowed_rows) / sizeof(borrowed_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_VULKAN
+  );
+
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_borrowed_ring(
+      map, &fixture, 1, MLN_TEST_PRESET_DRIVER
+    ),
+    mln_test_graphics_last_error()
+  );
+  call.session = fixture.session;
+  static const mln_test_validation_case session_rows[] = {
     {"more images than the session's ring has slots",
      replacement_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
-#else
-    {"a well-formed replacement with high handles", NULL,
-     MLN_STATUS_UNSUPPORTED, "not supported by this build"},
-#endif
   };
   mln_test_run_validation_table(
-    borrowed_rows, sizeof(borrowed_rows) / sizeof(borrowed_rows[0]), &call,
+    session_rows, sizeof(session_rows) / sizeof(session_rows[0]), &call,
     sizeof(call), submit_borrowed_set_target, NULL
   );
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   mln_test_render_fixture_destroy(&fixture);
+#endif
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-#endif
 }
 
 MLN_TEST_GROUP {
