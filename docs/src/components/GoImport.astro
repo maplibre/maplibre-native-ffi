@@ -1,5 +1,5 @@
 ---
-// A page at a Go module's vanity import path. The go command and the Go module
+// A page at a Go package's import path. The go command and the Go module
 // mirror read its go-import tag to find the module's source, and a browser
 // moves on to the install guide.
 interface Props {
@@ -9,12 +9,10 @@ interface Props {
   vcs: "git" | "mod";
   /** The repository URL, or the module proxy's base URL. */
   url: string;
-  /** The module's directory in a git repository. Go 1.25 reads this field. */
-  subdirectory?: string;
 }
 
-const { module, vcs, url, subdirectory } = Astro.props;
-const content = [module, vcs, url, subdirectory].filter(Boolean).join(" ");
+const { module, vcs, url } = Astro.props;
+const content = `${module} ${vcs} ${url}`;
 const guide = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/install/go/`;
 ---
 

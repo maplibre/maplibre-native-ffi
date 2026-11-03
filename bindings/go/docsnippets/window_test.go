@@ -5,7 +5,7 @@ package docsnippets
 import (
 	"context"
 
-	"maplibre.org/maplibre-native-ffi/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 // Stand-ins for the host's event loop, display timer, and graphics thread.

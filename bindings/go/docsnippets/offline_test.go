@@ -5,7 +5,7 @@ package docsnippets
 import (
 	"context"
 
-	"maplibre.org/maplibre-native-ffi/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 func recordProgress(regionID int64, completed, required uint64, complete bool) {}

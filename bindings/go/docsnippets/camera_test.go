@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 
-	"maplibre.org/maplibre-native-ffi/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 func useCamera(camera maplibre.Camera) {}

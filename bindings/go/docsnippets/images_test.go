@@ -5,7 +5,7 @@ package docsnippets
 import (
 	"context"
 
-	"maplibre.org/maplibre-native-ffi/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 func copyPixels(data []byte, stride uint32) {}

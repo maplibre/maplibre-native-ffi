@@ -2,7 +2,7 @@
 
 package maplibre
 
-import "maplibre.org/maplibre-native-ffi/go/internal/testsupport"
+import "maplibre.org/maplibre-native-ffi/bindings/go/internal/testsupport"
 
 const (
 	buildBackend    = RenderBackendFlagMetal

@@ -4,6 +4,14 @@ description:
   The MapLibre Native map engine as a C API, with bindings for nine languages.
 # Scope: what the library is, who it's for, where to start, and how stable it
 # is. Concepts explains how it works.
+# The go command reads this tag to find the Go module's source.
+head:
+  - tag: meta
+    attrs:
+      name: go-import
+      content:
+        maplibre.org/maplibre-native-ffi git
+        https://github.com/maplibre/maplibre-native-ffi
 ---
 
 import SupportMatrix from "../../components/SupportMatrix.astro";

@@ -34,7 +34,7 @@ updates:
       gitsubmodule:
         patterns: ["*"]
   - package-ecosystem: gomod
-    directory: /bindings/go
+    directory: /
     schedule:
       interval: weekly
     labels: [chore, "area:tooling", dependencies]

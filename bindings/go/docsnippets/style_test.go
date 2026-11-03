@@ -6,7 +6,7 @@ import (
 	"context"
 	"log"
 
-	"maplibre.org/maplibre-native-ffi/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 func drawImage(imageID string) maplibre.PremultipliedRgba8Image {
