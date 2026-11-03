@@ -565,6 +565,13 @@ endfunction()
 # run the suites side by side; any other device runs one test at a time.
 function(mln_native_bound_test test_name target timeout)
   set_tests_properties(${test_name} PROPERTIES TIMEOUT ${timeout})
+  # On macOS, ANGLE's Metal backend can stop completing a process's GPU work
+  # when several processes render at once on a virtual GPU, as CI runners have:
+  # reads then return zeros or an earlier frame, with no GL error. EGL tests
+  # there take turns. CMake can't tell which files render, so all of them do.
+  if(APPLE AND MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
+    set_tests_properties(${test_name} PROPERTIES RESOURCE_LOCK gpu)
+  endif()
   mln_native_runs_off_host(off_host)
   if(NOT off_host)
     return()
