@@ -6020,6 +6020,37 @@ func CVersion() uint32 {
 	return uint32(C.mln_c_version())
 }
 
+// CameraForTile computes the camera that shows exactly one tile on a square
+// map.
+//
+// Jump a map in MapModeTile to the camera to render tile, where logicalSize is
+// the map's size. The camera centers the tile and zooms until the tile fills
+// the map: to zoom z for a 512-pixel map, or z - 1 for a 256-pixel one, plus
+// 0.0001 to keep the neighboring tiles out. It looks straight down with north
+// up and no padding, so the map's earlier camera doesn't change the view. The
+// map keeps the camera within its zoom limits, so for a deep tile, raise the
+// maximum zoom past the camera's with MapHandle.SetBounds().
+//
+// See mln_camera_for_tile in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when logicalSize isn't square, or is wider than 512
+//     pixels, the width of a vector tile at its zoom. For denser tiles, raise
+//     the map's scale factor instead.
+//   - StatusInvalidArgument when tile.x or tile.y isn't less than 2 to the
+//     power tile.z, or when the camera's zoom would fall outside 0 to 25.5, as
+//     for tile 0/0/0 on a 256-pixel map.
+func CameraForTile(tile CanonicalTileId, logicalSize LogicalSize) (CameraOptions, error) {
+	var outCamera C.mln_camera_options
+	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_camera_for_tile(nativeCanonicalTileId(tile, arena), nativeLogicalSize(logicalSize, arena), &outCamera, diagnostic))
+	}, func(arena *bindingArena) CameraOptions {
+		return copyCameraOptions(outCamera)
+	})
+}
+
 // NewGeoJsonSourceData prepares GeoJSON data for GeoJSON sources.
 //
 // data is a GeoJSON feature collection, feature, or geometry. Preparing it can

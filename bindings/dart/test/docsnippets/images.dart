@@ -5,9 +5,6 @@ import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
-// The center of tile z/x/y. The snippet leaves the tile math to the reader.
-LatLng tileCenter(int z, int x, int y) => const LatLng();
-
 void copyPixels(Uint8List data, int stride) {}
 
 Future<void> images(RuntimeHandle runtime) async {
@@ -90,10 +87,9 @@ Future<void> imagesTile(
   map.discarding.updateCamera(
     CameraUpdate(
       mode: CameraUpdateMode.jump,
-      camera: CameraOptions(
-        center: tileCenter(z, x, y),
-        // A 512-pixel map shows tile z/x/y at zoom z.
-        zoom: z.toDouble(),
+      camera: cameraForTile(
+        CanonicalTileId(z: z, x: x, y: y),
+        const LogicalSize(width: 512, height: 512),
       ),
     ),
   );

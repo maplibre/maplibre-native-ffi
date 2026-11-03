@@ -100,6 +100,10 @@ export interface NativeOperations {
     consumerCompletion: GpuSync,
   ): void;
   mln_c_version(): number;
+  mln_camera_for_tile(
+    tile: CanonicalTileId | undefined,
+    logicalSize: LogicalSize | undefined,
+  ): CameraOptions;
   mln_geo_json_source_data_create(
     data: unknown,
     options: GeoJsonSourceOptions | undefined,

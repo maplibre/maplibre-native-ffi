@@ -5,12 +5,6 @@
 import Foundation
 import MaplibreNativeFFI
 
-/// The center of tile z/x/y. The snippet leaves the tile math to the
-/// reader.
-private func tileCenter(_: UInt32, _: UInt32, _: UInt32) -> LatLng {
-  LatLng()
-}
-
 private func copyPixels(_: Data, stride _: UInt32) {}
 
 private func images(runtime: RuntimeHandle) async throws {
@@ -89,10 +83,9 @@ private func imagesTile(
 
   try map.discarding.updateCamera(CameraUpdate(
     mode: .jump,
-    camera: CameraOptions(
-      center: tileCenter(z, x, y),
-      // A 512-pixel map shows tile z/x/y at zoom z.
-      zoom: Double(z)
+    camera: cameraForTile(
+      CanonicalTileId(z: z, x: x, y: y),
+      logicalSize: LogicalSize(width: 512, height: 512)
     )
   ))
   // #endregion tile

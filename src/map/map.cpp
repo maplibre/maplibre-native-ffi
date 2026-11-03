@@ -5157,6 +5157,64 @@ auto fit_camera_output(
 
 }  // namespace
 
+auto camera_for_tile(
+  mln_canonical_tile_id tile, mln_logical_size logical_size,
+  mln_camera_options* out_camera
+) -> mln_status {
+  // A vector source's tiles are util::tileSize_D logical pixels wide at their
+  // own zoom, so a wider map would show more than one.
+  if (
+    logical_size.width == 0 || logical_size.width != logical_size.height ||
+    logical_size.width > static_cast<std::uint32_t>(mln::util::tileSize_I)
+  ) {
+    set_thread_error("logical_size must be square, from 1 to 512 wide");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // A narrower map shows a tile at a zoom offset by the ratio of the widths.
+  // MapLibre's tile cover also counts a tile that only touches the view's
+  // edge, within rounding that grows with the zoom, and a tile map then logs
+  // that it drops the extra tiles. Zooming in by a sliver, which moves the
+  // tile's edges by under 0.02 logical pixels, keeps the neighbors out.
+  constexpr auto edge_margin_zoom = 1e-4;
+  const auto fit_zoom =
+    static_cast<double>(tile.z) +
+    std::log2(static_cast<double>(logical_size.width) / mln::util::tileSize_D);
+  const auto zoom = fit_zoom + edge_margin_zoom;
+  if (fit_zoom < mln::util::MIN_ZOOM || zoom > mln::util::MAX_ZOOM) {
+    set_thread_error(
+      "a map of logical_size can't show a tile at zoom tile.z from zoom 0 to "
+      "25.5"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // The zoom check above bounds tile.z well below 64.
+  const auto tile_count = std::uint64_t{1} << tile.z;
+  if (tile.x >= tile_count || tile.y >= tile_count) {
+    set_thread_error("tile.x and tile.y must be less than 2^tile.z");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto output_status = validate_camera_output(out_camera);
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+
+  // The tile's center in Web Mercator, in world pixels at scale 2^z.
+  const auto center = mln::Projection::unproject(
+    {(static_cast<double>(tile.x) + 0.5) * mln::util::tileSize_D,
+     (static_cast<double>(tile.y) + 0.5) * mln::util::tileSize_D},
+    static_cast<double>(tile_count)
+  );
+  auto camera = camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
+                  MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
+                  MLN_CAMERA_OPTION_ROLL | MLN_CAMERA_OPTION_PADDING |
+                  MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+  camera.center = from_native_lat_lng(center);
+  camera.zoom = zoom;
+  *out_camera = camera;
+  return MLN_STATUS_OK;
+}
+
 auto map_camera_for_lat_lng_bounds(
   MapObject& live, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera

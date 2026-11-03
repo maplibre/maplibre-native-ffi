@@ -7,10 +7,6 @@ namespace Maplibre.NativeFfi.Tests.DocSnippets;
 
 internal static class Images
 {
-    // The center of tile z/x/y. The snippet leaves the tile math to the reader.
-    private static LatLng TileCenter(uint z, uint x, uint y) =>
-        default;
-
     private static void CopyPixels(
         ImmutableArray<byte> data,
         uint stride
@@ -93,12 +89,10 @@ internal static class Images
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
-                Camera = new CameraOptions
-                {
-                    Center = TileCenter(z, x, y),
-                    // A 512-pixel map shows tile z/x/y at zoom z.
-                    Zoom = z,
-                },
+                Camera = MaplibreNative.CameraForTile(
+                    new CanonicalTileId(z, x, y),
+                    new LogicalSize(512, 512)
+                ),
             }
         );
         // #endregion tile

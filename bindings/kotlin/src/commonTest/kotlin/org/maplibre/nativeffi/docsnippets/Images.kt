@@ -6,6 +6,7 @@ package org.maplibre.nativeffi.docsnippets
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
+import org.maplibre.nativeffi.CanonicalTileId
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.LogicalSize
@@ -15,10 +16,7 @@ import org.maplibre.nativeffi.OffscreenDescriptor
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RuntimeHandle
-
-// The center of tile z/x/y. The snippet leaves the tile math to the
-// reader.
-private fun tileCenter(z: Int, x: Int, y: Int): LatLng = LatLng()
+import org.maplibre.nativeffi.cameraForTile
 
 private fun copyPixels(data: ByteArray, stride: UInt) {}
 
@@ -83,9 +81,9 @@ private suspend fun images(runtime: RuntimeHandle) {
 
 private suspend fun imagesTile(
   runtime: RuntimeHandle,
-  z: Int,
-  x: Int,
-  y: Int,
+  z: UInt,
+  x: UInt,
+  y: UInt,
 ) {
   // #region tile
   val (map, ready) =
@@ -106,10 +104,9 @@ private suspend fun imagesTile(
     CameraUpdate(
       mode = CameraUpdateMode.JUMP,
       camera =
-        CameraOptions(
-          center = tileCenter(z, x, y),
-          // A 512-pixel map shows tile z/x/y at zoom z.
-          zoom = z.toDouble(),
+        cameraForTile(
+          CanonicalTileId(z = z, x = x, y = y),
+          LogicalSize(width = 512u, height = 512u),
         ),
     ),
   )

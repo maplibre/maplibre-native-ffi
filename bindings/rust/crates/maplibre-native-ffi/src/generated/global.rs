@@ -38,6 +38,41 @@ pub fn c_version() -> u32 {
     value
 }
 
+/// Computes the camera that shows exactly one tile on a square map.
+///
+/// Jump a map in `MapMode::Tile` to the camera to render `tile`, where
+/// `logical_size` is the map's size. The camera centers the tile and zooms
+/// until the tile fills the map: to zoom z for a 512-pixel map, or z - 1
+/// for a 256-pixel one, plus 0.0001 to keep the neighboring tiles out. It
+/// looks straight down with north up and no padding, so the map's earlier
+/// camera doesn't change the view. The map keeps the camera within its zoom
+/// limits, so for a deep tile, raise the maximum zoom past the camera's
+/// with `MapHandle::set_bounds()`.
+///
+/// See `mln_camera_for_tile` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+///
+/// # Errors
+///
+/// - `Status::InvalidArgument` when `logical_size` isn't square, or is
+///   wider than 512 pixels, the width of a vector tile at its zoom. For
+///   denser tiles, raise the map's scale factor instead.
+/// - `Status::InvalidArgument` when `tile.x` or `tile.y` isn't less than 2
+///   to the power `tile.z`, or when the camera's zoom would fall outside 0
+///   to 25.5, as for tile 0/0/0 on a 256-pixel map.
+pub fn camera_for_tile(tile: CanonicalTileId, logical_size: LogicalSize) -> Result<CameraOptions> {
+    let mut call = Call::global();
+    crate::abi::validate_abi_version()?;
+    let mut out_camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
+    out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
+    let tile = call.input(&tile)?;
+    let logical_size = call.input(&logical_size)?;
+    call.status(|_, out_diagnostic| unsafe {
+        sys::mln_camera_for_tile(tile, logical_size, &mut out_camera, out_diagnostic)
+    })?;
+    Ok(unsafe { from_native(out_camera) }?)
+}
+
 /// Converts meters in the Web Mercator projection to a coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the

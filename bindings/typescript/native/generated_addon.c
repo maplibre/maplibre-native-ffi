@@ -251,6 +251,45 @@ static napi_value mln_ts_export_mln_c_version(
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_camera_for_tile(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_canonical_tile_id arg_tile;
+  mln_logical_size arg_logical_size;
+  mln_camera_options arg_out_camera;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  memset(&arg_tile, 0, sizeof arg_tile);
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    if (!mln_ts_read_record(call, call->argv[0], "tile")) goto done;
+    if (!mln_ts_write_canonical_tile_id(call, call->argv[0], &arg_tile, "tile"))
+      goto done;
+  }
+  memset(&arg_logical_size, 0, sizeof arg_logical_size);
+  if (!mln_ts_is_absent(call, call->argv[1])) {
+    if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
+    if (!mln_ts_write_logical_size(
+          call, call->argv[1], &arg_logical_size, "logicalSize"
+        ))
+      goto done;
+  }
+  memset(&arg_out_camera, 0, sizeof arg_out_camera);
+  arg_out_camera.size = sizeof arg_out_camera;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_camera_for_tile(
+    arg_tile, arg_logical_size, &arg_out_camera, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_camera_options(env, &(arg_out_camera), sizeof(arg_out_camera));
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_geo_json_source_data_create(
   napi_env env, napi_callback_info info
 ) {
@@ -6839,6 +6878,7 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_acquired_frame_view_begin},
   {"mln_acquired_frame_view_end", mln_ts_export_mln_acquired_frame_view_end},
   {"mln_c_version", mln_ts_export_mln_c_version},
+  {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
   {"mln_geo_json_source_data_create",
    mln_ts_export_mln_geo_json_source_data_create},
   {"mln_geo_json_source_data_release",

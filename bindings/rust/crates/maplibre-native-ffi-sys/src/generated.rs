@@ -1981,6 +1981,12 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_c_version() -> u32;
+    pub fn mln_camera_for_tile(
+        tile: mln_canonical_tile_id,
+        logical_size: mln_logical_size,
+        out_camera: *mut mln_camera_options,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_delivery_queue_create(
         options: *const mln_delivery_queue_options,
         out_queue: *mut mln_delivery_queue,

@@ -17,6 +17,23 @@ internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
 internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
   allocate(24, w(8, 8, 4)).also { putGpuSync(it, value) }
 
+internal fun NativeArena.putCanonicalTileId(target: Long, value: CanonicalTileId) {
+  writeU32(target, value.z)
+  writeU32(target + 4, value.x)
+  writeU32(target + 8, value.y)
+}
+
+internal fun NativeArena.writeCanonicalTileId(value: CanonicalTileId): Long =
+  allocate(12, 4).also { putCanonicalTileId(it, value) }
+
+internal fun NativeArena.putLogicalSize(target: Long, value: LogicalSize) {
+  writeU32(target, value.width)
+  writeU32(target + 4, value.height)
+}
+
+internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
+  allocate(8, 4).also { putLogicalSize(it, value) }
+
 internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
   writeU32(target, w(64, 72).toUInt())
   var fields = 0u
@@ -469,15 +486,6 @@ internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureSta
 internal fun NativeArena.writeFeatureStateSelector(value: FeatureStateSelector): Long =
   allocate(w(40, 72), w(4, 8)).also { putFeatureStateSelector(it, value) }
 
-internal fun NativeArena.putCanonicalTileId(target: Long, value: CanonicalTileId) {
-  writeU32(target, value.z)
-  writeU32(target + 4, value.x)
-  writeU32(target + 8, value.y)
-}
-
-internal fun NativeArena.writeCanonicalTileId(value: CanonicalTileId): Long =
-  allocate(12, 4).also { putCanonicalTileId(it, value) }
-
 internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
   writeU32(target, 120.toUInt())
   var fields = 0u
@@ -522,14 +530,6 @@ internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
 
 internal fun NativeArena.writeCameraOptions(value: CameraOptions): Long =
   allocate(120, w(8, 8, 4)).also { putCameraOptions(it, value) }
-
-internal fun NativeArena.putLogicalSize(target: Long, value: LogicalSize) {
-  writeU32(target, value.width)
-  writeU32(target + 4, value.height)
-}
-
-internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
-  allocate(8, 4).also { putLogicalSize(it, value) }
 
 internal fun NativeArena.putBoundOptions(target: Long, value: BoundOptions) {
   writeU32(target, 72.toUInt())
@@ -1197,12 +1197,6 @@ internal fun readWebGpuTextureFrame(source: Long, scope: ViewScope? = null): Web
     )
     .also { it.bindingScope = scope }
 
-internal fun readLatLng(source: Long): LatLng =
-  LatLng(latitude = readF64(source), longitude = readF64(source + 8))
-
-internal fun readProjectedMeters(source: Long): ProjectedMeters =
-  ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
-
 internal fun readCameraOptions(source: Long): CameraOptions {
   val fields = readU32(source + 4)
   return CameraOptions(
@@ -1217,6 +1211,12 @@ internal fun readCameraOptions(source: Long): CameraOptions {
     fieldOfView = if ((fields and 256u) != 0u) readF64(source + 112) else null,
   )
 }
+
+internal fun readLatLng(source: Long): LatLng =
+  LatLng(latitude = readF64(source), longitude = readF64(source + 8))
+
+internal fun readProjectedMeters(source: Long): ProjectedMeters =
+  ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
 
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
   CameraQueryResult(generation = readU64(source), camera = readCamera(source + 8))

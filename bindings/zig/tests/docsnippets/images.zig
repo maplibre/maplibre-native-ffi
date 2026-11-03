@@ -9,12 +9,6 @@ comptime {
     _ = &imagesTile;
 }
 
-/// The center of tile z/x/y. The snippet leaves the tile math to the reader.
-fn tileCenter(z: u32, x: u32, y: u32) maplibre.LatLng {
-    _ = .{ z, x, y };
-    return .{};
-}
-
 fn copyPixels(data: []const u8, stride: u32) void {
     _ = .{ data, stride };
 }
@@ -102,11 +96,11 @@ fn imagesTile(runtime: maplibre.Runtime, z: u32, x: u32, y: u32) !void {
 
     try map.discarding().updateCamera(.{
         .mode = .jump,
-        .camera = .{
-            .center = tileCenter(z, x, y),
-            // A 512-pixel map shows tile z/x/y at zoom z.
-            .zoom = @floatFromInt(z),
-        },
+        .camera = try maplibre.cameraForTile(
+            .{ .z = z, .x = x, .y = y },
+            .{ .width = 512, .height = 512 },
+            null,
+        ),
     }, null);
     // #endregion tile
 

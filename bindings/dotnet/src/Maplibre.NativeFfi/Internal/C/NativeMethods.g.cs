@@ -76,6 +76,14 @@ internal static unsafe partial class NativeMethods
     internal static partial uint mln_c_version();
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_camera_for_tile(
+        mln_canonical_tile_id tile,
+        mln_logical_size logical_size,
+        mln_camera_options* out_camera,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_geo_json_source_data_create(
         mln_buffer_view data,
         mln_geo_json_source_options* options,

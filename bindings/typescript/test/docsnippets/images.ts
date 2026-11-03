@@ -3,16 +3,11 @@
 
 import {
   CameraUpdateMode,
-  type LatLng,
+  cameraForTile,
   MapMode,
   RenderDriverKind,
   RuntimeHandle,
 } from "../../src/index.ts";
-
-// The center of tile z/x/y. The snippet leaves the tile math to the reader.
-function tileCenter(_z: number, _x: number, _y: number): LatLng {
-  return { latitude: 0, longitude: 0 };
-}
 
 function copyPixels(_data: Uint8Array, _stride: number): void {}
 
@@ -76,8 +71,7 @@ export async function imagesTile(
 
   map.discarding.updateCamera({
     mode: CameraUpdateMode.jump,
-    // A 512-pixel map shows tile z/x/y at zoom z.
-    camera: { center: tileCenter(z, x, y), zoom: z },
+    camera: cameraForTile({ z, x, y }, { width: 512, height: 512 }),
   });
   // #endregion tile
 

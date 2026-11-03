@@ -4,11 +4,6 @@
 import maplibre_native_ffi as mln
 
 
-# The center of tile z/x/y. The snippet leaves the tile math to the reader.
-def tile_center(z: int, x: int, y: int) -> mln.LatLng:
-    return mln.LatLng(latitude=0.0, longitude=0.0)
-
-
 def copy_pixels(data: bytes, stride: int) -> None:
     pass
 
@@ -85,9 +80,9 @@ def images_tile(
     map_handle.discarding.update_camera(
         mln.CameraUpdate(
             mode=mln.CameraUpdateMode.JUMP,
-            # A 512-pixel map shows tile z/x/y at zoom z.
-            camera=mln.CameraOptions(
-                center=tile_center(z, x, y), zoom=z
+            camera=mln.camera_for_tile(
+                mln.CanonicalTileId(z=z, x=x, y=y),
+                mln.LogicalSize(width=512, height=512),
             ),
         )
     )

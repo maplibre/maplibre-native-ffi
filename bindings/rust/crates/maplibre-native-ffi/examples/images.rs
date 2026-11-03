@@ -5,11 +5,6 @@
 
 use maplibre_native_ffi::*;
 
-// The center of tile z/x/y. The snippet leaves the tile math to the reader.
-fn tile_center(_z: u32, _x: u32, _y: u32) -> LatLng {
-    LatLng::default()
-}
-
 fn copy_pixels(_data: &[u8], _stride: u32) {}
 
 async fn images(runtime: &RuntimeHandle) -> Result<()> {
@@ -82,12 +77,10 @@ async fn images_tile(
 
     map.discarding().update_camera(&CameraUpdate {
         mode: CameraUpdateMode::Jump,
-        camera: CameraOptions {
-            center: Some(tile_center(z, x, y)),
-            // A 512-pixel map shows tile z/x/y at zoom z.
-            zoom: Some(f64::from(z)),
-            ..Default::default()
-        },
+        camera: camera_for_tile(
+            CanonicalTileId::new(z, x, y),
+            LogicalSize::new(512, 512),
+        )?,
         ..Default::default()
     })?;
     // #endregion tile

@@ -7800,6 +7800,32 @@ pub fn cVersion() u32 {
     return c.mln_c_version();
 }
 
+/// Computes the camera that shows exactly one tile on a square map.
+///
+/// Jump a map in `MapMode.tile` to the camera to render `tile`, where
+/// `logical_size` is the map's size. The camera centers the tile and zooms
+/// until the tile fills the map: to zoom z for a 512-pixel map, or z - 1 for a
+/// 256-pixel one, plus 0.0001 to keep the neighboring tiles out. It looks
+/// straight down with north up and no padding, so the map's earlier camera
+/// doesn't change the view. The map keeps the camera within its zoom limits, so
+/// for a deep tile, raise the maximum zoom past the camera's with
+/// `Map.setBounds()`.
+///
+/// See `mln_camera_for_tile` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+///
+/// Errors:
+///
+/// - `error.InvalidArgument` when `logical_size` isn't square, or is wider than
+///   512 pixels, the width of a vector tile at its zoom. For denser tiles,
+///   raise the map's scale factor instead.
+/// - `error.InvalidArgument` when `tile.x` or `tile.y` isn't less than 2 to the
+///   power `tile.z`, or when the camera's zoom would fall outside 0 to 25.5, as
+///   for tile 0/0/0 on a 256-pixel map.
+pub fn cameraForTile(tile: CanonicalTileId, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!CameraOptions {
+    return call.invoke("mln_camera_for_tile", .none, {}, null, diagnostic, .{ tile, logical_size, call.sizedOut(CameraOptions) });
+}
+
 /// Converts meters in the Web Mercator projection to a coordinate.
 ///
 /// See `mln_lat_lng_for_projected_meters` in the

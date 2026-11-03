@@ -59,8 +59,7 @@ For map tiles, such as on a tile server, create the map with
 map clients expect, such as 256 or 512. For `@2x` tiles, set the scale factor to
 2 and keep the size.
 
-To render tile z/x/y, jump to the tile's center. A tile at zoom z is 512 logical
-pixels wide, so a 512-pixel map uses zoom z, and a 256-pixel map uses zoom z
-− 1.
+To render tile z/x/y, compute its camera for the map's size with
+[](api:mln_camera_for_tile), and jump to it.
 
 <Snippet page="images" region="tile" />

@@ -61,6 +61,14 @@ internal actual object C {
 
   actual fun mln_c_version(): Int = mln_kw_mln_c_version()
 
+  actual fun mln_camera_for_tile(
+    tile: Long,
+    logicalSize: Long,
+    outCamera: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_camera_for_tile(word(tile), word(logicalSize), word(outCamera), word(outDiagnostic))
+
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     mln_kw_mln_delivery_queue_create(word(options), word(outQueue), word(outDiagnostic))
 
@@ -1962,6 +1970,11 @@ private fun mln_kw_mln_android_init(p0: Int, p1: Int, p2: Int): Int =
 
 private fun mln_kw_mln_c_version(): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_c_version()")
+
+private fun mln_kw_mln_camera_for_tile(p0: Int, p1: Int, p2: Int, p3: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_camera_for_tile(p0, p1, p2, p3)",
+  )
 
 private fun mln_kw_mln_delivery_queue_create(p0: Int, p1: Int, p2: Int): Int =
   js(

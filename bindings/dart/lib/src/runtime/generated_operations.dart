@@ -300,6 +300,32 @@ VulkanTextureFrame _readVulkanTextureFrame(
   layout: source.layout,
 );
 
+Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
+  CanonicalTileId value,
+  Allocator arena, {
+  Pointer<raw.mln_canonical_tile_id>? into,
+}) {
+  final result = into ?? arena<raw.mln_canonical_tile_id>();
+  result.ref.z = _nativeInteger(value.z, 0, 4294967295);
+  result.ref.x = _nativeInteger(value.x, 0, 4294967295);
+  result.ref.y = _nativeInteger(value.y, 0, 4294967295);
+  return result;
+}
+
+CanonicalTileId _readCanonicalTileId(raw.mln_canonical_tile_id source) =>
+    CanonicalTileId(z: source.z, x: source.x, y: source.y);
+
+Pointer<raw.mln_logical_size> _writeLogicalSize(
+  LogicalSize value,
+  Allocator arena, {
+  Pointer<raw.mln_logical_size>? into,
+}) {
+  final result = into ?? arena<raw.mln_logical_size>();
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
+  return result;
+}
+
 Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
   GeoJsonSourceOptions value,
   Allocator arena, {
@@ -422,21 +448,6 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
     rethrow;
   }
 }
-
-Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
-  CanonicalTileId value,
-  Allocator arena, {
-  Pointer<raw.mln_canonical_tile_id>? into,
-}) {
-  final result = into ?? arena<raw.mln_canonical_tile_id>();
-  result.ref.z = _nativeInteger(value.z, 0, 4294967295);
-  result.ref.x = _nativeInteger(value.x, 0, 4294967295);
-  result.ref.y = _nativeInteger(value.y, 0, 4294967295);
-  return result;
-}
-
-CanonicalTileId _readCanonicalTileId(raw.mln_canonical_tile_id source) =>
-    CanonicalTileId(z: source.z, x: source.x, y: source.y);
 
 final raw.mln_custom_source_fetch_tile_callback
 _deliverCustomSourceFetchTileCallback = isolateCallable(
@@ -723,17 +734,6 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
     registrations,
   ).ref;
   result.ref.gesture_phase = value.gesturePhase.rawValue;
-  return result;
-}
-
-Pointer<raw.mln_logical_size> _writeLogicalSize(
-  LogicalSize value,
-  Allocator arena, {
-  Pointer<raw.mln_logical_size>? into,
-}) {
-  final result = into ?? arena<raw.mln_logical_size>();
-  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
-  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
   return result;
 }
 
@@ -2867,6 +2867,44 @@ int cVersion() {
   final nativeResult = raw.mln_c_version();
   return nativeResult;
 }
+
+/// Computes the camera that shows exactly one tile on a square map.
+///
+/// Jump a map in `MapMode.tile` to the camera to render `tile`, where
+/// `logicalSize` is the map's size. The camera centers the tile and zooms
+/// until the tile fills the map: to zoom z for a 512-pixel map, or z - 1 for
+/// a 256-pixel one, plus 0.0001 to keep the neighboring tiles out. It looks
+/// straight down with north up and no padding, so the map's earlier camera
+/// doesn't change the view. The map keeps the camera within its zoom limits,
+/// so for a deep tile, raise the maximum zoom past the camera's with
+/// `MapHandle.setBounds()`.
+///
+/// See `mln_camera_for_tile` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+///
+/// Errors:
+///
+/// - `Status.invalidArgument` when `logicalSize` isn't square, or is wider
+///   than 512 pixels, the width of a vector tile at its zoom. For denser
+///   tiles, raise the map's scale factor instead.
+/// - `Status.invalidArgument` when `tile.x` or `tile.y` isn't less than 2 to
+///   the power `tile.z`, or when the camera's zoom would fall outside 0 to
+///   25.5, as for tile 0/0/0 on a 256-pixel map.
+CameraOptions cameraForTile(CanonicalTileId tile, LogicalSize logicalSize) =>
+    withNativeArena((arena) {
+      ensureAbiVersion();
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      _check(
+        raw.mln_camera_for_tile(
+          _writeCanonicalTileId(tile, arena).ref,
+          _writeLogicalSize(logicalSize, arena).ref,
+          outCamera,
+          nativeDiagnostic,
+        ),
+      );
+      return _readCameraOptions(outCamera.ref);
+    });
 
 /// Converts meters in the Web Mercator projection to a coordinate.
 ///

@@ -8,11 +8,6 @@ import (
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
 )
 
-// The center of tile z/x/y. The snippet leaves the tile math to the reader.
-func tileCenter(z, x, y uint32) maplibre.LatLng {
-	return maplibre.LatLng{}
-}
-
 func copyPixels(data []byte, stride uint32) {}
 
 func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
@@ -121,11 +116,16 @@ func imagesTile(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y ui
 		return err
 	}
 
-	// A 512-pixel map shows tile z/x/y at zoom z.
-	center, zoom := tileCenter(z, x, y), float64(z)
+	camera, err := maplibre.CameraForTile(
+		maplibre.CanonicalTileId{Z: z, X: x, Y: y},
+		maplibre.LogicalSize{Width: 512, Height: 512},
+	)
+	if err != nil {
+		return err
+	}
 	err = m.Discarding().UpdateCamera(maplibre.CameraUpdate{
 		Mode:   maplibre.CameraUpdateModeJump,
-		Camera: maplibre.CameraOptions{Center: &center, Zoom: &zoom},
+		Camera: camera,
 	})
 	if err != nil {
 		return err
