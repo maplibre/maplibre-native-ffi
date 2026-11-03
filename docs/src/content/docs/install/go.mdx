@@ -61,6 +61,9 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 go build -tags mln_pkgconfig
 ```
 
+A vendored build needs this too, because `go mod vendor` leaves out the C
+headers that the module carries.
+
 On Windows, cgo links the C library with MSYS2's Clang: MINGW64 on x64, or
 CLANGARM64 on ARM64. Set `CC` to that environment's `bin/clang.exe` and
 `PKG_CONFIG` to its `bin/pkgconf.exe`. Put the C library's `bin` directory and
