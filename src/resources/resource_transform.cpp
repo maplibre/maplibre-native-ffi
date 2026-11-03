@@ -64,7 +64,6 @@ auto error_reason_from_abi(mln_resource_error_reason reason)
       return mln::Response::Error::Reason::RateLimit;
     case MLN_RESOURCE_ERROR_REASON_OTHER:
       return mln::Response::Error::Reason::Other;
-    case MLN_RESOURCE_ERROR_REASON_NONE:
     default:
       return std::nullopt;
   }
@@ -155,7 +154,7 @@ auto fail_resource_transform_request(
   }
   const auto reason = error_reason_from_abi(error->reason);
   if (!reason) {
-    set_thread_error("mln_resource_transform_error.reason must name an error");
+    set_thread_error("mln_resource_transform_error.reason is unknown");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!validate_c_string_view(error->message, "message")) {

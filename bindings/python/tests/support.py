@@ -33,7 +33,6 @@ RED_PIXEL = b"\xff\x00\x00\xff"
 def ok_response(style: object = EMPTY_STYLE) -> mln.ResourceResponse:
     return mln.ResourceResponse(
         status=mln.ResourceResponseStatus.OK,
-        error_reason=mln.ResourceErrorReason.NONE,
         bytes=json.dumps(style).encode(),
         error_message="",
         must_revalidate=False,

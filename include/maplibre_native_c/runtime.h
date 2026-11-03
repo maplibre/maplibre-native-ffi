@@ -324,14 +324,14 @@ typedef enum mln_resource_response_status : uint32_t {
 
 /** Why a resource request failed. */
 typedef enum mln_resource_error_reason : uint32_t {
-  MLN_RESOURCE_ERROR_REASON_NONE = 0,
+  /** A reason that no other value names. */
+  MLN_RESOURCE_ERROR_REASON_OTHER = 0,
   MLN_RESOURCE_ERROR_REASON_NOT_FOUND = 1,
   /** The server reported an error. */
   MLN_RESOURCE_ERROR_REASON_SERVER = 2,
   /** The server couldn't be reached. */
   MLN_RESOURCE_ERROR_REASON_CONNECTION = 3,
   MLN_RESOURCE_ERROR_REASON_RATE_LIMIT = 4,
-  MLN_RESOURCE_ERROR_REASON_OTHER = 5,
 } mln_resource_error_reason;
 
 /** Reads whether the library may use the network. */
@@ -579,9 +579,9 @@ typedef uint32_t mln_resource_kind_flags;
 
 /// How a URL pattern matches a request's URL.
 ///
-/// A pattern matches the whole URL, query included.
+/// A pattern matches the whole URL, query included. Without flags, it matches
+/// only the URL that equals it exactly.
 typedef enum MLN_BINDING("kind=bitmask") mln_url_match_flag : uint32_t {
-  MLN_URL_MATCH_EXACT = 0U,
   /// The URL matches the pattern as a glob. `*` matches any characters except
   /// `/`, `**` matches any characters, and `?` matches one character except
   /// `/`. `\` makes the next character match only itself. For example,
@@ -655,8 +655,7 @@ typedef uint32_t mln_resource_transform_error_fields;
 typedef struct mln_resource_transform_error {
   uint32_t size;
   mln_resource_transform_error_fields fields;
-  /** Must not be MLN_RESOURCE_ERROR_REASON_NONE. */
-  mln_resource_error_reason reason MLN_BINDING("required=true");
+  mln_resource_error_reason reason;
   mln_buffer_view message;
   /** When to retry, for MLN_RESOURCE_ERROR_REASON_RATE_LIMIT. */
   int64_t retry_after_unix_ms

@@ -729,7 +729,9 @@ final class RenderSessionState extends _Enum {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceErrorReason extends _Enum {
   const ResourceErrorReason.fromRawValue(super.rawValue);
-  static const none = ResourceErrorReason.fromRawValue(0);
+
+  /// A reason that no other value names.
+  static const other = ResourceErrorReason.fromRawValue(0);
   static const notFound = ResourceErrorReason.fromRawValue(1);
 
   /// The server reported an error.
@@ -738,15 +740,13 @@ final class ResourceErrorReason extends _Enum {
   /// The server couldn't be reached.
   static const connection = ResourceErrorReason.fromRawValue(3);
   static const rateLimit = ResourceErrorReason.fromRawValue(4);
-  static const other = ResourceErrorReason.fromRawValue(5);
   @override
   String toString() => switch (rawValue) {
-    0 => 'ResourceErrorReason.none',
+    0 => 'ResourceErrorReason.other',
     1 => 'ResourceErrorReason.notFound',
     2 => 'ResourceErrorReason.server',
     3 => 'ResourceErrorReason.connection',
     4 => 'ResourceErrorReason.rateLimit',
-    5 => 'ResourceErrorReason.other',
     _ => 'ResourceErrorReason($rawValue)',
   };
 }
@@ -1345,13 +1345,13 @@ final class TileOperation extends _Enum {
 
 /// How a URL pattern matches a request's URL.
 ///
-/// A pattern matches the whole URL, query included.
+/// A pattern matches the whole URL, query included. Without flags, it matches
+/// only the URL that equals it exactly.
 ///
 /// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class UrlMatchFlag extends _Flags<UrlMatchFlag> {
   const UrlMatchFlag.fromRawValue(super.rawValue);
-  static const exact = UrlMatchFlag.fromRawValue(0);
 
   /// The URL matches the pattern as a glob. `*` matches any characters except
   /// `/`, `**` matches any characters, and `?` matches one character except
@@ -1359,10 +1359,13 @@ final class UrlMatchFlag extends _Flags<UrlMatchFlag> {
   /// `https://*.example.com/tiles/**` matches every URL under `/tiles/` on each
   /// subdomain of `example.com`.
   static const glob = UrlMatchFlag.fromRawValue(1);
+
+  /// No flags.
+  static const none = UrlMatchFlag.fromRawValue(0);
   @override
   UrlMatchFlag _of(int rawValue) => UrlMatchFlag.fromRawValue(rawValue);
   @override
-  String toString() => _describe('UrlMatchFlag', const {0: 'exact', 1: 'glob'});
+  String toString() => _describe('UrlMatchFlag', const {0: 'none', 1: 'glob'});
 }
 
 /// The vertical direction of the image that the map renders.
@@ -5401,12 +5404,10 @@ typedef ResourceRequestCancelCallback = void Function();
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceTransformError extends _Value {
   const ResourceTransformError({
-    required this.reason,
+    this.reason = const ResourceErrorReason.fromRawValue(0),
     this.message = '',
     this.retryAfterUnixMs,
   });
-
-  /// Must not be `ResourceErrorReason.none`.
   final ResourceErrorReason reason;
   final String message;
 
@@ -6167,7 +6168,7 @@ final class HttpHeader extends _Value {
 final class HttpHeaderRule extends _Value {
   HttpHeaderRule({
     this.kinds = ResourceKindFlag.none,
-    this.flags = UrlMatchFlag.exact,
+    this.flags = UrlMatchFlag.none,
     this.url = '',
     List<HttpHeader> headers = const [],
   }) : headers = List.unmodifiable(headers);
@@ -6322,7 +6323,7 @@ typedef ResourceProviderCallback =
 final class ResourceRoute extends _Value {
   const ResourceRoute({
     this.kinds = ResourceKindFlag.none,
-    this.flags = UrlMatchFlag.exact,
+    this.flags = UrlMatchFlag.none,
     this.url = '',
   });
 

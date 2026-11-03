@@ -5,15 +5,14 @@ namespace Maplibre.NativeFfi;
 /// How a URL pattern matches a request's URL.
 /// </summary>
 /// <remarks>
-/// <para>A pattern matches the whole URL, query included.</para>
+/// <para>A pattern matches the whole URL, query included. Without flags, it
+/// matches only the URL that equals it exactly.</para>
 /// <para>See <c>mln_url_match_flag</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
 /// </remarks>
 [Flags]
 public enum UrlMatchFlag : uint
 {
-    Exact = 0,
-
     /// <summary>
     /// The URL matches the pattern as a glob. <c>*</c> matches any characters
     /// except <c>/</c>, <c>**</c> matches any characters, and <c>?</c> matches

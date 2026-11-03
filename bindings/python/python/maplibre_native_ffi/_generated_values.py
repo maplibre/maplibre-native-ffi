@@ -640,12 +640,11 @@ class ResourceErrorReason(UnknownIntEnum):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    NONE = 0
+    OTHER = 0
     NOT_FOUND = 1
     SERVER = 2
     CONNECTION = 3
     RATE_LIMIT = 4
-    OTHER = 5
 
 
 class ResourceKind(UnknownIntEnum):
@@ -979,13 +978,13 @@ class TileOperation(UnknownIntEnum):
 class UrlMatchFlag(IntFlag):
     """How a URL pattern matches a request's URL.
 
-    A pattern matches the whole URL, query included.
+    A pattern matches the whole URL, query included. Without flags, it
+    matches only the URL that equals it exactly.
 
     See `mln_url_match_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    EXACT = 0
     GLOB = 1
 
 
@@ -1819,7 +1818,7 @@ class HttpHeaderRule:
     kinds: ResourceKindFlag = field(default_factory=lambda: ResourceKindFlag(0))
     """The kinds of resource that the rule covers. Zero covers every kind."""
 
-    flags: UrlMatchFlag = UrlMatchFlag.EXACT
+    flags: UrlMatchFlag = field(default_factory=lambda: UrlMatchFlag(0))
 
     url: str = ""
 
@@ -3517,7 +3516,7 @@ class ResourceResponse:
 
     status: ResourceResponseStatus = ResourceResponseStatus.OK
 
-    error_reason: ResourceErrorReason = ResourceErrorReason.NONE
+    error_reason: ResourceErrorReason = ResourceErrorReason.OTHER
     """Why the request failed, for `ResourceResponseStatus.ERROR`."""
 
     bytes: Buffer = b""
@@ -3570,7 +3569,7 @@ class ResourceRoute:
     kinds: ResourceKindFlag = field(default_factory=lambda: ResourceKindFlag(0))
     """The kinds of resource that the route covers. Zero covers every kind."""
 
-    flags: UrlMatchFlag = UrlMatchFlag.EXACT
+    flags: UrlMatchFlag = field(default_factory=lambda: UrlMatchFlag(0))
 
     url: str = ""
 
@@ -3612,8 +3611,7 @@ class ResourceTransformError:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    reason: ResourceErrorReason
-    """Must not be `ResourceErrorReason.NONE`."""
+    reason: ResourceErrorReason = ResourceErrorReason.OTHER
 
     message: str = ""
 

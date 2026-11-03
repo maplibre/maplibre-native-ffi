@@ -821,20 +821,20 @@ func (value RenderSessionState) String() string {
 type ResourceErrorReason uint32
 
 const (
-	ResourceErrorReasonNone     ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_NONE)
+	// A reason that no other value names.
+	ResourceErrorReasonOther    ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_OTHER)
 	ResourceErrorReasonNotFound ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_NOT_FOUND)
 	// The server reported an error.
 	ResourceErrorReasonServer ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_SERVER)
 	// The server couldn't be reached.
 	ResourceErrorReasonConnection ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_CONNECTION)
 	ResourceErrorReasonRateLimit  ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_RATE_LIMIT)
-	ResourceErrorReasonOther      ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_OTHER)
 )
 
 func (value ResourceErrorReason) String() string {
 	switch value {
 	case 0:
-		return "ResourceErrorReasonNone"
+		return "ResourceErrorReasonOther"
 	case 1:
 		return "ResourceErrorReasonNotFound"
 	case 2:
@@ -843,8 +843,6 @@ func (value ResourceErrorReason) String() string {
 		return "ResourceErrorReasonConnection"
 	case 4:
 		return "ResourceErrorReasonRateLimit"
-	case 5:
-		return "ResourceErrorReasonOther"
 	}
 	return fmt.Sprintf("ResourceErrorReason(%d)", value)
 }
@@ -1578,14 +1576,14 @@ func (value TileOperation) String() string {
 // UrlMatchFlag corresponds to mln_url_match_flag. How a URL pattern matches a
 // request's URL.
 //
-// A pattern matches the whole URL, query included.
+// A pattern matches the whole URL, query included. Without flags, it matches
+// only the URL that equals it exactly.
 //
 // See mln_url_match_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type UrlMatchFlag uint32
 
 const (
-	UrlMatchFlagExact UrlMatchFlag = UrlMatchFlag(C.MLN_URL_MATCH_EXACT)
 	// The URL matches the pattern as a glob. * matches any characters except /, **
 	// matches any characters, and ? matches one character except /. \ makes the
 	// next character match only itself. For example, https://*.example.com/tiles/**
@@ -4382,7 +4380,6 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 // See mln_resource_transform_error in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceTransformError struct {
-	// Must not be ResourceErrorReasonNone.
 	Reason  ResourceErrorReason
 	Message string
 	// When to retry, for ResourceErrorReasonRateLimit.

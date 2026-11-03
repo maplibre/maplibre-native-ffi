@@ -259,7 +259,6 @@ auto error_reason_from_abi(mln_resource_error_reason reason)
     case MLN_RESOURCE_ERROR_REASON_RATE_LIMIT:
       return mln::Response::Error::Reason::RateLimit;
     case MLN_RESOURCE_ERROR_REASON_OTHER:
-    case MLN_RESOURCE_ERROR_REASON_NONE:
     default:
       return mln::Response::Error::Reason::Other;
   }

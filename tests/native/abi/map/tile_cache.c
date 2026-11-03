@@ -40,7 +40,6 @@ static void serve_tile(
     .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
     .status = revalidation ? MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED
                            : MLN_RESOURCE_RESPONSE_STATUS_OK,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
     .bytes = server->bytes,
     .byte_count = server->byte_count,
     .expires_unix_ms = 4102444800000,

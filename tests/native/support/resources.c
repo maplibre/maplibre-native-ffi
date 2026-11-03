@@ -139,7 +139,6 @@ mln_resource_response mln_test_text_response(const char* text) {
   return (mln_resource_response){
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
     .bytes = (const uint8_t*)text,
     .byte_count = text == NULL ? 0 : strlen(text),
   };

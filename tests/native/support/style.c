@@ -312,7 +312,6 @@ static void serve_route(
     response = (mln_resource_response){
       .size = sizeof(mln_resource_response),
       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-      .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
       .bytes = (const uint8_t*)route->body,
       .byte_count = strlen(route->body),
     };

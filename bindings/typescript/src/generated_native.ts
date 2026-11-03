@@ -749,7 +749,7 @@ export interface NativeOperations {
   mln_resource_transform_request_fail(
     request: bigint,
     token: object | undefined,
-    error: ResourceTransformError,
+    error: ResourceTransformError | undefined,
   ): void;
   mln_resource_transform_request_release(
     request: bigint,

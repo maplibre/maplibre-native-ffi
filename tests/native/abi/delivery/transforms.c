@@ -274,7 +274,7 @@ static void the_host_fails_a_dispatched_transform(void) {
 
   mln_resource_transform_error error = {
     .size = sizeof(mln_resource_transform_error),
-    .reason = MLN_RESOURCE_ERROR_REASON_NONE,
+    .reason = (mln_resource_error_reason)99,
   };
   MLN_TEST_INVALID(mln_resource_transform_request_fail(request, NULL, NULL));
   MLN_TEST_INVALID(mln_resource_transform_request_fail(request, &error, NULL));
@@ -306,6 +306,44 @@ static void the_host_fails_a_dispatched_transform(void) {
   TEST_ASSERT_EQUAL_INT(
     1, mln_test_http_server_requests(server, "/rewritten.json")
   );
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/original.json")
+  );
+
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_delivery_queue_release(&queue);
+  mln_test_http_server_stop(server);
+}
+
+// A transform error with only its size set fails the request with
+// MLN_RESOURCE_ERROR_REASON_OTHER and the default message.
+static void a_zeroed_transform_error_fails_its_request(void) {
+  mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
+  char original[256];
+  mln_test_http_server_url(
+    server, "/original.json", original, sizeof(original)
+  );
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  const mln_resource_transform transform = queue_transform(queue.handle, NULL);
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, original));
+  const mln_resource_transform_request request =
+    await_transform(queue.handle, NULL);
+
+  const mln_resource_transform_error error = {
+    .size = sizeof(mln_resource_transform_error),
+  };
+  MLN_TEST_OK(mln_resource_transform_request_fail(request, &error, NULL));
+  char message[512];
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "resource transform failed"));
   TEST_ASSERT_EQUAL_INT(
     0, mln_test_http_server_requests(server, "/original.json")
   );
@@ -568,6 +606,7 @@ MLN_TEST_GROUP {
 #if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(the_host_answers_a_dispatched_transform_later);
   RUN_TEST(the_host_fails_a_dispatched_transform);
+  RUN_TEST(a_zeroed_transform_error_fails_its_request);
   RUN_TEST(an_unanswered_transform_fails_its_request);
   RUN_TEST(the_release_follows_the_last_transform);
 #endif

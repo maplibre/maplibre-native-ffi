@@ -5799,14 +5799,14 @@ pub const RenderingStats = struct {
 /// See `mln_resource_error_reason` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceErrorReason = enum(u32) {
-    none = 0,
+    /// A reason that no other value names.
+    other = 0,
     not_found = 1,
     /// The server reported an error.
     server = 2,
     /// The server couldn't be reached.
     connection = 3,
     rate_limit = 4,
-    other = 5,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -6067,7 +6067,7 @@ pub const ResourceRequestInfo = struct {
 pub const ResourceResponse = struct {
     status: ResourceResponseStatus = .ok,
     /// Why the request failed, for `ResourceResponseStatus.@"error"`.
-    error_reason: ResourceErrorReason = .none,
+    error_reason: ResourceErrorReason = .other,
     /// The resource, for `ResourceResponseStatus.ok`.
     bytes: []const u8 = &.{},
     /// A description of the error, for `ResourceResponseStatus.@"error"`.
@@ -6232,8 +6232,7 @@ pub const ResourceTransform = struct {
 /// See `mln_resource_transform_error` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceTransformError = struct {
-    /// Must not be `ResourceErrorReason.none`.
-    reason: ResourceErrorReason,
+    reason: ResourceErrorReason = .other,
     message: []const u8 = &.{},
     /// When to retry, for `ResourceErrorReason.rate_limit`.
     retry_after_unix_ms: ?i64 = null,
@@ -6456,7 +6455,7 @@ pub const RuntimeEventHandler = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventOfflineRegionResponseError = struct {
     region_id: i64 = 0,
-    reason: ResourceErrorReason = .none,
+    reason: ResourceErrorReason = .other,
     pub fn fromNative(raw: c.mln_runtime_event_offline_region_response_error) RuntimeEventOfflineRegionResponseError {
         return .{
             .region_id = raw.region_id,
@@ -7431,7 +7430,8 @@ pub const UnitBezier = struct {
 
 /// How a URL pattern matches a request's URL.
 ///
-/// A pattern matches the whole URL, query included.
+/// A pattern matches the whole URL, query included. Without flags, it matches
+/// only the URL that equals it exactly.
 ///
 /// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -7447,7 +7447,6 @@ pub const UrlMatchFlag = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
-    pub const exact: UrlMatchFlag = .{};
 };
 
 /// A vector in three dimensions.

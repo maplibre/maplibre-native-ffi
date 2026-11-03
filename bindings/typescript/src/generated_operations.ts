@@ -4683,7 +4683,7 @@ export class ResourceTransformRequestHandle extends Owner {
    * See `mln_resource_transform_request_fail` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  fail(error: ResourceTransformError): void {
+  fail(error: ResourceTransformError = {}): void {
     answerSync(this, (handle, token) =>
       native.mln_resource_transform_request_fail(handle, token, error),
     );

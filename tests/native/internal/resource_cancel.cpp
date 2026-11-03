@@ -23,7 +23,6 @@ auto style_response() -> mln_resource_response {
   return mln_resource_response{
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
     .bytes = inline_style_json,
     .byte_count = sizeof(inline_style_json) - 1,
   };

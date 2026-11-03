@@ -2252,7 +2252,10 @@ export interface RenderingStats {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export const ResourceErrorReason = {
-  none: 0,
+  /**
+   * A reason that no other value names.
+   */
+  other: 0,
   notFound: 1,
   /**
    * The server reported an error.
@@ -2263,7 +2266,6 @@ export const ResourceErrorReason = {
    */
   connection: 3,
   rateLimit: 4,
-  other: 5,
 } as const;
 /** One of the ResourceErrorReason values, or a value this binding does not know. */
 export type ResourceErrorReason =
@@ -2528,10 +2530,7 @@ export type ResourceTransform = (
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface ResourceTransformError {
-  /**
-   * Must not be `ResourceErrorReason.none`.
-   */
-  reason: ResourceErrorReason;
+  reason?: ResourceErrorReason;
   message?: string;
   /**
    * When to retry, for `ResourceErrorReason.rateLimit`.
@@ -3453,13 +3452,13 @@ export interface UnitBezier {
 /**
  * How a URL pattern matches a request's URL.
  *
- * A pattern matches the whole URL, query included.
+ * A pattern matches the whole URL, query included. Without flags, it matches
+ * only the URL that equals it exactly.
  *
  * See `mln_url_match_flag` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export const UrlMatchFlag = {
-  exact: 0,
   /**
    * The URL matches the pattern as a glob. `*` matches any characters except
    * `/`, `**` matches any characters, and `?` matches one character except `/`.
