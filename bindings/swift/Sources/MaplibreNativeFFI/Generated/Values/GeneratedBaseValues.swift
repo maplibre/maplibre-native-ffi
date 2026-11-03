@@ -54,8 +54,6 @@ public struct Status: RawRepresentable, CustomStringConvertible,
   public static let busy: Status = .init(rawValue: -7)
   /// The render target can't be drawn to anymore.
   public static let targetLost: Status = .init(rawValue: -8)
-  /// There is nothing to return yet, such as when no new frame is ready.
-  public static let notReady: Status = .init(rawValue: -9)
   /// Nothing has the given ID.
   public static let notFound: Status = .init(rawValue: -10)
   public var description: String {
@@ -69,7 +67,6 @@ public struct Status: RawRepresentable, CustomStringConvertible,
     case -6: return "cancelled"
     case -7: return "busy"
     case -8: return "targetLost"
-    case -9: return "notReady"
     case -10: return "notFound"
     default: return "Status(\(rawValue))"
     }

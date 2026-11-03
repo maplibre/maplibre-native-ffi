@@ -837,58 +837,56 @@ mln_status copy_values(
             ):
                 bind(self.parse(source), require_complete=True)
 
-    def test_an_absence_status_names_the_one_output_it_reports_absent(self):
+    def test_a_nullable_handle_output_is_absent_when_null(self):
         model = bind(
-            parse(groups=("absent_handle", "absent_value")), require_complete=True
+            parse(groups=("absent_handle", "strided_records")), require_complete=True
         )
         self.assertEqual(
             {
-                name: (
-                    plan.absence.status,
-                    plan.absence.value,
-                    plan.absence.output.name,
-                )
+                name: plan.absence.output.name
                 for name, plan in model.operations_by_name.items()
                 if plan.absence
             },
             {
-                "mln_probe_take_parcel": ("MLN_STATUS_NOT_READY", -9, "out_parcel"),
-                "mln_probe_read_level": ("MLN_STATUS_NOT_READY", -9, "out_level"),
+                "mln_probe_take_parcel": "out_parcel",
+                "mln_probe_ledger_drain": "out_batch",
             },
         )
-        one = 'double *value BIND("direction=out"), mln_diagnostic *out_diagnostic'
-        two = 'double *first BIND("direction=out"), ' + one
-        later = "mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic"
+        handles = """
+typedef unsigned long long thing BIND("kind=handle;release=thing_release");
+void thing_release(thing value);
+"""
+        one = 'thing *value BIND("direction=out;nullable=true"), mln_diagnostic *out_diagnostic'
+        two = 'thing *first BIND("direction=out"), ' + one
+        later = (
+            'mln_map map, thing *value BIND("direction=out;nullable=true"), '
+            "const mln_completion *completion, mln_diagnostic *out_diagnostic"
+        )
         for annotation, parameters, error in (
-            ("absent_on=MLN_STATUS_NOT_READY", two, "exactly one output"),
+            ("", two, "the one output or a drain's batch"),
             (
-                "execution=query;result=double;absent_on=MLN_STATUS_NOT_READY",
+                'BIND("execution=query;result=double")',
                 later,
                 "without a completion",
             ),
-            ("absent_on=MLN_STATUS_OK", one, "failure enumerator"),
-            # A drain is absent on MLN_STATUS_NOT_READY by convention.
             (
-                "execution=event_batch;absent_on=MLN_STATUS_NOT_READY",
-                one,
-                "absent_on=MLN_STATUS_NOT_READY restates the default",
+                "",
+                'double *value BIND("direction=out;nullable=true"), mln_diagnostic *out_diagnostic',
+                "requires a handle",
             ),
+            ('BIND("execution=event_batch")', one, "a slice view output"),
         ):
-            source = f'BIND("{annotation}") mln_status read({parameters});'
+            source = f"{handles}{annotation} mln_status read({parameters});"
             with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):
                 bind(self.parse(source), require_complete=True)
-        # An absent call publishes nothing, so no binding may root a
-        # registration that it passed.
+        # A call that publishes nothing roots no registration that it passed.
         callbacks = """
 typedef void (*notify)(void *state);
 typedef void (*release)(void *state);
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 """
         source = (
-            callbacks
-            + 'BIND("absent_on=MLN_STATUS_NOT_READY") mln_status read(const signals *events, '
-            + one
-            + ");"
+            handles + callbacks + "mln_status read(const signals *events, " + one + ");"
         )
         with self.assertRaisesRegex(ModelError, "without registrations"):
             bind(self.parse(source), require_complete=True)

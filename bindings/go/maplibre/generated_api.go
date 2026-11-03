@@ -1209,8 +1209,6 @@ const (
 	StatusBusy Status = Status(C.MLN_STATUS_BUSY)
 	// The render target can't be drawn to anymore.
 	StatusTargetLost Status = Status(C.MLN_STATUS_TARGET_LOST)
-	// There is nothing to return yet, such as when no new frame is ready.
-	StatusNotReady Status = Status(C.MLN_STATUS_NOT_READY)
 	// Nothing has the given ID.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
@@ -1235,8 +1233,6 @@ func (value Status) String() string {
 		return "StatusBusy"
 	case -8:
 		return "StatusTargetLost"
-	case -9:
-		return "StatusNotReady"
 	case -10:
 		return "StatusNotFound"
 	}
@@ -1263,8 +1259,6 @@ func (value Status) Error() string {
 		return "maplibre: busy"
 	case -8:
 		return "maplibre: target lost"
-	case -9:
-		return "maplibre: not ready"
 	case -10:
 		return "maplibre: not found"
 	}
@@ -7305,7 +7299,8 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 //
 // It takes the oldest frame that you haven't acquired. The session can render
 // over a frame before you acquire it. While you hold a frame in every texture
-// of the ring, new frames wait until you release one.
+// of the ring, new frames wait until you release one. When no frame is ready,
+// it succeeds and writes the null handle.
 //
 // See mln_render_session_acquire_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7316,9 +7311,12 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 //   - StatusInvalidState when the session has failed.
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
 	var outFrame C.mln_acquired_frame
-	return bindingGetUnless(bindingOwned(receiver.owner()), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_acquire_frame(C.mln_render_session(raw), &outFrame, diagnostic))
 	}, func(arena *bindingArena) *AcquiredFrameHandle {
+		if outFrame == 0 {
+			return nil
+		}
 		adopted := adoptAcquiredFrameHandle(uint64(outFrame), receiver)
 		return adopted
 	})
@@ -7394,15 +7392,21 @@ func (receiver *RenderSessionHandle) Close() (*Future[struct{}], error) {
 
 // DrainFrameResults takes the frame results that the session has queued.
 //
+// When no result is queued, it succeeds and writes the null handle and an empty
+// view.
+//
 // See mln_render_session_drain_frame_results in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) DrainFrameResults() ([]RenderFrameResult, error) {
 	var outBatch C.mln_render_frame_batch
 	var outView C.mln_render_frame_batch_view
 	outView.size = C.uint32_t(unsafe.Sizeof(outView))
-	return bindingGetUnless(bindingOwned(receiver.owner()), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outBatch, &outView, diagnostic))
 	}, func(arena *bindingArena) []RenderFrameResult {
+		if outBatch == 0 {
+			return nil
+		}
 		defer C.mln_render_frame_batch_release(outBatch)
 		return func() []RenderFrameResult {
 			length := bindingLength(uint64(outView.result_count))

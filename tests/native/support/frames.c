@@ -47,8 +47,8 @@ static bool results_ready(void* context) {
   results_wait* wait = context;
   const mln_status status =
     mln_test_drain_frame_results(wait->fixture->session, &wait->batch, NULL);
-  wait->failed = status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY;
-  return status != MLN_STATUS_NOT_READY;
+  wait->failed = status != MLN_STATUS_OK;
+  return wait->failed || wait->batch != MLN_HANDLE_NULL;
 }
 
 typedef struct result_list_wait {
@@ -64,11 +64,11 @@ static bool result_list_ready(void* context) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status status =
     mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
-  if (status == MLN_STATUS_NOT_READY) return false;
   if (status != MLN_STATUS_OK) {
     wait->failed = true;
     return true;
   }
+  if (batch == MLN_HANDLE_NULL) return false;
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   for (size_t index = 0; index < view.result_count; index += 1) {
     if (wait->received < wait->count) {
@@ -121,7 +121,7 @@ mln_status mln_test_drain_frame_results(
   const mln_status status = mln_render_session_drain_frame_results(
     session, out_batch, &view, out_diagnostic
   );
-  if (status == MLN_STATUS_OK) {
+  if (status == MLN_STATUS_OK && *out_batch != MLN_HANDLE_NULL) {
     const size_t slot =
       next_drained_view++ % (sizeof(drained_views) / sizeof(*drained_views));
     drained_views[slot].batch = *out_batch;

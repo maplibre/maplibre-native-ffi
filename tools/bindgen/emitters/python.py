@@ -713,22 +713,24 @@ def operation(
         status = plan.status
         absence = plan.absence
         body = setup + [
-            f"        let result = unsafe {{ call.status_unless(sys::{absence.status}, |diagnostic| {call}) }};"
-            if absence
-            else f"        let result = unsafe {{ call.status(|diagnostic| {call}) }};"
+            f"        let result = unsafe {{ call.status(|diagnostic| {call}) }};"
             if status
             else f"        let result = unsafe {{ call.run(|| {call}) }};"
         ]
         if status:
             if plan.consumes == "always":
                 body.append("        reservation.commit();")
-            body.append(
-                "        if !result? { return Ok(PyList::empty(py).into_any().unbind()); }"
-                if plan.drain
-                else "        if !result? { return Ok(py.None()); }"
-                if absence
-                else "        result?;"
-            )
+            body.append("        result?;")
+            if absence:
+                # A null handle is nothing to return.
+                empty = (
+                    "PyList::empty(py).into_any().unbind()"
+                    if plan.drain
+                    else "py.None()"
+                )
+                body.append(
+                    f"        if {absence.output.name}.0 == 0 {{ return Ok({empty}); }}"
+                )
             if plan.consumes and plan.consumes != "always":
                 body.append("        reservation.commit();")
         elif plan.result:
@@ -785,7 +787,7 @@ def operation(
             else:
                 if absence:
                     raise unsupported(
-                        function, "absence requires an owned handle output"
+                        function, "a nullable output requires an owned handle output"
                     )
                 body.append(f"        {ok(copy_output(output, value))}")
                 public_result = values.type(value)

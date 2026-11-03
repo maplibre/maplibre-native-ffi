@@ -1494,7 +1494,8 @@ pub const RenderSession = struct {
     ///
     /// It takes the oldest frame that you haven't acquired. The session can render
     /// over a frame before you acquire it. While you hold a frame in every texture
-    /// of the ring, new frames wait until you release one.
+    /// of the ring, new frames wait until you release one. When no frame is ready,
+    /// it succeeds and writes the null handle.
     ///
     /// See `mln_render_session_acquire_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1505,7 +1506,7 @@ pub const RenderSession = struct {
     ///   `RenderSessionCapabilityFlag.frame_acquisition`.
     /// - `error.InvalidState` when the session has failed.
     pub fn acquireFrame(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!?AcquiredFrame {
-        return call.invokeUnless("mln_render_session_acquire_frame", .handle, self, null, diagnostic, c.MLN_STATUS_NOT_READY, .{call.adopt(AcquiredFrame)});
+        return call.invokeNullable("mln_render_session_acquire_frame", .handle, self, null, diagnostic, .{call.adopt(AcquiredFrame)});
     }
 
     /// Ends the session's pending frame requests and waits for its earlier work.
@@ -1591,10 +1592,13 @@ pub const RenderSession = struct {
 
     /// Takes the frame results that the session has queued.
     ///
+    /// When no result is queued, it succeeds and writes the null handle and an
+    /// empty view.
+    ///
     /// See `mln_render_session_drain_frame_results` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn drainFrameResults(self: RenderSession, allocator: std.mem.Allocator, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const RenderFrameResult) {
-        return call.drain("mln_render_session_drain_frame_results", .handle, self, RenderFrameResult, "results", "result_count", "result_size", c.mln_render_frame_batch_release, allocator, diagnostic, c.MLN_STATUS_NOT_READY);
+        return call.drain("mln_render_session_drain_frame_results", .handle, self, RenderFrameResult, "results", "result_count", "result_size", c.mln_render_frame_batch_release, allocator, diagnostic);
     }
 
     /// Logs debugging information about the session's renderer.
@@ -6192,8 +6196,6 @@ pub const Status = enum(i32) {
     busy = -7,
     /// The render target can't be drawn to anymore.
     target_lost = -8,
-    /// There is nothing to return yet, such as when no new frame is ready.
-    not_ready = -9,
     /// Nothing has the given ID.
     not_found = -10,
     _,

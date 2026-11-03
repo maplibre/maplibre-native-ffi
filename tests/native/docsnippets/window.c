@@ -63,7 +63,8 @@ static void drain_frame_results(void) {
   if (
     mln_render_session_drain_frame_results(
       session, &batch, &view, NULL
-    ) != MLN_STATUS_OK
+    ) != MLN_STATUS_OK ||
+    batch == MLN_HANDLE_NULL
   ) {
     return;  // No results yet.
   }

@@ -473,25 +473,15 @@ def operation(plan, values, *, discard=False, dispose=False):
     else:
         check = f"func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
         if plan.absence:
+            # A null handle is nothing to return: nil, or an empty slice.
+            absent = [f"if {labels[plan.absence.output.name]} == 0 {{\nreturn nil\n}}"]
             if plan.drain:
                 # Released even if the copy fails.
                 batch = element(plan.drain.batch.value)
                 release = values.api.handles[batch.native].release
-                adoptions.insert(
-                    0, f"defer C.{release}({labels[plan.drain.batch.name]})"
-                )
-            elif outputs[0][1].kind != "handle":
-                assert returned is not None
-                returned = "*" + returned
-                adoptions.append(f"value := {converted}")
-                converted = "&value"
-            result_closure = (
-                f"func(arena *bindingArena) {returned} {{\n"
-                + "".join(line + "\n" for line in adoptions)
-                + f"return {converted}\n}}"
-            )
-            invocation = f"return bindingGetUnless({target}, int32(C.{plan.absence.status}), {check}, {result_closure})"
-        elif outputs:
+                absent.append(f"defer C.{release}({labels[plan.drain.batch.name]})")
+            adoptions[:0] = absent
+        if outputs:
             result_closure = (
                 f"func(arena *bindingArena) {returned} {{\n"
                 + "".join(line + "\n" for line in adoptions)

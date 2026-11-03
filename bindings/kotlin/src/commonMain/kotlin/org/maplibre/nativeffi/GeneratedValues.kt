@@ -1343,7 +1343,6 @@ public value class Status(public val rawValue: Int) {
       -6 -> "CANCELLED"
       -7 -> "BUSY"
       -8 -> "TARGET_LOST"
-      -9 -> "NOT_READY"
       -10 -> "NOT_FOUND"
       else -> "Status($rawValue)"
     }
@@ -1368,8 +1367,6 @@ public value class Status(public val rawValue: Int) {
     public val BUSY: Status = Status(-7)
     /** The render target can't be drawn to anymore. */
     public val TARGET_LOST: Status = Status(-8)
-    /** There is nothing to return yet, such as when no new frame is ready. */
-    public val NOT_READY: Status = Status(-9)
     /** Nothing has the given ID. */
     public val NOT_FOUND: Status = Status(-10)
   }

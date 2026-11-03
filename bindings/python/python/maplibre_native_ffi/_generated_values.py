@@ -790,7 +790,6 @@ class Status(UnknownIntEnum):
     CANCELLED = -6
     BUSY = -7
     TARGET_LOST = -8
-    NOT_READY = -9
     NOT_FOUND = -10
 
 

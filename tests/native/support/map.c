@@ -21,13 +21,11 @@ static void collect_frames(still_image_wait* wait) {
   const mln_status drained = mln_test_drain_frame_results(
     wait->fixture->session, &batch, MLN_TEST_DIAGNOSTIC
   );
-  if (drained == MLN_STATUS_NOT_READY) {
-    return;
-  }
   if (drained != MLN_STATUS_OK) {
     wait->failure = drained;
     return;
   }
+  if (batch == MLN_HANDLE_NULL) return;
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   for (size_t index = 0; index < view.result_count; ++index) {
     if (
@@ -41,7 +39,8 @@ static void collect_frames(still_image_wait* wait) {
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   while (mln_render_session_acquire_frame(
            wait->fixture->session, &frame, MLN_TEST_DIAGNOSTIC
-         ) == MLN_STATUS_OK) {
+         ) == MLN_STATUS_OK &&
+         frame != MLN_HANDLE_NULL) {
     const mln_status released =
       mln_acquired_frame_release(frame, NULL, MLN_TEST_DIAGNOSTIC);
     if (released != MLN_STATUS_OK) {

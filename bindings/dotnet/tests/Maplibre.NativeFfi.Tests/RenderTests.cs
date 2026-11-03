@@ -41,8 +41,8 @@ public sealed class RenderTests
             {
                 var session = fixture.Session;
                 fixture.Await(session.Ready, "the session to be ready");
-                // Native reports both calls as not ready, which reads as no results and no
-                // frame.
+                // Native writes a null batch and a null frame, which read as no results and
+                // no frame.
                 Assert.Empty(session.DrainFrameResults());
                 Assert.Null(session.AcquireFrame());
             }

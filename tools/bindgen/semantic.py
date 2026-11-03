@@ -394,7 +394,7 @@ class DrainPlan:
     """A drain that publishes an owned batch and a borrowed slice view of it.
 
     A binding copies the slice, releases the batch, and returns the slice, which
-    is empty when the drain reports nothing queued.
+    is empty when the drain publishes a null batch because nothing is queued.
     """
 
     batch: ParameterPlan
@@ -404,14 +404,13 @@ class DrainPlan:
 
 @dataclass(frozen=True)
 class AbsencePlan:
-    """A failure status that reports the operation's one output as absent.
+    """A handle output that native leaves null on success when it has nothing
+    to return, as its `nullable=true` annotation says.
 
-    A binding returns its language's empty form for this status instead of an
-    error, and adopts or copies the output only on success.
+    A binding returns its language's empty form when the handle is null, and
+    adopts the handle otherwise.
     """
 
-    status: str
-    value: int
     output: ParameterPlan
 
 
@@ -506,7 +505,7 @@ class OperationPlan:
     member: str = ""
     # A drain's batch and slice view, which bindings present as the slice.
     drain: DrainPlan | None = None
-    # The `absent_on=` status, its value, and the output that it reports absent.
+    # The handle output that native may leave null on success.
     absence: AbsencePlan | None = None
     # What an immediate call waits for before it returns, such as a native
     # thread start, which some host threads cannot wait for.
@@ -1454,30 +1453,25 @@ class Binder:
                 member.removeprefix("get_"),
             )
         absence = None
-        if "absent_on" in metadata:
-            # An absent call publishes nothing, so it neither consumes its
-            # receiver nor roots a registration.
+        nullable = [o for o in outputs if o.value.nullable]
+        if nullable:
+            # A call that publishes nothing neither consumes its receiver nor
+            # roots a registration.
             if view or consumes:
                 raise ModelError(
-                    [f"{context}: absent_on requires an output that the caller owns"]
+                    [
+                        f"{context}: a nullable output requires an output that the caller owns"
+                    ]
                 )
             if registrations:
                 raise ModelError(
-                    [f"{context}: absent_on requires a call without registrations"]
+                    [
+                        f"{context}: a nullable output requires a call without registrations"
+                    ]
                 )
-            absence = AbsencePlan(
-                metadata["absent_on"],
-                next(
-                    value.value
-                    for enum in self.api.enums
-                    if enum.name == STATUS
-                    for value in enum.values
-                    if value.name == metadata["absent_on"]
-                ),
-                outputs[0],
-            )
+            absence = AbsencePlan(nullable[0])
         drain = None
-        if absence and len(outputs) == 2:
+        if metadata["execution"] == "event_batch":
 
             def slice_record(parameter):
                 value = parameter.value

@@ -78,18 +78,22 @@ mln_status mln_test_render_fixture_service(
   const mln_test_render_fixture* fixture
 );
 
+// What a helper below returns when its deadline passes. No library call
+// returns it.
+#define MLN_TEST_RENDER_TIMED_OUT ((mln_status)INT32_MIN)
+
 // Services the fixture's driver work until `ready(context)` holds, waiting for
 // the fixture's wakes in between with mln_test_await_on_event_loop(), so a
 // WebGPU readback's map reaches the thread that services. Returns
 // MLN_STATUS_OK once it holds, the service status when service fails, or
-// MLN_STATUS_NOT_READY at the deadline.
+// MLN_TEST_RENDER_TIMED_OUT at the deadline.
 mln_status mln_test_render_step_until(
   const mln_test_render_fixture* fixture, bool (*ready)(void* context),
   void* context, mln_test_deadline deadline, const char* what
 );
 
 // Services the fixture until `completion` is delivered, and returns its
-// status, or MLN_STATUS_NOT_READY when it never arrives.
+// status, or MLN_TEST_RENDER_TIMED_OUT when it never arrives.
 mln_status mln_test_render_fixture_finish_operation(
   const mln_test_render_fixture* fixture, mln_test_completion* completion
 );

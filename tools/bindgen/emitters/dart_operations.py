@@ -45,6 +45,8 @@ class Method:
     attach_output: str | None = None
     # The batch that a drain releases once it copies the slice.
     drained: str | None = None
+    # The handle output that native may leave null on success.
+    absent: str | None = None
 
     @property
     def parameters(self) -> str:
@@ -219,7 +221,7 @@ def convert(
                 # The drain releases the batch once it copies the slice.
                 setup.append(f"final {local} = arena<Uint64>();")
                 args.append(local)
-                method.drained = local
+                method.drained = method.absent = local
                 continue
             owned = next(
                 (o for o in plan.owned_outputs if o.parameter == parameter.name), None
@@ -232,6 +234,8 @@ def convert(
                     continue
                 setup.append(f"final {local} = arena<Uint64>();")
                 args.append(local)
+                if plan.absence and plan.absence.output.name == parameter.name:
+                    method.absent = local
                 returns.append(adopt_owner(owned, local + ".value", function, values))
                 continue
             values.check(output)
@@ -381,14 +385,18 @@ def immediate(plan: OperationPlan, method: Method, result: str | None) -> list[s
     returns `result`."""
     call = method.call
     body = method.setup + [
-        f"if (!_present({call}, raw.{plan.absence.status})) {{ return {'const []' if plan.drain else 'null'}; }}"
-        if plan.absence
-        else f"_check({call});"
+        f"_check({call});"
         if plan.status
         else f"final nativeResult = {call};"
         if plan.result
         else f"{call};"
     ]
+    if plan.absence:
+        if method.absent is None:
+            raise Unsupported("a nullable output requires a handle output")
+        body.append(
+            f"if ({method.absent}.value == 0) {{ return {'const []' if plan.drain else 'null'}; }}"
+        )
     if result:
         body.append(f"return {result};")
     return body

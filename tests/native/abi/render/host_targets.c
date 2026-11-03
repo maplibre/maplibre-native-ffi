@@ -196,10 +196,8 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
     )
   );
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY,
-    mln_test_drain_frame_results(fixture.session, &batch, NULL)
-  );
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture.session, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
   mln_test_render_release_frame(&first);
   batch = mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);

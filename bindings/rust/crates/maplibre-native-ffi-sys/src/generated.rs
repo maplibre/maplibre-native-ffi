@@ -380,7 +380,6 @@ pub const MLN_STATUS_NATIVE_ERROR: mln_status = -5;
 pub const MLN_STATUS_CANCELLED: mln_status = -6;
 pub const MLN_STATUS_BUSY: mln_status = -7;
 pub const MLN_STATUS_TARGET_LOST: mln_status = -8;
-pub const MLN_STATUS_NOT_READY: mln_status = -9;
 pub const MLN_STATUS_NOT_FOUND: mln_status = -10;
 pub type mln_style_expression_input_field = u32;
 pub const MLN_STYLE_EXPRESSION_INPUT_ZOOM: mln_style_expression_input_field = 1;

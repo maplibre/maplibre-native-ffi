@@ -1090,9 +1090,6 @@ final class Status extends _Enum {
   /// The render target can't be drawn to anymore.
   static const targetLost = Status.fromRawValue(-8);
 
-  /// There is nothing to return yet, such as when no new frame is ready.
-  static const notReady = Status.fromRawValue(-9);
-
   /// Nothing has the given ID.
   static const notFound = Status.fromRawValue(-10);
   @override
@@ -1106,7 +1103,6 @@ final class Status extends _Enum {
     -6 => 'Status.cancelled',
     -7 => 'Status.busy',
     -8 => 'Status.targetLost',
-    -9 => 'Status.notReady',
     -10 => 'Status.notFound',
     _ => 'Status($rawValue)',
   };

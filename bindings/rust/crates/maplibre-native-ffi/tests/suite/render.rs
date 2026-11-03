@@ -58,8 +58,8 @@ fn a_drain_before_any_demand_returns_no_batch() {
     let ring = [host_texture(&graphics)];
     let fixture = styled_fixture();
     let session = graphics.borrowed_texture_session(fixture.map(), EXTENT, &ring);
-    // Native reports both calls as not ready, which reads as empty and as no
-    // value.
+    // Native writes a null batch and a null frame, which read as empty and as
+    // no value.
     assert!(session.handle.drain_frame_results().unwrap().is_empty());
     assert!(session.handle.acquire_frame().unwrap().is_none());
     session.close();

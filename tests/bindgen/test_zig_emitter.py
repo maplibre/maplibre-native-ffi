@@ -41,7 +41,7 @@ typedef unsigned long long mln_reading_batch BIND(
 void mln_reading_batch_release(mln_reading_batch batch);
 BIND("execution=event_batch")
 mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
@@ -59,8 +59,7 @@ class ZigEmitterTests(unittest.TestCase):
             "?*diagnostics.Diagnostic) status.Error!OwnedValue([]const Reading) {\n"
             '    return call.drain("mln_drain_readings", .none, {}, Reading, '
             '"readings", "reading_count", "reading_size", '
-            "c.mln_reading_batch_release, allocator, diagnostic, "
-            "c.MLN_STATUS_NOT_READY);",
+            "c.mln_reading_batch_release, allocator, diagnostic);",
             source,
         )
         self.assertNotIn("pub const ReadingBatch ", source)
@@ -210,7 +209,6 @@ void mln_query_release(mln_query query);
                 "keywords",
                 "defaults",
                 "absent_handle",
-                "absent_value",
                 "owned_argument",
             ),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION"),

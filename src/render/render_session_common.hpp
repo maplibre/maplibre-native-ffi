@@ -95,6 +95,9 @@ using OpenGLBorrowedTarget = BorrowedTarget<
 using WebGPUBorrowedTarget = BorrowedTarget<
   mln_web_gpu_borrowed_texture_descriptor, mln_web_gpu_borrowed_texture>;
 
+// Thrown while a frame renders when the target can't take it this time. The
+// frame finishes with MLN_RENDER_RESULT_TARGET_NOT_READY, and a later demand
+// renders its update.
 class RenderTargetNotReady : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
@@ -296,6 +299,8 @@ class TextureSessionBackend : public RenderSessionBackend {
     -> std::shared_ptr<TextureReadback>;
 
   virtual void prepare_render_resources() {}
+  // Runs after a completed render. Throws RenderTargetNotReady for a frame
+  // that failed in a way the next one can retry.
   virtual auto after_render(
     mln_render_session_object& session, bool& out_rendered
   ) -> mln_status {
@@ -326,8 +331,8 @@ class TextureSessionBackend : public RenderSessionBackend {
   // Records the backend metadata a host reads back from an acquired frame.
   // Runs on the driver thread, right after the render, for the slot the
   // backend still has selected, so it may touch graphics state; acquisition
-  // transfers the stored metadata. NOT_READY reports a slot with no
-  // publishable texture yet.
+  // transfers the stored metadata. Throws RenderTargetNotReady when the slot
+  // has no publishable texture yet.
   virtual auto record_frame_metadata(const RenderFrameMetadata&, std::any&)
     -> mln_status {
     return MLN_STATUS_UNSUPPORTED;

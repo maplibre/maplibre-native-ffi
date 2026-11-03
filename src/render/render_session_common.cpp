@@ -2799,38 +2799,37 @@ auto publish_frame_result(
   mln::testing::hit(mln::testing::SyncPoint::RenderFrameResultPublished);
 }
 
-auto finish_failed_attempt(
-  const std::shared_ptr<mln_render_session_object>& session, mln_status status
+auto finish_unready_attempt(
+  const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> mln_render_result;
 
 // Delivers queued worker results to the renderer without rendering. Tile and
 // placement continuations run on the session scheduler, and the renderer
 // reports what they change to the map's run loop, which publishes the next
 // update, so delivering them must not wait for a demand that happens to
-// render.
+// render. Returns the disposition that ends the frame attempt when the target
+// couldn't take the work or the session failed, and nothing once it delivered.
 auto deliver_pending_session_work(
   const std::shared_ptr<mln_render_session_object>& session
-) noexcept -> mln_status {
+) noexcept -> std::optional<mln_render_result> {
   try {
     auto* backend = renderer_backend(session.get());
     if (backend == nullptr || session->map_object == nullptr)
-      return MLN_STATUS_OK;
+      return std::nullopt;
     auto current = ScopedCurrentScheduler{session->scheduler};
     auto guard = mln::gfx::BackendScope{*backend};
     session->scheduler.drain();
     map_run_render_jobs(*session->map_object);
-    return MLN_STATUS_OK;
+    return std::nullopt;
   } catch (const RenderTargetNotReady&) {
-    static_cast<void>(finish_failed_attempt(session, MLN_STATUS_NOT_READY));
-    return MLN_STATUS_NOT_READY;
+    return finish_unready_attempt(session);
 #if defined(MLN_RENDER_BACKEND_VULKAN)
   } catch (const mln::vulkan::SurfaceNotReady&) {
-    static_cast<void>(finish_failed_attempt(session, MLN_STATUS_NOT_READY));
-    return MLN_STATUS_NOT_READY;
+    return finish_unready_attempt(session);
 #endif
   } catch (...) {
     fail_session_exception(session, std::current_exception());
-    return session->failure_status;
+    return MLN_RENDER_RESULT_FAILED;
   }
 }
 
@@ -2971,10 +2970,15 @@ auto fail_session(
 auto finish_failed_attempt(
   const std::shared_ptr<mln_render_session_object>& session, mln_status status
 ) noexcept -> mln_render_result {
-  if (status != MLN_STATUS_NOT_READY) {
-    fail_session(session, status, thread_last_error_message());
-    return MLN_RENDER_RESULT_FAILED;
-  }
+  fail_session(session, status, thread_last_error_message());
+  return MLN_RENDER_RESULT_FAILED;
+}
+
+// Ends a frame attempt that the target couldn't take. The update stays
+// pending, so a later demand renders it.
+auto finish_unready_attempt(
+  const std::shared_ptr<mln_render_session_object>& session
+) noexcept -> mln_render_result {
   const auto lock = std::scoped_lock{session->control_mutex};
   session->pending_changes = true;
   session->rendered_update_generation = 0;
@@ -3028,10 +3032,8 @@ auto run_frame_demand(
   if (session->target_released) {
     // No target can take the frame. Tile and placement results still reach
     // the renderer, so it has the map ready for the next target.
-    const auto status = deliver_pending_session_work(session);
-    result.disposition = finish_failed_attempt(
-      session, status == MLN_STATUS_OK ? MLN_STATUS_NOT_READY : status
-    );
+    const auto ended = deliver_pending_session_work(session);
+    result.disposition = ended ? *ended : finish_unready_attempt(session);
     publish_frame_result(session, result);
     return;
   }
@@ -3055,13 +3057,12 @@ auto run_frame_demand(
         // generation and sets pending_changes before the next demand runs.
         // Rendering delivers queued worker results inside the render. This fast
         // path delivers them before publishing its result.
-        const auto status = deliver_pending_session_work(session);
-        result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
-        if (status != MLN_STATUS_OK) {
-          result.disposition = finish_failed_attempt(session, status);
+        if (const auto ended = deliver_pending_session_work(session)) {
+          result.disposition = *ended;
           publish_frame_result(session, result);
           return;
         }
+        result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
         if (
           waits_for_update &&
           !wait_for_map_update(
@@ -3172,7 +3173,7 @@ auto run_frame_demand(
         disposition = finish_failed_attempt(session, status);
       } else if (disposition == MLN_RENDER_RESULT_TARGET_NOT_READY) {
         scope.reset();
-        static_cast<void>(finish_failed_attempt(session, MLN_STATUS_NOT_READY));
+        static_cast<void>(finish_unready_attempt(session));
       }
     }
     result.disposition = disposition;
@@ -3244,10 +3245,10 @@ auto run_frame_demand(
     if (result.disposition == MLN_RENDER_RESULT_RENDERED)
       session->frame_observer.commit_render();
   } catch (const RenderTargetNotReady&) {
-    result.disposition = finish_failed_attempt(session, MLN_STATUS_NOT_READY);
+    result.disposition = finish_unready_attempt(session);
 #if defined(MLN_RENDER_BACKEND_VULKAN)
   } catch (const mln::vulkan::SurfaceNotReady&) {
-    result.disposition = finish_failed_attempt(session, MLN_STATUS_NOT_READY);
+    result.disposition = finish_unready_attempt(session);
 #endif
   } catch (...) {
     fail_session_exception(session, std::current_exception());
@@ -3538,11 +3539,18 @@ auto render_session_drain_frame_results(
   }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
+  const auto empty = mln_render_frame_batch_view{
+    .size = sizeof(mln_render_frame_batch_view),
+    .result_size = sizeof(mln_render_frame_result),
+    .results = nullptr,
+    .result_count = 0,
+  };
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->frame_results.empty()) {
       live->frame_wake_pending = false;
-      return MLN_STATUS_NOT_READY;
+      *out_view = empty;
+      return MLN_STATUS_OK;
     }
   }
   // Allocating and registering the batch before the swap means a failure
@@ -3563,7 +3571,8 @@ auto render_session_drain_frame_results(
   // A concurrent drain can empty the queue between the two locks.
   if (batch->results.empty()) {
     render_frame_batch_release(handle);
-    return MLN_STATUS_NOT_READY;
+    *out_view = empty;
+    return MLN_STATUS_OK;
   }
   *out_batch = handle;
   *out_view = mln_render_frame_batch_view{
@@ -3608,7 +3617,7 @@ auto render_session_acquire_frame(
     }
     // Every frame published before a queued replacement names a texture that
     // it replaces, which the host may destroy once the replacement completes.
-    if (live->texture.pending_retargets != 0) return MLN_STATUS_NOT_READY;
+    if (live->texture.pending_retargets != 0) return MLN_STATUS_OK;
     const auto slot = std::min_element(
       live->texture.slots.begin(), live->texture.slots.end(),
       [](const RenderTextureSlot& left, const RenderTextureSlot& right) {
@@ -3618,10 +3627,10 @@ auto render_session_acquire_frame(
       }
     );
     if (slot == live->texture.slots.end() || !slot->available || slot->acquired)
-      return MLN_STATUS_NOT_READY;
+      return MLN_STATUS_OK;
     // The driver recorded this when it published the frame; an empty record
     // means the backend had nothing to hand over yet.
-    if (!slot->backend_metadata.has_value()) return MLN_STATUS_NOT_READY;
+    if (!slot->backend_metadata.has_value()) return MLN_STATUS_OK;
     frame = std::make_shared<mln_acquired_frame_object>();
     frame->session = live;
     frame->slot = static_cast<std::size_t>(slot - live->texture.slots.begin());

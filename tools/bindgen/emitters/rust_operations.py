@@ -544,7 +544,8 @@ def immediate(
         return (
             f"Option<{public}>",
             [
-                f"if !{body.call}.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
+                f"{body.call}.status({closure} {native})?;",
+                f"if {body.names[plan.absence.output.name]}.0 == 0 {{",
                 "    return Ok(None);",
                 "}",
             ],
@@ -568,8 +569,8 @@ def immediate(
 def drained(
     plan: OperationPlan, value_types, body: Body, closure: str, native: str
 ) -> tuple[str, list[str]]:
-    """A drain, which returns no elements when nothing is queued and releases
-    the batch that it copies the slice from."""
+    """A drain, which returns no elements when native publishes no batch and
+    releases the batch that it copies the slice from."""
     function = plan.function
     assert plan.drain is not None and plan.absence is not None
     if not function.diagnostic:
@@ -580,7 +581,8 @@ def drained(
         raise Unsupported(f"{release}: a drained batch's release must not fail")
     public, output = joined(body)
     return public, [
-        f"if !{body.call}.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
+        f"{body.call}.status({closure} {native})?;",
+        f"if {body.names[plan.drain.batch.name]}.0 == 0 {{",
         "    return Ok(Vec::new());",
         "}",
         "// SAFETY: native published the batch to this call alone.",

@@ -2,7 +2,6 @@
 
 package org.maplibre.nativeffi.internal.delivery
 
-import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.word
 import org.maplibre.nativeffi.internal.callback.contain
@@ -45,7 +44,6 @@ internal actual object HostDelivery {
   fun dispatch() {
     val diagnostic = NativeDiagnostics.buffer()
     val status = C.mln_delivery_queue_dispatch(queue, diagnostic)
-    if (status == Status.NOT_READY.rawValue) return
     checkStatus(status) { NativeDiagnostics.message(diagnostic) }
   }
 }

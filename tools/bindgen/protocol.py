@@ -21,7 +21,6 @@ COMPLETION_VALUE = "value"
 COMPLETION_VALUE_COUNT = "value_count"
 COMPLETION_VALUE_SIZE = "value_size"
 BUFFER_VIEW = "mln_buffer_view"
-NOT_READY = "MLN_STATUS_NOT_READY"
 DELIVERY_QUEUE = "mln_delivery_queue"
 # The query of the C ABI version, which every runtime's version check calls, so
 # calling it skips the check.

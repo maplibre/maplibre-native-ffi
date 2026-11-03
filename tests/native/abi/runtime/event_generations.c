@@ -94,14 +94,12 @@ static void record_visited_event(
 // completion may call it; the recorder keeps a failure for the test to report.
 static void recorder_drain(void) {
   recorder_lock();
-  while (!recorder.callbacks) {
-    const mln_status dispatched =
-      mln_test_dispatch_events(recorder.runtime, record_visited_event, NULL);
-    if (dispatched == MLN_STATUS_NOT_READY) break;
-    if (dispatched != MLN_STATUS_OK) {
-      recorder.drain_failed = true;
-      break;
-    }
+  if (
+    !recorder.callbacks &&
+    mln_test_dispatch_events(recorder.runtime, record_visited_event, NULL) !=
+      MLN_STATUS_OK
+  ) {
+    recorder.drain_failed = true;
   }
   recorder_unlock();
 }

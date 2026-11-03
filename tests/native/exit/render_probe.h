@@ -135,8 +135,8 @@ static inline bool probe_drain_rendered(mln_render_session session) {
   mln_render_frame_batch_view view = {.size = sizeof(view)};
   const mln_status status =
     mln_render_session_drain_frame_results(session, &batch, &view, NULL);
-  if (status == MLN_STATUS_NOT_READY) return false;
   probe_require(status, "draining frame results");
+  if (batch == MLN_HANDLE_NULL) return false;
   bool rendered = false;
   for (size_t index = 0; index < view.result_count; index += 1) {
     const mln_render_frame_result* result =

@@ -3654,7 +3654,8 @@ export class RenderSessionHandle extends Owner {
    *
    * It takes the oldest frame that you haven't acquired. The session can render
    * over a frame before you acquire it. While you hold a frame in every texture
-   * of the ring, new frames wait until you release one.
+   * of the ring, new frames wait until you release one. When no frame is ready,
+   * it succeeds and writes the null handle.
    *
    * See `mln_render_session_acquire_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3778,6 +3779,9 @@ export class RenderSessionHandle extends Owner {
 
   /**
    * Takes the frame results that the session has queued.
+   *
+   * When no result is queued, it succeeds and writes the null handle and an
+   * empty view.
    *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

@@ -50,19 +50,6 @@ extension NativeReceiver {
     try nativeInvoke(call) { () }
   }
 
-  /// Calls a status-returning function like `nativeInvoke`, except that
-  /// `absent` reports that native published no output, and returns nil.
-  func nativeInvoke<T>(
-    absentOn absent: mln_status,
-    _ call: NativeStatusCall,
-    result: () throws -> T
-  ) throws -> T? {
-    var present = true
-    return try nativeInvoke({ raw, arena, diagnostic in
-      try presence(of: call(raw, arena, diagnostic), absent, &present)
-    }) { present ? try result() : nil }
-  }
-
   func nativeStart<T: Sendable>(
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> T,
     _ call: NativeStartCall
@@ -219,32 +206,6 @@ func nativeInvoke(
   _ call: NativeStatusCall
 ) throws {
   try nativeInvoke(owner: owner, call) { () }
-}
-
-/// Calls a status-returning function like `nativeInvoke`, except that
-/// `absent` reports that native published no output, and returns nil.
-func nativeInvoke<T>(
-  owner: AnyObject? = nil,
-  absentOn absent: mln_status,
-  _ call: NativeStatusCall,
-  result: () throws -> T
-) throws -> T? {
-  var present = true
-  return try nativeInvoke(owner: owner, { raw, arena, diagnostic in
-    try presence(of: call(raw, arena, diagnostic), absent, &present)
-  }) { present ? try result() : nil }
-}
-
-/// Reads `absent` as a call that succeeded without publishing its output, which
-/// clears `present`.
-private func presence(
-  of status: mln_status,
-  _ absent: mln_status,
-  _ present: inout Bool
-) -> mln_status {
-  guard status == absent else { return status }
-  present = false
-  return MLN_STATUS_OK
 }
 
 func nativeStart<T: Sendable>(

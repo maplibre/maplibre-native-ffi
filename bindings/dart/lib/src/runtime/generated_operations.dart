@@ -5983,7 +5983,8 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// It takes the oldest frame that you haven't acquired. The session can
   /// render over a frame before you acquire it. While you hold a frame in every
-  /// texture of the ring, new frames wait until you release one.
+  /// texture of the ring, new frames wait until you release one. When no frame
+  /// is ready, it succeeds and writes the null handle.
   ///
   /// See `mln_render_session_acquire_frame` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5995,14 +5996,14 @@ final class RenderSessionHandle implements Finalizable {
   /// - `Status.invalidState` when the session has failed.
   AcquiredFrameHandle? acquireFrame() => withNativeArena((arena) {
     final outFrame = arena<Uint64>();
-    if (!_present(
+    _check(
       raw.mln_render_session_acquire_frame(
         _handle.raw,
         outFrame,
         nativeDiagnostic,
       ),
-      raw.MLN_STATUS_NOT_READY,
-    )) {
+    );
+    if (outFrame.value == 0) {
       return null;
     }
     return _adoptOwned(
@@ -6113,21 +6114,24 @@ final class RenderSessionHandle implements Finalizable {
 
   /// Takes the frame results that the session has queued.
   ///
+  /// When no result is queued, it succeeds and writes the null handle and an
+  /// empty view.
+  ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   List<RenderFrameResult> drainFrameResults() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
     final outView = arena<raw.mln_render_frame_batch_view>();
     outView.ref.size = sizeOf<raw.mln_render_frame_batch_view>();
-    if (!_present(
+    _check(
       raw.mln_render_session_drain_frame_results(
         _handle.raw,
         outBatch,
         outView,
         nativeDiagnostic,
       ),
-      raw.MLN_STATUS_NOT_READY,
-    )) {
+    );
+    if (outBatch.value == 0) {
       return const [];
     }
     return _drain(outBatch.value, (batch) {

@@ -61,7 +61,7 @@ internal constructor(
    *
    * It takes the oldest frame that you haven't acquired. The session can render over a frame before
    * you acquire it. While you hold a frame in every texture of the ring, new frames wait until you
-   * release one.
+   * release one. When no frame is ready, it succeeds and writes the null handle.
    *
    * See `mln_render_session_acquire_frame` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -74,7 +74,7 @@ internal constructor(
   public fun acquireFrame(): AcquiredFrameHandle? =
     nativeCall(this, binding) {
       val out = allocate(8, w(8, 8, 4))
-      if (present(C.mln_render_session_acquire_frame(handle, out, diagnostic), absent = -9))
+      if (published(C.mln_render_session_acquire_frame(handle, out, diagnostic), out))
         adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
           AcquiredFrameHandle(it, this@RenderSessionHandle)
         }
@@ -167,6 +167,8 @@ internal constructor(
   /**
    * Takes the frame results that the session has queued.
    *
+   * When no result is queued, it succeeds and writes the null handle and an empty view.
+   *
    * See `mln_render_session_drain_frame_results` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
@@ -175,10 +177,7 @@ internal constructor(
       val batch = allocate(8, w(8, 8, 4))
       val out = sized(w(16, 24), w(4, 8))
       if (
-        present(
-          C.mln_render_session_drain_frame_results(handle, batch, out, diagnostic),
-          absent = -9,
-        )
+        published(C.mln_render_session_drain_frame_results(handle, batch, out, diagnostic), batch)
       )
         drain(batch, { C.mln_render_frame_batch_release(it) }) { readRenderFrameBatchView(out) }
       else emptyList()

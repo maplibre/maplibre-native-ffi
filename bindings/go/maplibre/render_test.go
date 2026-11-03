@@ -265,7 +265,7 @@ func TestCloseRetiresAnAttachedSession(t *testing.T) {
 }
 
 // Before any demand, no frame result is queued and no frame has rendered,
-// which native reports as not ready and the binding returns as empty and nil.
+// so native writes null handles, which the binding returns as empty and nil.
 func TestDrainBeforeAnyDemandReturnsNoBatch(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)

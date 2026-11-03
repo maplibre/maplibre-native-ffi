@@ -65,8 +65,6 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_BUSY = -7,
   /** The render target can't be drawn to anymore. */
   MLN_STATUS_TARGET_LOST = -8,
-  /** There is nothing to return yet, such as when no new frame is ready. */
-  MLN_STATUS_NOT_READY = -9,
   /** Nothing has the given ID. */
   MLN_STATUS_NOT_FOUND = -10,
 } mln_status;

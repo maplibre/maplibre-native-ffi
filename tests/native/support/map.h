@@ -14,7 +14,7 @@ extern "C" {
 // Requests one still image from a static or tile map that `fixture` renders,
 // and services the session until the image completes and the frame result of
 // its own demand arrives, releasing every frame rendered meanwhile. Returns the
-// still image's terminal status, or MLN_STATUS_NOT_READY at the default
+// still image's terminal status, or MLN_TEST_RENDER_TIMED_OUT at the default
 // deadline. When it returns MLN_STATUS_OK, no still-image demand is pending and
 // no frame result is queued; on the deadline or a failure, either may be.
 mln_status mln_test_render_still_image(

@@ -414,7 +414,7 @@ def returned(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | N
 
 def invoked(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | None]:
     """A status call returns a copy of what it writes to its outputs, and
-    nothing when an absent output is absent."""
+    nothing when native leaves a nullable output null."""
     outputs = call.outputs
     native_text = call.call
     output_plans = {parameter.name: parameter.value for parameter in plan.outputs}
@@ -483,11 +483,6 @@ def invoked(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | No
                     f"  value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
                 )
         capture.append(value_types.copy(value, f"value{index}"))
-    absent = (
-        f"{', ' if call.target else ''}absentOn: {plan.absence.status}"
-        if plan.absence
-        else ""
-    )
     declined = next(
         (
             f"value{index}"
@@ -502,7 +497,7 @@ def invoked(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | No
         # Native kept nothing from a declined registration, so its
         # callbacks release with the arena.
         native_text = f"let status = {native_text}; arena.decline(if: status == MLN_STATUS_OK && {declined}); return status"
-    invoke = f"{call.helpers}nativeInvoke({call.target}{absent}) {{ raw, arena, diagnostic in {native_text} }}"
+    invoke = f"{call.helpers}nativeInvoke({call.target}) {{ raw, arena, diagnostic in {native_text} }}"
     if not types:
         return (
             f"""{call.doc_comment}{call.signature} throws {{
@@ -524,10 +519,21 @@ def invoked(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | No
     copied = capture[0] if len(capture) == 1 else "(" + ", ".join(capture) + ")"
     if plan.absence:
         result += "?"
+        absent = next(
+            index
+            for index, output in enumerate(outputs)
+            if output.name == plan.absence.output.name
+        )
+        copied = (
+            f"\n    guard value{absent} != 0 else {{ return nil }}\n"
+            f"    return {copied}\n  "
+        )
+    else:
+        copied = f" {copied} "
     return (
         f"""{call.doc_comment}{call.signature} throws -> {result} {{
 {chr(10).join(storage)}
-  return try {invoke} result: {{ {copied} }}
+  return try {invoke} result: {{{copied}}}
 }}
 """,
         call.owner,
@@ -536,9 +542,10 @@ def invoked(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | No
 
 def drained(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | None]:
     """A drain returns a copy of its slice, and releases the batch that holds
-    it once the copy ends or fails. Nothing queued is an empty slice."""
+    it once the copy ends or fails. A null batch, when nothing is queued, is
+    an empty slice."""
     drain = plan.drain
-    assert drain is not None and plan.absence is not None
+    assert drain is not None
     view = drain.view.value.unwrapped
     handle = drain.batch.value.unwrapped.handle
     assert handle is not None
@@ -563,15 +570,16 @@ def drained(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | No
         ),
         "",
     )
-    invoke = f"nativeInvoke({call.target}{', ' if call.target else ''}absentOn: {plan.absence.status}) {{ raw, arena, diagnostic in {call.call} }}"
+    invoke = f"nativeInvoke({call.target}) {{ raw, arena, diagnostic in {call.call} }}"
     return (
         f"""{call.doc_comment}{call.signature} throws -> {value_types.public(view)} {{
   var {batch}: {handle.native} = 0
   var {slice_view} = {view.native}(){size}
   return try {invoke} result: {{
+    guard {batch} != 0 else {{ return [] }}
     defer {{ {released} }}
     return {value_types.copy(view, slice_view)}
-  }} ?? []
+  }}
 }}
 """,
         call.owner,

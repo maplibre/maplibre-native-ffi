@@ -413,7 +413,8 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
     mln_test_last_error()
   );
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
+  MLN_TEST_OK(acquire(fixture, &frame));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
 
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
@@ -422,7 +423,8 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
+  MLN_TEST_OK(acquire(fixture, &frame));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
 
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
@@ -467,10 +469,8 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   ));
   finish(fixture, &fence, MLN_STATUS_OK, "the fence");
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_NOT_READY,
-    mln_test_drain_frame_results(fixture->session, &batch, NULL)
-  );
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture->session, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
 
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
@@ -1054,7 +1054,8 @@ static void releases_that_a_ring_refuses(void) {
   );
   release_target(fixture, MLN_STATUS_OK);
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NOT_READY, acquire(fixture, &frame));
+  MLN_TEST_OK(acquire(fixture, &frame));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   close_map(&map);
 }
 #endif

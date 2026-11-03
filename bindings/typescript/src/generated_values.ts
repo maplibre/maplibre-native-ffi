@@ -2628,10 +2628,6 @@ export const Status = {
    */
   targetLost: -8,
   /**
-   * There is nothing to return yet, such as when no new frame is ready.
-   */
-  notReady: -9,
-  /**
    * Nothing has the given ID.
    */
   notFound: -10,

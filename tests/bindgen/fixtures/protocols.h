@@ -73,7 +73,6 @@ typedef enum mln_status : int {
   MLN_STATUS_CANCELLED = -6,
   MLN_STATUS_BUSY = -7,
   MLN_STATUS_TARGET_LOST = -8,
-  MLN_STATUS_NOT_READY = -9,
   MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
 typedef struct mln_diagnostic {
@@ -626,27 +625,18 @@ mln_status mln_delivery_queue_dispatch(
 );
 #endif
 
-// Outputs that a failure status reports as absent: each call first finds
-// nothing, then publishes its output, and then fails. The parcel drain is
-// absent on MLN_STATUS_NOT_READY by convention; mln_probe_read_level is not a
-// drain, so it names the status with absent_on.
+// A handle output that native leaves null on success when it has nothing to
+// return: the call first finds nothing, then publishes its output, and then
+// fails.
 #ifdef MLN_PROTOCOL_ABSENT_HANDLE
 typedef unsigned long long mln_probe_parcel BIND(
   "kind=handle;release=mln_probe_parcel_release;dispose=mln_probe_parcel_"
   "release"
 );
 void mln_probe_parcel_release(mln_probe_parcel parcel);
-BIND("execution=event_batch")
 mln_status mln_probe_take_parcel(
-  mln_probe_parcel* out_parcel BIND("direction=out"),
+  mln_probe_parcel* out_parcel BIND("direction=out;nullable=true"),
   mln_diagnostic* out_diagnostic
-);
-#endif
-
-#ifdef MLN_PROTOCOL_ABSENT_VALUE
-BIND("absent_on=MLN_STATUS_NOT_READY")
-mln_status mln_probe_read_level(
-  double* out_level BIND("direction=out"), mln_diagnostic* out_diagnostic
 );
 #endif
 
@@ -682,7 +672,7 @@ mln_status mln_probe_ledger_open(
 BIND("execution=event_batch")
 mln_status mln_probe_ledger_drain(
   mln_probe_ledger ledger,
-  mln_probe_reading_batch* out_batch BIND("direction=out"),
+  mln_probe_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_probe_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );

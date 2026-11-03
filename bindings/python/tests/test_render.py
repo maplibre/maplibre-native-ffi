@@ -451,8 +451,8 @@ def test_a_drain_before_any_demand_returns_no_value(
     harness: Harness, backend: str
 ) -> None:
     with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
-        # Native reports both calls as not ready, which reads as no results and
-        # no frame.
+        # Native writes a null batch and a null frame, which read as no
+        # results and no frame.
         assert target.session.drain_frame_results() == ()
         assert target.session.acquire_frame() is None
 

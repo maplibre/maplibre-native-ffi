@@ -83,7 +83,7 @@ typedef struct capture_wait {
 static bool captured_a_result(void* context) {
   capture_wait* wait = context;
   const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
-  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+  if (status != MLN_STATUS_OK) {
     wait->failure = status;
     return true;
   }
@@ -180,9 +180,7 @@ static void a_rejected_submission_queues_nothing(void) {
   );
 
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
-  );
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
 
   mln_test_delivery_queue_release(&queue);
   completion = mln_test_queue_completion(queue.handle, NULL);

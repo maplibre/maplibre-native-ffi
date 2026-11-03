@@ -744,13 +744,16 @@ def invoke(call: Call, values: Values) -> ValuePlan | None:
         if not status:
             raise Unsupported("consumption on success requires a status")
         body.append("if (status == MLN_STATUS_OK) mln_ts_consume(call);")
-    if plan.absence:
-        if not status:
-            raise Unsupported("absence requires a status")
-        body.append(f"if (status == {plan.absence.status}) goto done;")
-        lowered.absent = True
     if status:
         body.append("if (!mln_ts_check(call, status, &diagnostic)) goto done;")
+    if plan.absence:
+        if not status:
+            raise Unsupported("a nullable output requires a status")
+        # A null handle is nothing to return.
+        body.append(
+            f"if (arg_{plan.absence.output.name} == MLN_HANDLE_NULL) goto done;"
+        )
+        lowered.absent = True
     return result_value
 
 
@@ -758,8 +761,8 @@ def publish(
     call: Call, values: Values, natives: NativeValues, result_value: ValuePlan | None
 ) -> None:
     """Sets the addon's result: the handle of the owner that the call
-    creates, its outputs, or the value that the function returns. A status
-    that reports the output absent returns undefined."""
+    creates, its outputs, or the value that the function returns. A null
+    handle output returns undefined."""
     lowered = call.lowered
     text = lowered.plan.caller_sized_text
     returned = call.returned
@@ -1008,7 +1011,7 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
         else:
             lines.append(f"return {adopted};")
     elif shape == "drain":
-        # Nothing queued reads as no elements.
+        # A null batch, when nothing is queued, reads as no elements.
         lines = [f"return {call} ?? [];"]
     elif shape == "view":
         view = entry.plan.view

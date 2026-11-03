@@ -765,7 +765,7 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
     } else {
       TEST_ASSERT_NOT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, still, row->label);
       TEST_ASSERT_NOT_EQUAL_INT_MESSAGE(
-        MLN_STATUS_NOT_READY, still, row->label
+        MLN_TEST_RENDER_TIMED_OUT, still, row->label
       );
     }
     mln_test_render_fixture_destroy(&fixture);

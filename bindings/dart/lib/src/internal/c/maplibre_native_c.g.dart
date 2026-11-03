@@ -2029,7 +2029,6 @@ const MLN_STATUS_NATIVE_ERROR = -5;
 const MLN_STATUS_CANCELLED = -6;
 const MLN_STATUS_BUSY = -7;
 const MLN_STATUS_TARGET_LOST = -8;
-const MLN_STATUS_NOT_READY = -9;
 const MLN_STATUS_NOT_FOUND = -10;
 
 // mln_style_expression_input_field

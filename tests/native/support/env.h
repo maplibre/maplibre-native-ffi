@@ -160,7 +160,7 @@ typedef void (*mln_test_event_visit)(
 mln_status mln_test_dispatch_events(
   mln_runtime runtime, mln_test_event_visit visit, void* context
 );
-// Dispatches until no event is queued, and returns how many it discarded.
+// Dispatches every queued event, and returns how many it discarded.
 size_t mln_test_drain_all(mln_runtime runtime);
 
 // The same, counting the events whose type matches.

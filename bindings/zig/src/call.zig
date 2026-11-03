@@ -408,37 +408,38 @@ fn invokeInner(
     return op.outputs(allocator);
 }
 
-/// Calls a status-returning native function like `invoke`, except that the
-/// `absent` status reports that native published no output, which returns null.
-pub fn invokeUnless(
+/// Calls a status-returning native function like `invoke` whose one output is
+/// a handle that native leaves null when it has nothing to return, which
+/// returns null.
+pub fn invokeNullable(
     comptime name: []const u8,
     comptime access: Access,
     receiver: anytype,
     allocator: anytype,
     diagnostic: ?*Diagnostic,
-    comptime absent: i32,
     args: anytype,
 ) Error!?Outputs(@TypeOf(args)) {
     status.begin(diagnostic);
-    return status.propagate(diagnostic, invokeUnlessInner(name, access, receiver, allocator, diagnostic, absent, args));
+    return status.propagate(diagnostic, invokeNullableInner(name, access, receiver, allocator, diagnostic, args));
 }
 
-fn invokeUnlessInner(
+fn invokeNullableInner(
     comptime name: []const u8,
     comptime access: Access,
     receiver: anytype,
     allocator: anytype,
     diagnostic: ?*Diagnostic,
-    comptime absent: i32,
     args: anytype,
 ) Error!?Outputs(@TypeOf(args)) {
+    const indices = comptime outputIndices(@TypeOf(args));
+    if (indices.len != 1) @compileError(name ++ ": a nullable output is the call's one output");
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
     var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
-    const present = try status.callUnless(@field(c, name), native, diagnostic, absent);
+    try status.call(@field(c, name), native, diagnostic);
     op.roots.accept();
-    if (!present) return null;
+    if (op.held[indices[0]] == 0) return null;
     return try op.outputs(allocator);
 }
 
@@ -446,7 +447,7 @@ fn invokeUnlessInner(
 /// Copies the view's `items` array, whose length is its `count` field and whose
 /// records step by its `stride` field, into `Item` values. Releases the batch
 /// even if the copy fails, and returns the copy, which is empty when native
-/// returns `absent` and publishes no batch.
+/// publishes a null batch because nothing is queued.
 pub fn drain(
     comptime name: []const u8,
     comptime access: Access,
@@ -458,10 +459,9 @@ pub fn drain(
     comptime release: anytype,
     allocator: std.mem.Allocator,
     diagnostic: ?*Diagnostic,
-    comptime absent: i32,
 ) Error!marshal.OwnedValue([]const Item) {
     status.begin(diagnostic);
-    return status.propagate(diagnostic, drainInner(name, access, receiver, Item, items, count, stride, release, allocator, diagnostic, absent));
+    return status.propagate(diagnostic, drainInner(name, access, receiver, Item, items, count, stride, release, allocator, diagnostic));
 }
 
 fn drainInner(
@@ -475,7 +475,6 @@ fn drainInner(
     comptime release: anytype,
     allocator: std.mem.Allocator,
     diagnostic: ?*Diagnostic,
-    comptime absent: i32,
 ) Error!marshal.OwnedValue([]const Item) {
     const function = @field(c, name);
     const offset: usize = if (access == .none) 0 else 1;
@@ -484,8 +483,8 @@ fn drainInner(
     const Record = @typeInfo(@FieldType(View, items)).pointer.child;
     var arena = std.heap.ArenaAllocator.init(allocator);
     errdefer arena.deinit();
-    const drained = try invokeUnlessInner(name, access, receiver, null, diagnostic, absent, .{ out(Batch), sizedOut(View) }) orelse
-        return .{ .arena = arena, .value = &.{} };
+    const drained = try invokeInner(name, access, receiver, null, diagnostic, .{ out(Batch), sizedOut(View) });
+    if (drained[0] == 0) return .{ .arena = arena, .value = &.{} };
     defer release(drained[0]);
     const view = drained[1];
     const length = @field(view, count);

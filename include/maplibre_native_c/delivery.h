@@ -53,8 +53,9 @@ MLN_API void mln_delivery_queue_release(mln_delivery_queue queue) MLN_NOEXCEPT;
 /**
  * Runs the calls in the queue on the calling thread.
  *
+ * When the queue is empty, it succeeds and runs nothing.
+ *
  * Returns:
- * - MLN_STATUS_NOT_READY when the queue had no calls to run.
  * - MLN_STATUS_BUSY when another dispatch of the queue is running. That
  *   dispatch runs the calls instead.
  */

@@ -56,15 +56,15 @@ function runs. The generator uses them to write safe wrappers in each binding.
 - Annotate each function with how it runs, as in
   `MLN_BINDING("execution=command")`:
 
-  | Execution     | Function                                                  |
-  | ------------- | --------------------------------------------------------- |
-  | `command`     | Changes state asynchronously                              |
-  | `query`       | Reads state asynchronously                                |
-  | `operation`   | Does other asynchronous work                              |
-  | `lifecycle`   | Creates, attaches, or retires a handle asynchronously     |
-  | `immediate`   | Returns its result synchronously; the default             |
-  | `snapshot`    | Copies the current state behind a handle synchronously    |
-  | `event_batch` | Takes the queued frame results, or reports there are none |
+  | Execution     | Function                                                   |
+  | ------------- | ---------------------------------------------------------- |
+  | `command`     | Changes state asynchronously                               |
+  | `query`       | Reads state asynchronously                                 |
+  | `operation`   | Does other asynchronous work                               |
+  | `lifecycle`   | Creates, attaches, or retires a handle asynchronously      |
+  | `immediate`   | Returns its result synchronously; the default              |
+  | `snapshot`    | Copies the current state behind a handle synchronously     |
+  | `event_batch` | Takes the queued frame results as a batch, or a null batch |
 
 - Fix surprising behavior instead of documenting it. When a contract is hard to
   state, change the API instead of writing more prose.

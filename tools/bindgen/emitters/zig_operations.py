@@ -343,10 +343,9 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
                 f"return call.invokeDeclinable({head}, {allocator}, {diagnostic}, {args});"
             ]
         elif plan.absence:
-            absent = f"c.{plan.absence.status}"
             return_type = "?" + results[0][1]
             body = [
-                f"return call.invokeUnless({head}, {allocator}, {diagnostic}, {absent}, {args});"
+                f"return call.invokeNullable({head}, {allocator}, {diagnostic}, {args});"
             ]
         else:
             return_type = results[0][1] if results else "void"
@@ -479,7 +478,6 @@ def drain_operation(plan, values, method=False):
         f"c.{release}",
         "allocator",
         "diagnostic",
-        f"c.{plan.absence.status}",
     ]
     name = method_name(plan)
     return (

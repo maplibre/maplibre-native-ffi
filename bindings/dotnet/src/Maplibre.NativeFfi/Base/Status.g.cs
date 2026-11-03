@@ -56,11 +56,6 @@ public enum Status : int
     TargetLost = -8,
 
     /// <summary>
-    /// There is nothing to return yet, such as when no new frame is ready.
-    /// </summary>
-    NotReady = -9,
-
-    /// <summary>
     /// Nothing has the given ID.
     /// </summary>
     NotFound = -10,

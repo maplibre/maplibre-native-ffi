@@ -81,7 +81,7 @@ typedef unsigned long long mln_reading_batch BIND(
 void mln_reading_batch_release(mln_reading_batch batch);
 BIND("execution=event_batch")
 mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
@@ -272,7 +272,6 @@ void mln_query_release(mln_query query);
                 "caller_sized_text",
                 "keywords",
                 "absent_handle",
-                "absent_value",
             ),
             defines=defines,
         )
@@ -290,7 +289,6 @@ void mln_query_release(mln_query query);
                 "mln_map_move",
                 "mln_map_release",
                 "mln_probe_parcel_release",
-                "mln_probe_read_level",
                 "mln_probe_take_parcel",
             },
         )

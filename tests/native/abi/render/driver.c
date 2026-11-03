@@ -236,13 +236,11 @@ static void drain_tokens(maintenance_probe* probe) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status drained =
     mln_test_drain_frame_results(probe->session, &batch, NULL);
-  if (drained == MLN_STATUS_NOT_READY) {
-    return;
-  }
   if (drained != MLN_STATUS_OK) {
     probe->drain_failed = true;
     return;
   }
+  if (batch == MLN_HANDLE_NULL) return;
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   for (size_t index = 0; index < view.result_count; index += 1) {
     if (
@@ -930,7 +928,8 @@ static void drain_inside_frame_wake(void* context) {
     mln_status status = MLN_STATUS_OK;
     while (
       (status = mln_test_drain_frame_results(host->session, &batch, NULL)) ==
-      MLN_STATUS_OK) {
+        MLN_STATUS_OK &&
+      batch != MLN_HANDLE_NULL) {
       const mln_render_frame_batch_view view =
         mln_test_render_batch_view(batch);
       for (size_t index = 0; index < view.result_count; index += 1) {
@@ -946,7 +945,7 @@ static void drain_inside_frame_wake(void* context) {
       mln_render_frame_batch_release(batch);
       batch = MLN_HANDLE_NULL;
     }
-    if (status != MLN_STATUS_NOT_READY) atomic_fetch_add(&host->failures, 1U);
+    if (status != MLN_STATUS_OK) atomic_fetch_add(&host->failures, 1U);
   }
   mln_test_pulse();
 }
