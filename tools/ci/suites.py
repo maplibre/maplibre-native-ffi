@@ -107,9 +107,12 @@ def consumer_commands(target: Target) -> list[list[str]]:
         extra = None
         if target.preset == "linux-gnu-x64-vulkan":
             extra = {
+                "go": "//bindings/go:test:package",
                 "rust": "//bindings/rust:test:package",
                 "python": "//bindings/python:test:floor",
             }.get(binding)
+        elif target.preset == "macos-arm64-metal" and binding == "go":
+            extra = "//bindings/go:test:package"
         elif target.preset == "emscripten-wasm32-webgl" and binding == "kotlin-native":
             extra = "//bindings/kotlin:test:wasm-canary"
         if extra and gaps.supported(binding, target, "test"):

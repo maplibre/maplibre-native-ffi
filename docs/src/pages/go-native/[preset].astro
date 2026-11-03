@@ -1,0 +1,18 @@
+---
+import presets from "../../../../bindings/go/presets.json";
+import GoImport from "../../components/GoImport.astro";
+
+// Each preset's module is served through the module proxy protocol from the
+// releases that tools/release/go_native_modules.py publishes.
+export function getStaticPaths() {
+  return presets.map((preset) => ({ params: { preset } }));
+}
+
+const { preset } = Astro.params;
+---
+
+<GoImport
+  module={`maplibre.org/maplibre-native-ffi/go-native/${preset}`}
+  vcs="mod"
+  url="https://github.com/maplibre/maplibre-native-ffi/releases/download/go"
+/>
