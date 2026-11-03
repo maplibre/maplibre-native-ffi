@@ -17,7 +17,15 @@ public sealed record BoundOptions
     public LatLngBounds? Bounds { get; init; }
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }
+
+    /// <summary>
+    /// The lowest pitch, in degrees.
+    /// </summary>
     public double? MinPitch { get; init; }
+
+    /// <summary>
+    /// The highest pitch, in degrees.
+    /// </summary>
     public double? MaxPitch { get; init; }
 
     /// <summary>

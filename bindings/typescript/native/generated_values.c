@@ -1748,13 +1748,13 @@ napi_value mln_ts_read_rendering_stats(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "encodingTime",
-        mln_ts_number(env, (double)(source->encoding_time))
+        env, result, "encodingTimeMs",
+        mln_ts_number(env, (double)(source->encoding_time_ms))
       ))
     return NULL;
   if (!mln_ts_set(
-        env, result, "renderingTime",
-        mln_ts_number(env, (double)(source->rendering_time))
+        env, result, "renderingTimeMs",
+        mln_ts_number(env, (double)(source->rendering_time_ms))
       ))
     return NULL;
   if (!mln_ts_set(

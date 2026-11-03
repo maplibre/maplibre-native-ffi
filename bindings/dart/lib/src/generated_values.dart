@@ -1580,8 +1580,6 @@ final class EdgeInsets extends _Value {
 
 /// A map's whole camera.
 ///
-/// Its members mean the same as those of `CameraOptions`.
-///
 /// See `mln_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class Camera extends _Value {
@@ -1596,12 +1594,24 @@ final class Camera extends _Value {
     this.fieldOfView = 0,
   });
   final LatLng center;
+
+  /// The altitude of the center, in meters above sea level.
   final double centerAltitude;
+
+  /// Insets from the map's edges. The camera centers within the rest.
   final EdgeInsets padding;
   final double zoom;
+
+  /// The rotation from north, in degrees.
   final double bearing;
+
+  /// The tilt toward the horizon, in degrees. 0 looks straight down.
   final double pitch;
+
+  /// The roll, in degrees.
   final double roll;
+
+  /// The vertical field of view, in degrees.
   final double fieldOfView;
 
   /// A copy of this value with the given members replaced.
@@ -3297,7 +3307,11 @@ final class CameraFitOptions extends _Value {
 
   /// Space to leave between the area and each edge of the map.
   final EdgeInsets? padding;
+
+  /// The rotation from north, in degrees.
   final double? bearing;
+
+  /// The tilt toward the horizon, in degrees.
   final double? pitch;
 
   /// A copy of this value with the given members replaced.
@@ -3525,7 +3539,7 @@ final class MapTileOptions extends _Value {
   /// Scales the distance to the view point. Above 1 lowers the detail.
   final double? lodScale;
 
-  /// The pitch, in radians, above which the map lowers the detail.
+  /// The pitch, in degrees, above which the map lowers the detail.
   final double? lodPitchThreshold;
 
   /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
@@ -3589,7 +3603,11 @@ final class BoundOptions extends _Value {
   final LatLngBounds? bounds;
   final double? minZoom;
   final double? maxZoom;
+
+  /// The lowest pitch, in degrees.
   final double? minPitch;
+
+  /// The highest pitch, in degrees.
   final double? maxPitch;
 
   /// Removes the area that limits the camera's center.
@@ -5370,18 +5388,18 @@ final class OfflineRegionStatus extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RenderingStats extends _Value {
   const RenderingStats({
-    this.encodingTime = 0,
-    this.renderingTime = 0,
+    this.encodingTimeMs = 0,
+    this.renderingTimeMs = 0,
     this.frameCount = 0,
     this.drawCallCount = 0,
     this.totalDrawCallCount = 0,
   });
 
-  /// The time that the frame took to encode, in seconds.
-  final double encodingTime;
+  /// The time that the frame took to encode, in milliseconds.
+  final double encodingTimeMs;
 
-  /// The time that the frame took to render, in seconds.
-  final double renderingTime;
+  /// The time that the frame took to render, in milliseconds.
+  final double renderingTimeMs;
 
   /// The frames rendered so far.
   final int frameCount;
@@ -5394,16 +5412,16 @@ final class RenderingStats extends _Value {
 
   @override
   List<Object?> get _members => [
-    encodingTime,
-    renderingTime,
+    encodingTimeMs,
+    renderingTimeMs,
     frameCount,
     drawCallCount,
     totalDrawCallCount,
   ];
   @override
   String toString() => _describe('RenderingStats', const [
-    'encodingTime',
-    'renderingTime',
+    'encodingTimeMs',
+    'renderingTimeMs',
     'frameCount',
     'drawCallCount',
     'totalDrawCallCount',

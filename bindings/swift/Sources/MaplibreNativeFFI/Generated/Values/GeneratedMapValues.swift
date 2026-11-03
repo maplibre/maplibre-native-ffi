@@ -89,7 +89,9 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   public var bounds: LatLngBounds?
   public var minZoom: Double?
   public var maxZoom: Double?
+  /// The lowest pitch, in degrees.
   public var minPitch: Double?
+  /// The highest pitch, in degrees.
   public var maxPitch: Double?
   public init(
     unbounded: Bool = false,
@@ -150,18 +152,22 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
 
 /// A map's whole camera.
 ///
-/// Its members mean the same as those of `CameraOptions`.
-///
 /// See `mln_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Camera: Equatable, Hashable, Sendable {
   public var center: LatLng
+  /// The altitude of the center, in meters above sea level.
   public var centerAltitude: Double
+  /// Insets from the map's edges. The camera centers within the rest.
   public var padding: EdgeInsets
   public var zoom: Double
+  /// The rotation from north, in degrees.
   public var bearing: Double
+  /// The tilt toward the horizon, in degrees. 0 looks straight down.
   public var pitch: Double
+  /// The roll, in degrees.
   public var roll: Double
+  /// The vertical field of view, in degrees.
   public var fieldOfView: Double
   public init(
     center: LatLng = .init(),
@@ -295,7 +301,9 @@ public struct CameraDelta: Sendable {
 public struct CameraFitOptions: Equatable, Hashable, Sendable {
   /// Space to leave between the area and each edge of the map.
   public var padding: EdgeInsets?
+  /// The rotation from north, in degrees.
   public var bearing: Double?
+  /// The tilt toward the horizon, in degrees.
   public var pitch: Double?
   public init(
     padding: EdgeInsets? = nil,
@@ -1129,7 +1137,7 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   public var lodMinRadius: Double?
   /// Scales the distance to the view point. Above 1 lowers the detail.
   public var lodScale: Double?
-  /// The pitch, in radians, above which the map lowers the detail.
+  /// The pitch, in degrees, above which the map lowers the detail.
   public var lodPitchThreshold: Double?
   /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
   public var lodZoomShift: Double?

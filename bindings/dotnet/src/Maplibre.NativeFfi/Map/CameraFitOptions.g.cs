@@ -15,6 +15,14 @@ public sealed record CameraFitOptions
     /// Space to leave between the area and each edge of the map.
     /// </summary>
     public EdgeInsets? Padding { get; init; }
+
+    /// <summary>
+    /// The rotation from north, in degrees.
+    /// </summary>
     public double? Bearing { get; init; }
+
+    /// <summary>
+    /// The tilt toward the horizon, in degrees.
+    /// </summary>
     public double? Pitch { get; init; }
 }

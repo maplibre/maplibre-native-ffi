@@ -369,10 +369,10 @@ typedef struct mln_runtime_options {
 
 /** Statistics about the frames that a map renders. */
 typedef struct mln_rendering_stats {
-  /** The time that the frame took to encode, in seconds. */
-  double encoding_time;
-  /** The time that the frame took to render, in seconds. */
-  double rendering_time;
+  /** The time that the frame took to encode, in milliseconds. */
+  double encoding_time_ms;
+  /** The time that the frame took to render, in milliseconds. */
+  double rendering_time_ms;
   /** The frames rendered so far. */
   int64_t frame_count;
   /** The draw calls in the frame. */

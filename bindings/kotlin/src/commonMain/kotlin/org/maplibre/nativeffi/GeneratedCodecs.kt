@@ -2005,8 +2005,8 @@ internal fun readRuntimeEventSprite(source: Long): RuntimeEventSprite =
 
 internal fun readRenderingStats(source: Long): RenderingStats =
   RenderingStats(
-    encodingTime = readF64(source),
-    renderingTime = readF64(source + 8),
+    encodingTimeMs = readF64(source),
+    renderingTimeMs = readF64(source + 8),
     frameCount = readI64(source + 16),
     drawCallCount = readI64(source + 24),
     totalDrawCallCount = readI64(source + 32),

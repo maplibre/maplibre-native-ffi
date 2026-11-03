@@ -1584,8 +1584,8 @@ internal static unsafe class GeneratedValues
 
     internal static RenderingStats CopyRenderingStats(mln_rendering_stats value) =>
         new(
-            value.encoding_time,
-            value.rendering_time,
+            value.encoding_time_ms,
+            value.rendering_time_ms,
             value.frame_count,
             value.draw_call_count,
             value.total_draw_call_count

@@ -1851,10 +1851,12 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type BoundOptions struct {
 	// The area that the camera's center stays within.
-	Bounds   *LatLngBounds
-	MinZoom  *float64
-	MaxZoom  *float64
+	Bounds  *LatLngBounds
+	MinZoom *float64
+	MaxZoom *float64
+	// The lowest pitch, in degrees.
 	MinPitch *float64
+	// The highest pitch, in degrees.
 	MaxPitch *float64
 	// Removes the area that limits the camera's center.
 	Unbounded bool
@@ -1888,19 +1890,23 @@ func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_opt
 
 // Camera corresponds to mln_camera. A map's whole camera.
 //
-// Its members mean the same as those of CameraOptions.
-//
 // See mln_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type Camera struct {
-	Center         LatLng
+	Center LatLng
+	// The altitude of the center, in meters above sea level.
 	CenterAltitude float64
-	Padding        EdgeInsets
-	Zoom           float64
-	Bearing        float64
-	Pitch          float64
-	Roll           float64
-	FieldOfView    float64
+	// Insets from the map's edges. The camera centers within the rest.
+	Padding EdgeInsets
+	Zoom    float64
+	// The rotation from north, in degrees.
+	Bearing float64
+	// The tilt toward the horizon, in degrees. 0 looks straight down.
+	Pitch float64
+	// The roll, in degrees.
+	Roll float64
+	// The vertical field of view, in degrees.
+	FieldOfView float64
 }
 
 func copyCamera(raw C.mln_camera) Camera {
@@ -1972,8 +1978,10 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 type CameraFitOptions struct {
 	// Space to leave between the area and each edge of the map.
 	Padding *EdgeInsets
+	// The rotation from north, in degrees.
 	Bearing *float64
-	Pitch   *float64
+	// The tilt toward the horizon, in degrees.
+	Pitch *float64
 }
 
 func nativeCameraFitOptions(input CameraFitOptions, arena *bindingArena) C.mln_camera_fit_options {
@@ -2804,7 +2812,7 @@ type MapTileOptions struct {
 	LodMinRadius *float64
 	// Scales the distance to the view point. Above 1 lowers the detail.
 	LodScale *float64
-	// The pitch, in radians, above which the map lowers the detail.
+	// The pitch, in degrees, above which the map lowers the detail.
 	LodPitchThreshold *float64
 	// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
 	LodZoomShift *float64
@@ -3909,10 +3917,10 @@ func nativeRenderedQueryGeometry(input RenderedQueryGeometry, arena *bindingAren
 // See mln_rendering_stats in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RenderingStats struct {
-	// The time that the frame took to encode, in seconds.
-	EncodingTime float64
-	// The time that the frame took to render, in seconds.
-	RenderingTime float64
+	// The time that the frame took to encode, in milliseconds.
+	EncodingTimeMs float64
+	// The time that the frame took to render, in milliseconds.
+	RenderingTimeMs float64
 	// The frames rendered so far.
 	FrameCount int64
 	// The draw calls in the frame.
@@ -3923,8 +3931,8 @@ type RenderingStats struct {
 
 func copyRenderingStats(raw C.mln_rendering_stats) RenderingStats {
 	var result RenderingStats
-	result.EncodingTime = float64(raw.encoding_time)
-	result.RenderingTime = float64(raw.rendering_time)
+	result.EncodingTimeMs = float64(raw.encoding_time_ms)
+	result.RenderingTimeMs = float64(raw.rendering_time_ms)
 	result.FrameCount = int64(raw.frame_count)
 	result.DrawCallCount = int64(raw.draw_call_count)
 	result.TotalDrawCallCount = int64(raw.total_draw_call_count)
