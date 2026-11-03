@@ -495,14 +495,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_lat_lng_bounds_for_camera_unwrapped(
-    map: Long,
-    camera: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_list_style_layers(
     map: Long,
     completion: Long,

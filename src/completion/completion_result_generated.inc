@@ -155,13 +155,6 @@ struct CompletionResult<&mln_map_lat_lng_bounds_for_camera> {
   static constexpr bool nullable = false;
 };
 template <>
-struct CompletionResult<&mln_map_lat_lng_bounds_for_camera_unwrapped> {
-  static constexpr bool has_value = true;
-  using type = mln_lat_lng_bounds;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
 struct CompletionResult<&mln_map_list_style_layers> {
   static constexpr bool has_value = true;
   using type = mln_style_layer_info;

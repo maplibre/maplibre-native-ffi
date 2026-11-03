@@ -190,17 +190,6 @@ auto mln_map_lat_lng_bounds_for_camera(
   });
 }
 
-auto mln_map_lat_lng_bounds_for_camera_unwrapped(
-  mln_map map, const mln_camera_options* camera,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::map_lat_lng_bounds_for_camera_unwrapped_start(
-      map, camera, completion
-    );
-  });
-}
-
 auto mln_map_set_bounds(
   mln_map map, const mln_bound_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

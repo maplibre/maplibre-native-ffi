@@ -5143,25 +5143,8 @@ auto map_lat_lng_bounds_for_camera(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  *out_bounds = from_native_lat_lng_bounds(
-    live.map->latLngBoundsForCamera(to_native_camera(*camera))
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_lat_lng_bounds_for_camera_unwrapped(
-  MapObject& live, const mln_camera_options* camera,
-  mln_lat_lng_bounds* out_bounds
-) -> mln_status {
-  const auto camera_status = validate_camera_options(camera);
-  if (camera_status != MLN_STATUS_OK) {
-    return camera_status;
-  }
-  if (out_bounds == nullptr) {
-    set_thread_error("out_bounds must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  // The engine's wrapped variant takes the hull of only two screen corners,
+  // which misses rotated corners and flips across the antimeridian.
   *out_bounds = from_native_lat_lng_bounds(
     live.map->latLngBoundsForCameraUnwrapped(to_native_camera(*camera))
   );
@@ -5257,41 +5240,20 @@ auto map_camera_for_geometry_start(
   );
 }
 
-template <auto Function>
-auto start_bounds_for_camera(
-  mln_map map, const mln_camera_options* camera, bool unwrapped,
+auto map_lat_lng_bounds_for_camera_start(
+  mln_map map, const mln_camera_options* camera,
   const mln_completion* completion
 ) -> mln_status {
   if (validate_camera_options(camera) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto copied = *camera;
-  return start_geometry_operation<Function>(
+  return start_geometry_operation<&mln_map_lat_lng_bounds_for_camera>(
     map,
-    [copied, unwrapped](MapObject& live, mln_lat_lng_bounds& result) {
-      return unwrapped
-               ? map_lat_lng_bounds_for_camera_unwrapped(live, &copied, &result)
-               : map_lat_lng_bounds_for_camera(live, &copied, &result);
+    [copied](MapObject& live, mln_lat_lng_bounds& result) {
+      return map_lat_lng_bounds_for_camera(live, &copied, &result);
     },
     completion
-  );
-}
-
-auto map_lat_lng_bounds_for_camera_start(
-  mln_map map, const mln_camera_options* camera,
-  const mln_completion* completion
-) -> mln_status {
-  return start_bounds_for_camera<&mln_map_lat_lng_bounds_for_camera>(
-    map, camera, false, completion
-  );
-}
-
-auto map_lat_lng_bounds_for_camera_unwrapped_start(
-  mln_map map, const mln_camera_options* camera,
-  const mln_completion* completion
-) -> mln_status {
-  return start_bounds_for_camera<&mln_map_lat_lng_bounds_for_camera_unwrapped>(
-    map, camera, true, completion
   );
 }
 

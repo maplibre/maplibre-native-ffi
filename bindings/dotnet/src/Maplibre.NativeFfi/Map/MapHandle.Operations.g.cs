@@ -1383,7 +1383,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </summary>
     /// <remarks>
     /// <para>Camera fields that <c>camera</c> doesn't set come from the map's
-    /// camera. The longitudes stay between -180 and 180.</para>
+    /// camera. The longitudes can fall outside -180 to 180, so a view across
+    /// the antimeridian gives one continuous range.</para>
     /// <para>See <c>mln_map_lat_lng_bounds_for_camera</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -1393,39 +1394,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeCamera = NativeCameraOptions(camera);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_lat_lng_bounds_for_camera(
-            Handle,
-            &nativeCamera,
-            NativeCompletion.Start<LatLngBounds>(
-                &nativeCompletion,
-                static nativeResult =>
-                    NativeCompletion.Single<mln_lat_lng_bounds, LatLngBounds>(
-                        nativeResult,
-                        CopyLatLngBounds
-                    ),
-                out var nativePending
-            ),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Computes the area that the map would show with <c>camera</c>, without
-    /// wrapping longitudes.
-    /// </summary>
-    /// <remarks>
-    /// <para>Camera fields that <c>camera</c> doesn't set come from the map's
-    /// camera. The longitudes can fall outside -180 to 180, so a view across
-    /// the antimeridian gives one continuous range.</para>
-    /// <para>See <c>mln_map_lat_lng_bounds_for_camera_unwrapped</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public Task<LatLngBounds> LatLngBoundsForCameraUnwrappedAsync(CameraOptions camera)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeCamera = NativeCameraOptions(camera);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped(
             Handle,
             &nativeCamera,
             NativeCompletion.Start<LatLngBounds>(

@@ -341,11 +341,6 @@ export interface NativeOperations {
     camera: CameraOptions | undefined,
     completion: NativeCompletion,
   ): void;
-  mln_map_lat_lng_bounds_for_camera_unwrapped(
-    map: bigint,
-    camera: CameraOptions | undefined,
-    completion: NativeCompletion,
-  ): void;
   mln_map_list_style_layers(map: bigint, completion: NativeCompletion): void;
   mln_map_list_style_sources(map: bigint, completion: NativeCompletion): void;
   mln_map_move_style_layer(

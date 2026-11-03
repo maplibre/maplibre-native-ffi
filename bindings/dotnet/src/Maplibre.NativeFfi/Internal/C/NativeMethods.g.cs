@@ -490,14 +490,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
-        MlnMap map,
-        mln_camera_options* camera,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_list_style_layers(
         MlnMap map,
         mln_completion* completion,

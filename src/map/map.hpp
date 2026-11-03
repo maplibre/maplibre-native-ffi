@@ -480,10 +480,6 @@ auto map_lat_lng_bounds_for_camera_start(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion
 ) -> mln_status;
-auto map_lat_lng_bounds_for_camera_unwrapped_start(
-  mln_map map, const mln_camera_options* camera,
-  const mln_completion* completion
-) -> mln_status;
 auto map_view_from_transform(
   const mln::TransformState& transform, double scale_factor
 ) -> mln_map_view;
@@ -548,10 +544,6 @@ auto map_camera_for_geometry(
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status;
 auto map_lat_lng_bounds_for_camera(
-  MapObject& live, const mln_camera_options* camera,
-  mln_lat_lng_bounds* out_bounds
-) -> mln_status;
-auto map_lat_lng_bounds_for_camera_unwrapped(
   MapObject& live, const mln_camera_options* camera,
   mln_lat_lng_bounds* out_bounds
 ) -> mln_status;
