@@ -53,6 +53,11 @@ package for your language, then
   to Compose Multiplatform.
 - [MapLibre for Flutter](https://github.com/josxha/flutter-maplibre) brings maps
   to Flutter.
+- [Rampardos](https://github.com/lenisko/rampardos) renders static maps and
+  raster tiles from local MBTiles.
+- [Mapigrade](https://github.com/greensopinion/mapigrade) draws a MapLibre
+  Native map into a Flutter `Texture` widget as the base layer of a
+  [`flutter_map`](https://pub.dev/packages/flutter_map) map.
 
 ## Status
 
