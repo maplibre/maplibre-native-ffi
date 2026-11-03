@@ -412,8 +412,8 @@ auto invoke_resource_transform(
   void* platform_context, mln_resource_kind kind, const std::string& url,
   mln::ResourceTransform::FinishedCallback finished
 ) -> void;
-auto run_ambient_cache_operation_start(
-  mln_runtime runtime, mln_ambient_cache_operation operation,
+auto run_cache_database_operation_start(
+  mln_runtime runtime, mln_cache_database_operation operation,
   const mln_completion* completion
 ) -> mln_status;
 auto set_maximum_ambient_cache_size_start(

@@ -1760,12 +1760,12 @@ int32_t mln_kw_mln_runtime_release(
   );
 }
 
-int32_t mln_kw_mln_runtime_run_ambient_cache_operation(
+int32_t mln_kw_mln_runtime_run_cache_database_operation(
   int64_t runtime, int32_t operation, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_runtime_run_ambient_cache_operation(
-    (mln_runtime)runtime, (mln_ambient_cache_operation)operation,
+  return (int32_t)mln_runtime_run_cache_database_operation(
+    (mln_runtime)runtime, (mln_cache_database_operation)operation,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }

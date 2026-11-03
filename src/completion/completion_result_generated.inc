@@ -319,7 +319,7 @@ struct CompletionResult<&mln_runtime_release> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_runtime_run_ambient_cache_operation> {
+struct CompletionResult<&mln_runtime_run_cache_database_operation> {
   static constexpr bool has_value = false;
 };
 template <>

@@ -1716,13 +1716,13 @@ internal actual object C {
   actual fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_runtime_release(runtime, word(completion), word(outDiagnostic))
 
-  actual fun mln_runtime_run_ambient_cache_operation(
+  actual fun mln_runtime_run_cache_database_operation(
     runtime: Long,
     operation: Int,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_runtime_run_ambient_cache_operation(
+    mln_kw_mln_runtime_run_cache_database_operation(
       runtime,
       operation,
       word(completion),
@@ -3135,14 +3135,14 @@ private fun mln_kw_mln_runtime_merge_offline_regions(p0: Long, p1: Int, p2: Int,
 private fun mln_kw_mln_runtime_release(p0: Long, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_release(p0, p1, p2)")
 
-private fun mln_kw_mln_runtime_run_ambient_cache_operation(
+private fun mln_kw_mln_runtime_run_cache_database_operation(
   p0: Long,
   p1: Int,
   p2: Int,
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_run_ambient_cache_operation(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_run_cache_database_operation(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_set_event_handler(p0: Long, p1: Int, p2: Int, p3: Int): Int =

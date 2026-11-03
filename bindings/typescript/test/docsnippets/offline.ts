@@ -2,7 +2,7 @@
 // tests, which never run them.
 
 import {
-  AmbientCacheOperation,
+  CacheDatabaseOperation,
   OfflineRegionDownloadState,
   RuntimeHandle,
 } from "../../src/index.ts";
@@ -49,7 +49,9 @@ export async function offline(): Promise<void> {
   // #region ambient
   // 50 MiB
   await runtime.setMaximumAmbientCacheSize(50n * 1024n * 1024n);
-  await runtime.runAmbientCacheOperation(AmbientCacheOperation.clear);
+  await runtime.runCacheDatabaseOperation(
+    CacheDatabaseOperation.clear,
+  );
   // #endregion ambient
 
   // #region download

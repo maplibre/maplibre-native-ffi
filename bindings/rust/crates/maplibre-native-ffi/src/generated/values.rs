@@ -1,27 +1,6 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
-native_enum! {
-/// An action on a runtime's ambient cache.
-///
-/// The ambient cache holds the resources that maps load, apart from the ones
-/// that offline regions hold.
-///
-/// See `mln_ambient_cache_operation` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub enum AmbientCacheOperation: u32 {
-    /// Deletes the whole database, offline regions included, and starts an
-    /// empty one.
-    ResetDatabase = 1,
-    /// Shrinks the database file to free the disk space it no longer uses.
-    PackDatabase = 2,
-    /// Makes the library check each cached resource for changes before it uses
-    /// the resource again.
-    Invalidate = 3,
-    Clear = 4,
-} Unknown
-}
-
 /// How a camera change animates.
 ///
 /// See `mln_animation_options` in the
@@ -118,6 +97,32 @@ impl ToNative<sys::mln_bound_options> for BoundOptions {
         }
         Ok(raw)
     }
+}
+
+native_enum! {
+/// A maintenance action on a runtime's cache database.
+///
+/// The cache database is the file that `RuntimeOptions::cache_path` names. It
+/// holds the ambient cache, meaning the resources that maps loaded, and the
+/// offline regions.
+///
+/// See `mln_cache_database_operation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub enum CacheDatabaseOperation: u32 {
+    /// Deletes the ambient cache's resources and frees the space they used.
+    /// Offline regions keep their resources.
+    Clear = 1,
+    /// Keeps the ambient cache's resources, but makes maps check each one with
+    /// the server before they use it again. Offline regions keep their
+    /// resources as they are.
+    Invalidate = 2,
+    /// Compacts the whole database file to free the disk space that it no
+    /// longer uses.
+    Pack = 3,
+    /// Deletes the whole database, offline regions included, and starts an
+    /// empty one.
+    Reset = 4,
+} Unknown
 }
 
 /// A map's whole camera.
@@ -4745,8 +4750,8 @@ pub struct RuntimeOptions<'a> {
     /// The directory that `asset://` URLs load from. Empty uses the working
     /// directory, or the app's assets on Android.
     pub asset_path: &'a str,
-    /// The database file that holds the ambient cache and offline regions.
-    /// Empty keeps them in memory.
+    /// The cache database file, which holds the ambient cache and offline
+    /// regions. Empty keeps them in memory.
     pub cache_path: &'a str,
 }
 impl<'a> ToNative<sys::mln_runtime_options> for RuntimeOptions<'a> {

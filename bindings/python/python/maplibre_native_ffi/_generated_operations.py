@@ -11,8 +11,8 @@ from . import _native
 from ._completion import CommandCompletion
 from ._future import map_future
 from ._generated_values import (
-    AmbientCacheOperation,
     BoundOptions,
+    CacheDatabaseOperation,
     CameraDelta,
     CameraFitOptions,
     CameraFitUpdate,
@@ -2610,15 +2610,15 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.close()
 
-    def run_ambient_cache_operation(
-        self, operation: AmbientCacheOperation
+    def run_cache_database_operation(
+        self, operation: CacheDatabaseOperation
     ) -> Future[None]:
-        """Runs an action on the runtime's ambient cache.
+        """Runs a maintenance action on the runtime's cache database.
 
-        See `mln_runtime_run_ambient_cache_operation` in the
+        See `mln_runtime_run_cache_database_operation` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.run_ambient_cache_operation(operation)
+        return self._native.run_cache_database_operation(operation)
 
     def set_event_handler(
         self, handler: RuntimeEventHandler
@@ -2665,8 +2665,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_maximum_ambient_cache_size(self, size: int) -> Future[None]:
         """Limits the size of the runtime's ambient cache.
 
-        `size` is in bytes. Offline regions count toward it, but the library
-        evicts only ambient cache resources to stay within it.
+        `size` is in bytes. Offline regions don't count toward it.
 
         See `mln_runtime_set_maximum_ambient_cache_size` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

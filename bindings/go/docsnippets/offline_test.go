@@ -59,8 +59,8 @@ func offline(ctx context.Context) error {
 		return err
 	}
 
-	cleared, err := runtime.RunAmbientCacheOperation(
-		maplibre.AmbientCacheOperationClear,
+	cleared, err := runtime.RunCacheDatabaseOperation(
+		maplibre.CacheDatabaseOperationClear,
 	)
 	if err != nil {
 		return err

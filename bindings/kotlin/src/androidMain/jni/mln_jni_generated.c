@@ -1980,12 +1980,12 @@ static jint mln_runtime_release_jni(
   );
 }
 
-static jint mln_runtime_run_ambient_cache_operation_jni(
+static jint mln_runtime_run_cache_database_operation_jni(
   JNIEnv* env, jclass type, jlong runtime, jint operation, jlong completion,
   jlong out_diagnostic
 ) {
-  return (jint)mln_runtime_run_ambient_cache_operation(
-    (mln_runtime)runtime, (mln_ambient_cache_operation)operation,
+  return (jint)mln_runtime_run_cache_database_operation(
+    (mln_runtime)runtime, (mln_cache_database_operation)operation,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2464,8 +2464,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_runtime_merge_offline_regions", "(JJJJ)I",
    (void*)mln_runtime_merge_offline_regions_jni},
   {"mln_runtime_release", "(JJJ)I", (void*)mln_runtime_release_jni},
-  {"mln_runtime_run_ambient_cache_operation", "(JIJJ)I",
-   (void*)mln_runtime_run_ambient_cache_operation_jni},
+  {"mln_runtime_run_cache_database_operation", "(JIJJ)I",
+   (void*)mln_runtime_run_cache_database_operation_jni},
   {"mln_runtime_set_event_handler", "(JJJJ)I",
    (void*)mln_runtime_set_event_handler_jni},
   {"mln_runtime_set_event_mask", "(JJJ)I",
@@ -2822,8 +2822,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_runtime_merge_offline_regions", "(JJJJ)I",
    (void*)mln_runtime_merge_offline_regions_jni},
   {"mln_runtime_release", "(JJJ)I", (void*)mln_runtime_release_jni},
-  {"mln_runtime_run_ambient_cache_operation", "(JIJJ)I",
-   (void*)mln_runtime_run_ambient_cache_operation_jni},
+  {"mln_runtime_run_cache_database_operation", "(JIJJ)I",
+   (void*)mln_runtime_run_cache_database_operation_jni},
   {"mln_runtime_set_event_handler", "(JJJJ)I",
    (void*)mln_runtime_set_event_handler_jni},
   {"mln_runtime_set_event_mask", "(JJJ)I",

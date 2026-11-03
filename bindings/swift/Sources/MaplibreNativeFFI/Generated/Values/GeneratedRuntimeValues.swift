@@ -3,14 +3,15 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// An action on a runtime's ambient cache.
+/// A maintenance action on a runtime's cache database.
 ///
-/// The ambient cache holds the resources that maps load, apart from the ones
-/// that offline regions hold.
+/// The cache database is the file that `RuntimeOptions.cachePath` names. It
+/// holds the ambient cache, meaning the resources that maps loaded, and the
+/// offline regions.
 ///
-/// See `mln_ambient_cache_operation` in the
+/// See `mln_cache_database_operation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
+public struct CacheDatabaseOperation: RawRepresentable, CustomStringConvertible,
   NativeOpenValue, Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
@@ -18,22 +19,26 @@ public struct AmbientCacheOperation: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
+  /// Deletes the ambient cache's resources and frees the space they used.
+  /// Offline regions keep their resources.
+  public static let clear: CacheDatabaseOperation = .init(rawValue: 1)
+  /// Keeps the ambient cache's resources, but makes maps check each one with
+  /// the server before they use it again. Offline regions keep their resources
+  /// as they are.
+  public static let invalidate: CacheDatabaseOperation = .init(rawValue: 2)
+  /// Compacts the whole database file to free the disk space that it no longer
+  /// uses.
+  public static let pack: CacheDatabaseOperation = .init(rawValue: 3)
   /// Deletes the whole database, offline regions included, and starts an empty
   /// one.
-  public static let resetDatabase: AmbientCacheOperation = .init(rawValue: 1)
-  /// Shrinks the database file to free the disk space it no longer uses.
-  public static let packDatabase: AmbientCacheOperation = .init(rawValue: 2)
-  /// Makes the library check each cached resource for changes before it uses
-  /// the resource again.
-  public static let invalidate: AmbientCacheOperation = .init(rawValue: 3)
-  public static let clear: AmbientCacheOperation = .init(rawValue: 4)
+  public static let reset: CacheDatabaseOperation = .init(rawValue: 4)
   public var description: String {
     switch rawValue {
-    case 1: return "resetDatabase"
-    case 2: return "packDatabase"
-    case 3: return "invalidate"
-    case 4: return "clear"
-    default: return "AmbientCacheOperation(\(rawValue))"
+    case 1: return "clear"
+    case 2: return "invalidate"
+    case 3: return "pack"
+    case 4: return "reset"
+    default: return "CacheDatabaseOperation(\(rawValue))"
     }
   }
 }
@@ -1537,8 +1542,8 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// The directory that `asset://` URLs load from. Empty uses the working
   /// directory, or the app's assets on Android.
   public var assetPath: String
-  /// The database file that holds the ambient cache and offline regions. Empty
-  /// keeps them in memory.
+  /// The cache database file, which holds the ambient cache and offline
+  /// regions. Empty keeps them in memory.
   public var cachePath: String
   public init(assetPath: String = "", cachePath: String = "") {
     self.assetPath = assetPath

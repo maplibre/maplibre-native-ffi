@@ -1427,14 +1427,6 @@ internal unsafe struct mln_wgl_context_descriptor
     public void* get_proc_address;
 }
 
-internal enum mln_ambient_cache_operation : uint
-{
-    MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1,
-    MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2,
-    MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3,
-    MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4,
-}
-
 internal enum mln_animation_option_field : uint
 {
     MLN_ANIMATION_OPTION_DURATION = 1,
@@ -1452,6 +1444,14 @@ internal enum mln_bound_option_field : uint
     MLN_BOUND_OPTION_MIN_PITCH = 8,
     MLN_BOUND_OPTION_MAX_PITCH = 16,
     MLN_BOUND_OPTION_UNBOUNDED = 32,
+}
+
+internal enum mln_cache_database_operation : uint
+{
+    MLN_CACHE_DATABASE_OPERATION_CLEAR = 1,
+    MLN_CACHE_DATABASE_OPERATION_INVALIDATE = 2,
+    MLN_CACHE_DATABASE_OPERATION_PACK = 3,
+    MLN_CACHE_DATABASE_OPERATION_RESET = 4,
 }
 
 internal enum mln_camera_change_mode : uint

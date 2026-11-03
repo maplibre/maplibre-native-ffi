@@ -28,26 +28,35 @@ typedef enum mln_network_status : uint32_t {
 } mln_network_status;
 
 /**
- * An action on a runtime's ambient cache.
+ * A maintenance action on a runtime's cache database.
  *
- * The ambient cache holds the resources that maps load, apart from the ones
- * that offline regions hold.
+ * The cache database is the file that mln_runtime_options.cache_path names. It
+ * holds the ambient cache, meaning the resources that maps loaded, and the
+ * offline regions.
  */
-typedef enum mln_ambient_cache_operation : uint32_t {
+typedef enum mln_cache_database_operation : uint32_t {
+  /**
+   * Deletes the ambient cache's resources and frees the space they used.
+   * Offline regions keep their resources.
+   */
+  MLN_CACHE_DATABASE_OPERATION_CLEAR = 1,
+  /**
+   * Keeps the ambient cache's resources, but makes maps check each one with the
+   * server before they use it again. Offline regions keep their resources as
+   * they are.
+   */
+  MLN_CACHE_DATABASE_OPERATION_INVALIDATE = 2,
+  /**
+   * Compacts the whole database file to free the disk space that it no longer
+   * uses.
+   */
+  MLN_CACHE_DATABASE_OPERATION_PACK = 3,
   /**
    * Deletes the whole database, offline regions included, and starts an empty
    * one.
    */
-  MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1,
-  /** Shrinks the database file to free the disk space it no longer uses. */
-  MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2,
-  /**
-   * Makes the library check each cached resource for changes before it uses
-   * the resource again.
-   */
-  MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3,
-  MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4,
-} mln_ambient_cache_operation;
+  MLN_CACHE_DATABASE_OPERATION_RESET = 4,
+} mln_cache_database_operation;
 
 /** The ID of an offline region in a runtime's database. */
 typedef int64_t mln_offline_region_id;
@@ -361,8 +370,8 @@ typedef struct mln_runtime_options {
    */
   mln_buffer_view asset_path;
   /**
-   * The database file that holds the ambient cache and offline regions. Empty
-   * keeps them in memory.
+   * The cache database file, which holds the ambient cache and offline
+   * regions. Empty keeps them in memory.
    */
   mln_buffer_view cache_path;
 } mln_runtime_options;
@@ -1050,18 +1059,17 @@ MLN_API mln_status mln_runtime_clear_http_header_transform(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Runs an action on the runtime's ambient cache. */
+/** Runs a maintenance action on the runtime's cache database. */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_runtime_run_ambient_cache_operation(
-  mln_runtime runtime, mln_ambient_cache_operation operation,
+MLN_API mln_status mln_runtime_run_cache_database_operation(
+  mln_runtime runtime, mln_cache_database_operation operation,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
  * Limits the size of the runtime's ambient cache.
  *
- * `size` is in bytes. Offline regions count toward it, but the library evicts
- * only ambient cache resources to stay within it.
+ * `size` is in bytes. Offline regions don't count toward it.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(

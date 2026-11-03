@@ -917,7 +917,7 @@ internal expect object C {
 
   fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_runtime_run_ambient_cache_operation(
+  fun mln_runtime_run_cache_database_operation(
     runtime: Long,
     operation: Int,
     completion: Long,

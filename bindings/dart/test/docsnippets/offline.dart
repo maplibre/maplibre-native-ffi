@@ -50,7 +50,9 @@ Future<void> offline() async {
   // #region ambient
   // 50 MiB
   await runtime.setMaximumAmbientCacheSize(50 * 1024 * 1024);
-  await runtime.runAmbientCacheOperation(AmbientCacheOperation.clear);
+  await runtime.runCacheDatabaseOperation(
+    CacheDatabaseOperation.clear,
+  );
   // #endregion ambient
 
   // #region download

@@ -448,19 +448,19 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Runs an action on the runtime's ambient cache.
+    /// Runs a maintenance action on the runtime's cache database.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_runtime_run_ambient_cache_operation</c> in the <see
+    /// See <c>mln_runtime_run_cache_database_operation</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public Task RunAmbientCacheOperationAsync(AmbientCacheOperation operation)
+    public Task RunCacheDatabaseOperationAsync(CacheDatabaseOperation operation)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_runtime_run_ambient_cache_operation(
+        var nativeStatus = NativeMethods.mln_runtime_run_cache_database_operation(
             Handle,
-            (mln_ambient_cache_operation)operation,
+            (mln_cache_database_operation)operation,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -539,8 +539,8 @@ public sealed unsafe partial class RuntimeHandle
     /// Limits the size of the runtime's ambient cache.
     /// </summary>
     /// <remarks>
-    /// <para><c>size</c> is in bytes. Offline regions count toward it, but the
-    /// library evicts only ambient cache resources to stay within it.</para>
+    /// <para><c>size</c> is in bytes. Offline regions don't count toward
+    /// it.</para>
     /// <para>See <c>mln_runtime_set_maximum_ambient_cache_size</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>

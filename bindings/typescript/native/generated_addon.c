@@ -6199,13 +6199,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
+static napi_value mln_ts_export_mln_runtime_run_cache_database_operation(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
-  mln_ambient_cache_operation arg_operation;
+  mln_cache_database_operation arg_operation;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -6223,7 +6223,7 @@ static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
           call, call->argv[1], 0LL, 4294967295LL, &number, "operation"
         ))
       goto done;
-    arg_operation = (mln_ambient_cache_operation)number;
+    arg_operation = (mln_cache_database_operation)number;
   }
   if (!mln_ts_read_completion(
         call, call->argv[2], false, NULL, &arg_completion, &present_completion
@@ -6231,7 +6231,7 @@ static napi_value mln_ts_export_mln_runtime_run_ambient_cache_operation(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_runtime_run_ambient_cache_operation(
+  status = mln_runtime_run_cache_database_operation(
     arg_runtime, arg_operation, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
@@ -7078,8 +7078,8 @@ static const mln_ts_export exports[] = {
   {"mln_runtime_merge_offline_regions",
    mln_ts_export_mln_runtime_merge_offline_regions},
   {"mln_runtime_release", mln_ts_export_mln_runtime_release},
-  {"mln_runtime_run_ambient_cache_operation",
-   mln_ts_export_mln_runtime_run_ambient_cache_operation},
+  {"mln_runtime_run_cache_database_operation",
+   mln_ts_export_mln_runtime_run_cache_database_operation},
   {"mln_runtime_set_event_handler",
    mln_ts_export_mln_runtime_set_event_handler},
   {"mln_runtime_set_event_mask", mln_ts_export_mln_runtime_set_event_mask},

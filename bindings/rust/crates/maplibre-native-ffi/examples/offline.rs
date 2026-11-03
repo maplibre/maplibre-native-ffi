@@ -53,7 +53,7 @@ async fn offline() -> Result<()> {
         .set_maximum_ambient_cache_size(50 * 1024 * 1024)?
         .await?;
     runtime
-        .run_ambient_cache_operation(AmbientCacheOperation::Clear)?
+        .run_cache_database_operation(CacheDatabaseOperation::Clear)?
         .await?;
     // #endregion ambient
 

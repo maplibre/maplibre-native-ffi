@@ -1,34 +1,40 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 part of 'values.dart';
 
-/// An action on a runtime's ambient cache.
+/// A maintenance action on a runtime's cache database.
 ///
-/// The ambient cache holds the resources that maps load, apart from the ones
-/// that offline regions hold.
+/// The cache database is the file that `RuntimeOptions.cachePath` names. It
+/// holds the ambient cache, meaning the resources that maps loaded, and the
+/// offline regions.
 ///
-/// See `mln_ambient_cache_operation` in the
+/// See `mln_cache_database_operation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class AmbientCacheOperation extends _Enum {
-  const AmbientCacheOperation.fromRawValue(super.rawValue);
+final class CacheDatabaseOperation extends _Enum {
+  const CacheDatabaseOperation.fromRawValue(super.rawValue);
+
+  /// Deletes the ambient cache's resources and frees the space they used.
+  /// Offline regions keep their resources.
+  static const clear = CacheDatabaseOperation.fromRawValue(1);
+
+  /// Keeps the ambient cache's resources, but makes maps check each one with
+  /// the server before they use it again. Offline regions keep their resources
+  /// as they are.
+  static const invalidate = CacheDatabaseOperation.fromRawValue(2);
+
+  /// Compacts the whole database file to free the disk space that it no longer
+  /// uses.
+  static const pack = CacheDatabaseOperation.fromRawValue(3);
 
   /// Deletes the whole database, offline regions included, and starts an empty
   /// one.
-  static const resetDatabase = AmbientCacheOperation.fromRawValue(1);
-
-  /// Shrinks the database file to free the disk space it no longer uses.
-  static const packDatabase = AmbientCacheOperation.fromRawValue(2);
-
-  /// Makes the library check each cached resource for changes before it uses
-  /// the resource again.
-  static const invalidate = AmbientCacheOperation.fromRawValue(3);
-  static const clear = AmbientCacheOperation.fromRawValue(4);
+  static const reset = CacheDatabaseOperation.fromRawValue(4);
   @override
   String toString() => switch (rawValue) {
-    1 => 'AmbientCacheOperation.resetDatabase',
-    2 => 'AmbientCacheOperation.packDatabase',
-    3 => 'AmbientCacheOperation.invalidate',
-    4 => 'AmbientCacheOperation.clear',
-    _ => 'AmbientCacheOperation($rawValue)',
+    1 => 'CacheDatabaseOperation.clear',
+    2 => 'CacheDatabaseOperation.invalidate',
+    3 => 'CacheDatabaseOperation.pack',
+    4 => 'CacheDatabaseOperation.reset',
+    _ => 'CacheDatabaseOperation($rawValue)',
   };
 }
 
@@ -5446,8 +5452,8 @@ final class RuntimeOptions extends _Value {
   /// directory, or the app's assets on Android.
   final String assetPath;
 
-  /// The database file that holds the ambient cache and offline regions. Empty
-  /// keeps them in memory.
+  /// The cache database file, which holds the ambient cache and offline
+  /// regions. Empty keeps them in memory.
   final String cachePath;
 
   /// A copy of this value with the given members replaced.

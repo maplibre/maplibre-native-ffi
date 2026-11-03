@@ -157,7 +157,7 @@ fn a_record_built_from_its_required_members_zeroes_the_others() {
 
 // An enum without a zero member has no default rather than an unknown 0, and
 // a record that holds one has none either.
-static_assertions::assert_not_impl_any!(AmbientCacheOperation: Default);
+static_assertions::assert_not_impl_any!(CacheDatabaseOperation: Default);
 static_assertions::assert_not_impl_any!(RuntimeEvent: Default);
 
 #[test]

@@ -32,9 +32,9 @@ from ._generated_owners import (
     StyleExpressionHandle,
 )
 from ._generated_values import (
-    AmbientCacheOperation,
     AnimationOptions,
     BoundOptions,
+    CacheDatabaseOperation,
     Camera,
     CameraBounds,
     CameraChangeMode,
@@ -247,9 +247,9 @@ from ._generated_values import (
 
 __all__ = [
     "AcquiredFrameHandle",
-    "AmbientCacheOperation",
     "AnimationOptions",
     "BoundOptions",
+    "CacheDatabaseOperation",
     "Camera",
     "CameraBounds",
     "CameraChangeMode",

@@ -1337,9 +1337,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_run_ambient_cache_operation(
+    internal static partial mln_status mln_runtime_run_cache_database_operation(
         MlnRuntime runtime,
-        mln_ambient_cache_operation operation,
+        mln_cache_database_operation operation,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

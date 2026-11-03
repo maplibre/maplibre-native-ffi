@@ -71,8 +71,8 @@ internal static class Offline
         await runtime.SetMaximumAmbientCacheSizeAsync(
             50 * 1024 * 1024
         );
-        await runtime.RunAmbientCacheOperationAsync(
-            AmbientCacheOperation.Clear
+        await runtime.RunCacheDatabaseOperationAsync(
+            CacheDatabaseOperation.Clear
         );
         // #endregion ambient
 

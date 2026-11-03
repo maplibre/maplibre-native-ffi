@@ -1,8 +1,8 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
-  AmbientCacheOperation,
   BoundOptions,
+  CacheDatabaseOperation,
   CameraDelta,
   CameraFitOptions,
   CameraFitUpdate,
@@ -5004,14 +5004,14 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Runs an action on the runtime's ambient cache.
+   * Runs a maintenance action on the runtime's cache database.
    *
-   * See `mln_runtime_run_ambient_cache_operation` in the
+   * See `mln_runtime_run_cache_database_operation` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  runAmbientCacheOperation(operation: AmbientCacheOperation): Promise<void> {
+  runCacheDatabaseOperation(operation: CacheDatabaseOperation): Promise<void> {
     return run((completion) =>
-      native.mln_runtime_run_ambient_cache_operation(
+      native.mln_runtime_run_cache_database_operation(
         this.id,
         operation,
         completion,
@@ -5081,8 +5081,7 @@ export class RuntimeHandle extends Owner {
   /**
    * Limits the size of the runtime's ambient cache.
    *
-   * `size` is in bytes. Offline regions count toward it, but the library evicts
-   * only ambient cache resources to stay within it.
+   * `size` is in bytes. Offline regions don't count toward it.
    *
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

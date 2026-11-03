@@ -253,20 +253,21 @@ class RuntimeEventSpriteVariant:
         return cls(RuntimeEventSprite._from_native(raw))
 
 
-class AmbientCacheOperation(UnknownIntEnum):
-    """An action on a runtime's ambient cache.
+class CacheDatabaseOperation(UnknownIntEnum):
+    """A maintenance action on a runtime's cache database.
 
-    The ambient cache holds the resources that maps load, apart from the ones
-    that offline regions hold.
+    The cache database is the file that `RuntimeOptions.cache_path` names. It
+    holds the ambient cache, meaning the resources that maps loaded, and the
+    offline regions.
 
-    See `mln_ambient_cache_operation` in the
+    See `mln_cache_database_operation` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    RESET_DATABASE = 1
-    PACK_DATABASE = 2
-    INVALIDATE = 3
-    CLEAR = 4
+    CLEAR = 1
+    INVALIDATE = 2
+    PACK = 3
+    RESET = 4
 
 
 class CameraChangeMode(UnknownIntEnum):
@@ -3896,8 +3897,8 @@ class RuntimeOptions:
     """
 
     cache_path: str = ""
-    """The database file that holds the ambient cache and offline regions. Empty
-    keeps them in memory.
+    """The cache database file, which holds the ambient cache and offline
+    regions. Empty keeps them in memory.
     """
 
     @classmethod

@@ -1137,9 +1137,9 @@ internal actual object C {
     )
   private val mln_runtime_release =
     Ffm.downcall("mln_runtime_release", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_runtime_run_ambient_cache_operation =
+  private val mln_runtime_run_cache_database_operation =
     Ffm.downcall(
-      "mln_runtime_run_ambient_cache_operation",
+      "mln_runtime_run_cache_database_operation",
       JAVA_INT,
       JAVA_LONG,
       JAVA_INT,
@@ -2986,13 +2986,13 @@ internal actual object C {
   actual fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int =
     mln_runtime_release.invokeExact(runtime, completion, outDiagnostic) as Int
 
-  actual fun mln_runtime_run_ambient_cache_operation(
+  actual fun mln_runtime_run_cache_database_operation(
     runtime: Long,
     operation: Int,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_runtime_run_ambient_cache_operation.invokeExact(
+    mln_runtime_run_cache_database_operation.invokeExact(
       runtime,
       operation,
       completion,

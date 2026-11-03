@@ -2116,13 +2116,13 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_runtime_run_ambient_cache_operation(
+  actual fun mln_runtime_run_cache_database_operation(
     runtime: Long,
     operation: Int,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_runtime_run_ambient_cache_operation(
+    org.maplibre.nativeffi.internal.cinterop.mln_runtime_run_cache_database_operation(
       runtime.toULong(),
       operation.toUInt(),
       completion.toCPointer(),
