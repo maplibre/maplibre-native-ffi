@@ -1980,7 +1980,10 @@ auto render_session_set_target(
   if (replace_status != MLN_STATUS_OK) {
     return replace_status;
   }
-  live->target_released = false;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    live->target_released = false;
+  }
   live->target_identity = identity;
 
   // As with a resize, the renderer carries its caches to the new target.
@@ -2145,10 +2148,10 @@ auto render_session_release_target(mln_render_session_object& live)
                             ? live.surface.backend->release_target()
                             : live.texture.backend->release_borrowed_target();
     if (released != MLN_STATUS_OK) return released;
-    live.target_released = true;
   }
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{live.control_mutex};
+  live.target_released = true;
   live.pending_changes = true;
   live.rendered_update_generation = 0;
   live.rendered_target_generation = 0;
@@ -3247,6 +3250,8 @@ auto render_session_get_snapshot(
     .frame_generation = live->frame_generation,
     .acquired_frame_count = live->acquired_frame_count,
     .failure_status = live->failure_status,
+    .has_target = live->state == MLN_RENDER_SESSION_STATE_ATTACHED &&
+                  !live->target_released,
   };
   return MLN_STATUS_OK;
 }
@@ -4484,7 +4489,9 @@ auto abandon_render_session(
         live->state == MLN_RENDER_SESSION_STATE_ABANDONED
       ) {
         stop_waiting();
-        set_thread_error("render session has already released its target");
+        set_thread_error(
+          "render session has already detached or been abandoned"
+        );
         return MLN_STATUS_INVALID_STATE;
       }
       if (!live->driver_call_in_flight) break;

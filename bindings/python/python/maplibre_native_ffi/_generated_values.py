@@ -2856,6 +2856,19 @@ class RenderSessionAttachOptions:
     """
 
     driver: RenderDriverKind
+    """The thread that runs the session's graphics work. Whoever owns the
+    target's graphics context drives it:
+
+    - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for an OpenGL or WebGPU
+      target that you pass, since its context belongs to your thread: a
+      shared or dedicated EGL or WGL context, an existing WebGL context, or a
+      browser's WebGPU device.
+    - `RenderDriverKind.CORE_WORKER` for a target whose context the library
+      owns: a transferred WebGL canvas, or an offscreen session.
+    - Either one for a Metal or Vulkan target.
+
+    An attach with another driver fails with `Status.UNSUPPORTED`.
+    """
 
     producer_sync_kinds: GpuSyncKindFlag = field(
         default_factory=lambda: GpuSyncKindFlag(0)
@@ -2952,6 +2965,12 @@ class RenderSessionSnapshot:
     failed for another reason.
     """
 
+    has_target: bool
+    """Whether the session is attached and has a target to render to. It's false
+    from when `RenderSessionHandle.release_target()` completes until you give
+    the session a new target.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2961,6 +2980,7 @@ class RenderSessionSnapshot:
             frame_generation=raw["frame_generation"],
             acquired_frame_count=raw["acquired_frame_count"],
             failure_status=Status(raw["failure_status"]),
+            has_target=raw["has_target"],
         )
 
 

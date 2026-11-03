@@ -829,6 +829,7 @@ fn generated_copy_mln_render_session_snapshot(
         generated_value(py, value.acquired_frame_count)?,
     )?;
     dict.set_item("failure_status", generated_value(py, value.failure_status)?)?;
+    dict.set_item("has_target", generated_value(py, value.has_target)?)?;
     Ok(dict.into_any().unbind())
 }
 

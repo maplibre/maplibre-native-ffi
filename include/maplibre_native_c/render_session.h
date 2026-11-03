@@ -130,6 +130,12 @@ typedef struct mln_render_session_snapshot {
    * failed for another reason.
    */
   mln_status failure_status;
+  /**
+   * Whether the session is attached and has a target to render to. It's false
+   * from when mln_render_session_release_target() completes until you give the
+   * session a new target.
+   */
+  bool has_target;
 } mln_render_session_snapshot;
 
 /** What mln_render_session_abandon() did with a session's graphics objects. */
@@ -365,7 +371,8 @@ MLN_API mln_status mln_render_session_resize(
  * destroy the old target.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the session renders offscreen.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen, since the
+ *   session owns that target.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas.

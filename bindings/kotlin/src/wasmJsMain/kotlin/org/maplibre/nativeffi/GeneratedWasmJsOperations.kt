@@ -32,8 +32,6 @@ public fun <T> AcquiredFrameHandle.withWebGpuTexture(block: (WebGpuTextureFrame)
 /**
  * Creates a session that renders the map into a ring of your WebGPU textures.
  *
- * The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.
- *
  * See `mln_map_attach_web_gpu_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  *
@@ -68,8 +66,6 @@ public fun MapHandle.attachWebGpuBorrowedTexture(
 
 /**
  * Creates a session that renders the map to a WebGPU surface.
- *
- * The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.
  *
  * See `mln_map_attach_web_gpu_surface` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

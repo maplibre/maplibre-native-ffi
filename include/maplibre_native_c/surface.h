@@ -177,9 +177,6 @@ MLN_API mln_status mln_map_attach_vulkan_surface(
 /**
  * Creates a session that renders the map to an OpenGL surface.
  *
- * The session needs MLN_RENDER_DRIVER_CORE_WORKER for a transferred WebGL
- * canvas, and MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for any other context.
- *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when mln_open_gl_supported_context_provider_mask()
  *   lacks the context's platform.
@@ -194,8 +191,6 @@ MLN_API mln_status mln_map_attach_open_gl_surface(
 
 /**
  * Creates a session that renders the map to a WebGPU surface.
- *
- * The session needs MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks

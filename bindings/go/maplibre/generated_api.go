@@ -3721,6 +3721,18 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 // See mln_render_session_attach_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type RenderSessionAttachOptions struct {
+	// The thread that runs the session's graphics work. Whoever owns the target's
+	// graphics context drives it:
+	//
+	//   - RenderDriverKindCallerGraphicsThread for an OpenGL or WebGPU target that
+	//     you pass, since its context belongs to your thread: a shared or dedicated
+	//     EGL or WGL context, an existing WebGL context, or a browser's WebGPU
+	//     device.
+	//   - RenderDriverKindCoreWorker for a target whose context the library owns: a
+	//     transferred WebGL canvas, or an offscreen session.
+	//   - Either one for a Metal or Vulkan target.
+	//
+	// An attach with another driver fails with StatusUnsupported.
 	Driver RenderDriverKind
 	// The kinds of GpuSync that you can wait on before you read an acquired frame.
 	// The session uses one of them that its target supports. Zero lets the session
@@ -3794,6 +3806,10 @@ type RenderSessionSnapshot struct {
 	// because it lost its target, or StatusNativeError when it failed for another
 	// reason.
 	FailureStatus Status
+	// Whether the session is attached and has a target to render to. It's false
+	// from when RenderSessionHandle.ReleaseTarget() completes until you give the
+	// session a new target.
+	HasTarget bool
 }
 
 func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionSnapshot {
@@ -3804,6 +3820,7 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.AcquiredFrameCount = uint32(raw.acquired_frame_count)
 	result.FailureStatus = Status(raw.failure_status)
+	result.HasTarget = bool(raw.has_target)
 	return result
 }
 
@@ -6105,8 +6122,7 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 
 // AttachOffscreen attaches a render session that renders the map offscreen.
 //
-// Read each image's pixels with RenderSessionHandle.ReadTexture(). options must
-// select RenderDriverKindCoreWorker.
+// Read each image's pixels with RenderSessionHandle.ReadTexture().
 //
 // The session renders on device. When device is null, the session creates a
 // device with the default options, and releases it when the session ends.
@@ -6139,8 +6155,6 @@ func (receiver *MapHandle) AttachOffscreen(descriptor OffscreenDescriptor, optio
 // AttachOpenGlBorrowedTexture creates a session that renders the map into a
 // ring of your OpenGL textures.
 //
-// The session needs RenderDriverKindCallerGraphicsThread.
-//
 // See mln_map_attach_open_gl_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
@@ -6168,9 +6182,6 @@ func (receiver *MapHandle) AttachOpenGlBorrowedTexture(descriptor OpenGlBorrowed
 
 // AttachOpenGlSurface creates a session that renders the map to an OpenGL
 // surface.
-//
-// The session needs RenderDriverKindCoreWorker for a transferred WebGL canvas,
-// and RenderDriverKindCallerGraphicsThread for any other context.
 //
 // See mln_map_attach_open_gl_surface in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
@@ -7779,7 +7790,8 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the session renders offscreen.
+//   - StatusUnsupported when the session renders offscreen, since the session
+//     owns that target.
 //   - StatusUnsupported when the target is a WebGL canvas.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.

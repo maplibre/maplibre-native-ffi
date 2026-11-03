@@ -937,8 +937,9 @@ struct mln_render_session_object
   bool disposal_keeps_graphics = false;
   bool destruction_started = false;
   bool attached = false;
-  // Set by a target release and cleared by the next target replacement. Read
-  // and written only by driver work, which runs one item at a time.
+  // Set by a target release and cleared by the next target replacement.
+  // Written only by driver work, which runs one item at a time, under
+  // control_mutex, so the driver reads it without the lock.
   bool target_released = false;
   // The host objects of the target that the session renders to, set by attach
   // and by each target replacement. Only driver work reads or writes it after

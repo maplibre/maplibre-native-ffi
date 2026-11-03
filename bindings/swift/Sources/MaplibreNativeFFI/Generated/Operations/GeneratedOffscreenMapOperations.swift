@@ -7,7 +7,6 @@ public extension MapHandle {
   /// Attaches a render session that renders the map offscreen.
   ///
   /// Read each image's pixels with `RenderSessionHandle.readTexture()`.
-  /// `options` must select `RenderDriverKind.coreWorker`.
   ///
   /// The session renders on `device`. When `device` is null, the session
   /// creates a device with the default options, and releases it when the

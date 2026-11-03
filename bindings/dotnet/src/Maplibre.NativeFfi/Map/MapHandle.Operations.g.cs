@@ -454,8 +454,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </summary>
     /// <remarks>
     /// <para>Read each image's pixels with
-    /// <c>RenderSessionHandle.ReadTextureAsync()</c>. <c>options</c> must
-    /// select <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <c>RenderSessionHandle.ReadTextureAsync()</c>.</para>
     /// <para>The session renders on <c>device</c>. When <c>device</c> is null,
     /// the session creates a device with the default options, and releases it
     /// when the session ends.</para>
@@ -499,8 +498,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// textures.
     /// </summary>
     /// <remarks>
-    /// <para>The session needs
-    /// <c>RenderDriverKind.CallerGraphicsThread</c>.</para>
     /// <para>See <c>mln_map_attach_open_gl_borrowed_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -538,10 +535,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Creates a session that renders the map to an OpenGL surface.
     /// </summary>
     /// <remarks>
-    /// <para>The session needs <c>RenderDriverKind.CoreWorker</c> for a
-    /// transferred WebGL canvas, and
-    /// <c>RenderDriverKind.CallerGraphicsThread</c> for any other
-    /// context.</para>
     /// <para>See <c>mln_map_attach_open_gl_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

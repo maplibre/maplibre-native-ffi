@@ -375,7 +375,6 @@ impl MapHandle {
     /// Attaches a render session that renders the map offscreen.
     ///
     /// Read each image's pixels with `RenderSessionHandle::read_texture()`.
-    /// `options` must select `RenderDriverKind::CoreWorker`.
     ///
     /// The session renders on `device`. When `device` is null, the session
     /// creates a device with the default options, and releases it when the
@@ -420,8 +419,6 @@ impl MapHandle {
     /// Creates a session that renders the map into a ring of your OpenGL
     /// textures.
     ///
-    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
-    ///
     /// See `mln_map_attach_open_gl_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
@@ -459,10 +456,6 @@ impl MapHandle {
     }
 
     /// Creates a session that renders the map to an OpenGL surface.
-    ///
-    /// The session needs `RenderDriverKind::CoreWorker` for a transferred WebGL
-    /// canvas, and `RenderDriverKind::CallerGraphicsThread` for any other
-    /// context.
     ///
     /// See `mln_map_attach_open_gl_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -592,8 +585,6 @@ impl MapHandle {
     /// Creates a session that renders the map into a ring of your WebGPU
     /// textures.
     ///
-    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
-    ///
     /// See `mln_map_attach_web_gpu_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
@@ -632,8 +623,6 @@ impl MapHandle {
     }
 
     /// Creates a session that renders the map to a WebGPU surface.
-    ///
-    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
     ///
     /// See `mln_map_attach_web_gpu_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

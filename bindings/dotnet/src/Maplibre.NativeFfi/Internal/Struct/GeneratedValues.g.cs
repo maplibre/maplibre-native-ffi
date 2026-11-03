@@ -1518,7 +1518,8 @@ internal static unsafe class GeneratedValues
             value.generation,
             value.frame_generation,
             value.acquired_frame_count,
-            (global::Maplibre.NativeFfi.Status)value.failure_status
+            (global::Maplibre.NativeFfi.Status)value.failure_status,
+            value.has_target != 0
         );
 
     internal static RenderedFeature CopyRenderedFeature(mln_rendered_feature value) =>

@@ -2595,6 +2595,24 @@ final class RenderSessionAttachOptions extends _Value {
     this.driverWorkWake = const Wake(),
     this.queueLock,
   });
+
+  /// The thread that runs the session's graphics work. Whoever owns the
+  /// target's graphics context drives it:
+  ///
+  /// - `RenderDriverKind.callerGraphicsThread` for an OpenGL or WebGPU target
+  ///   that you pass, since its context belongs to your thread: a shared or
+  ///   dedicated EGL or WGL context, an existing WebGL context, or a browser's
+  ///   WebGPU device.
+  /// - `RenderDriverKind.coreWorker` for a target whose context the library
+  ///   owns: a transferred WebGL canvas, or an offscreen session.
+  /// - Either one for a Metal or Vulkan target.
+  ///
+  /// An attach with another driver fails with `Status.unsupported`.
+  ///
+  /// An isolate cannot service a caller-graphics-thread driver, because Dart
+  /// can resume it on another native thread after any `await`. Host native code
+  /// services such a session on the graphics thread by passing its `id` to the
+  /// C function that `RenderSessionHandle.serviceDriverWork()` calls.
   final RenderDriverKind driver;
 
   /// The kinds of `GpuSync` that you can wait on before you read an acquired
@@ -4334,6 +4352,7 @@ final class RenderSessionSnapshot extends _Value {
     this.frameGeneration = 0,
     this.acquiredFrameCount = 0,
     this.failureStatus = const Status.fromRawValue(0),
+    this.hasTarget = false,
   });
   final RenderSessionState state;
 
@@ -4348,6 +4367,11 @@ final class RenderSessionSnapshot extends _Value {
   /// for another reason.
   final Status failureStatus;
 
+  /// Whether the session is attached and has a target to render to. It's false
+  /// from when `RenderSessionHandle.releaseTarget()` completes until you give
+  /// the session a new target.
+  final bool hasTarget;
+
   @override
   List<Object?> get _members => [
     state,
@@ -4356,6 +4380,7 @@ final class RenderSessionSnapshot extends _Value {
     frameGeneration,
     acquiredFrameCount,
     failureStatus,
+    hasTarget,
   ];
   @override
   String toString() => _describe('RenderSessionSnapshot', const [
@@ -4365,6 +4390,7 @@ final class RenderSessionSnapshot extends _Value {
     'frameGeneration',
     'acquiredFrameCount',
     'failureStatus',
+    'hasTarget',
   ]);
 }
 

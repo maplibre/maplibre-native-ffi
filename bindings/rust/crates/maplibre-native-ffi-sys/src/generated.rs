@@ -1167,6 +1167,7 @@ pub struct mln_render_session_snapshot {
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
     pub failure_status: mln_status,
+    pub has_target: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

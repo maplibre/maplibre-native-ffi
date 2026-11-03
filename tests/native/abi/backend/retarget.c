@@ -178,6 +178,16 @@ static void release_target(
   const mln_test_render_fixture* fixture, mln_status expected
 );
 
+static bool has_target(const mln_test_render_fixture* fixture) {
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(mln_render_session_get_snapshot(
+    fixture->session, &snapshot, MLN_TEST_DIAGNOSTIC
+  ));
+  return snapshot.has_target;
+}
+
 typedef struct retarget_map {
   mln_runtime runtime;
   mln_map map;
@@ -462,7 +472,9 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
 
 // A host may hand the session its current target again, such as on every
 // frame. That changes nothing, so a demand that waits for an update keeps
-// waiting rather than rendering a frame the target already has.
+// waiting rather than rendering a frame the target already has. Once the
+// session has released that target, handing it over again gives the session a
+// target.
 static void a_retarget_to_the_current_target_renders_nothing(void) {
   retarget_map map = {0};
   open_map(TARGET_BORROWED, &map);
@@ -493,6 +505,7 @@ static void a_retarget_to_the_current_target_renders_nothing(void) {
     mln_test_last_error()
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the same texture again");
+  TEST_ASSERT_TRUE(has_target(fixture));
   // The fence runs after the replacement. Dumping debug logs publishes no map
   // update, which would end the wait.
   mln_test_completion fence = mln_test_completion_default(0);
@@ -513,6 +526,17 @@ static void a_retarget_to_the_current_target_renders_nothing(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
   );
+  TEST_ASSERT_FALSE(has_target(fixture));
+
+  completion = mln_test_completion_default(0);
+  MLN_TEST_OK_MESSAGE(
+    mln_test_render_fixture_set_textures(
+      fixture, &texture, 1, &completion.descriptor
+    ),
+    mln_test_last_error()
+  );
+  finish(fixture, &completion, MLN_STATUS_OK, "the released texture again");
+  TEST_ASSERT_TRUE(has_target(fixture));
   close_map(&map);
 }
 
@@ -776,6 +800,8 @@ static void release_target(
   finish(fixture, &completion, expected, "the release");
 }
 
+// The snapshot reports the session without a target from the release until
+// the next target.
 static void a_released_target_can_be_destroyed_before_the_next(
   enum target_kind kind
 ) {
@@ -816,7 +842,9 @@ static void a_released_target_can_be_destroyed_before_the_next(
   finish(fixture, &completion, MLN_STATUS_OK, "the first replacement");
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
 
+  TEST_ASSERT_TRUE(has_target(fixture));
   release_target(fixture, MLN_STATUS_OK);
+  TEST_ASSERT_FALSE(has_target(fixture));
   mln_test_graphics_surface_destroy(surface);
   mln_test_graphics_texture_destroy(texture);
   restore_fixture_context(fixture);
@@ -849,6 +877,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
     );
   }
   finish(fixture, &completion, MLN_STATUS_OK, "the next target");
+  TEST_ASSERT_TRUE(has_target(fixture));
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));

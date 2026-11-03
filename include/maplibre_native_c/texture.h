@@ -379,8 +379,6 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
 /**
  * Creates a session that renders the map into a ring of your OpenGL textures.
  *
- * The session needs MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
- *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when mln_open_gl_supported_context_provider_mask()
  *   lacks the context's platform, or when the target supports none of the
@@ -396,8 +394,6 @@ MLN_API mln_status mln_map_attach_open_gl_borrowed_texture(
 
 /**
  * Creates a session that renders the map into a ring of your WebGPU textures.
- *
- * The session needs MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
