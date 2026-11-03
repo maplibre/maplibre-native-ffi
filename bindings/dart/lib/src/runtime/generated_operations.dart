@@ -1168,6 +1168,24 @@ LatLngBounds _readLatLngBounds(raw.mln_lat_lng_bounds source) => LatLngBounds(
   northeast: _readLatLng(source.northeast),
 );
 
+Pointer<raw.mln_camera_fit_update> _writeCameraFitUpdate(
+  CameraFitUpdate value,
+  Allocator arena,
+  _NativeRegistrations registrations, {
+  Pointer<raw.mln_camera_fit_update>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_fit_update>();
+  result.ref.size = sizeOf<raw.mln_camera_fit_update>();
+  result.ref.mode = value.mode.rawValue;
+  result.ref.fit = _writeCameraFitOptions(value.fit, arena).ref;
+  result.ref.animation = _writeAnimationOptions(
+    value.animation,
+    arena,
+    registrations,
+  ).ref;
+  return result;
+}
+
 CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
     CameraQueryResult(
       generation: source.generation,
@@ -3459,6 +3477,56 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
+  void fitCameraToGeometry(Object? geometry, CameraFitUpdate update) =>
+      _discard((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_map_fit_camera_to_geometry(
+            _handle.raw,
+            _nativeJsonView(geometry, arena),
+            _writeCameraFitUpdate(update, arena, registrations),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
+  void fitCameraToLatLngBounds(LatLngBounds bounds, CameraFitUpdate update) =>
+      _discard((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_map_fit_camera_to_lat_lng_bounds(
+            _handle.raw,
+            _writeLatLngBounds(bounds, arena).ref,
+            _writeCameraFitUpdate(update, arena, registrations),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
+  void fitCameraToLatLngs(List<LatLng> coordinates, CameraFitUpdate update) =>
+      _discard((arena, completion) {
+        final nativecoordinates = arena<raw.mln_lat_lng>(
+          coordinates.isEmpty ? 1 : coordinates.length,
+        );
+        for (var index = 0; index < coordinates.length; index++) {
+          _writeLatLng(
+            coordinates[index],
+            arena,
+            into: nativecoordinates + index,
+          );
+        }
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_map_fit_camera_to_lat_lngs(
+            _handle.raw,
+            nativecoordinates,
+            coordinates.length,
+            _writeCameraFitUpdate(update, arena, registrations),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
   void invalidateCustomGeometrySourceRegion(
     String sourceId,
     LatLngBounds bounds,
@@ -4446,6 +4514,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_camera_for_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+  ///   for the area: its left and right add up to at least the map's width, or
+  ///   its top and bottom to at least the map's height.
   Future<CameraOptions> cameraForGeometry(
     Object? geometry, {
     CameraFitOptions? fitOptions,
@@ -4467,6 +4541,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_camera_for_lat_lng_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+  ///   for the area: its left and right add up to at least the map's width, or
+  ///   its top and bottom to at least the map's height.
   Future<CameraOptions> cameraForLatLngBounds(
     LatLngBounds bounds, {
     CameraFitOptions? fitOptions,
@@ -4489,6 +4569,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_camera_for_lat_lngs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+  ///   for the area: its left and right add up to at least the map's width, or
+  ///   its top and bottom to at least the map's height.
   Future<CameraOptions> cameraForLatLngs(
     List<LatLng> coordinates, {
     CameraFitOptions? fitOptions,
@@ -4573,6 +4659,110 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+  /// with an animation.
+  ///
+  /// `geometry` is a GeoJSON geometry object with at least one coordinate, not
+  /// a feature. The map computes the camera when it runs the command, from the
+  /// camera and size that earlier commands leave, as
+  /// `MapHandle.cameraForGeometry()` would then. The function finishes when the
+  /// map applies the change, before an animation ends.
+  ///
+  /// See `mln_map_fit_camera_to_geometry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `update` leaves no room for
+  ///   the area: its left and right add up to at least the map's width, or its
+  ///   top and bottom to at least the map's height. The camera doesn't move.
+  Future<CommandCompletion> fitCameraToGeometry(
+    Object? geometry,
+    CameraFitUpdate update,
+  ) => _command((arena, completion) {
+    final registrations = _NativeRegistrations(_callbackRoots);
+    return registrations.run(
+      () => raw.mln_map_fit_camera_to_geometry(
+        _handle.raw,
+        _nativeJsonView(geometry, arena),
+        _writeCameraFitUpdate(update, arena, registrations),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
+
+  /// Moves the camera to fit `bounds` in the map's view, at once or with an
+  /// animation.
+  ///
+  /// The map computes the camera when it runs the command, from the camera and
+  /// size that earlier commands leave, as `MapHandle.cameraForLatLngBounds()`
+  /// would then. The function finishes when the map applies the change, before
+  /// an animation ends.
+  ///
+  /// See `mln_map_fit_camera_to_lat_lng_bounds` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `update` leaves no room for
+  ///   the area: its left and right add up to at least the map's width, or its
+  ///   top and bottom to at least the map's height. The camera doesn't move.
+  Future<CommandCompletion> fitCameraToLatLngBounds(
+    LatLngBounds bounds,
+    CameraFitUpdate update,
+  ) => _command((arena, completion) {
+    final registrations = _NativeRegistrations(_callbackRoots);
+    return registrations.run(
+      () => raw.mln_map_fit_camera_to_lat_lng_bounds(
+        _handle.raw,
+        _writeLatLngBounds(bounds, arena).ref,
+        _writeCameraFitUpdate(update, arena, registrations),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
+
+  /// Moves the camera to fit `coordinates` in the map's view, at once or with
+  /// an animation.
+  ///
+  /// `coordinates` must not be empty. The map computes the camera when it runs
+  /// the command, from the camera and size that earlier commands leave, as
+  /// `MapHandle.cameraForLatLngs()` would then. The function finishes when the
+  /// map applies the change, before an animation ends.
+  ///
+  /// See `mln_map_fit_camera_to_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `update` leaves no room for
+  ///   the area: its left and right add up to at least the map's width, or its
+  ///   top and bottom to at least the map's height. The camera doesn't move.
+  Future<CommandCompletion> fitCameraToLatLngs(
+    List<LatLng> coordinates,
+    CameraFitUpdate update,
+  ) => _command((arena, completion) {
+    final nativecoordinates = arena<raw.mln_lat_lng>(
+      coordinates.isEmpty ? 1 : coordinates.length,
+    );
+    for (var index = 0; index < coordinates.length; index++) {
+      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
+    }
+    final registrations = _NativeRegistrations(_callbackRoots);
+    return registrations.run(
+      () => raw.mln_map_fit_camera_to_lat_lngs(
+        _handle.raw,
+        nativecoordinates,
+        coordinates.length,
+        _writeCameraFitUpdate(update, arena, registrations),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
 
   /// Reads the map's camera.
   ///

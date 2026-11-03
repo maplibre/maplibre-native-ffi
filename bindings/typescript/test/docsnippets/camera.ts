@@ -87,11 +87,8 @@ export async function camera(map: MapHandle): Promise<void> {
     southwest: { latitude: 45.8, longitude: 5.9 },
     northeast: { latitude: 47.8, longitude: 10.5 },
   };
-  const fitted = await map.cameraForLatLngBounds(bounds);
-
-  map.discarding.updateCamera({
+  map.discarding.fitCameraToLatLngBounds(bounds, {
     mode: CameraUpdateMode.ease,
-    camera: fitted,
     animation: { durationMs: 500 },
   });
   // #endregion fit

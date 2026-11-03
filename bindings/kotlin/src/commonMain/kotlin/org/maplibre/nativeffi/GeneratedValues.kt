@@ -94,7 +94,8 @@ public value class CameraTransitionOutcome(public val rawValue: UInt) {
     /**
      * `MapHandle.cancelCameraTransitions()`, `MapHandle.cancelCameraTransitionsWithId()`, a
      * gesture's `GesturePhase.BEGIN` or `GesturePhase.CANCEL`, `MapHandle.setFreeCameraOptions()`,
-     * or a resize that moves the camera back inside its bounds stopped the change.
+     * or a resize that moves the camera back inside its bounds stopped the change, or the command
+     * failed before it moved the camera.
      */
     public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(1u)
     /** The map closed before the change ended. */
@@ -112,7 +113,7 @@ public value class CameraTransitionOutcome(public val rawValue: UInt) {
 }
 
 /**
- * How `MapHandle.updateCamera()` moves the camera.
+ * How a camera command moves the camera.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -2777,6 +2778,22 @@ public data class CameraFitOptions(
 public data class LatLngBounds(
   public val southwest: LatLng = LatLng(),
   public val northeast: LatLng = LatLng(),
+)
+
+/**
+ * A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()` and the other fit
+ * commands.
+ *
+ * A jump uses only the end handler of `animation`, and the handler runs as soon as the camera
+ * moves.
+ *
+ * See `mln_camera_fit_update` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraFitUpdate(
+  public val mode: CameraUpdateMode = CameraUpdateMode.JUMP,
+  public val fit: CameraFitOptions = CameraFitOptions(),
+  public val animation: AnimationOptions = AnimationOptions(),
 )
 
 /**

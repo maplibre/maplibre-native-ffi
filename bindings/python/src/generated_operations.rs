@@ -1541,6 +1541,20 @@ fn generated_input_mln_camera_fit_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_camera_fit_update<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_camera_fit_update> {
+    let mut raw: sys::mln_camera_fit_update = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_camera_fit_update>() as _;
+    raw.mode = value
+        .getattr("mode")?
+        .extract::<sys::mln_camera_update_mode>()?;
+    raw.fit = generated_input_mln_camera_fit_options(&value.getattr("fit")?, storage)?;
+    raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
+    Ok(raw)
+}
+
 fn generated_input_mln_camera_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -4346,6 +4360,174 @@ impl MapHandle {
                 sys::mln_map_end_command_group(handle, completion, diagnostic)
             })
         }
+    }
+    #[pyo3(signature = (geometry, update))]
+    fn fit_camera_to_geometry(
+        &self,
+        py: Python<'_>,
+        geometry: &Bound<'_, PyAny>,
+        update: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let geometry_value = storage.json(geometry.clone(), false)?;
+        let update_value = generated_input_mln_camera_fit_update(&update.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_fit_camera_to_geometry(
+                    handle,
+                    geometry_value,
+                    &update_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (geometry, update))]
+    fn _discard_fit_camera_to_geometry(
+        &self,
+        py: Python<'_>,
+        geometry: &Bound<'_, PyAny>,
+        update: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let geometry_value = storage.json(geometry.clone(), false)?;
+        let update_value = generated_input_mln_camera_fit_update(&update.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_fit_camera_to_geometry(
+                    handle,
+                    geometry_value,
+                    &update_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (bounds, update))]
+    fn fit_camera_to_lat_lng_bounds(
+        &self,
+        py: Python<'_>,
+        bounds: &Bound<'_, PyAny>,
+        update: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
+        let update_value = generated_input_mln_camera_fit_update(&update.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_fit_camera_to_lat_lng_bounds(
+                    handle,
+                    bounds_value,
+                    &update_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (bounds, update))]
+    fn _discard_fit_camera_to_lat_lng_bounds(
+        &self,
+        py: Python<'_>,
+        bounds: &Bound<'_, PyAny>,
+        update: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
+        let update_value = generated_input_mln_camera_fit_update(&update.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_fit_camera_to_lat_lng_bounds(
+                    handle,
+                    bounds_value,
+                    &update_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (coordinates, update))]
+    fn fit_camera_to_lat_lngs(
+        &self,
+        py: Python<'_>,
+        coordinates: &Bound<'_, PyAny>,
+        update: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
+        let update_value = generated_input_mln_camera_fit_update(&update.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_fit_camera_to_lat_lngs(
+                    handle,
+                    coordinates_values.as_ptr(),
+                    coordinates_values.len(),
+                    &update_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (coordinates, update))]
+    fn _discard_fit_camera_to_lat_lngs(
+        &self,
+        py: Python<'_>,
+        coordinates: &Bound<'_, PyAny>,
+        update: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
+        let update_value = generated_input_mln_camera_fit_update(&update.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_fit_camera_to_lat_lngs(
+                    handle,
+                    coordinates_values.as_ptr(),
+                    coordinates_values.len(),
+                    &update_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
     }
     #[pyo3(signature = ())]
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

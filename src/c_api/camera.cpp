@@ -179,6 +179,40 @@ auto mln_map_camera_for_geometry(
   });
 }
 
+auto mln_map_fit_camera_to_lat_lng_bounds(
+  mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_update* update,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::map_fit_camera_to_lat_lng_bounds(
+      map, bounds, update, completion
+    );
+  });
+}
+
+auto mln_map_fit_camera_to_lat_lngs(
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  const mln_camera_fit_update* update, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::map_fit_camera_to_lat_lngs(
+      map, coordinates, coordinate_count, update, completion
+    );
+  });
+}
+
+auto mln_map_fit_camera_to_geometry(
+  mln_map map, mln_buffer_view geometry, const mln_camera_fit_update* update,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::map_fit_camera_to_geometry(
+      map, geometry, update, completion
+    );
+  });
+}
+
 auto mln_map_lat_lng_bounds_for_camera(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

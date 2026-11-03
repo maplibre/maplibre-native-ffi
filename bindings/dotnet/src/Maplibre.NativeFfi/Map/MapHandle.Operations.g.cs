@@ -681,6 +681,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// zoom limits.</para>
     /// <para>See <c>mln_map_camera_for_geometry</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the padding in
+    /// <c>fitOptions</c> leaves no room for the area: its left and right add up
+    /// to at least the map's width, or its top and bottom to at least the map's
+    /// height.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CameraOptions> CameraForGeometryAsync(
         string geometry,
@@ -719,6 +726,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// limits.</para>
     /// <para>See <c>mln_map_camera_for_lat_lng_bounds</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the padding in
+    /// <c>fitOptions</c> leaves no room for the area: its left and right add up
+    /// to at least the map's width, or its top and bottom to at least the map's
+    /// height.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngBoundsAsync(
         LatLngBounds bounds,
@@ -757,6 +771,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// within the map's zoom limits.</para>
     /// <para>See <c>mln_map_camera_for_lat_lngs</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the padding in
+    /// <c>fitOptions</c> leaves no room for the area: its left and right add up
+    /// to at least the map's width, or its top and bottom to at least the map's
+    /// height.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngsAsync(
         LatLng[] coordinates,
@@ -866,6 +887,122 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_end_command_group(
             Handle,
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
+    /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+    /// with an animation.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>geometry</c> is a GeoJSON geometry object with at least one
+    /// coordinate, not a feature. The map computes the camera when it runs the
+    /// command, from the camera and size that earlier commands leave, as
+    /// <c>MapHandle.CameraForGeometryAsync()</c> would then. The function
+    /// finishes when the map applies the change, before an animation
+    /// ends.</para>
+    /// <para>See <c>mln_map_fit_camera_to_geometry</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the padding in
+    /// <c>update</c> leaves no room for the area: its left and right add up to
+    /// at least the map's width, or its top and bottom to at least the map's
+    /// height. The camera doesn't move.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> FitCameraToGeometryAsync(string geometry, CameraFitUpdate update)
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeUpdate = NativeCameraFitUpdate(update, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_fit_camera_to_geometry(
+            Handle,
+            scope.Utf8(geometry),
+            &nativeUpdate,
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
+    /// Moves the camera to fit <c>bounds</c> in the map's view, at once or with
+    /// an animation.
+    /// </summary>
+    /// <remarks>
+    /// <para>The map computes the camera when it runs the command, from the
+    /// camera and size that earlier commands leave, as
+    /// <c>MapHandle.CameraForLatLngBoundsAsync()</c> would then. The function
+    /// finishes when the map applies the change, before an animation
+    /// ends.</para>
+    /// <para>See <c>mln_map_fit_camera_to_lat_lng_bounds</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the padding in
+    /// <c>update</c> leaves no room for the area: its left and right add up to
+    /// at least the map's width, or its top and bottom to at least the map's
+    /// height. The camera doesn't move.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> FitCameraToLatLngBoundsAsync(
+        LatLngBounds bounds,
+        CameraFitUpdate update
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeUpdate = NativeCameraFitUpdate(update, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_fit_camera_to_lat_lng_bounds(
+            Handle,
+            NativeLatLngBounds(bounds),
+            &nativeUpdate,
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
+    /// Moves the camera to fit <c>coordinates</c> in the map's view, at once or
+    /// with an animation.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>coordinates</c> must not be empty. The map computes the camera
+    /// when it runs the command, from the camera and size that earlier commands
+    /// leave, as <c>MapHandle.CameraForLatLngsAsync()</c> would then. The
+    /// function finishes when the map applies the change, before an animation
+    /// ends.</para>
+    /// <para>See <c>mln_map_fit_camera_to_lat_lngs</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the padding in
+    /// <c>update</c> leaves no room for the area: its left and right add up to
+    /// at least the map's width, or its top and bottom to at least the map's
+    /// height. The camera doesn't move.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> FitCameraToLatLngsAsync(
+        LatLng[] coordinates,
+        CameraFitUpdate update
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeUpdate = NativeCameraFitUpdate(update, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_fit_camera_to_lat_lngs(
+            Handle,
+            scope.Array<mln_lat_lng, LatLng>(
+                coordinates,
+                static (item, scope) => NativeLatLng(item)
+            ),
+            checked((nuint)coordinates.Length),
+            &nativeUpdate,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2734,6 +2871,61 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(NativeMethods.mln_map_end_command_group(receiverHandle, null, Diagnostic));
+            scope.Accept();
+        }
+
+        public void FitCameraToGeometry(string geometry, CameraFitUpdate update)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeUpdate = NativeCameraFitUpdate(update, scope);
+            Check(
+                NativeMethods.mln_map_fit_camera_to_geometry(
+                    receiverHandle,
+                    scope.Utf8(geometry),
+                    &nativeUpdate,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void FitCameraToLatLngBounds(LatLngBounds bounds, CameraFitUpdate update)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeUpdate = NativeCameraFitUpdate(update, scope);
+            Check(
+                NativeMethods.mln_map_fit_camera_to_lat_lng_bounds(
+                    receiverHandle,
+                    NativeLatLngBounds(bounds),
+                    &nativeUpdate,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void FitCameraToLatLngs(LatLng[] coordinates, CameraFitUpdate update)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeUpdate = NativeCameraFitUpdate(update, scope);
+            Check(
+                NativeMethods.mln_map_fit_camera_to_lat_lngs(
+                    receiverHandle,
+                    scope.Array<mln_lat_lng, LatLng>(
+                        coordinates,
+                        static (item, scope) => NativeLatLng(item)
+                    ),
+                    checked((nuint)coordinates.Length),
+                    &nativeUpdate,
+                    null,
+                    Diagnostic
+                )
+            );
             scope.Accept();
         }
 

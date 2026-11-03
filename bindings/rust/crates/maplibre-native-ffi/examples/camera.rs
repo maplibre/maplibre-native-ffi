@@ -94,18 +94,17 @@ async fn camera(map: &MapHandle) -> Result<()> {
         southwest: LatLng::new(45.8, 5.9),
         northeast: LatLng::new(47.8, 10.5),
     };
-    // None uses the default fit options.
-    let fitted = map.camera_for_lat_lng_bounds(bounds, None)?.await?;
-
-    map.discarding().update_camera(&CameraUpdate {
-        mode: CameraUpdateMode::Ease,
-        camera: fitted,
-        animation: AnimationOptions {
-            duration_ms: Some(500.0),
+    map.discarding().fit_camera_to_lat_lng_bounds(
+        bounds,
+        &CameraFitUpdate {
+            mode: CameraUpdateMode::Ease,
+            animation: AnimationOptions {
+                duration_ms: Some(500.0),
+                ..Default::default()
+            },
             ..Default::default()
         },
-        ..Default::default()
-    })?;
+    )?;
     // #endregion fit
 
     // #region limit

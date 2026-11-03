@@ -99,14 +99,8 @@ fn camera(map: maplibre.Map) !void {
         .southwest = .{ .latitude = 45.8, .longitude = 5.9 },
         .northeast = .{ .latitude = 47.8, .longitude = 10.5 },
     };
-    // null fit options use the defaults.
-    var fit = try map.cameraForLatLngBounds(bounds, null, null);
-    defer fit.deinit();
-    const fitted = try fit.wait(null);
-
-    try map.discarding().updateCamera(.{
+    try map.discarding().fitCameraToLatLngBounds(bounds, .{
         .mode = .ease,
-        .camera = fitted,
         .animation = .{ .duration_ms = 500 },
     }, null);
     // #endregion fit

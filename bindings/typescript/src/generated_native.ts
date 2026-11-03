@@ -5,6 +5,7 @@ import type {
   BoundOptions,
   CameraDelta,
   CameraFitOptions,
+  CameraFitUpdate,
   CameraOptions,
   CameraUpdate,
   CanonicalTileId,
@@ -264,6 +265,24 @@ export interface NativeOperations {
   ): void;
   mln_map_end_command_group(
     map: bigint,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_fit_camera_to_geometry(
+    map: bigint,
+    geometry: unknown,
+    update: CameraFitUpdate | undefined,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_fit_camera_to_lat_lng_bounds(
+    map: bigint,
+    bounds: LatLngBounds | undefined,
+    update: CameraFitUpdate | undefined,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_fit_camera_to_lat_lngs(
+    map: bigint,
+    coordinates: readonly LatLng[],
+    update: CameraFitUpdate | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_get_camera(map: bigint, completion: NativeCompletion): void;

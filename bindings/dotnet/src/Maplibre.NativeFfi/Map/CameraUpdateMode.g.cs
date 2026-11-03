@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How <c>MapHandle.UpdateCameraAsync()</c> moves the camera.
+/// How a camera command moves the camera.
 /// </summary>
 /// <remarks>
 /// See <c>mln_camera_update_mode</c> in the <see

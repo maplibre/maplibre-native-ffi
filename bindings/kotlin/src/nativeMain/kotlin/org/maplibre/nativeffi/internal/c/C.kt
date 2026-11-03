@@ -591,6 +591,53 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_fit_camera_to_geometry(
+    map: Long,
+    geometry: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_fit_camera_to_geometry(
+      map.toULong(),
+      geometry.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      update.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_fit_camera_to_lat_lng_bounds(
+    map: Long,
+    bounds: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_fit_camera_to_lat_lng_bounds(
+      map.toULong(),
+      bounds.toCPointer<mln_lat_lng_bounds>()!!.pointed.readValue(),
+      update.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_fit_camera_to_lat_lngs(
+    map: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_fit_camera_to_lat_lngs(
+      map.toULong(),
+      coordinates.toCPointer(),
+      coordinateCount.convert(),
+      update.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_get_camera(
       map.toULong(),

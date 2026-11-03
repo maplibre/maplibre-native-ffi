@@ -68,7 +68,8 @@ final class CameraTransitionOutcome extends _Enum {
   /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
   /// `GesturePhase.begin` or `GesturePhase.cancel`,
   /// `MapHandle.setFreeCameraOptions()`, or a resize that moves the camera back
-  /// inside its bounds stopped the change.
+  /// inside its bounds stopped the change, or the command failed before it
+  /// moved the camera.
   static const cancelled = CameraTransitionOutcome.fromRawValue(1);
 
   /// The map closed before the change ended.
@@ -92,7 +93,7 @@ final class CameraTransitionOutcome extends _Enum {
   };
 }
 
-/// How `MapHandle.updateCamera()` moves the camera.
+/// How a camera command moves the camera.
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3492,6 +3493,42 @@ final class LatLngBounds extends _Value {
   @override
   String toString() =>
       _describe('LatLngBounds', const ['southwest', 'northeast']);
+}
+
+/// A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()`
+/// and the other fit commands.
+///
+/// A jump uses only the end handler of `animation`, and the handler runs as
+/// soon as the camera moves.
+///
+/// See `mln_camera_fit_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraFitUpdate extends _Value {
+  const CameraFitUpdate({
+    this.mode = const CameraUpdateMode.fromRawValue(0),
+    this.fit = const CameraFitOptions(),
+    this.animation = const AnimationOptions(),
+  });
+  final CameraUpdateMode mode;
+  final CameraFitOptions fit;
+  final AnimationOptions animation;
+
+  /// A copy of this value with the given members replaced.
+  CameraFitUpdate copyWith({
+    CameraUpdateMode? mode,
+    CameraFitOptions? fit,
+    AnimationOptions? animation,
+  }) => CameraFitUpdate(
+    mode: mode ?? this.mode,
+    fit: fit ?? this.fit,
+    animation: animation ?? this.animation,
+  );
+
+  @override
+  List<Object?> get _members => [mode, fit, animation];
+  @override
+  String toString() =>
+      _describe('CameraFitUpdate', const ['mode', 'fit', 'animation']);
 }
 
 /// A map's camera, with the snapshot generation that it matches.

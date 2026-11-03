@@ -41,11 +41,15 @@ To stop an animation where it is, cancel the map's camera transitions with
 
 ## Fit the camera
 
-To show an area, query the camera that fits its bounding box with
-[](api:mln_map_camera_for_lat_lng_bounds), then jump or animate to that camera.
-For a list of coordinates or a GeoJSON geometry, use
-[](api:mln_map_camera_for_lat_lngs) or [](api:mln_map_camera_for_geometry)
-instead.
+To show an area, fit the camera to its bounding box with
+[](api:mln_map_fit_camera_to_lat_lng_bounds), at once or with an animation. For
+a list of coordinates or a GeoJSON geometry, use
+[](api:mln_map_fit_camera_to_lat_lngs) or [](api:mln_map_fit_camera_to_geometry)
+instead. The map computes the camera when it runs the command, so the fit
+accounts for the size and camera that your earlier commands leave.
+
+To inspect the camera before you move to it, query it with
+[](api:mln_map_camera_for_lat_lng_bounds) or one of its siblings instead.
 
 <Snippet page="camera" region="fit" />
 

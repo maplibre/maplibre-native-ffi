@@ -135,6 +135,21 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_camera_fit_update NativeCameraFitUpdate(
+        CameraFitUpdate value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Fit, "CameraFitUpdate.Fit must not be null.");
+        Required(value.Animation, "CameraFitUpdate.Animation must not be null.");
+        var native = new mln_camera_fit_update();
+        native.size = (uint)sizeof(mln_camera_fit_update);
+        native.mode = (mln_camera_update_mode)value.Mode;
+        native.fit = NativeCameraFitOptions(value.Fit);
+        native.animation = NativeAnimationOptions(value.Animation, scope);
+        return native;
+    }
+
     internal static CameraOptions CopyCameraOptions(mln_camera_options value) =>
         new()
         {

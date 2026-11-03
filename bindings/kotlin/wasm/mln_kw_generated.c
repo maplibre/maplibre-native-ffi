@@ -483,6 +483,39 @@ int32_t mln_kw_mln_map_end_command_group(
   );
 }
 
+int32_t mln_kw_mln_map_fit_camera_to_geometry(
+  int64_t map, uintptr_t geometry, uintptr_t update, uintptr_t completion,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_fit_camera_to_geometry(
+    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)geometry,
+    (const mln_camera_fit_update*)update, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_fit_camera_to_lat_lng_bounds(
+  int64_t map, uintptr_t bounds, uintptr_t update, uintptr_t completion,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_fit_camera_to_lat_lng_bounds(
+    (mln_map)map, *(const mln_lat_lng_bounds*)(uintptr_t)bounds,
+    (const mln_camera_fit_update*)update, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_fit_camera_to_lat_lngs(
+  int64_t map, uintptr_t coordinates, uint32_t coordinate_count,
+  uintptr_t update, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_fit_camera_to_lat_lngs(
+    (mln_map)map, (const mln_lat_lng*)coordinates, (size_t)coordinate_count,
+    (const mln_camera_fit_update*)update, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_get_camera(
   int64_t map, uintptr_t completion, uintptr_t out_diagnostic
 ) {

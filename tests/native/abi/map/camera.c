@@ -148,6 +148,65 @@ static const mln_test_validation_case update_cases[] = {
    MLN_STATUS_INVALID_ARGUMENT, "within [0, 1]"},
 };
 
+static mln_status submit_fit_update_row(
+  void* context, const void* descriptor, mln_diagnostic* diagnostic
+) {
+  const mln_completion discard = mln_test_discard_completion();
+  const mln_lat_lng_bounds bounds = {
+    .southwest = {.latitude = -10.0, .longitude = -10.0},
+    .northeast = {.latitude = 10.0, .longitude = 10.0},
+  };
+  return mln_map_fit_camera_to_lat_lng_bounds(
+    *(const mln_map*)context, bounds, descriptor, &discard, diagnostic
+  );
+}
+
+static void fit_update_undersized(void* descriptor) {
+  ((mln_camera_fit_update*)descriptor)->size -= 1;
+}
+static void fit_update_bad_mode(void* descriptor) {
+  ((mln_camera_fit_update*)descriptor)->mode = MLN_CAMERA_UPDATE_MODE_FLY + 1;
+}
+// The update versions its embedded fit options, so native ignores their own
+// size.
+static void fit_without_size(void* descriptor) {
+  ((mln_camera_fit_update*)descriptor)->fit.size = 0;
+}
+static void fit_unknown_field(void* descriptor) {
+  ((mln_camera_fit_update*)descriptor)->fit.fields = UINT32_C(1) << 31;
+}
+static void fit_negative_padding(void* descriptor) {
+  mln_camera_fit_options* fit = &((mln_camera_fit_update*)descriptor)->fit;
+  fit->fields = MLN_CAMERA_FIT_OPTION_PADDING;
+  fit->padding.left = -1.0;
+}
+static void fit_nan_pitch(void* descriptor) {
+  mln_camera_fit_options* fit = &((mln_camera_fit_update*)descriptor)->fit;
+  fit->fields = MLN_CAMERA_FIT_OPTION_PITCH;
+  fit->pitch = NAN;
+}
+static void fit_animation_zero_velocity(void* descriptor) {
+  mln_animation_options* animation =
+    &((mln_camera_fit_update*)descriptor)->animation;
+  animation->fields = MLN_ANIMATION_OPTION_VELOCITY;
+  animation->velocity = 0.0;
+}
+
+static const mln_test_validation_case fit_update_cases[] = {
+  {"undersized update", fit_update_undersized, MLN_STATUS_INVALID_ARGUMENT,
+   "valid size"},
+  {"mode out of range", fit_update_bad_mode, MLN_STATUS_INVALID_ARGUMENT,
+   "mode is invalid"},
+  {"fit without size", fit_without_size, MLN_STATUS_OK, NULL},
+  {"unknown fit field", fit_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
+   "unknown bits"},
+  {"negative padding", fit_negative_padding, MLN_STATUS_INVALID_ARGUMENT,
+   "greater than or equal to 0"},
+  {"NaN pitch", fit_nan_pitch, MLN_STATUS_INVALID_ARGUMENT, "must be finite"},
+  {"zero velocity", fit_animation_zero_velocity, MLN_STATUS_INVALID_ARGUMENT,
+   "positive and finite"},
+};
+
 // One absolute camera field and the value MapLibre must hand back for it.
 typedef struct camera_row {
   const char* label;
@@ -709,6 +768,227 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// The three ways to name the area that a fit frames: bounds, coordinates, and
+// a geometry, each covering the same region.
+typedef enum fit_area { FIT_BOUNDS, FIT_COORDINATES, FIT_GEOMETRY } fit_area;
+
+static const fit_area fit_areas[] = {FIT_BOUNDS, FIT_COORDINATES, FIT_GEOMETRY};
+static const char* const fit_area_labels[] = {
+  "bounds", "coordinates", "geometry"
+};
+
+// Wider than it is tall, so a map's width and height limit its fit
+// differently.
+static const mln_lat_lng_bounds fit_region = {
+  .southwest = {.latitude = 35.0, .longitude = -125.0},
+  .northeast = {.latitude = 39.0, .longitude = -115.0},
+};
+
+static mln_status submit_fit_query(
+  mln_map map, fit_area area, const mln_camera_fit_options* fit,
+  const mln_completion* completion
+) {
+  const mln_lat_lng corners[] = {fit_region.southwest, fit_region.northeast};
+  switch (area) {
+    case FIT_BOUNDS:
+      return mln_map_camera_for_lat_lng_bounds(
+        map, fit_region, fit, completion, NULL
+      );
+    case FIT_COORDINATES:
+      return mln_map_camera_for_lat_lngs(
+        map, corners, 2, fit, completion, NULL
+      );
+    case FIT_GEOMETRY:
+      return mln_map_camera_for_geometry(
+        map,
+        MLN_BUFFER_LITERAL(
+          "{\"type\":\"LineString\",\"coordinates\":[[-125,35],[-115,39]]}"
+        ),
+        fit, completion, NULL
+      );
+  }
+  return MLN_STATUS_INVALID_ARGUMENT;
+}
+
+static mln_status submit_fit_command(
+  mln_map map, fit_area area, const mln_camera_fit_update* update,
+  const mln_completion* completion
+) {
+  const mln_lat_lng corners[] = {fit_region.southwest, fit_region.northeast};
+  switch (area) {
+    case FIT_BOUNDS:
+      return mln_map_fit_camera_to_lat_lng_bounds(
+        map, fit_region, update, completion, NULL
+      );
+    case FIT_COORDINATES:
+      return mln_map_fit_camera_to_lat_lngs(
+        map, corners, 2, update, completion, NULL
+      );
+    case FIT_GEOMETRY:
+      return mln_map_fit_camera_to_geometry(
+        map,
+        MLN_BUFFER_LITERAL(
+          "{\"type\":\"LineString\",\"coordinates\":[[-125,35],[-115,39]]}"
+        ),
+        update, completion, NULL
+      );
+  }
+  return MLN_STATUS_INVALID_ARGUMENT;
+}
+
+static mln_camera_options query_fit(
+  mln_map map, fit_area area, const mln_camera_fit_options* fit
+) {
+  mln_test_completion query =
+    mln_test_completion_default(sizeof(mln_camera_options));
+  MLN_TEST_OK(submit_fit_query(map, area, fit, &query.descriptor));
+  return finish_camera_query(&query);
+}
+
+static void assert_camera_matches_fit(
+  const mln_camera* camera, const mln_camera_options* fit, const char* label
+) {
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
+    1e-9, fit->center.latitude, camera->center.latitude, label
+  );
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
+    1e-9, fit->center.longitude, camera->center.longitude, label
+  );
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(1e-9, fit->zoom, camera->zoom, label);
+}
+
+static void a_fit_command_moves_the_camera_where_the_query_fits(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_square_map(runtime, 512);
+  mln_camera_fit_update update = {.size = sizeof(mln_camera_fit_update)};
+  update.fit.size = sizeof(mln_camera_fit_options);
+  update.fit.fields = MLN_CAMERA_FIT_OPTION_PADDING |
+                      MLN_CAMERA_FIT_OPTION_BEARING |
+                      MLN_CAMERA_FIT_OPTION_PITCH;
+  update.fit.padding =
+    (mln_edge_insets){.top = 64, .left = 32, .bottom = 16, .right = 8};
+  update.fit.bearing = 5.0;
+  update.fit.pitch = 15.0;
+  mln_camera_options start = {.size = sizeof(mln_camera_options)};
+  start.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
+                 MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
+                 MLN_CAMERA_OPTION_PADDING;
+  for (size_t index = 0; index < 3; index += 1) {
+    const char* label = fit_area_labels[index];
+    jump(map, start);
+    const mln_camera_options fit =
+      query_fit(map, fit_areas[index], &update.fit);
+    MLN_TEST_AWAIT_OK(
+      submit_fit_command(map, fit_areas[index], &update, &completion.descriptor)
+    );
+    const mln_camera camera = query_camera(map).camera;
+    assert_camera_matches_fit(&camera, &fit, label);
+    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(1e-9, 5.0, camera.bearing, label);
+    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(1e-9, 15.0, camera.pitch, label);
+    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(1e-9, 64.0, camera.padding.top, label);
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The command resolves its camera when the map runs it, so it fits the size
+// that a resize sent just before it leaves.
+static void a_fit_command_fits_the_map_that_earlier_commands_leave(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_square_map(runtime, 512);
+  mln_camera_fit_update update = {.size = sizeof(mln_camera_fit_update)};
+  for (size_t index = 0; index < 3; index += 1) {
+    const char* label = fit_area_labels[index];
+    MLN_TEST_AWAIT_OK(mln_map_resize(
+      map, (mln_logical_size){.width = 512, .height = 512},
+      &completion.descriptor, NULL
+    ));
+    const mln_camera_options square = query_fit(map, fit_areas[index], NULL);
+
+    MLN_TEST_OK(mln_map_resize(
+      map, (mln_logical_size){.width = 1024, .height = 512}, NULL, NULL
+    ));
+    MLN_TEST_AWAIT_OK(
+      submit_fit_command(map, fit_areas[index], &update, &completion.descriptor)
+    );
+    const mln_camera camera = query_camera(map).camera;
+    const mln_camera_options wide = query_fit(map, fit_areas[index], NULL);
+    assert_camera_matches_fit(&camera, &wide, label);
+    TEST_ASSERT_GREATER_THAN_DOUBLE_MESSAGE(
+      square.zoom + 0.5, camera.zoom, label
+    );
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+typedef struct padding_row {
+  const char* label;
+  mln_edge_insets padding;
+  mln_status expected;
+} padding_row;
+
+static const padding_row padding_rows[] = {
+  {"left and right fill the width",
+   {.top = 0, .left = 256, .bottom = 0, .right = 256},
+   MLN_STATUS_INVALID_ARGUMENT},
+  {"top and bottom pass the height",
+   {.top = 400, .left = 0, .bottom = 200, .right = 0},
+   MLN_STATUS_INVALID_ARGUMENT},
+  {"just under the width and height",
+   {.top = 255.5, .left = 255.5, .bottom = 255.5, .right = 255.5},
+   MLN_STATUS_OK},
+};
+
+static void fits_reject_padding_that_leaves_no_room(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_square_map(runtime, 512);
+  const size_t row_count = sizeof(padding_rows) / sizeof(*padding_rows);
+  for (size_t row_index = 0; row_index < row_count; row_index += 1) {
+    const padding_row* row = &padding_rows[row_index];
+    mln_camera_fit_update update = {.size = sizeof(mln_camera_fit_update)};
+    update.fit.size = sizeof(mln_camera_fit_options);
+    update.fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
+    update.fit.padding = row->padding;
+    for (size_t index = 0; index < 3; index += 1) {
+      char label[96];
+      snprintf(
+        label, sizeof(label), "%s, %s", row->label, fit_area_labels[index]
+      );
+      mln_test_completion query =
+        mln_test_completion_default(sizeof(mln_camera_options));
+      MLN_TEST_OK(
+        submit_fit_query(map, fit_areas[index], &update.fit, &query.descriptor)
+      );
+      TEST_ASSERT_EQUAL_INT_MESSAGE(
+        row->expected, mln_test_completion_finish(&query), label
+      );
+      mln_test_completion_destroy(&query);
+
+      const mln_camera before = query_camera(map).camera;
+      mln_test_completion command = mln_test_completion_default(0);
+      MLN_TEST_OK(
+        submit_fit_command(map, fit_areas[index], &update, &command.descriptor)
+      );
+      TEST_ASSERT_EQUAL_INT_MESSAGE(
+        row->expected, mln_test_completion_finish(&command), label
+      );
+      if (row->expected != MLN_STATUS_OK) {
+        TEST_ASSERT_NOT_NULL_MESSAGE(
+          strstr(mln_test_completion_diagnostic(&command), "padding"), label
+        );
+        const mln_camera after = query_camera(map).camera;
+        TEST_ASSERT_EQUAL_MEMORY_MESSAGE(
+          &before, &after, sizeof(before), label
+        );
+      }
+      mln_test_completion_destroy(&command);
+    }
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void visible_bounds_unwrap_across_the_antimeridian(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 512);
@@ -851,6 +1131,49 @@ static void camera_calls_reject_what_they_cannot_express(void) {
     MLN_TEST_INVALID(
       mln_map_lat_lng_bounds_for_camera(map, &undersized, &operation, NULL)
     );
+  }
+  {
+    const mln_camera_fit_update defaults = {
+      .size = sizeof(mln_camera_fit_update)
+    };
+    mln_test_run_validation_table(
+      fit_update_cases, sizeof(fit_update_cases) / sizeof(*fit_update_cases),
+      &defaults, sizeof(defaults), submit_fit_update_row, &map
+    );
+    mln_completion command = mln_test_discard_completion();
+    const mln_lat_lng_bounds bounds = {
+      .southwest = {.latitude = 10.0, .longitude = -10.0},
+      .northeast = {.latitude = -10.0, .longitude = 10.0},
+    };
+    MLN_TEST_INVALID(mln_map_fit_camera_to_lat_lng_bounds(
+      map, bounds, &defaults, &command, MLN_TEST_DIAGNOSTIC
+    ));
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "southwest"));
+    MLN_TEST_INVALID(
+      mln_map_fit_camera_to_lat_lng_bounds(map, bounds, NULL, &command, NULL)
+    );
+    const mln_lat_lng coordinate = {.latitude = 0.0, .longitude = 0.0};
+    MLN_TEST_INVALID(
+      mln_map_fit_camera_to_lat_lngs(map, NULL, 1, &defaults, &command, NULL)
+    );
+    MLN_TEST_INVALID(mln_map_fit_camera_to_lat_lngs(
+      map, &coordinate, 0, &defaults, &command, NULL
+    ));
+    MLN_TEST_INVALID(
+      mln_map_fit_camera_to_lat_lngs(map, &coordinate, 1, NULL, &command, NULL)
+    );
+    MLN_TEST_INVALID(mln_map_fit_camera_to_geometry(
+      map, MLN_BUFFER_LITERAL("{\"type\":\"Point\""), &defaults, &command, NULL
+    ));
+    MLN_TEST_INVALID(mln_map_fit_camera_to_geometry(
+      map, MLN_BUFFER_LITERAL("{\"type\":\"MultiPoint\",\"coordinates\":[]}"),
+      &defaults, &command, MLN_TEST_DIAGNOSTIC
+    ));
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "at least one"));
+    MLN_TEST_INVALID(mln_map_fit_camera_to_geometry(
+      map, MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"),
+      NULL, &command, NULL
+    ));
   }
   {
     mln_bound_options options = {.size = sizeof(mln_bound_options)};
@@ -1002,6 +1325,9 @@ MLN_TEST_GROUP {
   RUN_TEST(every_camera_delta_field_follows_its_convention);
   RUN_TEST(an_immediate_anchored_pan_keeps_the_dragged_coordinate);
   RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
+  RUN_TEST(a_fit_command_moves_the_camera_where_the_query_fits);
+  RUN_TEST(a_fit_command_fits_the_map_that_earlier_commands_leave);
+  RUN_TEST(fits_reject_padding_that_leaves_no_room);
   RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
   RUN_TEST(visible_bounds_hold_every_corner_of_a_rotated_view);
   RUN_TEST(unbounded_and_world_bounds_stay_distinct);

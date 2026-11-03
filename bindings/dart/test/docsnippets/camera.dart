@@ -84,13 +84,11 @@ Future<void> camera(MapHandle map) async {
     southwest: LatLng(latitude: 45.8, longitude: 5.9),
     northeast: LatLng(latitude: 47.8, longitude: 10.5),
   );
-  final fitted = await map.cameraForLatLngBounds(bounds);
-
-  map.discarding.updateCamera(
-    CameraUpdate(
+  map.discarding.fitCameraToLatLngBounds(
+    bounds,
+    const CameraFitUpdate(
       mode: CameraUpdateMode.ease,
-      camera: fitted,
-      animation: const AnimationOptions(durationMs: 500),
+      animation: AnimationOptions(durationMs: 500),
     ),
   );
   // #endregion fit

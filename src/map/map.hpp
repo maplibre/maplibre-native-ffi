@@ -475,6 +475,18 @@ auto map_camera_for_geometry_start(
   mln_map map, mln_buffer_view geometry,
   const mln_camera_fit_options* fit_options, const mln_completion* completion
 ) -> mln_status;
+auto map_fit_camera_to_lat_lng_bounds(
+  mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_update* update,
+  const mln_completion* completion
+) -> mln_status;
+auto map_fit_camera_to_lat_lngs(
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  const mln_camera_fit_update* update, const mln_completion* completion
+) -> mln_status;
+auto map_fit_camera_to_geometry(
+  mln_map map, mln_buffer_view geometry, const mln_camera_fit_update* update,
+  const mln_completion* completion
+) -> mln_status;
 auto map_lat_lng_bounds_for_camera_start(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion

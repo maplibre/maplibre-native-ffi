@@ -420,6 +420,12 @@ internal constructor(
    *
    * See `mln_map_camera_for_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area: its
+   *   left and right add up to at least the map's width, or its top and bottom to at least the
+   *   map's height.
    */
   public fun cameraForGeometry(
     geometry: String,
@@ -445,6 +451,12 @@ internal constructor(
    *
    * See `mln_map_camera_for_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area: its
+   *   left and right add up to at least the map's width, or its top and bottom to at least the
+   *   map's height.
    */
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
@@ -470,6 +482,12 @@ internal constructor(
    *
    * See `mln_map_camera_for_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area: its
+   *   left and right add up to at least the map's width, or its top and bottom to at least the
+   *   map's height.
    */
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
@@ -553,6 +571,104 @@ internal constructor(
   public fun endCommandGroup(): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_end_command_group(handle, completion, diagnostic))
+    }
+
+  /**
+   * Moves the camera to fit a GeoJSON geometry in the map's view, at once or with an animation.
+   *
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a feature. The map
+   * computes the camera when it runs the command, from the camera and size that earlier commands
+   * leave, as `MapHandle.cameraForGeometry()` would then. The function finishes when the map
+   * applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_geometry` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area: its left
+   *   and right add up to at least the map's width, or its top and bottom to at least the map's
+   *   height. The camera doesn't move.
+   */
+  public fun fitCameraToGeometry(
+    geometry: String,
+    update: CameraFitUpdate,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
+      check(
+        C.mln_map_fit_camera_to_geometry(
+          handle,
+          view(geometry),
+          writeCameraFitUpdate(update),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
+   * Moves the camera to fit `bounds` in the map's view, at once or with an animation.
+   *
+   * The map computes the camera when it runs the command, from the camera and size that earlier
+   * commands leave, as `MapHandle.cameraForLatLngBounds()` would then. The function finishes when
+   * the map applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_lat_lng_bounds` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area: its left
+   *   and right add up to at least the map's width, or its top and bottom to at least the map's
+   *   height. The camera doesn't move.
+   */
+  public fun fitCameraToLatLngBounds(
+    bounds: LatLngBounds,
+    update: CameraFitUpdate,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
+      check(
+        C.mln_map_fit_camera_to_lat_lng_bounds(
+          handle,
+          writeLatLngBounds(bounds),
+          writeCameraFitUpdate(update),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
+   * Moves the camera to fit `coordinates` in the map's view, at once or with an animation.
+   *
+   * `coordinates` must not be empty. The map computes the camera when it runs the command, from the
+   * camera and size that earlier commands leave, as `MapHandle.cameraForLatLngs()` would then. The
+   * function finishes when the map applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area: its left
+   *   and right add up to at least the map's width, or its top and bottom to at least the map's
+   *   height. The camera doesn't move.
+   */
+  public fun fitCameraToLatLngs(
+    coordinates: List<LatLng>,
+    update: CameraFitUpdate,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
+      check(
+        C.mln_map_fit_camera_to_lat_lngs(
+          handle,
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
+          coordinates.size.toLong(),
+          writeCameraFitUpdate(update),
+          completion,
+          diagnostic,
+        ),
+      )
     }
 
   /**
@@ -1955,6 +2071,49 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
   public fun endCommandGroup(): Unit =
     nativeDiscard(owner, binding) {
       check(C.mln_map_end_command_group(handle, completion, diagnostic))
+    }
+
+  /** [MapHandle.fitCameraToGeometry] without its completion. */
+  public fun fitCameraToGeometry(geometry: String, update: CameraFitUpdate): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_map_fit_camera_to_geometry(
+          handle,
+          view(geometry),
+          writeCameraFitUpdate(update),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /** [MapHandle.fitCameraToLatLngBounds] without its completion. */
+  public fun fitCameraToLatLngBounds(bounds: LatLngBounds, update: CameraFitUpdate): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_map_fit_camera_to_lat_lng_bounds(
+          handle,
+          writeLatLngBounds(bounds),
+          writeCameraFitUpdate(update),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /** [MapHandle.fitCameraToLatLngs] without its completion. */
+  public fun fitCameraToLatLngs(coordinates: List<LatLng>, update: CameraFitUpdate): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_map_fit_camera_to_lat_lngs(
+          handle,
+          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
+          coordinates.size.toLong(),
+          writeCameraFitUpdate(update),
+          completion,
+          diagnostic,
+        ),
+      )
     }
 
   /** [MapHandle.invalidateCustomGeometrySourceRegion] without its completion. */

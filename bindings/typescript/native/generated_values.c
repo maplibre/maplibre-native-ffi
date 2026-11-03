@@ -3060,6 +3060,43 @@ bool mln_ts_write_camera_fit_options(
   return true;
 }
 
+bool mln_ts_write_camera_fit_update(
+  mln_ts_call* call, napi_value value, mln_camera_fit_update* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "mode", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "mode");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->mode = (mln_camera_update_mode)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "fit", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "fit");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->fit, 0, sizeof out->fit);
+    out->fit.size = sizeof out->fit;
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_camera_fit_options(call, member, &out->fit, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "animation", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "animation");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->animation, 0, sizeof out->animation);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_animation_options(call, member, &out->animation, child))
+      return false;
+  }
+  return true;
+}
+
 bool mln_ts_write_camera_options(
   mln_ts_call* call, napi_value value, mln_camera_options* out, const char* path
 ) {

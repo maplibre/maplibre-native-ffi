@@ -501,6 +501,53 @@ internal actual object C {
   actual fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_map_end_command_group(map, word(completion), word(outDiagnostic))
 
+  actual fun mln_map_fit_camera_to_geometry(
+    map: Long,
+    geometry: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_fit_camera_to_geometry(
+      map,
+      word(geometry),
+      word(update),
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_fit_camera_to_lat_lng_bounds(
+    map: Long,
+    bounds: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_fit_camera_to_lat_lng_bounds(
+      map,
+      word(bounds),
+      word(update),
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_fit_camera_to_lat_lngs(
+    map: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_fit_camera_to_lat_lngs(
+      map,
+      word(coordinates),
+      word(coordinateCount),
+      word(update),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_map_get_camera(map, word(completion), word(outDiagnostic))
 
@@ -2230,6 +2277,40 @@ private fun mln_kw_mln_map_dump_debug_logs(p0: Long, p1: Int, p2: Int): Int =
 private fun mln_kw_mln_map_end_command_group(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_end_command_group(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_map_fit_camera_to_geometry(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_fit_camera_to_geometry(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_fit_camera_to_lat_lng_bounds(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_fit_camera_to_lat_lng_bounds(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_fit_camera_to_lat_lngs(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_fit_camera_to_lat_lngs(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_get_camera(p0: Long, p1: Int, p2: Int): Int =

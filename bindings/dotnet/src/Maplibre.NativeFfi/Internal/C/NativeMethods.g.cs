@@ -348,6 +348,34 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_fit_camera_to_geometry(
+        MlnMap map,
+        mln_buffer_view geometry,
+        mln_camera_fit_update* update,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_fit_camera_to_lat_lng_bounds(
+        MlnMap map,
+        mln_lat_lng_bounds bounds,
+        mln_camera_fit_update* update,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_fit_camera_to_lat_lngs(
+        MlnMap map,
+        mln_lat_lng* coordinates,
+        nuint coordinate_count,
+        mln_camera_fit_update* update,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_get_camera(
         MlnMap map,
         mln_completion* completion,

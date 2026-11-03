@@ -325,6 +325,37 @@ internal actual object C {
     Ffm.downcall("mln_map_dump_debug_logs", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_end_command_group =
     Ffm.downcall("mln_map_end_command_group", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_fit_camera_to_geometry =
+    Ffm.downcall(
+      "mln_map_fit_camera_to_geometry",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_fit_camera_to_lat_lng_bounds =
+    Ffm.downcall(
+      "mln_map_fit_camera_to_lat_lng_bounds",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_lat_lng_bounds,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_fit_camera_to_lat_lngs =
+    Ffm.downcall(
+      "mln_map_fit_camera_to_lat_lngs",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_get_camera =
     Ffm.downcall("mln_map_get_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_get_feature_state =
@@ -1728,6 +1759,53 @@ internal actual object C {
 
   actual fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_end_command_group.invokeExact(map, completion, outDiagnostic) as Int
+
+  actual fun mln_map_fit_camera_to_geometry(
+    map: Long,
+    geometry: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_fit_camera_to_geometry.invokeExact(
+      map,
+      Ffm.value(geometry, mln_buffer_view),
+      update,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_fit_camera_to_lat_lng_bounds(
+    map: Long,
+    bounds: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_fit_camera_to_lat_lng_bounds.invokeExact(
+      map,
+      Ffm.value(bounds, mln_lat_lng_bounds),
+      update,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_fit_camera_to_lat_lngs(
+    map: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_fit_camera_to_lat_lngs.invokeExact(
+      map,
+      coordinates,
+      coordinateCount,
+      update,
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_get_camera.invokeExact(map, completion, outDiagnostic) as Int
