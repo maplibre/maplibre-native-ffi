@@ -346,8 +346,7 @@ function(mln_ffi_install_c_api_library target)
     PATTERN "binding_support.h" EXCLUDE)
   # plugin.h includes MapLibre Native's plugin API from upstream's path.
   install(
-    FILES
-    "${PROJECT_SOURCE_DIR}/third_party/maplibre-native/include/mln/plugin/plugin_api.h"
+    FILES "${PROJECT_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mln/plugin"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
   install(

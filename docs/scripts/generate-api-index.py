@@ -40,10 +40,7 @@ def binding_names() -> dict[str, dict[str, str]]:
         assert isinstance(symbol, Resolver)
         return symbol.names
 
-    api = parse_headers(
-        REPO_ROOT / "include",
-        clang_args=(f"-I{REPO_ROOT / 'third_party/maplibre-native/include'}",),
-    )
+    api = parse_headers(REPO_ROOT / "include")
     validate(api)
     bound = compile_api(api)
     names = {

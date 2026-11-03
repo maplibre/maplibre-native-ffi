@@ -516,8 +516,6 @@ pub fn build(b: *std.Build) void {
     // library.
     const doc_include_dirs = b.pathList(&.{
         "include",
-        // The plugin header includes MapLibre Native's mln/plugin/plugin_api.h.
-        "third_party/maplibre-native/include",
     });
 
     // A checkout without a local build has no native library to link.
