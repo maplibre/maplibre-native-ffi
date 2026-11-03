@@ -6599,7 +6599,7 @@ final class RenderSessionHandle implements Finalizable {
   /// An attached session detaches first, and frees its graphics objects, unless
   /// you hold one of its frames. A session driven by
   /// `RenderDriverKind.callerGraphicsThread` detaches at your next
-  /// `RenderSessionHandle.serviceDriverWork()`, so keep servicing it until the
+  /// `mln_render_session_service_driver_work()`, so keep servicing it until the
   /// disposal completes. If you release or dispose its map before that service,
   /// the session is abandoned instead. Any other session is abandoned as
   /// `RenderSessionHandle.abandon()` does. Once the disposal completes, the
@@ -6622,7 +6622,7 @@ final class RenderSessionHandle implements Finalizable {
   /// An attached session detaches first, and frees its graphics objects, unless
   /// you hold one of its frames. A session driven by
   /// `RenderDriverKind.callerGraphicsThread` detaches at your next
-  /// `RenderSessionHandle.serviceDriverWork()`, so keep servicing it until the
+  /// `mln_render_session_service_driver_work()`, so keep servicing it until the
   /// disposal completes. If you release or dispose its map before that service,
   /// the session is abandoned instead. Any other session is abandoned as
   /// `RenderSessionHandle.abandon()` does. Once the disposal completes, the
@@ -6903,28 +6903,6 @@ final class RenderSessionHandle implements Finalizable {
       completion,
       nativeDiagnostic,
     ),
-  );
-
-  /// Runs the session's ready graphics work on your graphics thread.
-  ///
-  /// Use it with `RenderDriverKind.callerGraphicsThread`, and call it from the
-  /// same thread every time. Call it each time
-  /// `RenderSessionAttachOptions.driverWorkWake` is called, even while you
-  /// demand no frames, and until a detach or disposal completes. It returns
-  /// once no work is ready.
-  ///
-  /// It accepts a disposed session until the session retires. The service after
-  /// the disposal detaches the session and frees its graphics objects.
-  ///
-  /// An isolate cannot service a caller-graphics-thread driver, because Dart
-  /// can resume it on another native thread after any `await`. Host native code
-  /// services such a session on the graphics thread by passing its `id` to the
-  /// C function that `RenderSessionHandle.serviceDriverWork()` calls.
-  ///
-  /// See `mln_render_session_service_driver_work` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  void serviceDriverWork() => _check(
-    raw.mln_render_session_service_driver_work(_handle.raw, nativeDiagnostic),
   );
 
   /// Replaces the Metal textures that a borrowed ring renders into.

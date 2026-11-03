@@ -19,6 +19,7 @@ from tools.bindgen.semantic import (
 )
 
 from .dart_values import (
+    NATIVE_ONLY,
     Unsupported,
     Values,
     doc,
@@ -132,6 +133,8 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             return None
 
     def operation(plan: OperationPlan) -> str | None:
+        if plan.name in NATIVE_ONLY:
+            return plan.name
         if plan.name in bound.unsupported or plan.scoped_receiver:
             return None
         name = method_name(plan, bound)
@@ -203,6 +206,8 @@ def _lower(api: Api | BoundApi):
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
     for plan in bound.operations:
+        if plan.name in NATIVE_ONLY:
+            continue
         try:
             # Failed attempts cannot leave unrenderable value fragments behind.
             local_values = Values(bound)

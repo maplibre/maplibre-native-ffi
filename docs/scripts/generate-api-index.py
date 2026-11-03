@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.docs import Resolver, Symbol
-from tools.bindgen.emitters import typescript
+from tools.bindgen.emitters import dart_values, typescript
 from tools.bindgen.frontend import parse_headers
 from tools.bindgen.schema import validate
 
@@ -240,6 +240,11 @@ def zig_links(names: dict[str, str]) -> Link:
     return link
 
 
+# The declarations that a binding leaves to host native code. Its readers see
+# the C declaration, linked to the C reference.
+NATIVE_ONLY = {"dart": dart_values.NATIVE_ONLY}
+
+
 LINKS: dict[str, Callable[[], Link]] = {
     "c": c_links,
     "dart": dart_links,
@@ -268,6 +273,9 @@ def main() -> None:
                     "name": spelled,
                     "url": f"{language}/{url}",
                 }
+    for language, natives in NATIVE_ONLY.items():
+        for native in natives:
+            index[native][language] = index[native]["c"]
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
 

@@ -56,21 +56,24 @@ def owner_names(handle) -> tuple[str, str]:
     return name + "Handle", "_Native" + name
 
 
-# The C call that host native code makes, which the note names through its
-# Dart method.
+# An isolate can resume on another native thread after any `await`, so only
+# host native code can service a caller-graphics-thread driver.
 CALLER_DRIVER_NOTE = (
     "An isolate cannot service a caller-graphics-thread driver, because Dart "
     "can resume it on another native thread after any `await`. Host native "
     "code services such a session on the graphics thread by passing its `id` "
-    "to the C function that `mln_render_session_service_driver_work()` calls."
+    "to `mln_render_session_service_driver_work()`."
 )
 
 # Paragraphs about what Dart adds to a declaration's C contract, keyed like
 # `BoundApi.doc`.
 NOTES = {
     "mln_render_session_attach_options.driver": (CALLER_DRIVER_NOTE,),
-    "mln_render_session_service_driver_work": (CALLER_DRIVER_NOTE,),
 }
+
+# Operations that only host native code can call. Dart declares them only in
+# its raw FFI bindings, and its documentation names them by their C names.
+NATIVE_ONLY = frozenset({"mln_render_session_service_driver_work"})
 
 
 def doc(bound: BoundApi, native: str, indent: str = "", *, discard=False) -> str:
