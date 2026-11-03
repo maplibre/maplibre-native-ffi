@@ -59,4 +59,9 @@ public enum Status : int
     /// Nothing has the given ID.
     /// </summary>
     NotFound = -10,
+
+    /// <summary>
+    /// Something already has the given ID.
+    /// </summary>
+    AlreadyExists = -11,
 }

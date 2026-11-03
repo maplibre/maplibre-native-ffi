@@ -57,7 +57,7 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   const mln_buffer_view empty_source =
     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "",
+    MLN_STATUS_ALREADY_EXISTS, "source already exists",
     mln_map_add_style_source_json(
       map, source, empty_source, &completion.descriptor, NULL
     )

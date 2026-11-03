@@ -2183,6 +2183,7 @@ const MLN_STATUS_CANCELLED = -6;
 const MLN_STATUS_BUSY = -7;
 const MLN_STATUS_TARGET_LOST = -8;
 const MLN_STATUS_NOT_FOUND = -10;
+const MLN_STATUS_ALREADY_EXISTS = -11;
 
 // mln_style_expression_input_field
 const MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1;

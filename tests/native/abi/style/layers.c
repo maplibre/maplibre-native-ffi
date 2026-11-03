@@ -471,7 +471,7 @@ static void a_layer_requires_a_source_that_supports_its_type(void) {
   TEST_ASSERT_EQUAL_STRING("hillshade", probe.type);
   TEST_ASSERT_EQUAL_STRING("dem", probe.source_id);
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "layer already exists",
+    MLN_STATUS_ALREADY_EXISTS, "layer already exists",
     mln_map_add_style_layer_json(
       map, hillshade, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
     )

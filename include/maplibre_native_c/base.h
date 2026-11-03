@@ -67,6 +67,8 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_TARGET_LOST = -8,
   /** Nothing has the given ID. */
   MLN_STATUS_NOT_FOUND = -10,
+  /** Something already has the given ID. */
+  MLN_STATUS_ALREADY_EXISTS = -11,
 } mln_status;
 
 /** The size of mln_diagnostic's message in bytes, with its terminator. */

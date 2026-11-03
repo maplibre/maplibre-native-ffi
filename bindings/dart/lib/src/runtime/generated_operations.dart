@@ -4012,7 +4012,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addCustomGeometrySource(
     String sourceId,
@@ -4039,7 +4039,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addCustomVectorSource(
     String sourceId,
@@ -4069,7 +4069,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addGeoJsonSourceData(
     String sourceId,
@@ -4091,7 +4091,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addGeoJsonSourceUrl(
     String sourceId,
@@ -4117,7 +4117,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addImageSourceImage(
     String sourceId,
@@ -4150,7 +4150,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addImageSourceUrl(
     String sourceId,
@@ -4188,7 +4188,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.notFound` when the style has no layer named `beforeLayerId`, or
   ///   no source with the ID that the layer uses.
-  /// - `Status.invalidArgument` when the style already has a layer with the new
+  /// - `Status.alreadyExists` when the style already has a layer with the new
   ///   layer's ID.
   Future<CommandCompletion> addStyleLayerJson(
     Object? layerJson,
@@ -4213,7 +4213,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   Future<CommandCompletion> addStyleSourceJson(
     String sourceId,

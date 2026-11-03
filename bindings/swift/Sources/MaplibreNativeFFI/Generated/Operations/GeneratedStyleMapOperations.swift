@@ -11,7 +11,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addCustomGeometrySource(
@@ -36,7 +36,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addCustomVectorSource(
@@ -64,7 +64,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addGeoJsonSourceData(
@@ -89,7 +89,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addGeoJsonSourceUrl(
@@ -118,7 +118,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addImageSourceImage(
@@ -148,7 +148,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addImageSourceUrl(
@@ -183,7 +183,7 @@ public extension MapHandle {
   ///
   /// - `Status.notFound` when the style has no layer named `beforeLayerId`, or
   ///   no source with the ID that the layer uses.
-  /// - `Status.invalidArgument` when the style already has a layer with the new
+  /// - `Status.alreadyExists` when the style already has a layer with the new
   ///   layer's ID.
   @discardableResult
   func addStyleLayerJson(
@@ -211,7 +211,7 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when the style already has a source named
+  /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   @discardableResult
   func addStyleSourceJson(

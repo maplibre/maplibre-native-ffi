@@ -2951,6 +2951,10 @@ export const Status = {
    * Nothing has the given ID.
    */
   notFound: -10,
+  /**
+   * Something already has the given ID.
+   */
+  alreadyExists: -11,
 } as const;
 /** One of the Status values, or a value this binding does not know. */
 export type Status = (typeof Status)[keyof typeof Status] | (number & {});

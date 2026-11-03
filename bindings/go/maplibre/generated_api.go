@@ -1240,6 +1240,8 @@ const (
 	StatusTargetLost Status = Status(C.MLN_STATUS_TARGET_LOST)
 	// Nothing has the given ID.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
+	// Something already has the given ID.
+	StatusAlreadyExists Status = Status(C.MLN_STATUS_ALREADY_EXISTS)
 )
 
 func (value Status) String() string {
@@ -1264,6 +1266,8 @@ func (value Status) String() string {
 		return "StatusTargetLost"
 	case -10:
 		return "StatusNotFound"
+	case -11:
+		return "StatusAlreadyExists"
 	}
 	return fmt.Sprintf("Status(%d)", value)
 }
@@ -1290,6 +1294,8 @@ func (value Status) Error() string {
 		return "maplibre: target lost"
 	case -10:
 		return "maplibre: not found"
+	case -11:
+		return "maplibre: already exists"
 	}
 	return fmt.Sprintf("maplibre: status %d", int32(value))
 }
@@ -6212,7 +6218,7 @@ func LogicalExtentPhysicalSize(extent LogicalExtent) (width uint32, height uint3
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
@@ -6225,7 +6231,7 @@ func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options Cust
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddCustomVectorSource(sourceId string, options CustomVectorSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomVectorSourceOptions(options, arena), arena), completion, diagnostic))
@@ -6241,7 +6247,7 @@ func (receiver *MapHandle) AddCustomVectorSource(sourceId string, options Custom
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
@@ -6254,7 +6260,7 @@ func (receiver *MapHandle) AddGeoJsonSourceData(sourceId string, data *GeoJsonSo
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddGeoJsonSourceUrl(sourceId string, url string, options *GeoJsonSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geo_json_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), completion, diagnostic))
@@ -6269,7 +6275,7 @@ func (receiver *MapHandle) AddGeoJsonSourceUrl(sourceId string, url string, opti
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
@@ -6284,7 +6290,7 @@ func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []La
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
@@ -6303,7 +6309,7 @@ func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatL
 // Errors:
 //   - StatusNotFound when the style has no layer named beforeLayerId, or no
 //     source with the ID that the layer uses.
-//   - StatusInvalidArgument when the style already has a layer with the new
+//   - StatusAlreadyExists when the style already has a layer with the new
 //     layer's ID.
 func (receiver *MapHandle) AddStyleLayerJson(layerJson string, beforeLayerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -6320,7 +6326,7 @@ func (receiver *MapHandle) AddStyleLayerJson(layerJson string, beforeLayerId str
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when the style already has a source named sourceId.
+//   - StatusAlreadyExists when the style already has a source named sourceId.
 func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))

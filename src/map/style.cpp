@@ -402,7 +402,7 @@ auto validate_source_can_be_added(
 ) -> mln_status {
   if (style.getSource(source_id) != nullptr) {
     mln::core::set_thread_error("source already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_ALREADY_EXISTS;
   }
   return MLN_STATUS_OK;
 }
@@ -1078,7 +1078,7 @@ auto map_add_style_source_json(
   const auto id = string_from_view(source_id);
   if (style.getSource(id) != nullptr) {
     set_thread_error("source already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_ALREADY_EXISTS;
   }
 
   auto error = mln::style::conversion::Error{};
@@ -1851,7 +1851,7 @@ auto map_add_style_layer_json(
   const auto id = (*layer)->getID();
   if (style.getLayer(id) != nullptr) {
     set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_ALREADY_EXISTS;
   }
   if (
     (*layer)->getTypeInfo()->source ==

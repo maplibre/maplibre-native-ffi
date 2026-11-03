@@ -1953,6 +1953,7 @@ internal enum mln_status : int
     MLN_STATUS_BUSY = -7,
     MLN_STATUS_TARGET_LOST = -8,
     MLN_STATUS_NOT_FOUND = -10,
+    MLN_STATUS_ALREADY_EXISTS = -11,
 }
 
 internal enum mln_style_expression_input_field : uint

@@ -363,7 +363,7 @@ static void accepted_adds_release_their_callback_state(void) {
     mln_test_completion duplicate = mln_test_completion_default(0);
     MLN_TEST_OK(kind->add(map, &probe, ADD_VALID, &duplicate.descriptor));
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_settle(&duplicate),
+      MLN_STATUS_ALREADY_EXISTS, mln_test_completion_settle(&duplicate),
       kind->name
     );
     MLN_TEST_OK(mln_test_map_fence(map));

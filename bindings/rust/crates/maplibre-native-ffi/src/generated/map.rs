@@ -21,7 +21,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_custom_geometry_source(
         &self,
@@ -49,7 +49,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_custom_vector_source(
         &self,
@@ -80,7 +80,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_geo_json_source_data(
         &self,
@@ -102,7 +102,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_geo_json_source_url(
         &self,
@@ -135,7 +135,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_image_source_image(
         &self,
@@ -170,7 +170,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_image_source_url(
         &self,
@@ -210,7 +210,7 @@ impl MapHandle {
     ///
     /// - `Status::NotFound` when the style has no layer named
     ///   `before_layer_id`, or no source with the ID that the layer uses.
-    /// - `Status::InvalidArgument` when the style already has a layer with the
+    /// - `Status::AlreadyExists` when the style already has a layer with the
     ///   new layer's ID.
     pub fn add_style_layer_json(
         &self,
@@ -241,7 +241,7 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when the style already has a source named
+    /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     pub fn add_style_source_json(
         &self,

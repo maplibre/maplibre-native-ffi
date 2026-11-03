@@ -336,7 +336,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_custom_geometry_source(source_id, options)
@@ -351,7 +351,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_custom_vector_source(source_id, options)
@@ -369,7 +369,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_geo_json_source_data(source_id, data._native)
@@ -384,7 +384,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_geo_json_source_url(source_id, url, options)
@@ -405,7 +405,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_image_source_image(source_id, coordinates, image)
@@ -423,7 +423,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_image_source_url(source_id, coordinates, url)
@@ -445,8 +445,8 @@ class _MapHandleOperations(GeneratedOperations):
 
         - `Status.NOT_FOUND` when the style has no layer named
           `before_layer_id`, or no source with the ID that the layer uses.
-        - `Status.INVALID_ARGUMENT` when the style already has a layer with
-          the new layer's ID.
+        - `Status.ALREADY_EXISTS` when the style already has a layer with the
+          new layer's ID.
         """
         return self._native.add_style_layer_json(layer_json, before_layer_id)
 
@@ -463,7 +463,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.INVALID_ARGUMENT` when the style already has a source named
+        - `Status.ALREADY_EXISTS` when the style already has a source named
           `source_id`.
         """
         return self._native.add_style_source_json(source_id, source_json)

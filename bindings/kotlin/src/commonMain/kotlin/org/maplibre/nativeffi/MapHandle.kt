@@ -48,7 +48,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addCustomGeometrySource(
     sourceId: String,
@@ -74,7 +74,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addCustomVectorSource(
     sourceId: String,
@@ -103,7 +103,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addGeoJsonSourceData(
     sourceId: String,
@@ -129,7 +129,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addGeoJsonSourceUrl(
     sourceId: String,
@@ -159,7 +159,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addImageSourceImage(
     sourceId: String,
@@ -190,7 +190,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addImageSourceUrl(
     sourceId: String,
@@ -225,7 +225,7 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`, or no source with the
    *   ID that the layer uses.
-   * - `Status.INVALID_ARGUMENT` when the style already has a layer with the new layer's ID.
+   * - `Status.ALREADY_EXISTS` when the style already has a layer with the new layer's ID.
    */
   public fun addStyleLayerJson(
     layerJson: String,
@@ -253,7 +253,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the style already has a source named `sourceId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    */
   public fun addStyleSourceJson(sourceId: String, sourceJson: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
