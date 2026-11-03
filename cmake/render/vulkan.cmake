@@ -51,12 +51,15 @@ function(mln_ffi_configure_render_dependencies target)
       MLN_FFI_STATIC_ARCHIVES
       "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen"
   )
+  mln_ffi_configure_vulkan_test_loader(${target})
+endfunction()
 
-  # The loader belongs to the test harness, which drives Vulkan directly the way
-  # a host does. The library resolves it at runtime, so build-host loader paths
-  # stay out of the shipped binary, and a build without the harness needs no
-  # loader for the target architecture at all. That is what lets a build for one
-  # architecture run on another.
+# The loader belongs to the test harness, which drives Vulkan directly the way a
+# host does. The library resolves it at runtime, so build-host loader paths stay
+# out of the shipped binary, and a build without the harness needs no loader for
+# the target architecture at all. That is what lets a build for one architecture
+# run on another.
+function(mln_ffi_configure_vulkan_test_loader target)
   if(NOT BUILD_TESTING)
     return()
   endif()
