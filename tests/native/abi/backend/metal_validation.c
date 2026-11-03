@@ -238,54 +238,39 @@ static void metal_attach_rejects_malformed_calls(void) {
 }
 
 // set_target checks its replacement, so these rows cover a row for each
-// pointer and handle it reads, and its own steps. It checks the session before
-// the replacement, and a build without Metal reports the missing backend last,
-// so there the rows name no session. A Metal build submits them for a live
-// session of the replacement's kind.
+// pointer and handle it reads, and its own steps.
 static void metal_set_target_rejects_malformed_replacements(void) {
-  mln_test_target_call call = mln_test_target_call_default(
-    MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
-  );
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_surface(map, &fixture),
-    mln_test_graphics_last_error()
-  );
-  call.session = fixture.session;
-#endif
+  mln_test_target_call call =
+    mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
+  call.session = mln_test_create_disposed_session(map);
   call.descriptor.metal_surface_replacement = (mln_metal_surface_replacement){
     .size = sizeof(mln_metal_surface_replacement),
     .logical_size = mln_test_target_size(),
     .layer = MLN_TEST_FAKE_HANDLE,
   };
   static const mln_test_validation_case surface_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(metal_surface_replacement),
     {"null layer", replacement_without_layer, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
-#if !defined(MLN_FFI_TEST_BACKEND_METAL)
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
   };
-  mln_test_run_validation_table(
-    surface_rows, sizeof(surface_rows) / sizeof(surface_rows[0]), &call,
-    sizeof(call), submit_surface_set_target, NULL
+  mln_test_run_set_target_table(
+    submit_surface_set_target, &call, surface_rows,
+    sizeof(surface_rows) / sizeof(surface_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_METAL
   );
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_test_render_fixture_destroy(&fixture);
+  // A Metal build reads the replacement's textures, which come from the live
+  // ring that the ring-depth row needs.
+  mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_borrowed_ring(
       map, &fixture, 1, MLN_TEST_PRESET_DRIVER
     ),
     mln_test_graphics_last_error()
   );
-  call.session = fixture.session;
   mln_test_graphics_texture* replacement =
     mln_test_render_fixture_new_texture(&fixture);
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
@@ -306,32 +291,34 @@ static void metal_set_target_rejects_malformed_replacements(void) {
   describe_borrowed_replacement(&call, MLN_TEST_FAKE_HANDLE);
 #endif
   static const mln_test_validation_case borrowed_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(metal_borrowed_replacement),
     MLN_TEST_BORROWED_CASES(metal_borrowed_replacement),
     {"null texture", replacement_without_texture, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"zero physical width", replacement_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
+  };
+  mln_test_run_set_target_table(
+    submit_borrowed_set_target, &call, borrowed_rows,
+    sizeof(borrowed_rows) / sizeof(borrowed_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_METAL
+  );
+
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  call.session = fixture.session;
+  static const mln_test_validation_case session_rows[] = {
     {"more textures than the session's ring has slots",
      replacement_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
-#else
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
   };
   mln_test_run_validation_table(
-    borrowed_rows, sizeof(borrowed_rows) / sizeof(borrowed_rows[0]), &call,
+    session_rows, sizeof(session_rows) / sizeof(session_rows[0]), &call,
     sizeof(call), submit_borrowed_set_target, NULL
   );
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
   second_texture = NULL;
   mln_test_render_fixture_destroy(&fixture);
+#endif
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-#endif
 }
 
 MLN_TEST_GROUP {

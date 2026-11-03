@@ -451,13 +451,6 @@ auto vulkan_borrowed_texture_set_target_start(
   const mln_vulkan_borrowed_texture_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
-  auto checked_completion = std::shared_ptr<Completion>{};
-  const auto submission_status = validate_render_session_retarget_submission(
-    session, RetargetTargetKind::BorrowedTexture, completion, checked_completion
-  );
-  if (submission_status != MLN_STATUS_OK) {
-    return submission_status;
-  }
   const auto replacement_status =
     validate_vulkan_borrowed_texture_replacement(replacement);
   if (replacement_status != MLN_STATUS_OK) {
@@ -468,6 +461,13 @@ auto vulkan_borrowed_texture_set_target_start(
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
+  }
+  auto checked_completion = std::shared_ptr<Completion>{};
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::BorrowedTexture, completion, checked_completion
+  );
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   auto target = VulkanBorrowedTextures{*replacement};
   auto identity = render_target_identity(std::span{target.textures});

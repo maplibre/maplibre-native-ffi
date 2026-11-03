@@ -19,7 +19,6 @@ MLN_TEST_DESCRIPTOR_EDITS(
 )
 MLN_TEST_BORROWED_EDITS(webgpu_borrowed, webgpu)
 MLN_TEST_RING_RULE_EDITS(webgpu_borrowed, webgpu)
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 MLN_TEST_DESCRIPTOR_EDITS(
   webgpu_surface_replacement, mln_web_gpu_surface_replacement
 )
@@ -27,7 +26,6 @@ MLN_TEST_DESCRIPTOR_EDITS(
   webgpu_borrowed_replacement, mln_web_gpu_borrowed_texture_replacement
 )
 MLN_TEST_BORROWED_EDITS(webgpu_borrowed_replacement, webgpu)
-#endif
 
 static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_surface.surface = NULL;
@@ -50,7 +48,6 @@ static void borrowed_without_format(void* call) {
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_borrowed.physical_width = 0;
 }
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 static void replacement_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_surface_replacement.surface =
     NULL;
@@ -65,13 +62,11 @@ static void replacement_without_physical_width(void* call) {
   ((mln_test_target_call*)call)
     ->descriptor.webgpu_borrowed_replacement.physical_width = 0;
 }
-#endif
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_web_gpu_surface)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_web_gpu_borrowed_texture
 )
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_surface_set_target, mln_render_session_set_web_gpu_surface_target
 )
@@ -79,7 +74,6 @@ MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target,
   mln_render_session_set_web_gpu_borrowed_texture_target
 )
-#endif
 
 static mln_web_gpu_surface_descriptor surface_descriptor(void) {
   mln_web_gpu_surface_descriptor descriptor = {
@@ -165,14 +159,14 @@ static void webgpu_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-// A build without WebGPU checks a replacement before it reports the missing
-// backend, whatever the session, so these rows cover a row for each pointer
-// and handle it reads, and its own steps.
-static void webgpu_set_target_checks_its_replacement_first(void) {
-  mln_test_target_call call = mln_test_target_call_default(
-    MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
-  );
+// set_target checks its replacement, so these rows cover a row for each
+// pointer and handle it reads, and its own steps.
+static void webgpu_set_target_rejects_malformed_replacements(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_target_call call =
+    mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
+  call.session = mln_test_create_disposed_session(map);
   call.descriptor.webgpu_surface_replacement =
     (mln_web_gpu_surface_replacement){
       .size = sizeof(mln_web_gpu_surface_replacement),
@@ -180,17 +174,14 @@ static void webgpu_set_target_checks_its_replacement_first(void) {
       .surface = MLN_TEST_FAKE_HANDLE,
   };
   static const mln_test_validation_case surface_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(webgpu_surface_replacement),
     {"null surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
   };
-  mln_test_run_validation_table(
-    surface_rows, sizeof(surface_rows) / sizeof(surface_rows[0]), &call,
-    sizeof(call), submit_surface_set_target, NULL
+  mln_test_run_set_target_table(
+    submit_surface_set_target, &call, surface_rows,
+    sizeof(surface_rows) / sizeof(surface_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_WEB_GPU
   );
 
   call.textures.webgpu[0] = (mln_web_gpu_borrowed_texture){
@@ -207,27 +198,24 @@ static void webgpu_set_target_checks_its_replacement_first(void) {
       .texture_count = 1,
   };
   static const mln_test_validation_case borrowed_rows[] = {
-    {"null replacement", mln_test_call_without_descriptor,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(webgpu_borrowed_replacement),
     MLN_TEST_BORROWED_CASES(webgpu_borrowed_replacement),
     {"null texture view", replacement_without_texture_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", replacement_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
   };
-  mln_test_run_validation_table(
-    borrowed_rows, sizeof(borrowed_rows) / sizeof(borrowed_rows[0]), &call,
-    sizeof(call), submit_borrowed_set_target, NULL
+  mln_test_run_set_target_table(
+    submit_borrowed_set_target, &call, borrowed_rows,
+    sizeof(borrowed_rows) / sizeof(borrowed_rows[0]),
+    MLN_RENDER_BACKEND_FLAG_WEB_GPU
   );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
-#endif
 
 MLN_TEST_GROUP {
   RUN_TEST(webgpu_attach_rejects_malformed_calls);
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  RUN_TEST(webgpu_set_target_checks_its_replacement_first);
-#endif
+  RUN_TEST(webgpu_set_target_rejects_malformed_replacements);
 }

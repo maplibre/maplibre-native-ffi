@@ -945,42 +945,37 @@ static void a_release_finishes_a_waiting_demand(void) {
   close_map(&map);
 }
 
-// A set_target checks the session before it reads the descriptor, so an
-// offscreen session refuses even a null one.
-static mln_status set_borrowed_target(
-  mln_render_session session, const mln_completion* completion
-) {
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  return mln_render_session_set_metal_borrowed_texture_target(
-    session, NULL, completion, MLN_TEST_DIAGNOSTIC
-  );
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  return mln_render_session_set_vulkan_borrowed_texture_target(
-    session, NULL, completion, MLN_TEST_DIAGNOSTIC
-  );
-#else
-  return mln_render_session_set_open_gl_borrowed_texture_target(
-    session, NULL, completion, MLN_TEST_DIAGNOSTIC
-  );
-#endif
-}
-
 // An offscreen session renders into a texture of its own, so it takes no
 // target and releases none, and keeps rendering into its own.
 static void an_offscreen_session_refuses_targets(void) {
   retarget_map offscreen = {0};
   open_map(TARGET_OFFSCREEN, &offscreen);
   const mln_test_render_fixture* fixture = &offscreen.fixture;
+  // A ring on another map makes the texture that the replacement names.
+  mln_map ring_map = mln_test_create_map(offscreen.runtime);
+  mln_test_render_fixture ring = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_borrowed_ring(
+      ring_map, &ring, 1, MLN_TEST_PRESET_DRIVER
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_test_graphics_texture* texture =
+    mln_test_render_fixture_new_texture(&ring);
+  TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
   mln_test_completion refused = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_UNSUPPORTED,
-    set_borrowed_target(fixture->session, &refused.descriptor)
+    MLN_STATUS_UNSUPPORTED, mln_test_render_fixture_set_textures(
+                              fixture, &texture, 1, &refused.descriptor
+                            )
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "offscreen session"), mln_test_last_error()
   );
   mln_test_completion_reject(&refused);
   mln_test_completion_destroy(&refused);
+  mln_test_render_fixture_destroy(&ring);
+  mln_test_destroy_map(ring_map);
 
   refused = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(

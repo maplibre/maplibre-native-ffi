@@ -2,8 +2,10 @@
 // not carry.
 //
 // The validation order is part of what a host sees, so it matches the
-// backend-native attach paths step for step: the map, the descriptor, then the
-// size, and finally the attachment request. Only once all of those pass does
+// backend-native paths step for step. An attach checks the map, the
+// descriptor, then the size, and finally the attachment request. A set_target
+// checks its replacement and a borrowed ring's physical size, which a backend's
+// set_target also checks before its session. Only once all of those pass does
 // the caller hear that the backend is missing.
 
 #include "diagnostics/diagnostics.hpp"
