@@ -215,20 +215,17 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
     previous_generation = results[index].frame_generation;
   }
 
-  mln_acquired_frame frames[2] = {MLN_HANDLE_NULL, MLN_HANDLE_NULL};
-  for (size_t index = 0; index < 2; index += 1) {
-    MLN_TEST_OK(
-      mln_render_session_acquire_frame(fixture.session, &frames[index], NULL)
-    );
-    mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    MLN_TEST_OK(mln_acquired_frame_get_result(frames[index], &result, NULL));
-    TEST_ASSERT_EQUAL_UINT64(demand_count - 1 + index, result.token);
-  }
+  // The ring holds the last two frames. Acquiring takes the newest and drops
+  // the one before it.
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &frame, NULL));
+  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
+  MLN_TEST_OK(mln_acquired_frame_get_result(frame, &result, NULL));
+  TEST_ASSERT_EQUAL_UINT64(demand_count, result.token);
   mln_acquired_frame extra = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &extra, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, extra);
-  mln_test_render_release_frame(&frames[0]);
-  mln_test_render_release_frame(&frames[1]);
+  mln_test_render_release_frame(&frame);
   detach(runtime, map, &fixture);
 }
 
