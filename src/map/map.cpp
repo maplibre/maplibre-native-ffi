@@ -1090,6 +1090,7 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
   void onStyleImageMissing(
     const std::string& id, const StyleImageMissingCallback& done
   ) override {
+    mln::testing::hit(mln::testing::SyncPoint::RenderStyleImageMissing);
     delegate_.invoke(&mln::RendererObserver::onStyleImageMissing, id, done);
   }
 
