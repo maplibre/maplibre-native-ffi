@@ -19,10 +19,12 @@ import org.maplibre.nativeffi.internal.memory.*
 public class MapHandle
 internal constructor(
   handle: Long,
-  @Suppress("unused") private val parent: RuntimeHandle,
+  @Suppress("unused") private val parent: RuntimeHandle?,
+  borrowed: Boolean = false,
 ) : AsyncReleasable, AutoCloseable {
-  internal val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map)
-  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
+  internal val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)
+  @Suppress("unused")
+  private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)
   /**
    * The native handle value, which runtime events report as their source. It stays readable after
    * close, so events drained later still match this handle.
@@ -38,7 +40,8 @@ internal constructor(
     dispose()
   }
 
-  internal val bindingCallbacks: CallbackOwner = CallbackOwner()
+  internal val bindingCallbacks: CallbackOwner =
+    if (binding.borrowed) CallbackOwner.global else CallbackOwner()
 
   /**
    * Adds a source whose GeoJSON tiles come from callbacks.

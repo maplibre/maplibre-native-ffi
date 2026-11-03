@@ -32,6 +32,7 @@
 // as every such registration in the C API does.
 #if defined(MLN_PROTOCOL_RETAINED_REGISTRATION) || \
   defined(MLN_PROTOCOL_OWNED_ARGUMENT) ||          \
+  defined(MLN_PROTOCOL_BORROWED_ARGUMENT) ||       \
   defined(MLN_PROTOCOL_RECORD_NOTIFICATION) ||     \
   defined(MLN_PROTOCOL_DECLINABLE_REGISTRATION) || \
   defined(MLN_PROTOCOL_DELIVERY)
@@ -42,7 +43,8 @@
 #endif
 #if (                                            \
   defined(MLN_PROTOCOL_RETAINED_REGISTRATION) || \
-  defined(MLN_PROTOCOL_OWNED_ARGUMENT)           \
+  defined(MLN_PROTOCOL_OWNED_ARGUMENT) ||        \
+  defined(MLN_PROTOCOL_BORROWED_ARGUMENT)        \
 ) &&                                             \
   !defined(MLN_PROTOCOL_MAP_RELEASE)
 #define MLN_PROTOCOL_MAP_CLOSE
@@ -575,6 +577,27 @@ mln_status mln_query_answer(
   mln_query query, mln_buffer_view text, mln_diagnostic* out_diagnostic
 );
 void mln_query_release(mln_query query);
+#endif
+
+#ifdef MLN_PROTOCOL_BORROWED_ARGUMENT
+// A callback that borrows the map that calls it, which it can call but not
+// release.
+typedef void (*mln_ping_callback)(
+  void* context, mln_map map BIND("ownership=borrowed"), mln_buffer_view name
+);
+typedef void (*mln_ping_release_context)(void* context);
+typedef struct mln_ping_handler {
+  unsigned int size;
+  mln_ping_callback callback;
+  void* context BIND("kind=context");
+  mln_ping_release_context release;
+  mln_delivery_queue queue BIND("kind=delivery_queue");
+} mln_ping_handler BIND("kind=callback_registration;release=release");
+BIND("execution=command")
+mln_status mln_map_set_ping_handler(
+  mln_map map, const mln_ping_handler* handler,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
 #endif
 
 #ifdef MLN_PROTOCOL_RECORD_NOTIFICATION

@@ -1179,6 +1179,20 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: borrowed_owner requires a callback handle parameter"
                 )
+        # A binding adopts a handle that the callback owns and lends one that it
+        # borrows, so each other handle argument says which.
+        for parameter in typedef.parameters:
+            handle = api.typedefs_by_name.get(parameter.type.declaration or "")
+            if (
+                handle is not None
+                and handle.metadata.get("kind") == "handle"
+                and parameter.name != typedef.metadata.get("borrowed_owner")
+                and parameter.metadata.get("ownership") not in {"owned", "borrowed"}
+            ):
+                errors.append(
+                    f"{context}: handle parameter '{parameter.name}' requires "
+                    "ownership=owned or ownership=borrowed"
+                )
         signature = typedef.type.pointee
         if signature is not None and signature.kind == "function":
             failure = typedef.metadata.get("failure")

@@ -2244,21 +2244,25 @@ typedef LogCallback =
 
 /// Asks for the data of a tile in a custom source.
 ///
-/// Return quickly. Once the data is ready, pass it to
-/// `MapHandle.setCustomGeometrySourceTileData()` or
+/// `map` and `sourceId` name the source that asks. Return quickly. Once the
+/// data is ready, pass it to `MapHandle.setCustomGeometrySourceTileData()` or
 /// `MapHandle.setCustomVectorSourceTileData()`. If it fails to load, report
 /// that with `MapHandle.setCustomGeometrySourceTileError()` or
 /// `MapHandle.setCustomVectorSourceTileError()`.
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceFetchTileCallback = void Function(CanonicalTileId tileId);
+typedef CustomSourceFetchTileCallback =
+    void Function(MapHandle map, String sourceId, CanonicalTileId tileId);
 
 /// Reports that a custom source no longer needs a tile.
 ///
+/// `map` and `sourceId` name the source.
+///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomSourceCancelTileCallback = void Function(CanonicalTileId tileId);
+typedef CustomSourceCancelTileCallback =
+    void Function(MapHandle map, String sourceId, CanonicalTileId tileId);
 
 /// The callbacks and options of a custom geometry source.
 ///

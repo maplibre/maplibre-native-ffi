@@ -482,12 +482,25 @@ def lower(api: Api | BoundApi) -> Lowered:
         constructor.append(
             f"state = new(handle, {destroy}, nameof({owner}), Abandon{', retainedParent: parent' if handle.parent else ''});"
         )
+        borrow = ""
+        if native in bound.borrowed_handles:
+            # A callback's borrowed owner has no parent to keep reachable, and
+            # never releases or disposes its handle.
+            borrow = "\n" + method(
+                f"private {owner}({native_type} handle, bool borrowed)",
+                [
+                    *(["Ready = Task.CompletedTask;"] if immediate_completion else []),
+                    f"state = new(handle, {destroy}, nameof({owner}), Abandon, borrowed: borrowed);",
+                ],
+            )
+            borrow += f"\n    internal static {owner} Borrow({native_type} handle) => new(handle, borrowed: true);\n"
         declarations = (
             "".join(f"    {field}\n" for field in fields)
             + "\n"
             + method(
                 f"internal {owner}({parent}{native_type} handle{extra})", constructor
             )
+            + borrow
             + f"\n    internal static {owner} Adopt({parent}{native_type} handle{adopt_extra}) =>\n"
             f"        NativeHandleState<{native_type}>.Adopt(handle, () => new {owner}({argument}handle{extra_argument}), Abandon);\n"
             f"\n    private static mln_status Abandon({native_type} live, mln_diagnostic* diagnostic) {abandon}\n"

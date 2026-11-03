@@ -9,7 +9,8 @@ internal class ReadHandleState(
   private val typeName: String,
   handle: Long,
   dispose: (Long) -> Unit,
-) : HandleState(typeName, handle, dispose) {
+  borrowed: Boolean = false,
+) : HandleState(typeName, handle, dispose, borrowed) {
   // The number of reads in progress, or minus the number of releases in progress.
   private val gate = AtomicInt(0)
 

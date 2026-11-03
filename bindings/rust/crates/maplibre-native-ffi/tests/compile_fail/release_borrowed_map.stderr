@@ -1,0 +1,13 @@
+error[E0507]: cannot move out of `*map` which is behind a shared reference
+ --> tests/compile_fail/release_borrowed_map.rs:6:17
+  |
+6 |         let _ = map.release();
+  |                 ^^^ --------- `*map` moved due to this method call
+  |                 |
+  |                 move occurs because `*map` has type `MapHandle`, which does not implement the `Copy` trait
+  |
+note: `maplibre_native_ffi::MapHandle::release` takes ownership of the receiver `self`, which moves `*map`
+ --> src/generated/map.rs
+  |
+  |     pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+  |                    ^^^^

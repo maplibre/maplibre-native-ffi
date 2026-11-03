@@ -144,7 +144,10 @@ func (arena *bindingArena) accept(owner *bindingOwner) {
 	for _, ticket := range arena.callbacks {
 		ticket.mu.Lock()
 		if !ticket.retired {
-			if owner != nil {
+			// A borrowed handle doesn't outlive its callback, so the
+			// registrations made through it stay rooted until native releases
+			// them.
+			if owner != nil && !owner.state.borrowed {
 				owner.rootsMu.Lock()
 				owner.roots[ticket.id] = ticket
 				owner.rootsMu.Unlock()
@@ -281,6 +284,9 @@ type bindingState struct {
 	raw      uint64
 	released atomic.Bool
 	dispose  func(uint64)
+	// borrowed reports a handle that a callback borrows from its owner, which
+	// the binding never releases or disposes.
+	borrowed bool
 }
 
 type bindingOwner struct {
@@ -302,6 +308,13 @@ func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64))
 		}
 	}, state)
 	return owner
+}
+
+// bindingBorrow wraps a handle that a callback borrows. Nothing disposes it,
+// and a call that would release it fails.
+func bindingBorrow(raw uint64, typeName string) *bindingOwner {
+	state := &bindingState{typeName: typeName, raw: raw, borrowed: true}
+	return &bindingOwner{state: state, roots: make(map[cgo.Handle]*bindingCallbackTicket)}
 }
 
 // Callback roots belong to their Go owner. Native stores a weak ticket so that

@@ -106,6 +106,7 @@ import {
 } from "./internal/completions.ts";
 import {
   ADOPT,
+  BORROW,
   type AdoptKey,
   Owner,
   ViewScope,
@@ -603,7 +604,7 @@ export class MapHandle extends Owner {
   constructor(
     key: AdoptKey,
     handle: bigint,
-    parent: RuntimeHandle,
+    parent: RuntimeHandle | undefined,
     registrations?: Registrations,
   ) {
     super(key, handle, "MapHandle", { parent, registrations });
@@ -5637,18 +5638,20 @@ defineCallbacks([
   (target, args) => {
     const callback = (target as CustomGeometrySourceOptions)
       .cancelTile as NonNullable<CustomGeometrySourceOptions["cancelTile"]>;
-    const [tileId] = args as Parameters<
+    const [map, sourceId, tileId] = args as Parameters<
       NonNullable<CustomGeometrySourceOptions["cancelTile"]>
     >;
-    callback(tileId);
+    const mapOwner = new MapHandle(BORROW, map as unknown as bigint, undefined);
+    callback(mapOwner, sourceId, tileId);
   },
   // mln_custom_source_fetch_tile_callback
   (target, args) => {
     const callback = (target as CustomGeometrySourceOptions).fetchTile;
-    const [tileId] = args as Parameters<
+    const [map, sourceId, tileId] = args as Parameters<
       NonNullable<CustomGeometrySourceOptions["fetchTile"]>
     >;
-    callback(tileId);
+    const mapOwner = new MapHandle(BORROW, map as unknown as bigint, undefined);
+    callback(mapOwner, sourceId, tileId);
   },
   // mln_log_callback
   (target, args) => {

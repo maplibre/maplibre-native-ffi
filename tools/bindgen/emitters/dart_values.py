@@ -237,11 +237,9 @@ class Values:
     def check_arguments(self, callback):
         """Accept a queued callback whose arguments Dart can convert."""
         for parameter in callback.arguments:
-            if self.owned_argument(parameter):
+            if self.owned_argument(parameter) or self.borrowed_argument(parameter):
                 if parameter.value.native not in self.bound.public_handles:
-                    raise Unsupported(
-                        "owned handle argument requires a generated owner"
-                    )
+                    raise Unsupported("handle argument requires a generated owner")
                 continue
             if parameter.value.kind == "handle":
                 raise Unsupported("handle argument requires an owner rule")
@@ -665,6 +663,13 @@ class Values:
         which an owner adopts."""
         return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
+    def borrowed_argument(self, parameter):
+        """Whether a callback argument is a handle that the callback borrows,
+        which an owner presents without releasing it."""
+        return (
+            parameter.value.kind == "handle" and parameter.value.ownership == "borrowed"
+        )
+
     def native_signature(self, callback):
         """The Dart parameters and result of a callback's C function type."""
         declarations = Declarations(self.bound)
@@ -709,6 +714,11 @@ class Values:
         decoded = [
             "owner"
             if parameter in owned
+            # A borrowed handle arrives in an owner that never releases it.
+            else "{}._borrowed({}({}))".format(
+                *owner_names(parameter.value.handle), identifier(parameter.name)
+            )
+            if self.borrowed_argument(parameter)
             else self.copy(parameter.value, identifier(parameter.name))
             for parameter in callback.arguments
         ]

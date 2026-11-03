@@ -1,5 +1,8 @@
 package org.maplibre.nativeffi.render
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -7,8 +10,11 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
+import org.maplibre.nativeffi.MapMode
+import org.maplibre.nativeffi.MaplibreException
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderResult
 import org.maplibre.nativeffi.RenderSessionAttachOptions
@@ -45,6 +51,48 @@ class RenderSessionTest {
 
       complete(session.detach())
       assertEquals(RenderSessionState.DETACHED, session.getSnapshot().state)
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun aCustomSourceAnswersThroughTheMapItBorrows() = runSuspendTest {
+    // A continuous map asks for its tiles as it renders.
+    withOffscreenSession(mapMode = MapMode.CONTINUOUS) {
+      val map = mapFixture.map
+      val calls = AtomicReference(emptyList<Triple<ULong, String, Status?>>())
+      setStyle(RED_BACKGROUND_STYLE)
+      complete(
+        map.addCustomGeometrySource(
+          "custom",
+          CustomGeometrySourceOptions(
+            fetchTile = { borrowed, sourceId, tile ->
+              borrowed.discarding.setCustomGeometrySourceTileData(
+                sourceId,
+                tile,
+                """{"type":"FeatureCollection","features":[]}""",
+              )
+              // The callback borrows the map, so it can't release it.
+              val refusal =
+                try {
+                  borrowed.dispose()
+                  null
+                } catch (error: MaplibreException) {
+                  error.status
+                }
+              calls.update { it + Triple(borrowed.id, sourceId, refusal) }
+            },
+          ),
+        ),
+        "the source",
+      )
+      complete(
+        map.addStyleLayerJson("""{"id":"dots","type":"circle","source":"custom"}""", ""),
+        "the layer",
+      )
+      renderUntil("a tile fetch") { calls.load().isNotEmpty() }
+      assertEquals(Triple(map.id, "custom", Status.INVALID_STATE), calls.load().first())
+      assertFalse(map.isClosed)
     }
   }
 

@@ -82,6 +82,45 @@ test(
   { needs: ["disposers"] },
 );
 
+test("a custom source answers through the map it borrows, which it can't release", async () => {
+  const map = await openRenderMap();
+  const calls: [bigint, string, unknown][] = [];
+  await bounded(
+    map.addCustomGeometrySource("custom", {
+      fetchTile: (borrowed, sourceId, tile) => {
+        borrowed.discarding.setCustomGeometrySourceTileData(sourceId, tile, {
+          type: "FeatureCollection",
+          features: [],
+        });
+        let refusal: unknown;
+        try {
+          borrowed.dispose();
+        } catch (error) {
+          refusal = error;
+        }
+        calls.push([borrowed.id, sourceId, refusal]);
+      },
+    }),
+    "a command",
+  );
+  await bounded(
+    map.addStyleLayerJson({ id: "dots", type: "circle", source: "custom" }, ""),
+    "a command",
+  );
+  const worker = await TestSession.offscreen(map);
+  // The map asks for its tiles as it renders.
+  for (let frame = 0; frame < 32 && calls.length === 0; frame++) {
+    await worker.renderFrame();
+  }
+  assert.ok(calls.length > 0, "the source fetched no tile");
+  const [id, sourceId, refusal] = calls[0]!;
+  assert.equal(id, map.id);
+  assert.equal(sourceId, "custom");
+  assert.ok(refusal instanceof MaplibreError, String(refusal));
+  assert.equal(refusal.status, Status.invalidState);
+  assert.equal(map.isClosed, false);
+});
+
 test("a drain before any demand returns no results", async () => {
   const map = await openRenderMap();
   const worker = await TestSession.offscreen(map);

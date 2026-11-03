@@ -76,6 +76,62 @@ void main() {
     },
   );
 
+  test(
+    "a custom source answers through the map it borrows, which it can't release",
+    () async {
+      final map = await openRenderMap(emptyStyle);
+      final calls = <(int, String, Object?)>[];
+      await within(
+        map.addCustomGeometrySource(
+          'custom',
+          CustomGeometrySourceOptions(
+            fetchTile: (borrowed, sourceId, tile) {
+              borrowed.discarding.setCustomGeometrySourceTileData(
+                sourceId,
+                tile,
+                {'type': 'FeatureCollection', 'features': <Object?>[]},
+              );
+              Object? refusal;
+              try {
+                borrowed.dispose();
+              } on MaplibreException catch (error) {
+                refusal = error;
+              }
+              calls.add((borrowed.id, sourceId, refusal));
+            },
+          ),
+        ),
+        'source add',
+      );
+      await within(
+        map.addStyleLayerJson({
+          'id': 'dots',
+          'type': 'circle',
+          'source': 'custom',
+        }, ''),
+        'layer add',
+      );
+      final worker = await WorkerSession.attach(map);
+      // The map asks for its tiles as it renders.
+      for (var frame = 0; frame < 32 && calls.isEmpty; frame++) {
+        await worker.renderFrame();
+      }
+      expect(calls, isNotEmpty, reason: 'the source fetched no tile');
+      final (id, sourceId, refusal) = calls.first;
+      expect(id, map.id);
+      expect(sourceId, 'custom');
+      expect(
+        refusal,
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidState,
+        ),
+      );
+      expect(map.isClosed, isFalse);
+    },
+  );
+
   test('a drain before any demand returns no results', () async {
     final map = await openRenderMap(_redStyle);
     final worker = await WorkerSession.attach(map);

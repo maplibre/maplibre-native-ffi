@@ -227,6 +227,63 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 self.assertIn(plain, source)
                 self.assertNotIn("storedWidth", source)
 
+    def test_a_borrowed_callback_handle_reaches_the_host_unable_to_release_it(self):
+        api = parse(groups=("borrowed_argument",))
+        validate(api)
+        bound = compile_api(api)
+        map_, _name = bound.callbacks["mln_ping_callback"].arguments
+        self.assertEqual(
+            (map_.name, map_.value.kind, map_.value.ownership),
+            ("map", "handle", "borrowed"),
+        )
+        self.assertEqual(bound.borrowed_handles, {"mln_map"})
+        # Each binding wraps the handle in an owner that never releases or
+        # disposes it, or lends it where the type system forbids the release.
+        expected = {
+            dart: (
+                "callback(MapHandle._borrowed(_NativeMap(map)), ",
+                "NativeHandleState(handle, 'MapHandle', borrowed: true)",
+            ),
+            dotnet: (
+                "Callback?.Invoke(MapHandle.Borrow(map), ",
+                "state = new(handle, Abandon, nameof(MapHandle), Abandon, borrowed: borrowed);",
+            ),
+            go: (
+                "callbacks.Callback(borrowMapHandle(uint64(native__map)), ",
+                'return &MapHandle{bindingBorrow(raw, "MapHandle")}',
+            ),
+            kotlin: (
+                "value.callback(MapHandle(map, borrowed = true), ",
+                'HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)',
+            ),
+            python: (
+                "call1((MapHandle::borrow(py, map)?, ",
+                "map = _adopt_value(map, 'MapHandle')",
+            ),
+            rust: (
+                "(state.callback)(&*MapHandle::borrow(map)?, ",
+                "Fn(&MapHandle, &str) + Send + Sync + 'static",
+            ),
+            swift: (
+                "guard let borrowedMap = try? MapHandle(borrowing: `map`) else { return }",
+                'NativeHandleState(typeName: "MapHandle", handle: NativeMapHandle(raw: raw), borrowed: true)',
+            ),
+            typescript: (
+                "const mapOwner = new MapHandle(BORROW, map as unknown as bigint);",
+                "callback(mapOwner, name);",
+            ),
+            zig: (
+                "const borrowed_map = Map.borrow(callback_arg_1);",
+                "pub fn close(self: *Map) status.Error!void {\n    try self.requireOwned(null);",
+                '@"callback": *const fn (context: ?*anyopaque, map: *const Map, name: []const u8)',
+            ),
+        }
+        for emitter, fragments in expected.items():
+            with self.subTest(emitter=emitter.__name__):
+                source = self.rendered(emitter, api)
+                for fragment in fragments:
+                    self.assertIn(fragment, source)
+
     def test_a_complete_record_converts_to_its_option_bag(self):
         # The record's members come in another order than the bag's, and the
         # bag has a member, `anchor`, that the record lacks.

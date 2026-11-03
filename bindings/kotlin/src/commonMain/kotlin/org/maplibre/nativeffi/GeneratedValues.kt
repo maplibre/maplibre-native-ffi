@@ -4171,9 +4171,10 @@ public data class CustomGeometrySourceOptions(
 /**
  * Asks for the data of a tile in a custom source.
  *
- * Return quickly. Once the data is ready, pass it to `MapHandle.setCustomGeometrySourceTileData()`
- * or `MapHandle.setCustomVectorSourceTileData()`. If it fails to load, report that with
- * `MapHandle.setCustomGeometrySourceTileError()` or `MapHandle.setCustomVectorSourceTileError()`.
+ * `map` and `sourceId` name the source that asks. Return quickly. Once the data is ready, pass it
+ * to `MapHandle.setCustomGeometrySourceTileData()` or `MapHandle.setCustomVectorSourceTileData()`.
+ * If it fails to load, report that with `MapHandle.setCustomGeometrySourceTileError()` or
+ * `MapHandle.setCustomVectorSourceTileError()`.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
  * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
@@ -4184,11 +4185,13 @@ public data class CustomGeometrySourceOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public fun interface CustomSourceFetchTileCallback {
-  public operator fun invoke(tileId: CanonicalTileId)
+  public operator fun invoke(map: MapHandle, sourceId: String, tileId: CanonicalTileId)
 }
 
 /**
  * Reports that a custom source no longer needs a tile.
+ *
+ * `map` and `sourceId` name the source.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
  * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
@@ -4199,7 +4202,7 @@ public fun interface CustomSourceFetchTileCallback {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public fun interface CustomSourceCancelTileCallback {
-  public operator fun invoke(tileId: CanonicalTileId)
+  public operator fun invoke(map: MapHandle, sourceId: String, tileId: CanonicalTileId)
 }
 
 /**

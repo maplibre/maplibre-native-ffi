@@ -24,51 +24,87 @@ internal object Upcalls {
     contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
   @JvmStatic
-  fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
+  fun customGeometrySourceOptionsFetchTile(
+    userData: Long,
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+  ): Unit = run {
     upcall<CustomGeometrySourceOptions, Boolean>(
       "mln_custom_source_fetch_tile_callback",
       userData,
       false,
     ) { value ->
-      value.fetchTile(readCanonicalTileId(tileId))
+      value.fetchTile(
+        MapHandle(map, null, borrowed = true),
+        readViewString(sourceId),
+        readCanonicalTileId(tileId),
+      )
       true
     }
   }
 
   @JvmStatic
-  fun customGeometrySourceOptionsCancelTile(userData: Long, tileId: Long): Unit = run {
+  fun customGeometrySourceOptionsCancelTile(
+    userData: Long,
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+  ): Unit = run {
     upcall<CustomGeometrySourceOptions, Boolean>(
       "mln_custom_source_cancel_tile_callback",
       userData,
       false,
     ) { value ->
       val invoke = value.cancelTile ?: return@upcall false
-      invoke(readCanonicalTileId(tileId))
+      invoke(
+        MapHandle(map, null, borrowed = true),
+        readViewString(sourceId),
+        readCanonicalTileId(tileId),
+      )
       true
     }
   }
 
   @JvmStatic
-  fun customVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit = run {
+  fun customVectorSourceOptionsFetchTile(
+    userData: Long,
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+  ): Unit = run {
     upcall<CustomVectorSourceOptions, Boolean>(
       "mln_custom_source_fetch_tile_callback",
       userData,
       false,
     ) { value ->
-      value.fetchTile(readCanonicalTileId(tileId))
+      value.fetchTile(
+        MapHandle(map, null, borrowed = true),
+        readViewString(sourceId),
+        readCanonicalTileId(tileId),
+      )
       true
     }
   }
 
   @JvmStatic
-  fun customVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit = run {
+  fun customVectorSourceOptionsCancelTile(
+    userData: Long,
+    map: Long,
+    sourceId: Long,
+    tileId: Long,
+  ): Unit = run {
     upcall<CustomVectorSourceOptions, Boolean>(
       "mln_custom_source_cancel_tile_callback",
       userData,
       false,
     ) { value ->
       val invoke = value.cancelTile ?: return@upcall false
-      invoke(readCanonicalTileId(tileId))
+      invoke(
+        MapHandle(map, null, borrowed = true),
+        readViewString(sourceId),
+        readCanonicalTileId(tileId),
+      )
       true
     }
   }

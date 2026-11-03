@@ -229,9 +229,19 @@ def descriptor(values, plan):
             for parameter in callback.arguments
             if parameter.value.kind == "handle" and parameter.value.ownership == "owned"
         ]
+        # A handle the callback borrows arrives in an owner that never
+        # releases it.
+        borrowed = [
+            parameter
+            for parameter in callback.arguments
+            if parameter.value.kind == "handle"
+            and parameter.value.ownership == "borrowed"
+        ]
         args = ", ".join(
             "owned" + name(parameter.name)
             if parameter in owned
+            else "borrowed" + name(parameter.name)
+            if parameter in borrowed
             else "response" + name(parameter.name)
             if parameter in responses
             else decode(values, parameter.value, identifier(parameter.name))
@@ -257,6 +267,8 @@ def descriptor(values, plan):
             if release.diagnostic:
                 arguments.append("nil")
             setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(handle)}(adopting: {identifier(parameter.name)}) else {{ {handle.release}({', '.join(arguments)}); {fail or 'return'} }}\n"
+        for parameter in borrowed:
+            setup += f"  guard let borrowed{name(parameter.name)} = try? {owner_name(parameter.value.handle)}(borrowing: {identifier(parameter.name)}) else {{ {fail or 'return'} }}\n"
         value = "box.value"
         optional = "" if field.name in required else "?"
         call = f"{'try ' if throws(callback) else ''}{value}.{identifier(camel(field.name))}{optional}({args})"

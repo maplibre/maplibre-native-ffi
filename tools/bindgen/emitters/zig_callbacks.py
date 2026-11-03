@@ -53,7 +53,7 @@ def parts(values, value):
             if plan.result.ctype.kind == "void" or plan.status
             else values.public(plan.result)
         )
-        argument_types = [values.public(p.value) for p in parameters]
+        argument_types = [argument_type(values, p) for p in parameters]
         summary = (
             "    /// An error that names a native status, such as error.InvalidArgument,\n"
             "    /// answers native that status. Any other error is logged and answers\n"
@@ -108,6 +108,14 @@ def parts(values, value):
                     f"defer if (!ownership_transferred) {{ {release}; }}; "
                 )
                 converted.append(adopted)
+            elif borrowed(parameter):
+                # The callback reaches a borrowed handle through a constant
+                # pointer, which can't release it, and a copy of it fails to.
+                lent = "borrowed_" + parameter.name
+                owned.append(
+                    f"const {lent} = {values.public(parameter.value)}.borrow({raw}); "
+                )
+                converted.append("&" + lent)
             elif (
                 parameter.value.kind == "reference" and parameter.value.element.response
             ):
@@ -135,7 +143,7 @@ def parts(values, value):
             action = f"{call} catch |err| {{ if (status.rawStatus(err)) |deliberate| return deliberate; {report} return {failure_value(plan)}; }}; {transfer}return c.MLN_STATUS_OK;"
         else:
             action = f"const result = {call} catch |err| {{ {report} {fallback} }}; {transfer}return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
-        ownership_setup = "var ownership_transferred = false; " if owned else ""
+        ownership_setup = "var ownership_transferred = false; " if transfer else ""
         body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) anyerror!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local}{'' if field.name in required else f' orelse {{ {fallback} }}'}; {scope} {ownership_setup}{''.join(owned)}"
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
@@ -260,6 +268,18 @@ RESERVED = frozenset(
 )
 
 
+def borrowed(parameter):
+    """Whether a callback argument is a handle that the callback borrows."""
+    return parameter.value.kind == "handle" and parameter.value.ownership == "borrowed"
+
+
+def argument_type(values, parameter):
+    """The Zig type of a callback argument: a borrowed handle's is a constant
+    pointer, whose release and dispose methods don't apply."""
+    public = values.public(parameter.value)
+    return f"*const {public}" if borrowed(parameter) else public
+
+
 def callback_type(values, field):
     plan = values.bound.callbacks[field.value.native]
     result = (
@@ -268,7 +288,8 @@ def callback_type(values, field):
         else values.public(plan.result)
     )
     named = "".join(
-        f", {parameter_name(p.name)}: {values.public(p.value)}" for p in plan.arguments
+        f", {parameter_name(p.name)}: {argument_type(values, p)}"
+        for p in plan.arguments
     )
     return f"*const fn (context: ?*anyopaque{named}) anyerror!{result}"
 

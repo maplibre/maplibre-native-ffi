@@ -4,23 +4,40 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-// The tile and request handle of the calls this file's queues ran, by call
-// log index.
+// The map, source ID, tile, and request handle of the calls this file's queues
+// ran, by call log index.
+static mln_map seen_maps[mln_test_max_calls];
+static char seen_source_ids[mln_test_max_calls][16];
 static mln_canonical_tile_id seen_tiles[mln_test_max_calls];
 static mln_resource_request seen_requests[mln_test_max_calls];
 
-static void record_fetch(void* user_data, mln_canonical_tile_id tile_id) {
+static void record_tile_call(
+  char kind, void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
   if (mln_test_calls.count < mln_test_max_calls) {
+    seen_maps[mln_test_calls.count] = map;
+    snprintf(
+      seen_source_ids[mln_test_calls.count], sizeof(seen_source_ids[0]), "%.*s",
+      (int)source_id.size, (const char*)source_id.data
+    );
     seen_tiles[mln_test_calls.count] = tile_id;
   }
-  mln_test_record_call('f', user_data, MLN_STATUS_OK, 0);
+  mln_test_record_call(kind, user_data, MLN_STATUS_OK, 0);
 }
 
-static void record_cancel_tile(void* user_data, mln_canonical_tile_id tile_id) {
-  if (mln_test_calls.count < mln_test_max_calls) {
-    seen_tiles[mln_test_calls.count] = tile_id;
-  }
-  mln_test_record_call('x', user_data, MLN_STATUS_OK, 0);
+static void record_fetch(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
+  record_tile_call('f', user_data, map, source_id, tile_id);
+}
+
+static void record_cancel_tile(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
+  record_tile_call('x', user_data, map, source_id, tile_id);
 }
 
 static void record_end(void* user_data, const mln_camera_transition_end* end) {
@@ -140,6 +157,13 @@ static void a_custom_source_runs_its_fetches_and_cancels_then_its_release(
     &fixture, source_reached, &refetched, "the queued cancel and refetch"
   ));
 
+  // The cancel that this invalidation queues runs after the source is gone.
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
+  const int wakes = atomic_load(&queue.wakes);
+  MLN_TEST_AWAIT_OK(mln_map_invalidate_custom_geometry_source_tile(
+    map, MLN_BUFFER_LITERAL("queued"), root_tile, &completion.descriptor, NULL
+  ));
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&queue.wakes, wakes + 1));
   mln_test_render_fixture_destroy(&fixture);
   MLN_TEST_AWAIT_OK(mln_map_remove_style_layer(
     map, MLN_BUFFER_LITERAL("queued-dots"), &completion.descriptor, NULL
@@ -148,9 +172,16 @@ static void a_custom_source_runs_its_fetches_and_cancels_then_its_release(
     map, MLN_BUFFER_LITERAL("queued"), &completion.descriptor, NULL
   ));
   const size_t before_release = mln_test_calls.count;
-  mln_test_dispatch_until_calls(queue.handle, before_release + 1);
+  mln_test_dispatch_until_calls(queue.handle, before_release + 2);
+  TEST_ASSERT_EQUAL_CHAR('x', mln_test_call_at(before_release)->kind);
   TEST_ASSERT_EQUAL_CHAR('r', mln_test_call_at(mln_test_calls.count - 1)->kind);
   TEST_ASSERT_EQUAL_size_t(1, mln_test_count_calls('r', &token));
+  // Every queued call named the map and the source's ID.
+  for (size_t index = 0; index < mln_test_calls.count; index += 1) {
+    if (mln_test_call_at(index)->kind == 'r') continue;
+    TEST_ASSERT_EQUAL_UINT64(map, seen_maps[index]);
+    TEST_ASSERT_EQUAL_STRING("queued", seen_source_ids[index]);
+  }
 
   // A queue does not stand in for fetch_tile.
   options.fetch_tile = NULL;

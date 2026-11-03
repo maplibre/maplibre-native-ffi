@@ -482,13 +482,22 @@ final raw.mln_custom_source_fetch_tile_callback
 _deliverCustomSourceFetchTileCallback = isolateCallable(
   NativeCallable<
     raw.mln_custom_source_fetch_tile_callbackFunction
-  >.isolateLocal((Pointer<Void> userData, raw.mln_canonical_tile_id tileId) {
+  >.isolateLocal((
+    Pointer<Void> userData,
+    int map,
+    raw.mln_buffer_view sourceId,
+    raw.mln_canonical_tile_id tileId,
+  ) {
     runDispatched<CustomSourceFetchTileCallback>(
       userData,
       #mln_custom_source_fetch_tile_callback,
       (callback) {
         if (callback != null) {
-          callback(_readCanonicalTileId(tileId));
+          callback(
+            MapHandle._borrowed(_NativeMap(map)),
+            utf8.decode(_copyBufferView(sourceId)),
+            _readCanonicalTileId(tileId),
+          );
         }
       },
     );
@@ -499,13 +508,22 @@ final raw.mln_custom_source_cancel_tile_callback
 _deliverCustomSourceCancelTileCallback = isolateCallable(
   NativeCallable<
     raw.mln_custom_source_cancel_tile_callbackFunction
-  >.isolateLocal((Pointer<Void> userData, raw.mln_canonical_tile_id tileId) {
+  >.isolateLocal((
+    Pointer<Void> userData,
+    int map,
+    raw.mln_buffer_view sourceId,
+    raw.mln_canonical_tile_id tileId,
+  ) {
     runDispatched<CustomSourceCancelTileCallback>(
       userData,
       #mln_custom_source_cancel_tile_callback,
       (callback) {
         if (callback != null) {
-          callback(_readCanonicalTileId(tileId));
+          callback(
+            MapHandle._borrowed(_NativeMap(map)),
+            utf8.decode(_copyBufferView(sourceId)),
+            _readCanonicalTileId(tileId),
+          );
         }
       },
     );
@@ -4000,10 +4018,14 @@ extension type const _NativeMap(int raw) implements NativeHandle {}
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapHandle implements Finalizable, _CallbackRootOwner {
   MapHandle._(RuntimeHandle parent, _NativeMap handle)
-    : _state = NativeHandleState(handle, 'MapHandle')..retain(parent);
+    : _state = NativeHandleState(handle, 'MapHandle')..retain(parent),
+      _callbackRoots = _CallbackRoots();
+  MapHandle._borrowed(_NativeMap handle)
+    : _state = NativeHandleState(handle, 'MapHandle', borrowed: true),
+      _callbackRoots = _globalCallbackRoots;
   // Roots this owner's callback registrations for as long as it lives.
   @override
-  final _callbackRoots = _CallbackRoots();
+  final _CallbackRoots _callbackRoots;
   final NativeHandleState<_NativeMap> _state;
   _NativeMap get _handle => _state.handle;
   MapHandleDiscarding get discarding => MapHandleDiscarding._(this);

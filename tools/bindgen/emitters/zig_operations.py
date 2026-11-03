@@ -354,6 +354,11 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
         body = consume(
             function, names[receiver_name], body, return_type, infallible, plan.release
         )
+        if inputs[receiver_name].native in values.bound.borrowed_handles:
+            # A value that a callback borrows refuses the call, so a release
+            # that native can't fail can still fail here.
+            infallible = False
+            body.insert(0, f"try {names[receiver_name]}.requireOwned({diagnostic});")
     if needs_allocator:
         signature.insert(0, "allocator: std.mem.Allocator")
     if function.diagnostic:

@@ -986,11 +986,16 @@ class Values:
                 if parameter.value.kind == "handle"
                 and parameter.value.ownership == "owned"
             ]
+            # A handle the callback borrows arrives in an owner that never
+            # releases it.
             converted = ", ".join(
                 "response" + pascal(parameter.name)
                 if parameter in responses
                 else "owned" + pascal(parameter.name)
                 if parameter in owned
+                else f"{self.public_type(parameter.value)}.Borrow({member(parameter.name)})"
+                if parameter.value.kind == "handle"
+                and parameter.value.ownership == "borrowed"
                 else self.copy(parameter.value, f"{member(parameter.name)}")
                 for parameter in callback.arguments
             )

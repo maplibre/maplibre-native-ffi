@@ -413,10 +413,18 @@ def lent_text(value):
     )
 
 
+def borrowed_handle(value):
+    """Whether a callback argument is a handle that native lends for the call,
+    which the host reaches through a reference that can't release it."""
+    return value.kind == "handle" and value.ownership == "borrowed"
+
+
 def callback_parameter_type(values, parameter):
     scoped = response(parameter.value)
     if scoped:
         return "&mut " + values.public(scoped)
+    if borrowed_handle(parameter.value):
+        return "&" + values.public(parameter.value)
     return "&str" if lent_text(parameter.value) else values.public(parameter.value)
 
 
@@ -434,6 +442,8 @@ def callback_parameter_capture(values, parameter, local=None):
         return f"unsafe {{ crate::string::{borrow}({local}) }}?"
     if parameter.value.kind == "handle" and parameter.value.ownership == "owned":
         return f"{values.public(parameter.value)}::adopt({local})?"
+    if borrowed_handle(parameter.value):
+        return f"&*{values.public(parameter.value)}::borrow({local})?"
     if parameter.value.kind == "handle":
         return f"{values.name(parameter.value)} {{ state: std::sync::Arc::clone(&request_state), not_sync: std::marker::PhantomData }}"
     return decode(values, parameter.value, local)

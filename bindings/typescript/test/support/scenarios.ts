@@ -46,7 +46,7 @@ export async function routeRequests(
   await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
   await bounded(
     map.addCustomGeometrySource("custom", {
-      fetchTile: (tile) =>
+      fetchTile: (_map, _sourceId, tile) =>
         tiles.push(`${scheme}/${tile.z}/${tile.x}/${tile.y}`),
     }),
     "a command",

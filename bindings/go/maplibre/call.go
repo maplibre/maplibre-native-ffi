@@ -69,6 +69,9 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	owner := target.owner
 	state := bindingHandleState(owner)
 	defer runtime.KeepAlive(owner)
+	if target.consumes && state.borrowed {
+		panic(bindingFailure{newBindingError(StatusInvalidState, state.typeName+" is borrowed by a callback, which can't release it")})
+	}
 	if target.consumes && synchronous && !target.repeatReachesNative && state.released.Load() {
 		var zero T
 		return zero

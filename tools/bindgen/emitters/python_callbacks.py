@@ -163,6 +163,13 @@ def sources(values, plan):
             for p in parameters
             if p.value.kind == "handle" and p.value.ownership == "owned"
         ]
+        # A handle the callback borrows arrives in an owner that never
+        # releases it.
+        borrowed = [
+            p
+            for p in parameters
+            if p.value.kind == "handle" and p.value.ownership == "borrowed"
+        ]
         required = not field.value.nullable
         fields.append(
             f"    {name}: {public_name(callback.native)}"
@@ -170,12 +177,14 @@ def sources(values, plan):
         )
         signature = ", ".join(["self"] + [p.name for p in parameters])
         arguments = ", ".join(
-            p.name if p in owned else values.facade_copy(p.value, p.name)
+            p.name
+            if p in owned or p in borrowed
+            else values.facade_copy(p.value, p.name)
             for p in parameters
         )
         wraps = "".join(
             f"        {p.name} = _adopt_value({p.name}, {OWNERS[p.value.native]!r})\n"
-            for p in owned
+            for p in [*owned, *borrowed]
         )
         invoke = f"return callback({arguments})"
         if owned:
@@ -191,9 +200,11 @@ def sources(values, plan):
             for p in callback.parameters
         )
 
-        def copy_parameter(parameter, owned=owned):
+        def copy_parameter(parameter, owned=owned, borrowed=borrowed):
             if parameter in owned:
                 return f"{rust_field(parameter.name)}_owner"
+            if parameter in borrowed:
+                return f"{OWNERS[parameter.value.native]}::borrow(py, {rust_field(parameter.name)})?"
             return values.copy(parameter.value, rust_field(parameter.name))
 
         copied = ", ".join(copy_parameter(p) for p in parameters)
@@ -345,7 +356,8 @@ def protocol_sources(values):
             f", {field_name(p.name)}: "
             + (
                 OWNERS[p.value.native]
-                if p.value.kind == "handle" and p.value.ownership == "owned"
+                if p.value.kind == "handle"
+                and p.value.ownership in {"owned", "borrowed"}
                 else values.type(p.value)
             )
             for p in callback.arguments

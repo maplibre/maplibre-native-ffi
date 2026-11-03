@@ -15,10 +15,15 @@ import type { Registrations, RootHolder } from "./realm.ts";
 
 /** The key that only generated code passes to an owner constructor. */
 export const ADOPT: unique symbol = Symbol("adopt");
-export type AdoptKey = typeof ADOPT;
+/**
+ * The key that builds an owner of a handle that a callback borrows, which the
+ * owner never releases or disposes.
+ */
+export const BORROW: unique symbol = Symbol("borrow");
+export type AdoptKey = typeof ADOPT | typeof BORROW;
 
 export function checkKey(key: AdoptKey): void {
-  if (key !== ADOPT) {
+  if (key !== ADOPT && key !== BORROW) {
     throw new TypeError("this object is created by the MapLibre Native API");
   }
 }
@@ -30,6 +35,8 @@ interface OwnerState extends RootHolder {
   readonly parent: Owner | undefined;
   token: object | undefined;
   released: boolean;
+  // A callback borrows the handle, so the owner never releases it.
+  readonly borrowed: boolean;
 }
 
 let stateOf: (owner: Owner) => OwnerState;
@@ -72,14 +79,18 @@ export abstract class Owner {
     if (options.root) {
       armExit();
     }
+    const borrowed = key === BORROW;
     // The token takes ownership of the handle, so it is the last step that
-    // can fail.
+    // can fail. A borrowed handle has none, so nothing disposes it.
     this.#state = {
       handle,
       name,
       parent: options.parent,
-      token: native.ownerTokenCreate(handle, name, !!options.session),
+      token: borrowed
+        ? undefined
+        : native.ownerTokenCreate(handle, name, !!options.session),
       released: false,
+      borrowed,
       roots: new Map(),
     };
     options.registrations?.commit(this.#state);
@@ -99,9 +110,24 @@ export abstract class Owner {
   }
 }
 
-/** The callback roots of an owner, which its registering calls extend. */
-export function rootsOf(owner: Owner): RootHolder {
-  return stateOf(owner);
+/**
+ * The callback roots of an owner, which its registering calls extend. A
+ * borrowed owner doesn't outlive its callback, so the realm roots the
+ * registrations made through it until native code releases them.
+ */
+export function rootsOf(owner: Owner): RootHolder | undefined {
+  const state = stateOf(owner);
+  return state.borrowed ? undefined : state;
+}
+
+/** Refuses to release a handle that a callback borrows. */
+function checkReleasable(state: OwnerState): void {
+  if (state.borrowed) {
+    throw new MaplibreError(
+      Status.invalidState,
+      `${state.name} is borrowed by a callback, which can't release it`,
+    );
+  }
 }
 
 function released(state: OwnerState): void {
@@ -119,6 +145,7 @@ export function closeSync(
   release: (handle: bigint, token: object | undefined) => void,
 ) {
   const state = stateOf(owner);
+  checkReleasable(state);
   if (state.released) {
     return;
   }
@@ -137,6 +164,7 @@ export function answerSync(
   answer: (handle: bigint, token: object | undefined) => void,
 ) {
   const state = stateOf(owner);
+  checkReleasable(state);
   answer(state.handle, state.token);
   released(state);
 }
@@ -154,6 +182,7 @@ export function closeAsync(
   const state = stateOf(owner);
   let completion: Promise<void>;
   try {
+    checkReleasable(state);
     completion = release(state.handle, state.token);
   } catch (error) {
     return Promise.reject(error);

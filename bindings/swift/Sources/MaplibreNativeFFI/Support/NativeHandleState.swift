@@ -5,12 +5,16 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private let lock = NSLock()
   private var closed = false
   private let parent: AnyObject?
+  /// Whether a callback borrows the handle, which the binding then never
+  /// releases or disposes.
+  private let borrowed: Bool
   let value: Handle
 
   init(
     typeName: String,
     handle: Handle,
-    parent: AnyObject? = nil
+    parent: AnyObject? = nil,
+    borrowed: Bool = false
   ) throws {
     guard !handle.isNull else {
       throw MaplibreError
@@ -18,11 +22,12 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
     self.typeName = typeName
     self.parent = parent
+    self.borrowed = borrowed
     value = handle
   }
 
   deinit {
-    if !closed {
+    if !closed, !borrowed {
       NativeRetirement(
         handle: value,
         parent: parent,
@@ -44,8 +49,10 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     return "\(typeName)(id=0x\(String(value.raw, radix: 16)), closed=\(closed))"
   }
 
-  /// Closes a handle whose `destroy` can't fail.
+  /// Closes a handle whose `destroy` can't fail. A borrowed handle stays
+  /// open.
   func closeInfallibly(_ destroy: (Handle) -> Void) {
+    guard !borrowed else { return }
     try! closeOnce(destroy)
   }
 
@@ -53,6 +60,11 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     idempotent: Bool = true,
     _ destroy: (Handle) throws -> Void
   ) throws {
+    guard !borrowed else {
+      throw MaplibreError.invalidState(
+        "\(typeName) is borrowed by a callback, which can't release it"
+      )
+    }
     let shouldClose = lock.withLock { !(idempotent && closed) }
     guard shouldClose else { return }
     defer { withExtendedLifetime(parent) {} }

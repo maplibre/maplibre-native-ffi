@@ -72,9 +72,9 @@ export function network(
 
   // #region custom-source
   map.discarding.addCustomGeometrySource("app-data", {
-    fetchTile: (tile) => {
+    fetchTile: (map, sourceId, tile) => {
       map.discarding.setCustomGeometrySourceTileData(
-        "app-data",
+        sourceId,
         tile,
         geojsonForTile(tile),
       );

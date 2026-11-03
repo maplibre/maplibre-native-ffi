@@ -446,8 +446,16 @@ def lower(api: Api | BoundApi) -> Lowered:
             operation_doc(bound, plan, "  ") + rendered[plan.name] for plan in common
         ]
         if callback_owner(bound, receiver):
+            # A borrowed owner doesn't outlive its callback, so the
+            # registrations made through it stay rooted until native releases
+            # them.
+            callbacks = (
+                "if (binding.borrowed) CallbackOwner.global else CallbackOwner()"
+                if receiver in bound.borrowed_handles
+                else "CallbackOwner()"
+            )
             body.insert(
-                0, "  internal val bindingCallbacks: CallbackOwner = CallbackOwner()\n"
+                0, f"  internal val bindingCallbacks: CallbackOwner = {callbacks}\n"
             )
         trailer = ""
         commands = [p for p in common if p.completion and p.completion.discardable]

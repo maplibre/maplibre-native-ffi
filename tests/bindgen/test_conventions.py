@@ -166,6 +166,20 @@ mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diag
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 bind(parse(source.replace(before, after)), require_complete=True)
 
+    def test_a_callback_handle_argument_says_who_owns_it(self):
+        source = """
+typedef unsigned long long request BIND("kind=handle;release=request_close");
+void request_close(request value);
+typedef void (*notify)(void *context, request value BIND("ownership=borrowed"));
+"""
+        validate(parse(source))
+        validate(parse(source.replace("ownership=borrowed", "ownership=owned")))
+        with self.assertRaisesRegex(
+            ModelError,
+            "handle parameter 'value' requires ownership=owned or ownership=borrowed",
+        ):
+            validate(parse(source.replace(' BIND("ownership=borrowed")', "")))
+
     def test_a_callback_failure_must_be_a_result_it_can_return(self):
         source = """
 typedef enum decision : unsigned { PASS = 0, TAKE = 1 } decision;

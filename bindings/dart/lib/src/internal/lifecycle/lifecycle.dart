@@ -32,11 +32,26 @@ const _createOwnerToken = raw.mln_binding_owner_token_create;
 const _destroyOwnerToken = raw.mln_binding_owner_token_destroy;
 
 final class NativeHandleState<H extends NativeHandle> implements Finalizable {
-  NativeHandleState(this._handle, this.typeName) {
+  /// Owns [_handle], or, when [borrowed], wraps a handle that a callback
+  /// borrows, which the binding never releases or disposes.
+  NativeHandleState(this._handle, this.typeName, {this.borrowed = false}) {
     if (_handle.isNull) {
       throwInvalidArgument('$typeName handle must not be the null handle');
     }
-    _attachOwnerFinalizer(_handle);
+    if (!borrowed) {
+      _attachOwnerFinalizer(_handle);
+    }
+  }
+
+  final bool borrowed;
+
+  void _checkReleasable() {
+    if (borrowed) {
+      throw MaplibreException(
+        Status.invalidState,
+        "$typeName is borrowed by a callback, which can't release it",
+      );
+    }
   }
 
   final H _handle;
@@ -62,6 +77,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
 
   /// Releases the native handle once native accepts [destroy].
   void close(int Function(H) destroy) {
+    _checkReleasable();
     if (_closed) return;
     answer(destroy);
   }
@@ -70,6 +86,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// call. A repeated answer still reaches native, which reports the handle
   /// stale, where a second [close] does nothing.
   void answer(int Function(H) answer) {
+    _checkReleasable();
     checkNativeCall(answer(_handle));
     _closed = true;
     _detachOwnerFinalizer();
@@ -81,6 +98,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   Future<void> closeAsync(Future<void> Function(H) submit) {
     final Future<void> completion;
     try {
+      _checkReleasable();
       completion = submit(_handle);
     } catch (error, stack) {
       return Future.error(error, stack);

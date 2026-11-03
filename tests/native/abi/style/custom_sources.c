@@ -9,16 +9,37 @@
 #include "support/test_support.h"
 
 // Written from MapLibre threads and read from the test thread, so atomic. Each
-// callback pulses, so the waits below wake on it.
+// callback pulses, so the waits below wake on it. A case sets map and
+// source_id before it adds the source, and every call that names another map
+// or source counts in misnamed.
 typedef struct custom_probe {
+  mln_map map;
+  const char* source_id;
   atomic_size_t release_count;
   atomic_size_t fetch_count;
   atomic_size_t root_fetches;
   atomic_size_t root_cancels;
+  atomic_size_t misnamed;
 } custom_probe;
 
-static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
+static bool view_equals(mln_buffer_view view, const char* text) {
+  return view.size == strlen(text) && memcmp(view.data, text, view.size) == 0;
+}
+
+static void probe_check_names(
+  custom_probe* probe, mln_map map, mln_buffer_view source_id
+) {
+  if (map != probe->map || !view_equals(source_id, probe->source_id)) {
+    atomic_fetch_add(&probe->misnamed, 1);
+  }
+}
+
+static void probe_fetch_tile(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
   custom_probe* probe = user_data;
+  probe_check_names(probe, map, source_id);
   atomic_fetch_add(&probe->fetch_count, 1);
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_fetches, 1);
@@ -26,8 +47,12 @@ static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
   mln_test_pulse();
 }
 
-static void probe_cancel_tile(void* user_data, mln_canonical_tile_id tile_id) {
+static void probe_cancel_tile(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
   custom_probe* probe = user_data;
+  probe_check_names(probe, map, source_id);
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_cancels, 1);
   }
@@ -226,10 +251,13 @@ static const custom_kind kinds[] = {
        kind < kinds + sizeof(kinds) / sizeof(kinds[0]); kind += 1)
 
 static void init_probe(custom_probe* probe) {
+  probe->map = MLN_HANDLE_NULL;
+  probe->source_id = "";
   atomic_init(&probe->release_count, 0);
   atomic_init(&probe->fetch_count, 0);
   atomic_init(&probe->root_fetches, 0);
   atomic_init(&probe->root_cancels, 0);
+  atomic_init(&probe->misnamed, 0);
 }
 
 static mln_status submit_and_settle(
@@ -244,6 +272,8 @@ static mln_status submit_and_settle(
 static void add_source(
   const custom_kind* kind, mln_map map, custom_probe* probe
 ) {
+  probe->map = map;
+  probe->source_id = kind->source_id;
   mln_test_completion add = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     kind->add(map, probe, ADD_VALID, &add.descriptor), kind->name
@@ -488,10 +518,97 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
       );
     }
 
+    // Every fetch and cancel named this map and the source's ID.
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(
+      0, atomic_load(&probe.misnamed), kind->name
+    );
+
     mln_test_render_fixture_destroy(&fixture);
     mln_test_destroy_map(map);
     mln_test_destroy_runtime(runtime);
   }
+}
+
+// Answers each fetch through the map and source ID that the call names, with a
+// point whose "source" property is that ID. The null completion discards the
+// command's outcome.
+static void answer_with_source_id(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
+  (void)user_data;
+  char data[256];
+  snprintf(
+    data, sizeof(data),
+    "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
+    "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},"
+    "\"properties\":{\"source\":\"%.*s\"}}]}",
+    (int)source_id.size, (const char*)source_id.data
+  );
+  (void)mln_map_set_custom_geometry_source_tile_data(
+    map, source_id, tile_id, mln_buffer_view_from_cstr(data), NULL, NULL
+  );
+}
+
+typedef struct shared_target {
+  const mln_test_render_fixture* fixture;
+  const char* source_ids[2];
+} shared_target;
+
+static bool source_answered(
+  const mln_test_render_fixture* fixture, const char* source_id
+) {
+  const mln_test_feature_list list =
+    mln_test_style_query_source(fixture, source_id, NULL);
+  char property[64];
+  snprintf(property, sizeof(property), "\"source\":\"%s\"", source_id);
+  return list.status == MLN_STATUS_OK && list.count == 1 &&
+         strstr(list.features[0].feature, property) != NULL;
+}
+
+static bool both_sources_answered(void* context) {
+  const shared_target* target = context;
+  return source_answered(target->fixture, target->source_ids[0]) &&
+         source_answered(target->fixture, target->source_ids[1]);
+}
+
+static void sources_that_share_a_callback_answer_their_own_tiles(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
+  shared_target target = {.source_ids = {"first", "second"}};
+  int shared = 0;
+  for (size_t index = 0; index < 2; index += 1) {
+    const mln_custom_geometry_source_options options = {
+      .size = sizeof(mln_custom_geometry_source_options),
+      .fetch_tile = answer_with_source_id,
+      .user_data = &shared,
+    };
+    MLN_TEST_AWAIT_OK(mln_map_add_custom_geometry_source(
+      map, mln_buffer_view_from_cstr(target.source_ids[index]), &options,
+      &completion.descriptor, NULL
+    ));
+    char layer[96];
+    snprintf(
+      layer, sizeof(layer),
+      "{\"id\":\"%s-dots\",\"type\":\"circle\",\"source\":\"%s\"}",
+      target.source_ids[index], target.source_ids[index]
+    );
+    MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+      map, mln_buffer_view_from_cstr(layer), MLN_BUFFER_LITERAL(""),
+      &completion.descriptor, NULL
+    ));
+  }
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  target.fixture = &fixture;
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, both_sources_answered, &target, "each source's own answer"
+  ));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 // Set from MapLibre's threads, so it lives in static storage that outlives any
@@ -844,6 +961,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_explicit_removal_releases_once);
   RUN_TEST(accepted_adds_release_their_callback_state);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
+  RUN_TEST(sources_that_share_a_callback_answer_their_own_tiles);
   RUN_TEST(a_failed_tile_is_reported_and_invalidation_refetches_it);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);
   RUN_TEST(custom_sources_take_and_validate_every_option);

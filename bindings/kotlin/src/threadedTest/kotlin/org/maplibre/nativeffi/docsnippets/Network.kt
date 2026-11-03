@@ -89,9 +89,9 @@ private fun network(runtime: RuntimeHandle, map: MapHandle) {
   map.discarding.addCustomGeometrySource(
     "app-data",
     CustomGeometrySourceOptions(
-      fetchTile = { tile ->
-        map.discarding.setCustomGeometrySourceTileData(
-          "app-data",
+      fetchTile = { sourceMap, sourceId, tile ->
+        sourceMap.discarding.setCustomGeometrySourceTileData(
+          sourceId,
           tile,
           geojsonForTile(tile),
         )

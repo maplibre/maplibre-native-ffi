@@ -42,20 +42,30 @@ struct OwnedView {
 };
 
 auto queue_tile_fetch(
-  void* registration, mln_canonical_tile_id tile_id
+  void* registration, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) noexcept -> void {
   static_cast<void>(
     static_cast<const mln::delivery::QueuedRegistration*>(registration)
-      ->push(mln::delivery::CustomSourceFetchTileArguments{.tile_id = tile_id})
+      ->push(
+        mln::delivery::CustomSourceFetchTileArguments{
+          .map = map, .source_id = source_id, .tile_id = tile_id
+        }
+      )
   );
 }
 
 auto queue_tile_cancel(
-  void* registration, mln_canonical_tile_id tile_id
+  void* registration, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) noexcept -> void {
   static_cast<void>(
     static_cast<const mln::delivery::QueuedRegistration*>(registration)
-      ->push(mln::delivery::CustomSourceCancelTileArguments{.tile_id = tile_id})
+      ->push(
+        mln::delivery::CustomSourceCancelTileArguments{
+          .map = map, .source_id = source_id, .tile_id = tile_id
+        }
+      )
   );
 }
 

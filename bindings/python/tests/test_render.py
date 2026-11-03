@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
+import gc
 import subprocess
 import sys
 import threading
@@ -447,6 +448,112 @@ def test_a_session_renders_pixels_the_binding_reads_back(harness: Harness) -> No
         assert image.info.stride >= WIDTH * 4
         assert len(image.data) == image.info.byte_length
         assert image.data[:4] == RED_PIXEL
+
+
+def test_a_custom_source_answers_through_the_map_it_borrows(harness: Harness) -> None:
+    fetched = Signal()
+    calls: list[tuple[int, str, mln.Status]] = []
+
+    def fetch_tile(
+        map_handle: mln.MapHandle, source_id: str, tile: mln.CanonicalTileId
+    ) -> None:
+        map_handle.discarding.set_custom_geometry_source_tile_data(
+            source_id, tile, {"type": "FeatureCollection", "features": []}
+        )
+        # The callback borrows the map, so it can't release it.
+        try:
+            map_handle.dispose()
+        except mln.MaplibreError as error:
+            calls.append((map_handle.id, source_id, error.status))
+        fetched.notify()
+
+    with Offscreen(harness) as target:
+        assert target.map is not None
+        result(target.map.set_style_json(RED_STYLE))
+        result(
+            target.map.add_custom_geometry_source(
+                "custom", mln.CustomGeometrySourceOptions(fetch_tile=fetch_tile)
+            )
+        )
+        result(
+            target.map.add_style_layer_json(
+                {"id": "dots", "type": "circle", "source": "custom"}, ""
+            )
+        )
+        # The map asks for its tiles as it renders.
+        for _ in range(32):
+            if calls:
+                break
+            target.render()
+        fetched.wait_until(lambda: calls or None, "a tile fetch")
+        assert calls[0] == (target.map.id, "custom", mln.Status.INVALID_STATE)
+        assert not target.map.is_closed
+
+
+def test_a_source_added_through_a_borrowed_map_survives_a_collection(
+    harness: Harness,
+) -> None:
+    fetched = Signal()
+    added: list[bool] = []
+    inner_tiles: list[mln.CanonicalTileId] = []
+    empty = {"type": "FeatureCollection", "features": []}
+
+    def fetch_tile(
+        map_handle: mln.MapHandle, source_id: str, tile: mln.CanonicalTileId
+    ) -> None:
+        map_handle.discarding.set_custom_geometry_source_tile_data(
+            source_id, tile, empty
+        )
+        if added:
+            return
+
+        # The inner callback holds the borrowed map that registers it, so
+        # only that registration keeps the two alive.
+        def fetch_inner_tile(
+            _: mln.MapHandle, inner_id: str, inner_tile: mln.CanonicalTileId
+        ) -> None:
+            map_handle.discarding.set_custom_geometry_source_tile_data(
+                inner_id, inner_tile, empty
+            )
+            inner_tiles.append(inner_tile)
+            fetched.notify()
+
+        map_handle.discarding.add_custom_geometry_source(
+            "inner", mln.CustomGeometrySourceOptions(fetch_tile=fetch_inner_tile)
+        )
+        added.append(True)
+        fetched.notify()
+
+    with Offscreen(harness) as target:
+        assert target.map is not None
+        result(target.map.set_style_json(RED_STYLE))
+        result(
+            target.map.add_custom_geometry_source(
+                "outer", mln.CustomGeometrySourceOptions(fetch_tile=fetch_tile)
+            )
+        )
+        result(
+            target.map.add_style_layer_json(
+                {"id": "outer", "type": "circle", "source": "outer"}, ""
+            )
+        )
+        for _ in range(32):
+            if added:
+                break
+            target.render()
+        fetched.wait_until(lambda: added or None, "the inner source")
+        gc.collect()
+        # The inner source fetches tiles once a layer uses it.
+        result(
+            target.map.add_style_layer_json(
+                {"id": "inner", "type": "circle", "source": "inner"}, ""
+            )
+        )
+        for _ in range(32):
+            if inner_tiles:
+                break
+            target.render()
+        fetched.wait_until(lambda: inner_tiles or None, "an inner tile fetch")
 
 
 @pytest.mark.parametrize("backend", BACKENDS)

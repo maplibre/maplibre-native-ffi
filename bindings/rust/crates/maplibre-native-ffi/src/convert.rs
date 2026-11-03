@@ -568,8 +568,8 @@ mod tests {
         let tile = CanonicalTileId::new(3, 4, 5);
         for accepted in [false, true] {
             let seen = Arc::clone(&calls);
-            let options = CustomGeometrySourceOptions::new(move |received| {
-                assert_eq!(received, tile);
+            let options = CustomGeometrySourceOptions::new(move |map, source_id, received| {
+                assert_eq!((map.id(), source_id, received), (7, "custom", tile));
                 seen.fetch_add(1, Ordering::SeqCst);
                 panic!("contained callback panic");
             });
@@ -583,9 +583,13 @@ mod tests {
             drop(arena);
             if accepted {
                 let native = to_native(&tile, &mut InputArena::default()).unwrap();
+                let source_id = sys::mln_buffer_view {
+                    data: b"custom".as_ptr().cast(),
+                    size: 6,
+                };
                 // SAFETY: accepted registration retains its generated root until release.
                 unsafe {
-                    raw.fetch_tile.unwrap()(raw.user_data, native);
+                    raw.fetch_tile.unwrap()(raw.user_data, sys::mln_map(7), source_id, native);
                     raw.release_user_data.unwrap()(raw.user_data);
                 }
             }

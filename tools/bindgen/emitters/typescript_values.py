@@ -438,6 +438,13 @@ class Values:
         which an owner adopts."""
         return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
+    def borrowed_argument(self, parameter) -> bool:
+        """Whether a callback argument is a handle that the callback borrows,
+        which an owner presents without releasing it."""
+        return (
+            parameter.value.kind == "handle" and parameter.value.ownership == "borrowed"
+        )
+
     def argument_handle(self, parameter):
         return parameter.value.handle or self.bound.handles[parameter.value.native]
 
@@ -450,7 +457,9 @@ class Values:
                 "callback must answer on its native thread, which TypeScript cannot run"
             )
         for parameter in callback.arguments:
-            if self.owned_argument(callback, parameter):
+            if self.owned_argument(callback, parameter) or self.borrowed_argument(
+                parameter
+            ):
                 handle = self.argument_handle(parameter)
                 if handle.native not in self.bound.public_handles:
                     raise Unsupported("delivered handle requires a generated owner")
@@ -506,7 +515,9 @@ class Values:
     def callback_type(self, callback) -> str:
         parameters = []
         for parameter in callback.arguments:
-            if self.owned_argument(callback, parameter):
+            if self.owned_argument(callback, parameter) or self.borrowed_argument(
+                parameter
+            ):
                 ts = owner_class(self.argument_handle(parameter))
             else:
                 ts = self.ts(parameter.value)

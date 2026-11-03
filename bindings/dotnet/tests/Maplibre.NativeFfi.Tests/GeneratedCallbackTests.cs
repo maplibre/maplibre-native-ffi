@@ -8,14 +8,20 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class GeneratedCallbackTests
 {
+    // The callback borrows the map that it names, so it can't release it.
     [Fact]
     public void GeneratedCallbacksCopyArgumentsAndContainFailures()
     {
-        CanonicalTileId? fetched = null;
+        (ulong Map, string SourceId, CanonicalTileId Tile)? fetched = null;
+        Exception? release = null;
         var options = new CustomGeometrySourceOptions
         {
-            FetchTile = tile => fetched = tile,
-            CancelTile = _ => throw new InvalidOperationException("callback failure"),
+            FetchTile = (map, sourceId, tile) =>
+            {
+                fetched = (map.Id, sourceId, tile);
+                release = Record.Exception(map.Dispose);
+            },
+            CancelTile = (_, _, _) => throw new InvalidOperationException("callback failure"),
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeCustomGeometrySourceOptions(options, scope);
@@ -25,9 +31,14 @@ public sealed unsafe class GeneratedCallbackTests
             x = 2,
             y = 3,
         };
-        native.fetch_tile(native.user_data, tile);
-        native.cancel_tile(native.user_data, tile);
-        Assert.Equal(new CanonicalTileId(1, 2, 3), fetched);
+        fixed (byte* id = "custom"u8)
+        {
+            var sourceId = new mln_buffer_view { data = id, size = 6 };
+            native.fetch_tile(native.user_data, new MlnMap(7), sourceId, tile);
+            native.cancel_tile(native.user_data, new MlnMap(7), sourceId, tile);
+        }
+        Assert.Equal((7UL, "custom", new CanonicalTileId(1, 2, 3)), fetched);
+        Assert.Equal(Status.InvalidState, Assert.IsType<MaplibreException>(release).Status);
         native.release_user_data(native.user_data);
         scope.Accept();
     }
@@ -41,7 +52,7 @@ public sealed unsafe class GeneratedCallbackTests
         var native = Prepare(() => Interlocked.Increment(ref calls));
         Gc.Collect();
 
-        native.fetch_tile(native.user_data, default);
+        native.fetch_tile(native.user_data, new MlnMap(7), default, default);
         native.release_user_data(native.user_data);
         Assert.Equal(1, calls);
     }
@@ -51,7 +62,7 @@ public sealed unsafe class GeneratedCallbackTests
     {
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeCustomGeometrySourceOptions(
-            new CustomGeometrySourceOptions { FetchTile = _ => onFetch() },
+            new CustomGeometrySourceOptions { FetchTile = (_, _, _) => onFetch() },
             scope
         );
         scope.Accept();

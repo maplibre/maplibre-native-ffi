@@ -247,6 +247,8 @@ HANDLE_DECLARATIONS = {
     "native_name",
     "methods",
     "adopt",
+    "borrow",
+    "requireOwned",
     "id",
     "isClosed",
     "format",
@@ -393,12 +395,24 @@ pub const OwnedValue = marshal.OwnedValue;
             and receiver_native(plan) == handle.native
             for plan in bound.operations
         )
+        # A callback's copy of a borrowed handle keeps the flag, so no copy
+        # can release the caller's handle.
+        borrowable = handle.native in bound.borrowed_handles
         members = [
             "raw: u64,",
             "closed: bool = false,",
+            *(["borrowed: bool = false,"] if borrowable else []),
             f'pub const native_name = "{handle.native}";',
             f'const methods = owner.Handle(@This(), "{public}", {dispose});',
             "pub const adopt = methods.adopt;",
+            *(
+                [
+                    "const borrow = methods.borrow;",
+                    "const requireOwned = methods.requireOwned;",
+                ]
+                if borrowable
+                else []
+            ),
             "pub const id = methods.id;",
             "pub const isClosed = methods.isClosed;",
             "pub const format = methods.format;",

@@ -404,17 +404,20 @@ void mln_ts_dispatch_camera_transition_end_callback(
 }
 
 void mln_ts_dispatch_custom_source_cancel_tile_callback(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
   napi_handle_scope scope;
   napi_env env = mln_ts_upcall_begin(user_data, &scope);
   bool received = false;
   if (env != NULL) {
-    napi_value argv[1] = {
+    napi_value argv[3] = {
+      mln_ts_u64(env, (uint64_t)(map)),
+      mln_ts_text(env, (source_id).data, (source_id).size),
       mln_ts_read_canonical_tile_id(env, &(tile_id), sizeof(tile_id))
     };
     received = mln_ts_upcall_end(
-      user_data, scope, MLN_TS_CALLBACK_CUSTOM_SOURCE_CANCEL_TILE_CALLBACK, 1,
+      user_data, scope, MLN_TS_CALLBACK_CUSTOM_SOURCE_CANCEL_TILE_CALLBACK, 3,
       argv
     );
   }
@@ -422,17 +425,20 @@ void mln_ts_dispatch_custom_source_cancel_tile_callback(
 }
 
 void mln_ts_dispatch_custom_source_fetch_tile_callback(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
   napi_handle_scope scope;
   napi_env env = mln_ts_upcall_begin(user_data, &scope);
   bool received = false;
   if (env != NULL) {
-    napi_value argv[1] = {
+    napi_value argv[3] = {
+      mln_ts_u64(env, (uint64_t)(map)),
+      mln_ts_text(env, (source_id).data, (source_id).size),
       mln_ts_read_canonical_tile_id(env, &(tile_id), sizeof(tile_id))
     };
     received = mln_ts_upcall_end(
-      user_data, scope, MLN_TS_CALLBACK_CUSTOM_SOURCE_FETCH_TILE_CALLBACK, 1,
+      user_data, scope, MLN_TS_CALLBACK_CUSTOM_SOURCE_FETCH_TILE_CALLBACK, 3,
       argv
     );
   }

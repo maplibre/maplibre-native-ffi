@@ -247,10 +247,16 @@ def _lower(api):
             ),
             diagnostic="nil",
         )
+        borrow = (
+            f'func borrow{owner}(raw uint64) *{owner} {{ return &{owner}{{bindingBorrow(raw, "{owner}")}} }}\n'
+            if native in bound.borrowed_handles
+            else ""
+        )
         owners.append(
             doc(bound, native, owner)
             + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",func(raw uint64){{ {dispose} }})}}; return owner }}\n'
-            f"func (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
+            + borrow
+            + f"func (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}\n"
             + owner_members(owner, native in bound.event_sources)
         )
         used_support.add(disposer)

@@ -70,13 +70,15 @@ private func network(runtime: RuntimeHandle, map: MapHandle) throws {
   // #region custom-source
   try map.discarding.addCustomGeometrySource(
     "app-data",
-    options: CustomGeometrySourceOptions(fetchTile: { tile in
-      try? map.discarding.setCustomGeometrySourceTileData(
-        "app-data",
-        tileId: tile,
-        data: geojsonForTile(tile)
-      )
-    })
+    options: CustomGeometrySourceOptions(
+      fetchTile: { sourceMap, sourceId, tile in
+        try? sourceMap.discarding.setCustomGeometrySourceTileData(
+          sourceId,
+          tileId: tile,
+          data: geojsonForTile(tile)
+        )
+      }
+    )
   )
   // #endregion custom-source
 

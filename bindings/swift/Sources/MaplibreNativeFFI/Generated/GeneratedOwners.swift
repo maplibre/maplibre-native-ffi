@@ -131,6 +131,14 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
     )
   }
 
+  init(borrowing raw: mln_map) throws {
+    handle = try NativeHandleState(
+      typeName: "MapHandle",
+      handle: NativeMapHandle(raw: raw),
+      borrowed: true
+    )
+  }
+
   /// The native handle, which no later handle in the process reuses
   /// and runtime events report as their source. It stays valid after
   /// the handle closes.

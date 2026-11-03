@@ -43,6 +43,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         state = new(handle, StartRelease, nameof(MapHandle), Abandon, retainedParent: parent);
     }
 
+    private MapHandle(MlnMap handle, bool borrowed)
+    {
+        Ready = Task.CompletedTask;
+        state = new(handle, StartRelease, nameof(MapHandle), Abandon, borrowed: borrowed);
+    }
+
+    internal static MapHandle Borrow(MlnMap handle) => new(handle, borrowed: true);
+
     internal static MapHandle Adopt(RuntimeHandle parent, MlnMap handle, Task completion) =>
         NativeHandleState<MlnMap>.Adopt(
             handle,

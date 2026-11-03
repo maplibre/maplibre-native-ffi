@@ -2,6 +2,8 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.callback.reportUncaught
 
 /**
@@ -17,6 +19,8 @@ internal open class HandleState(
   private val typeName: String,
   val handle: Long,
   private val dispose: (Long) -> Unit,
+  /** Whether a callback borrows the handle, which the binding then never releases or disposes. */
+  val borrowed: Boolean = false,
 ) {
   private val released = AtomicBoolean(false)
 
@@ -28,7 +32,20 @@ internal open class HandleState(
    * native refuses leaves the flag clear, so a later one can retry. Native decides which concurrent
    * release ends the handle.
    */
-  open fun <T> release(call: () -> T): T = call().also { released.store(true) }
+  open fun <T> release(call: () -> T): T {
+    checkReleasable()
+    return call().also { released.store(true) }
+  }
+
+  /** Refuses to release a handle that a callback borrows. */
+  protected fun checkReleasable() {
+    if (borrowed) {
+      throw MaplibreException(
+        Status.INVALID_STATE,
+        "$typeName is borrowed by a callback, which can't release it",
+      )
+    }
+  }
 
   /**
    * Disposes a handle that its owner never released, then reports the leak, with any disposal
@@ -36,7 +53,7 @@ internal open class HandleState(
    * handle.
    */
   fun disposeLeaked() {
-    if (!released.compareAndSet(false, true)) return
+    if (borrowed || !released.compareAndSet(false, true)) return
     val failure =
       try {
         dispose(handle)

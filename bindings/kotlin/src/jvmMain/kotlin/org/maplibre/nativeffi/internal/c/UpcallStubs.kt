@@ -36,6 +36,8 @@ internal actual object UpcallStubs {
       "customGeometrySourceOptionsFetchTile",
       null,
       JAVA_LONG,
+      JAVA_LONG,
+      mln_buffer_view,
       mln_canonical_tile_id,
     )
   actual val customGeometrySourceOptionsCancelTile: Long =
@@ -44,6 +46,8 @@ internal actual object UpcallStubs {
       "customGeometrySourceOptionsCancelTile",
       null,
       JAVA_LONG,
+      JAVA_LONG,
+      mln_buffer_view,
       mln_canonical_tile_id,
     )
   actual val customVectorSourceOptionsFetchTile: Long =
@@ -52,6 +56,8 @@ internal actual object UpcallStubs {
       "customVectorSourceOptionsFetchTile",
       null,
       JAVA_LONG,
+      JAVA_LONG,
+      mln_buffer_view,
       mln_canonical_tile_id,
     )
   actual val customVectorSourceOptionsCancelTile: Long =
@@ -60,6 +66,8 @@ internal actual object UpcallStubs {
       "customVectorSourceOptionsCancelTile",
       null,
       JAVA_LONG,
+      JAVA_LONG,
+      mln_buffer_view,
       mln_canonical_tile_id,
     )
   actual val resourceRequestCancelHandlerCallback: Long =

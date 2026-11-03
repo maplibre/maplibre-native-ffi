@@ -24,12 +24,17 @@ internal sealed unsafe class NativeHandleState<T>
     private object? retainedParent;
     private bool closed;
 
+    // Whether a callback borrows the handle, which the binding then never
+    // releases or disposes.
+    private readonly bool borrowed;
+
     internal NativeHandleState(
         T handle,
         StatusDestroy<T> destroy,
         string typeName,
         StatusDestroy<T>? disposeAbandoned = null,
-        object? retainedParent = null
+        object? retainedParent = null,
+        bool borrowed = false
     )
     {
         if (handle.Value == 0)
@@ -42,6 +47,9 @@ internal sealed unsafe class NativeHandleState<T>
         this.typeName = typeName;
         this.disposeAbandoned = disposeAbandoned;
         this.retainedParent = retainedParent;
+        this.borrowed = borrowed;
+        if (borrowed)
+            GC.SuppressFinalize(this);
     }
 
     ~NativeHandleState()
@@ -115,6 +123,11 @@ internal sealed unsafe class NativeHandleState<T>
     // Returns whether this call ended the handle, rather than finding it closed.
     internal bool Release(StatusDestroy<T> release, bool idempotent = true)
     {
+        if (borrowed)
+            throw new MaplibreException(
+                global::Maplibre.NativeFfi.Status.InvalidState,
+                $"{typeName} is borrowed by a callback, which can't release it."
+            );
         lock (gate)
         {
             if (idempotent && closed)

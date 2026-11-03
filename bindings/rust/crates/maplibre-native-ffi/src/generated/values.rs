@@ -706,10 +706,12 @@ impl Default for ConstrainMode {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
 pub struct CustomGeometrySourceOptions {
-    /// The callback receives (`tile_id`).
-    pub fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
-    /// The callback receives (`tile_id`).
-    pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
+    /// The callback receives (`map`, `source_id`, `tile_id`).
+    pub fetch_tile:
+        std::sync::Arc<dyn Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static>,
+    /// The callback receives (`map`, `source_id`, `tile_id`).
+    pub cancel_tile:
+        Option<std::sync::Arc<dyn Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     /// How far, in pixels, simplified geometry can stray from the original.
@@ -733,14 +735,14 @@ impl std::fmt::Debug for CustomGeometrySourceOptions {
 impl CustomGeometrySourceOptions {
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
+        F: Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static,
     {
         self.cancel_tile = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(fetch_tile: F) -> Self
     where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
+        F: Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static,
     {
         Self {
             fetch_tile: std::sync::Arc::new(fetch_tile),
@@ -756,25 +758,37 @@ impl CustomGeometrySourceOptions {
     }
     unsafe extern "C" fn fetch_tile_trampoline(
         user_data: *mut std::ffi::c_void,
+        map: sys::mln_map,
+        source_id: sys::mln_buffer_view,
         tile_id: sys::mln_canonical_tile_id,
     ) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_custom_source_fetch_tile_callback", (), || {
-            (state.fetch_tile)(unsafe { from_native(tile_id) }?);
+            (state.fetch_tile)(
+                &*MapHandle::borrow(map)?,
+                unsafe { crate::string::borrow_string_view(source_id) }?,
+                unsafe { from_native(tile_id) }?,
+            );
             Ok(())
         })
     }
     unsafe extern "C" fn cancel_tile_trampoline(
         user_data: *mut std::ffi::c_void,
+        map: sys::mln_map,
+        source_id: sys::mln_buffer_view,
         tile_id: sys::mln_canonical_tile_id,
     ) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_custom_source_cancel_tile_callback", (), || {
-            callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
+            callback::require(&state.cancel_tile)?(
+                &*MapHandle::borrow(map)?,
+                unsafe { crate::string::borrow_string_view(source_id) }?,
+                unsafe { from_native(tile_id) }?,
+            );
             Ok(())
         })
     }
@@ -834,10 +848,12 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
 pub struct CustomVectorSourceOptions {
-    /// The callback receives (`tile_id`).
-    pub fetch_tile: std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>,
-    /// The callback receives (`tile_id`).
-    pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) + Send + Sync + 'static>>,
+    /// The callback receives (`map`, `source_id`, `tile_id`).
+    pub fetch_tile:
+        std::sync::Arc<dyn Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static>,
+    /// The callback receives (`map`, `source_id`, `tile_id`).
+    pub cancel_tile:
+        Option<std::sync::Arc<dyn Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
 }
@@ -850,14 +866,14 @@ impl std::fmt::Debug for CustomVectorSourceOptions {
 impl CustomVectorSourceOptions {
     pub fn with_cancel_tile<F>(mut self, callback: F) -> Self
     where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
+        F: Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static,
     {
         self.cancel_tile = Some(std::sync::Arc::new(callback));
         self
     }
     pub fn new<F>(fetch_tile: F) -> Self
     where
-        F: Fn(CanonicalTileId) + Send + Sync + 'static,
+        F: Fn(&MapHandle, &str, CanonicalTileId) + Send + Sync + 'static,
     {
         Self {
             fetch_tile: std::sync::Arc::new(fetch_tile),
@@ -868,25 +884,37 @@ impl CustomVectorSourceOptions {
     }
     unsafe extern "C" fn fetch_tile_trampoline(
         user_data: *mut std::ffi::c_void,
+        map: sys::mln_map,
+        source_id: sys::mln_buffer_view,
         tile_id: sys::mln_canonical_tile_id,
     ) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_custom_source_fetch_tile_callback", (), || {
-            (state.fetch_tile)(unsafe { from_native(tile_id) }?);
+            (state.fetch_tile)(
+                &*MapHandle::borrow(map)?,
+                unsafe { crate::string::borrow_string_view(source_id) }?,
+                unsafe { from_native(tile_id) }?,
+            );
             Ok(())
         })
     }
     unsafe extern "C" fn cancel_tile_trampoline(
         user_data: *mut std::ffi::c_void,
+        map: sys::mln_map,
+        source_id: sys::mln_buffer_view,
         tile_id: sys::mln_canonical_tile_id,
     ) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_custom_source_cancel_tile_callback", (), || {
-            callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
+            callback::require(&state.cancel_tile)?(
+                &*MapHandle::borrow(map)?,
+                unsafe { crate::string::borrow_string_view(source_id) }?,
+                unsafe { from_native(tile_id) }?,
+            );
             Ok(())
         })
     }
