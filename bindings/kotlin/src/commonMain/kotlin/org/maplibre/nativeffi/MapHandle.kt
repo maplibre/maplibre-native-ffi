@@ -1020,7 +1020,7 @@ internal constructor(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(120, 152, 108),
+          w(192, 232, 176),
         ) {
           readStyleSourceInfo(it)
         }
@@ -1387,8 +1387,8 @@ internal constructor(
   /**
    * Replaces the data of a GeoJSON source.
    *
-   * `data` must have been prepared with the same options as the source. It can be released once
-   * this function returns.
+   * `data` must have been prepared with the source's options, which `MapHandle.getStyleSource()`
+   * reports, though `min_zoom` may differ. `data` can be released once this function returns.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

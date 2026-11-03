@@ -2021,8 +2021,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Replaces the data of a GeoJSON source.
     /// </summary>
     /// <remarks>
-    /// <para><c>data</c> must have been prepared with the same options as the
-    /// source. It can be released once this function returns.</para>
+    /// <para><c>data</c> must have been prepared with the source's options,
+    /// which <c>MapHandle.GetStyleSourceAsync()</c> reports, though
+    /// <c>min_zoom</c> may differ. <c>data</c> can be released once this
+    /// function returns.</para>
     /// <para>See <c>mln_map_set_geo_json_source_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

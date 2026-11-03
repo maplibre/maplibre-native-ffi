@@ -35,7 +35,7 @@ internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
   allocate(8, 4).also { putLogicalSize(it, value) }
 
 internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
-  writeU32(target, w(64, 72).toUInt())
+  writeU32(target, w(72, 80, 68).toUInt())
   var fields = 0u
   value.minZoom?.let {
     fields = fields or 1u
@@ -64,21 +64,21 @@ internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSou
   }
   value.clusterMinPoints?.let {
     fields = fields or 64u
-    writeU32(target + w(56, 64), it)
+    writeU64(target + w(56, 64), it)
   }
   value.lineMetrics?.let {
     fields = fields or 128u
-    writeBool(target + w(60, 68), it)
+    writeBool(target + w(64, 72), it)
   }
   value.cluster?.let {
     fields = fields or 256u
-    writeBool(target + w(61, 69), it)
+    writeBool(target + w(65, 73), it)
   }
   writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions): Long =
-  allocate(w(64, 72), w(8, 8, 4)).also { putGeoJsonSourceOptions(it, value) }
+  allocate(w(72, 80, 68), w(8, 8, 4)).also { putGeoJsonSourceOptions(it, value) }
 
 internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
   writeF64(target, value.northing)
@@ -1297,6 +1297,8 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
     rasterEncoding =
       if ((fields and 16u) != 0u) StyleRasterDemEncoding(readU32(source + w(112, 144, 104)))
       else null,
+    geoJson =
+      if ((fields and 32u) != 0u) readGeoJsonSourceOptions(source + w(120, 152, 108)) else null,
   )
 }
 
@@ -1805,6 +1807,22 @@ internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
     maxZoom = readF64(source + w(16, 24)),
     scheme = StyleTileScheme(readU32(source + w(24, 32))),
   )
+
+internal fun readGeoJsonSourceOptions(source: Long): GeoJsonSourceOptions {
+  val fields = readU32(source + 4)
+  return GeoJsonSourceOptions(
+    minZoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
+    maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    tolerance = if ((fields and 4u) != 0u) readF64(source + 24) else null,
+    clusterMaxZoom = if ((fields and 8u) != 0u) readF64(source + 32) else null,
+    clusterProperties = readViewString(source + 40),
+    buffer = if ((fields and 16u) != 0u) readU32(source + w(48, 56)) else null,
+    clusterRadius = if ((fields and 32u) != 0u) readU32(source + w(52, 60)) else null,
+    clusterMinPoints = if ((fields and 64u) != 0u) readU64(source + w(56, 64)) else null,
+    lineMetrics = if ((fields and 128u) != 0u) readBool(source + w(64, 72)) else null,
+    cluster = if ((fields and 256u) != 0u) readBool(source + w(65, 73)) else null,
+  )
+}
 
 internal fun readLogicalExtent(source: Long): LogicalExtent =
   LogicalExtent(

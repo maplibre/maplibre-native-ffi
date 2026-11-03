@@ -1141,20 +1141,21 @@ impl ToNative<sys::mln_free_camera_options> for FreeCameraOptions {
 /// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct GeoJsonSourceOptions<'a> {
+pub struct GeoJsonSourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub tolerance: Option<f64>,
     pub cluster_max_zoom: Option<f64>,
     /// The `clusterProperties` object, or empty for none.
-    pub cluster_properties: &'a str,
+    pub cluster_properties: String,
     pub buffer: Option<u32>,
     pub cluster_radius: Option<u32>,
-    pub cluster_min_points: Option<u32>,
+    /// At most 4294967295 on a 32-bit target.
+    pub cluster_min_points: Option<u64>,
     pub line_metrics: Option<bool>,
     pub cluster: Option<bool>,
 }
-impl<'a> ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions<'a> {
+impl ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_geo_json_source_options> {
         let mut raw: sys::mln_geo_json_source_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_geo_json_source_options>() as _;
@@ -1197,6 +1198,32 @@ impl<'a> ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions<'a>
             raw.cluster = *item;
         }
         Ok(raw)
+    }
+}
+impl FromNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
+    unsafe fn from_native(raw: sys::mln_geo_json_source_options) -> Result<Self> {
+        Ok(Self {
+            min_zoom: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
+            tolerance: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE != 0)
+                .then_some(raw.tolerance),
+            cluster_max_zoom: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0)
+                .then_some(raw.cluster_max_zoom),
+            cluster_properties: unsafe { from_native(raw.cluster_properties) }?,
+            buffer: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_BUFFER != 0)
+                .then_some(raw.buffer),
+            cluster_radius: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS != 0)
+                .then_some(raw.cluster_radius),
+            cluster_min_points: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+                != 0)
+                .then_some(raw.cluster_min_points),
+            line_metrics: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS != 0)
+                .then_some(raw.line_metrics),
+            cluster: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0)
+                .then_some(raw.cluster),
+        })
     }
 }
 
@@ -5161,6 +5188,9 @@ pub struct StyleSourceInfo {
     pub tile_size: Option<u32>,
     pub vector_encoding: Option<StyleVectorTileEncoding>,
     pub raster_encoding: Option<StyleRasterDemEncoding>,
+    /// A GeoJSON source's options, with every field set. Data prepared with
+    /// them can replace the source's data.
+    pub geo_json: Option<GeoJsonSourceOptions>,
 }
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     unsafe fn from_native(raw: sys::mln_style_source_info) -> Result<Self> {
@@ -5192,6 +5222,13 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
             } else {
                 None
             },
+            geo_json: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_GEO_JSON,
+                    raw.geo_json,
+                )
+            }?,
         })
     }
 }

@@ -50,6 +50,7 @@ struct StyleSourceRecord {
   std::string attribution;
   std::string url;
   std::vector<std::string> tile_urls;
+  std::string cluster_properties;
 };
 
 // A style layer's metadata. type views the layer type's static string.
@@ -135,6 +136,9 @@ auto deliver_style_result(
       if ((info.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON) != 0) {
         info.tile_json.tile_urls = tile_urls.data();
         info.tile_json.tile_url_count = tile_urls.size();
+      }
+      if ((info.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON) != 0) {
+        info.geo_json.cluster_properties = view(source.cluster_properties);
       }
       return info;
     };

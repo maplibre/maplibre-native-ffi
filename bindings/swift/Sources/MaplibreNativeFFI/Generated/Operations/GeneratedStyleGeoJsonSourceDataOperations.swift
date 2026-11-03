@@ -15,9 +15,9 @@ public extension GeoJsonSourceDataHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when `data` isn't valid GeoJSON, or when
-  ///   `options` turns on clustering and `data` isn't a feature collection of
-  ///   points.
+  /// - `Status.invalidArgument` when `data` isn't valid GeoJSON, when an option
+  ///   in `options` is out of range, or when `options` turns on clustering and
+  ///   `data` isn't a feature collection of points.
   static func create(
     data bindingArg0: String,
     options bindingArg1: GeoJsonSourceOptions? = nil

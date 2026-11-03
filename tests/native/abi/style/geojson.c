@@ -333,6 +333,32 @@ static void geojson_pixel_options_respect_the_scaled_limits(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
 }
 
+// The engine counts cluster points in a size_t, so a 32-bit target rejects a
+// count past 32 bits instead of truncating it.
+#if SIZE_MAX <= UINT32_MAX
+static void cluster_min_points_must_fit_a_32_bit_target(void) {
+  mln_geo_json_source_options options = {
+    .size = sizeof(mln_geo_json_source_options)
+  };
+  options.fields = MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+  options.cluster_min_points = UINT32_MAX;
+  mln_geo_json_source_data_release(
+    prepare(POINT_COLLECTION("points"), &options)
+  );
+
+  options.cluster_min_points = (uint64_t)UINT32_MAX + 1U;
+  mln_geo_json_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(mln_geo_json_source_data_create(
+    MLN_BUFFER_LITERAL(POINT_COLLECTION("points")), &options, &data,
+    MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_EQUAL_STRING(
+    "cluster_min_points must be at most 4294967295", mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
+}
+#endif
+
 // The submit-time lease keeps the prepared index alive, so each source keeps
 // its own reference after the host destroys the handle.
 static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
@@ -618,6 +644,9 @@ MLN_TEST_GROUP {
   RUN_TEST(geojson_data_preparation_validates_documents_and_options);
   RUN_TEST(geojson_max_zoom_respects_the_tiling_limit);
   RUN_TEST(geojson_pixel_options_respect_the_scaled_limits);
+#if SIZE_MAX <= UINT32_MAX
+  RUN_TEST(cluster_min_points_must_fit_a_32_bit_target);
+#endif
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
   RUN_TEST(clustering_fields_decide_which_points_the_source_holds);

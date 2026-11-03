@@ -2167,7 +2167,8 @@ public data class GeoJsonSourceOptions(
   public val clusterProperties: String = "",
   public val buffer: UInt? = null,
   public val clusterRadius: UInt? = null,
-  public val clusterMinPoints: UInt? = null,
+  /** At most 4294967295 on a 32-bit target. */
+  public val clusterMinPoints: ULong? = null,
   public val lineMetrics: Boolean? = null,
   public val cluster: Boolean? = null,
 )
@@ -3053,6 +3054,11 @@ public data class StyleSourceInfo(
   public val tileSize: UInt?,
   public val vectorEncoding: StyleVectorTileEncoding?,
   public val rasterEncoding: StyleRasterDemEncoding?,
+  /**
+   * A GeoJSON source's options, with every field set. Data prepared with them can replace the
+   * source's data.
+   */
+  public val geoJson: GeoJsonSourceOptions?,
 )
 
 /**

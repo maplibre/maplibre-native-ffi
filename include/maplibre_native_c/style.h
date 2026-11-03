@@ -65,6 +65,7 @@ typedef enum MLN_BINDING(
   MLN_STYLE_SOURCE_INFO_TILE_SIZE = 1U << 2U,
   MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 3U,
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 4U,
+  MLN_STYLE_SOURCE_INFO_GEO_JSON = 1U << 5U,
 } mln_style_source_info_field;
 
 /** A set of mln_style_source_info_field bits. */
@@ -210,6 +211,39 @@ typedef struct mln_style_source_tile_info {
   mln_style_tile_scheme scheme;
 } mln_style_source_tile_info;
 
+/**
+ * Options for a GeoJSON
+ * [source](https://maplibre.org/maplibre-style-spec/sources/#geojson).
+ *
+ * Zoom levels are whole numbers.
+ */
+typedef struct mln_geo_json_source_options {
+  uint32_t size;
+  mln_geo_json_source_option_fields fields;
+  double min_zoom
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM");
+  double max_zoom
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM");
+  double tolerance
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE");
+  double cluster_max_zoom
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
+  /** The `clusterProperties` object, or empty for none. */
+  mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
+  uint32_t buffer
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_BUFFER");
+  uint32_t cluster_radius
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS");
+  /** At most 4294967295 on a 32-bit target. */
+  uint64_t cluster_min_points MLN_BINDING(
+    "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS"
+  );
+  bool line_metrics
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS");
+  bool cluster
+    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER");
+} mln_geo_json_source_options;
+
 /** A source in the map's style. */
 typedef struct mln_style_source_info {
   mln_buffer_view id;
@@ -231,6 +265,12 @@ typedef struct mln_style_source_info {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING");
   mln_style_raster_dem_encoding raster_encoding
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING");
+  /**
+   * A GeoJSON source's options, with every field set. Data prepared with them
+   * can replace the source's data.
+   */
+  mln_geo_json_source_options geo_json
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_GEO_JSON");
 } mln_style_source_info;
 
 /** A layer in the map's style. */
@@ -255,38 +295,6 @@ typedef struct mln_style_layer_info {
   double max_zoom;
   mln_style_layer_visibility visibility;
 } mln_style_layer_info;
-
-/**
- * Options for a GeoJSON
- * [source](https://maplibre.org/maplibre-style-spec/sources/#geojson).
- *
- * Zoom levels are whole numbers.
- */
-typedef struct mln_geo_json_source_options {
-  uint32_t size;
-  mln_geo_json_source_option_fields fields;
-  double min_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM");
-  double max_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM");
-  double tolerance
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE");
-  double cluster_max_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
-  /** The `clusterProperties` object, or empty for none. */
-  mln_buffer_view cluster_properties MLN_BINDING("encoding=json");
-  uint32_t buffer
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_BUFFER");
-  uint32_t cluster_radius
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS");
-  uint32_t cluster_min_points MLN_BINDING(
-    "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS"
-  );
-  bool line_metrics
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS");
-  bool cluster
-    MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER");
-} mln_geo_json_source_options;
 
 /**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -545,9 +553,9 @@ MLN_API mln_status mln_map_list_style_sources(
  * can share it.
  *
  * Returns:
- * - MLN_STATUS_INVALID_ARGUMENT when `data` isn't valid GeoJSON, or when
- *   `options` turns on clustering and `data` isn't a feature collection of
- *   points.
+ * - MLN_STATUS_INVALID_ARGUMENT when `data` isn't valid GeoJSON, when an
+ *   option in `options` is out of range, or when `options` turns on
+ *   clustering and `data` isn't a feature collection of points.
  */
 MLN_API mln_status mln_geo_json_source_data_create(
   mln_buffer_view data MLN_BINDING("encoding=json"),
@@ -598,8 +606,9 @@ MLN_API mln_status mln_map_set_geo_json_source_url(
 /**
  * Replaces the data of a GeoJSON source.
  *
- * `data` must have been prepared with the same options as the source. It can be
- * released once this function returns.
+ * `data` must have been prepared with the source's options, which
+ * mln_map_get_style_source() reports, though `min_zoom` may differ. `data` can
+ * be released once this function returns.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.

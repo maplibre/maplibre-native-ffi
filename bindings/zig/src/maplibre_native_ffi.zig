@@ -177,8 +177,9 @@ pub const GeoJsonSourceData = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when `data` isn't valid GeoJSON, or when `options`
-    ///   turns on clustering and `data` isn't a feature collection of points.
+    /// - `error.InvalidArgument` when `data` isn't valid GeoJSON, when an option in
+    ///   `options` is out of range, or when `options` turns on clustering and
+    ///   `data` isn't a feature collection of points.
     pub fn create(data: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GeoJsonSourceData {
         return call.invoke("mln_geo_json_source_data_create", .none, {}, null, diagnostic, .{ data, options, call.adopt(GeoJsonSourceData) });
     }
@@ -1066,8 +1067,9 @@ pub const Map = struct {
 
     /// Replaces the data of a GeoJSON source.
     ///
-    /// `data` must have been prepared with the same options as the source. It can
-    /// be released once this function returns.
+    /// `data` must have been prepared with the source's options, which
+    /// `Map.getStyleSource()` reports, though `min_zoom` may differ. `data` can be
+    /// released once this function returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3421,7 +3423,8 @@ pub const GeoJsonSourceOptions = struct {
     cluster_properties: []const u8 = &.{},
     buffer: ?u32 = null,
     cluster_radius: ?u32 = null,
-    cluster_min_points: ?u32 = null,
+    /// At most 4294967295 on a 32-bit target.
+    cluster_min_points: ?u64 = null,
     line_metrics: ?bool = null,
     cluster: ?bool = null,
     pub fn toNative(self: GeoJsonSourceOptions) status.Error!c.mln_geo_json_source_options {
@@ -7049,6 +7052,9 @@ pub const StyleSourceInfo = struct {
     tile_size: ?u32 = null,
     vector_encoding: ?StyleVectorTileEncoding = null,
     raster_encoding: ?StyleRasterDemEncoding = null,
+    /// A GeoJSON source's options, with every field set. Data prepared with
+    /// them can replace the source's data.
+    geo_json: ?GeoJsonSourceOptions = null,
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_info) status.Error!StyleSourceInfo {
         return .{
@@ -7062,6 +7068,7 @@ pub const StyleSourceInfo = struct {
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
             .vector_encoding = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0) StyleVectorTileEncoding.fromNative(raw.vector_encoding) else null,
             .raster_encoding = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0) StyleRasterDemEncoding.fromNative(raw.raster_encoding) else null,
+            .geo_json = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_GEO_JSON != 0) try GeoJsonSourceOptions.fromNative(allocator, raw.geo_json) else null,
         };
     }
 };

@@ -15,6 +15,7 @@ typedef struct source_copy {
   char attribution[64];
   char url[64];
   char tile_urls[2][64];
+  char cluster_properties[128];
   // Whether every view was NUL-terminated, as native lends text.
   bool terminated;
 } source_copy;
@@ -50,6 +51,14 @@ static void copy_sources(void* user_data, const mln_completion_result* result) {
     copy_text(info->id, copy->id, sizeof(copy->id));
     copy_text(info->attribution, copy->attribution, sizeof(copy->attribution));
     copy_text(info->url, copy->url, sizeof(copy->url));
+    if ((info->fields & MLN_STYLE_SOURCE_INFO_GEO_JSON) != 0) {
+      copy->terminated &=
+        mln_test_lent_text_is_terminated(info->geo_json.cluster_properties);
+      copy_text(
+        info->geo_json.cluster_properties, copy->cluster_properties,
+        sizeof(copy->cluster_properties)
+      );
+    }
     for (size_t url = 0; url < info->tile_json.tile_url_count && url < 2;
          url += 1) {
       copy->terminated &=
@@ -174,6 +183,121 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
+
+// A GeoJSON source reports its options, even when style JSON declared it, so
+// data prepared with them can replace its data.
+static void a_geojson_source_reports_the_options_its_data_needs(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_style_serve(runtime, NULL, 0);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
+  add_source_json(
+    map, "clustered",
+    "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
+    "\"features\":[]},\"minzoom\":3,\"maxzoom\":12,\"buffer\":64,"
+    "\"tolerance\":0.5,\"cluster\":true,\"clusterRadius\":40,"
+    "\"clusterMaxZoom\":10,\"clusterMinPoints\":3,"
+    "\"clusterProperties\":{\"total\":[\"+\",[\"get\",\"weight\"]]}}"
+  );
+  add_source_json(
+    map, "vector",
+    "{\"type\":\"vector\",\"tiles\":[\"fixture://a/{z}/{x}/{y}.mvt\"]}"
+  );
+
+  const source_copy vector = read_source(map, "vector");
+  TEST_ASSERT_EQUAL_HEX32(
+    0, vector.info.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON
+  );
+  const source_copy probe = read_source(map, "clustered");
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_STYLE_SOURCE_INFO_GEO_JSON,
+    probe.info.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON
+  );
+  mln_geo_json_source_options options = probe.info.geo_json;
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_geo_json_source_options), options.size);
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM | MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM |
+      MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE |
+      MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+      MLN_GEO_JSON_SOURCE_OPTION_BUFFER |
+      MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS |
+      MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+      MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS |
+      MLN_GEO_JSON_SOURCE_OPTION_CLUSTER,
+    options.fields
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(3.0, options.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, options.max_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(0.5, options.tolerance);
+  TEST_ASSERT_EQUAL_DOUBLE(10.0, options.cluster_max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(64, options.buffer);
+  TEST_ASSERT_EQUAL_UINT32(40, options.cluster_radius);
+  TEST_ASSERT_EQUAL_UINT32(3, options.cluster_min_points);
+  TEST_ASSERT_FALSE(options.line_metrics);
+  TEST_ASSERT_TRUE(options.cluster);
+  TEST_ASSERT_NOT_NULL(strstr(probe.cluster_properties, "\"total\""));
+
+  // The reported options prepare data that the source takes, and min_zoom,
+  // which doesn't shape the prepared data, may differ.
+  static const char points[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
+    "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},"
+    "\"properties\":{\"weight\":2}}]}";
+  options.cluster_properties =
+    mln_buffer_view_from_cstr(probe.cluster_properties);
+  for (int pass = 0; pass < 2; pass += 1) {
+    if (pass == 1) options.min_zoom = 0.0;
+    mln_geo_json_source_data data = MLN_HANDLE_NULL;
+    MLN_TEST_OK(mln_geo_json_source_data_create(
+      MLN_BUFFER_LITERAL(points), &options, &data, NULL
+    ));
+    MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
+      map, MLN_BUFFER_LITERAL("clustered"), data, &completion.descriptor, NULL
+    ));
+    mln_geo_json_source_data_release(data);
+  }
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The engine counts cluster points in a size_t, so a count past 32 bits
+// reports exactly and prepares data that the source takes. A 32-bit target
+// can't hold one.
+#if SIZE_MAX > UINT32_MAX
+static void a_geojson_source_reports_its_full_cluster_min_points(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\","
+           "\"data\":{\"type\":\"FeatureCollection\",\"features\":[]},"
+           "\"clusterMinPoints\":4294967296}},\"layers\":[]}"
+         )
+  );
+
+  const source_copy probe = read_source(map, "points");
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_STYLE_SOURCE_INFO_GEO_JSON,
+    probe.info.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON
+  );
+  const mln_geo_json_source_options options = probe.info.geo_json;
+  TEST_ASSERT_EQUAL_UINT64(4294967296ULL, options.cluster_min_points);
+
+  mln_geo_json_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_geo_json_source_data_create(
+    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+    &options, &data, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
+    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
+  ));
+  mln_geo_json_source_data_release(data);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
 
 static void assert_same_source(
   const source_copy* expected, const source_copy* actual
@@ -424,6 +548,10 @@ static void image_sources_take_corners_images_and_urls(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_source_reports_its_url_attribution_and_tilejson);
+  RUN_TEST(a_geojson_source_reports_the_options_its_data_needs);
+#if SIZE_MAX > UINT32_MAX
+  RUN_TEST(a_geojson_source_reports_its_full_cluster_min_points);
+#endif
   RUN_TEST(sources_list_in_style_order_with_their_info);
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);

@@ -368,11 +368,7 @@ Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
   }
   if (value.clusterMinPoints != null) {
     result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
-    result.ref.cluster_min_points = _nativeInteger(
-      value.clusterMinPoints!,
-      0,
-      4294967295,
-    );
+    result.ref.cluster_min_points = value.clusterMinPoints!;
   }
   if (value.lineMetrics != null) {
     result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS;
@@ -384,6 +380,43 @@ Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
   }
   return result;
 }
+
+GeoJsonSourceOptions _readGeoJsonSourceOptions(
+  raw.mln_geo_json_source_options source,
+) => GeoJsonSourceOptions(
+  minZoom: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) != 0
+      ? source.min_zoom
+      : null,
+  maxZoom: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM) != 0
+      ? source.max_zoom
+      : null,
+  tolerance: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE) != 0
+      ? source.tolerance
+      : null,
+  clusterMaxZoom:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
+      ? source.cluster_max_zoom
+      : null,
+  clusterProperties: _decodeJsonView(source.cluster_properties),
+  buffer: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_BUFFER) != 0
+      ? source.buffer
+      : null,
+  clusterRadius:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0
+      ? source.cluster_radius
+      : null,
+  clusterMinPoints:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0
+      ? source.cluster_min_points
+      : null,
+  lineMetrics:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS) != 0
+      ? source.line_metrics
+      : null,
+  cluster: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER) != 0
+      ? source.cluster
+      : null,
+);
 
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
@@ -1392,6 +1425,9 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
       rasterEncoding:
           (source.fields & raw.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0
           ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
+          : null,
+      geoJson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_GEO_JSON) != 0
+          ? _readGeoJsonSourceOptions(source.geo_json)
           : null,
     );
 
@@ -3320,9 +3356,9 @@ final class GeoJsonSourceDataHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidArgument` when `data` isn't valid GeoJSON, or when
-  ///   `options` turns on clustering and `data` isn't a feature collection of
-  ///   points.
+  /// - `Status.invalidArgument` when `data` isn't valid GeoJSON, when an option
+  ///   in `options` is out of range, or when `options` turns on clustering and
+  ///   `data` isn't a feature collection of points.
   static GeoJsonSourceDataHandle create(
     Object? data, {
     GeoJsonSourceOptions? options,
@@ -5396,8 +5432,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Replaces the data of a GeoJSON source.
   ///
-  /// `data` must have been prepared with the same options as the source. It can
-  /// be released once this function returns.
+  /// `data` must have been prepared with the source's options, which
+  /// `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
+  /// can be released once this function returns.
   ///
   /// See `mln_map_set_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

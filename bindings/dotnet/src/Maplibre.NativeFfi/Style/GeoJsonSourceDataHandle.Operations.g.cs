@@ -71,8 +71,9 @@ public sealed unsafe partial class GeoJsonSourceDataHandle
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when <c>data</c> isn't
-    /// valid GeoJSON, or when <c>options</c> turns on clustering and
-    /// <c>data</c> isn't a feature collection of points.</description></item>
+    /// valid GeoJSON, when an option in <c>options</c> is out of range, or when
+    /// <c>options</c> turns on clustering and <c>data</c> isn't a feature
+    /// collection of points.</description></item>
     /// </list>
     /// </remarks>
     public static GeoJsonSourceDataHandle Create(string data, GeoJsonSourceOptions? options = null)

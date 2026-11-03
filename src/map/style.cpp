@@ -812,7 +812,7 @@ auto geojson_source_options_default() noexcept -> mln_geo_json_source_options {
     .cluster_properties = {},
     .buffer = defaults.buffer,
     .cluster_radius = defaults.clusterRadius,
-    .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
+    .cluster_min_points = defaults.clusterMinPoints,
     .line_metrics = defaults.lineMetrics,
     .cluster = defaults.cluster
   };
@@ -1129,6 +1129,12 @@ auto style_source_record(const mln::style::Source& source)
   }
   if (auto url = source_url(source)) {
     record.url = std::move(*url);
+  }
+  if (const auto* geojson = source.as<mln::style::GeoJSONSource>()) {
+    info.fields |= MLN_STYLE_SOURCE_INFO_GEO_JSON;
+    info.geo_json = from_native_geojson_source_options(
+      geojson->getOptions(), record.cluster_properties
+    );
   }
 
   const auto* tile_source = tile_source_from_source(source);

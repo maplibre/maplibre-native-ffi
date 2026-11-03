@@ -1669,6 +1669,7 @@ class GeoJsonSourceOptions:
     cluster_radius: int | None = None
 
     cluster_min_points: int | None = None
+    """At most 4294967295 on a 32-bit target."""
 
     line_metrics: bool | None = None
 
@@ -4234,6 +4235,11 @@ class StyleSourceInfo:
 
     raster_encoding: StyleRasterDemEncoding | None
 
+    geo_json: GeoJsonSourceOptions | None
+    """A GeoJSON source's options, with every field set. Data prepared with them
+    can replace the source's data.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -4247,6 +4253,7 @@ class StyleSourceInfo:
             tile_size=raw["tile_size"],
             vector_encoding=_maybe(StyleVectorTileEncoding, raw["vector_encoding"]),
             raster_encoding=_maybe(StyleRasterDemEncoding, raw["raster_encoding"]),
+            geo_json=_maybe(GeoJsonSourceOptions._from_native, raw["geo_json"]),
         )
 
 

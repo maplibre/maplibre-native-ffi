@@ -2493,9 +2493,25 @@ type GeoJsonSourceOptions struct {
 	ClusterProperties string
 	Buffer            *uint32
 	ClusterRadius     *uint32
-	ClusterMinPoints  *uint32
-	LineMetrics       *bool
-	Cluster           *bool
+	// At most 4294967295 on a 32-bit target.
+	ClusterMinPoints *uint64
+	LineMetrics      *bool
+	Cluster          *bool
+}
+
+func copyGeoJsonSourceOptions(raw C.mln_geo_json_source_options) GeoJsonSourceOptions {
+	var result GeoJsonSourceOptions
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.MaxZoom = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
+	result.Tolerance = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
+	result.ClusterMaxZoom = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0, func() float64 { return float64(raw.cluster_max_zoom) })
+	result.ClusterProperties = bindingString(raw.cluster_properties.data, uint64(raw.cluster_properties.size))
+	result.Buffer = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
+	result.ClusterRadius = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS != 0, func() uint32 { return uint32(raw.cluster_radius) })
+	result.ClusterMinPoints = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0, func() uint64 { return uint64(raw.cluster_min_points) })
+	result.LineMetrics = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS != 0, func() bool { return bool(raw.line_metrics) })
+	result.Cluster = bindingPresent(raw.fields&C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0, func() bool { return bool(raw.cluster) })
+	return result
 }
 
 func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena) C.mln_geo_json_source_options {
@@ -2509,7 +2525,7 @@ func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena)
 	raw.cluster_properties = C.mln_buffer_view{data: arena.bytes([]byte(input.ClusterProperties)), size: C.size_t(len(input.ClusterProperties))}
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_BUFFER, &raw.buffer, input.Buffer, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, input.ClusterRadius, arena, bindingNumber[uint32, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint64, C.uint64_t])
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, input.LineMetrics, arena, bindingBool[bool, C.bool])
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER, &raw.cluster, input.Cluster, arena, bindingBool[bool, C.bool])
 	return raw
@@ -4956,6 +4972,9 @@ type StyleSourceInfo struct {
 	TileSize       *uint32
 	VectorEncoding *StyleVectorTileEncoding
 	RasterEncoding *StyleRasterDemEncoding
+	// A GeoJSON source's options, with every field set. Data prepared with them can
+	// replace the source's data.
+	GeoJson *GeoJsonSourceOptions
 }
 
 func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
@@ -4970,6 +4989,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
 	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
 	result.RasterEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0, func() StyleRasterDemEncoding { return StyleRasterDemEncoding(raw.raster_encoding) })
+	result.GeoJson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_GEO_JSON != 0, func() GeoJsonSourceOptions { return copyGeoJsonSourceOptions(raw.geo_json) })
 	return result
 }
 
@@ -6083,8 +6103,9 @@ func CameraForTile(tile CanonicalTileId, logicalSize LogicalSize) (CameraOptions
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidArgument when data isn't valid GeoJSON, or when options
-//     turns on clustering and data isn't a feature collection of points.
+//   - StatusInvalidArgument when data isn't valid GeoJSON, when an option in
+//     options is out of range, or when options turns on clustering and data
+//     isn't a feature collection of points.
 func NewGeoJsonSourceData(data string, options *GeoJsonSourceOptions) (*GeoJsonSourceDataHandle, error) {
 	var outData C.mln_geo_json_source_data
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
@@ -7336,7 +7357,8 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 
 // SetGeoJsonSourceData replaces the data of a GeoJSON source.
 //
-// data must have been prepared with the same options as the source. It can be
+// data must have been prepared with the source's options, which
+// MapHandle.GetStyleSource() reports, though min_zoom may differ. data can be
 // released once this function returns.
 //
 // See mln_map_set_geo_json_source_data in the C API reference:

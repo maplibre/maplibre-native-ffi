@@ -2143,6 +2143,8 @@ final class GeoJsonSourceOptions extends _Value {
   final Object? clusterProperties;
   final int? buffer;
   final int? clusterRadius;
+
+  /// At most 4294967295 on a 32-bit target.
   final int? clusterMinPoints;
   final bool? lineMetrics;
   final bool? cluster;
@@ -4042,6 +4044,7 @@ final class StyleSourceInfo extends _Value {
     this.tileSize,
     this.vectorEncoding,
     this.rasterEncoding,
+    this.geoJson,
   });
   final String id;
   final StyleSourceType type;
@@ -4056,6 +4059,10 @@ final class StyleSourceInfo extends _Value {
   final StyleVectorTileEncoding? vectorEncoding;
   final StyleRasterDemEncoding? rasterEncoding;
 
+  /// A GeoJSON source's options, with every field set. Data prepared with them
+  /// can replace the source's data.
+  final GeoJsonSourceOptions? geoJson;
+
   @override
   List<Object?> get _members => [
     id,
@@ -4068,6 +4075,7 @@ final class StyleSourceInfo extends _Value {
     tileSize,
     vectorEncoding,
     rasterEncoding,
+    geoJson,
   ];
   @override
   String toString() => _describe('StyleSourceInfo', const [
@@ -4081,6 +4089,7 @@ final class StyleSourceInfo extends _Value {
     'tileSize',
     'vectorEncoding',
     'rasterEncoding',
+    'geoJson',
   ]);
 }
 
