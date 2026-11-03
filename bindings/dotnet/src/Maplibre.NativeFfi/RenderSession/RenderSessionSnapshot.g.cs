@@ -18,8 +18,6 @@ public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     LogicalExtent Extent,
     ulong Generation,
-    ulong MapUpdateGeneration,
-    ulong RenderedUpdateGeneration,
     ulong FrameGeneration,
     uint AcquiredFrameCount,
     Status FailureStatus

@@ -193,19 +193,7 @@ public sealed class RenderTests
     {
         var scope = new NativeViewScope();
         var frame = new VulkanTextureFrameView(
-            new VulkanTextureFrame(
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                NativePointer.FromBorrowedAddress(9),
-                10,
-                11
-            ),
+            new VulkanTextureFrame(2, 3, 4, 6, 7, 8, NativePointer.FromBorrowedAddress(9), 10, 11),
             scope
         );
         Assert.Equal(7ul, frame.Image);

@@ -23,7 +23,7 @@ public fun <T> AcquiredFrameHandle.withMetalTexture(block: (MetalTextureFrame) -
       { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
       { C.mln_acquired_frame_view_end(it) },
     ) { scope ->
-      val out = sized(w(64, 72, 56), w(8, 8, 4))
+      val out = sized(w(48, 56, 40), w(8, 8, 4))
       check(C.mln_acquired_frame_get_metal_texture(handle, out, diagnostic))
       block(readMetalTextureFrame(out, scope))
     }

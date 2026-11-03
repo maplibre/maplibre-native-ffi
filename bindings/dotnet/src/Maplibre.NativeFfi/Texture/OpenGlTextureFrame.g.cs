@@ -13,11 +13,9 @@ namespace Maplibre.NativeFfi;
 /// The texture's index in the descriptor's <c>textures</c>.
 /// </param>
 public readonly partial record struct OpenGlTextureFrame(
-    ulong Generation,
     uint Width,
     uint Height,
     double ScaleFactor,
-    ulong FrameId,
     uint Slot,
     uint Texture,
     uint Target

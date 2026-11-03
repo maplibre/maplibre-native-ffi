@@ -13,18 +13,15 @@ class ViewScopeTest {
     val texture = NativePointer.scoped(0x10L, scope)
     val frame =
       MetalTextureFrame(
-          generation = ULong.MAX_VALUE,
           width = 2u,
           height = 3u,
           scaleFactor = 1.0,
-          frameId = 1uL,
           slot = 0u,
           texture = texture,
           device = NativePointer.scoped(0x20L, scope),
           pixelFormat = 0uL,
         )
         .also { it.bindingScope = scope }
-    assertEquals(ULong.MAX_VALUE, frame.generation)
     assertEquals(2u, frame.width)
     assertEquals(0x10L, texture.address)
     scope.close()

@@ -3188,8 +3188,6 @@ auto run_frame_demand(
         result.generation = session->generation;
         result.frame_generation = ++session->frame_generation;
         metadata_request = RenderFrameMetadata{
-          .generation = session->generation,
-          .frame_id = result.frame_generation,
           .slot = static_cast<uint32_t>(selected_slot.value_or(0)),
           .physical_width = session->physical_width,
           .physical_height = session->physical_height,
@@ -3307,8 +3305,6 @@ auto render_session_get_snapshot(
     .state = live->state,
     .extent = {live->width, live->height, live->scale_factor},
     .generation = live->generation,
-    .map_update_generation = live->map_update_generation,
-    .rendered_update_generation = live->rendered_update_generation,
     .frame_generation = live->frame_generation,
     .acquired_frame_count = live->acquired_frame_count,
     .failure_status = live->failure_status,

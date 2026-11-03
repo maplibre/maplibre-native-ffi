@@ -5276,10 +5276,6 @@ export class ScopedMetalTextureFrame {
     this.#scope = scope;
   }
 
-  get generation(): MetalTextureFrame["generation"] {
-    return this.#value.generation;
-  }
-
   get width(): MetalTextureFrame["width"] {
     return this.#value.width;
   }
@@ -5290,10 +5286,6 @@ export class ScopedMetalTextureFrame {
 
   get scaleFactor(): MetalTextureFrame["scaleFactor"] {
     return this.#value.scaleFactor;
-  }
-
-  get frameId(): MetalTextureFrame["frameId"] {
-    return this.#value.frameId;
   }
 
   get slot(): MetalTextureFrame["slot"] {
@@ -5333,10 +5325,6 @@ export class ScopedOpenGlTextureFrame {
     this.#scope = scope;
   }
 
-  get generation(): OpenGlTextureFrame["generation"] {
-    return this.#value.generation;
-  }
-
   get width(): OpenGlTextureFrame["width"] {
     return this.#value.width;
   }
@@ -5347,10 +5335,6 @@ export class ScopedOpenGlTextureFrame {
 
   get scaleFactor(): OpenGlTextureFrame["scaleFactor"] {
     return this.#value.scaleFactor;
-  }
-
-  get frameId(): OpenGlTextureFrame["frameId"] {
-    return this.#value.frameId;
   }
 
   get slot(): OpenGlTextureFrame["slot"] {
@@ -5386,10 +5370,6 @@ export class ScopedVulkanTextureFrame {
     this.#scope = scope;
   }
 
-  get generation(): VulkanTextureFrame["generation"] {
-    return this.#value.generation;
-  }
-
   get width(): VulkanTextureFrame["width"] {
     return this.#value.width;
   }
@@ -5400,10 +5380,6 @@ export class ScopedVulkanTextureFrame {
 
   get scaleFactor(): VulkanTextureFrame["scaleFactor"] {
     return this.#value.scaleFactor;
-  }
-
-  get frameId(): VulkanTextureFrame["frameId"] {
-    return this.#value.frameId;
   }
 
   get slot(): VulkanTextureFrame["slot"] {
@@ -5451,10 +5427,6 @@ export class ScopedWebGpuTextureFrame {
     this.#scope = scope;
   }
 
-  get generation(): WebGpuTextureFrame["generation"] {
-    return this.#value.generation;
-  }
-
   get width(): WebGpuTextureFrame["width"] {
     return this.#value.width;
   }
@@ -5465,10 +5437,6 @@ export class ScopedWebGpuTextureFrame {
 
   get scaleFactor(): WebGpuTextureFrame["scaleFactor"] {
     return this.#value.scaleFactor;
-  }
-
-  get frameId(): WebGpuTextureFrame["frameId"] {
-    return this.#value.frameId;
   }
 
   get slot(): WebGpuTextureFrame["slot"] {

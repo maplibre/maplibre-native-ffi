@@ -10,11 +10,13 @@
 
 typedef struct replacement_wait {
   mln_runtime runtime;
+  mln_map map;
   const mln_test_render_fixture* fixture;
   uint64_t token;
   uint64_t generation;
   uint64_t render_update_generation;
   uint64_t retained_frame;
+  uint64_t repainted_update;
   unsigned int observed_frame_wakes;
   bool host_requested;
   bool pending;
@@ -38,9 +40,15 @@ static bool frame_finished_while_retained(void* context) {
   return snapshot.frame_generation > wait->retained_frame;
 }
 
+static uint64_t latest_update(const replacement_wait* wait) {
+  mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(wait->map, &snapshot, NULL));
+  return snapshot.latest_render_update_generation;
+}
+
 static bool repaint_waits_for_a_demand(void* context) {
-  const mln_render_session_snapshot snapshot = session_snapshot(context);
-  return snapshot.map_update_generation > snapshot.rendered_update_generation;
+  const replacement_wait* wait = context;
+  return latest_update(wait) > wait->repainted_update;
 }
 
 static void request_next(replacement_wait* wait) {
@@ -153,7 +161,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed_ring(
     map, &fixture, 1, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
   ));
-  replacement_wait wait = {.runtime = runtime, .fixture = &fixture};
+  replacement_wait wait = {.runtime = runtime, .map = map, .fixture = &fixture};
   request_next(&wait);
   await_replacement(&wait);
 
@@ -194,6 +202,7 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
     const unsigned int retained_wakes = atomic_load(&fixture.frame_wakes);
     wait.observed_frame_wakes = retained_wakes;
     (void)mln_test_drain_all(runtime);
+    wait.repainted_update = latest_update(&wait);
     MLN_TEST_OK(mln_test_map_request_repaint(map));
     MLN_TEST_OK(mln_test_render_step_until(
       &fixture, repaint_waits_for_a_demand, &wait, mln_test_deadline_default(),

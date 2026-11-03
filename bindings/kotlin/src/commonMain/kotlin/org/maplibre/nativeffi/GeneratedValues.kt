@@ -1757,11 +1757,9 @@ public value class WebGlContextKind(public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class MetalTextureFrame(
-  public val generation: ULong,
   public val width: UInt,
   public val height: UInt,
   public val scaleFactor: Double,
-  public val frameId: ULong,
   /** The texture's index in the descriptor's `textures`. */
   public val slot: UInt,
   /** The MTLTexture. */
@@ -1794,11 +1792,9 @@ public class MetalTextureFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class OpenGlTextureFrame(
-  public val generation: ULong,
   public val width: UInt,
   public val height: UInt,
   public val scaleFactor: Double,
-  public val frameId: ULong,
   /** The texture's index in the descriptor's `textures`. */
   public val slot: UInt,
   texture: UInt,
@@ -1957,11 +1953,9 @@ public data class RenderFrameResult(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class VulkanTextureFrame(
-  public val generation: ULong,
   public val width: UInt,
   public val height: UInt,
   public val scaleFactor: Double,
-  public val frameId: ULong,
   /** The image's index in the descriptor's `textures`. */
   public val slot: UInt,
   /** The VkImage. */
@@ -2005,11 +1999,9 @@ public class VulkanTextureFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class WebGpuTextureFrame(
-  public val generation: ULong,
   public val width: UInt,
   public val height: UInt,
   public val scaleFactor: Double,
-  public val frameId: ULong,
   /** The texture's index in the descriptor's `textures`. */
   public val slot: UInt,
   /** The WGPUTexture. */
@@ -3085,8 +3077,6 @@ public data class RenderSessionSnapshot(
   public val state: RenderSessionState,
   public val extent: LogicalExtent,
   public val generation: ULong,
-  public val mapUpdateGeneration: ULong,
-  public val renderedUpdateGeneration: ULong,
   public val frameGeneration: ULong,
   public val acquiredFrameCount: UInt,
   /**

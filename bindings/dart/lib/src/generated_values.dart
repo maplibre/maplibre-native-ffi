@@ -1404,21 +1404,17 @@ final class WebGlContextKind extends _Enum {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalTextureFrame extends _Value {
   const MetalTextureFrame({
-    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    this.frameId = 0,
     this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
     this.pixelFormat = 0,
   });
-  final int generation;
   final int width;
   final int height;
   final double scaleFactor;
-  final int frameId;
 
   /// The texture's index in the descriptor's `textures`.
   final int slot;
@@ -1434,11 +1430,9 @@ final class MetalTextureFrame extends _Value {
 
   @override
   List<Object?> get _members => [
-    generation,
     width,
     height,
     scaleFactor,
-    frameId,
     slot,
     texture,
     device,
@@ -1446,11 +1440,9 @@ final class MetalTextureFrame extends _Value {
   ];
   @override
   String toString() => _describe('MetalTextureFrame', const [
-    'generation',
     'width',
     'height',
     'scaleFactor',
-    'frameId',
     'slot',
     'texture',
     'device',
@@ -1464,20 +1456,16 @@ final class MetalTextureFrame extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenGlTextureFrame extends _Value {
   const OpenGlTextureFrame({
-    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    this.frameId = 0,
     this.slot = 0,
     this.texture = 0,
     this.target = 0,
   });
-  final int generation;
   final int width;
   final int height;
   final double scaleFactor;
-  final int frameId;
 
   /// The texture's index in the descriptor's `textures`.
   final int slot;
@@ -1486,22 +1474,18 @@ final class OpenGlTextureFrame extends _Value {
 
   @override
   List<Object?> get _members => [
-    generation,
     width,
     height,
     scaleFactor,
-    frameId,
     slot,
     texture,
     target,
   ];
   @override
   String toString() => _describe('OpenGlTextureFrame', const [
-    'generation',
     'width',
     'height',
     'scaleFactor',
-    'frameId',
     'slot',
     'texture',
     'target',
@@ -1862,11 +1846,9 @@ final class RenderFrameResult extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanTextureFrame extends _Value {
   const VulkanTextureFrame({
-    this.generation = 0,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
-    this.frameId = 0,
     this.slot = 0,
     this.image = 0,
     this.imageView = 0,
@@ -1874,11 +1856,9 @@ final class VulkanTextureFrame extends _Value {
     this.format = 0,
     this.layout = 0,
   });
-  final int generation;
   final int width;
   final int height;
   final double scaleFactor;
-  final int frameId;
 
   /// The image's index in the descriptor's `textures`.
   final int slot;
@@ -1900,11 +1880,9 @@ final class VulkanTextureFrame extends _Value {
 
   @override
   List<Object?> get _members => [
-    generation,
     width,
     height,
     scaleFactor,
-    frameId,
     slot,
     image,
     imageView,
@@ -1914,11 +1892,9 @@ final class VulkanTextureFrame extends _Value {
   ];
   @override
   String toString() => _describe('VulkanTextureFrame', const [
-    'generation',
     'width',
     'height',
     'scaleFactor',
-    'frameId',
     'slot',
     'image',
     'imageView',
@@ -4317,8 +4293,6 @@ final class RenderSessionSnapshot extends _Value {
     required this.state,
     this.extent = const LogicalExtent(),
     this.generation = 0,
-    this.mapUpdateGeneration = 0,
-    this.renderedUpdateGeneration = 0,
     this.frameGeneration = 0,
     this.acquiredFrameCount = 0,
     this.failureStatus = const Status.fromRawValue(0),
@@ -4326,8 +4300,6 @@ final class RenderSessionSnapshot extends _Value {
   final RenderSessionState state;
   final LogicalExtent extent;
   final int generation;
-  final int mapUpdateGeneration;
-  final int renderedUpdateGeneration;
   final int frameGeneration;
   final int acquiredFrameCount;
 
@@ -4341,8 +4313,6 @@ final class RenderSessionSnapshot extends _Value {
     state,
     extent,
     generation,
-    mapUpdateGeneration,
-    renderedUpdateGeneration,
     frameGeneration,
     acquiredFrameCount,
     failureStatus,
@@ -4352,8 +4322,6 @@ final class RenderSessionSnapshot extends _Value {
     'state',
     'extent',
     'generation',
-    'mapUpdateGeneration',
-    'renderedUpdateGeneration',
     'frameGeneration',
     'acquiredFrameCount',
     'failureStatus',

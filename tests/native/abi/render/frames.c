@@ -174,10 +174,8 @@ static mln_status call_with_record(
 }
 
 // The preset's texture record describes the frame the session rendered, at the
-// session's extent and generation. Returns the frame's ID.
-static uint64_t expect_preset_texture(
-  const frame_record* record, uint64_t generation
-) {
+// session's extent.
+static void expect_preset_texture(const frame_record* record) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const mln_metal_texture_frame* frame = &record->metal;
   TEST_ASSERT_NOT_NULL(frame->texture);
@@ -201,12 +199,9 @@ static uint64_t expect_preset_texture(
   TEST_ASSERT_NOT_NULL(frame->device);
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->format);
 #endif
-  TEST_ASSERT_EQUAL_UINT64(generation, frame->generation);
   TEST_ASSERT_EQUAL_UINT32(64, frame->width);
   TEST_ASSERT_EQUAL_UINT32(64, frame->height);
   TEST_ASSERT_EQUAL_DOUBLE(1.0, frame->scale_factor);
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->frame_id);
-  return frame->frame_id;
 }
 
 static void only_the_sessions_backend_describes_its_frame_texture(void) {
@@ -222,7 +217,6 @@ static void only_the_sessions_backend_describes_its_frame_texture(void) {
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
 
-  uint64_t first_frame_id = 0;
   for (size_t index = 0; index < accessor_count; index += 1) {
     const accessor_entry* accessor = &accessors[index];
     frame_record record;
@@ -248,18 +242,18 @@ static void only_the_sessions_backend_describes_its_frame_texture(void) {
         snapshot.frame_generation, record.result.frame_generation
       );
     } else if (accessor->call != get_producer_sync) {
-      first_frame_id = expect_preset_texture(&record, snapshot.generation);
+      expect_preset_texture(&record);
     }
   }
   mln_test_render_release_frame(&frame);
 
+  // The next frame reports its own result.
   frame = mln_test_render_and_acquire(&fixture, 2);
-  frame_record record;
-  MLN_TEST_OK(
-    call_with_record(&accessors[PRESET_FRAME_BACKEND], frame, &record, NULL)
-  );
-  TEST_ASSERT_NOT_EQUAL_UINT64(
-    first_frame_id, expect_preset_texture(&record, snapshot.generation)
+  mln_render_frame_result next = {.size = sizeof(mln_render_frame_result)};
+  MLN_TEST_OK(mln_acquired_frame_get_result(frame, &next, NULL));
+  TEST_ASSERT_EQUAL_UINT64(2, next.token);
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    snapshot.frame_generation, next.frame_generation
   );
   mln_test_render_release_frame(&frame);
   detach(runtime, map, &fixture);

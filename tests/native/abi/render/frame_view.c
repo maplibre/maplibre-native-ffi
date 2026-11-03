@@ -418,11 +418,7 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
-  render_frame(&fixture, 1);
-  mln_render_session_snapshot before = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
+  const mln_render_frame_result before = render_frame(&fixture, 1);
 
   mln_camera_update update = {
     .size = sizeof(mln_camera_update),
@@ -441,9 +437,7 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   const uint64_t render_update =
     mln_test_completion_render_update_generation(&jump);
   mln_test_completion_destroy(&jump);
-  TEST_ASSERT_GREATER_THAN_UINT64(
-    before.rendered_update_generation, render_update
-  );
+  TEST_ASSERT_GREATER_THAN_UINT64(before.map_update_generation, render_update);
 
   const mln_render_frame_result frame =
     render_through_update(&fixture, render_update);

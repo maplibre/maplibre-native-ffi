@@ -3,11 +3,9 @@ part of 'runtime.dart';
 
 MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
     MetalTextureFrame(
-      generation: source.generation,
       width: source.width,
       height: source.height,
       scaleFactor: source.scale_factor,
-      frameId: source.frame_id,
       slot: source.slot,
       texture: NativePointer(source.texture.address),
       device: NativePointer(source.device.address),
@@ -17,11 +15,9 @@ MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
 OpenGlTextureFrame _readOpenGlTextureFrame(
   raw.mln_open_gl_texture_frame source,
 ) => OpenGlTextureFrame(
-  generation: source.generation,
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
-  frameId: source.frame_id,
   slot: source.slot,
   texture: source.texture,
   target: source.target,
@@ -250,11 +246,9 @@ RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
 VulkanTextureFrame _readVulkanTextureFrame(
   raw.mln_vulkan_texture_frame source,
 ) => VulkanTextureFrame(
-  generation: source.generation,
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
-  frameId: source.frame_id,
   slot: source.slot,
   image: source.image,
   imageView: source.image_view,
@@ -1728,8 +1722,6 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   state: RenderSessionState.fromRawValue(source.state),
   extent: _readLogicalExtent(source.extent),
   generation: source.generation,
-  mapUpdateGeneration: source.map_update_generation,
-  renderedUpdateGeneration: source.rendered_update_generation,
   frameGeneration: source.frame_generation,
   acquiredFrameCount: source.acquired_frame_count,
   failureStatus: Status.fromRawValue(source.failure_status),
@@ -7480,11 +7472,9 @@ final class ScopedMetalTextureFrame {
   ScopedMetalTextureFrame._(this._scope, this._value);
   final MetalTextureFrame _value;
   final _NativeViewScope _scope;
-  int get generation => _value.generation;
   int get width => _value.width;
   int get height => _value.height;
   double get scaleFactor => _value.scaleFactor;
-  int get frameId => _value.frameId;
   int get slot => _value.slot;
   ScopedNativePointer get texture => ScopedNativePointer(
     _value.texture.address,
@@ -7506,11 +7496,9 @@ final class ScopedOpenGlTextureFrame {
   ScopedOpenGlTextureFrame._(this._scope, this._value);
   final OpenGlTextureFrame _value;
   final _NativeViewScope _scope;
-  int get generation => _value.generation;
   int get width => _value.width;
   int get height => _value.height;
   double get scaleFactor => _value.scaleFactor;
-  int get frameId => _value.frameId;
   int get slot => _value.slot;
   int get texture => _scope.active(_value).texture;
   int get target => _value.target;
@@ -7535,11 +7523,9 @@ final class ScopedVulkanTextureFrame {
   ScopedVulkanTextureFrame._(this._scope, this._value);
   final VulkanTextureFrame _value;
   final _NativeViewScope _scope;
-  int get generation => _value.generation;
   int get width => _value.width;
   int get height => _value.height;
   double get scaleFactor => _value.scaleFactor;
-  int get frameId => _value.frameId;
   int get slot => _value.slot;
   int get image => _scope.active(_value).image;
   int get imageView => _scope.active(_value).imageView;

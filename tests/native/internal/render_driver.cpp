@@ -1939,13 +1939,12 @@ void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
   // work that the look queued.
   fence_driver(fixture);
   fence_driver(fixture);
-  auto snapshot =
-    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
-  MLN_TEST_OK(
-    mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
-  );
-  TEST_ASSERT_LESS_THAN_UINT64(held, snapshot.map_update_generation);
-  TEST_ASSERT_EQUAL_UINT64(held, snapshot.rendered_update_generation);
+  {
+    const auto live = mln::core::lease_render_session(fixture.render.session);
+    const auto lock = std::scoped_lock{live->control_mutex};
+    TEST_ASSERT_LESS_THAN_UINT64(held, live->map_update_generation);
+    TEST_ASSERT_EQUAL_UINT64(held, live->rendered_update_generation);
+  }
   TEST_ASSERT_EQUAL_INT(1, points.hits(SyncPoint::RenderDemandWaits));
 
   points.release(SyncPoint::RenderSessionUpdateNoticed);

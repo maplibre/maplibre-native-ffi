@@ -10,10 +10,6 @@ public final class MetalTextureFrameView {
     snapshot = value; self.scope = scope
   }
 
-  public var generation: UInt64 {
-    snapshot.generation
-  }
-
   public var width: UInt32 {
     snapshot.width
   }
@@ -24,10 +20,6 @@ public final class MetalTextureFrameView {
 
   public var scaleFactor: Double {
     snapshot.scaleFactor
-  }
-
-  public var frameId: UInt64 {
-    snapshot.frameId
   }
 
   public var slot: UInt32 {
@@ -54,10 +46,6 @@ public final class OpenGlTextureFrameView {
     snapshot = value; self.scope = scope
   }
 
-  public var generation: UInt64 {
-    snapshot.generation
-  }
-
   public var width: UInt32 {
     snapshot.width
   }
@@ -68,10 +56,6 @@ public final class OpenGlTextureFrameView {
 
   public var scaleFactor: Double {
     snapshot.scaleFactor
-  }
-
-  public var frameId: UInt64 {
-    snapshot.frameId
   }
 
   public var slot: UInt32 {
@@ -114,10 +98,6 @@ public final class VulkanTextureFrameView {
     snapshot = value; self.scope = scope
   }
 
-  public var generation: UInt64 {
-    snapshot.generation
-  }
-
   public var width: UInt32 {
     snapshot.width
   }
@@ -128,10 +108,6 @@ public final class VulkanTextureFrameView {
 
   public var scaleFactor: Double {
     snapshot.scaleFactor
-  }
-
-  public var frameId: UInt64 {
-    snapshot.frameId
   }
 
   public var slot: UInt32 {

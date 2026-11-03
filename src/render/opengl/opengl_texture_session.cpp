@@ -1256,11 +1256,9 @@ class OpenGLTextureSessionBackend final
     }
     out_metadata = mln_open_gl_texture_frame{
       .size = sizeof(mln_open_gl_texture_frame),
-      .generation = frame.generation,
       .width = frame.physical_width,
       .height = frame.physical_height,
       .scale_factor = frame.scale_factor,
-      .frame_id = frame.frame_id,
       .slot = frame.slot,
       .texture = texture,
       .target = opengl_texture_target,

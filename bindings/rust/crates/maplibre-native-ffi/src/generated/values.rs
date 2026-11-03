@@ -2163,11 +2163,9 @@ impl ToNative<sys::mln_metal_surface_descriptor> for MetalSurfaceDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MetalTextureFrame {
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     /// The texture's index in the descriptor's `textures`.
     pub slot: u32,
     /// The MTLTexture.
@@ -2180,11 +2178,9 @@ pub struct MetalTextureFrame {
 impl FromNative<sys::mln_metal_texture_frame> for MetalTextureFrame {
     unsafe fn from_native(raw: sys::mln_metal_texture_frame) -> Result<Self> {
         Ok(Self {
-            generation: raw.generation,
             width: raw.width,
             height: raw.height,
             scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
             slot: raw.slot,
             texture: raw.texture,
             device: raw.device,
@@ -2745,11 +2741,9 @@ impl<'a> ToNative<sys::mln_open_gl_surface_descriptor> for OpenGlSurfaceDescript
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OpenGlTextureFrame {
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     /// The texture's index in the descriptor's `textures`.
     pub slot: u32,
     pub texture: u32,
@@ -2758,11 +2752,9 @@ pub struct OpenGlTextureFrame {
 impl FromNative<sys::mln_open_gl_texture_frame> for OpenGlTextureFrame {
     unsafe fn from_native(raw: sys::mln_open_gl_texture_frame) -> Result<Self> {
         Ok(Self {
-            generation: raw.generation,
             width: raw.width,
             height: raw.height,
             scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
             slot: raw.slot,
             texture: raw.texture,
             target: raw.target,
@@ -3232,8 +3224,6 @@ pub struct RenderSessionSnapshot {
     pub state: RenderSessionState,
     pub extent: LogicalExtent,
     pub generation: u64,
-    pub map_update_generation: u64,
-    pub rendered_update_generation: u64,
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
     /// `Status::Ok` until the session fails. Then `Status::TargetLost` when it
@@ -3247,8 +3237,6 @@ impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
             state: RenderSessionState::from_raw(raw.state),
             extent: unsafe { from_native(raw.extent) }?,
             generation: raw.generation,
-            map_update_generation: raw.map_update_generation,
-            rendered_update_generation: raw.rendered_update_generation,
             frame_generation: raw.frame_generation,
             acquired_frame_count: raw.acquired_frame_count,
             failure_status: Status::from_raw(raw.failure_status),
@@ -5383,11 +5371,9 @@ impl ToNative<sys::mln_vulkan_surface_descriptor> for VulkanSurfaceDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct VulkanTextureFrame {
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     /// The image's index in the descriptor's `textures`.
     pub slot: u32,
     /// The VkImage.
@@ -5404,11 +5390,9 @@ pub struct VulkanTextureFrame {
 impl FromNative<sys::mln_vulkan_texture_frame> for VulkanTextureFrame {
     unsafe fn from_native(raw: sys::mln_vulkan_texture_frame) -> Result<Self> {
         Ok(Self {
-            generation: raw.generation,
             width: raw.width,
             height: raw.height,
             scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
             slot: raw.slot,
             image: raw.image,
             image_view: raw.image_view,
@@ -5691,11 +5675,9 @@ impl ToNative<sys::mln_web_gpu_surface_descriptor> for WebGpuSurfaceDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WebGpuTextureFrame {
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     /// The texture's index in the descriptor's `textures`.
     pub slot: u32,
     /// The WGPUTexture.
@@ -5710,11 +5692,9 @@ pub struct WebGpuTextureFrame {
 impl FromNative<sys::mln_web_gpu_texture_frame> for WebGpuTextureFrame {
     unsafe fn from_native(raw: sys::mln_web_gpu_texture_frame) -> Result<Self> {
         Ok(Self {
-            generation: raw.generation,
             width: raw.width,
             height: raw.height,
             scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
             slot: raw.slot,
             texture: raw.texture,
             texture_view: raw.texture_view,

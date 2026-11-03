@@ -13,11 +13,9 @@ public sealed class OpenGlTextureFrameView
         this.scope = scope;
     }
 
-    public ulong Generation => value.Generation;
     public uint Width => value.Width;
     public uint Height => value.Height;
     public double ScaleFactor => value.ScaleFactor;
-    public ulong FrameId => value.FrameId;
     public uint Slot => value.Slot;
     public uint Texture => scope.Active(value).Texture;
     public uint Target => value.Target;

@@ -586,8 +586,10 @@ static void a_waiting_demand_renders_the_next_map_update(void) {
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
   mln_test_render_until_idle(runtime, map, &fixture);
-  const uint64_t idle_generation =
-    read_snapshot(fixture.session).rendered_update_generation;
+  // The idle session drew the map's newest update.
+  mln_map_snapshot idle = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &idle, NULL));
+  const uint64_t idle_generation = idle.latest_render_update_generation;
 
   request_waiting(&fixture, 601);
   expect_waiting(&fixture);

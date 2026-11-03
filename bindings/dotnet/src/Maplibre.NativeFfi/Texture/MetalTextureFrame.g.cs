@@ -22,11 +22,9 @@ namespace Maplibre.NativeFfi;
 /// The texture's MTLPixelFormat.
 /// </param>
 public readonly partial record struct MetalTextureFrame(
-    ulong Generation,
     uint Width,
     uint Height,
     double ScaleFactor,
-    ulong FrameId,
     uint Slot,
     NativePointer Texture,
     NativePointer Device,
