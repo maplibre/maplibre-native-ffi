@@ -1491,12 +1491,13 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_abandon", .handle, self, null, diagnostic, .{call.sizedOut(RenderAbandonResult)});
     }
 
-    /// Takes a rendered frame from the session's texture ring, if one is ready.
+    /// Takes the newest rendered frame from the session's texture ring, if one is
+    /// ready.
     ///
-    /// It takes the oldest frame that you haven't acquired. The session can render
-    /// over a frame before you acquire it. While you hold a frame in every texture
-    /// of the ring, new frames wait until you release one. When no frame is ready,
-    /// it succeeds and writes the null handle.
+    /// Older frames that you haven't acquired are dropped, and the session can
+    /// render over a frame before you acquire it. While you hold a frame in every
+    /// texture of the ring, new frames wait until you release one. When no frame is
+    /// ready, it succeeds and writes the null handle.
     ///
     /// See `mln_render_session_acquire_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

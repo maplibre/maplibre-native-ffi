@@ -1759,12 +1759,12 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return RenderAbandonResult._from_native(self._native.abandon())
 
     def acquire_frame(self) -> AcquiredFrameHandle | None:
-        """Takes a rendered frame from the session's texture ring, if one is
-        ready.
+        """Takes the newest rendered frame from the session's texture ring, if
+        one is ready.
 
-        It takes the oldest frame that you haven't acquired. The session can
-        render over a frame before you acquire it. While you hold a frame in
-        every texture of the ring, new frames wait until you release one.
+        Older frames that you haven't acquired are dropped, and the session
+        can render over a frame before you acquire it. While you hold a frame
+        in every texture of the ring, new frames wait until you release one.
         When no frame is ready, it succeeds and writes the null handle.
 
         See `mln_render_session_acquire_frame` in the

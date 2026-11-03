@@ -3618,19 +3618,30 @@ auto render_session_acquire_frame(
     // Every frame published before a queued replacement names a texture that
     // it replaces, which the host may destroy once the replacement completes.
     if (live->texture.pending_retargets != 0) return MLN_STATUS_OK;
-    const auto slot = std::min_element(
-      live->texture.slots.begin(), live->texture.slots.end(),
-      [](const RenderTextureSlot& left, const RenderTextureSlot& right) {
-        if (!left.available || left.acquired) return false;
-        if (!right.available || right.acquired) return true;
+    auto& slots = live->texture.slots;
+    const auto acquirable = [](const RenderTextureSlot& value) {
+      return value.available && !value.acquired;
+    };
+    const auto slot = std::max_element(
+      slots.begin(), slots.end(),
+      [&](const RenderTextureSlot& left, const RenderTextureSlot& right) {
+        if (!acquirable(right)) return false;
+        if (!acquirable(left)) return true;
         return left.result.frame_generation < right.result.frame_generation;
       }
     );
-    if (slot == live->texture.slots.end() || !slot->available || slot->acquired)
-      return MLN_STATUS_OK;
+    if (slot == slots.end() || !acquirable(*slot)) return MLN_STATUS_OK;
     // The driver recorded this when it published the frame; an empty record
     // means the backend had nothing to hand over yet.
     if (!slot->backend_metadata.has_value()) return MLN_STATUS_OK;
+    // The older frames are dropped. The host never saw them, so the renderer
+    // can render into their slots again, as it does when it overwrites a frame
+    // before the host acquires it.
+    for (auto& older : slots) {
+      if (&older == &*slot || !acquirable(older)) continue;
+      older.available = false;
+      older.backend_metadata.reset();
+    }
     frame = std::make_shared<mln_acquired_frame_object>();
     frame->session = live;
     frame->slot = static_cast<std::size_t>(slot - live->texture.slots.begin());

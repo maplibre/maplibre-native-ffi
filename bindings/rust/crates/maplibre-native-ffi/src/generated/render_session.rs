@@ -35,9 +35,10 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_result) }?)
     }
 
-    /// Takes a rendered frame from the session's texture ring, if one is ready.
+    /// Takes the newest rendered frame from the session's texture ring, if one
+    /// is ready.
     ///
-    /// It takes the oldest frame that you haven't acquired. The session can
+    /// Older frames that you haven't acquired are dropped, and the session can
     /// render over a frame before you acquire it. While you hold a frame in
     /// every texture of the ring, new frames wait until you release one. When
     /// no frame is ready, it succeeds and writes the null handle.

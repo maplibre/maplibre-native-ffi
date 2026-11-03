@@ -225,12 +225,13 @@ MLN_API void mln_render_frame_batch_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Takes a rendered frame from the session's texture ring, if one is ready.
+ * Takes the newest rendered frame from the session's texture ring, if one is
+ * ready.
  *
- * It takes the oldest frame that you haven't acquired. The session can render
- * over a frame before you acquire it. While you hold a frame in every texture
- * of the ring, new frames wait until you release one. When no frame is ready,
- * it succeeds and writes the null handle.
+ * Older frames that you haven't acquired are dropped, and the session can
+ * render over a frame before you acquire it. While you hold a frame in every
+ * texture of the ring, new frames wait until you release one. When no frame is
+ * ready, it succeeds and writes the null handle.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session lacks
