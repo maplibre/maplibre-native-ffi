@@ -1265,11 +1265,14 @@ final class mln_runtime_event extends Struct {
   @Uint64()
   external int generation;
   @Uint32()
-  external int code;
-  @Uint32()
   external int payload_type;
   external mln_buffer_view message;
   external mln_runtime_event_payload payload;
+}
+
+final class mln_runtime_event_camera_change extends Struct {
+  @Uint32()
+  external int mode;
 }
 
 final class mln_runtime_event_glyphs extends Struct {
@@ -1294,6 +1297,11 @@ final class mln_runtime_event_handler extends Struct {
   external int queue;
 }
 
+final class mln_runtime_event_loading_failed extends Struct {
+  @Uint32()
+  external int error;
+}
+
 final class mln_runtime_event_offline_region_response_error extends Struct {
   @Int64()
   external int region_id;
@@ -1315,9 +1323,12 @@ final class mln_runtime_event_offline_region_tile_count_limit extends Struct {
 }
 
 final class mln_runtime_event_payload extends Union {
+  external mln_runtime_event_camera_change camera_change;
+  external mln_runtime_event_loading_failed loading_failed;
   external mln_runtime_event_render_frame render_frame;
-  external mln_runtime_event_render_map render_map;
+  external mln_runtime_event_style_image style_image;
   external mln_runtime_event_tile_action tile_action;
+  external mln_runtime_event_source_changed source_changed;
   external mln_runtime_event_offline_region_status offline_region_status;
   external mln_runtime_event_offline_region_response_error
   offline_region_response_error;
@@ -1337,9 +1348,8 @@ final class mln_runtime_event_render_frame extends Struct {
   external mln_rendering_stats stats;
 }
 
-final class mln_runtime_event_render_map extends Struct {
-  @Uint32()
-  external int mode;
+final class mln_runtime_event_source_changed extends Struct {
+  external mln_buffer_view source_id;
 }
 
 final class mln_runtime_event_sprite extends Struct {
@@ -1347,7 +1357,12 @@ final class mln_runtime_event_sprite extends Struct {
   external mln_buffer_view url;
 }
 
+final class mln_runtime_event_style_image extends Struct {
+  external mln_buffer_view image_id;
+}
+
 final class mln_runtime_event_tile_action extends Struct {
+  external mln_buffer_view source_id;
   @Uint32()
   external int operation;
   external mln_tile_id tile_id;
@@ -1965,6 +1980,11 @@ const MLN_MAP_DEBUG_OVERDRAW = 32;
 const MLN_MAP_DEBUG_STENCIL_CLIP = 64;
 const MLN_MAP_DEBUG_DEPTH_BUFFER = 128;
 
+// mln_map_load_error
+const MLN_MAP_LOAD_ERROR_UNKNOWN = 0;
+const MLN_MAP_LOAD_ERROR_STYLE_PARSE = 1;
+const MLN_MAP_LOAD_ERROR_STYLE_LOAD = 2;
+
 // mln_map_mode
 const MLN_MAP_MODE_CONTINUOUS = 0;
 const MLN_MAP_MODE_STATIC = 1;
@@ -2179,14 +2199,17 @@ const MLN_RUNTIME_EVENT_FLAG_ALL = 67108862;
 
 // mln_runtime_event_payload_type
 const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
-const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1;
-const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2;
-const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 3;
-const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4;
-const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5;
-const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6;
-const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 7;
-const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8;
+const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE = 1;
+const MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED = 2;
+const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 3;
+const MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE = 4;
+const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 5;
+const MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6;
+const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7;
+const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8;
+const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9;
+const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10;
+const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11;
 
 // mln_runtime_event_source_type
 const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;

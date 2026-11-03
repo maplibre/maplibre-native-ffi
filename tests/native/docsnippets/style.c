@@ -163,12 +163,9 @@ static void on_events(
     ) {
       continue;
     }
-    // The message holds the image's ID.
-    const mln_premultiplied_rgba8_image image =
-      draw_image(event->message);
-    mln_map_set_style_image(
-      map, event->message, &image, NULL, NULL, NULL
-    );
+    const mln_buffer_view id = event->payload.style_image.image_id;
+    const mln_premultiplied_rgba8_image image = draw_image(id);
+    mln_map_set_style_image(map, id, &image, NULL, NULL, NULL);
   }
 }
 // #endregion missing-image

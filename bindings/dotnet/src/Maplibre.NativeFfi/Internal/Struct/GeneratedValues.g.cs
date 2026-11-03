@@ -1919,21 +1919,32 @@ internal static unsafe class GeneratedValues
             (global::Maplibre.NativeFfi.RuntimeEventSourceType)value.source_type,
             value.source,
             value.generation,
-            value.code,
             RuntimeStructs.CopyUtf8((sbyte*)value.message.data, value.message.size),
             value.payload_type switch
             {
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE =>
+                    new RuntimeEvent.PayloadValue.CameraChange(
+                        CopyRuntimeEventCameraChange(value.payload.camera_change)
+                    ),
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED =>
+                    new RuntimeEvent.PayloadValue.LoadingFailed(
+                        CopyRuntimeEventLoadingFailed(value.payload.loading_failed)
+                    ),
                 mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME =>
                     new RuntimeEvent.PayloadValue.RenderFrame(
                         CopyRuntimeEventRenderFrame(value.payload.render_frame)
                     ),
-                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP =>
-                    new RuntimeEvent.PayloadValue.RenderMap(
-                        CopyRuntimeEventRenderMap(value.payload.render_map)
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE =>
+                    new RuntimeEvent.PayloadValue.StyleImage(
+                        CopyRuntimeEventStyleImage(value.payload.style_image)
                     ),
                 mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION =>
                     new RuntimeEvent.PayloadValue.TileAction(
                         CopyRuntimeEventTileAction(value.payload.tile_action)
+                    ),
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED =>
+                    new RuntimeEvent.PayloadValue.SourceChanged(
+                        CopyRuntimeEventSourceChanged(value.payload.source_changed)
                     ),
                 mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS =>
                     new RuntimeEvent.PayloadValue.OfflineRegionStatus(
@@ -1980,6 +1991,10 @@ internal static unsafe class GeneratedValues
                 ),
             }
         );
+
+    internal static RuntimeEventCameraChange CopyRuntimeEventCameraChange(
+        mln_runtime_event_camera_change value
+    ) => new((global::Maplibre.NativeFfi.CameraChangeMode)value.mode);
 
     internal static RuntimeEventGlyphs CopyRuntimeEventGlyphs(mln_runtime_event_glyphs value) =>
         default(RuntimeEventGlyphs) with
@@ -2030,6 +2045,10 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static RuntimeEventLoadingFailed CopyRuntimeEventLoadingFailed(
+        mln_runtime_event_loading_failed value
+    ) => new((global::Maplibre.NativeFfi.MapLoadError)value.error);
+
     internal static RuntimeEventOfflineRegionResponseError CopyRuntimeEventOfflineRegionResponseError(
         mln_runtime_event_offline_region_response_error value
     ) => new(value.region_id, (global::Maplibre.NativeFfi.ResourceErrorReason)value.reason);
@@ -2052,9 +2071,9 @@ internal static unsafe class GeneratedValues
             CopyRenderingStats(value.stats)
         );
 
-    internal static RuntimeEventRenderMap CopyRuntimeEventRenderMap(
-        mln_runtime_event_render_map value
-    ) => new((global::Maplibre.NativeFfi.RenderMode)value.mode);
+    internal static RuntimeEventSourceChanged CopyRuntimeEventSourceChanged(
+        mln_runtime_event_source_changed value
+    ) => new(RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size));
 
     internal static RuntimeEventSprite CopyRuntimeEventSprite(mln_runtime_event_sprite value) =>
         new(
@@ -2062,9 +2081,18 @@ internal static unsafe class GeneratedValues
             RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
         );
 
+    internal static RuntimeEventStyleImage CopyRuntimeEventStyleImage(
+        mln_runtime_event_style_image value
+    ) => new(RuntimeStructs.CopyUtf8((sbyte*)value.image_id.data, value.image_id.size));
+
     internal static RuntimeEventTileAction CopyRuntimeEventTileAction(
         mln_runtime_event_tile_action value
-    ) => new((global::Maplibre.NativeFfi.TileOperation)value.operation, CopyTileId(value.tile_id));
+    ) =>
+        new(
+            RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
+            (global::Maplibre.NativeFfi.TileOperation)value.operation,
+            CopyTileId(value.tile_id)
+        );
 
     internal static mln_runtime_options NativeRuntimeOptions(
         RuntimeOptions value,

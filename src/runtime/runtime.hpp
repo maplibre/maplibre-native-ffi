@@ -53,7 +53,6 @@ struct HeldMapEvent {
   mln_runtime_event_type type{};
   mln_runtime_event_payload_type payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE;
   mln_runtime_event_payload payload{};
-  uint32_t code = 0;
   std::string message;
   // The text that the payload's views point at; see
   // delivery::bind_event_strings().
@@ -551,8 +550,8 @@ auto push_runtime_map_event_payload(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type,
-  const mln_runtime_event_payload& payload, uint32_t code = 0,
-  std::string message = {}, std::vector<std::string> strings = {}
+  const mln_runtime_event_payload& payload, std::string message = {},
+  std::vector<std::string> strings = {}
 ) -> void;
 auto push_runtime_map_events(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,

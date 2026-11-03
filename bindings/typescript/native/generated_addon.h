@@ -263,11 +263,17 @@ napi_value mln_ts_read_resource_request_info(
 napi_value mln_ts_read_runtime_event(
   napi_env env, const mln_runtime_event* source, size_t size
 );
+napi_value mln_ts_read_runtime_event_camera_change(
+  napi_env env, const mln_runtime_event_camera_change* source, size_t size
+);
 napi_value mln_ts_read_runtime_event_glyphs(
   napi_env env, const mln_runtime_event_glyphs* source, size_t size
 );
 napi_value mln_ts_read_runtime_event_glyphs_font_stack(
   napi_env env, const mln_runtime_event_glyphs* source
+);
+napi_value mln_ts_read_runtime_event_loading_failed(
+  napi_env env, const mln_runtime_event_loading_failed* source, size_t size
 );
 napi_value mln_ts_read_runtime_event_offline_region_response_error(
   napi_env env, const mln_runtime_event_offline_region_response_error* source,
@@ -287,11 +293,14 @@ napi_value mln_ts_read_runtime_event_payload(
 napi_value mln_ts_read_runtime_event_render_frame(
   napi_env env, const mln_runtime_event_render_frame* source, size_t size
 );
-napi_value mln_ts_read_runtime_event_render_map(
-  napi_env env, const mln_runtime_event_render_map* source, size_t size
+napi_value mln_ts_read_runtime_event_source_changed(
+  napi_env env, const mln_runtime_event_source_changed* source, size_t size
 );
 napi_value mln_ts_read_runtime_event_sprite(
   napi_env env, const mln_runtime_event_sprite* source, size_t size
+);
+napi_value mln_ts_read_runtime_event_style_image(
+  napi_env env, const mln_runtime_event_style_image* source, size_t size
 );
 napi_value mln_ts_read_runtime_event_tile_action(
   napi_env env, const mln_runtime_event_tile_action* source, size_t size

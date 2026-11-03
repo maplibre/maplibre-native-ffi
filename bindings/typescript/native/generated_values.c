@@ -1943,10 +1943,6 @@ napi_value mln_ts_read_runtime_event(
       ))
     return NULL;
   if (!mln_ts_set(
-        env, result, "code", mln_ts_number(env, (double)(source->code))
-      ))
-    return NULL;
-  if (!mln_ts_set(
         env, result, "message",
         mln_ts_text(env, (source->message).data, (source->message).size)
       ))
@@ -1954,6 +1950,19 @@ napi_value mln_ts_read_runtime_event(
   if (!mln_ts_set(
         env, result, "payload",
         mln_ts_read_runtime_event_payload(env, source, size)
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_runtime_event_camera_change(
+  napi_env env, const mln_runtime_event_camera_change* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "mode", mln_ts_number(env, (double)(source->mode))
       ))
     return NULL;
   return result;
@@ -2002,6 +2011,19 @@ napi_value mln_ts_read_runtime_event_glyphs_font_stack(
     if (element == NULL) return NULL;
     if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;
   }
+  return result;
+}
+
+napi_value mln_ts_read_runtime_event_loading_failed(
+  napi_env env, const mln_runtime_event_loading_failed* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "error", mln_ts_number(env, (double)(source->error))
+      ))
+    return NULL;
   return result;
 }
 
@@ -2068,6 +2090,34 @@ napi_value mln_ts_read_runtime_event_payload(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   switch (source->payload_type) {
+    case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE:
+      if (!mln_ts_set(
+            env, result, "kind", mln_ts_text(env, "cameraChange", 12)
+          ))
+        return NULL;
+      if (!mln_ts_set(
+            env, result, "value",
+            mln_ts_read_runtime_event_camera_change(
+              env, &(source->payload.camera_change),
+              sizeof(source->payload.camera_change)
+            )
+          ))
+        return NULL;
+      return result;
+    case MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED:
+      if (!mln_ts_set(
+            env, result, "kind", mln_ts_text(env, "loadingFailed", 13)
+          ))
+        return NULL;
+      if (!mln_ts_set(
+            env, result, "value",
+            mln_ts_read_runtime_event_loading_failed(
+              env, &(source->payload.loading_failed),
+              sizeof(source->payload.loading_failed)
+            )
+          ))
+        return NULL;
+      return result;
     case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME:
       if (!mln_ts_set(env, result, "kind", mln_ts_text(env, "renderFrame", 11)))
         return NULL;
@@ -2080,14 +2130,14 @@ napi_value mln_ts_read_runtime_event_payload(
           ))
         return NULL;
       return result;
-    case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP:
-      if (!mln_ts_set(env, result, "kind", mln_ts_text(env, "renderMap", 9)))
+    case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE:
+      if (!mln_ts_set(env, result, "kind", mln_ts_text(env, "styleImage", 10)))
         return NULL;
       if (!mln_ts_set(
             env, result, "value",
-            mln_ts_read_runtime_event_render_map(
-              env, &(source->payload.render_map),
-              sizeof(source->payload.render_map)
+            mln_ts_read_runtime_event_style_image(
+              env, &(source->payload.style_image),
+              sizeof(source->payload.style_image)
             )
           ))
         return NULL;
@@ -2100,6 +2150,20 @@ napi_value mln_ts_read_runtime_event_payload(
             mln_ts_read_runtime_event_tile_action(
               env, &(source->payload.tile_action),
               sizeof(source->payload.tile_action)
+            )
+          ))
+        return NULL;
+      return result;
+    case MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED:
+      if (!mln_ts_set(
+            env, result, "kind", mln_ts_text(env, "sourceChanged", 13)
+          ))
+        return NULL;
+      if (!mln_ts_set(
+            env, result, "value",
+            mln_ts_read_runtime_event_source_changed(
+              env, &(source->payload.source_changed),
+              sizeof(source->payload.source_changed)
             )
           ))
         return NULL;
@@ -2217,14 +2281,15 @@ napi_value mln_ts_read_runtime_event_render_frame(
   return result;
 }
 
-napi_value mln_ts_read_runtime_event_render_map(
-  napi_env env, const mln_runtime_event_render_map* source, size_t size
+napi_value mln_ts_read_runtime_event_source_changed(
+  napi_env env, const mln_runtime_event_source_changed* source, size_t size
 ) {
   (void)size;
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "mode", mln_ts_number(env, (double)(source->mode))
+        env, result, "sourceId",
+        mln_ts_text(env, (source->source_id).data, (source->source_id).size)
       ))
     return NULL;
   return result;
@@ -2249,12 +2314,31 @@ napi_value mln_ts_read_runtime_event_sprite(
   return result;
 }
 
+napi_value mln_ts_read_runtime_event_style_image(
+  napi_env env, const mln_runtime_event_style_image* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "imageId",
+        mln_ts_text(env, (source->image_id).data, (source->image_id).size)
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_runtime_event_tile_action(
   napi_env env, const mln_runtime_event_tile_action* source, size_t size
 ) {
   (void)size;
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "sourceId",
+        mln_ts_text(env, (source->source_id).data, (source->source_id).size)
+      ))
+    return NULL;
   if (!mln_ts_set(
         env, result, "operation",
         mln_ts_number(env, (double)(source->operation))

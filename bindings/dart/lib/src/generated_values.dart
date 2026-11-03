@@ -420,6 +420,29 @@ final class MapDebugFlag extends _Flags<MapDebugFlag> {
   });
 }
 
+/// Why a map failed to load a style.
+///
+/// See `mln_map_load_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class MapLoadError extends _Enum {
+  const MapLoadError.fromRawValue(super.rawValue);
+  static const unknown = MapLoadError.fromRawValue(0);
+
+  /// The style document isn't a valid style.
+  static const styleParse = MapLoadError.fromRawValue(1);
+
+  /// The style's request failed, for any reason, including a 404 or a missing
+  /// file.
+  static const styleLoad = MapLoadError.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'MapLoadError.unknown',
+    1 => 'MapLoadError.styleParse',
+    2 => 'MapLoadError.styleLoad',
+    _ => 'MapLoadError($rawValue)',
+  };
+}
+
 /// When a map renders.
 ///
 /// See `mln_map_mode` in the
@@ -1006,6 +1029,10 @@ final class RuntimeEventSourceType extends _Enum {
 
 /// The kind of an event.
 ///
+/// An event's `payload_type` names the member of its payload that holds the
+/// event's details. An event that reports a failure carries the error's text in
+/// `message`.
+///
 /// Only maps in `MapMode.continuous` raise
 /// `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
 /// render frame and render map events. Offline region events come only for the
@@ -1015,8 +1042,12 @@ final class RuntimeEventSourceType extends _Enum {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeEventType extends _Enum {
   const RuntimeEventType.fromRawValue(super.rawValue);
+
+  /// The camera is about to change. Its details are in `camera_change`.
   static const mapCameraWillChange = RuntimeEventType.fromRawValue(1);
   static const mapCameraIsChanging = RuntimeEventType.fromRawValue(2);
+
+  /// The camera changed. Its details are in `camera_change`.
   static const mapCameraDidChange = RuntimeEventType.fromRawValue(3);
   static const mapStyleLoaded = RuntimeEventType.fromRawValue(4);
 
@@ -1026,40 +1057,69 @@ final class RuntimeEventType extends _Enum {
   /// The map loaded its style and everything that the current view needs, and
   /// rendered the result.
   static const mapLoadingFinished = RuntimeEventType.fromRawValue(6);
+
+  /// The map failed to load a style. Its details are in `loading_failed`, and
+  /// the error's text is in `message`.
   static const mapLoadingFailed = RuntimeEventType.fromRawValue(7);
 
   /// The map rendered a complete frame and has nothing left to load, animate,
   /// or redraw.
   static const mapIdle = RuntimeEventType.fromRawValue(8);
+
+  /// The map failed to render. The error's text is in `message`.
   static const mapRenderError = RuntimeEventType.fromRawValue(9);
   static const mapRenderFrameStarted = RuntimeEventType.fromRawValue(10);
+
+  /// The map rendered a frame. Its details are in `render_frame`.
   static const mapRenderFrameFinished = RuntimeEventType.fromRawValue(11);
   static const mapRenderMapStarted = RuntimeEventType.fromRawValue(12);
   static const mapRenderMapFinished = RuntimeEventType.fromRawValue(13);
+
+  /// The style uses an image that it doesn't have. Its details are in
+  /// `style_image`.
   static const mapStyleImageMissing = RuntimeEventType.fromRawValue(14);
 
-  /// A tile moved to another step of loading.
+  /// A tile moved to another step of loading. Its details are in `tile_action`.
   static const mapTileAction = RuntimeEventType.fromRawValue(15);
+
+  /// A source changed. Its details are in `source_changed`.
   static const mapSourceChanged = RuntimeEventType.fromRawValue(16);
+
+  /// The region's status changed. Its details are in `offline_region_status`.
   static const offlineRegionStatusChanged = RuntimeEventType.fromRawValue(17);
 
-  /// A resource that the region needs failed to download.
+  /// A resource that the region needs failed to download. Its details are in
+  /// `offline_region_response_error`, and the error's text is in `message`.
   static const offlineRegionResponseError = RuntimeEventType.fromRawValue(18);
 
   /// The region's download became inactive because the cache file's offline
   /// regions reached their limit of 6000 tiles from MapLibre's demo tile
-  /// server.
+  /// server. Its details are in `offline_region_tile_count_limit`.
   ///
   /// Only tiles of sources on the demo server count toward the limit: sources
   /// with a `maplibre://` URL, which resolves to
   /// https://demotiles.maplibre.org. Tiles from other servers never count.
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(19);
+
+  /// The map requested a range of glyphs. Its details are in `glyphs`.
   static const mapGlyphsRequested = RuntimeEventType.fromRawValue(20);
+
+  /// A range of glyphs loaded. Its details are in `glyphs`.
   static const mapGlyphsLoaded = RuntimeEventType.fromRawValue(21);
+
+  /// A range of glyphs failed to load. Its details are in `glyphs`, and the
+  /// error's text is in `message`.
   static const mapGlyphsError = RuntimeEventType.fromRawValue(22);
+
+  /// The map requested a sprite. Its details are in `sprite`.
   static const mapSpriteRequested = RuntimeEventType.fromRawValue(23);
+
+  /// A sprite loaded. Its details are in `sprite`.
   static const mapSpriteLoaded = RuntimeEventType.fromRawValue(24);
+
+  /// A sprite failed to load. Its details are in `sprite`, and the error's text
+  /// is in `message`.
   static const mapSpriteError = RuntimeEventType.fromRawValue(25);
   @override
   String toString() => switch (rawValue) {
@@ -5810,6 +5870,39 @@ final class OfflineRegionStatus extends _Value {
   ]);
 }
 
+/// The details of `RuntimeEventType.mapCameraWillChange` and
+/// `RuntimeEventType.mapCameraDidChange`.
+///
+/// See `mln_runtime_event_camera_change` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventCameraChange extends _Value {
+  const RuntimeEventCameraChange({
+    this.mode = const CameraChangeMode.fromRawValue(0),
+  });
+  final CameraChangeMode mode;
+
+  @override
+  List<Object?> get _members => [mode];
+  @override
+  String toString() => _describe('RuntimeEventCameraChange', const ['mode']);
+}
+
+/// The details of `RuntimeEventType.mapLoadingFailed`.
+///
+/// See `mln_runtime_event_loading_failed` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventLoadingFailed extends _Value {
+  const RuntimeEventLoadingFailed({
+    this.error = const MapLoadError.fromRawValue(0),
+  });
+  final MapLoadError error;
+
+  @override
+  List<Object?> get _members => [error];
+  @override
+  String toString() => _describe('RuntimeEventLoadingFailed', const ['error']);
+}
+
 /// Statistics about the frames that a map renders.
 ///
 /// See `mln_rendering_stats` in the
@@ -5883,18 +5976,18 @@ final class RuntimeEventRenderFrame extends _Value {
   ]);
 }
 
-/// The details of `RuntimeEventType.mapRenderMapFinished`.
+/// The details of `RuntimeEventType.mapStyleImageMissing`.
 ///
-/// See `mln_runtime_event_render_map` in the
+/// See `mln_runtime_event_style_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventRenderMap extends _Value {
-  const RuntimeEventRenderMap({this.mode = const RenderMode.fromRawValue(0)});
-  final RenderMode mode;
+final class RuntimeEventStyleImage extends _Value {
+  const RuntimeEventStyleImage({this.imageId = ''});
+  final String imageId;
 
   @override
-  List<Object?> get _members => [mode];
+  List<Object?> get _members => [imageId];
   @override
-  String toString() => _describe('RuntimeEventRenderMap', const ['mode']);
+  String toString() => _describe('RuntimeEventStyleImage', const ['imageId']);
 }
 
 /// The ID of a tile.
@@ -5945,17 +6038,39 @@ final class TileId extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeEventTileAction extends _Value {
   const RuntimeEventTileAction({
+    this.sourceId = '',
     this.operation = const TileOperation.fromRawValue(0),
     this.tileId = const TileId(),
   });
+
+  /// The source that the tile belongs to.
+  final String sourceId;
   final TileOperation operation;
   final TileId tileId;
 
   @override
-  List<Object?> get _members => [operation, tileId];
+  List<Object?> get _members => [sourceId, operation, tileId];
+  @override
+  String toString() => _describe('RuntimeEventTileAction', const [
+    'sourceId',
+    'operation',
+    'tileId',
+  ]);
+}
+
+/// The details of `RuntimeEventType.mapSourceChanged`.
+///
+/// See `mln_runtime_event_source_changed` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventSourceChanged extends _Value {
+  const RuntimeEventSourceChanged({this.sourceId = ''});
+  final String sourceId;
+
+  @override
+  List<Object?> get _members => [sourceId];
   @override
   String toString() =>
-      _describe('RuntimeEventTileAction', const ['operation', 'tileId']);
+      _describe('RuntimeEventSourceChanged', const ['sourceId']);
 }
 
 /// The details of `RuntimeEventType.offlineRegionStatusChanged`.
@@ -6082,7 +6197,6 @@ final class RuntimeEvent {
     this.sourceType = const RuntimeEventSourceType.fromRawValue(0),
     this.source = 0,
     this.generation = 0,
-    this.code = 0,
     this.message = '',
     required this.payload,
   });
@@ -6096,13 +6210,7 @@ final class RuntimeEvent {
   /// includes what the event reports. Zero for a runtime event.
   final int generation;
 
-  /// The `CameraChangeMode` for `RuntimeEventType.mapCameraWillChange` and
-  /// `RuntimeEventType.mapCameraDidChange`.
-  final int code;
-
-  /// The error for an event that reports a failure, the image ID for
-  /// `RuntimeEventType.mapStyleImageMissing`, or the source ID for
-  /// `RuntimeEventType.mapSourceChanged` and `RuntimeEventType.mapTileAction`.
+  /// The error's text for an event that reports a failure, or empty.
   final String message;
   final RuntimeEventPayload payload;
 }
@@ -6111,19 +6219,34 @@ sealed class RuntimeEventPayload {
   const RuntimeEventPayload._();
 }
 
+final class RuntimeEventPayloadCameraChange extends RuntimeEventPayload {
+  const RuntimeEventPayloadCameraChange(this.value) : super._();
+  final RuntimeEventCameraChange value;
+}
+
+final class RuntimeEventPayloadLoadingFailed extends RuntimeEventPayload {
+  const RuntimeEventPayloadLoadingFailed(this.value) : super._();
+  final RuntimeEventLoadingFailed value;
+}
+
 final class RuntimeEventPayloadRenderFrame extends RuntimeEventPayload {
   const RuntimeEventPayloadRenderFrame(this.value) : super._();
   final RuntimeEventRenderFrame value;
 }
 
-final class RuntimeEventPayloadRenderMap extends RuntimeEventPayload {
-  const RuntimeEventPayloadRenderMap(this.value) : super._();
-  final RuntimeEventRenderMap value;
+final class RuntimeEventPayloadStyleImage extends RuntimeEventPayload {
+  const RuntimeEventPayloadStyleImage(this.value) : super._();
+  final RuntimeEventStyleImage value;
 }
 
 final class RuntimeEventPayloadTileAction extends RuntimeEventPayload {
   const RuntimeEventPayloadTileAction(this.value) : super._();
   final RuntimeEventTileAction value;
+}
+
+final class RuntimeEventPayloadSourceChanged extends RuntimeEventPayload {
+  const RuntimeEventPayloadSourceChanged(this.value) : super._();
+  final RuntimeEventSourceChanged value;
 }
 
 final class RuntimeEventPayloadOfflineRegionStatus extends RuntimeEventPayload {

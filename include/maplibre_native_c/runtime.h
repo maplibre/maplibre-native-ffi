@@ -97,14 +97,21 @@ typedef struct mln_offline_region_status {
 /**
  * The kind of an event.
  *
+ * An event's `payload_type` names the member of its payload that holds the
+ * event's details. Each type below that has details names its member, and the
+ * others carry MLN_RUNTIME_EVENT_PAYLOAD_NONE. An event that reports a failure
+ * carries the error's text in `message`.
+ *
  * Only maps in MLN_MAP_MODE_CONTINUOUS raise
  * MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED, MLN_RUNTIME_EVENT_MAP_IDLE, and the
  * render frame and render map events. Offline region events come only for the
  * regions and types that mln_runtime_set_offline_region_observed() selects.
  */
 typedef enum mln_runtime_event_type : uint32_t {
+  /** The camera is about to change. Its details are in `camera_change`. */
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
   MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2,
+  /** The camera changed. Its details are in `camera_change`. */
   MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE = 3,
   MLN_RUNTIME_EVENT_MAP_STYLE_LOADED = 4,
   /** The map started to load a style. */
@@ -114,38 +121,71 @@ typedef enum mln_runtime_event_type : uint32_t {
    * rendered the result.
    */
   MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
+  /**
+   * The map failed to load a style. Its details are in `loading_failed`, and
+   * the error's text is in `message`.
+   */
   MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
   /**
    * The map rendered a complete frame and has nothing left to load, animate,
    * or redraw.
    */
   MLN_RUNTIME_EVENT_MAP_IDLE = 8,
+  /** The map failed to render. The error's text is in `message`. */
   MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 9,
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 10,
+  /** The map rendered a frame. Its details are in `render_frame`. */
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 11,
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 12,
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 13,
+  /**
+   * The style uses an image that it doesn't have. Its details are in
+   * `style_image`.
+   */
   MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 14,
-  /** A tile moved to another step of loading. */
+  /**
+   * A tile moved to another step of loading. Its details are in
+   * `tile_action`.
+   */
   MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15,
+  /** A source changed. Its details are in `source_changed`. */
   MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
+  /**
+   * The region's status changed. Its details are in `offline_region_status`.
+   */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
-  /** A resource that the region needs failed to download. */
+  /**
+   * A resource that the region needs failed to download. Its details are in
+   * `offline_region_response_error`, and the error's text is in `message`.
+   */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
   /**
    * The region's download became inactive because the cache file's offline
    * regions reached their limit of 6000 tiles from MapLibre's demo tile server.
+   * Its details are in `offline_region_tile_count_limit`.
    *
    * Only tiles of sources on the demo server count toward the limit: sources
    * with a `maplibre://` URL, which resolves to https://demotiles.maplibre.org.
    * Tiles from other servers never count.
    */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
+  /** The map requested a range of glyphs. Its details are in `glyphs`. */
   MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
+  /** A range of glyphs loaded. Its details are in `glyphs`. */
   MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
+  /**
+   * A range of glyphs failed to load. Its details are in `glyphs`, and the
+   * error's text is in `message`.
+   */
   MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
+  /** The map requested a sprite. Its details are in `sprite`. */
   MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
+  /** A sprite loaded. Its details are in `sprite`. */
   MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
+  /**
+   * A sprite failed to load. Its details are in `sprite`, and the error's text
+   * is in `message`.
+   */
   MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
 } mln_runtime_event_type;
 
@@ -243,14 +283,17 @@ typedef enum mln_runtime_event_source_type : uint32_t {
 /** The member of mln_runtime_event_payload that an event carries. */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
-  MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1,
-  MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2,
-  MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 3,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6,
-  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 7,
-  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8,
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE = 1,
+  MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED = 2,
+  MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 3,
+  MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE = 4,
+  MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 5,
+  MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9,
+  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10,
+  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11,
 } mln_runtime_event_payload_type;
 
 /** Whether a camera change jumps or animates. */
@@ -258,6 +301,18 @@ typedef enum mln_camera_change_mode : uint32_t {
   MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
   MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 } mln_camera_change_mode;
+
+/** Why a map failed to load a style. */
+typedef enum mln_map_load_error : uint32_t {
+  MLN_MAP_LOAD_ERROR_UNKNOWN = 0,
+  /** The style document isn't a valid style. */
+  MLN_MAP_LOAD_ERROR_STYLE_PARSE = 1,
+  /**
+   * The style's request failed, for any reason, including a 404 or a missing
+   * file.
+   */
+  MLN_MAP_LOAD_ERROR_STYLE_LOAD = 2,
+} mln_map_load_error;
 
 /**
  * Whether a frame drew the map complete, or lacked resources that are still
@@ -398,10 +453,28 @@ typedef struct mln_runtime_event_render_frame {
   mln_rendering_stats stats;
 } mln_runtime_event_render_frame;
 
-/** The details of MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED. */
-typedef struct mln_runtime_event_render_map {
-  mln_render_mode mode;
-} mln_runtime_event_render_map;
+/**
+ * The details of MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE and
+ * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE.
+ */
+typedef struct mln_runtime_event_camera_change {
+  mln_camera_change_mode mode;
+} mln_runtime_event_camera_change;
+
+/** The details of MLN_RUNTIME_EVENT_MAP_LOADING_FAILED. */
+typedef struct mln_runtime_event_loading_failed {
+  mln_map_load_error error;
+} mln_runtime_event_loading_failed;
+
+/** The details of MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING. */
+typedef struct mln_runtime_event_style_image {
+  mln_buffer_view image_id;
+} mln_runtime_event_style_image;
+
+/** The details of MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED. */
+typedef struct mln_runtime_event_source_changed {
+  mln_buffer_view source_id;
+} mln_runtime_event_source_changed;
 
 /**
  * The ID of a tile.
@@ -422,6 +495,8 @@ typedef struct mln_tile_id {
 
 /** The details of MLN_RUNTIME_EVENT_MAP_TILE_ACTION. */
 typedef struct mln_runtime_event_tile_action {
+  /** The source that the tile belongs to. */
+  mln_buffer_view source_id;
   mln_tile_operation operation;
   mln_tile_id tile_id;
 } mln_runtime_event_tile_action;
@@ -476,12 +551,18 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
 
 /** The details of an event, in the member that its `payload_type` names. */
 typedef union mln_runtime_event_payload {
+  mln_runtime_event_camera_change camera_change
+    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE");
+  mln_runtime_event_loading_failed loading_failed
+    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED");
   mln_runtime_event_render_frame render_frame
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME");
-  mln_runtime_event_render_map render_map
-    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP");
+  mln_runtime_event_style_image style_image
+    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE");
   mln_runtime_event_tile_action tile_action
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION");
+  mln_runtime_event_source_changed source_changed
+    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED");
   mln_runtime_event_offline_region_status offline_region_status
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS");
   mln_runtime_event_offline_region_response_error offline_region_response_error
@@ -509,17 +590,8 @@ typedef struct mln_runtime_event {
    * includes what the event reports. Zero for a runtime event.
    */
   uint64_t generation;
-  /**
-   * The mln_camera_change_mode for MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE
-   * and MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE.
-   */
-  uint32_t code;
   mln_runtime_event_payload_type payload_type;
-  /**
-   * The error for an event that reports a failure, the image ID for
-   * MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, or the source ID for
-   * MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED and MLN_RUNTIME_EVENT_MAP_TILE_ACTION.
-   */
+  /** The error's text for an event that reports a failure, or empty. */
   mln_buffer_view message;
   mln_runtime_event_payload payload MLN_BINDING(
     "tag=payload_type;empty_variant=MLN_RUNTIME_EVENT_PAYLOAD_NONE"

@@ -113,16 +113,13 @@ internal static class Style
                 {
                     if (
                         e.Source != map.Id
-                        || e.Type
-                            != RuntimeEventType.MapStyleImageMissing
+                        || e.Payload
+                            is not RuntimeEvent.PayloadValue.StyleImage missing
                     )
                         continue;
 
-                    // The message holds the image's ID.
-                    map.Discarding.SetStyleImage(
-                        e.Message,
-                        DrawImage(e.Message)
-                    );
+                    var id = missing.Value.ImageId;
+                    map.Discarding.SetStyleImage(id, DrawImage(id));
                 }
             })
         );

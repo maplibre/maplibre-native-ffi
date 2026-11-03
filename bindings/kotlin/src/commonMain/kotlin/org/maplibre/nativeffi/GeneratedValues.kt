@@ -517,6 +517,33 @@ public value class MapDebugFlag(public val rawValue: UInt) {
 }
 
 /**
+ * Why a map failed to load a style.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_map_load_error` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+@JvmInline
+public value class MapLoadError(public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "UNKNOWN"
+      1u -> "STYLE_PARSE"
+      2u -> "STYLE_LOAD"
+      else -> "MapLoadError($rawValue)"
+    }
+
+  public companion object {
+    public val UNKNOWN: MapLoadError = MapLoadError(0u)
+    /** The style document isn't a valid style. */
+    public val STYLE_PARSE: MapLoadError = MapLoadError(1u)
+    /** The style's request failed, for any reason, including a 404 or a missing file. */
+    public val STYLE_LOAD: MapLoadError = MapLoadError(2u)
+  }
+}
+
+/**
  * When a map renders.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
@@ -1270,6 +1297,9 @@ public value class RuntimeEventSourceType(public val rawValue: UInt) {
 /**
  * The kind of an event.
  *
+ * An event's `payload_type` names the member of its payload that holds the event's details. An
+ * event that reports a failure carries the error's text in `message`.
+ *
  * Only maps in `MapMode.CONTINUOUS` raise `RuntimeEventType.MAP_LOADING_FINISHED`,
  * `RuntimeEventType.MAP_IDLE`, and the render frame and render map events. Offline region events
  * come only for the regions and types that `RuntimeHandle.setOfflineRegionObserved()` selects.
@@ -1312,8 +1342,10 @@ public value class RuntimeEventType(public val rawValue: UInt) {
     }
 
   public companion object {
+    /** The camera is about to change. Its details are in `camera_change`. */
     public val MAP_CAMERA_WILL_CHANGE: RuntimeEventType = RuntimeEventType(1u)
     public val MAP_CAMERA_IS_CHANGING: RuntimeEventType = RuntimeEventType(2u)
+    /** The camera changed. Its details are in `camera_change`. */
     public val MAP_CAMERA_DID_CHANGE: RuntimeEventType = RuntimeEventType(3u)
     public val MAP_STYLE_LOADED: RuntimeEventType = RuntimeEventType(4u)
     /** The map started to load a style. */
@@ -1322,34 +1354,58 @@ public value class RuntimeEventType(public val rawValue: UInt) {
      * The map loaded its style and everything that the current view needs, and rendered the result.
      */
     public val MAP_LOADING_FINISHED: RuntimeEventType = RuntimeEventType(6u)
+    /**
+     * The map failed to load a style. Its details are in `loading_failed`, and the error's text is
+     * in `message`.
+     */
     public val MAP_LOADING_FAILED: RuntimeEventType = RuntimeEventType(7u)
     /** The map rendered a complete frame and has nothing left to load, animate, or redraw. */
     public val MAP_IDLE: RuntimeEventType = RuntimeEventType(8u)
+    /** The map failed to render. The error's text is in `message`. */
     public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(9u)
     public val MAP_RENDER_FRAME_STARTED: RuntimeEventType = RuntimeEventType(10u)
+    /** The map rendered a frame. Its details are in `render_frame`. */
     public val MAP_RENDER_FRAME_FINISHED: RuntimeEventType = RuntimeEventType(11u)
     public val MAP_RENDER_MAP_STARTED: RuntimeEventType = RuntimeEventType(12u)
     public val MAP_RENDER_MAP_FINISHED: RuntimeEventType = RuntimeEventType(13u)
+    /** The style uses an image that it doesn't have. Its details are in `style_image`. */
     public val MAP_STYLE_IMAGE_MISSING: RuntimeEventType = RuntimeEventType(14u)
-    /** A tile moved to another step of loading. */
+    /** A tile moved to another step of loading. Its details are in `tile_action`. */
     public val MAP_TILE_ACTION: RuntimeEventType = RuntimeEventType(15u)
+    /** A source changed. Its details are in `source_changed`. */
     public val MAP_SOURCE_CHANGED: RuntimeEventType = RuntimeEventType(16u)
+    /** The region's status changed. Its details are in `offline_region_status`. */
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(17u)
-    /** A resource that the region needs failed to download. */
+    /**
+     * A resource that the region needs failed to download. Its details are in
+     * `offline_region_response_error`, and the error's text is in `message`.
+     */
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(18u)
     /**
      * The region's download became inactive because the cache file's offline regions reached their
-     * limit of 6000 tiles from MapLibre's demo tile server.
+     * limit of 6000 tiles from MapLibre's demo tile server. Its details are in
+     * `offline_region_tile_count_limit`.
      *
      * Only tiles of sources on the demo server count toward the limit: sources with a `maplibre://`
      * URL, which resolves to https://demotiles.maplibre.org. Tiles from other servers never count.
      */
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(19u)
+    /** The map requested a range of glyphs. Its details are in `glyphs`. */
     public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(20u)
+    /** A range of glyphs loaded. Its details are in `glyphs`. */
     public val MAP_GLYPHS_LOADED: RuntimeEventType = RuntimeEventType(21u)
+    /**
+     * A range of glyphs failed to load. Its details are in `glyphs`, and the error's text is in
+     * `message`.
+     */
     public val MAP_GLYPHS_ERROR: RuntimeEventType = RuntimeEventType(22u)
+    /** The map requested a sprite. Its details are in `sprite`. */
     public val MAP_SPRITE_REQUESTED: RuntimeEventType = RuntimeEventType(23u)
+    /** A sprite loaded. Its details are in `sprite`. */
     public val MAP_SPRITE_LOADED: RuntimeEventType = RuntimeEventType(24u)
+    /**
+     * A sprite failed to load. Its details are in `sprite`, and the error's text is in `message`.
+     */
     public val MAP_SPRITE_ERROR: RuntimeEventType = RuntimeEventType(25u)
   }
 }
@@ -3786,6 +3842,27 @@ public data class OfflineRegionStatus(
 )
 
 /**
+ * The details of `RuntimeEventType.MAP_CAMERA_WILL_CHANGE` and
+ * `RuntimeEventType.MAP_CAMERA_DID_CHANGE`.
+ *
+ * See `mln_runtime_event_camera_change` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventCameraChange(
+  public val mode: CameraChangeMode,
+)
+
+/**
+ * The details of `RuntimeEventType.MAP_LOADING_FAILED`.
+ *
+ * See `mln_runtime_event_loading_failed` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventLoadingFailed(
+  public val error: MapLoadError,
+)
+
+/**
  * Statistics about the frames that a map renders.
  *
  * See `mln_rendering_stats` in the
@@ -3818,13 +3895,13 @@ public data class RuntimeEventRenderFrame(
 )
 
 /**
- * The details of `RuntimeEventType.MAP_RENDER_MAP_FINISHED`.
+ * The details of `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`.
  *
- * See `mln_runtime_event_render_map` in the
+ * See `mln_runtime_event_style_image` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public data class RuntimeEventRenderMap(
-  public val mode: RenderMode,
+public data class RuntimeEventStyleImage(
+  public val imageId: String,
 )
 
 /**
@@ -3853,8 +3930,20 @@ public data class TileId(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventTileAction(
+  /** The source that the tile belongs to. */
+  public val sourceId: String,
   public val operation: TileOperation,
   public val tileId: TileId,
+)
+
+/**
+ * The details of `RuntimeEventType.MAP_SOURCE_CHANGED`.
+ *
+ * See `mln_runtime_event_source_changed` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventSourceChanged(
+  public val sourceId: String,
 )
 
 /**
@@ -3927,11 +4016,17 @@ public data class RuntimeEventSprite(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public sealed interface RuntimeEventPayload {
+  public data class CameraChange(public val value: RuntimeEventCameraChange) : RuntimeEventPayload
+
+  public data class LoadingFailed(public val value: RuntimeEventLoadingFailed) : RuntimeEventPayload
+
   public data class RenderFrame(public val value: RuntimeEventRenderFrame) : RuntimeEventPayload
 
-  public data class RenderMap(public val value: RuntimeEventRenderMap) : RuntimeEventPayload
+  public data class StyleImage(public val value: RuntimeEventStyleImage) : RuntimeEventPayload
 
   public data class TileAction(public val value: RuntimeEventTileAction) : RuntimeEventPayload
+
+  public data class SourceChanged(public val value: RuntimeEventSourceChanged) : RuntimeEventPayload
 
   public data class OfflineRegionStatus(public val value: RuntimeEventOfflineRegionStatus) :
     RuntimeEventPayload
@@ -3977,16 +4072,7 @@ public data class RuntimeEvent(
    * reports. Zero for a runtime event.
    */
   public val generation: ULong,
-  /**
-   * The `CameraChangeMode` for `RuntimeEventType.MAP_CAMERA_WILL_CHANGE` and
-   * `RuntimeEventType.MAP_CAMERA_DID_CHANGE`.
-   */
-  public val code: UInt,
-  /**
-   * The error for an event that reports a failure, the image ID for
-   * `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`, or the source ID for
-   * `RuntimeEventType.MAP_SOURCE_CHANGED` and `RuntimeEventType.MAP_TILE_ACTION`.
-   */
+  /** The error's text for an event that reports a failure, or empty. */
   public val message: String,
   public val payload: RuntimeEventPayload,
 )

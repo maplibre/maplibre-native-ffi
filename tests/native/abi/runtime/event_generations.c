@@ -7,7 +7,8 @@ typedef struct recorded_event {
   uint32_t type;
   uint64_t source;
   uint64_t generation;
-  int32_t code;
+  // The camera change mode, or zero for an event without one.
+  uint32_t camera_mode;
   // The published snapshot read when the event was drained, set only when the
   // recorder reads snapshots.
   bool snapshot_read;
@@ -65,7 +66,10 @@ static void record_event(const mln_runtime_event* event) {
     .type = event->type,
     .source = event->source,
     .generation = event->generation,
-    .code = event->code,
+    .camera_mode =
+      event->payload_type == MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE
+        ? event->payload.camera_change.mode
+        : 0,
   };
   const uint64_t map = atomic_load(&recorder.map);
   if (
@@ -349,13 +353,14 @@ static void drain_on_wake(void* user_data) {
   recorder_drain();
 }
 
-static bool recorded(uint32_t type, int32_t code) {
+static bool recorded(uint32_t type, uint32_t camera_mode) {
   const uint64_t map = atomic_load(&recorder.map);
   recorder_lock();
   bool found = false;
   for (size_t index = 0; index < recorder.count && !found; index += 1) {
     const recorded_event* event = &recorder.events[index];
-    found = event->source == map && event->type == type && event->code == code;
+    found = event->source == map && event->type == type &&
+            event->camera_mode == camera_mode;
   }
   recorder_unlock();
   return found;
@@ -458,7 +463,9 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   TEST_ASSERT_GREATER_THAN_size_t(0, loading_finished);
   TEST_ASSERT_GREATER_THAN_size_t(0, idle);
   TEST_ASSERT_NOT_NULL(final_change);
-  TEST_ASSERT_EQUAL_INT32(MLN_CAMERA_CHANGE_MODE_ANIMATED, final_change->code);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_CAMERA_CHANGE_MODE_ANIMATED, final_change->camera_mode
+  );
   TEST_ASSERT_TRUE(final_change->snapshot_read);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, target_zoom, final_change->zoom);
 

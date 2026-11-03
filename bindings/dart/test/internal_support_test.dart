@@ -178,16 +178,18 @@ void main() {
     final events = calloc<Uint8>(eventSize * 2);
     final messageBytes = utf8.encode('copied message\u0000');
     final messages = calloc<Uint8>(messageBytes.length);
+    final imageIdBytes = utf8.encode('missing-icon');
+    final imageId = calloc<Uint8>(imageIdBytes.length);
     final batch = calloc<raw.mln_event_batch_view>();
     try {
       messages.asTypedList(messageBytes.length).setAll(0, messageBytes);
+      imageId.asTypedList(imageIdBytes.length).setAll(0, imageIdBytes);
 
       final unknown = (events + 0).cast<raw.mln_runtime_event>().ref;
       unknown.type = 0xfeed;
       unknown.source_type = 0xbeef;
       unknown.source = 0xcafe;
       unknown.generation = 0x100000005;
-      unknown.code = 17;
       unknown.payload_type = 0xf00d;
       unknown.message.data = messages.cast();
       unknown.message.size = 14;
@@ -198,16 +200,16 @@ void main() {
         unknownWindow[index] = index + 1;
       }
 
-      final renderMap = (events + eventSize).cast<raw.mln_runtime_event>().ref;
-      renderMap.type = raw.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED;
-      renderMap.source_type = raw.MLN_RUNTIME_EVENT_SOURCE_MAP;
+      final missing = (events + eventSize).cast<raw.mln_runtime_event>().ref;
+      missing.type = raw.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING;
+      missing.source_type = raw.MLN_RUNTIME_EVENT_SOURCE_MAP;
       // A map id this build cannot resolve to a wrapper still names one object
       // for the life of the process, so the raw id has to survive the decode:
       // it is the only identity a host can route or correlate the event on.
-      renderMap.source = 0xfeed;
-      renderMap.code = 0;
-      renderMap.payload_type = raw.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP;
-      renderMap.payload.render_map.mode = raw.MLN_RENDER_MODE_FULL;
+      missing.source = 0xfeed;
+      missing.payload_type = raw.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE;
+      missing.payload.style_image.image_id.data = imageId.cast();
+      missing.payload.style_image.image_id.size = imageIdBytes.length;
 
       batch.ref.size = sizeOf<raw.mln_event_batch_view>();
       batch.ref.event_size = eventSize;
@@ -218,12 +220,12 @@ void main() {
       // arena cannot change what the host already holds.
       unknownWindow.fillRange(0, unknownWindow.length, 9);
       messages[0] = 'X'.codeUnitAt(0);
+      imageId[0] = 'X'.codeUnitAt(0);
 
       expect(decoded, hasLength(2));
 
       final unknownEvent = decoded[0];
       expect(unknownEvent.type.rawValue, 0xfeed);
-      expect(unknownEvent.code, 17);
       expect(unknownEvent.sourceType.rawValue, 0xbeef);
       expect(unknownEvent.source, 0xcafe);
       expect(unknownEvent.generation, 0x100000005);
@@ -238,17 +240,18 @@ void main() {
 
       // The second event decodes only when the walk steps by the
       // reported stride rather than by this binding's own record size.
-      final renderMapEvent = decoded[1];
-      expect(renderMapEvent.type, RuntimeEventType.mapRenderMapFinished);
-      expect(renderMapEvent.sourceType, RuntimeEventSourceType.map);
-      expect(renderMapEvent.source, 0xfeed);
-      expect(renderMapEvent.message, isEmpty);
+      final missingEvent = decoded[1];
+      expect(missingEvent.type, RuntimeEventType.mapStyleImageMissing);
+      expect(missingEvent.sourceType, RuntimeEventSourceType.map);
+      expect(missingEvent.source, 0xfeed);
+      expect(missingEvent.message, isEmpty);
       expect(
-        (renderMapEvent.payload as RuntimeEventPayloadRenderMap).value.mode,
-        RenderMode.full,
+        (missingEvent.payload as RuntimeEventPayloadStyleImage).value.imageId,
+        'missing-icon',
       );
     } finally {
       calloc.free(batch);
+      calloc.free(imageId);
       calloc.free(messages);
       calloc.free(events);
     }

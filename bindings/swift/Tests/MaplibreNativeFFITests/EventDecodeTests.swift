@@ -20,7 +20,6 @@ import Testing
     sourceType: 9,
     source: 0x77,
     generation: 0x1_0000_0005,
-    code: 0xFFFF_FFF4,
     payloadType: 0xBEEF
   )
 
@@ -50,7 +49,6 @@ import Testing
   #expect(decoded.type.rawValue == 0x4242)
   #expect(decoded.sourceType.rawValue == 9 && decoded.source == 0x77)
   #expect(decoded.generation == 0x1_0000_0005)
-  #expect(decoded.code == 0xFFFF_FFF4)
   #expect(decoded.message == "opaque")
   #expect(decoded.payload == .unknown(0xBEEF, Data(window)))
   #expect(events.count == 2)

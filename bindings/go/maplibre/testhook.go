@@ -37,6 +37,8 @@ import (
 type runtimeEventForTest struct {
 	raw     C.mln_runtime_event
 	message string
+	// C copies of the payload's text, which decodeEventsForTest frees.
+	payloadText []unsafe.Pointer
 }
 
 func newRuntimeEventForTest(eventType RuntimeEventType, sourceType RuntimeEventSourceType, source uint64) runtimeEventForTest {
@@ -71,7 +73,10 @@ func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFrame
 }
 
 func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) runtimeEventForTest {
+	sourceID := C.CBytes([]byte(payload.SourceId))
+	event.payloadText = append(event.payloadText, sourceID)
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION, C.mln_runtime_event_tile_action{
+		source_id: C.mln_buffer_view{data: sourceID, size: C.size_t(len(payload.SourceId))},
 		operation: C.mln_tile_operation(payload.Operation),
 		tile_id: C.mln_tile_id{
 			overscaled_z: C.uint32_t(payload.TileId.OverscaledZ),
@@ -106,6 +111,9 @@ func decodeEventsForTest(stride uintptr, events []runtimeEventForTest) []Runtime
 	storage := C.calloc(C.size_t(max(len(events), 1)), C.size_t(stride))
 	defer C.free(storage)
 	for index, event := range events {
+		for _, text := range event.payloadText {
+			defer C.free(text)
+		}
 		raw := event.raw
 		if event.message != "" {
 			message := C.CBytes([]byte(event.message))

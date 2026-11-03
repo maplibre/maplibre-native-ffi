@@ -102,14 +102,12 @@ private func styleEvents(
   // Runs on a library thread.
   try runtime.discarding
     .setEventHandler(RuntimeEventHandler { events in
-      for event in events
-        where event.source == map.id && event
-        .type == .mapStyleImageMissing
-      {
-        // The message holds the image's ID.
+      for event in events where event.source == map.id {
+        guard case let .styleImage(missing) = event.payload
+        else { continue }
         try? map.discarding.setStyleImage(
-          event.message,
-          image: drawImage(event.message)
+          missing.imageId,
+          image: drawImage(missing.imageId)
         )
       }
     })

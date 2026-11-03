@@ -285,6 +285,36 @@ auto to_c_camera_change_mode(mln::MapObserver::CameraChangeMode mode)
   return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
 }
 
+auto camera_change_payload(mln::MapObserver::CameraChangeMode mode)
+  -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.camera_change =
+    mln_runtime_event_camera_change{.mode = to_c_camera_change_mode(mode)};
+  return payload;
+}
+
+auto to_c_map_load_error(mln::MapLoadError error) -> mln_map_load_error {
+  switch (error) {
+    case mln::MapLoadError::StyleParseError:
+      return MLN_MAP_LOAD_ERROR_STYLE_PARSE;
+    // MapLibre doesn't raise NotFoundError for a style. A style that isn't
+    // found is a failed request, as a 404 is.
+    case mln::MapLoadError::StyleLoadError:
+    case mln::MapLoadError::NotFoundError:
+      return MLN_MAP_LOAD_ERROR_STYLE_LOAD;
+    case mln::MapLoadError::UnknownError:
+      return MLN_MAP_LOAD_ERROR_UNKNOWN;
+  }
+  return MLN_MAP_LOAD_ERROR_UNKNOWN;
+}
+
+auto loading_failed_payload(mln_map_load_error error)
+  -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.loading_failed = mln_runtime_event_loading_failed{.error = error};
+  return payload;
+}
+
 auto to_c_render_mode(mln::MapObserver::RenderMode mode) -> mln_render_mode {
   switch (mode) {
     case mln::MapObserver::RenderMode::Partial:
@@ -321,14 +351,6 @@ auto render_frame_payload(const mln::MapObserver::RenderFrameStatus& status)
                ? to_c_rendering_stats(*status.renderingStats)
                : mln_rendering_stats{}
   };
-  return payload;
-}
-
-auto render_map_payload(mln::MapObserver::RenderMode mode)
-  -> mln_runtime_event_payload {
-  auto payload = mln::core::zeroed_event_payload();
-  payload.render_map =
-    mln_runtime_event_render_map{.mode = to_c_render_mode(mode)};
   return payload;
 }
 
@@ -370,7 +392,9 @@ auto tile_action_payload(
   mln::TileOperation operation, const mln::OverscaledTileID& tile_id
 ) -> mln_runtime_event_payload {
   auto payload = mln::core::zeroed_event_payload();
+  // delivery::bind_event_strings() points source_id at the event's copy.
   payload.tile_action = mln_runtime_event_tile_action{
+    .source_id = {},
     .operation = to_c_tile_operation(operation),
     .tile_id = to_c_tile_id(tile_id)
   };
@@ -480,8 +504,7 @@ auto queue_map_event(
   MapEventState& events, uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
   const mln_runtime_event_payload& payload = zeroed_event_payload(),
-  uint32_t code = 0, std::string_view message = {},
-  std::vector<std::string> strings = {}
+  std::string_view message = {}, std::vector<std::string> strings = {}
 ) noexcept -> void {
   try {
     if (events.in_transaction()) {
@@ -490,7 +513,6 @@ auto queue_map_event(
           .type = type,
           .payload_type = payload_type,
           .payload = payload,
-          .code = code,
           .message = std::string{message},
           .strings = std::move(strings),
         }
@@ -500,7 +522,7 @@ auto queue_map_event(
     if (generation == 0) return;
     push_runtime_map_event_payload(
       events.runtime_events, events.map, generation, type, payload_type,
-      payload, code, std::string{message}, std::move(strings)
+      payload, std::string{message}, std::move(strings)
     );
   } catch (...) {
     // MapLibre callbacks drop events that cannot be delivered.
@@ -671,7 +693,8 @@ class HeadlessObserver final : public mln::MapObserver {
     }
     // The camera has not moved yet, so the latest snapshot is current.
     queue_current(
-      MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, to_c_camera_change_mode(mode)
+      MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, {},
+      MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE, camera_change_payload(mode)
     );
   }
 
@@ -710,8 +733,7 @@ class HeadlessObserver final : public mln::MapObserver {
     if (did_change) {
       queue_map_event(
         events, generation, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-        MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
-        to_c_camera_change_mode(mode)
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE, camera_change_payload(mode)
       );
     }
     if (ended) post_ended_transitions(events, generation);
@@ -753,8 +775,8 @@ class HeadlessObserver final : public mln::MapObserver {
     if (selected(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
       queue_map_event(
         *event_state_, generation, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
-        MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
-        static_cast<uint32_t>(error), message
+        MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED,
+        loading_failed_payload(to_c_map_load_error(error)), message
       );
     }
     if (pending) {
@@ -806,7 +828,7 @@ class HeadlessObserver final : public mln::MapObserver {
       return;
     }
     queue_current(
-      MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED, 0, {},
+      MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED, {},
       MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME, render_frame_payload(status)
     );
   }
@@ -818,14 +840,13 @@ class HeadlessObserver final : public mln::MapObserver {
     queue_current(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED);
   }
 
-  void onDidFinishRenderingMap(RenderMode mode) override {
+  // MapLibre always reports RenderMode::Full here, so the event carries no
+  // mode.
+  void onDidFinishRenderingMap(RenderMode /*mode*/) override {
     if (!selected(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)) {
       return;
     }
-    queue_current(
-      MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED, 0, {},
-      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP, render_map_payload(mode)
-    );
+    queue_current(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED);
   }
 
   void onDidBecomeIdle() override {
@@ -841,17 +862,18 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   void onStyleImageMissing(const std::string& image_id) override {
-    if (!selected(MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)) {
-      return;
-    }
-    queue_current(MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, 0, image_id);
+    queue_with_id(
+      MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
+      MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE, zeroed_event_payload(), image_id
+    );
   }
 
   void onSourceChanged(mln::style::Source& source) override {
-    if (!selected(MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)) {
-      return;
-    }
-    queue_current(MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED, 0, source.getID());
+    queue_with_id(
+      MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED,
+      MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED, zeroed_event_payload(),
+      source.getID()
+    );
   }
 
   void onTileAction(
@@ -861,10 +883,9 @@ class HeadlessObserver final : public mln::MapObserver {
     if (!selected(MLN_RUNTIME_EVENT_MAP_TILE_ACTION)) {
       return;
     }
-    queue_current(
-      MLN_RUNTIME_EVENT_MAP_TILE_ACTION, 0, source_id,
-      MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-      tile_action_payload(operation, tile_id)
+    queue_with_id(
+      MLN_RUNTIME_EVENT_MAP_TILE_ACTION, MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
+      tile_action_payload(operation, tile_id), source_id
     );
   }
 
@@ -919,11 +940,9 @@ class HeadlessObserver final : public mln::MapObserver {
       }
       queue_current(MLN_RUNTIME_EVENT_MAP_RENDER_ERROR);
     } catch (const std::exception& exception) {
-      queue_current(MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, 0, exception.what());
+      queue_current(MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, exception.what());
     } catch (...) {
-      queue_current(
-        MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, 0, "unknown render error"
-      );
+      queue_current(MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, "unknown render error");
     }
   }
 
@@ -943,7 +962,7 @@ class HeadlessObserver final : public mln::MapObserver {
     if (!selected(type)) return;
     try {
       queue_current(
-        type, 0, exception_message(error), MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS,
+        type, exception_message(error), MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS,
         glyphs_payload(range), {font_stack.begin(), font_stack.end()}
       );
     } catch (...) {
@@ -962,27 +981,32 @@ class HeadlessObserver final : public mln::MapObserver {
                        ? std::vector<std::string>{sprite->id, sprite->spriteURL}
                        : std::vector<std::string>(2);
       queue_current(
-        type, 0, exception_message(error), MLN_RUNTIME_EVENT_PAYLOAD_SPRITE,
+        type, exception_message(error), MLN_RUNTIME_EVENT_PAYLOAD_SPRITE,
         zeroed_event_payload(), std::move(strings)
       );
     } catch (...) {
     }
   }
 
-  auto queue_fresh(
-    mln_runtime_event_type type, uint32_t code = 0,
-    std::string_view message = {}
+  // The payload's one ID; the mask test precedes its copy.
+  auto queue_with_id(
+    mln_runtime_event_type type, mln_runtime_event_payload_type payload_type,
+    const mln_runtime_event_payload& payload, const std::string& id
   ) noexcept -> void {
+    if (!selected(type)) return;
+    try {
+      queue_current(type, {}, payload_type, payload, {id});
+    } catch (...) {
+    }
+  }
+
+  auto queue_fresh(mln_runtime_event_type type) noexcept -> void {
     auto& events = *event_state_;
-    queue_map_event(
-      events, events.fresh_generation(), type, MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-      zeroed_event_payload(), code, message
-    );
+    queue_map_event(events, events.fresh_generation(), type);
   }
 
   auto queue_current(
-    mln_runtime_event_type type, uint32_t code = 0,
-    std::string_view message = {},
+    mln_runtime_event_type type, std::string_view message = {},
     mln_runtime_event_payload_type payload_type =
       MLN_RUNTIME_EVENT_PAYLOAD_NONE,
     const mln_runtime_event_payload& payload = zeroed_event_payload(),
@@ -990,8 +1014,8 @@ class HeadlessObserver final : public mln::MapObserver {
   ) noexcept -> void {
     auto& events = *event_state_;
     queue_map_event(
-      events, events.published_generation, type, payload_type, payload, code,
-      message, std::move(strings)
+      events, events.published_generation, type, payload_type, payload, message,
+      std::move(strings)
     );
   }
 
@@ -4358,10 +4382,13 @@ auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status {
     set_thread_error(exception.what());
     auto& events = *live.event_state;
     if (event_selected(events.mask, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
+      // MapLibre reports a style that fails to parse through
+      // onDidFailLoadingMap(), so an exception that escapes loadJSON() is none
+      // of the kinds that MapLoadError names.
       queue_map_event(
         events, events.fresh_generation(), MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
-        MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(), 0,
-        exception.what()
+        MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED,
+        loading_failed_payload(MLN_MAP_LOAD_ERROR_UNKNOWN), exception.what()
       );
     }
     return MLN_STATUS_NATIVE_ERROR;

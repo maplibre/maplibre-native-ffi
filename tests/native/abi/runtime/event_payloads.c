@@ -1,6 +1,6 @@
 // The payload contract of every runtime event type, as one table: the tag, the
-// source, the code, the message, the payload fields, and the zeroed bytes past
-// the active payload member. Each scenario below produces a set of event types
+// source, the message, the payload fields, and the zeroed bytes past the active
+// payload member. Each scenario below produces a set of event types
 // from local inputs only, and checks every event it drained against the rows
 // for those types.
 
@@ -109,8 +109,9 @@ typedef struct recorded_event {
   mln_runtime_event event;
   char message[128];
   // Copies of the payload's text, which the event borrows only until the
-  // drain releases its batch: a font stack's first names, or a sprite's ID and
-  // URL. The payload's own views are not read after the drain.
+  // drain releases its batch: a font stack's first names, a sprite's ID and
+  // URL, or an image or source ID. The payload's own views are not read after
+  // the drain.
   char strings[2][64];
   size_t string_count;
 } recorded_event;
@@ -157,6 +158,24 @@ static void record_payload_text(
     );
     copy_view(
       record->strings[1], sizeof(record->strings[1]), event->payload.sprite.url
+    );
+  } else if (event->payload_type == MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE) {
+    record->string_count = 1;
+    copy_view(
+      record->strings[0], sizeof(record->strings[0]),
+      event->payload.style_image.image_id
+    );
+  } else if (event->payload_type == MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION) {
+    record->string_count = 1;
+    copy_view(
+      record->strings[0], sizeof(record->strings[0]),
+      event->payload.tile_action.source_id
+    );
+  } else if (event->payload_type == MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED) {
+    record->string_count = 1;
+    copy_view(
+      record->strings[0], sizeof(record->strings[0]),
+      event->payload.source_changed.source_id
     );
   }
 }
@@ -241,11 +260,6 @@ typedef enum message_rule {
   MESSAGE_TEXT,
 } message_rule;
 
-typedef enum code_rule {
-  CODE_ZERO,
-  CODE_CHANGE_MODE,
-} code_rule;
-
 typedef struct payload_row {
   uint32_t type;
   scenario scenario;
@@ -254,7 +268,6 @@ typedef struct payload_row {
   // Bytes of the payload union the active member covers. Every later byte
   // must be zero.
   size_t payload_size;
-  code_rule code;
   message_rule message;
   // The exact message, or null to accept any nonempty one.
   const char* expected_message;
@@ -275,20 +288,49 @@ static void check_render_frame(
   );
 }
 
-static void check_render_map(
+static void check_camera_change(
   const recorded_event* record, const scenario_context* context
 ) {
   (void)context;
-  const uint32_t mode = record->event.payload.render_map.mode;
+  const uint32_t mode = record->event.payload.camera_change.mode;
   TEST_ASSERT_TRUE(
-    mode == MLN_RENDER_MODE_PARTIAL || mode == MLN_RENDER_MODE_FULL
+    mode == MLN_CAMERA_CHANGE_MODE_IMMEDIATE ||
+    mode == MLN_CAMERA_CHANGE_MODE_ANIMATED
   );
+}
+
+// The scenario's only failed load is a style JSON that doesn't parse.
+static void check_loading_failed(
+  const recorded_event* record, const scenario_context* context
+) {
+  (void)context;
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_MAP_LOAD_ERROR_STYLE_PARSE, record->event.payload.loading_failed.error
+  );
+}
+
+static void check_style_image(
+  const recorded_event* record, const scenario_context* context
+) {
+  (void)context;
+  TEST_ASSERT_EQUAL_size_t(1, record->string_count);
+  TEST_ASSERT_EQUAL_STRING(missing_image_id, record->strings[0]);
+}
+
+static void check_source_changed(
+  const recorded_event* record, const scenario_context* context
+) {
+  (void)context;
+  TEST_ASSERT_EQUAL_size_t(1, record->string_count);
+  TEST_ASSERT_EQUAL_STRING(tilejson_source_id, record->strings[0]);
 }
 
 static void check_tile_action(
   const recorded_event* record, const scenario_context* context
 ) {
   (void)context;
+  TEST_ASSERT_EQUAL_size_t(1, record->string_count);
+  TEST_ASSERT_EQUAL_STRING(geojson_source_id, record->strings[0]);
   const mln_runtime_event_tile_action* action =
     &record->event.payload.tile_action;
   TEST_ASSERT_LESS_OR_EQUAL_UINT32(MLN_TILE_OPERATION_NULL, action->operation);
@@ -368,20 +410,23 @@ static void check_sprite(
 
 enum { MAP = MLN_RUNTIME_EVENT_SOURCE_MAP };
 
-// A row that names only its type, scenario, and source has no payload, code,
-// or message.
+// A row that names only its type, scenario, and source has no payload or
+// message.
 static const payload_row payload_rows[] = {
   {MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, SCENARIO_CAMERA, MAP,
-   .code = CODE_CHANGE_MODE},
+   MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE,
+   sizeof(mln_runtime_event_camera_change), .check = check_camera_change},
   {MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING, SCENARIO_RENDER, MAP},
   {MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, SCENARIO_CAMERA, MAP,
-   .code = CODE_CHANGE_MODE},
+   MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE,
+   sizeof(mln_runtime_event_camera_change), .check = check_camera_change},
   {MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, SCENARIO_RENDER, MAP},
   {MLN_RUNTIME_EVENT_MAP_LOADING_STARTED, SCENARIO_RENDER, MAP},
   {MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED, SCENARIO_RENDER, MAP},
-  // A style-loading exception raised inside the call reports code 0.
   {MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, SCENARIO_STILL_IMAGE_FAILURE, MAP,
-   .message = MESSAGE_TEXT},
+   MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED,
+   sizeof(mln_runtime_event_loading_failed), .message = MESSAGE_TEXT,
+   .check = check_loading_failed},
   {MLN_RUNTIME_EVENT_MAP_IDLE, SCENARIO_RENDER, MAP},
   {MLN_RUNTIME_EVENT_MAP_RENDER_ERROR, SCENARIO_UNREACHABLE, MAP,
    .message = MESSAGE_TEXT,
@@ -394,17 +439,17 @@ static const payload_row payload_rows[] = {
    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
    sizeof(mln_runtime_event_render_frame), .check = check_render_frame},
   {MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED, SCENARIO_RENDER, MAP},
-  {MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED, SCENARIO_RENDER, MAP,
-   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP, sizeof(mln_runtime_event_render_map),
-   .check = check_render_map},
+  // MapLibre always reports the full mode here, so the event carries none.
+  {MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED, SCENARIO_RENDER, MAP},
   {MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, SCENARIO_RENDER, MAP,
-   .message = MESSAGE_TEXT, .expected_message = missing_image_id},
+   MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE, sizeof(mln_runtime_event_style_image),
+   .check = check_style_image},
   {MLN_RUNTIME_EVENT_MAP_TILE_ACTION, SCENARIO_RENDER, MAP,
    MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION, sizeof(mln_runtime_event_tile_action),
-   .message = MESSAGE_TEXT, .expected_message = geojson_source_id,
    .check = check_tile_action},
   {MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED, SCENARIO_SOURCE_DESCRIPTION, MAP,
-   .message = MESSAGE_TEXT, .expected_message = tilejson_source_id},
+   MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED,
+   sizeof(mln_runtime_event_source_changed), .check = check_source_changed},
   {MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED, SCENARIO_OFFLINE,
    MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
@@ -455,14 +500,6 @@ static void check_event_against_row(
   const mln_runtime_event* event = &record->event;
   TEST_ASSERT_EQUAL_UINT32(row->source_type, event->source_type);
   TEST_ASSERT_EQUAL_UINT32(row->payload_type, event->payload_type);
-  if (row->code == CODE_ZERO) {
-    TEST_ASSERT_EQUAL_INT32(0, event->code);
-  } else {
-    TEST_ASSERT_TRUE(
-      event->code == MLN_CAMERA_CHANGE_MODE_IMMEDIATE ||
-      event->code == MLN_CAMERA_CHANGE_MODE_ANIMATED
-    );
-  }
   if (row->message == MESSAGE_NONE) {
     TEST_ASSERT_EQUAL_UINT32(0, event->message.size);
   } else {
@@ -581,14 +618,15 @@ static void camera_events_carry_their_change_mode(void) {
   const recorded_event* jump_will =
     log_find(log, MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, map);
   TEST_ASSERT_NOT_NULL(jump_will);
-  TEST_ASSERT_EQUAL_INT32(
-    MLN_CAMERA_CHANGE_MODE_IMMEDIATE, jump_will->event.code
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_CAMERA_CHANGE_MODE_IMMEDIATE,
+    jump_will->event.payload.camera_change.mode
   );
   const recorded_event* jump_did =
     log_find(log, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, map);
   TEST_ASSERT_NOT_NULL(jump_did);
-  TEST_ASSERT_EQUAL_INT32(
-    MLN_CAMERA_CHANGE_MODE_IMMEDIATE, jump_did->event.code
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_CAMERA_CHANGE_MODE_IMMEDIATE, jump_did->event.payload.camera_change.mode
   );
 
   const size_t ease_start = log->count;
@@ -600,8 +638,21 @@ static void camera_events_carry_their_change_mode(void) {
   const size_t ease_will =
     log_next(log, ease_start, MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, map);
   TEST_ASSERT_LESS_THAN_size_t(log->count, ease_will);
-  TEST_ASSERT_EQUAL_INT32(
-    MLN_CAMERA_CHANGE_MODE_ANIMATED, log->events[ease_will].event.code
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_CAMERA_CHANGE_MODE_ANIMATED,
+    log->events[ease_will].event.payload.camera_change.mode
+  );
+  // Stopping the animation ends it with an animated change.
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
+  );
+  log_drain(runtime, log);
+  const size_t ease_did =
+    log_next(log, ease_will, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, map);
+  TEST_ASSERT_LESS_THAN_size_t(log->count, ease_did);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_CAMERA_CHANGE_MODE_ANIMATED,
+    log->events[ease_did].event.payload.camera_change.mode
   );
 
   check_scenario_rows(SCENARIO_CAMERA, log, &context);
@@ -663,16 +714,9 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
   submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 4.0, 0, 0.0);
   log_drain(runtime, log);
 
-  bool full_render = false;
   int64_t frame_count = -1;
   for (size_t index = 0; index < log->count; index += 1) {
     const mln_runtime_event* event = &log->events[index].event;
-    if (
-      event->type == MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED &&
-      event->payload.render_map.mode == MLN_RENDER_MODE_FULL
-    ) {
-      full_render = true;
-    }
     if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
       TEST_ASSERT_GREATER_THAN_INT64(
         frame_count, event->payload.render_frame.stats.frame_count
@@ -680,7 +724,6 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
       frame_count = event->payload.render_frame.stats.frame_count;
     }
   }
-  TEST_ASSERT_TRUE(full_render);
   TEST_ASSERT_GREATER_THAN_INT64(0, frame_count);
   check_scenario_rows(SCENARIO_RENDER, log, &context);
 
@@ -802,6 +845,185 @@ static void failed_loads_report_their_text(void) {
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+static const char unparsable_style_url[] = "test://styles/unparsable.json";
+static const char empty_style_url[] = "test://styles/empty.json";
+static const char missing_style_url[] = "test://styles/missing.json";
+
+static const mln_test_provided_resource failing_style_resources[] = {
+  {.url = unparsable_style_url,
+   .response =
+     {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)"{",
+       .byte_count = 1,
+     }},
+  {.url = empty_style_url,
+   .response = {.status = MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT}},
+};
+
+// Loads `url`, which fails, and checks the kind that its loading-failed event
+// names.
+static void expect_style_url_failure(
+  mln_runtime runtime, mln_map map, const char* url, uint32_t expected
+) {
+  log_reset(&scenario_log);
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_NATIVE_ERROR,
+    mln_map_set_style_url(
+      map, mln_buffer_view_from_cstr(url), &completion.descriptor, NULL
+    )
+  );
+  log_drain(runtime, &scenario_log);
+  const recorded_event* failed =
+    log_find(&scenario_log, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map);
+  TEST_ASSERT_NOT_NULL_MESSAGE(failed, url);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED, failed->event.payload_type
+  );
+  TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+    expected, failed->event.payload.loading_failed.error, url
+  );
+  TEST_ASSERT_GREATER_THAN_UINT32(0, failed->event.message.size);
+}
+
+// A style that doesn't parse reports a parse error whether it came as JSON or
+// from a URL. A style request that fails, or whose first response has no
+// content, reports a load error.
+static void a_failed_style_load_names_its_kind(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider* provider = mln_test_provider_create(
+    failing_style_resources,
+    sizeof(failing_style_resources) / sizeof(*failing_style_resources)
+  );
+  mln_test_provider_install(runtime, provider);
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_drain_all(runtime);
+
+  expect_style_url_failure(
+    runtime, map, unparsable_style_url, MLN_MAP_LOAD_ERROR_STYLE_PARSE
+  );
+  expect_style_url_failure(
+    runtime, map, empty_style_url, MLN_MAP_LOAD_ERROR_STYLE_LOAD
+  );
+  expect_style_url_failure(
+    runtime, map, missing_style_url, MLN_MAP_LOAD_ERROR_STYLE_LOAD
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
+// The render style, plus the source that only a TileJSON describes, so one
+// render reports a missing image, tile actions, and a source change.
+static const char id_style_json[] =
+  "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[0,0]},\"properties\":{}}},"
+  "\"described\":{\"type\":\"vector\",\"url\":\"test://tiles.json\"}},"
+  "\"layers\":[{\"id\":\"dot\",\"type\":\"circle\",\"source\":\"points\"},"
+  "{\"id\":\"icon\",\"type\":\"symbol\",\"source\":\"points\","
+  "\"layout\":{\"icon-image\":\"missing-icon\"}}]}";
+
+// What a callback-mode handler found, while the payload's views were lent.
+typedef struct lent_ids {
+  atomic_bool image_id;
+  atomic_bool tile_source_id;
+  atomic_bool changed_source_id;
+} lent_ids;
+
+static bool view_equals(mln_buffer_view view, const char* text) {
+  return view.size == strlen(text) &&
+         (view.size == 0 || memcmp(view.data, text, view.size) == 0);
+}
+
+static void find_lent_ids(void* user_data, const mln_event_batch_view* events) {
+  lent_ids* found = user_data;
+  for (size_t index = 0; index < events->event_count; index += 1) {
+    const mln_runtime_event* event = MLN_STRIDED_AT(
+      mln_runtime_event, events->events, events->event_size, index
+    );
+    switch (event->payload_type) {
+      case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE:
+        if (view_equals(event->payload.style_image.image_id, missing_image_id))
+          mln_test_flag_set(&found->image_id);
+        break;
+      case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
+        if (
+          view_equals(event->payload.tile_action.source_id, geojson_source_id)
+        )
+          mln_test_flag_set(&found->tile_source_id);
+        break;
+      case MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED:
+        if (
+          view_equals(
+            event->payload.source_changed.source_id, tilejson_source_id
+          )
+        )
+          mln_test_flag_set(&found->changed_source_id);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+static bool every_lent_id_found(const lent_ids* found) {
+  return atomic_load(&found->image_id) && atomic_load(&found->tile_source_id) &&
+         atomic_load(&found->changed_source_id);
+}
+
+// A handler without a delivery queue reads the IDs while native lends them.
+static void a_callback_handler_reads_the_ids_in_its_payloads(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  static const mln_test_provided_resource resources[] = {
+    {.url = tilejson_url,
+     .response = {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)tilejson,
+       .byte_count = sizeof(tilejson) - 1,
+     }},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_test_provider_install(runtime, provider);
+  static lent_ids found;
+  atomic_store(&found.image_id, false);
+  atomic_store(&found.tile_source_id, false);
+  atomic_store(&found.changed_source_id, false);
+  const mln_runtime_event_handler handler = {
+    .size = sizeof(handler),
+    .callback = find_lent_ids,
+    .user_data = &found,
+  };
+  MLN_TEST_AWAIT_OK(mln_runtime_set_event_handler(
+    runtime, &handler, &completion.descriptor, NULL
+  ));
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(id_style_json), &completion.descriptor, NULL
+  ));
+  const mln_test_deadline deadline = mln_test_deadline_default();
+  mln_test_watchdog_note("rendering until every payload ID arrives");
+  while (!every_lent_id_found(&found)) {
+    TEST_ASSERT_FALSE_MESSAGE(
+      mln_test_deadline_passed(deadline), "a payload ID never arrived"
+    );
+    render_one_frame(&fixture, runtime, NULL);
+  }
+  mln_test_watchdog_note(NULL);
+  MLN_TEST_AWAIT_OK(
+    mln_runtime_clear_event_handler(runtime, &completion.descriptor, NULL)
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
 }
 
 static void an_observed_offline_download_reports_status_and_errors(void) {
@@ -1051,6 +1273,8 @@ MLN_TEST_GROUP {
   RUN_TEST(camera_events_carry_their_change_mode);
   RUN_TEST(rendering_a_style_to_idle_reports_its_lifecycle);
   RUN_TEST(failed_loads_report_their_text);
+  RUN_TEST(a_failed_style_load_names_its_kind);
+  RUN_TEST(a_callback_handler_reads_the_ids_in_its_payloads);
   RUN_TEST(an_observed_offline_download_reports_status_and_errors);
   RUN_TEST(a_source_reports_the_description_its_tilejson_brings);
   RUN_TEST(sprites_and_glyphs_name_the_resource_they_report);

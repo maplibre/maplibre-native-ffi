@@ -567,7 +567,6 @@ auto push_offline_region_event(
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
     .source = source,
     .generation = 0,
-    .code = 0,
     .payload_type = payload_type,
     .message = {},
     .payload = payload
@@ -2727,14 +2726,13 @@ namespace {
 auto map_event(
   mln_map map, uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type,
-  const mln_runtime_event_payload& payload, uint32_t code
+  const mln_runtime_event_payload& payload
 ) -> mln_runtime_event {
   return mln_runtime_event{
     .type = type,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_MAP,
     .source = map,
     .generation = generation,
-    .code = code,
     .payload_type = payload_type,
     .message = {},
     .payload = payload
@@ -2747,12 +2745,12 @@ auto push_runtime_map_event_payload(
   const std::shared_ptr<RuntimeEventState>& state, mln_map map,
   uint64_t generation, mln_runtime_event_type type,
   mln_runtime_event_payload_type payload_type,
-  const mln_runtime_event_payload& payload, uint32_t code, std::string message,
+  const mln_runtime_event_payload& payload, std::string message,
   std::vector<std::string> strings
 ) -> void {
   if (state->registration == nullptr) return;
   state->registration->push(
-    map_event(map, generation, type, payload_type, payload, code), message,
+    map_event(map, generation, type, payload_type, payload), message,
     std::move(strings)
   );
 }
@@ -2764,9 +2762,7 @@ auto push_runtime_map_events(
   if (state->registration == nullptr) return;
   for (auto& held : events) {
     state->registration->push(
-      map_event(
-        map, generation, held.type, held.payload_type, held.payload, held.code
-      ),
+      map_event(map, generation, held.type, held.payload_type, held.payload),
       held.message, std::move(held.strings)
     );
   }

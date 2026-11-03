@@ -5,7 +5,6 @@ import {
   GeoJsonSourceDataHandle,
   type MapHandle,
   type PremultipliedRgba8Image,
-  RuntimeEventType,
   type RuntimeHandle,
 } from "../../src/index.ts";
 
@@ -103,18 +102,11 @@ export function styleEvents(
   // #region missing-image
   // The handler runs on this thread. The binding queues each call.
   runtime.discarding.setEventHandler((events) => {
-    for (const event of events) {
-      if (
-        event.source !== map.id ||
-        event.type !== RuntimeEventType.mapStyleImageMissing
-      ) {
+    for (const { source, payload } of events) {
+      if (source !== map.id || payload.kind !== "styleImage")
         continue;
-      }
-      // The message holds the image's ID.
-      map.discarding.setStyleImage(
-        event.message,
-        drawImage(event.message),
-      );
+      const { imageId } = payload.value;
+      map.discarding.setStyleImage(imageId, drawImage(imageId));
     }
   });
   // #endregion missing-image

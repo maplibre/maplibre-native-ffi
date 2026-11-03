@@ -16,22 +16,14 @@ namespace Maplibre.NativeFfi;
 /// For a map event, a map snapshot with this generation or a later one includes
 /// what the event reports. Zero for a runtime event.
 /// </param>
-/// <param name="Code">
-/// The <c>CameraChangeMode</c> for <c>RuntimeEventType.MapCameraWillChange</c>
-/// and <c>RuntimeEventType.MapCameraDidChange</c>.
-/// </param>
 /// <param name="Message">
-/// The error for an event that reports a failure, the image ID for
-/// <c>RuntimeEventType.MapStyleImageMissing</c>, or the source ID for
-/// <c>RuntimeEventType.MapSourceChanged</c> and
-/// <c>RuntimeEventType.MapTileAction</c>.
+/// The error's text for an event that reports a failure, or empty.
 /// </param>
 public readonly partial record struct RuntimeEvent(
     RuntimeEventType Type,
     RuntimeEventSourceType SourceType,
     ulong Source,
     ulong Generation,
-    uint Code,
     string Message,
     RuntimeEvent.PayloadValue Payload
 )
@@ -40,11 +32,17 @@ public readonly partial record struct RuntimeEvent(
     {
         private PayloadValue() { }
 
+        public sealed record CameraChange(RuntimeEventCameraChange Value) : PayloadValue;
+
+        public sealed record LoadingFailed(RuntimeEventLoadingFailed Value) : PayloadValue;
+
         public sealed record RenderFrame(RuntimeEventRenderFrame Value) : PayloadValue;
 
-        public sealed record RenderMap(RuntimeEventRenderMap Value) : PayloadValue;
+        public sealed record StyleImage(RuntimeEventStyleImage Value) : PayloadValue;
 
         public sealed record TileAction(RuntimeEventTileAction Value) : PayloadValue;
+
+        public sealed record SourceChanged(RuntimeEventSourceChanged Value) : PayloadValue;
 
         public sealed record OfflineRegionStatus(RuntimeEventOfflineRegionStatus Value)
             : PayloadValue;

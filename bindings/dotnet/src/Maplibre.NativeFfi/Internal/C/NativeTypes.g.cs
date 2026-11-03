@@ -997,10 +997,14 @@ internal unsafe struct mln_runtime_event
     public mln_runtime_event_source_type source_type;
     public ulong source;
     public ulong generation;
-    public uint code;
     public mln_runtime_event_payload_type payload_type;
     public mln_buffer_view message;
     public mln_runtime_event_payload payload;
+}
+
+internal unsafe struct mln_runtime_event_camera_change
+{
+    public mln_camera_change_mode mode;
 }
 
 internal unsafe struct mln_runtime_event_glyphs
@@ -1019,6 +1023,11 @@ internal unsafe struct mln_runtime_event_handler
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
+}
+
+internal unsafe struct mln_runtime_event_loading_failed
+{
+    public mln_map_load_error error;
 }
 
 internal unsafe struct mln_runtime_event_offline_region_response_error
@@ -1043,13 +1052,22 @@ internal unsafe struct mln_runtime_event_offline_region_tile_count_limit
 internal unsafe struct mln_runtime_event_payload
 {
     [FieldOffset(0)]
+    public mln_runtime_event_camera_change camera_change;
+
+    [FieldOffset(0)]
+    public mln_runtime_event_loading_failed loading_failed;
+
+    [FieldOffset(0)]
     public mln_runtime_event_render_frame render_frame;
 
     [FieldOffset(0)]
-    public mln_runtime_event_render_map render_map;
+    public mln_runtime_event_style_image style_image;
 
     [FieldOffset(0)]
     public mln_runtime_event_tile_action tile_action;
+
+    [FieldOffset(0)]
+    public mln_runtime_event_source_changed source_changed;
 
     [FieldOffset(0)]
     public mln_runtime_event_offline_region_status offline_region_status;
@@ -1075,9 +1093,9 @@ internal unsafe struct mln_runtime_event_render_frame
     public mln_rendering_stats stats;
 }
 
-internal unsafe struct mln_runtime_event_render_map
+internal unsafe struct mln_runtime_event_source_changed
 {
-    public mln_render_mode mode;
+    public mln_buffer_view source_id;
 }
 
 internal unsafe struct mln_runtime_event_sprite
@@ -1086,8 +1104,14 @@ internal unsafe struct mln_runtime_event_sprite
     public mln_buffer_view url;
 }
 
+internal unsafe struct mln_runtime_event_style_image
+{
+    public mln_buffer_view image_id;
+}
+
 internal unsafe struct mln_runtime_event_tile_action
 {
+    public mln_buffer_view source_id;
     public mln_tile_operation operation;
     public mln_tile_id tile_id;
 }
@@ -1672,6 +1696,13 @@ internal enum mln_map_debug_flag : uint
     MLN_MAP_DEBUG_DEPTH_BUFFER = 128,
 }
 
+internal enum mln_map_load_error : uint
+{
+    MLN_MAP_LOAD_ERROR_UNKNOWN = 0,
+    MLN_MAP_LOAD_ERROR_STYLE_PARSE = 1,
+    MLN_MAP_LOAD_ERROR_STYLE_LOAD = 2,
+}
+
 internal enum mln_map_mode : uint
 {
     MLN_MAP_MODE_CONTINUOUS = 0,
@@ -1957,14 +1988,17 @@ internal enum mln_runtime_event_flag : ulong
 internal enum mln_runtime_event_payload_type : uint
 {
     MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
-    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1,
-    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2,
-    MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 3,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 4,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 5,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 6,
-    MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 7,
-    MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 8,
+    MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE = 1,
+    MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED = 2,
+    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 3,
+    MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE = 4,
+    MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 5,
+    MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6,
+    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7,
+    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8,
+    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9,
+    MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10,
+    MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11,
 }
 
 internal enum mln_runtime_event_source_type : uint

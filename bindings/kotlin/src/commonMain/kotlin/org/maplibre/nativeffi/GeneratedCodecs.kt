@@ -1765,7 +1765,7 @@ internal fun readEventBatchView(source: Long): List<RuntimeEvent> =
     readAddress(source + 8),
     readSize(source + w(12, 16)),
     readU32(source + 4).toULong(),
-    w(112, 120, 104),
+    w(112, 120, 100),
   ) { item ->
     readRuntimeEvent(item)
   }
@@ -1969,33 +1969,38 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
     sourceType = RuntimeEventSourceType(readU32(source + 4)),
     source = readU64(source + 8),
     generation = readU64(source + 16),
-    code = readU32(source + 24),
-    message = readViewString(source + 32),
+    message = readViewString(source + w(28, 32)),
     payload =
-      readU32(source + 28).let { tag ->
+      readU32(source + 24).let { tag ->
         when (tag) {
-          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + w(40, 48)))
-          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + w(40, 48)))
-          3u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48)))
-          4u ->
-            RuntimeEventPayload.OfflineRegionStatus(
-              readRuntimeEventOfflineRegionStatus(source + w(40, 48)),
-            )
-          5u ->
-            RuntimeEventPayload.OfflineRegionResponseError(
-              readRuntimeEventOfflineRegionResponseError(source + w(40, 48)),
-            )
+          1u ->
+            RuntimeEventPayload.CameraChange(readRuntimeEventCameraChange(source + w(40, 48, 36)))
+          2u ->
+            RuntimeEventPayload.LoadingFailed(readRuntimeEventLoadingFailed(source + w(40, 48, 36)))
+          3u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + w(40, 48, 36)))
+          4u -> RuntimeEventPayload.StyleImage(readRuntimeEventStyleImage(source + w(40, 48, 36)))
+          5u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48, 36)))
           6u ->
-            RuntimeEventPayload.OfflineRegionTileCountLimit(
-              readRuntimeEventOfflineRegionTileCountLimit(source + w(40, 48)),
+            RuntimeEventPayload.SourceChanged(readRuntimeEventSourceChanged(source + w(40, 48, 36)))
+          7u ->
+            RuntimeEventPayload.OfflineRegionStatus(
+              readRuntimeEventOfflineRegionStatus(source + w(40, 48, 36)),
             )
-          7u -> RuntimeEventPayload.Glyphs(readRuntimeEventGlyphs(source + w(40, 48)))
-          8u -> RuntimeEventPayload.Sprite(readRuntimeEventSprite(source + w(40, 48)))
+          8u ->
+            RuntimeEventPayload.OfflineRegionResponseError(
+              readRuntimeEventOfflineRegionResponseError(source + w(40, 48, 36)),
+            )
+          9u ->
+            RuntimeEventPayload.OfflineRegionTileCountLimit(
+              readRuntimeEventOfflineRegionTileCountLimit(source + w(40, 48, 36)),
+            )
+          10u -> RuntimeEventPayload.Glyphs(readRuntimeEventGlyphs(source + w(40, 48, 36)))
+          11u -> RuntimeEventPayload.Sprite(readRuntimeEventSprite(source + w(40, 48, 36)))
           0u -> RuntimeEventPayload.None
           else ->
             RuntimeEventPayload.Unknown(
               tag,
-              NativeMemory.getBytes(source + w(40, 48), w(72, 72, 64)),
+              NativeMemory.getBytes(source + w(40, 48, 36), w(72, 72, 64)),
             )
         }
       },
@@ -2058,6 +2063,12 @@ internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
     generation = readU64(source + 8),
   )
 
+internal fun readRuntimeEventCameraChange(source: Long): RuntimeEventCameraChange =
+  RuntimeEventCameraChange(mode = CameraChangeMode(readU32(source)))
+
+internal fun readRuntimeEventLoadingFailed(source: Long): RuntimeEventLoadingFailed =
+  RuntimeEventLoadingFailed(error = MapLoadError(readU32(source)))
+
 internal fun readRuntimeEventRenderFrame(source: Long): RuntimeEventRenderFrame =
   RuntimeEventRenderFrame(
     mode = RenderMode(readU32(source)),
@@ -2066,14 +2077,18 @@ internal fun readRuntimeEventRenderFrame(source: Long): RuntimeEventRenderFrame 
     stats = readRenderingStats(source + 8),
   )
 
-internal fun readRuntimeEventRenderMap(source: Long): RuntimeEventRenderMap =
-  RuntimeEventRenderMap(mode = RenderMode(readU32(source)))
+internal fun readRuntimeEventStyleImage(source: Long): RuntimeEventStyleImage =
+  RuntimeEventStyleImage(imageId = readViewString(source))
 
 internal fun readRuntimeEventTileAction(source: Long): RuntimeEventTileAction =
   RuntimeEventTileAction(
-    operation = TileOperation(readU32(source)),
-    tileId = readTileId(source + 4),
+    sourceId = readViewString(source),
+    operation = TileOperation(readU32(source + w(8, 16))),
+    tileId = readTileId(source + w(12, 20)),
   )
+
+internal fun readRuntimeEventSourceChanged(source: Long): RuntimeEventSourceChanged =
+  RuntimeEventSourceChanged(sourceId = readViewString(source))
 
 internal fun readRuntimeEventOfflineRegionStatus(source: Long): RuntimeEventOfflineRegionStatus =
   RuntimeEventOfflineRegionStatus(

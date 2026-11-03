@@ -1008,11 +1008,26 @@ fn generated_copy_mln_runtime_event(
     dict.set_item("source_type", generated_value(py, value.source_type)?)?;
     dict.set_item("source", generated_value(py, value.source)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item("code", generated_value(py, value.code)?)?;
     dict.set_item("message", generated_text(py, value.message)?)?;
     dict.set_item(
         "payload",
         match value.payload_type {
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE => generated_variant(
+                py,
+                "camera_change",
+                generated_copy_mln_runtime_event_camera_change(
+                    py,
+                    &(unsafe { value.payload.camera_change }),
+                )?,
+            )?,
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED => generated_variant(
+                py,
+                "loading_failed",
+                generated_copy_mln_runtime_event_loading_failed(
+                    py,
+                    &(unsafe { value.payload.loading_failed }),
+                )?,
+            )?,
             sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => generated_variant(
                 py,
                 "render_frame",
@@ -1021,12 +1036,12 @@ fn generated_copy_mln_runtime_event(
                     &(unsafe { value.payload.render_frame }),
                 )?,
             )?,
-            sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => generated_variant(
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE => generated_variant(
                 py,
-                "render_map",
-                generated_copy_mln_runtime_event_render_map(
+                "style_image",
+                generated_copy_mln_runtime_event_style_image(
                     py,
-                    &(unsafe { value.payload.render_map }),
+                    &(unsafe { value.payload.style_image }),
                 )?,
             )?,
             sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => generated_variant(
@@ -1035,6 +1050,14 @@ fn generated_copy_mln_runtime_event(
                 generated_copy_mln_runtime_event_tile_action(
                     py,
                     &(unsafe { value.payload.tile_action }),
+                )?,
+            )?,
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED => generated_variant(
+                py,
+                "source_changed",
+                generated_copy_mln_runtime_event_source_changed(
+                    py,
+                    &(unsafe { value.payload.source_changed }),
                 )?,
             )?,
             sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => generated_variant(
@@ -1074,6 +1097,15 @@ fn generated_copy_mln_runtime_event(
             tag => generated_unknown_variant(py, tag)?,
         },
     )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_runtime_event_camera_change(
+    py: Python<'_>,
+    value: &sys::mln_runtime_event_camera_change,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("mode", generated_value(py, value.mode)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1131,6 +1163,15 @@ unsafe extern "C" fn generated_callback_mln_runtime_event_handler_callback(
     outcome
 }
 
+fn generated_copy_mln_runtime_event_loading_failed(
+    py: Python<'_>,
+    value: &sys::mln_runtime_event_loading_failed,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("error", generated_value(py, value.error)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_runtime_event_offline_region_response_error(
     py: Python<'_>,
     value: &sys::mln_runtime_event_offline_region_response_error,
@@ -1182,12 +1223,12 @@ fn generated_copy_mln_runtime_event_render_frame(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_runtime_event_render_map(
+fn generated_copy_mln_runtime_event_source_changed(
     py: Python<'_>,
-    value: &sys::mln_runtime_event_render_map,
+    value: &sys::mln_runtime_event_source_changed,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("mode", generated_value(py, value.mode)?)?;
+    dict.set_item("source_id", generated_text(py, value.source_id)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1201,11 +1242,21 @@ fn generated_copy_mln_runtime_event_sprite(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_runtime_event_style_image(
+    py: Python<'_>,
+    value: &sys::mln_runtime_event_style_image,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("image_id", generated_text(py, value.image_id)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_runtime_event_tile_action(
     py: Python<'_>,
     value: &sys::mln_runtime_event_tile_action,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
+    dict.set_item("source_id", generated_text(py, value.source_id)?)?;
     dict.set_item("operation", generated_value(py, value.operation)?)?;
     dict.set_item("tile_id", generated_copy_mln_tile_id(py, &value.tile_id)?)?;
     Ok(dict.into_any().unbind())
