@@ -13,7 +13,7 @@ from dataclasses import replace
 from .. import docs
 from ..model import Unsupported
 from ..names import camel, pascal
-from ..semantic import enum_member_prefix, required_callbacks
+from ..semantic import conversion_doc, enum_member_prefix, required_callbacks
 from .kotlin_abi import DATA_MODELS, Abi, LayoutError, width_expression
 
 SCALARS = {
@@ -271,6 +271,9 @@ class Values:
             else:
                 self.check(field.value)
         self.used[value.native] = value
+        if value.options:
+            # The record converts to its option bag.
+            self.check(self.bound.values[value.options])
 
     def public(self, value):
         from . import kotlin_callbacks
@@ -472,7 +475,11 @@ class Values:
                     f"{doc(self.bound, value.native)}public data class {public}(\n"
                     + ",\n".join(args)
                     + "\n)"
-                    + content_equality(public, typed)
+                    + (
+                        self.to_options(value)
+                        if value.options
+                        else content_equality(public, typed)
+                    )
                 )
         for public, (field, value) in self.attachments.items():
             result.append(
@@ -496,6 +503,22 @@ class Values:
                 )
             )
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
+
+    def to_options(self, value):
+        """The class body that converts a complete record to its option bag."""
+        bag = self.bound.values[value.options]
+        held = {field.name: member for member, _, field in self.members(value)}
+        arguments = ", ".join(
+            f"{member} = {held[field.name]}"
+            for member, _, field in self.members(bag)
+            if field.name in held
+        )
+        return (
+            " {\n"
+            + doc(self.bound, conversion_doc(value.native), "  ")
+            + f"  public fun toOptions(): {name(bag.native)} = {name(bag.native)}({arguments})\n"
+            + "}"
+        )
 
     def union_name(self, record, field):
         if record.union_member:

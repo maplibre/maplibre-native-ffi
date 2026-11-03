@@ -168,9 +168,12 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     tile.lod_mode = MLN_TILE_LOD_MODE_DEFAULT;
   }
 
-  mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
-  mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC | MLN_PROJECTION_MODE_X_SKEW |
-                MLN_PROJECTION_MODE_Y_SKEW;
+  mln_projection_mode_options mode = {
+    .size = sizeof(mln_projection_mode_options)
+  };
+  mode.fields = MLN_PROJECTION_MODE_OPTION_AXONOMETRIC |
+                MLN_PROJECTION_MODE_OPTION_X_SKEW |
+                MLN_PROJECTION_MODE_OPTION_Y_SKEW;
   mode.axonometric = true;
   mode.x_skew = 0.25;
   mode.y_skew = -0.125;
@@ -179,7 +182,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
       "projection mode",
       mln_map_set_projection_mode(map, &mode, &completion.descriptor, NULL)
     );
-    TEST_ASSERT_BITS_HIGH(mode.fields, snapshot.view.projection_mode.fields);
     TEST_ASSERT_EQUAL(
       mode.axonometric, snapshot.view.projection_mode.axonometric
     );
@@ -187,7 +189,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
       TEST_ASSERT_EQUAL_DOUBLE(0.25, snapshot.view.projection_mode.x_skew);
       TEST_ASSERT_EQUAL_DOUBLE(-0.125, snapshot.view.projection_mode.y_skew);
     }
-    mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
+    mode.fields = MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
     mode.axonometric = false;
   }
 
@@ -204,9 +206,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
                               map, &free_camera, &completion.descriptor, NULL
                             )
   );
-  TEST_ASSERT_BITS_HIGH(
-    MLN_FREE_CAMERA_OPTION_POSITION, snapshot.free_camera.fields
-  );
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.25, snapshot.free_camera.position.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.25, snapshot.free_camera.position.y);
   TEST_ASSERT_GREATER_THAN_DOUBLE(0.0, snapshot.free_camera.position.z);
@@ -217,9 +216,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     "free camera orientation", mln_map_set_free_camera_options(
                                  map, &free_camera, &completion.descriptor, NULL
                                )
-  );
-  TEST_ASSERT_BITS_HIGH(
-    MLN_FREE_CAMERA_OPTION_ORIENTATION, snapshot.free_camera.fields
   );
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, snapshot.free_camera.orientation.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, snapshot.free_camera.orientation.y);
@@ -241,7 +237,6 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     "zoom and pitch limits",
     mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_BITS_HIGH(bounds.fields, snapshot.bounds.fields);
   TEST_ASSERT_EQUAL_DOUBLE(2.0, snapshot.bounds.min_zoom);
   TEST_ASSERT_EQUAL_DOUBLE(15.0, snapshot.bounds.max_zoom);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 10.0, snapshot.bounds.min_pitch);
@@ -252,7 +247,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     "geographic bounds",
     mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_BITS_HIGH(MLN_BOUND_OPTION_BOUNDS, snapshot.bounds.fields);
+  TEST_ASSERT_FALSE(snapshot.bounds.unbounded);
   TEST_ASSERT_DOUBLE_WITHIN(
     1e-9, -45.0, snapshot.bounds.bounds.southwest.latitude
   );
@@ -269,7 +264,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
   COMMIT(
     "unbounded", mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_BITS_HIGH(MLN_BOUND_OPTION_UNBOUNDED, snapshot.bounds.fields);
+  TEST_ASSERT_TRUE(snapshot.bounds.unbounded);
 
   const uint64_t camera_events = MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE |
                                  MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED;
@@ -381,14 +376,14 @@ static mln_status submit_projection_mode_row(
 }
 
 static void mode_undersized(void* descriptor) {
-  ((mln_projection_mode*)descriptor)->size -= 1;
+  ((mln_projection_mode_options*)descriptor)->size -= 1;
 }
 static void mode_unknown_field(void* descriptor) {
-  ((mln_projection_mode*)descriptor)->fields = UINT32_C(1) << 31;
+  ((mln_projection_mode_options*)descriptor)->fields = UINT32_C(1) << 31;
 }
 static void mode_nan_x_skew(void* descriptor) {
-  mln_projection_mode* mode = descriptor;
-  mode->fields = MLN_PROJECTION_MODE_X_SKEW;
+  mln_projection_mode_options* mode = descriptor;
+  mode->fields = MLN_PROJECTION_MODE_OPTION_X_SKEW;
   mode->x_skew = NAN;
 }
 
@@ -416,7 +411,9 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
     tile_cases, sizeof(tile_cases) / sizeof(*tile_cases), &tile, sizeof(tile),
     submit_tile_row, &map
   );
-  const mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
+  const mln_projection_mode_options mode = {
+    .size = sizeof(mln_projection_mode_options)
+  };
   mln_test_run_validation_table(
     projection_mode_cases,
     sizeof(projection_mode_cases) / sizeof(*projection_mode_cases), &mode,

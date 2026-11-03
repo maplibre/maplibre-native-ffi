@@ -13,9 +13,5 @@ public readonly partial record struct MapView(
     Camera Camera,
     LogicalExtent Extent,
     ProjectionMode ProjectionMode,
-    MapViewportOptions Viewport
-)
-{
-    public MapView()
-        : this(default, default, new(), new()) { }
-}
+    MapViewport Viewport
+);

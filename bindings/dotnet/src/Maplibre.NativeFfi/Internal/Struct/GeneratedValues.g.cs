@@ -37,19 +37,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static BoundOptions CopyBoundOptions(mln_bound_options value) =>
-        new()
-        {
-            Bounds = value.fields.HasFlag(MLN_BOUND_OPTION_BOUNDS)
-                ? CopyLatLngBounds(value.bounds)
-                : null,
-            MinZoom = value.fields.HasFlag(MLN_BOUND_OPTION_MIN_ZOOM) ? value.min_zoom : null,
-            MaxZoom = value.fields.HasFlag(MLN_BOUND_OPTION_MAX_ZOOM) ? value.max_zoom : null,
-            MinPitch = value.fields.HasFlag(MLN_BOUND_OPTION_MIN_PITCH) ? value.min_pitch : null,
-            MaxPitch = value.fields.HasFlag(MLN_BOUND_OPTION_MAX_PITCH) ? value.max_pitch : null,
-            Unbounded = value.fields.HasFlag(MLN_BOUND_OPTION_UNBOUNDED),
-        };
-
     internal static mln_bound_options NativeBoundOptions(BoundOptions value)
     {
         var native = new mln_bound_options();
@@ -95,6 +82,16 @@ internal static unsafe class GeneratedValues
         native.field_of_view = value.FieldOfView;
         return native;
     }
+
+    internal static CameraBounds CopyCameraBounds(mln_camera_bounds value) =>
+        new(
+            CopyLatLngBounds(value.bounds),
+            value.unbounded != 0,
+            value.min_zoom,
+            value.max_zoom,
+            value.min_pitch,
+            value.max_pitch
+        );
 
     internal static mln_camera_delta NativeCameraDelta(CameraDelta value, NativeCallScope scope)
     {
@@ -499,16 +496,8 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static FreeCameraOptions CopyFreeCameraOptions(mln_free_camera_options value) =>
-        new()
-        {
-            Position = value.fields.HasFlag(MLN_FREE_CAMERA_OPTION_POSITION)
-                ? CopyVec3(value.position)
-                : null,
-            Orientation = value.fields.HasFlag(MLN_FREE_CAMERA_OPTION_ORIENTATION)
-                ? CopyQuaternion(value.orientation)
-                : null,
-        };
+    internal static FreeCamera CopyFreeCamera(mln_free_camera value) =>
+        new(CopyVec3(value.position), CopyQuaternion(value.orientation));
 
     internal static mln_free_camera_options NativeFreeCameraOptions(FreeCameraOptions value)
     {
@@ -827,6 +816,10 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static MapProjectionCameraResult CopyMapProjectionCameraResult(
+        mln_map_projection_camera_result value
+    ) => new(CopyCamera(value.camera));
+
     internal static MapSnapshot CopyMapSnapshot(mln_map_snapshot value) =>
         new(
             (global::Maplibre.NativeFfi.MapDebugFlag)value.debug_flags,
@@ -837,32 +830,11 @@ internal static unsafe class GeneratedValues
             value.transition_in_progress != 0,
             (global::Maplibre.NativeFfi.RuntimeEventFlag)value.event_mask,
             value.latest_render_update_generation,
-            CopyMapTileOptions(value.tile),
-            CopyBoundOptions(value.bounds),
-            CopyFreeCameraOptions(value.free_camera),
+            CopyMapTileSettings(value.tile),
+            CopyCameraBounds(value.bounds),
+            CopyFreeCamera(value.free_camera),
             CopyMapView(value.view)
         );
-
-    internal static MapTileOptions CopyMapTileOptions(mln_map_tile_options value) =>
-        new()
-        {
-            PrefetchZoomDelta = value.fields.HasFlag(MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA)
-                ? value.prefetch_zoom_delta
-                : null,
-            LodMinRadius = value.fields.HasFlag(MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS)
-                ? value.lod_min_radius
-                : null,
-            LodScale = value.fields.HasFlag(MLN_MAP_TILE_OPTION_LOD_SCALE) ? value.lod_scale : null,
-            LodPitchThreshold = value.fields.HasFlag(MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD)
-                ? value.lod_pitch_threshold
-                : null,
-            LodZoomShift = value.fields.HasFlag(MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT)
-                ? value.lod_zoom_shift
-                : null,
-            LodMode = value.fields.HasFlag(MLN_MAP_TILE_OPTION_LOD_MODE)
-                ? (global::Maplibre.NativeFfi.TileLodMode)value.lod_mode
-                : null,
-        };
 
     internal static mln_map_tile_options NativeMapTileOptions(MapTileOptions value)
     {
@@ -899,43 +871,52 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static MapTileSettings CopyMapTileSettings(mln_map_tile_settings value) =>
+        new(
+            value.prefetch_zoom_delta,
+            value.lod_min_radius,
+            value.lod_scale,
+            value.lod_pitch_threshold,
+            value.lod_zoom_shift,
+            (global::Maplibre.NativeFfi.TileLodMode)value.lod_mode
+        );
+
     internal static MapView CopyMapView(mln_map_view value) =>
         new(
             CopyCamera(value.camera),
             CopyLogicalExtent(value.extent),
             CopyProjectionMode(value.projection_mode),
-            CopyMapViewportOptions(value.viewport)
+            CopyMapViewport(value.viewport)
         );
 
     internal static mln_map_view NativeMapView(MapView value)
     {
-        Required(value.ProjectionMode, "MapView.ProjectionMode must not be null.");
-        Required(value.Viewport, "MapView.Viewport must not be null.");
         var native = new mln_map_view();
         native.size = (uint)sizeof(mln_map_view);
         native.camera = NativeCamera(value.Camera);
         native.extent = NativeLogicalExtent(value.Extent);
         native.projection_mode = NativeProjectionMode(value.ProjectionMode);
-        native.viewport = NativeMapViewportOptions(value.Viewport);
+        native.viewport = NativeMapViewport(value.Viewport);
         return native;
     }
 
-    internal static MapViewportOptions CopyMapViewportOptions(mln_map_viewport_options value) =>
-        new()
-        {
-            NorthOrientation = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION)
-                ? (global::Maplibre.NativeFfi.NorthOrientation)value.north_orientation
-                : null,
-            ConstrainMode = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE)
-                ? (global::Maplibre.NativeFfi.ConstrainMode)value.constrain_mode
-                : null,
-            ViewportMode = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE)
-                ? (global::Maplibre.NativeFfi.ViewportMode)value.viewport_mode
-                : null,
-            FrustumOffset = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET)
-                ? CopyEdgeInsets(value.frustum_offset)
-                : null,
-        };
+    internal static MapViewport CopyMapViewport(mln_map_viewport value) =>
+        new(
+            (global::Maplibre.NativeFfi.NorthOrientation)value.north_orientation,
+            (global::Maplibre.NativeFfi.ConstrainMode)value.constrain_mode,
+            (global::Maplibre.NativeFfi.ViewportMode)value.viewport_mode,
+            CopyEdgeInsets(value.frustum_offset)
+        );
+
+    internal static mln_map_viewport NativeMapViewport(MapViewport value)
+    {
+        var native = new mln_map_viewport();
+        native.north_orientation = (mln_north_orientation)value.NorthOrientation;
+        native.constrain_mode = (mln_constrain_mode)value.ConstrainMode;
+        native.viewport_mode = (mln_viewport_mode)value.ViewportMode;
+        native.frustum_offset = NativeEdgeInsets(value.FrustumOffset);
+        return native;
+    }
 
     internal static mln_map_viewport_options NativeMapViewportOptions(MapViewportOptions value)
     {
@@ -1350,28 +1331,32 @@ internal static unsafe class GeneratedValues
     }
 
     internal static ProjectionMode CopyProjectionMode(mln_projection_mode value) =>
-        new()
-        {
-            Axonometric = value.fields.HasFlag(MLN_PROJECTION_MODE_AXONOMETRIC)
-                ? value.axonometric != 0
-                : null,
-            XSkew = value.fields.HasFlag(MLN_PROJECTION_MODE_X_SKEW) ? value.x_skew : null,
-            YSkew = value.fields.HasFlag(MLN_PROJECTION_MODE_Y_SKEW) ? value.y_skew : null,
-        };
+        new(value.axonometric != 0, value.x_skew, value.y_skew);
 
     internal static mln_projection_mode NativeProjectionMode(ProjectionMode value)
     {
         var native = new mln_projection_mode();
+        native.axonometric = (byte)(value.Axonometric ? 1 : 0);
+        native.x_skew = value.XSkew;
+        native.y_skew = value.YSkew;
+        return native;
+    }
+
+    internal static mln_projection_mode_options NativeProjectionModeOptions(
+        ProjectionModeOptions value
+    )
+    {
+        var native = new mln_projection_mode_options();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_projection_mode);
+        native.size = (uint)sizeof(mln_projection_mode_options);
         native.fields |= Put(
             value.Axonometric,
             ref native.axonometric,
-            MLN_PROJECTION_MODE_AXONOMETRIC,
+            MLN_PROJECTION_MODE_OPTION_AXONOMETRIC,
             static present => (byte)(present ? 1 : 0)
         );
-        native.fields |= Put(value.XSkew, ref native.x_skew, MLN_PROJECTION_MODE_X_SKEW);
-        native.fields |= Put(value.YSkew, ref native.y_skew, MLN_PROJECTION_MODE_Y_SKEW);
+        native.fields |= Put(value.XSkew, ref native.x_skew, MLN_PROJECTION_MODE_OPTION_X_SKEW);
+        native.fields |= Put(value.YSkew, ref native.y_skew, MLN_PROJECTION_MODE_OPTION_Y_SKEW);
         return native;
     }
 

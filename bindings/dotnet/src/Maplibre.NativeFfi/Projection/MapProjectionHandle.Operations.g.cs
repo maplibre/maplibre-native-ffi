@@ -83,12 +83,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// See <c>mln_map_projection_get_camera</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
     /// </remarks>
-    public CameraOptions GetCamera()
+    public MapProjectionCameraResult GetCamera()
     {
         using var call = Enter(this);
-        var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        Check(NativeMethods.mln_map_projection_get_camera(Handle, &outCamera, Diagnostic));
-        return CopyCameraOptions(outCamera);
+        var outResult = new mln_map_projection_camera_result
+        {
+            size = (uint)sizeof(mln_map_projection_camera_result),
+        };
+        Check(NativeMethods.mln_map_projection_get_camera(Handle, &outResult, Diagnostic));
+        return CopyMapProjectionCameraResult(outResult);
     }
 
     /// <summary>

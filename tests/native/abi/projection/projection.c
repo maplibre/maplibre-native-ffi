@@ -4,10 +4,12 @@
 
 #include "support/test_support.h"
 
-static mln_camera_options read_camera(mln_map_projection projection) {
-  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
-  MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
-  return camera;
+static mln_camera read_camera(mln_map_projection projection) {
+  mln_map_projection_camera_result result = {
+    .size = sizeof(mln_map_projection_camera_result)
+  };
+  MLN_TEST_OK(mln_map_projection_get_camera(projection, &result, NULL));
+  return result.camera;
 }
 
 static void projection_outlives_its_source_map_and_runtime(void) {
@@ -17,20 +19,23 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   const mln_map_projection projection = mln_test_map_create_projection(map);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-  const mln_camera_options source_camera = read_camera(projection);
+  const mln_camera source_camera = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.center.latitude);
 
   mln_map_projection_release(projection);
 
   mln_map_projection_release(projection);
-  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
+  mln_map_projection_camera_result camera = {
+    .size = sizeof(mln_map_projection_camera_result)
+  };
   MLN_TEST_INVALID_STATE(
     mln_map_projection_get_camera(projection, &camera, NULL)
   );
-  camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  camera.zoom = 2.0;
+  mln_camera_options zoom = {.size = sizeof(mln_camera_options)};
+  zoom.fields = MLN_CAMERA_OPTION_ZOOM;
+  zoom.zoom = 2.0;
   MLN_TEST_INVALID_STATE(
-    mln_map_projection_set_camera(projection, &camera, NULL)
+    mln_map_projection_set_camera(projection, &zoom, NULL)
   );
   mln_screen_point point = {0};
   MLN_TEST_INVALID_STATE(mln_map_projection_pixel_for_lat_lng(
@@ -80,8 +85,10 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &padded, &completion.descriptor, NULL)
   );
-  mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
-  mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
+  mln_projection_mode_options mode = {
+    .size = sizeof(mln_projection_mode_options)
+  };
+  mode.fields = MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
   mode.axonometric = true;
   MLN_TEST_AWAIT_OK(
     mln_map_set_projection_mode(map, &mode, &completion.descriptor, NULL)
@@ -103,7 +110,7 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
 
   // The projection rebuilds its transform from the view's degrees and meters,
   // so its camera agrees with the view within a tolerance rather than bytewise.
-  const mln_camera_options camera = read_camera(projection);
+  const mln_camera camera = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(
     1e-9, snapshot.view.camera.center.latitude, camera.center.latitude
   );
@@ -172,13 +179,11 @@ static void zero_width(void* call) {
 static void zero_scale_factor(void* call) {
   ((projection_call*)call)->view.extent.scale_factor = 0.0;
 }
-static void unset_skew(void* call) {
-  ((projection_call*)call)->view.projection_mode.fields &=
-    ~MLN_PROJECTION_MODE_X_SKEW;
+static void infinite_skew(void* call) {
+  ((projection_call*)call)->view.projection_mode.x_skew = INFINITY;
 }
-static void unset_frustum_offset(void* call) {
-  ((projection_call*)call)->view.viewport.fields &=
-    ~MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+static void negative_frustum_offset(void* call) {
+  ((projection_call*)call)->view.viewport.frustum_offset.top = -1.0;
 }
 static void unknown_orientation(void* call) {
   ((projection_call*)call)->view.viewport.north_orientation = 9;
@@ -208,7 +213,7 @@ static mln_status submit_projection(
   return status;
 }
 
-static void creation_rejects_incomplete_or_invalid_views(void) {
+static void creation_rejects_invalid_views(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
@@ -231,9 +236,9 @@ static void creation_rejects_incomplete_or_invalid_views(void) {
     {"zero width", zero_width, MLN_STATUS_INVALID_ARGUMENT, "extent"},
     {"zero scale factor", zero_scale_factor, MLN_STATUS_INVALID_ARGUMENT,
      "extent"},
-    {"unset skew", unset_skew, MLN_STATUS_INVALID_ARGUMENT, "every field"},
-    {"unset frustum offset", unset_frustum_offset, MLN_STATUS_INVALID_ARGUMENT,
-     "every field"},
+    {"infinite skew", infinite_skew, MLN_STATUS_INVALID_ARGUMENT, "skews"},
+    {"negative frustum offset", negative_frustum_offset,
+     MLN_STATUS_INVALID_ARGUMENT, "frustum offset"},
     {"unknown orientation", unknown_orientation, MLN_STATUS_INVALID_ARGUMENT,
      "north_orientation"},
     {"null output", null_output, MLN_STATUS_INVALID_ARGUMENT, "out_projection"},
@@ -263,7 +268,7 @@ static void a_view_projection_ignores_the_maps_constraints(void) {
   camera.zoom = 24.0;
   camera.pitch = 70.0;
   MLN_TEST_OK(mln_map_projection_set_camera(projection, &camera, NULL));
-  const mln_camera_options applied = read_camera(projection);
+  const mln_camera applied = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 24.0, applied.zoom);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 70.0, applied.pitch);
 
@@ -279,9 +284,14 @@ static void setters_apply_before_return(void) {
 
   // A camera passed by pointer versions itself, unlike one embedded in an
   // update.
-  mln_camera_options too_small = {.size = sizeof(mln_camera_options) - 1};
-  MLN_TEST_INVALID(mln_map_projection_get_camera(projection, &too_small, NULL));
+  mln_map_projection_camera_result too_small_result = {
+    .size = sizeof(mln_map_projection_camera_result) - 1
+  };
+  MLN_TEST_INVALID(
+    mln_map_projection_get_camera(projection, &too_small_result, NULL)
+  );
   MLN_TEST_INVALID(mln_map_projection_get_camera(projection, NULL, NULL));
+  mln_camera_options too_small = {.size = sizeof(mln_camera_options) - 1};
   MLN_TEST_INVALID(mln_map_projection_set_camera(projection, &too_small, NULL));
 
   mln_camera_options camera = {.size = sizeof(mln_camera_options)};
@@ -290,7 +300,7 @@ static void setters_apply_before_return(void) {
   camera.center.longitude = 40.0;
   camera.zoom = 6.0;
   MLN_TEST_OK(mln_map_projection_set_camera(projection, &camera, NULL));
-  const mln_camera_options committed = read_camera(projection);
+  const mln_camera committed = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, committed.center.latitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, committed.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 6.0, committed.zoom);
@@ -559,10 +569,12 @@ static void projection_foreign_thread(void* argument) {
   probe->set_camera_status =
     mln_map_projection_set_camera(probe->projection, &camera, NULL);
 
-  camera = (mln_camera_options){.size = sizeof(mln_camera_options)};
+  mln_map_projection_camera_result observed = {
+    .size = sizeof(mln_map_projection_camera_result)
+  };
   probe->get_camera_status =
-    mln_map_projection_get_camera(probe->projection, &camera, NULL);
-  probe->observed_zoom = camera.zoom;
+    mln_map_projection_get_camera(probe->projection, &observed, NULL);
+  probe->observed_zoom = observed.camera.zoom;
 
   mln_screen_point pixel = {0};
   probe->pixel_status = mln_map_projection_pixel_for_lat_lng(
@@ -600,7 +612,9 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
   MLN_TEST_OK(probe.pixel_status);
   MLN_TEST_OK(probe.coordinate_status);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 15.0, probe.round_trip_latitude);
-  mln_camera_options camera = {.size = sizeof(mln_camera_options)};
+  mln_map_projection_camera_result camera = {
+    .size = sizeof(mln_map_projection_camera_result)
+  };
   MLN_TEST_INVALID_STATE(
     mln_map_projection_get_camera(probe.projection, &camera, NULL)
   );
@@ -613,7 +627,7 @@ static void projection_setters_reject_invalid_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_map_projection projection = mln_test_map_create_projection(map);
-  const mln_camera_options before = read_camera(projection);
+  const mln_camera before = read_camera(projection);
 
   mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   camera.fields = MLN_CAMERA_OPTION_ZOOM;
@@ -621,7 +635,7 @@ static void projection_setters_reject_invalid_values(void) {
   MLN_TEST_INVALID(
     mln_map_projection_set_camera(projection, &camera, MLN_TEST_DIAGNOSTIC)
   );
-  const mln_camera_options after = read_camera(projection);
+  const mln_camera after = read_camera(projection);
   TEST_ASSERT_EQUAL_DOUBLE(before.center.latitude, after.center.latitude);
   TEST_ASSERT_EQUAL_DOUBLE(before.center.longitude, after.center.longitude);
   TEST_ASSERT_EQUAL_DOUBLE(before.zoom, after.zoom);
@@ -723,7 +737,7 @@ MLN_TEST_GROUP {
   RUN_TEST(conversions_reject_invalid_inputs_without_writing_outputs);
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(projection_follows_committed_extent_viewport_and_mode);
-  RUN_TEST(creation_rejects_incomplete_or_invalid_views);
+  RUN_TEST(creation_rejects_invalid_views);
   RUN_TEST(a_view_projection_ignores_the_maps_constraints);
   RUN_TEST(setters_apply_before_return);
   RUN_TEST(projection_setters_reject_invalid_values);

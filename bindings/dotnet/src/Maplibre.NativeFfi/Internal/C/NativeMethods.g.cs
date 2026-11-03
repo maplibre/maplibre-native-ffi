@@ -522,7 +522,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_get_camera(
         MlnMapProjection projection,
-        mln_camera_options* out_camera,
+        mln_map_projection_camera_result* out_result,
         mln_diagnostic* out_diagnostic
     );
 
@@ -805,7 +805,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_projection_mode(
         MlnMap map,
-        mln_projection_mode* mode,
+        mln_projection_mode_options* options,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

@@ -94,7 +94,7 @@ internal constructor(
    */
   public fun getResult(): RenderFrameResult =
     nativeCall(this, binding) {
-      val out = sized(w(264, 264, 244), w(8, 8, 4))
+      val out = sized(w(248, 248, 228), w(8, 8, 4))
       check(C.mln_acquired_frame_get_result(handle, out, diagnostic))
       readRenderFrameResult(out)
     }

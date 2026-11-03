@@ -111,6 +111,9 @@ class Values:
             if value.native in self.used and wanted <= known:
                 return self.public(value)
             self.used[value.native] = value
+            if value.options:
+                # The record converts to its option bag.
+                self.add(self.bound.values[value.options], "in")
             # A record that holds only a union presents the union's variants.
             member = value.union_member
             fields = member.value.fields if member else value.fields

@@ -182,6 +182,12 @@ options.expected_type.kind = MLN_STYLE_EXPRESSION_TYPE_NUMBER;
   `mln_map_set_viewport_options` takes, changes only the settings whose bits are
   set. The others keep their current values instead of returning to defaults,
   and the function's comment says so.
+- A function that reads back the settings of such a struct reports a record that
+  holds every setting, without `size` or `fields`. The record is named for what
+  it holds, without `_options`: `mln_camera` for `mln_camera_options`. A
+  function that writes the record through a pointer wraps it in a struct that
+  begins with `size`, as `mln_map_projection_camera_result` wraps an
+  `mln_camera`.
 
 ### Data in and out
 

@@ -28,6 +28,7 @@ from ..semantic import (
     BoundApi,
     FieldPlan,
     ValuePlan,
+    conversion_doc,
     enum_member_prefix,
     required_member,
 )
@@ -426,6 +427,9 @@ class Values:
                 self.check(field.value, direction)
             (self.inputs if direction == "in" else self.outputs).add(value.native)
             self.used[value.native] = value
+            if value.options:
+                # The record converts to its option bag.
+                self.check(self.bound.values[value.options], "in")
             return
         raise Unsupported(f"{value.native}: {value.kind} needs a TypeScript rule")
 
@@ -623,6 +627,40 @@ class Values:
             + f"export interface {public} {{\n"
             + "".join(members)
             + "}\n"
+            + self.to_options(value)
+        )
+
+    def zero(self, value: ValuePlan) -> str:
+        """The value that an input reads for an absent member of this type."""
+        if value.kind in {"scalar", "enum"}:
+            scalar = self.carrier(value) if value.kind == "scalar" else None
+            ts = scalar.ts if scalar else self.enum_scalar(value).ts
+            return {"boolean": "false", "bigint": "0n", "number": "0"}[ts]
+        if value.kind == "record" and self.all_omittable(value):
+            return "{}"
+        raise Unsupported(f"{value.native}: no zero value to convert")
+
+    def to_options(self, value: ValuePlan) -> str:
+        """The function that converts a complete record to its option bag."""
+        if not value.options:
+            return ""
+        bag = self.bound.values[value.options]
+        public = public_name(value.native)
+        source = public[0].lower() + public[1:]
+        held = {field.name: field for field in self.fields(value)}
+        members = []
+        for field in self.fields(bag):
+            if field.name not in held:
+                continue
+            read = f"{source}.{identifier(field.name)}"
+            if self.member_optional(value, held[field.name]):
+                read += f" ?? {self.zero(field.value)}"
+            members.append(f"    {identifier(field.name)}: {read},\n")
+        return (
+            "\n"
+            + doc(self.bound, conversion_doc(value.native))
+            + f"export function {source}ToOptions({source}: {public}): "
+            + f"{public_name(bag.native)} {{\n  return {{\n{''.join(members)}  }};\n}}\n"
         )
 
     def render_registration(self, value: ValuePlan) -> str:

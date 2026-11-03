@@ -36,4 +36,22 @@ public readonly partial record struct Camera(
     double Pitch,
     double Roll,
     double FieldOfView
-);
+)
+{
+    /// <summary>
+    /// Converts this <c>Camera</c> to <c>CameraOptions</c> that set each of its
+    /// members.
+    /// </summary>
+    public CameraOptions ToOptions() =>
+        new()
+        {
+            Center = Center,
+            CenterAltitude = CenterAltitude,
+            Padding = Padding,
+            Zoom = Zoom,
+            Bearing = Bearing,
+            Pitch = Pitch,
+            Roll = Roll,
+            FieldOfView = FieldOfView,
+        };
+}

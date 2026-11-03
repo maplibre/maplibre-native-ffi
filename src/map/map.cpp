@@ -2553,34 +2553,19 @@ auto to_native_bound_options(const mln_bound_options& options)
   return result;
 }
 
-auto from_native_bound_options(const mln::BoundOptions& options)
-  -> mln_bound_options {
-  auto result = mln::core::bound_options_default();
-  if (options.bounds) {
-    if (is_unbounded_lat_lng_bounds(*options.bounds)) {
-      result.fields |= MLN_BOUND_OPTION_UNBOUNDED;
-    } else {
-      result.fields |= MLN_BOUND_OPTION_BOUNDS;
-      result.bounds = from_native_lat_lng_bounds(*options.bounds);
-    }
-  }
-  if (options.minZoom) {
-    result.fields |= MLN_BOUND_OPTION_MIN_ZOOM;
-    result.min_zoom = *options.minZoom;
-  }
-  if (options.maxZoom) {
-    result.fields |= MLN_BOUND_OPTION_MAX_ZOOM;
-    result.max_zoom = *options.maxZoom;
-  }
-  if (options.minPitch) {
-    result.fields |= MLN_BOUND_OPTION_MIN_PITCH;
-    result.min_pitch = *options.minPitch;
-  }
-  if (options.maxPitch) {
-    result.fields |= MLN_BOUND_OPTION_MAX_PITCH;
-    result.max_pitch = *options.maxPitch;
-  }
-  return result;
+// MapLibre Native reports every bound, and an unbounded center as a
+// default-constructed LatLngBounds whose corners cover the whole world.
+auto from_native_camera_bounds(const mln::BoundOptions& options)
+  -> mln_camera_bounds {
+  const auto& bounds = options.bounds.value();
+  return mln_camera_bounds{
+    .bounds = from_native_lat_lng_bounds(bounds),
+    .unbounded = is_unbounded_lat_lng_bounds(bounds),
+    .min_zoom = options.minZoom.value(),
+    .max_zoom = options.maxZoom.value(),
+    .min_pitch = options.minPitch.value(),
+    .max_pitch = options.maxPitch.value(),
+  };
 }
 
 auto to_native_vec3(mln_vec3 value) -> mln::vec3 {
@@ -2616,31 +2601,17 @@ auto to_native_free_camera(const mln_free_camera_options& options)
 }
 
 auto from_native_free_camera(const mln::FreeCameraOptions& options)
-  -> mln_free_camera_options {
-  auto result = mln::core::free_camera_options_default();
-  if (options.position) {
-    result.fields |= MLN_FREE_CAMERA_OPTION_POSITION;
-    result.position = from_native_vec3(*options.position);
-  }
-  if (options.orientation) {
-    result.fields |= MLN_FREE_CAMERA_OPTION_ORIENTATION;
-    result.orientation = from_native_vec4(*options.orientation);
-  }
-  return result;
+  -> mln_free_camera {
+  return mln_free_camera{
+    .position = from_native_vec3(options.position.value()),
+    .orientation = from_native_vec4(options.orientation.value()),
+  };
 }
 
 // A view's camera has finite members, and its zoom, pitch, and field of view
 // stay within MapLibre Native's absolute limits, the only range in which a
 // transform converts coordinates.
 auto validate_map_view(const mln_map_view& view) -> mln_status {
-  constexpr auto projection_mode_fields =
-    static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
-    MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW;
-  constexpr auto viewport_fields =
-    static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
-    MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
-    MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
-    MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
   const auto& camera = view.camera;
   if (
     const auto status = validate_lat_lng(camera.center); status != MLN_STATUS_OK
@@ -2684,22 +2655,23 @@ auto validate_map_view(const mln_map_view& view) -> mln_status {
     return status;
   }
   const auto& mode = view.projection_mode;
-  if (
-    mode.fields != projection_mode_fields || !std::isfinite(mode.x_skew) ||
-    !std::isfinite(mode.y_skew)
-  ) {
-    mln::core::set_thread_error(
-      "view projection mode must set every field, with finite skews"
-    );
+  if (!std::isfinite(mode.x_skew) || !std::isfinite(mode.y_skew)) {
+    mln::core::set_thread_error("view projection skews must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if ((view.viewport.fields & viewport_fields) != viewport_fields) {
-    mln::core::set_thread_error("view viewport options must set every field");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto viewport = view.viewport;
-  viewport.size = sizeof(mln_map_viewport_options);
-  return validate_viewport_options(&viewport);
+  const auto& viewport = view.viewport;
+  const auto viewport_options = mln_map_viewport_options{
+    .size = sizeof(mln_map_viewport_options),
+    .fields = static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
+              MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
+              MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
+              MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
+    .north_orientation = viewport.north_orientation,
+    .constrain_mode = viewport.constrain_mode,
+    .viewport_mode = viewport.viewport_mode,
+    .frustum_offset = viewport.frustum_offset,
+  };
+  return validate_viewport_options(&viewport_options);
 }
 
 // Assigns a validated view to a fresh transform. A camera jump would wrap the
@@ -2756,19 +2728,10 @@ auto map_view_from_transform(
         .width = size.width, .height = size.height, .scale_factor = scale_factor
       },
     .projection_mode =
-      {.size = sizeof(mln_projection_mode),
-       .fields = static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
-                 MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW,
-       .axonometric = transform.getAxonometric(),
+      {.axonometric = transform.getAxonometric(),
        .x_skew = transform.getXSkew(),
        .y_skew = transform.getYSkew()},
     .viewport = {
-      .size = sizeof(mln_map_viewport_options),
-      .fields =
-        static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
-        MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
-        MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
-        MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
       .north_orientation =
         from_native_north_orientation(transform.getNorthOrientation()),
       .constrain_mode =
@@ -2895,7 +2858,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     const auto transition = live.map->inTransition();
     const auto refresh_camera = live.snapshot_camera_dirty;
     auto view = mln_map_view{};
-    auto free_camera = mln_free_camera_options{};
+    auto free_camera = mln_free_camera{};
     if (refresh_camera) {
       view = map_view_from_transform(
         live.map->getTransformState(), live.logical_extent.scale_factor
@@ -2933,13 +2896,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .latest_render_update_generation =
       live.frontend->latest_update_generation(),
     .tile =
-      {.size = sizeof(mln_map_tile_options),
-       .fields =
-         static_cast<uint32_t>(MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) |
-         MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS | MLN_MAP_TILE_OPTION_LOD_SCALE |
-         MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD |
-         MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT | MLN_MAP_TILE_OPTION_LOD_MODE,
-       .prefetch_zoom_delta = live.map->getPrefetchZoomDelta(),
+      {.prefetch_zoom_delta = live.map->getPrefetchZoomDelta(),
        .lod_min_radius = live.map->getTileLodMinRadius(),
        .lod_scale = live.map->getTileLodScale(),
        // The engine takes the threshold in radians.
@@ -2947,7 +2904,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
          mln::util::rad2deg(live.map->getTileLodPitchThreshold()),
        .lod_zoom_shift = live.map->getTileLodZoomShift(),
        .lod_mode = from_native_tile_lod_mode(live.map->getTileLodMode())},
-    .bounds = from_native_bound_options(live.map->getBounds()),
+    .bounds = from_native_camera_bounds(live.map->getBounds()),
     .free_camera = from_native_free_camera(live.map->getFreeCameraOptions()),
     .view = map_view_from_transform(
       live.map->getTransformState(), live.logical_extent.scale_factor
@@ -3133,29 +3090,6 @@ auto camera_fit_options_default() noexcept -> mln_camera_fit_options {
     .padding = {.top = 0, .left = 0, .bottom = 0, .right = 0},
     .bearing = 0,
     .pitch = 0
-  };
-}
-
-auto bound_options_default() noexcept -> mln_bound_options {
-  return mln_bound_options{
-    .size = sizeof(mln_bound_options),
-    .fields = 0,
-    .bounds =
-      {.southwest = {.latitude = 0, .longitude = 0},
-       .northeast = {.latitude = 0, .longitude = 0}},
-    .min_zoom = 0,
-    .max_zoom = 0,
-    .min_pitch = 0,
-    .max_pitch = 0
-  };
-}
-
-auto free_camera_options_default() noexcept -> mln_free_camera_options {
-  return mln_free_camera_options{
-    .size = sizeof(mln_free_camera_options),
-    .fields = 0,
-    .position = {.x = 0, .y = 0, .z = 0},
-    .orientation = {.x = 0, .y = 0, .z = 0, .w = 1}
   };
 }
 
@@ -4804,14 +4738,17 @@ auto map_projection_release(mln_map_projection projection) -> void {
 }
 
 auto map_projection_get_camera(
-  mln_map_projection projection, mln_camera_options* out_camera
+  mln_map_projection projection, mln_map_projection_camera_result* out_result
 ) -> mln_status {
-  if (out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)) {
-    set_thread_error("out_camera must not be null and must have a valid size");
+  if (
+    out_result == nullptr ||
+    out_result->size < sizeof(mln_map_projection_camera_result)
+  ) {
+    set_thread_error("out_result must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return with_projection(projection, [out_camera](mln::MapProjection& value) {
-    *out_camera = from_native_camera(value.getCamera());
+  return with_projection(projection, [out_result](mln::MapProjection& value) {
+    out_result->camera = from_native_complete_camera(value.getCamera());
   });
 }
 
@@ -5286,38 +5223,41 @@ auto map_set_free_camera_options(
 }
 
 auto map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode, const mln_completion* completion
+  mln_map map, const mln_projection_mode_options* options,
+  const mln_completion* completion
 ) -> mln_status {
-  if (mode == nullptr || mode->size < sizeof(mln_projection_mode)) {
-    set_thread_error("mode must not be null and must have a valid size");
+  if (
+    options == nullptr || options->size < sizeof(mln_projection_mode_options)
+  ) {
+    set_thread_error("options must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
-    MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW;
-  if ((mode->fields & ~known_fields) != 0U) {
-    set_thread_error("mode fields contain unknown bits");
+    static_cast<uint32_t>(MLN_PROJECTION_MODE_OPTION_AXONOMETRIC) |
+    MLN_PROJECTION_MODE_OPTION_X_SKEW | MLN_PROJECTION_MODE_OPTION_Y_SKEW;
+  if ((options->fields & ~known_fields) != 0U) {
+    set_thread_error("projection mode fields contain unknown bits");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    ((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U &&
-     !std::isfinite(mode->x_skew)) ||
-    ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U &&
-     !std::isfinite(mode->y_skew))
+    ((options->fields & MLN_PROJECTION_MODE_OPTION_X_SKEW) != 0U &&
+     !std::isfinite(options->x_skew)) ||
+    ((options->fields & MLN_PROJECTION_MODE_OPTION_Y_SKEW) != 0U &&
+     !std::isfinite(options->y_skew))
   ) {
     set_thread_error("projection skew values must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   auto copied = mln::ProjectionMode{};
-  if ((mode->fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
-    copied.withAxonometric(mode->axonometric);
+  if ((options->fields & MLN_PROJECTION_MODE_OPTION_AXONOMETRIC) != 0U) {
+    copied.withAxonometric(options->axonometric);
   }
-  if ((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U) {
-    copied.withXSkew(mode->x_skew);
+  if ((options->fields & MLN_PROJECTION_MODE_OPTION_X_SKEW) != 0U) {
+    copied.withXSkew(options->x_skew);
   }
-  if ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U) {
-    copied.withYSkew(mode->y_skew);
+  if ((options->fields & MLN_PROJECTION_MODE_OPTION_Y_SKEW) != 0U) {
+    copied.withYSkew(options->y_skew);
   }
   return submit_map_command(
     map,

@@ -1,55 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
-fn generated_copy_mln_bound_options(
-    py: Python<'_>,
-    value: &sys::mln_bound_options,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "bounds",
-        generated_optional(py, value.fields & sys::MLN_BOUND_OPTION_BOUNDS != 0, || {
-            generated_copy_mln_lat_lng_bounds(py, &value.bounds)
-        })?,
-    )?;
-    dict.set_item(
-        "min_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_BOUND_OPTION_MIN_ZOOM != 0,
-            || generated_value(py, value.min_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "max_zoom",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_BOUND_OPTION_MAX_ZOOM != 0,
-            || generated_value(py, value.max_zoom),
-        )?,
-    )?;
-    dict.set_item(
-        "min_pitch",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_BOUND_OPTION_MIN_PITCH != 0,
-            || generated_value(py, value.min_pitch),
-        )?,
-    )?;
-    dict.set_item(
-        "max_pitch",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_BOUND_OPTION_MAX_PITCH != 0,
-            || generated_value(py, value.max_pitch),
-        )?,
-    )?;
-    dict.set_item(
-        "unbounded",
-        value.fields & sys::MLN_BOUND_OPTION_UNBOUNDED != 0,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_camera(py: Python<'_>, value: &sys::mln_camera) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("center", generated_copy_mln_lat_lng(py, &value.center)?)?;
@@ -66,6 +16,23 @@ fn generated_copy_mln_camera(py: Python<'_>, value: &sys::mln_camera) -> PyResul
     dict.set_item("pitch", generated_value(py, value.pitch)?)?;
     dict.set_item("roll", generated_value(py, value.roll)?)?;
     dict.set_item("field_of_view", generated_value(py, value.field_of_view)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_camera_bounds(
+    py: Python<'_>,
+    value: &sys::mln_camera_bounds,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "bounds",
+        generated_copy_mln_lat_lng_bounds(py, &value.bounds)?,
+    )?;
+    dict.set_item("unbounded", generated_value(py, value.unbounded)?)?;
+    dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
+    dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
+    dict.set_item("min_pitch", generated_value(py, value.min_pitch)?)?;
+    dict.set_item("max_pitch", generated_value(py, value.max_pitch)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -285,26 +252,15 @@ fn generated_copy_mln_edge_insets(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_free_camera_options(
+fn generated_copy_mln_free_camera(
     py: Python<'_>,
-    value: &sys::mln_free_camera_options,
+    value: &sys::mln_free_camera,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item(
-        "position",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_FREE_CAMERA_OPTION_POSITION != 0,
-            || generated_copy_mln_vec3(py, &value.position),
-        )?,
-    )?;
+    dict.set_item("position", generated_copy_mln_vec3(py, &value.position)?)?;
     dict.set_item(
         "orientation",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_FREE_CAMERA_OPTION_ORIENTATION != 0,
-            || generated_copy_mln_quaternion(py, &value.orientation),
-        )?,
+        generated_copy_mln_quaternion(py, &value.orientation)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -398,6 +354,15 @@ fn generated_copy_mln_logical_extent(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_map_projection_camera_result(
+    py: Python<'_>,
+    value: &sys::mln_map_projection_camera_result,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("camera", generated_copy_mln_camera(py, &value.camera)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_map_snapshot(
     py: Python<'_>,
     value: &sys::mln_map_snapshot,
@@ -425,73 +390,37 @@ fn generated_copy_mln_map_snapshot(
     )?;
     dict.set_item(
         "tile",
-        generated_copy_mln_map_tile_options(py, &value.tile)?,
+        generated_copy_mln_map_tile_settings(py, &value.tile)?,
     )?;
     dict.set_item(
         "bounds",
-        generated_copy_mln_bound_options(py, &value.bounds)?,
+        generated_copy_mln_camera_bounds(py, &value.bounds)?,
     )?;
     dict.set_item(
         "free_camera",
-        generated_copy_mln_free_camera_options(py, &value.free_camera)?,
+        generated_copy_mln_free_camera(py, &value.free_camera)?,
     )?;
     dict.set_item("view", generated_copy_mln_map_view(py, &value.view)?)?;
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_map_tile_options(
+fn generated_copy_mln_map_tile_settings(
     py: Python<'_>,
-    value: &sys::mln_map_tile_options,
+    value: &sys::mln_map_tile_settings,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item(
         "prefetch_zoom_delta",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0,
-            || generated_value(py, value.prefetch_zoom_delta),
-        )?,
+        generated_value(py, value.prefetch_zoom_delta)?,
     )?;
-    dict.set_item(
-        "lod_min_radius",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0,
-            || generated_value(py, value.lod_min_radius),
-        )?,
-    )?;
-    dict.set_item(
-        "lod_scale",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_TILE_OPTION_LOD_SCALE != 0,
-            || generated_value(py, value.lod_scale),
-        )?,
-    )?;
+    dict.set_item("lod_min_radius", generated_value(py, value.lod_min_radius)?)?;
+    dict.set_item("lod_scale", generated_value(py, value.lod_scale)?)?;
     dict.set_item(
         "lod_pitch_threshold",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0,
-            || generated_value(py, value.lod_pitch_threshold),
-        )?,
+        generated_value(py, value.lod_pitch_threshold)?,
     )?;
-    dict.set_item(
-        "lod_zoom_shift",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0,
-            || generated_value(py, value.lod_zoom_shift),
-        )?,
-    )?;
-    dict.set_item(
-        "lod_mode",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0,
-            || generated_value(py, value.lod_mode),
-        )?,
-    )?;
+    dict.set_item("lod_zoom_shift", generated_value(py, value.lod_zoom_shift)?)?;
+    dict.set_item("lod_mode", generated_value(py, value.lod_mode)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -508,47 +437,25 @@ fn generated_copy_mln_map_view(py: Python<'_>, value: &sys::mln_map_view) -> PyR
     )?;
     dict.set_item(
         "viewport",
-        generated_copy_mln_map_viewport_options(py, &value.viewport)?,
+        generated_copy_mln_map_viewport(py, &value.viewport)?,
     )?;
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_map_viewport_options(
+fn generated_copy_mln_map_viewport(
     py: Python<'_>,
-    value: &sys::mln_map_viewport_options,
+    value: &sys::mln_map_viewport,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item(
         "north_orientation",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0,
-            || generated_value(py, value.north_orientation),
-        )?,
+        generated_value(py, value.north_orientation)?,
     )?;
-    dict.set_item(
-        "constrain_mode",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0,
-            || generated_value(py, value.constrain_mode),
-        )?,
-    )?;
-    dict.set_item(
-        "viewport_mode",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0,
-            || generated_value(py, value.viewport_mode),
-        )?,
-    )?;
+    dict.set_item("constrain_mode", generated_value(py, value.constrain_mode)?)?;
+    dict.set_item("viewport_mode", generated_value(py, value.viewport_mode)?)?;
     dict.set_item(
         "frustum_offset",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0,
-            || generated_copy_mln_edge_insets(py, &value.frustum_offset),
-        )?,
+        generated_copy_mln_edge_insets(py, &value.frustum_offset)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -713,30 +620,9 @@ fn generated_copy_mln_projection_mode(
     value: &sys::mln_projection_mode,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item(
-        "axonometric",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_PROJECTION_MODE_AXONOMETRIC != 0,
-            || generated_value(py, value.axonometric),
-        )?,
-    )?;
-    dict.set_item(
-        "x_skew",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_PROJECTION_MODE_X_SKEW != 0,
-            || generated_value(py, value.x_skew),
-        )?,
-    )?;
-    dict.set_item(
-        "y_skew",
-        generated_optional(
-            py,
-            value.fields & sys::MLN_PROJECTION_MODE_Y_SKEW != 0,
-            || generated_value(py, value.y_skew),
-        )?,
-    )?;
+    dict.set_item("axonometric", generated_value(py, value.axonometric)?)?;
+    dict.set_item("x_skew", generated_value(py, value.x_skew)?)?;
+    dict.set_item("y_skew", generated_value(py, value.y_skew)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2206,7 +2092,26 @@ fn generated_input_mln_map_view<'py>(
     raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.projection_mode =
         generated_input_mln_projection_mode(&value.getattr("projection_mode")?, storage)?;
-    raw.viewport = generated_input_mln_map_viewport_options(&value.getattr("viewport")?, storage)?;
+    raw.viewport = generated_input_mln_map_viewport(&value.getattr("viewport")?, storage)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_map_viewport<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_map_viewport> {
+    let mut raw: sys::mln_map_viewport = unsafe { std::mem::zeroed() };
+    raw.north_orientation = value
+        .getattr("north_orientation")?
+        .extract::<sys::mln_north_orientation>()?;
+    raw.constrain_mode = value
+        .getattr("constrain_mode")?
+        .extract::<sys::mln_constrain_mode>()?;
+    raw.viewport_mode = value
+        .getattr("viewport_mode")?
+        .extract::<sys::mln_viewport_mode>()?;
+    raw.frustum_offset =
+        generated_input_mln_edge_insets(&value.getattr("frustum_offset")?, storage)?;
     Ok(raw)
 }
 
@@ -2551,19 +2456,34 @@ fn generated_input_mln_projection_mode<'py>(
 ) -> PyResult<sys::mln_projection_mode> {
     let _ = storage;
     let mut raw: sys::mln_projection_mode = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_projection_mode>() as _;
+    raw.axonometric = value.getattr("axonometric")?.extract::<bool>()?;
+    raw.x_skew = value.getattr("x_skew")?.extract::<f64>()?;
+    raw.y_skew = value.getattr("y_skew")?.extract::<f64>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_projection_mode_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_projection_mode_options> {
+    let _ = storage;
+    let mut raw: sys::mln_projection_mode_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_projection_mode_options>() as _;
     raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
     if let Some(field) = generated_present(value, "axonometric")? {
         raw.axonometric = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
+        raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
     }
     if let Some(field) = generated_present(value, "x_skew")? {
         raw.x_skew = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
+        raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_X_SKEW;
     }
     if let Some(field) = generated_present(value, "y_skew")? {
         raw.y_skew = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
+        raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_Y_SKEW;
     }
     Ok(raw)
 }
@@ -5928,31 +5848,37 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (mode))]
-    fn set_projection_mode(&self, py: Python<'_>, mode: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let mode_value = generated_input_mln_projection_mode(&mode.clone(), storage)?;
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_projection_mode(handle, &mode_value, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = (mode))]
-    fn _discard_set_projection_mode(
+    #[pyo3(signature = (options=None))]
+    fn set_projection_mode(
         &self,
         py: Python<'_>,
-        mode: &Bound<'_, PyAny>,
+        options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let mode_value = generated_input_mln_projection_mode(&mode.clone(), storage)?;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_input_mln_projection_mode_options(&options.clone(), storage)?;
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_set_projection_mode(handle, &options_value, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = (options=None))]
+    fn _discard_set_projection_mode(
+        &self,
+        py: Python<'_>,
+        options: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_input_mln_projection_mode_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_set_projection_mode(handle, &mode_value, completion, diagnostic)
+                sys::mln_map_set_projection_mode(handle, &options_value, completion, diagnostic)
             })
         }
     }
@@ -6454,14 +6380,14 @@ impl MapProjectionHandle {
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let mut out_camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
-        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
+        let mut out_result: sys::mln_map_projection_camera_result = unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_map_projection_camera_result>() as _;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_map_projection_get_camera(handle, &mut out_camera, diagnostic)
+                sys::mln_map_projection_get_camera(handle, &mut out_result, diagnostic)
             })
         }?;
-        generated_copy_mln_camera_options(py, &out_camera)
+        generated_copy_mln_map_projection_camera_result(py, &out_result)
     }
     #[pyo3(signature = (point))]
     fn lat_lng_for_pixel(&self, py: Python<'_>, point: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {

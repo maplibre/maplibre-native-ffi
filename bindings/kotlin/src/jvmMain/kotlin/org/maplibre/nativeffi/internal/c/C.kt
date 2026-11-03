@@ -1922,9 +1922,9 @@ internal actual object C {
 
   actual fun mln_map_projection_get_camera(
     projection: Long,
-    outCamera: Long,
+    outResult: Long,
     outDiagnostic: Long,
-  ): Int = mln_map_projection_get_camera.invokeExact(projection, outCamera, outDiagnostic) as Int
+  ): Int = mln_map_projection_get_camera.invokeExact(projection, outResult, outDiagnostic) as Int
 
   actual fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
@@ -2324,10 +2324,10 @@ internal actual object C {
 
   actual fun mln_map_set_projection_mode(
     map: Long,
-    mode: Long,
+    options: Long,
     completion: Long,
     outDiagnostic: Long,
-  ): Int = mln_map_set_projection_mode.invokeExact(map, mode, completion, outDiagnostic) as Int
+  ): Int = mln_map_set_projection_mode.invokeExact(map, options, completion, outDiagnostic) as Int
 
   actual fun mln_map_set_rendering_stats_view_enabled(
     map: Long,

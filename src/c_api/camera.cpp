@@ -53,11 +53,11 @@ auto mln_map_get_camera(
 }
 
 auto mln_map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode,
+  mln_map map, const mln_projection_mode_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_set_projection_mode(map, mode, completion);
+    return mln::core::map_set_projection_mode(map, options, completion);
   });
 }
 

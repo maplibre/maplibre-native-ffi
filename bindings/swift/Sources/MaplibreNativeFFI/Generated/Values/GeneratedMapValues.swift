@@ -212,6 +212,64 @@ public struct Camera: Equatable, Hashable, Sendable {
     raw.field_of_view = fieldOfView
     return raw
   }
+
+  /// Converts this `Camera` to `CameraOptions` that set each of its members.
+  public func toOptions() -> CameraOptions {
+    CameraOptions(
+      center: center,
+      centerAltitude: centerAltitude,
+      padding: padding,
+      zoom: zoom,
+      bearing: bearing,
+      pitch: pitch,
+      roll: roll,
+      fieldOfView: fieldOfView
+    )
+  }
+}
+
+/// All the limits on a map's camera.
+///
+/// Its members mean the same as those of `BoundOptions`.
+///
+/// See `mln_camera_bounds` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraBounds: Equatable, Hashable, Sendable {
+  /// The area that the camera's center stays within. When `unbounded` is true,
+  /// it covers the whole world.
+  public var bounds: LatLngBounds
+  /// Whether no area limits the camera's center.
+  public var unbounded: Bool
+  public var minZoom: Double
+  public var maxZoom: Double
+  /// The lowest pitch, in degrees.
+  public var minPitch: Double
+  /// The highest pitch, in degrees.
+  public var maxPitch: Double
+  public init(
+    bounds: LatLngBounds = .init(),
+    unbounded: Bool = false,
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    minPitch: Double = 0,
+    maxPitch: Double = 0
+  ) {
+    self.bounds = bounds
+    self.unbounded = unbounded
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.minPitch = minPitch
+    self.maxPitch = maxPitch
+  }
+
+  init(raw: mln_camera_bounds) {
+    bounds = LatLngBounds(raw: raw.bounds)
+    unbounded = raw.unbounded
+    minZoom = raw.min_zoom
+    maxZoom = raw.max_zoom
+    minPitch = raw.min_pitch
+    maxPitch = raw.max_pitch
+  }
 }
 
 /// A change to the camera from where it is now, for gestures.
@@ -773,6 +831,26 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   }
 }
 
+/// A map camera's whole position and orientation in three dimensions.
+///
+/// Its members mean the same as those of `FreeCameraOptions`.
+///
+/// See `mln_free_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct FreeCamera: Equatable, Hashable, Sendable {
+  public var position: Vec3
+  public var orientation: Quaternion
+  public init(position: Vec3 = .init(), orientation: Quaternion = .init()) {
+    self.position = position
+    self.orientation = orientation
+  }
+
+  init(raw: mln_free_camera) {
+    position = Vec3(raw: raw.position)
+    orientation = Quaternion(raw: raw.orientation)
+  }
+}
+
 /// The camera's position and orientation in three dimensions.
 ///
 /// See `mln_free_camera_options` in the
@@ -1074,9 +1152,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var eventMask: RuntimeEventFlag
   /// Counts the render updates that the map has made for its render session.
   public var latestRenderUpdateGeneration: UInt64
-  public var tile: MapTileOptions
-  public var bounds: BoundOptions
-  public var freeCamera: FreeCameraOptions
+  public var tile: MapTileSettings
+  public var bounds: CameraBounds
+  public var freeCamera: FreeCamera
   public var view: MapView
   public init(
     debugFlags: MapDebugFlag = .init(rawValue: 0),
@@ -1087,9 +1165,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     transitionInProgress: Bool = false,
     eventMask: RuntimeEventFlag = .init(rawValue: 0),
     latestRenderUpdateGeneration: UInt64 = 0,
-    tile: MapTileOptions = .init(),
-    bounds: BoundOptions = .init(),
-    freeCamera: FreeCameraOptions = .init(),
+    tile: MapTileSettings = .init(),
+    bounds: CameraBounds = .init(),
+    freeCamera: FreeCamera = .init(),
     view: MapView = .init()
   ) {
     self.debugFlags = debugFlags
@@ -1115,9 +1193,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     transitionInProgress = raw.transition_in_progress
     eventMask = RuntimeEventFlag(rawValue: raw.event_mask)
     latestRenderUpdateGeneration = raw.latest_render_update_generation
-    tile = MapTileOptions(raw: raw.tile)
-    bounds = BoundOptions(raw: raw.bounds)
-    freeCamera = FreeCameraOptions(raw: raw.free_camera)
+    tile = MapTileSettings(raw: raw.tile)
+    bounds = CameraBounds(raw: raw.bounds)
+    freeCamera = FreeCamera(raw: raw.free_camera)
     view = MapView(raw: raw.view)
   }
 }
@@ -1206,6 +1284,46 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// All the settings for how a map picks the tiles to load.
+///
+/// Its members mean the same as those of `MapTileOptions`.
+///
+/// See `mln_map_tile_settings` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct MapTileSettings: Equatable, Hashable, Sendable {
+  public var prefetchZoomDelta: UInt32
+  public var lodMinRadius: Double
+  public var lodScale: Double
+  /// The pitch, in degrees, above which the map lowers the detail.
+  public var lodPitchThreshold: Double
+  public var lodZoomShift: Double
+  public var lodMode: TileLodMode
+  public init(
+    prefetchZoomDelta: UInt32 = 0,
+    lodMinRadius: Double = 0,
+    lodScale: Double = 0,
+    lodPitchThreshold: Double = 0,
+    lodZoomShift: Double = 0,
+    lodMode: TileLodMode = .init(rawValue: 0)
+  ) {
+    self.prefetchZoomDelta = prefetchZoomDelta
+    self.lodMinRadius = lodMinRadius
+    self.lodScale = lodScale
+    self.lodPitchThreshold = lodPitchThreshold
+    self.lodZoomShift = lodZoomShift
+    self.lodMode = lodMode
+  }
+
+  init(raw: mln_map_tile_settings) {
+    prefetchZoomDelta = raw.prefetch_zoom_delta
+    lodMinRadius = raw.lod_min_radius
+    lodScale = raw.lod_scale
+    lodPitchThreshold = raw.lod_pitch_threshold
+    lodZoomShift = raw.lod_zoom_shift
+    lodMode = TileLodMode(rawValue: raw.lod_mode.rawValue)
+  }
+}
+
 /// One view of a map: its camera, size, and projection.
 ///
 /// See `mln_map_view` in the
@@ -1214,12 +1332,12 @@ public struct MapView: Equatable, Hashable, Sendable {
   public var camera: Camera
   public var extent: LogicalExtent
   public var projectionMode: ProjectionMode
-  public var viewport: MapViewportOptions
+  public var viewport: MapViewport
   public init(
     camera: Camera = .init(),
     extent: LogicalExtent = .init(),
     projectionMode: ProjectionMode = .init(),
-    viewport: MapViewportOptions = .init()
+    viewport: MapViewport = .init()
   ) {
     self.camera = camera
     self.extent = extent
@@ -1231,7 +1349,7 @@ public struct MapView: Equatable, Hashable, Sendable {
     camera = Camera(raw: raw.camera)
     extent = LogicalExtent(raw: raw.extent)
     projectionMode = ProjectionMode(raw: raw.projection_mode)
-    viewport = MapViewportOptions(raw: raw.viewport)
+    viewport = MapViewport(raw: raw.viewport)
   }
 
   func nativeValue() -> mln_map_view {
@@ -1241,6 +1359,49 @@ public struct MapView: Equatable, Hashable, Sendable {
     raw.extent = extent.nativeValue()
     raw.projection_mode = projectionMode.nativeValue()
     raw.viewport = viewport.nativeValue()
+    return raw
+  }
+}
+
+/// A map's whole viewport.
+///
+/// Its members mean the same as those of `MapViewportOptions`.
+///
+/// See `mln_map_viewport` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct MapViewport: Equatable, Hashable, Sendable {
+  public var northOrientation: NorthOrientation
+  public var constrainMode: ConstrainMode
+  public var viewportMode: ViewportMode
+  public var frustumOffset: EdgeInsets
+  public init(
+    northOrientation: NorthOrientation = .init(rawValue: 0),
+    constrainMode: ConstrainMode = .init(rawValue: 0),
+    viewportMode: ViewportMode = .init(rawValue: 0),
+    frustumOffset: EdgeInsets = .init()
+  ) {
+    self.northOrientation = northOrientation
+    self.constrainMode = constrainMode
+    self.viewportMode = viewportMode
+    self.frustumOffset = frustumOffset
+  }
+
+  init(raw: mln_map_viewport) {
+    northOrientation = NorthOrientation(rawValue: raw.north_orientation
+      .rawValue)
+    constrainMode = ConstrainMode(rawValue: raw.constrain_mode.rawValue)
+    viewportMode = ViewportMode(rawValue: raw.viewport_mode.rawValue)
+    frustumOffset = EdgeInsets(raw: raw.frustum_offset)
+  }
+
+  func nativeValue() -> mln_map_viewport {
+    var raw = mln_map_viewport()
+    raw
+      .north_orientation = mln_north_orientation(rawValue: northOrientation
+        .rawValue)
+    raw.constrain_mode = mln_constrain_mode(rawValue: constrainMode.rawValue)
+    raw.viewport_mode = mln_viewport_mode(rawValue: viewportMode.rawValue)
+    raw.frustum_offset = frustumOffset.nativeValue()
     return raw
   }
 }
@@ -1565,11 +1726,42 @@ public struct ProjectedMeters: Equatable, Hashable, Sendable {
   }
 }
 
-/// Settings that skew the map or draw it without perspective.
+/// A map's whole projection mode.
+///
+/// Its members mean the same as those of `ProjectionModeOptions`.
 ///
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectionMode: Equatable, Hashable, Sendable {
+  public var axonometric: Bool
+  public var xSkew: Double
+  public var ySkew: Double
+  public init(axonometric: Bool = false, xSkew: Double = 0, ySkew: Double = 0) {
+    self.axonometric = axonometric
+    self.xSkew = xSkew
+    self.ySkew = ySkew
+  }
+
+  init(raw: mln_projection_mode) {
+    axonometric = raw.axonometric
+    xSkew = raw.x_skew
+    ySkew = raw.y_skew
+  }
+
+  func nativeValue() -> mln_projection_mode {
+    var raw = mln_projection_mode()
+    raw.axonometric = axonometric
+    raw.x_skew = xSkew
+    raw.y_skew = ySkew
+    return raw
+  }
+}
+
+/// Settings that skew the map or draw it without perspective.
+///
+/// See `mln_projection_mode_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct ProjectionModeOptions: Equatable, Hashable, Sendable {
   /// Whether the map draws without perspective.
   public var axonometric: Bool?
   public var xSkew: Double?
@@ -1584,28 +1776,30 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
     self.ySkew = ySkew
   }
 
-  init(raw: mln_projection_mode) {
-    axonometric = raw.fields & MLN_PROJECTION_MODE_AXONOMETRIC
+  init(raw: mln_projection_mode_options) {
+    axonometric = raw.fields & MLN_PROJECTION_MODE_OPTION_AXONOMETRIC
       .rawValue != 0 ? raw.axonometric : nil
-    xSkew = raw.fields & MLN_PROJECTION_MODE_X_SKEW.rawValue != 0 ? raw
+    xSkew = raw.fields & MLN_PROJECTION_MODE_OPTION_X_SKEW.rawValue != 0 ? raw
       .x_skew : nil
-    ySkew = raw.fields & MLN_PROJECTION_MODE_Y_SKEW.rawValue != 0 ? raw
+    ySkew = raw.fields & MLN_PROJECTION_MODE_OPTION_Y_SKEW.rawValue != 0 ? raw
       .y_skew : nil
   }
 
-  func nativeValue() -> mln_projection_mode {
-    var raw = mln_projection_mode()
+  func nativeValue() -> mln_projection_mode_options {
+    var raw = mln_projection_mode_options()
     raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_projection_mode>.size)
+    raw.size = UInt32(MemoryLayout<mln_projection_mode_options>.size)
     if let item = axonometric {
-      raw.fields |= MLN_PROJECTION_MODE_AXONOMETRIC.rawValue; raw
+      raw.fields |= MLN_PROJECTION_MODE_OPTION_AXONOMETRIC.rawValue; raw
         .axonometric = item
     }
     if let item = xSkew {
-      raw.fields |= MLN_PROJECTION_MODE_X_SKEW.rawValue; raw.x_skew = item
+      raw.fields |= MLN_PROJECTION_MODE_OPTION_X_SKEW.rawValue; raw
+        .x_skew = item
     }
     if let item = ySkew {
-      raw.fields |= MLN_PROJECTION_MODE_Y_SKEW.rawValue; raw.y_skew = item
+      raw.fields |= MLN_PROJECTION_MODE_OPTION_Y_SKEW.rawValue; raw
+        .y_skew = item
     }
     return raw
   }

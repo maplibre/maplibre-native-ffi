@@ -129,6 +129,52 @@ export interface Camera {
 }
 
 /**
+ * Converts this `Camera` to `CameraOptions` that set each of its members.
+ */
+export function cameraToOptions(camera: Camera): CameraOptions {
+  return {
+    center: camera.center ?? {},
+    centerAltitude: camera.centerAltitude ?? 0,
+    padding: camera.padding ?? {},
+    zoom: camera.zoom ?? 0,
+    bearing: camera.bearing ?? 0,
+    pitch: camera.pitch ?? 0,
+    roll: camera.roll ?? 0,
+    fieldOfView: camera.fieldOfView ?? 0,
+  };
+}
+
+/**
+ * All the limits on a map's camera.
+ *
+ * Its members mean the same as those of `BoundOptions`.
+ *
+ * See `mln_camera_bounds` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface CameraBounds {
+  /**
+   * The area that the camera's center stays within. When `unbounded` is true,
+   * it covers the whole world.
+   */
+  readonly bounds: LatLngBounds;
+  /**
+   * Whether no area limits the camera's center.
+   */
+  readonly unbounded: boolean;
+  readonly minZoom: number;
+  readonly maxZoom: number;
+  /**
+   * The lowest pitch, in degrees.
+   */
+  readonly minPitch: number;
+  /**
+   * The highest pitch, in degrees.
+   */
+  readonly maxPitch: number;
+}
+
+/**
  * Whether a camera change jumps or animates.
  *
  * See `mln_camera_change_mode` in the
@@ -535,6 +581,19 @@ export const FrameDemandFlag = {
 } as const;
 /** A bitwise OR of FrameDemandFlag flags. */
 export type FrameDemandFlag = number;
+
+/**
+ * A map camera's whole position and orientation in three dimensions.
+ *
+ * Its members mean the same as those of `FreeCameraOptions`.
+ *
+ * See `mln_free_camera` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface FreeCamera {
+  readonly position: Vec3;
+  readonly orientation: Quaternion;
+}
 
 /**
  * The camera's position and orientation in three dimensions.
@@ -954,6 +1013,16 @@ export interface MapOptions {
 }
 
 /**
+ * A projection's camera, as `MapProjectionHandle.getCamera()` reports it.
+ *
+ * See `mln_map_projection_camera_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ */
+export interface MapProjectionCameraResult {
+  readonly camera: Camera;
+}
+
+/**
  * A map's state, as `MapHandle.getSnapshot()` reads it.
  *
  * See `mln_map_snapshot` in the
@@ -977,9 +1046,9 @@ export interface MapSnapshot {
    * Counts the render updates that the map has made for its render session.
    */
   readonly latestRenderUpdateGeneration: bigint;
-  readonly tile: MapTileOptions;
-  readonly bounds: BoundOptions;
-  readonly freeCamera: FreeCameraOptions;
+  readonly tile: MapTileSettings;
+  readonly bounds: CameraBounds;
+  readonly freeCamera: FreeCamera;
   readonly view: MapView;
 }
 
@@ -1021,6 +1090,26 @@ export interface MapTileOptions {
 }
 
 /**
+ * All the settings for how a map picks the tiles to load.
+ *
+ * Its members mean the same as those of `MapTileOptions`.
+ *
+ * See `mln_map_tile_settings` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface MapTileSettings {
+  readonly prefetchZoomDelta: number;
+  readonly lodMinRadius: number;
+  readonly lodScale: number;
+  /**
+   * The pitch, in degrees, above which the map lowers the detail.
+   */
+  readonly lodPitchThreshold: number;
+  readonly lodZoomShift: number;
+  readonly lodMode: TileLodMode;
+}
+
+/**
  * One view of a map: its camera, size, and projection.
  *
  * See `mln_map_view` in the
@@ -1030,7 +1119,22 @@ export interface MapView {
   camera?: Camera;
   extent?: LogicalExtent;
   projectionMode?: ProjectionMode;
-  viewport?: MapViewportOptions;
+  viewport?: MapViewport;
+}
+
+/**
+ * A map's whole viewport.
+ *
+ * Its members mean the same as those of `MapViewportOptions`.
+ *
+ * See `mln_map_viewport` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface MapViewport {
+  northOrientation?: NorthOrientation;
+  constrainMode?: ConstrainMode;
+  viewportMode?: ViewportMode;
+  frustumOffset?: EdgeInsets;
 }
 
 /**
@@ -1612,12 +1716,26 @@ export interface ProjectedMeters {
 }
 
 /**
- * Settings that skew the map or draw it without perspective.
+ * A map's whole projection mode.
+ *
+ * Its members mean the same as those of `ProjectionModeOptions`.
  *
  * See `mln_projection_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface ProjectionMode {
+  axonometric?: boolean;
+  xSkew?: number;
+  ySkew?: number;
+}
+
+/**
+ * Settings that skew the map or draw it without perspective.
+ *
+ * See `mln_projection_mode_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface ProjectionModeOptions {
   /**
    * Whether the map draws without perspective.
    */

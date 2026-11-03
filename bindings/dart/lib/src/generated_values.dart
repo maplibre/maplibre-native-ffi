@@ -1635,6 +1635,18 @@ final class Camera extends _Value {
     fieldOfView: fieldOfView ?? this.fieldOfView,
   );
 
+  /// Converts this `Camera` to `CameraOptions` that set each of its members.
+  CameraOptions toOptions() => CameraOptions(
+    center: center,
+    centerAltitude: centerAltitude,
+    padding: padding,
+    zoom: zoom,
+    bearing: bearing,
+    pitch: pitch,
+    roll: roll,
+    fieldOfView: fieldOfView,
+  );
+
   @override
   List<Object?> get _members => [
     center,
@@ -1651,6 +1663,115 @@ final class Camera extends _Value {
     'center',
     'centerAltitude',
     'padding',
+    'zoom',
+    'bearing',
+    'pitch',
+    'roll',
+    'fieldOfView',
+  ]);
+}
+
+/// A point on the screen, in logical pixels from the map's top-left corner.
+///
+/// See `mln_screen_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ScreenPoint extends _Value {
+  const ScreenPoint({this.x = 0, this.y = 0});
+  final double x;
+  final double y;
+
+  /// A copy of this value with the given members replaced.
+  ScreenPoint copyWith({double? x, double? y}) =>
+      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
+
+  @override
+  List<Object?> get _members => [x, y];
+  @override
+  String toString() => _describe('ScreenPoint', const ['x', 'y']);
+}
+
+/// A camera, with only the members that `fields` selects.
+///
+/// See `mln_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraOptions extends _Value {
+  const CameraOptions({
+    this.center,
+    this.centerAltitude,
+    this.padding,
+    this.anchor,
+    this.zoom,
+    this.bearing,
+    this.pitch,
+    this.roll,
+    this.fieldOfView,
+  });
+  final LatLng? center;
+
+  /// The altitude of the center, in meters above sea level.
+  final double? centerAltitude;
+
+  /// Insets from the map's edges. The camera centers within the rest.
+  final EdgeInsets? padding;
+
+  /// The screen point that a change to the zoom, bearing, or pitch keeps in
+  /// place. A `center` overrides it.
+  final ScreenPoint? anchor;
+  final double? zoom;
+
+  /// The rotation from north, in degrees.
+  final double? bearing;
+
+  /// The tilt toward the horizon, in degrees. 0 looks straight down.
+  final double? pitch;
+
+  /// The roll, in degrees.
+  final double? roll;
+
+  /// The vertical field of view, in degrees.
+  final double? fieldOfView;
+
+  /// A copy of this value with the given members replaced.
+  CameraOptions copyWith({
+    LatLng? center,
+    double? centerAltitude,
+    EdgeInsets? padding,
+    ScreenPoint? anchor,
+    double? zoom,
+    double? bearing,
+    double? pitch,
+    double? roll,
+    double? fieldOfView,
+  }) => CameraOptions(
+    center: center ?? this.center,
+    centerAltitude: centerAltitude ?? this.centerAltitude,
+    padding: padding ?? this.padding,
+    anchor: anchor ?? this.anchor,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    roll: roll ?? this.roll,
+    fieldOfView: fieldOfView ?? this.fieldOfView,
+  );
+
+  @override
+  List<Object?> get _members => [
+    center,
+    centerAltitude,
+    padding,
+    anchor,
+    zoom,
+    bearing,
+    pitch,
+    roll,
+    fieldOfView,
+  ];
+  @override
+  String toString() => _describe('CameraOptions', const [
+    'center',
+    'centerAltitude',
+    'padding',
+    'anchor',
     'zoom',
     'bearing',
     'pitch',
@@ -1684,17 +1805,21 @@ final class LogicalExtent extends _Value {
       _describe('LogicalExtent', const ['width', 'height', 'scaleFactor']);
 }
 
-/// Settings that skew the map or draw it without perspective.
+/// A map's whole projection mode.
+///
+/// Its members mean the same as those of `ProjectionModeOptions`.
 ///
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class ProjectionMode extends _Value {
-  const ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
-
-  /// Whether the map draws without perspective.
-  final bool? axonometric;
-  final double? xSkew;
-  final double? ySkew;
+  const ProjectionMode({
+    this.axonometric = false,
+    this.xSkew = 0,
+    this.ySkew = 0,
+  });
+  final bool axonometric;
+  final double xSkew;
+  final double ySkew;
 
   /// A copy of this value with the given members replaced.
   ProjectionMode copyWith({bool? axonometric, double? xSkew, double? ySkew}) =>
@@ -1711,29 +1836,31 @@ final class ProjectionMode extends _Value {
       _describe('ProjectionMode', const ['axonometric', 'xSkew', 'ySkew']);
 }
 
-/// How the map orients and constrains its view.
+/// A map's whole viewport.
 ///
-/// See `mln_map_viewport_options` in the
+/// Its members mean the same as those of `MapViewportOptions`.
+///
+/// See `mln_map_viewport` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapViewportOptions extends _Value {
-  const MapViewportOptions({
-    this.northOrientation,
-    this.constrainMode,
-    this.viewportMode,
-    this.frustumOffset,
+final class MapViewport extends _Value {
+  const MapViewport({
+    this.northOrientation = const NorthOrientation.fromRawValue(0),
+    this.constrainMode = const ConstrainMode.fromRawValue(0),
+    this.viewportMode = const ViewportMode.fromRawValue(0),
+    this.frustumOffset = const EdgeInsets(),
   });
-  final NorthOrientation? northOrientation;
-  final ConstrainMode? constrainMode;
-  final ViewportMode? viewportMode;
-  final EdgeInsets? frustumOffset;
+  final NorthOrientation northOrientation;
+  final ConstrainMode constrainMode;
+  final ViewportMode viewportMode;
+  final EdgeInsets frustumOffset;
 
   /// A copy of this value with the given members replaced.
-  MapViewportOptions copyWith({
+  MapViewport copyWith({
     NorthOrientation? northOrientation,
     ConstrainMode? constrainMode,
     ViewportMode? viewportMode,
     EdgeInsets? frustumOffset,
-  }) => MapViewportOptions(
+  }) => MapViewport(
     northOrientation: northOrientation ?? this.northOrientation,
     constrainMode: constrainMode ?? this.constrainMode,
     viewportMode: viewportMode ?? this.viewportMode,
@@ -1748,7 +1875,7 @@ final class MapViewportOptions extends _Value {
     frustumOffset,
   ];
   @override
-  String toString() => _describe('MapViewportOptions', const [
+  String toString() => _describe('MapViewport', const [
     'northOrientation',
     'constrainMode',
     'viewportMode',
@@ -1765,19 +1892,19 @@ final class MapView extends _Value {
     this.camera = const Camera(),
     this.extent = const LogicalExtent(),
     this.projectionMode = const ProjectionMode(),
-    this.viewport = const MapViewportOptions(),
+    this.viewport = const MapViewport(),
   });
   final Camera camera;
   final LogicalExtent extent;
   final ProjectionMode projectionMode;
-  final MapViewportOptions viewport;
+  final MapViewport viewport;
 
   /// A copy of this value with the given members replaced.
   MapView copyWith({
     Camera? camera,
     LogicalExtent? extent,
     ProjectionMode? projectionMode,
-    MapViewportOptions? viewport,
+    MapViewport? viewport,
   }) => MapView(
     camera: camera ?? this.camera,
     extent: extent ?? this.extent,
@@ -2189,25 +2316,6 @@ final class PremultipliedRgba8Image extends _Value {
     'stride',
     'pixels',
   ]);
-}
-
-/// A point on the screen, in logical pixels from the map's top-left corner.
-///
-/// See `mln_screen_point` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class ScreenPoint extends _Value {
-  const ScreenPoint({this.x = 0, this.y = 0});
-  final double x;
-  final double y;
-
-  /// A copy of this value with the given members replaced.
-  ScreenPoint copyWith({double? x, double? y}) =>
-      ScreenPoint(x: x ?? this.x, y: y ?? this.y);
-
-  @override
-  List<Object?> get _members => [x, y];
-  @override
-  String toString() => _describe('ScreenPoint', const ['x', 'y']);
 }
 
 /// A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
@@ -3332,96 +3440,6 @@ final class CameraFitOptions extends _Value {
       _describe('CameraFitOptions', const ['padding', 'bearing', 'pitch']);
 }
 
-/// A camera, with only the members that `fields` selects.
-///
-/// See `mln_camera_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraOptions extends _Value {
-  const CameraOptions({
-    this.center,
-    this.centerAltitude,
-    this.padding,
-    this.anchor,
-    this.zoom,
-    this.bearing,
-    this.pitch,
-    this.roll,
-    this.fieldOfView,
-  });
-  final LatLng? center;
-
-  /// The altitude of the center, in meters above sea level.
-  final double? centerAltitude;
-
-  /// Insets from the map's edges. The camera centers within the rest.
-  final EdgeInsets? padding;
-
-  /// The screen point that a change to the zoom, bearing, or pitch keeps in
-  /// place. A `center` overrides it.
-  final ScreenPoint? anchor;
-  final double? zoom;
-
-  /// The rotation from north, in degrees.
-  final double? bearing;
-
-  /// The tilt toward the horizon, in degrees. 0 looks straight down.
-  final double? pitch;
-
-  /// The roll, in degrees.
-  final double? roll;
-
-  /// The vertical field of view, in degrees.
-  final double? fieldOfView;
-
-  /// A copy of this value with the given members replaced.
-  CameraOptions copyWith({
-    LatLng? center,
-    double? centerAltitude,
-    EdgeInsets? padding,
-    ScreenPoint? anchor,
-    double? zoom,
-    double? bearing,
-    double? pitch,
-    double? roll,
-    double? fieldOfView,
-  }) => CameraOptions(
-    center: center ?? this.center,
-    centerAltitude: centerAltitude ?? this.centerAltitude,
-    padding: padding ?? this.padding,
-    anchor: anchor ?? this.anchor,
-    zoom: zoom ?? this.zoom,
-    bearing: bearing ?? this.bearing,
-    pitch: pitch ?? this.pitch,
-    roll: roll ?? this.roll,
-    fieldOfView: fieldOfView ?? this.fieldOfView,
-  );
-
-  @override
-  List<Object?> get _members => [
-    center,
-    centerAltitude,
-    padding,
-    anchor,
-    zoom,
-    bearing,
-    pitch,
-    roll,
-    fieldOfView,
-  ];
-  @override
-  String toString() => _describe('CameraOptions', const [
-    'center',
-    'centerAltitude',
-    'padding',
-    'anchor',
-    'zoom',
-    'bearing',
-    'pitch',
-    'roll',
-    'fieldOfView',
-  ]);
-}
-
 /// A rectangle of coordinates, from its southwest to its northeast corner.
 ///
 /// See `mln_lat_lng_bounds` in the
@@ -3512,58 +3530,29 @@ final class FeatureStateSelector extends _Value {
   ]);
 }
 
-/// How the map picks the tiles to load.
+/// All the settings for how a map picks the tiles to load.
 ///
-/// The `lod_` members lower the level of detail away from the camera, so the
-/// map loads fewer tiles when the pitch is high.
+/// Its members mean the same as those of `MapTileOptions`.
 ///
-/// See `mln_map_tile_options` in the
+/// See `mln_map_tile_settings` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapTileOptions extends _Value {
-  const MapTileOptions({
-    this.prefetchZoomDelta,
-    this.lodMinRadius,
-    this.lodScale,
-    this.lodPitchThreshold,
-    this.lodZoomShift,
-    this.lodMode,
+final class MapTileSettings extends _Value {
+  const MapTileSettings({
+    this.prefetchZoomDelta = 0,
+    this.lodMinRadius = 0,
+    this.lodScale = 0,
+    this.lodPitchThreshold = 0,
+    this.lodZoomShift = 0,
+    this.lodMode = const TileLodMode.fromRawValue(0),
   });
-
-  /// How many zoom levels lower the map also loads tiles for, so it can show a
-  /// coarse map while the current tiles load. 0 loads only the current tiles.
-  final int? prefetchZoomDelta;
-
-  /// The radius around the view point, in tiles, that keeps full detail.
-  final double? lodMinRadius;
-
-  /// Scales the distance to the view point. Above 1 lowers the detail.
-  final double? lodScale;
+  final int prefetchZoomDelta;
+  final double lodMinRadius;
+  final double lodScale;
 
   /// The pitch, in degrees, above which the map lowers the detail.
-  final double? lodPitchThreshold;
-
-  /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
-  final double? lodZoomShift;
-
-  /// `TileLodMode.distance` ignores `lod_min_radius`.
-  final TileLodMode? lodMode;
-
-  /// A copy of this value with the given members replaced.
-  MapTileOptions copyWith({
-    int? prefetchZoomDelta,
-    double? lodMinRadius,
-    double? lodScale,
-    double? lodPitchThreshold,
-    double? lodZoomShift,
-    TileLodMode? lodMode,
-  }) => MapTileOptions(
-    prefetchZoomDelta: prefetchZoomDelta ?? this.prefetchZoomDelta,
-    lodMinRadius: lodMinRadius ?? this.lodMinRadius,
-    lodScale: lodScale ?? this.lodScale,
-    lodPitchThreshold: lodPitchThreshold ?? this.lodPitchThreshold,
-    lodZoomShift: lodZoomShift ?? this.lodZoomShift,
-    lodMode: lodMode ?? this.lodMode,
-  );
+  final double lodPitchThreshold;
+  final double lodZoomShift;
+  final TileLodMode lodMode;
 
   @override
   List<Object?> get _members => [
@@ -3575,7 +3564,7 @@ final class MapTileOptions extends _Value {
     lodMode,
   ];
   @override
-  String toString() => _describe('MapTileOptions', const [
+  String toString() => _describe('MapTileSettings', const [
     'prefetchZoomDelta',
     'lodMinRadius',
     'lodScale',
@@ -3585,68 +3574,54 @@ final class MapTileOptions extends _Value {
   ]);
 }
 
-/// Limits on the camera, for `MapHandle.setBounds()`.
+/// All the limits on a map's camera.
 ///
-/// See `mln_bound_options` in the
+/// Its members mean the same as those of `BoundOptions`.
+///
+/// See `mln_camera_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class BoundOptions extends _Value {
-  const BoundOptions({
-    this.bounds,
-    this.minZoom,
-    this.maxZoom,
-    this.minPitch,
-    this.maxPitch,
+final class CameraBounds extends _Value {
+  const CameraBounds({
+    this.bounds = const LatLngBounds(),
     this.unbounded = false,
+    this.minZoom = 0,
+    this.maxZoom = 0,
+    this.minPitch = 0,
+    this.maxPitch = 0,
   });
 
-  /// The area that the camera's center stays within.
-  final LatLngBounds? bounds;
-  final double? minZoom;
-  final double? maxZoom;
+  /// The area that the camera's center stays within. When `unbounded` is true,
+  /// it covers the whole world.
+  final LatLngBounds bounds;
+
+  /// Whether no area limits the camera's center.
+  final bool unbounded;
+  final double minZoom;
+  final double maxZoom;
 
   /// The lowest pitch, in degrees.
-  final double? minPitch;
+  final double minPitch;
 
   /// The highest pitch, in degrees.
-  final double? maxPitch;
-
-  /// Removes the area that limits the camera's center.
-  final bool unbounded;
-
-  /// A copy of this value with the given members replaced.
-  BoundOptions copyWith({
-    LatLngBounds? bounds,
-    double? minZoom,
-    double? maxZoom,
-    double? minPitch,
-    double? maxPitch,
-    bool? unbounded,
-  }) => BoundOptions(
-    bounds: bounds ?? this.bounds,
-    minZoom: minZoom ?? this.minZoom,
-    maxZoom: maxZoom ?? this.maxZoom,
-    minPitch: minPitch ?? this.minPitch,
-    maxPitch: maxPitch ?? this.maxPitch,
-    unbounded: unbounded ?? this.unbounded,
-  );
+  final double maxPitch;
 
   @override
   List<Object?> get _members => [
     bounds,
+    unbounded,
     minZoom,
     maxZoom,
     minPitch,
     maxPitch,
-    unbounded,
   ];
   @override
-  String toString() => _describe('BoundOptions', const [
+  String toString() => _describe('CameraBounds', const [
     'bounds',
+    'unbounded',
     'minZoom',
     'maxZoom',
     'minPitch',
     'maxPitch',
-    'unbounded',
   ]);
 }
 
@@ -3696,34 +3671,25 @@ final class Quaternion extends _Value {
   String toString() => _describe('Quaternion', const ['x', 'y', 'z', 'w']);
 }
 
-/// The camera's position and orientation in three dimensions.
+/// A map camera's whole position and orientation in three dimensions.
 ///
-/// See `mln_free_camera_options` in the
+/// Its members mean the same as those of `FreeCameraOptions`.
+///
+/// See `mln_free_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class FreeCameraOptions extends _Value {
-  const FreeCameraOptions({this.position, this.orientation});
-
-  /// The camera's position in Web Mercator units, where the world is 1 wide,
-  /// (0, 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is
-  /// the altitude in the same units.
-  final Vec3? position;
-
-  /// The camera's rotation from looking straight down with north at the top of
-  /// the screen.
-  final Quaternion? orientation;
-
-  /// A copy of this value with the given members replaced.
-  FreeCameraOptions copyWith({Vec3? position, Quaternion? orientation}) =>
-      FreeCameraOptions(
-        position: position ?? this.position,
-        orientation: orientation ?? this.orientation,
-      );
+final class FreeCamera extends _Value {
+  const FreeCamera({
+    this.position = const Vec3(),
+    this.orientation = const Quaternion(),
+  });
+  final Vec3 position;
+  final Quaternion orientation;
 
   @override
   List<Object?> get _members => [position, orientation];
   @override
   String toString() =>
-      _describe('FreeCameraOptions', const ['position', 'orientation']);
+      _describe('FreeCamera', const ['position', 'orientation']);
 }
 
 /// A map's state, as `MapHandle.getSnapshot()` reads it.
@@ -3740,9 +3706,9 @@ final class MapSnapshot extends _Value {
     this.transitionInProgress = false,
     this.eventMask = RuntimeEventFlag.none,
     this.latestRenderUpdateGeneration = 0,
-    this.tile = const MapTileOptions(),
-    this.bounds = const BoundOptions(),
-    this.freeCamera = const FreeCameraOptions(),
+    this.tile = const MapTileSettings(),
+    this.bounds = const CameraBounds(),
+    this.freeCamera = const FreeCamera(),
     this.view = const MapView(),
   });
   final MapDebugFlag debugFlags;
@@ -3759,9 +3725,9 @@ final class MapSnapshot extends _Value {
 
   /// Counts the render updates that the map has made for its render session.
   final int latestRenderUpdateGeneration;
-  final MapTileOptions tile;
-  final BoundOptions bounds;
-  final FreeCameraOptions freeCamera;
+  final MapTileSettings tile;
+  final CameraBounds bounds;
+  final FreeCamera freeCamera;
   final MapView view;
 
   @override
@@ -4101,6 +4067,148 @@ final class StyleTransitionOptions extends _Value {
   ]);
 }
 
+/// A projection's camera, as `MapProjectionHandle.getCamera()` reports it.
+///
+/// See `mln_map_projection_camera_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+final class MapProjectionCameraResult extends _Value {
+  const MapProjectionCameraResult({this.camera = const Camera()});
+  final Camera camera;
+
+  @override
+  List<Object?> get _members => [camera];
+  @override
+  String toString() => _describe('MapProjectionCameraResult', const ['camera']);
+}
+
+/// Limits on the camera, for `MapHandle.setBounds()`.
+///
+/// See `mln_bound_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class BoundOptions extends _Value {
+  const BoundOptions({
+    this.bounds,
+    this.minZoom,
+    this.maxZoom,
+    this.minPitch,
+    this.maxPitch,
+    this.unbounded = false,
+  });
+
+  /// The area that the camera's center stays within.
+  final LatLngBounds? bounds;
+  final double? minZoom;
+  final double? maxZoom;
+
+  /// The lowest pitch, in degrees.
+  final double? minPitch;
+
+  /// The highest pitch, in degrees.
+  final double? maxPitch;
+
+  /// Removes the area that limits the camera's center.
+  final bool unbounded;
+
+  /// A copy of this value with the given members replaced.
+  BoundOptions copyWith({
+    LatLngBounds? bounds,
+    double? minZoom,
+    double? maxZoom,
+    double? minPitch,
+    double? maxPitch,
+    bool? unbounded,
+  }) => BoundOptions(
+    bounds: bounds ?? this.bounds,
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    minPitch: minPitch ?? this.minPitch,
+    maxPitch: maxPitch ?? this.maxPitch,
+    unbounded: unbounded ?? this.unbounded,
+  );
+
+  @override
+  List<Object?> get _members => [
+    bounds,
+    minZoom,
+    maxZoom,
+    minPitch,
+    maxPitch,
+    unbounded,
+  ];
+  @override
+  String toString() => _describe('BoundOptions', const [
+    'bounds',
+    'minZoom',
+    'maxZoom',
+    'minPitch',
+    'maxPitch',
+    'unbounded',
+  ]);
+}
+
+/// The camera's position and orientation in three dimensions.
+///
+/// See `mln_free_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class FreeCameraOptions extends _Value {
+  const FreeCameraOptions({this.position, this.orientation});
+
+  /// The camera's position in Web Mercator units, where the world is 1 wide,
+  /// (0, 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is
+  /// the altitude in the same units.
+  final Vec3? position;
+
+  /// The camera's rotation from looking straight down with north at the top of
+  /// the screen.
+  final Quaternion? orientation;
+
+  /// A copy of this value with the given members replaced.
+  FreeCameraOptions copyWith({Vec3? position, Quaternion? orientation}) =>
+      FreeCameraOptions(
+        position: position ?? this.position,
+        orientation: orientation ?? this.orientation,
+      );
+
+  @override
+  List<Object?> get _members => [position, orientation];
+  @override
+  String toString() =>
+      _describe('FreeCameraOptions', const ['position', 'orientation']);
+}
+
+/// Settings that skew the map or draw it without perspective.
+///
+/// See `mln_projection_mode_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ProjectionModeOptions extends _Value {
+  const ProjectionModeOptions({this.axonometric, this.xSkew, this.ySkew});
+
+  /// Whether the map draws without perspective.
+  final bool? axonometric;
+  final double? xSkew;
+  final double? ySkew;
+
+  /// A copy of this value with the given members replaced.
+  ProjectionModeOptions copyWith({
+    bool? axonometric,
+    double? xSkew,
+    double? ySkew,
+  }) => ProjectionModeOptions(
+    axonometric: axonometric ?? this.axonometric,
+    xSkew: xSkew ?? this.xSkew,
+    ySkew: ySkew ?? this.ySkew,
+  );
+
+  @override
+  List<Object?> get _members => [axonometric, xSkew, ySkew];
+  @override
+  String toString() => _describe('ProjectionModeOptions', const [
+    'axonometric',
+    'xSkew',
+    'ySkew',
+  ]);
+}
+
 /// Options for a style image, as the
 /// \[sprite\](https://maplibre.org/maplibre-style-spec/sprite/) spec describes
 /// them.
@@ -4178,6 +4286,124 @@ final class StyleImageOptions extends _Value {
     'pixelRatio',
     'sdf',
     'keepUnused',
+  ]);
+}
+
+/// How the map picks the tiles to load.
+///
+/// The `lod_` members lower the level of detail away from the camera, so the
+/// map loads fewer tiles when the pitch is high.
+///
+/// See `mln_map_tile_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MapTileOptions extends _Value {
+  const MapTileOptions({
+    this.prefetchZoomDelta,
+    this.lodMinRadius,
+    this.lodScale,
+    this.lodPitchThreshold,
+    this.lodZoomShift,
+    this.lodMode,
+  });
+
+  /// How many zoom levels lower the map also loads tiles for, so it can show a
+  /// coarse map while the current tiles load. 0 loads only the current tiles.
+  final int? prefetchZoomDelta;
+
+  /// The radius around the view point, in tiles, that keeps full detail.
+  final double? lodMinRadius;
+
+  /// Scales the distance to the view point. Above 1 lowers the detail.
+  final double? lodScale;
+
+  /// The pitch, in degrees, above which the map lowers the detail.
+  final double? lodPitchThreshold;
+
+  /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
+  final double? lodZoomShift;
+
+  /// `TileLodMode.distance` ignores `lod_min_radius`.
+  final TileLodMode? lodMode;
+
+  /// A copy of this value with the given members replaced.
+  MapTileOptions copyWith({
+    int? prefetchZoomDelta,
+    double? lodMinRadius,
+    double? lodScale,
+    double? lodPitchThreshold,
+    double? lodZoomShift,
+    TileLodMode? lodMode,
+  }) => MapTileOptions(
+    prefetchZoomDelta: prefetchZoomDelta ?? this.prefetchZoomDelta,
+    lodMinRadius: lodMinRadius ?? this.lodMinRadius,
+    lodScale: lodScale ?? this.lodScale,
+    lodPitchThreshold: lodPitchThreshold ?? this.lodPitchThreshold,
+    lodZoomShift: lodZoomShift ?? this.lodZoomShift,
+    lodMode: lodMode ?? this.lodMode,
+  );
+
+  @override
+  List<Object?> get _members => [
+    prefetchZoomDelta,
+    lodMinRadius,
+    lodScale,
+    lodPitchThreshold,
+    lodZoomShift,
+    lodMode,
+  ];
+  @override
+  String toString() => _describe('MapTileOptions', const [
+    'prefetchZoomDelta',
+    'lodMinRadius',
+    'lodScale',
+    'lodPitchThreshold',
+    'lodZoomShift',
+    'lodMode',
+  ]);
+}
+
+/// How the map orients and constrains its view.
+///
+/// See `mln_map_viewport_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MapViewportOptions extends _Value {
+  const MapViewportOptions({
+    this.northOrientation,
+    this.constrainMode,
+    this.viewportMode,
+    this.frustumOffset,
+  });
+  final NorthOrientation? northOrientation;
+  final ConstrainMode? constrainMode;
+  final ViewportMode? viewportMode;
+  final EdgeInsets? frustumOffset;
+
+  /// A copy of this value with the given members replaced.
+  MapViewportOptions copyWith({
+    NorthOrientation? northOrientation,
+    ConstrainMode? constrainMode,
+    ViewportMode? viewportMode,
+    EdgeInsets? frustumOffset,
+  }) => MapViewportOptions(
+    northOrientation: northOrientation ?? this.northOrientation,
+    constrainMode: constrainMode ?? this.constrainMode,
+    viewportMode: viewportMode ?? this.viewportMode,
+    frustumOffset: frustumOffset ?? this.frustumOffset,
+  );
+
+  @override
+  List<Object?> get _members => [
+    northOrientation,
+    constrainMode,
+    viewportMode,
+    frustumOffset,
+  ];
+  @override
+  String toString() => _describe('MapViewportOptions', const [
+    'northOrientation',
+    'constrainMode',
+    'viewportMode',
+    'frustumOffset',
   ]);
 }
 

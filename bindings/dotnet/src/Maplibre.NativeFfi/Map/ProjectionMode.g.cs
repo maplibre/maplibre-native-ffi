@@ -3,18 +3,12 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Settings that skew the map or draw it without perspective.
+/// A map's whole projection mode.
 /// </summary>
 /// <remarks>
-/// See <c>mln_projection_mode</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+/// <para>Its members mean the same as those of
+/// <c>ProjectionModeOptions</c>.</para>
+/// <para>See <c>mln_projection_mode</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
-public sealed record ProjectionMode
-{
-    /// <summary>
-    /// Whether the map draws without perspective.
-    /// </summary>
-    public bool? Axonometric { get; init; }
-    public double? XSkew { get; init; }
-    public double? YSkew { get; init; }
-}
+public readonly partial record struct ProjectionMode(bool Axonometric, double XSkew, double YSkew);

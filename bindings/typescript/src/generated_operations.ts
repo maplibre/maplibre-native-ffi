@@ -26,6 +26,7 @@ import type {
   LogicalSize,
   MapDebugFlag,
   MapOptions,
+  MapProjectionCameraResult,
   MapSnapshot,
   MapTileOptions,
   MapView,
@@ -50,7 +51,7 @@ import type {
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
-  ProjectionMode,
+  ProjectionModeOptions,
   RenderAbandonResult,
   RenderBackendFlag,
   RenderFrameResult,
@@ -2221,14 +2222,16 @@ export class MapHandle extends Owner {
    * Sets whether the map draws in perspective or axonometric projection, and
    * how much it skews the view.
    *
-   * Settings that `mode` doesn't set keep their current values.
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setProjectionMode(mode: ProjectionMode = {}): Promise<CommandCompletion> {
+  setProjectionMode(
+    options: ProjectionModeOptions = {},
+  ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_set_projection_mode(this.id, mode, completion),
+      native.mln_map_set_projection_mode(this.id, options, completion),
     );
   }
 
@@ -3141,13 +3144,13 @@ export class MapHandleDiscarding {
    * Sets whether the map draws in perspective or axonometric projection, and
    * how much it skews the view.
    *
-   * Settings that `mode` doesn't set keep their current values.
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setProjectionMode(mode: ProjectionMode = {}): void {
-    native.mln_map_set_projection_mode(this.#owner.id, mode, undefined);
+  setProjectionMode(options: ProjectionModeOptions = {}): void {
+    native.mln_map_set_projection_mode(this.#owner.id, options, undefined);
   }
 
   /**
@@ -3400,7 +3403,7 @@ export class MapProjectionHandle extends Owner {
    * See `mln_map_projection_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  getCamera(): CameraOptions {
+  getCamera(): MapProjectionCameraResult {
     return native.mln_map_projection_get_camera(this.id);
   }
 

@@ -35,6 +35,7 @@ from ._generated_values import (
     LogSeverityFlag,
     MapDebugFlag,
     MapOptions,
+    MapProjectionCameraResult,
     MapSnapshot,
     MapTileOptions,
     MapView,
@@ -59,7 +60,7 @@ from ._generated_values import (
     OpenGlTextureFrame,
     PremultipliedRgba8Image,
     ProjectedMeters,
-    ProjectionMode,
+    ProjectionModeOptions,
     RenderAbandonResult,
     RenderBackendFlag,
     RenderedFeature,
@@ -1384,16 +1385,18 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_image_source_url(source_id, url)
 
-    def set_projection_mode(self, mode: ProjectionMode) -> Future[CommandCompletion]:
+    def set_projection_mode(
+        self, options: ProjectionModeOptions | None = None
+    ) -> Future[CommandCompletion]:
         """Sets whether the map draws in perspective or axonometric projection,
         and how much it skews the view.
 
-        Settings that `mode` doesn't set keep their current values.
+        Settings that `options` doesn't set keep their current values.
 
         See `mln_map_set_projection_mode` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
-        return self._native.set_projection_mode(mode)
+        return self._native.set_projection_mode(options)
 
     def set_rendering_stats_view_enabled(
         self, enabled: bool
@@ -1575,13 +1578,13 @@ class _MapProjectionHandleOperations(GeneratedOperations):
             _native._MapProjectionHandle.create(view), "MapProjectionHandle", None
         )
 
-    def get_camera(self) -> CameraOptions:
+    def get_camera(self) -> MapProjectionCameraResult:
         """Reads the projection's camera.
 
         See `mln_map_projection_get_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
-        return CameraOptions._from_native(self._native.get_camera())
+        return MapProjectionCameraResult._from_native(self._native.get_camera())
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
         """Finds the coordinate at a screen point.
@@ -3274,16 +3277,16 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_image_source_url(source_id, url)
 
-    def set_projection_mode(self, mode: ProjectionMode) -> None:
+    def set_projection_mode(self, options: ProjectionModeOptions | None = None) -> None:
         """Sets whether the map draws in perspective or axonometric projection,
         and how much it skews the view.
 
-        Settings that `mode` doesn't set keep their current values.
+        Settings that `options` doesn't set keep their current values.
 
         See `mln_map_set_projection_mode` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
-        return self._native._discard_set_projection_mode(mode)
+        return self._native._discard_set_projection_mode(options)
 
     def set_rendering_stats_view_enabled(self, enabled: bool) -> None:
         """Shows or hides an overlay of rendering statistics on the map.

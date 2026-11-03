@@ -148,9 +148,12 @@ static void apply(mln_map map, const view_row* row) {
   MLN_TEST_AWAIT_OK(
     mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
   );
-  mln_projection_mode mode = {.size = sizeof(mln_projection_mode)};
-  mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC | MLN_PROJECTION_MODE_X_SKEW |
-                MLN_PROJECTION_MODE_Y_SKEW;
+  mln_projection_mode_options mode = {
+    .size = sizeof(mln_projection_mode_options)
+  };
+  mode.fields = MLN_PROJECTION_MODE_OPTION_AXONOMETRIC |
+                MLN_PROJECTION_MODE_OPTION_X_SKEW |
+                MLN_PROJECTION_MODE_OPTION_Y_SKEW;
   mode.axonometric = row->axonometric;
   mode.x_skew = row->x_skew;
   mode.y_skew = row->y_skew;

@@ -85,15 +85,15 @@ internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
   allocate(16, w(8, 8, 4)).also { putLogicalExtent(it, value) }
 
 internal fun NativeArena.putMapView(target: Long, value: MapView) {
-  writeU32(target, w(208, 208, 196).toUInt())
+  writeU32(target, w(192, 192, 180).toUInt())
   putCamera(target + w(8, 8, 4), value.camera)
   putLogicalExtent(target + w(104, 104, 100), value.extent)
   putProjectionMode(target + w(120, 120, 116), value.projectionMode)
-  putMapViewportOptions(target + w(152, 152, 144), value.viewport)
+  putMapViewport(target + w(144, 144, 136), value.viewport)
 }
 
 internal fun NativeArena.writeMapView(value: MapView): Long =
-  allocate(w(208, 208, 196), w(8, 8, 4)).also { putMapView(it, value) }
+  allocate(w(192, 192, 180), w(8, 8, 4)).also { putMapView(it, value) }
 
 internal fun NativeArena.putOffscreenDeviceOptions(target: Long, value: OffscreenDeviceOptions) {
   writeU32(target, 20.toUInt())
@@ -568,7 +568,7 @@ internal fun NativeArena.putFreeCameraOptions(target: Long, value: FreeCameraOpt
 internal fun NativeArena.writeFreeCameraOptions(value: FreeCameraOptions): Long =
   allocate(64, w(8, 8, 4)).also { putFreeCameraOptions(it, value) }
 
-internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) {
+internal fun NativeArena.putProjectionModeOptions(target: Long, value: ProjectionModeOptions) {
   writeU32(target, w(32, 32, 28).toUInt())
   var fields = 0u
   value.axonometric?.let {
@@ -586,8 +586,8 @@ internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) 
   writeU32(target + 4, fields)
 }
 
-internal fun NativeArena.writeProjectionMode(value: ProjectionMode): Long =
-  allocate(w(32, 32, 28), w(8, 8, 4)).also { putProjectionMode(it, value) }
+internal fun NativeArena.writeProjectionModeOptions(value: ProjectionModeOptions): Long =
+  allocate(w(32, 32, 28), w(8, 8, 4)).also { putProjectionModeOptions(it, value) }
 
 internal fun NativeArena.putStyleImageOptions(target: Long, value: StyleImageOptions) {
   writeU32(target, w(56, 72).toUInt())
@@ -1145,7 +1145,7 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
     view = readMapView(source + w(48, 48, 44)),
-    mode = RenderMode(readU32(source + w(256, 256, 240))),
+    mode = RenderMode(readU32(source + w(240, 240, 224))),
   )
 
 internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame =
@@ -1221,10 +1221,10 @@ internal fun readMapSnapshot(source: Long): MapSnapshot =
     transitionInProgress = readBool(source + 19),
     eventMask = RuntimeEventFlag(readU64(source + w(24, 24, 20))),
     latestRenderUpdateGeneration = readU64(source + w(32, 32, 28)),
-    tile = readMapTileOptions(source + w(40, 40, 36)),
-    bounds = readBoundOptions(source + w(96, 96, 84)),
-    freeCamera = readFreeCameraOptions(source + w(168, 168, 156)),
-    view = readMapView(source + w(232, 232, 220)),
+    tile = readMapTileSettings(source + w(40, 40, 36)),
+    bounds = readCameraBounds(source + w(88, 88, 76)),
+    freeCamera = readFreeCamera(source + w(160, 160, 144)),
+    view = readMapView(source + w(216, 216, 200)),
   )
 
 internal fun readStyleImageInfo(source: Long): StyleImageInfo {
@@ -1295,6 +1295,9 @@ internal fun readStyleTransitionOptions(source: Long): StyleTransitionOptions {
 internal fun readLatLngBounds(source: Long): LatLngBounds =
   LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
 
+internal fun readMapProjectionCameraResult(source: Long): MapProjectionCameraResult =
+  MapProjectionCameraResult(camera = readCamera(source + w(8, 8, 4)))
+
 internal fun readScreenPoint(source: Long): ScreenPoint =
   ScreenPoint(x = readF64(source), y = readF64(source + 8))
 
@@ -1309,7 +1312,7 @@ internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
     readAddress(source + 8),
     readSize(source + w(12, 16)),
     readU32(source + 4).toULong(),
-    w(264, 264, 244),
+    w(248, 248, 228),
   ) { item ->
     readRenderFrameResult(item)
   }
@@ -1388,6 +1391,25 @@ internal fun NativeArena.putCamera(target: Long, value: Camera) {
 
 internal fun NativeArena.writeCamera(value: Camera): Long =
   allocate(96, w(8, 8, 4)).also { putCamera(it, value) }
+
+internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) {
+  writeBool(target, value.axonometric)
+  writeF64(target + w(8, 8, 4), value.xSkew)
+  writeF64(target + w(16, 16, 12), value.ySkew)
+}
+
+internal fun NativeArena.writeProjectionMode(value: ProjectionMode): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putProjectionMode(it, value) }
+
+internal fun NativeArena.putMapViewport(target: Long, value: MapViewport) {
+  writeU32(target, value.northOrientation.rawValue)
+  writeU32(target + 4, value.constrainMode.rawValue)
+  writeU32(target + 8, value.viewportMode.rawValue)
+  putEdgeInsets(target + w(16, 16, 12), value.frustumOffset)
+}
+
+internal fun NativeArena.writeMapViewport(value: MapViewport): Long =
+  allocate(w(48, 48, 44), w(8, 8, 4)).also { putMapViewport(it, value) }
 
 internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
   writeU32(target, value.kind.rawValue)
@@ -1695,7 +1717,7 @@ internal fun readMapView(source: Long): MapView =
     camera = readCamera(source + w(8, 8, 4)),
     extent = readLogicalExtent(source + w(104, 104, 100)),
     projectionMode = readProjectionMode(source + w(120, 120, 116)),
-    viewport = readMapViewportOptions(source + w(152, 152, 144)),
+    viewport = readMapViewport(source + w(144, 144, 136)),
   )
 
 internal fun readEdgeInsets(source: Long): EdgeInsets =
@@ -1718,37 +1740,28 @@ internal fun readCamera(source: Long): Camera =
     fieldOfView = readF64(source + 88),
   )
 
-internal fun readMapTileOptions(source: Long): MapTileOptions {
-  val fields = readU32(source + 4)
-  return MapTileOptions(
-    prefetchZoomDelta = if ((fields and 1u) != 0u) readU32(source + 8) else null,
-    lodMinRadius = if ((fields and 2u) != 0u) readF64(source + w(16, 16, 12)) else null,
-    lodScale = if ((fields and 4u) != 0u) readF64(source + w(24, 24, 20)) else null,
-    lodPitchThreshold = if ((fields and 8u) != 0u) readF64(source + w(32, 32, 28)) else null,
-    lodZoomShift = if ((fields and 16u) != 0u) readF64(source + w(40, 40, 36)) else null,
-    lodMode = if ((fields and 32u) != 0u) TileLodMode(readU32(source + w(48, 48, 44))) else null,
+internal fun readMapTileSettings(source: Long): MapTileSettings =
+  MapTileSettings(
+    prefetchZoomDelta = readU32(source),
+    lodMinRadius = readF64(source + w(8, 8, 4)),
+    lodScale = readF64(source + w(16, 16, 12)),
+    lodPitchThreshold = readF64(source + w(24, 24, 20)),
+    lodZoomShift = readF64(source + w(32, 32, 28)),
+    lodMode = TileLodMode(readU32(source + w(40, 40, 36))),
   )
-}
 
-internal fun readBoundOptions(source: Long): BoundOptions {
-  val fields = readU32(source + 4)
-  return BoundOptions(
-    unbounded = (fields and 32u) != 0u,
-    bounds = if ((fields and 1u) != 0u) readLatLngBounds(source + 8) else null,
-    minZoom = if ((fields and 2u) != 0u) readF64(source + 40) else null,
-    maxZoom = if ((fields and 4u) != 0u) readF64(source + 48) else null,
-    minPitch = if ((fields and 8u) != 0u) readF64(source + 56) else null,
-    maxPitch = if ((fields and 16u) != 0u) readF64(source + 64) else null,
+internal fun readCameraBounds(source: Long): CameraBounds =
+  CameraBounds(
+    bounds = readLatLngBounds(source),
+    unbounded = readBool(source + 32),
+    minZoom = readF64(source + w(40, 40, 36)),
+    maxZoom = readF64(source + w(48, 48, 44)),
+    minPitch = readF64(source + w(56, 56, 52)),
+    maxPitch = readF64(source + w(64, 64, 60)),
   )
-}
 
-internal fun readFreeCameraOptions(source: Long): FreeCameraOptions {
-  val fields = readU32(source + 4)
-  return FreeCameraOptions(
-    position = if ((fields and 1u) != 0u) readVec3(source + 8) else null,
-    orientation = if ((fields and 2u) != 0u) readQuaternion(source + 32) else null,
-  )
-}
+internal fun readFreeCamera(source: Long): FreeCamera =
+  FreeCamera(position = readVec3(source), orientation = readQuaternion(source + 24))
 
 internal fun readImageStretch(source: Long): ImageStretch =
   ImageStretch(from = readF32(source), to = readF32(source + 4))
@@ -1891,24 +1904,20 @@ internal fun readRuntimeEvent(source: Long): RuntimeEvent =
 internal fun readResourceRange(source: Long): ResourceRange =
   ResourceRange(start = readU64(source), end = readU64(source + 8))
 
-internal fun readProjectionMode(source: Long): ProjectionMode {
-  val fields = readU32(source + 4)
-  return ProjectionMode(
-    axonometric = if ((fields and 1u) != 0u) readBool(source + 8) else null,
-    xSkew = if ((fields and 2u) != 0u) readF64(source + w(16, 16, 12)) else null,
-    ySkew = if ((fields and 4u) != 0u) readF64(source + w(24, 24, 20)) else null,
+internal fun readProjectionMode(source: Long): ProjectionMode =
+  ProjectionMode(
+    axonometric = readBool(source),
+    xSkew = readF64(source + w(8, 8, 4)),
+    ySkew = readF64(source + w(16, 16, 12)),
   )
-}
 
-internal fun readMapViewportOptions(source: Long): MapViewportOptions {
-  val fields = readU32(source + 4)
-  return MapViewportOptions(
-    northOrientation = if ((fields and 1u) != 0u) NorthOrientation(readU32(source + 8)) else null,
-    constrainMode = if ((fields and 2u) != 0u) ConstrainMode(readU32(source + 12)) else null,
-    viewportMode = if ((fields and 4u) != 0u) ViewportMode(readU32(source + 16)) else null,
-    frustumOffset = if ((fields and 8u) != 0u) readEdgeInsets(source + w(24, 24, 20)) else null,
+internal fun readMapViewport(source: Long): MapViewport =
+  MapViewport(
+    northOrientation = NorthOrientation(readU32(source)),
+    constrainMode = ConstrainMode(readU32(source + 4)),
+    viewportMode = ViewportMode(readU32(source + 8)),
+    frustumOffset = readEdgeInsets(source + w(16, 16, 12)),
   )
-}
 
 internal fun readVec3(source: Long): Vec3 =
   Vec3(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16))

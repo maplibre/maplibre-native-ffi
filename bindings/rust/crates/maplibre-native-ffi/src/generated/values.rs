@@ -119,20 +119,6 @@ impl ToNative<sys::mln_bound_options> for BoundOptions {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_bound_options> for BoundOptions {
-    unsafe fn from_native(raw: sys::mln_bound_options) -> Result<Self> {
-        Ok(Self {
-            unbounded: raw.fields & sys::MLN_BOUND_OPTION_UNBOUNDED != 0,
-            bounds: unsafe {
-                convert::present(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS, raw.bounds)
-            }?,
-            min_zoom: (raw.fields & sys::MLN_BOUND_OPTION_MIN_ZOOM != 0).then_some(raw.min_zoom),
-            max_zoom: (raw.fields & sys::MLN_BOUND_OPTION_MAX_ZOOM != 0).then_some(raw.max_zoom),
-            min_pitch: (raw.fields & sys::MLN_BOUND_OPTION_MIN_PITCH != 0).then_some(raw.min_pitch),
-            max_pitch: (raw.fields & sys::MLN_BOUND_OPTION_MAX_PITCH != 0).then_some(raw.max_pitch),
-        })
-    }
-}
 
 /// A map's whole camera.
 ///
@@ -177,6 +163,20 @@ impl Camera {
             field_of_view,
         }
     }
+    /// Converts this `Camera` to `CameraOptions` that set each of its members.
+    pub const fn to_options(self) -> CameraOptions {
+        CameraOptions {
+            center: Some(self.center),
+            center_altitude: Some(self.center_altitude),
+            padding: Some(self.padding),
+            anchor: None,
+            zoom: Some(self.zoom),
+            bearing: Some(self.bearing),
+            pitch: Some(self.pitch),
+            roll: Some(self.roll),
+            field_of_view: Some(self.field_of_view),
+        }
+    }
 }
 impl ToNative<sys::mln_camera> for Camera {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera> {
@@ -203,6 +203,39 @@ impl FromNative<sys::mln_camera> for Camera {
             pitch: raw.pitch,
             roll: raw.roll,
             field_of_view: raw.field_of_view,
+        })
+    }
+}
+
+/// All the limits on a map's camera.
+///
+/// Its members mean the same as those of `BoundOptions`.
+///
+/// See `mln_camera_bounds` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CameraBounds {
+    /// The area that the camera's center stays within. When `unbounded` is
+    /// true, it covers the whole world.
+    pub bounds: LatLngBounds,
+    /// Whether no area limits the camera's center.
+    pub unbounded: bool,
+    pub min_zoom: f64,
+    pub max_zoom: f64,
+    /// The lowest pitch, in degrees.
+    pub min_pitch: f64,
+    /// The highest pitch, in degrees.
+    pub max_pitch: f64,
+}
+impl FromNative<sys::mln_camera_bounds> for CameraBounds {
+    unsafe fn from_native(raw: sys::mln_camera_bounds) -> Result<Self> {
+        Ok(Self {
+            bounds: unsafe { from_native(raw.bounds) }?,
+            unbounded: raw.unbounded,
+            min_zoom: raw.min_zoom,
+            max_zoom: raw.max_zoom,
+            min_pitch: raw.min_pitch,
+            max_pitch: raw.max_pitch,
         })
     }
 }
@@ -1007,6 +1040,26 @@ pub struct FrameDemandFlag: u32 {
 }
 }
 
+/// A map camera's whole position and orientation in three dimensions.
+///
+/// Its members mean the same as those of `FreeCameraOptions`.
+///
+/// See `mln_free_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct FreeCamera {
+    pub position: Vec3,
+    pub orientation: Quaternion,
+}
+impl FromNative<sys::mln_free_camera> for FreeCamera {
+    unsafe fn from_native(raw: sys::mln_free_camera) -> Result<Self> {
+        Ok(Self {
+            position: unsafe { from_native(raw.position) }?,
+            orientation: unsafe { from_native(raw.orientation) }?,
+        })
+    }
+}
+
 /// The camera's position and orientation in three dimensions.
 ///
 /// See `mln_free_camera_options` in the
@@ -1035,26 +1088,6 @@ impl ToNative<sys::mln_free_camera_options> for FreeCameraOptions {
             raw.orientation = to_native(&*item, arena)?;
         }
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_free_camera_options> for FreeCameraOptions {
-    unsafe fn from_native(raw: sys::mln_free_camera_options) -> Result<Self> {
-        Ok(Self {
-            position: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_FREE_CAMERA_OPTION_POSITION,
-                    raw.position,
-                )
-            }?,
-            orientation: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_FREE_CAMERA_OPTION_ORIENTATION,
-                    raw.orientation,
-                )
-            }?,
-        })
     }
 }
 
@@ -1841,6 +1874,22 @@ impl ToNative<sys::mln_map_options> for MapOptions {
     }
 }
 
+/// A projection's camera, as `MapProjectionHandle::get_camera()` reports it.
+///
+/// See `mln_map_projection_camera_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MapProjectionCameraResult {
+    pub camera: Camera,
+}
+impl FromNative<sys::mln_map_projection_camera_result> for MapProjectionCameraResult {
+    unsafe fn from_native(raw: sys::mln_map_projection_camera_result) -> Result<Self> {
+        Ok(Self {
+            camera: unsafe { from_native(raw.camera) }?,
+        })
+    }
+}
+
 /// A map's state, as `MapHandle::get_snapshot()` reads it.
 ///
 /// See `mln_map_snapshot` in the
@@ -1858,9 +1907,9 @@ pub struct MapSnapshot {
     pub event_mask: RuntimeEventFlag,
     /// Counts the render updates that the map has made for its render session.
     pub latest_render_update_generation: u64,
-    pub tile: MapTileOptions,
-    pub bounds: BoundOptions,
-    pub free_camera: FreeCameraOptions,
+    pub tile: MapTileSettings,
+    pub bounds: CameraBounds,
+    pub free_camera: FreeCamera,
     pub view: MapView,
 }
 impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
@@ -1938,24 +1987,32 @@ impl ToNative<sys::mln_map_tile_options> for MapTileOptions {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_map_tile_options> for MapTileOptions {
-    unsafe fn from_native(raw: sys::mln_map_tile_options) -> Result<Self> {
+
+/// All the settings for how a map picks the tiles to load.
+///
+/// Its members mean the same as those of `MapTileOptions`.
+///
+/// See `mln_map_tile_settings` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MapTileSettings {
+    pub prefetch_zoom_delta: u32,
+    pub lod_min_radius: f64,
+    pub lod_scale: f64,
+    /// The pitch, in degrees, above which the map lowers the detail.
+    pub lod_pitch_threshold: f64,
+    pub lod_zoom_shift: f64,
+    pub lod_mode: TileLodMode,
+}
+impl FromNative<sys::mln_map_tile_settings> for MapTileSettings {
+    unsafe fn from_native(raw: sys::mln_map_tile_settings) -> Result<Self> {
         Ok(Self {
-            prefetch_zoom_delta: (raw.fields & sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0)
-                .then_some(raw.prefetch_zoom_delta),
-            lod_min_radius: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0)
-                .then_some(raw.lod_min_radius),
-            lod_scale: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_SCALE != 0)
-                .then_some(raw.lod_scale),
-            lod_pitch_threshold: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0)
-                .then_some(raw.lod_pitch_threshold),
-            lod_zoom_shift: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0)
-                .then_some(raw.lod_zoom_shift),
-            lod_mode: if raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0 {
-                Some(TileLodMode::from_raw(raw.lod_mode))
-            } else {
-                None
-            },
+            prefetch_zoom_delta: raw.prefetch_zoom_delta,
+            lod_min_radius: raw.lod_min_radius,
+            lod_scale: raw.lod_scale,
+            lod_pitch_threshold: raw.lod_pitch_threshold,
+            lod_zoom_shift: raw.lod_zoom_shift,
+            lod_mode: TileLodMode::from_raw(raw.lod_mode),
         })
     }
 }
@@ -1969,7 +2026,7 @@ pub struct MapView {
     pub camera: Camera,
     pub extent: LogicalExtent,
     pub projection_mode: ProjectionMode,
-    pub viewport: MapViewportOptions,
+    pub viewport: MapViewport,
 }
 impl ToNative<sys::mln_map_view> for MapView {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_map_view> {
@@ -1989,6 +2046,40 @@ impl FromNative<sys::mln_map_view> for MapView {
             extent: unsafe { from_native(raw.extent) }?,
             projection_mode: unsafe { from_native(raw.projection_mode) }?,
             viewport: unsafe { from_native(raw.viewport) }?,
+        })
+    }
+}
+
+/// A map's whole viewport.
+///
+/// Its members mean the same as those of `MapViewportOptions`.
+///
+/// See `mln_map_viewport` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MapViewport {
+    pub north_orientation: NorthOrientation,
+    pub constrain_mode: ConstrainMode,
+    pub viewport_mode: ViewportMode,
+    pub frustum_offset: EdgeInsets,
+}
+impl ToNative<sys::mln_map_viewport> for MapViewport {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_map_viewport> {
+        let mut raw: sys::mln_map_viewport = unsafe { std::mem::zeroed() };
+        raw.north_orientation = to_native(&self.north_orientation, arena)?;
+        raw.constrain_mode = to_native(&self.constrain_mode, arena)?;
+        raw.viewport_mode = to_native(&self.viewport_mode, arena)?;
+        raw.frustum_offset = to_native(&self.frustum_offset, arena)?;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_map_viewport> for MapViewport {
+    unsafe fn from_native(raw: sys::mln_map_viewport) -> Result<Self> {
+        Ok(Self {
+            north_orientation: NorthOrientation::from_raw(raw.north_orientation),
+            constrain_mode: ConstrainMode::from_raw(raw.constrain_mode),
+            viewport_mode: ViewportMode::from_raw(raw.viewport_mode),
+            frustum_offset: unsafe { from_native(raw.frustum_offset) }?,
         })
     }
 }
@@ -2026,34 +2117,6 @@ impl ToNative<sys::mln_map_viewport_options> for MapViewportOptions {
             raw.frustum_offset = to_native(&*item, arena)?;
         }
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_map_viewport_options> for MapViewportOptions {
-    unsafe fn from_native(raw: sys::mln_map_viewport_options) -> Result<Self> {
-        Ok(Self {
-            north_orientation: if raw.fields & sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0 {
-                Some(NorthOrientation::from_raw(raw.north_orientation))
-            } else {
-                None
-            },
-            constrain_mode: if raw.fields & sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0 {
-                Some(ConstrainMode::from_raw(raw.constrain_mode))
-            } else {
-                None
-            },
-            viewport_mode: if raw.fields & sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0 {
-                Some(ViewportMode::from_raw(raw.viewport_mode))
-            } else {
-                None
-            },
-            frustum_offset: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
-                    raw.frustum_offset,
-                )
-            }?,
-        })
     }
 }
 
@@ -3028,45 +3091,75 @@ impl FromNative<sys::mln_projected_meters> for ProjectedMeters {
     }
 }
 
-/// Settings that skew the map or draw it without perspective.
+/// A map's whole projection mode.
+///
+/// Its members mean the same as those of `ProjectionModeOptions`.
 ///
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ProjectionMode {
-    /// Whether the map draws without perspective.
-    pub axonometric: Option<bool>,
-    pub x_skew: Option<f64>,
-    pub y_skew: Option<f64>,
+    pub axonometric: bool,
+    pub x_skew: f64,
+    pub y_skew: f64,
+}
+impl ProjectionMode {
+    pub const fn new(axonometric: bool, x_skew: f64, y_skew: f64) -> Self {
+        Self {
+            axonometric,
+            x_skew,
+            y_skew,
+        }
+    }
 }
 impl ToNative<sys::mln_projection_mode> for ProjectionMode {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_projection_mode> {
         let mut raw: sys::mln_projection_mode = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_projection_mode>() as _;
-        raw.fields = 0;
-        if let Some(item) = &self.axonometric {
-            raw.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
-            raw.axonometric = *item;
-        }
-        if let Some(item) = &self.x_skew {
-            raw.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
-            raw.x_skew = *item;
-        }
-        if let Some(item) = &self.y_skew {
-            raw.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
-            raw.y_skew = *item;
-        }
+        raw.axonometric = self.axonometric;
+        raw.x_skew = self.x_skew;
+        raw.y_skew = self.y_skew;
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_projection_mode> for ProjectionMode {
     unsafe fn from_native(raw: sys::mln_projection_mode) -> Result<Self> {
         Ok(Self {
-            axonometric: (raw.fields & sys::MLN_PROJECTION_MODE_AXONOMETRIC != 0)
-                .then_some(raw.axonometric),
-            x_skew: (raw.fields & sys::MLN_PROJECTION_MODE_X_SKEW != 0).then_some(raw.x_skew),
-            y_skew: (raw.fields & sys::MLN_PROJECTION_MODE_Y_SKEW != 0).then_some(raw.y_skew),
+            axonometric: raw.axonometric,
+            x_skew: raw.x_skew,
+            y_skew: raw.y_skew,
         })
+    }
+}
+
+/// Settings that skew the map or draw it without perspective.
+///
+/// See `mln_projection_mode_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ProjectionModeOptions {
+    /// Whether the map draws without perspective.
+    pub axonometric: Option<bool>,
+    pub x_skew: Option<f64>,
+    pub y_skew: Option<f64>,
+}
+impl ToNative<sys::mln_projection_mode_options> for ProjectionModeOptions {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_projection_mode_options> {
+        let mut raw: sys::mln_projection_mode_options = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_projection_mode_options>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.axonometric {
+            raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
+            raw.axonometric = *item;
+        }
+        if let Some(item) = &self.x_skew {
+            raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_X_SKEW;
+            raw.x_skew = *item;
+        }
+        if let Some(item) = &self.y_skew {
+            raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_Y_SKEW;
+            raw.y_skew = *item;
+        }
+        Ok(raw)
     }
 }
 

@@ -133,9 +133,6 @@ static napi_value mln_ts_export_mln_acquired_frame_get_result(
   memset(&arg_out_result, 0, sizeof arg_out_result);
   arg_out_result.size = sizeof arg_out_result;
   arg_out_result.view.size = sizeof arg_out_result.view;
-  arg_out_result.view.projection_mode.size =
-    sizeof arg_out_result.view.projection_mode;
-  arg_out_result.view.viewport.size = sizeof arg_out_result.view.viewport;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
@@ -1811,13 +1808,7 @@ static napi_value mln_ts_export_mln_map_get_snapshot(
   }
   memset(&arg_out_snapshot, 0, sizeof arg_out_snapshot);
   arg_out_snapshot.size = sizeof arg_out_snapshot;
-  arg_out_snapshot.tile.size = sizeof arg_out_snapshot.tile;
-  arg_out_snapshot.bounds.size = sizeof arg_out_snapshot.bounds;
-  arg_out_snapshot.free_camera.size = sizeof arg_out_snapshot.free_camera;
   arg_out_snapshot.view.size = sizeof arg_out_snapshot.view;
-  arg_out_snapshot.view.projection_mode.size =
-    sizeof arg_out_snapshot.view.projection_mode;
-  arg_out_snapshot.view.viewport.size = sizeof arg_out_snapshot.view.viewport;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_get_snapshot(arg_map, &arg_out_snapshot, &diagnostic);
@@ -2387,8 +2378,6 @@ static napi_value mln_ts_export_mln_map_projection_create(
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
   memset(&arg_view, 0, sizeof arg_view);
   arg_view.size = sizeof arg_view;
-  arg_view.projection_mode.size = sizeof arg_view.projection_mode;
-  arg_view.viewport.size = sizeof arg_view.viewport;
   if (!mln_ts_read_record(call, call->argv[0], "view")) goto done;
   if (!mln_ts_write_map_view(call, call->argv[0], &arg_view, "view")) goto done;
   diagnostic.size = sizeof diagnostic;
@@ -2407,7 +2396,7 @@ static napi_value mln_ts_export_mln_map_projection_get_camera(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map_projection arg_projection = 0;
-  mln_camera_options arg_out_camera;
+  mln_map_projection_camera_result arg_out_result;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -2416,15 +2405,16 @@ static napi_value mln_ts_export_mln_map_projection_get_camera(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
     arg_projection = (mln_map_projection)number;
   }
-  memset(&arg_out_camera, 0, sizeof arg_out_camera);
-  arg_out_camera.size = sizeof arg_out_camera;
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status =
-    mln_map_projection_get_camera(arg_projection, &arg_out_camera, &diagnostic);
+    mln_map_projection_get_camera(arg_projection, &arg_out_result, &diagnostic);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result =
-    mln_ts_read_camera_options(env, &(arg_out_camera), sizeof(arg_out_camera));
+  call->result = mln_ts_read_map_projection_camera_result(
+    env, &(arg_out_result), sizeof(arg_out_result)
+  );
 done:
   return mln_ts_end(call);
 }
@@ -3694,7 +3684,7 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  mln_projection_mode arg_mode;
+  mln_projection_mode_options arg_options;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -3705,10 +3695,12 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  memset(&arg_mode, 0, sizeof arg_mode);
-  arg_mode.size = sizeof arg_mode;
-  if (!mln_ts_read_record(call, call->argv[1], "mode")) goto done;
-  if (!mln_ts_write_projection_mode(call, call->argv[1], &arg_mode, "mode"))
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
+  if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
+  if (!mln_ts_write_projection_mode_options(
+        call, call->argv[1], &arg_options, "options"
+      ))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
@@ -3717,7 +3709,7 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_set_projection_mode(
-    arg_map, &arg_mode, present_completion, &diagnostic
+    arg_map, &arg_options, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;

@@ -1092,6 +1092,61 @@ class Camera:
             field_of_view=raw["field_of_view"],
         )
 
+    def to_options(self) -> CameraOptions:
+        """Converts this `Camera` to `CameraOptions` that set each of its
+        members.
+        """
+        return CameraOptions(
+            center=self.center,
+            center_altitude=self.center_altitude,
+            padding=self.padding,
+            zoom=self.zoom,
+            bearing=self.bearing,
+            pitch=self.pitch,
+            roll=self.roll,
+            field_of_view=self.field_of_view,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CameraBounds:
+    """All the limits on a map's camera.
+
+    Its members mean the same as those of `BoundOptions`.
+
+    See `mln_camera_bounds` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    bounds: LatLngBounds
+    """The area that the camera's center stays within. When `unbounded` is true,
+    it covers the whole world.
+    """
+
+    unbounded: bool
+    """Whether no area limits the camera's center."""
+
+    min_zoom: float
+
+    max_zoom: float
+
+    min_pitch: float
+    """The lowest pitch, in degrees."""
+
+    max_pitch: float
+    """The highest pitch, in degrees."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            bounds=LatLngBounds._from_native(raw["bounds"]),
+            unbounded=raw["unbounded"],
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            min_pitch=raw["min_pitch"],
+            max_pitch=raw["max_pitch"],
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class CameraDelta:
@@ -1501,6 +1556,28 @@ class FrameDemand:
 
 
 @dataclass(frozen=True, slots=True)
+class FreeCamera:
+    """A map camera's whole position and orientation in three dimensions.
+
+    Its members mean the same as those of `FreeCameraOptions`.
+
+    See `mln_free_camera` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    position: Vec3
+
+    orientation: Quaternion
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            position=Vec3._from_native(raw["position"]),
+            orientation=Quaternion._from_native(raw["orientation"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class FreeCameraOptions:
     """The camera's position and orientation in three dimensions.
 
@@ -1840,6 +1917,21 @@ class MapOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class MapProjectionCameraResult:
+    """A projection's camera, as `MapProjectionHandle.get_camera()` reports it.
+
+    See `mln_map_projection_camera_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    """
+
+    camera: Camera
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(camera=Camera._from_native(raw["camera"]))
+
+
+@dataclass(frozen=True, slots=True)
 class MapSnapshot:
     """A map's state, as `MapHandle.get_snapshot()` reads it.
 
@@ -1866,11 +1958,11 @@ class MapSnapshot:
     latest_render_update_generation: int
     """Counts the render updates that the map has made for its render session."""
 
-    tile: MapTileOptions
+    tile: MapTileSettings
 
-    bounds: BoundOptions
+    bounds: CameraBounds
 
-    free_camera: FreeCameraOptions
+    free_camera: FreeCamera
 
     view: MapView
 
@@ -1885,9 +1977,9 @@ class MapSnapshot:
             transition_in_progress=raw["transition_in_progress"],
             event_mask=RuntimeEventFlag(raw["event_mask"]),
             latest_render_update_generation=raw["latest_render_update_generation"],
-            tile=MapTileOptions._from_native(raw["tile"]),
-            bounds=BoundOptions._from_native(raw["bounds"]),
-            free_camera=FreeCameraOptions._from_native(raw["free_camera"]),
+            tile=MapTileSettings._from_native(raw["tile"]),
+            bounds=CameraBounds._from_native(raw["bounds"]),
+            free_camera=FreeCamera._from_native(raw["free_camera"]),
             view=MapView._from_native(raw["view"]),
         )
 
@@ -1936,6 +2028,41 @@ class MapTileOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class MapTileSettings:
+    """All the settings for how a map picks the tiles to load.
+
+    Its members mean the same as those of `MapTileOptions`.
+
+    See `mln_map_tile_settings` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    prefetch_zoom_delta: int
+
+    lod_min_radius: float
+
+    lod_scale: float
+
+    lod_pitch_threshold: float
+    """The pitch, in degrees, above which the map lowers the detail."""
+
+    lod_zoom_shift: float
+
+    lod_mode: TileLodMode
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            prefetch_zoom_delta=raw["prefetch_zoom_delta"],
+            lod_min_radius=raw["lod_min_radius"],
+            lod_scale=raw["lod_scale"],
+            lod_pitch_threshold=raw["lod_pitch_threshold"],
+            lod_zoom_shift=raw["lod_zoom_shift"],
+            lod_mode=TileLodMode(raw["lod_mode"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MapView:
     """One view of a map: its camera, size, and projection.
 
@@ -1949,7 +2076,7 @@ class MapView:
 
     projection_mode: ProjectionMode = field(default_factory=lambda: ProjectionMode())
 
-    viewport: MapViewportOptions = field(default_factory=lambda: MapViewportOptions())
+    viewport: MapViewport = field(default_factory=lambda: MapViewport())
 
     @classmethod
     def _from_native(cls, raw):
@@ -1957,7 +2084,35 @@ class MapView:
             camera=Camera._from_native(raw["camera"]),
             extent=LogicalExtent._from_native(raw["extent"]),
             projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
-            viewport=MapViewportOptions._from_native(raw["viewport"]),
+            viewport=MapViewport._from_native(raw["viewport"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MapViewport:
+    """A map's whole viewport.
+
+    Its members mean the same as those of `MapViewportOptions`.
+
+    See `mln_map_viewport` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    north_orientation: NorthOrientation = NorthOrientation.UP
+
+    constrain_mode: ConstrainMode = ConstrainMode.NONE
+
+    viewport_mode: ViewportMode = ViewportMode.DEFAULT
+
+    frustum_offset: EdgeInsets = field(default_factory=lambda: EdgeInsets())
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            north_orientation=NorthOrientation(raw["north_orientation"]),
+            constrain_mode=ConstrainMode(raw["constrain_mode"]),
+            viewport_mode=ViewportMode(raw["viewport_mode"]),
+            frustum_offset=EdgeInsets._from_native(raw["frustum_offset"]),
         )
 
 
@@ -2697,9 +2852,32 @@ class ProjectedMeters:
 
 @dataclass(frozen=True, slots=True)
 class ProjectionMode:
-    """Settings that skew the map or draw it without perspective.
+    """A map's whole projection mode.
+
+    Its members mean the same as those of `ProjectionModeOptions`.
 
     See `mln_projection_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    axonometric: bool = False
+
+    x_skew: float = 0.0
+
+    y_skew: float = 0.0
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            axonometric=raw["axonometric"], x_skew=raw["x_skew"], y_skew=raw["y_skew"]
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionModeOptions:
+    """Settings that skew the map or draw it without perspective.
+
+    See `mln_projection_mode_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 

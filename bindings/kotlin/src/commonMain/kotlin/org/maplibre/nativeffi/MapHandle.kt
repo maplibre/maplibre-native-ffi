@@ -651,7 +651,7 @@ internal constructor(
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {
-      val out = sized(w(440, 440, 416), w(8, 8, 4))
+      val out = sized(w(408, 408, 380), w(8, 8, 4))
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
     }
@@ -1513,15 +1513,20 @@ internal constructor(
    * Sets whether the map draws in perspective or axonometric projection, and how much it skews the
    * view.
    *
-   * Settings that `mode` doesn't set keep their current values.
+   * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setProjectionMode(mode: ProjectionMode): Deferred<CommandCompletion> =
+  public fun setProjectionMode(options: ProjectionModeOptions): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_set_projection_mode(handle, writeProjectionMode(mode), completion, diagnostic),
+        C.mln_map_set_projection_mode(
+          handle,
+          writeProjectionModeOptions(options),
+          completion,
+          diagnostic,
+        ),
       )
     }
 
@@ -2257,10 +2262,15 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
     }
 
   /** [MapHandle.setProjectionMode] without its completion. */
-  public fun setProjectionMode(mode: ProjectionMode): Unit =
+  public fun setProjectionMode(options: ProjectionModeOptions): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_set_projection_mode(handle, writeProjectionMode(mode), completion, diagnostic),
+        C.mln_map_set_projection_mode(
+          handle,
+          writeProjectionModeOptions(options),
+          completion,
+          diagnostic,
+        ),
       )
     }
 

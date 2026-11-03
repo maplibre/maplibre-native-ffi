@@ -264,12 +264,14 @@ public extension MapHandle {
   /// Sets whether the map draws in perspective or axonometric projection, and
   /// how much it skews the view.
   ///
-  /// Settings that `mode` doesn't set keep their current values.
+  /// Settings that `options` doesn't set keep their current values.
   ///
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setProjectionMode(_ bindingArg0: ProjectionMode) async throws
+  func setProjectionMode(
+    options bindingArg0: ProjectionModeOptions
+  ) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, arena, completion, diagnostic in
@@ -430,7 +432,7 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func setProjectionMode(_ bindingArg0: ProjectionMode) throws {
+  func setProjectionMode(options bindingArg0: ProjectionModeOptions) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_projection_mode(
         raw,

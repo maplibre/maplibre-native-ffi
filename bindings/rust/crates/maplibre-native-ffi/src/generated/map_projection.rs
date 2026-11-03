@@ -37,14 +37,14 @@ impl MapProjectionHandle {
     ///
     /// See `mln_map_projection_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn get_camera(&self) -> Result<CameraOptions> {
+    pub fn get_camera(&self) -> Result<MapProjectionCameraResult> {
         let mut call = self.inner.call();
-        let mut out_camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
-        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
+        let mut out_result: sys::mln_map_projection_camera_result = unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_map_projection_camera_result>() as _;
         call.status(|projection, out_diagnostic| unsafe {
-            sys::mln_map_projection_get_camera(projection, &mut out_camera, out_diagnostic)
+            sys::mln_map_projection_get_camera(projection, &mut out_result, out_diagnostic)
         })?;
-        Ok(unsafe { from_native(out_camera) }?)
+        Ok(unsafe { from_native(out_result) }?)
     }
 
     /// Finds the coordinate at a screen point.

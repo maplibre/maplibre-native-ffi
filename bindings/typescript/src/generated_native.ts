@@ -24,6 +24,7 @@ import type {
   LogicalSize,
   MapDebugFlag,
   MapOptions,
+  MapProjectionCameraResult,
   MapSnapshot,
   MapTileOptions,
   MapView,
@@ -46,7 +47,7 @@ import type {
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
-  ProjectionMode,
+  ProjectionModeOptions,
   RenderAbandonResult,
   RenderBackendFlag,
   RenderFrameResult,
@@ -350,7 +351,7 @@ export interface NativeOperations {
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_projection_create(view: MapView | undefined): bigint;
-  mln_map_projection_get_camera(projection: bigint): CameraOptions;
+  mln_map_projection_get_camera(projection: bigint): MapProjectionCameraResult;
   mln_map_projection_lat_lng_for_pixel(
     projection: bigint,
     point: ScreenPoint | undefined,
@@ -521,7 +522,7 @@ export interface NativeOperations {
   ): void;
   mln_map_set_projection_mode(
     map: bigint,
-    mode: ProjectionMode | undefined,
+    options: ProjectionModeOptions | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_rendering_stats_view_enabled(

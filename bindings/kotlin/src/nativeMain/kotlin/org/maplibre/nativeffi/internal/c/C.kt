@@ -835,12 +835,12 @@ internal actual object C {
 
   actual fun mln_map_projection_get_camera(
     projection: Long,
-    outCamera: Long,
+    outResult: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_projection_get_camera(
       projection.toULong(),
-      outCamera.toCPointer(),
+      outResult.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -1288,13 +1288,13 @@ internal actual object C {
 
   actual fun mln_map_set_projection_mode(
     map: Long,
-    mode: Long,
+    options: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_set_projection_mode(
       map.toULong(),
-      mode.toCPointer(),
+      options.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

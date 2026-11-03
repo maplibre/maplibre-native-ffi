@@ -1862,17 +1862,6 @@ type BoundOptions struct {
 	Unbounded bool
 }
 
-func copyBoundOptions(raw C.mln_bound_options) BoundOptions {
-	var result BoundOptions
-	result.Bounds = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
-	result.MinZoom = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
-	result.MaxZoom = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
-	result.MinPitch = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MIN_PITCH != 0, func() float64 { return float64(raw.min_pitch) })
-	result.MaxPitch = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MAX_PITCH != 0, func() float64 { return float64(raw.max_pitch) })
-	result.Unbounded = raw.fields&C.MLN_BOUND_OPTION_UNBOUNDED != 0
-	return result
-}
-
 func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_options {
 	raw := C.mln_bound_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
@@ -1909,6 +1898,11 @@ type Camera struct {
 	FieldOfView float64
 }
 
+// ToOptions converts this Camera to CameraOptions that set each of its members.
+func (value Camera) ToOptions() CameraOptions {
+	return CameraOptions{Center: &value.Center, CenterAltitude: &value.CenterAltitude, Padding: &value.Padding, Zoom: &value.Zoom, Bearing: &value.Bearing, Pitch: &value.Pitch, Roll: &value.Roll, FieldOfView: &value.FieldOfView}
+}
+
 func copyCamera(raw C.mln_camera) Camera {
 	var result Camera
 	result.Center = copyLatLng(raw.center)
@@ -1933,6 +1927,38 @@ func nativeCamera(input Camera, arena *bindingArena) C.mln_camera {
 	raw.roll = C.double(input.Roll)
 	raw.field_of_view = C.double(input.FieldOfView)
 	return raw
+}
+
+// CameraBounds corresponds to mln_camera_bounds. All the limits on a map's
+// camera.
+//
+// Its members mean the same as those of BoundOptions.
+//
+// See mln_camera_bounds in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraBounds struct {
+	// The area that the camera's center stays within. When unbounded is true, it
+	// covers the whole world.
+	Bounds LatLngBounds
+	// Whether no area limits the camera's center.
+	Unbounded bool
+	MinZoom   float64
+	MaxZoom   float64
+	// The lowest pitch, in degrees.
+	MinPitch float64
+	// The highest pitch, in degrees.
+	MaxPitch float64
+}
+
+func copyCameraBounds(raw C.mln_camera_bounds) CameraBounds {
+	var result CameraBounds
+	result.Bounds = copyLatLngBounds(raw.bounds)
+	result.Unbounded = bool(raw.unbounded)
+	result.MinZoom = float64(raw.min_zoom)
+	result.MaxZoom = float64(raw.max_zoom)
+	result.MinPitch = float64(raw.min_pitch)
+	result.MaxPitch = float64(raw.max_pitch)
+	return result
 }
 
 // CameraDelta corresponds to mln_camera_delta. A change to the camera from
@@ -2350,6 +2376,25 @@ func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_deman
 	return raw
 }
 
+// FreeCamera corresponds to mln_free_camera. A map camera's whole position and
+// orientation in three dimensions.
+//
+// Its members mean the same as those of FreeCameraOptions.
+//
+// See mln_free_camera in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type FreeCamera struct {
+	Position    Vec3
+	Orientation Quaternion
+}
+
+func copyFreeCamera(raw C.mln_free_camera) FreeCamera {
+	var result FreeCamera
+	result.Position = copyVec3(raw.position)
+	result.Orientation = copyQuaternion(raw.orientation)
+	return result
+}
+
 // FreeCameraOptions corresponds to mln_free_camera_options. The camera's
 // position and orientation in three dimensions.
 //
@@ -2363,13 +2408,6 @@ type FreeCameraOptions struct {
 	// The camera's rotation from looking straight down with north at the top of the
 	// screen.
 	Orientation *Quaternion
-}
-
-func copyFreeCameraOptions(raw C.mln_free_camera_options) FreeCameraOptions {
-	var result FreeCameraOptions
-	result.Position = bindingPresent(raw.fields&C.MLN_FREE_CAMERA_OPTION_POSITION != 0, func() Vec3 { return copyVec3(raw.position) })
-	result.Orientation = bindingPresent(raw.fields&C.MLN_FREE_CAMERA_OPTION_ORIENTATION != 0, func() Quaternion { return copyQuaternion(raw.orientation) })
-	return result
 }
 
 func nativeFreeCameraOptions(input FreeCameraOptions, arena *bindingArena) C.mln_free_camera_options {
@@ -2756,6 +2794,19 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	return raw
 }
 
+// MapProjectionCameraResult corresponds to mln_map_projection_camera_result. A
+// projection's camera, as MapProjectionHandle.Camera() reports it.
+//
+// See mln_map_projection_camera_result in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+type MapProjectionCameraResult struct{ Camera Camera }
+
+func copyMapProjectionCameraResult(raw C.mln_map_projection_camera_result) MapProjectionCameraResult {
+	var result MapProjectionCameraResult
+	result.Camera = copyCamera(raw.camera)
+	return result
+}
+
 // MapSnapshot corresponds to mln_map_snapshot. A map's state, as
 // MapHandle.Snapshot() reads it.
 //
@@ -2773,9 +2824,9 @@ type MapSnapshot struct {
 	EventMask                 RuntimeEventFlag
 	// Counts the render updates that the map has made for its render session.
 	LatestRenderUpdateGeneration uint64
-	Tile                         MapTileOptions
-	Bounds                       BoundOptions
-	FreeCamera                   FreeCameraOptions
+	Tile                         MapTileSettings
+	Bounds                       CameraBounds
+	FreeCamera                   FreeCamera
 	View                         MapView
 }
 
@@ -2789,9 +2840,9 @@ func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	result.TransitionInProgress = bool(raw.transition_in_progress)
 	result.EventMask = RuntimeEventFlag(raw.event_mask)
 	result.LatestRenderUpdateGeneration = uint64(raw.latest_render_update_generation)
-	result.Tile = copyMapTileOptions(raw.tile)
-	result.Bounds = copyBoundOptions(raw.bounds)
-	result.FreeCamera = copyFreeCameraOptions(raw.free_camera)
+	result.Tile = copyMapTileSettings(raw.tile)
+	result.Bounds = copyCameraBounds(raw.bounds)
+	result.FreeCamera = copyFreeCamera(raw.free_camera)
 	result.View = copyMapView(raw.view)
 	return result
 }
@@ -2820,17 +2871,6 @@ type MapTileOptions struct {
 	LodMode *TileLodMode
 }
 
-func copyMapTileOptions(raw C.mln_map_tile_options) MapTileOptions {
-	var result MapTileOptions
-	result.PrefetchZoomDelta = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0, func() uint32 { return uint32(raw.prefetch_zoom_delta) })
-	result.LodMinRadius = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0, func() float64 { return float64(raw.lod_min_radius) })
-	result.LodScale = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_SCALE != 0, func() float64 { return float64(raw.lod_scale) })
-	result.LodPitchThreshold = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0, func() float64 { return float64(raw.lod_pitch_threshold) })
-	result.LodZoomShift = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0, func() float64 { return float64(raw.lod_zoom_shift) })
-	result.LodMode = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MODE != 0, func() TileLodMode { return TileLodMode(raw.lod_mode) })
-	return result
-}
-
 func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_tile_options {
 	raw := C.mln_map_tile_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
@@ -2844,6 +2884,34 @@ func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_t
 	return raw
 }
 
+// MapTileSettings corresponds to mln_map_tile_settings. All the settings for
+// how a map picks the tiles to load.
+//
+// Its members mean the same as those of MapTileOptions.
+//
+// See mln_map_tile_settings in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type MapTileSettings struct {
+	PrefetchZoomDelta uint32
+	LodMinRadius      float64
+	LodScale          float64
+	// The pitch, in degrees, above which the map lowers the detail.
+	LodPitchThreshold float64
+	LodZoomShift      float64
+	LodMode           TileLodMode
+}
+
+func copyMapTileSettings(raw C.mln_map_tile_settings) MapTileSettings {
+	var result MapTileSettings
+	result.PrefetchZoomDelta = uint32(raw.prefetch_zoom_delta)
+	result.LodMinRadius = float64(raw.lod_min_radius)
+	result.LodScale = float64(raw.lod_scale)
+	result.LodPitchThreshold = float64(raw.lod_pitch_threshold)
+	result.LodZoomShift = float64(raw.lod_zoom_shift)
+	result.LodMode = TileLodMode(raw.lod_mode)
+	return result
+}
+
 // MapView corresponds to mln_map_view. One view of a map: its camera, size, and
 // projection.
 //
@@ -2853,7 +2921,7 @@ type MapView struct {
 	Camera         Camera
 	Extent         LogicalExtent
 	ProjectionMode ProjectionMode
-	Viewport       MapViewportOptions
+	Viewport       MapViewport
 }
 
 func copyMapView(raw C.mln_map_view) MapView {
@@ -2861,7 +2929,7 @@ func copyMapView(raw C.mln_map_view) MapView {
 	result.Camera = copyCamera(raw.camera)
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.ProjectionMode = copyProjectionMode(raw.projection_mode)
-	result.Viewport = copyMapViewportOptions(raw.viewport)
+	result.Viewport = copyMapViewport(raw.viewport)
 	return result
 }
 
@@ -2871,7 +2939,38 @@ func nativeMapView(input MapView, arena *bindingArena) C.mln_map_view {
 	raw.camera = nativeCamera(input.Camera, arena)
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.projection_mode = nativeProjectionMode(input.ProjectionMode, arena)
-	raw.viewport = nativeMapViewportOptions(input.Viewport, arena)
+	raw.viewport = nativeMapViewport(input.Viewport, arena)
+	return raw
+}
+
+// MapViewport corresponds to mln_map_viewport. A map's whole viewport.
+//
+// Its members mean the same as those of MapViewportOptions.
+//
+// See mln_map_viewport in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type MapViewport struct {
+	NorthOrientation NorthOrientation
+	ConstrainMode    ConstrainMode
+	ViewportMode     ViewportMode
+	FrustumOffset    EdgeInsets
+}
+
+func copyMapViewport(raw C.mln_map_viewport) MapViewport {
+	var result MapViewport
+	result.NorthOrientation = NorthOrientation(raw.north_orientation)
+	result.ConstrainMode = ConstrainMode(raw.constrain_mode)
+	result.ViewportMode = ViewportMode(raw.viewport_mode)
+	result.FrustumOffset = copyEdgeInsets(raw.frustum_offset)
+	return result
+}
+
+func nativeMapViewport(input MapViewport, arena *bindingArena) C.mln_map_viewport {
+	raw := C.mln_map_viewport{}
+	raw.north_orientation = C.mln_north_orientation(input.NorthOrientation)
+	raw.constrain_mode = C.mln_constrain_mode(input.ConstrainMode)
+	raw.viewport_mode = C.mln_viewport_mode(input.ViewportMode)
+	raw.frustum_offset = nativeEdgeInsets(input.FrustumOffset, arena)
 	return raw
 }
 
@@ -2885,15 +2984,6 @@ type MapViewportOptions struct {
 	ConstrainMode    *ConstrainMode
 	ViewportMode     *ViewportMode
 	FrustumOffset    *EdgeInsets
-}
-
-func copyMapViewportOptions(raw C.mln_map_viewport_options) MapViewportOptions {
-	var result MapViewportOptions
-	result.NorthOrientation = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0, func() NorthOrientation { return NorthOrientation(raw.north_orientation) })
-	result.ConstrainMode = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0, func() ConstrainMode { return ConstrainMode(raw.constrain_mode) })
-	result.ViewportMode = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0, func() ViewportMode { return ViewportMode(raw.viewport_mode) })
-	result.FrustumOffset = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0, func() EdgeInsets { return copyEdgeInsets(raw.frustum_offset) })
-	return result
 }
 
 func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.mln_map_viewport_options {
@@ -3563,33 +3653,54 @@ func nativeProjectedMeters(input ProjectedMeters, arena *bindingArena) C.mln_pro
 	return raw
 }
 
-// ProjectionMode corresponds to mln_projection_mode. Settings that skew the map
-// or draw it without perspective.
+// ProjectionMode corresponds to mln_projection_mode. A map's whole projection
+// mode.
+//
+// Its members mean the same as those of ProjectionModeOptions.
 //
 // See mln_projection_mode in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type ProjectionMode struct {
+	Axonometric bool
+	XSkew       float64
+	YSkew       float64
+}
+
+func copyProjectionMode(raw C.mln_projection_mode) ProjectionMode {
+	var result ProjectionMode
+	result.Axonometric = bool(raw.axonometric)
+	result.XSkew = float64(raw.x_skew)
+	result.YSkew = float64(raw.y_skew)
+	return result
+}
+
+func nativeProjectionMode(input ProjectionMode, arena *bindingArena) C.mln_projection_mode {
+	raw := C.mln_projection_mode{}
+	raw.axonometric = C.bool(input.Axonometric)
+	raw.x_skew = C.double(input.XSkew)
+	raw.y_skew = C.double(input.YSkew)
+	return raw
+}
+
+// ProjectionModeOptions corresponds to mln_projection_mode_options. Settings
+// that skew the map or draw it without perspective.
+//
+// See mln_projection_mode_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type ProjectionModeOptions struct {
 	// Whether the map draws without perspective.
 	Axonometric *bool
 	XSkew       *float64
 	YSkew       *float64
 }
 
-func copyProjectionMode(raw C.mln_projection_mode) ProjectionMode {
-	var result ProjectionMode
-	result.Axonometric = bindingPresent(raw.fields&C.MLN_PROJECTION_MODE_AXONOMETRIC != 0, func() bool { return bool(raw.axonometric) })
-	result.XSkew = bindingPresent(raw.fields&C.MLN_PROJECTION_MODE_X_SKEW != 0, func() float64 { return float64(raw.x_skew) })
-	result.YSkew = bindingPresent(raw.fields&C.MLN_PROJECTION_MODE_Y_SKEW != 0, func() float64 { return float64(raw.y_skew) })
-	return result
-}
-
-func nativeProjectionMode(input ProjectionMode, arena *bindingArena) C.mln_projection_mode {
-	raw := C.mln_projection_mode{}
+func nativeProjectionModeOptions(input ProjectionModeOptions, arena *bindingArena) C.mln_projection_mode_options {
+	raw := C.mln_projection_mode_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_AXONOMETRIC, &raw.axonometric, input.Axonometric, arena, bindingBool[bool, C.bool])
-	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_X_SKEW, &raw.x_skew, input.XSkew, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_Y_SKEW, &raw.y_skew, input.YSkew, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_OPTION_AXONOMETRIC, &raw.axonometric, input.Axonometric, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_OPTION_X_SKEW, &raw.x_skew, input.XSkew, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_OPTION_Y_SKEW, &raw.y_skew, input.YSkew, arena, bindingNumber[float64, C.double])
 	return raw
 }
 
@@ -6668,13 +6779,13 @@ func NewMapProjection(view MapView) (*MapProjectionHandle, error) {
 //
 // See mln_map_projection_get_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) Camera() (CameraOptions, error) {
-	var outCamera C.mln_camera_options
-	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
+func (receiver *MapProjectionHandle) Camera() (MapProjectionCameraResult, error) {
+	var outResult C.mln_map_projection_camera_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outCamera, diagnostic))
-	}, func(arena *bindingArena) CameraOptions {
-		return copyCameraOptions(outCamera)
+		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outResult, diagnostic))
+	}, func(arena *bindingArena) MapProjectionCameraResult {
+		return copyMapProjectionCameraResult(outResult)
 	})
 }
 
@@ -7186,13 +7297,13 @@ func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Futu
 // SetProjectionMode sets whether the map draws in perspective or axonometric
 // projection, and how much it skews the view.
 //
-// Settings that mode doesn't set keep their current values.
+// Settings that options doesn't set keep their current values.
 //
 // See mln_map_set_projection_mode in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) SetProjectionMode(mode ProjectionMode) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetProjectionMode(options ProjectionModeOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionMode(mode, arena), arena), completion, diagnostic))
+		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionModeOptions(options, arena), arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -8748,10 +8859,10 @@ func (view MapHandleDiscarding) SetImageSourceUrl(sourceId string, url string) e
 	})
 }
 
-func (view MapHandleDiscarding) SetProjectionMode(mode ProjectionMode) error {
+func (view MapHandleDiscarding) SetProjectionMode(options ProjectionModeOptions) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionMode(mode, arena), arena), completion, diagnostic))
+		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionModeOptions(options, arena), arena), completion, diagnostic))
 	})
 }
 

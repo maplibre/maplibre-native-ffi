@@ -527,7 +527,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_map_projection_get_camera(
     projection: Long,
-    outCamera: Long,
+    outResult: Long,
     outDiagnostic: Long,
   ): Int
 
@@ -801,7 +801,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_map_set_projection_mode(
     map: Long,
-    mode: Long,
+    options: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

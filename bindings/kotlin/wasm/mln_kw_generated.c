@@ -699,10 +699,11 @@ int32_t mln_kw_mln_map_projection_create(
 }
 
 int32_t mln_kw_mln_map_projection_get_camera(
-  int64_t projection, uintptr_t out_camera, uintptr_t out_diagnostic
+  int64_t projection, uintptr_t out_result, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_projection_get_camera(
-    (mln_map_projection)projection, (mln_camera_options*)out_camera,
+    (mln_map_projection)projection,
+    (mln_map_projection_camera_result*)out_result,
     (mln_diagnostic*)out_diagnostic
   );
 }
@@ -1043,10 +1044,10 @@ int32_t mln_kw_mln_map_set_image_source_url(
 }
 
 int32_t mln_kw_mln_map_set_projection_mode(
-  int64_t map, uintptr_t mode, uintptr_t completion, uintptr_t out_diagnostic
+  int64_t map, uintptr_t options, uintptr_t completion, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_set_projection_mode(
-    (mln_map)map, (const mln_projection_mode*)mode,
+    (mln_map)map, (const mln_projection_mode_options*)options,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }

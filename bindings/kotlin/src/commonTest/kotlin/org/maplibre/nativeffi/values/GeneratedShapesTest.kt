@@ -4,8 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.FeatureStateSelector
@@ -108,16 +106,6 @@ class GeneratedShapesTest {
       assertEquals(12.0, view.camera.center.latitude, 1e-6)
       assertEquals(34.0, view.camera.center.longitude, 1e-6)
       assertEquals(4.0, view.camera.zoom, 1e-6)
-
-      // A field the output does not report stays absent rather than reading as zero.
-      val projection = MapProjectionHandle.create(view)
-      try {
-        val reported = projection.getCamera()
-        assertEquals(4.0, assertNotNull(reported.zoom), 1e-6)
-        assertNull(reported.anchor)
-      } finally {
-        projection.close()
-      }
 
       // An update that sets only the zoom leaves every other field where it was.
       map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).await()

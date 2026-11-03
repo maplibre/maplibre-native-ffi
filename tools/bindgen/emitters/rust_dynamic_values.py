@@ -8,7 +8,7 @@ as an array's count or a presence mask.
 
 from dataclasses import replace
 
-from ..semantic import required_callbacks
+from ..semantic import conversion_doc, required_callbacks
 from .rust import Unsupported, doc, identifier, is_text, native_identifier, pascal
 
 TRAIT_COPY = "unsafe {{ from_native({}) }}?"
@@ -329,6 +329,8 @@ def declaration(values, value):
         constructors.append(
             f"pub fn new({', '.join(taken)}) -> Self {{ Self {{ {', '.join(members)} }} }}"
         )
+    if value.options:
+        constructors.append(to_options(values, value))
     derives = ["Debug", "Clone"]
     if copyable:
         derives += ["Copy", "PartialEq"]
@@ -367,6 +369,23 @@ def declaration(values, value):
         + impl
         + to_native
         + from_native
+    )
+
+
+def to_options(values, value):
+    """The method that converts a complete record to its option bag."""
+    bag = values.bound.values[value.options]
+    held = {field.name for field in value.fields if field.public}
+    members = [
+        f"{identifier(field.name)}: "
+        + (f"Some(self.{identifier(field.name)})" if field.name in held else "None")
+        for field in bag.fields
+        if field.public
+    ] + [f"{identifier(flag.member)}: false" for flag in bag.mask_flags]
+    return (
+        doc(values.bound, conversion_doc(value.native), "    ").strip()
+        + f"\n    pub const fn to_options(self) -> {values.public(bag)} "
+        + f"{{ {values.public(bag)} {{ {', '.join(members)} }} }}"
     )
 
 

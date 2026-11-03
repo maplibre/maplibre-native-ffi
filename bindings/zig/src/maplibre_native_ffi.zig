@@ -1123,12 +1123,12 @@ pub const Map = struct {
     /// Sets whether the map draws in perspective or axonometric projection, and how
     /// much it skews the view.
     ///
-    /// Settings that `mode` doesn't set keep their current values.
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn setProjectionMode(self: Map, mode: ProjectionMode, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_projection_mode", .handle, self, call.command, null, diagnostic, .{mode});
+    pub fn setProjectionMode(self: Map, options: ProjectionModeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_projection_mode", .handle, self, call.command, null, diagnostic, .{options});
     }
 
     /// Shows or hides an overlay of rendering statistics on the map.
@@ -1298,8 +1298,8 @@ pub const MapProjection = struct {
     ///
     /// See `mln_map_projection_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn getCamera(self: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!CameraOptions {
-        return call.invoke("mln_map_projection_get_camera", .handle, self, null, diagnostic, .{call.sizedOut(CameraOptions)});
+    pub fn getCamera(self: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjectionCameraResult {
+        return call.invoke("mln_map_projection_get_camera", .handle, self, null, diagnostic, .{call.sizedOut(MapProjectionCameraResult)});
     }
 
     /// Finds the coordinate at a screen point.
@@ -2540,6 +2540,49 @@ pub const Camera = struct {
             .field_of_view = raw.field_of_view,
         };
     }
+    /// Converts this `Camera` to `CameraOptions` that set each of its members.
+    pub fn toOptions(self: Camera) CameraOptions {
+        return .{
+            .center = self.center,
+            .center_altitude = self.center_altitude,
+            .padding = self.padding,
+            .zoom = self.zoom,
+            .bearing = self.bearing,
+            .pitch = self.pitch,
+            .roll = self.roll,
+            .field_of_view = self.field_of_view,
+        };
+    }
+};
+
+/// All the limits on a map's camera.
+///
+/// Its members mean the same as those of `BoundOptions`.
+///
+/// See `mln_camera_bounds` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraBounds = struct {
+    /// The area that the camera's center stays within. When `unbounded` is
+    /// true, it covers the whole world.
+    bounds: LatLngBounds = .{},
+    /// Whether no area limits the camera's center.
+    unbounded: bool = false,
+    min_zoom: f64 = 0,
+    max_zoom: f64 = 0,
+    /// The lowest pitch, in degrees.
+    min_pitch: f64 = 0,
+    /// The highest pitch, in degrees.
+    max_pitch: f64 = 0,
+    pub fn fromNative(raw: c.mln_camera_bounds) CameraBounds {
+        return .{
+            .bounds = LatLngBounds.fromNative(raw.bounds),
+            .unbounded = raw.unbounded,
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
+            .min_pitch = raw.min_pitch,
+            .max_pitch = raw.max_pitch,
+        };
+    }
 };
 
 /// Whether a camera change jumps or animates.
@@ -3200,6 +3243,23 @@ pub const FrameDemandFlag = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
+};
+
+/// A map camera's whole position and orientation in three dimensions.
+///
+/// Its members mean the same as those of `FreeCameraOptions`.
+///
+/// See `mln_free_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const FreeCamera = struct {
+    position: Vec3 = .{},
+    orientation: Quaternion = .{},
+    pub fn fromNative(raw: c.mln_free_camera) FreeCamera {
+        return .{
+            .position = Vec3.fromNative(raw.position),
+            .orientation = Quaternion.fromNative(raw.orientation),
+        };
+    }
 };
 
 /// The camera's position and orientation in three dimensions.
@@ -3874,6 +3934,19 @@ pub const MapOptions = struct {
     }
 };
 
+/// A projection's camera, as `MapProjection.getCamera()` reports it.
+///
+/// See `mln_map_projection_camera_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub const MapProjectionCameraResult = struct {
+    camera: Camera = .{},
+    pub fn fromNative(raw: c.mln_map_projection_camera_result) MapProjectionCameraResult {
+        return .{
+            .camera = Camera.fromNative(raw.camera),
+        };
+    }
+};
+
 /// A map's state, as `Map.getSnapshot()` reads it.
 ///
 /// See `mln_map_snapshot` in the
@@ -3890,9 +3963,9 @@ pub const MapSnapshot = struct {
     event_mask: RuntimeEventFlag = .{},
     /// Counts the render updates that the map has made for its render session.
     latest_render_update_generation: u64 = 0,
-    tile: MapTileOptions = .{},
-    bounds: BoundOptions = .{},
-    free_camera: FreeCameraOptions = .{},
+    tile: MapTileSettings = .{},
+    bounds: CameraBounds = .{},
+    free_camera: FreeCamera = .{},
     view: MapView = .{},
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
@@ -3904,9 +3977,9 @@ pub const MapSnapshot = struct {
             .transition_in_progress = raw.transition_in_progress,
             .event_mask = RuntimeEventFlag.fromNative(raw.event_mask),
             .latest_render_update_generation = raw.latest_render_update_generation,
-            .tile = MapTileOptions.fromNative(raw.tile),
-            .bounds = BoundOptions.fromNative(raw.bounds),
-            .free_camera = FreeCameraOptions.fromNative(raw.free_camera),
+            .tile = MapTileSettings.fromNative(raw.tile),
+            .bounds = CameraBounds.fromNative(raw.bounds),
+            .free_camera = FreeCamera.fromNative(raw.free_camera),
             .view = MapView.fromNative(raw.view),
         };
     }
@@ -3958,6 +4031,32 @@ pub const MapTileOptions = struct {
     }
 };
 
+/// All the settings for how a map picks the tiles to load.
+///
+/// Its members mean the same as those of `MapTileOptions`.
+///
+/// See `mln_map_tile_settings` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MapTileSettings = struct {
+    prefetch_zoom_delta: u32 = 0,
+    lod_min_radius: f64 = 0,
+    lod_scale: f64 = 0,
+    /// The pitch, in degrees, above which the map lowers the detail.
+    lod_pitch_threshold: f64 = 0,
+    lod_zoom_shift: f64 = 0,
+    lod_mode: TileLodMode = .default,
+    pub fn fromNative(raw: c.mln_map_tile_settings) MapTileSettings {
+        return .{
+            .prefetch_zoom_delta = raw.prefetch_zoom_delta,
+            .lod_min_radius = raw.lod_min_radius,
+            .lod_scale = raw.lod_scale,
+            .lod_pitch_threshold = raw.lod_pitch_threshold,
+            .lod_zoom_shift = raw.lod_zoom_shift,
+            .lod_mode = TileLodMode.fromNative(raw.lod_mode),
+        };
+    }
+};
+
 /// One view of a map: its camera, size, and projection.
 ///
 /// See `mln_map_view` in the
@@ -3966,7 +4065,7 @@ pub const MapView = struct {
     camera: Camera = .{},
     extent: LogicalExtent = .{},
     projection_mode: ProjectionMode = .{},
-    viewport: MapViewportOptions = .{},
+    viewport: MapViewport = .{},
     pub fn toNative(self: MapView) c.mln_map_view {
         var raw = std.mem.zeroes(c.mln_map_view);
         raw.size = @sizeOf(c.mln_map_view);
@@ -3981,7 +4080,36 @@ pub const MapView = struct {
             .camera = Camera.fromNative(raw.camera),
             .extent = LogicalExtent.fromNative(raw.extent),
             .projection_mode = ProjectionMode.fromNative(raw.projection_mode),
-            .viewport = MapViewportOptions.fromNative(raw.viewport),
+            .viewport = MapViewport.fromNative(raw.viewport),
+        };
+    }
+};
+
+/// A map's whole viewport.
+///
+/// Its members mean the same as those of `MapViewportOptions`.
+///
+/// See `mln_map_viewport` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MapViewport = struct {
+    north_orientation: NorthOrientation = .up,
+    constrain_mode: ConstrainMode = .none,
+    viewport_mode: ViewportMode = .default,
+    frustum_offset: EdgeInsets = .{},
+    pub fn toNative(self: MapViewport) c.mln_map_viewport {
+        var raw = std.mem.zeroes(c.mln_map_viewport);
+        raw.north_orientation = self.north_orientation.toNative();
+        raw.constrain_mode = self.constrain_mode.toNative();
+        raw.viewport_mode = self.viewport_mode.toNative();
+        raw.frustum_offset = self.frustum_offset.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_map_viewport) MapViewport {
+        return .{
+            .north_orientation = NorthOrientation.fromNative(raw.north_orientation),
+            .constrain_mode = ConstrainMode.fromNative(raw.constrain_mode),
+            .viewport_mode = ViewportMode.fromNative(raw.viewport_mode),
+            .frustum_offset = EdgeInsets.fromNative(raw.frustum_offset),
         };
     }
 };
@@ -4848,29 +4976,55 @@ pub const ProjectedMeters = struct {
     }
 };
 
-/// Settings that skew the map or draw it without perspective.
+/// A map's whole projection mode.
+///
+/// Its members mean the same as those of `ProjectionModeOptions`.
 ///
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const ProjectionMode = struct {
-    /// Whether the map draws without perspective.
-    axonometric: ?bool = null,
-    x_skew: ?f64 = null,
-    y_skew: ?f64 = null,
+    axonometric: bool = false,
+    x_skew: f64 = 0,
+    y_skew: f64 = 0,
     pub fn toNative(self: ProjectionMode) c.mln_projection_mode {
         var raw = std.mem.zeroes(c.mln_projection_mode);
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_projection_mode);
-        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_AXONOMETRIC, &raw.axonometric, self.axonometric);
-        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_X_SKEW, &raw.x_skew, self.x_skew);
-        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_Y_SKEW, &raw.y_skew, self.y_skew);
+        raw.axonometric = self.axonometric;
+        raw.x_skew = self.x_skew;
+        raw.y_skew = self.y_skew;
         return raw;
     }
     pub fn fromNative(raw: c.mln_projection_mode) ProjectionMode {
         return .{
-            .axonometric = if (raw.fields & c.MLN_PROJECTION_MODE_AXONOMETRIC != 0) raw.axonometric else null,
-            .x_skew = if (raw.fields & c.MLN_PROJECTION_MODE_X_SKEW != 0) raw.x_skew else null,
-            .y_skew = if (raw.fields & c.MLN_PROJECTION_MODE_Y_SKEW != 0) raw.y_skew else null,
+            .axonometric = raw.axonometric,
+            .x_skew = raw.x_skew,
+            .y_skew = raw.y_skew,
+        };
+    }
+};
+
+/// Settings that skew the map or draw it without perspective.
+///
+/// See `mln_projection_mode_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const ProjectionModeOptions = struct {
+    /// Whether the map draws without perspective.
+    axonometric: ?bool = null,
+    x_skew: ?f64 = null,
+    y_skew: ?f64 = null,
+    pub fn toNative(self: ProjectionModeOptions) c.mln_projection_mode_options {
+        var raw = std.mem.zeroes(c.mln_projection_mode_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_projection_mode_options);
+        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_OPTION_AXONOMETRIC, &raw.axonometric, self.axonometric);
+        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_OPTION_X_SKEW, &raw.x_skew, self.x_skew);
+        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_OPTION_Y_SKEW, &raw.y_skew, self.y_skew);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_projection_mode_options) ProjectionModeOptions {
+        return .{
+            .axonometric = if (raw.fields & c.MLN_PROJECTION_MODE_OPTION_AXONOMETRIC != 0) raw.axonometric else null,
+            .x_skew = if (raw.fields & c.MLN_PROJECTION_MODE_OPTION_X_SKEW != 0) raw.x_skew else null,
+            .y_skew = if (raw.fields & c.MLN_PROJECTION_MODE_OPTION_Y_SKEW != 0) raw.y_skew else null,
         };
     }
 };
@@ -7825,9 +7979,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_image_source_url", .handle, map, null, diagnostic, .{ source_id, url });
     }
 
-    pub fn setProjectionMode(self: MapDiscarding, mode: ProjectionMode, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setProjectionMode(self: MapDiscarding, options: ProjectionModeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_projection_mode", .handle, map, null, diagnostic, .{mode});
+        return call.discard("mln_map_set_projection_mode", .handle, map, null, diagnostic, .{options});
     }
 
     pub fn setRenderingStatsViewEnabled(self: MapDiscarding, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
