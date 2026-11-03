@@ -382,10 +382,6 @@ Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
     result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
     result.ref.cluster = value.cluster!;
   }
-  if (value.synchronousTiling != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-    result.ref.synchronous_tiling = value.synchronousTiling!;
-  }
   return result;
 }
 
@@ -5424,11 +5420,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Sets whether a GeoJSON source builds its tiles synchronously.
+  /// Sets whether a GeoJSON source builds its tiles while the map renders.
   ///
-  /// This works like the synchronous tiling option of `GeoJsonSourceOptions`,
-  /// but `enabled` can't turn off synchronous tiling that the source's options
-  /// turned on.
+  /// When `enabled` is true, the source builds its tiles while the map renders
+  /// instead of in the background, so new data shows in the next frame. Until
+  /// this is called, a source follows the `synchronousUpdate` member of its
+  /// source JSON, which defaults to false. This setting replaces that value.
   ///
   /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

@@ -2052,12 +2052,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets whether a GeoJSON source builds its tiles synchronously.
+    /// Sets whether a GeoJSON source builds its tiles while the map renders.
     /// </summary>
     /// <remarks>
-    /// <para>This works like the synchronous tiling option of
-    /// <c>GeoJsonSourceOptions</c>, but <c>enabled</c> can't turn off
-    /// synchronous tiling that the source's options turned on.</para>
+    /// <para>When <c>enabled</c> is true, the source builds its tiles while the
+    /// map renders instead of in the background, so new data shows in the next
+    /// frame. Until this is called, a source follows the
+    /// <c>synchronousUpdate</c> member of its source JSON, which defaults to
+    /// false. This setting replaces that value.</para>
     /// <para>See <c>mln_map_set_geo_json_source_synchronous_tiling</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>

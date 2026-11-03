@@ -814,8 +814,7 @@ auto geojson_source_options_default() noexcept -> mln_geo_json_source_options {
     .cluster_radius = defaults.clusterRadius,
     .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
     .line_metrics = defaults.lineMetrics,
-    .cluster = defaults.cluster,
-    .synchronous_tiling = defaults.synchronousUpdate
+    .cluster = defaults.cluster
   };
 }
 

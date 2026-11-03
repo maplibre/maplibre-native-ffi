@@ -27,10 +27,4 @@ public sealed record GeoJsonSourceOptions
     public uint? ClusterMinPoints { get; init; }
     public bool? LineMetrics { get; init; }
     public bool? Cluster { get; init; }
-
-    /// <summary>
-    /// Builds tiles while the map renders instead of in the background, so that
-    /// new data shows in the next frame.
-    /// </summary>
-    public bool? SynchronousTiling { get; init; }
 }

@@ -1717,11 +1717,13 @@ impl MapHandle {
         })
     }
 
-    /// Sets whether a GeoJSON source builds its tiles synchronously.
+    /// Sets whether a GeoJSON source builds its tiles while the map renders.
     ///
-    /// This works like the synchronous tiling option of `GeoJsonSourceOptions`,
-    /// but `enabled` can't turn off synchronous tiling that the source's
-    /// options turned on.
+    /// When `enabled` is true, the source builds its tiles while the map
+    /// renders instead of in the background, so new data shows in the next
+    /// frame. Until this is called, a source follows the `synchronousUpdate`
+    /// member of its source JSON, which defaults to false. This setting
+    /// replaces that value.
     ///
     /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2838,11 +2840,13 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Sets whether a GeoJSON source builds its tiles synchronously.
+    /// Sets whether a GeoJSON source builds its tiles while the map renders.
     ///
-    /// This works like the synchronous tiling option of `GeoJsonSourceOptions`,
-    /// but `enabled` can't turn off synchronous tiling that the source's
-    /// options turned on.
+    /// When `enabled` is true, the source builds its tiles while the map
+    /// renders instead of in the background, so new data shows in the next
+    /// frame. Until this is called, a source follows the `synchronousUpdate`
+    /// member of its source JSON, which defaults to false. This setting
+    /// replaces that value.
     ///
     /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

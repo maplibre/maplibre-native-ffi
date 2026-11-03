@@ -74,10 +74,6 @@ internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSou
     fields = fields or 256u
     writeBool(target + w(61, 69), it)
   }
-  value.synchronousTiling?.let {
-    fields = fields or 512u
-    writeBool(target + w(62, 70), it)
-  }
   writeU32(target + 4, fields)
 }
 

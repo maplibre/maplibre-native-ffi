@@ -590,12 +590,6 @@ internal static unsafe class GeneratedValues
             MLN_GEO_JSON_SOURCE_OPTION_CLUSTER,
             static present => (byte)(present ? 1 : 0)
         );
-        native.fields |= Put(
-            value.SynchronousTiling,
-            ref native.synchronous_tiling,
-            MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
-            static present => (byte)(present ? 1 : 0)
-        );
         return native;
     }
 

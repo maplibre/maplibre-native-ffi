@@ -674,11 +674,6 @@ export interface GeoJsonSourceOptions {
   clusterMinPoints?: number;
   lineMetrics?: boolean;
   cluster?: boolean;
-  /**
-   * Builds tiles while the map renders instead of in the background, so that
-   * new data shows in the next frame.
-   */
-  synchronousTiling?: boolean;
 }
 
 /**

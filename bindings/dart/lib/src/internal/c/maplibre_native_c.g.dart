@@ -451,8 +451,6 @@ final class mln_geo_json_source_options extends Struct {
   external bool line_metrics;
   @Bool()
   external bool cluster;
-  @Bool()
-  external bool synchronous_tiling;
 }
 
 final class mln_gpu_sync extends Struct {
@@ -1845,7 +1843,6 @@ const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS = 32;
 const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64;
 const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128;
 const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256;
-const MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512;
 
 // mln_gesture_phase
 const MLN_GESTURE_PHASE_NONE = 0;

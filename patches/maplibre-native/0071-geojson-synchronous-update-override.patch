@@ -1,0 +1,288 @@
+Lets GeoJSONSource::setOverrideSynchronousUpdate() turn synchronous updates
+off as well as on, and makes a change reach the tiles a source already has. A
+source reported options->synchronousUpdate || overrideSynchronousUpdate, so one
+whose options or style JSON set "synchronousUpdate": true stayed synchronous
+whatever the override said. The override now replaces the option once it is
+set. A tile also lays out in the mode it was created with, and
+RenderGeoJSONSource reuses its tiles when the data changes, so a mode change
+didn't reach them. RenderGeoJSONSource now recreates its tiles when the mode
+changes (https://github.com/maplibre/maplibre-native-ffi/issues/1491).
+
+Recreating the tiles leaves the old tiles' queued background slices to run. If
+the source turned synchronous, the new tiles then slice the same geojson-vt
+index inline on the render thread, while GeoJSONVT::getTile() fills its tile
+cache without synchronization. Turning synchronous updates on while a slice ran
+already raced the same way. GeoJSONVTData now holds a mutex around every
+slice. Supercluster indexes need none, since their queries are const and never
+change the index after construction.
+Upstream: not proposed
+
+diff --git a/src/mln/renderer/sources/render_geojson_source.cpp b/src/mln/renderer/sources/render_geojson_source.cpp
+index b139b56..e0d9875 100644
+--- a/src/mln/renderer/sources/render_geojson_source.cpp
++++ b/src/mln/renderer/sources/render_geojson_source.cpp
+@@ -83,6 +83,13 @@ void RenderGeoJSONSource::update(Immutable<style::Source::Impl> baseImpl_,
+ 
+     enabled = needsRendering;
+ 
++    // A tile lays out in the mode it was created with, so a mode change
++    // recreates the tiles.
++    if (parameters.isUpdateSynchronous != tilesUpdateSynchronously) {
++        tilesUpdateSynchronously = parameters.isUpdateSynchronous;
++        tilePyramid.clearAll();
++    }
++
+     auto data_ = impl().getData().lock();
+     if (data.lock() != data_) {
+         data = data_;
+diff --git a/src/mln/renderer/sources/render_geojson_source.hpp b/src/mln/renderer/sources/render_geojson_source.hpp
+index 50325d6..6c13697 100644
+--- a/src/mln/renderer/sources/render_geojson_source.hpp
++++ b/src/mln/renderer/sources/render_geojson_source.hpp
+@@ -30,6 +30,8 @@ private:
+     const style::GeoJSONSource::Impl& impl() const;
+ 
+     std::weak_ptr<style::GeoJSONData> data;
++    // The mode the tiles in tilePyramid were created with.
++    bool tilesUpdateSynchronously = false;
+ };
+ 
+ } // namespace mln
+diff --git a/src/mln/style/sources/geojson_source_impl.cpp b/src/mln/style/sources/geojson_source_impl.cpp
+index d9f7df4..138329e 100644
+--- a/src/mln/style/sources/geojson_source_impl.cpp
++++ b/src/mln/style/sources/geojson_source_impl.cpp
+@@ -19,6 +19,7 @@
+ #endif
+ 
+ #include <cmath>
++#include <mutex>
+ 
+ namespace mln {
+ namespace style {
+@@ -27,11 +28,17 @@ class GeoJSONVTData final : public GeoJSONData {
+     void getTile(const CanonicalTileID& id, const std::function<void(TileFeatures)>& fn, bool runSynchronously) final {
+         assert(fn);
+         if (runSynchronously) {
+-            fn(this->impl->getTile(id.z, id.x, id.y).features);
++            TileFeatures features;
++            {
++                const std::scoped_lock lock(*mutex);
++                features = this->impl->getTile(id.z, id.x, id.y).features;
++            }
++            fn(std::move(features));
+         } else {
+             sequencedScheduler->scheduleAndReplyValue(
+                 util::SimpleIdentity::Empty,
+-                [id, geoJSONVT_impl = this->impl]() -> TileFeatures {
++                [id, geoJSONVT_impl = this->impl, mutex_ = this->mutex]() -> TileFeatures {
++                    const std::scoped_lock lock(*mutex_);
+                     return geoJSONVT_impl->getTile(id.z, id.x, id.y).features;
+                 },
+                 fn);
+@@ -54,6 +61,10 @@ class GeoJSONVTData final : public GeoJSONData {
+     }
+ 
+     std::shared_ptr<mapbox::geojsonvt::GeoJSONVT> impl; // Accessed on worker thread.
++    // GeoJSONVT::getTile() fills a tile cache. A slice queued in the background
++    // can still run after the source turns synchronous and slices inline, so
++    // every slice holds this.
++    std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+     std::shared_ptr<Scheduler> sequencedScheduler;
+ };
+ 
+@@ -162,7 +173,7 @@ std::optional<std::string> GeoJSONSource::Impl::getAttribution() const {
+ }
+ 
+ bool GeoJSONSource::Impl::isUpdateSynchronous() const {
+-    return options->synchronousUpdate || overrideSynchronousUpdate;
++    return overrideSynchronousUpdate.value_or(options->synchronousUpdate);
+ }
+ 
+ void GeoJSONSource::Impl::setOverrideSynchronousUpdate(bool newOverride) const {
+diff --git a/src/mln/style/sources/geojson_source_impl.hpp b/src/mln/style/sources/geojson_source_impl.hpp
+index d2f523a..a8f325c 100644
+--- a/src/mln/style/sources/geojson_source_impl.hpp
++++ b/src/mln/style/sources/geojson_source_impl.hpp
+@@ -4,6 +4,8 @@
+ #include <mln/style/sources/geojson_source.hpp>
+ #include <mln/util/range.hpp>
+ 
++#include <optional>
++
+ namespace mln {
+ 
+ class AsyncRequest;
+@@ -29,7 +31,8 @@ public:
+ private:
+     Immutable<GeoJSONOptions> options;
+     std::shared_ptr<GeoJSONData> data;
+-    mutable bool overrideSynchronousUpdate = false;
++    // Replaces options->synchronousUpdate once set.
++    mutable std::optional<bool> overrideSynchronousUpdate;
+ };
+ 
+ } // namespace style
+diff --git a/test/style/source.test.cpp b/test/style/source.test.cpp
+index b7f0103..e1d101a 100644
+--- a/test/style/source.test.cpp
++++ b/test/style/source.test.cpp
+@@ -51,6 +51,8 @@
+ 
+ #include <optional>
+ #include <stdexcept>
++#include <thread>
++#include <utility>
+ 
+ using namespace mln;
+ using SourceType = mln::style::SourceType;
+@@ -1071,6 +1073,149 @@ TEST(Source, GeoJSONSourceTilesAfterDataReset) {
+     EXPECT_TRUE(renderSource.isLoaded()); // Tiles are reset in static mode.
+ }
+ 
++TEST(Source, GeoJSONSourceSynchronousUpdateOverrideReplacesTheOption) {
++    GeoJSONOptions options;
++    options.synchronousUpdate = true;
++    GeoJSONSource source("source", makeMutable<GeoJSONOptions>(options));
++    EXPECT_TRUE(source.isUpdateSynchronous());
++
++    source.setOverrideSynchronousUpdate(false);
++    EXPECT_FALSE(source.isUpdateSynchronous());
++
++    source.setOverrideSynchronousUpdate(true);
++    EXPECT_TRUE(source.isUpdateSynchronous());
++
++    GeoJSONSource asynchronous("asynchronous");
++    EXPECT_FALSE(asynchronous.isUpdateSynchronous());
++    asynchronous.setOverrideSynchronousUpdate(true);
++    EXPECT_TRUE(asynchronous.isUpdateSynchronous());
++}
++
++namespace {
++
++// A GeoJSON source rendered with a circle layer. Its data is clustered, which
++// slices a tile within the call in either mode, so whether the tiles complete
++// within an update shows only how they lay out.
++struct SynchronousUpdateSource {
++    explicit SynchronousUpdateSource(SourceTest& test_, bool synchronousUpdate)
++        : test(test_),
++          options(makeOptions(synchronousUpdate)),
++          source("source", options),
++          renderSource(staticImmutableCast<GeoJSONSource::Impl>(source.baseImpl), test.threadPool) {}
++
++    static Immutable<GeoJSONOptions> makeOptions(bool synchronousUpdate) {
++        GeoJSONOptions result;
++        result.cluster = true;
++        result.synchronousUpdate = synchronousUpdate;
++        return makeMutable<GeoJSONOptions>(result);
++    }
++
++    // Sets new data and updates the render source, as a frame would.
++    void update() {
++        source.setGeoJSONData(GeoJSONData::create(
++            mapbox::geojson::parse(R"({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
++                "geometry": {"type": "Point", "coordinates": [1.1, 1.1]}}]})"),
++            Scheduler::GetSequenced(),
++            options));
++        TileParameters parameters = test.tileParameters();
++        parameters.isUpdateSynchronous = source.isUpdateSynchronous();
++        static_cast<RenderSource&>(renderSource).update(source.baseImpl, layers, true, true, parameters);
++    }
++
++    SourceTest& test;
++    Immutable<GeoJSONOptions> options;
++    GeoJSONSource source;
++    RenderGeoJSONSource renderSource;
++    CircleLayer layer{"id", "source"};
++    std::vector<Immutable<LayerProperties>> layers{
++        makeMutable<CircleLayerProperties>(staticImmutableCast<CircleLayer::Impl>(layer.baseImpl))};
++};
++
++} // namespace
++
++TEST(Source, GeoJSONSourceSynchronousUpdateOverrideAppliesToExistingTiles) {
++    SourceTest test;
++
++    SynchronousUpdateSource synchronous(test, true);
++    synchronous.update();
++    EXPECT_TRUE(synchronous.renderSource.isLoaded()); // The tiles complete within the update.
++    synchronous.source.setOverrideSynchronousUpdate(false);
++    synchronous.update();
++    EXPECT_FALSE(synchronous.renderSource.isLoaded()); // The tiles now lay out in the background.
++
++    SynchronousUpdateSource asynchronous(test, false);
++    asynchronous.update();
++    EXPECT_FALSE(asynchronous.renderSource.isLoaded());
++    while (!asynchronous.renderSource.isLoaded()) {
++        test.loop.runOnce();
++    }
++    asynchronous.source.setOverrideSynchronousUpdate(true);
++    asynchronous.update();
++    EXPECT_TRUE(asynchronous.renderSource.isLoaded()); // The tiles now complete within the update.
++}
++
++namespace {
++
++// Holds the tasks it is given until the test runs them.
++class HeldScheduler final : public Scheduler {
++public:
++    void schedule(std::function<void()>&& task) override { tasks.push_back(std::move(task)); }
++    void schedule(const util::SimpleIdentity, std::function<void()>&& task) override { schedule(std::move(task)); }
++    void waitForEmpty(const util::SimpleIdentity) override {}
++    mapbox::base::WeakPtr<Scheduler> makeWeakPtr() override { return weakFactory.makeWeakPtr(); }
++
++    std::vector<std::function<void()>> tasks;
++
++private:
++    mapbox::base::WeakPtrFactory<Scheduler> weakFactory{this};
++    // Do not add members here, see `WeakPtrFactory`
++};
++
++} // namespace
++
++TEST(Source, GeoJSONSourceSlicesInlineWhileABackgroundSliceRuns) {
++    SourceTest test;
++    // At zoom 3 the index slices its tiles on demand, which fills its tile cache.
++    test.transform.jumpTo(CameraOptions().withCenter(LatLng()).withZoom(3.0));
++    test.transformState = test.transform.getState();
++
++    // Unclustered data slices on this scheduler while the source is asynchronous.
++    auto slicer = std::make_shared<HeldScheduler>();
++    GeoJSONSource source("source");
++    source.setGeoJSONData(GeoJSONData::create(mapbox::geojson::parse(R"({"type": "Polygon",
++        "coordinates": [[[-10, -10], [10, -10], [10, 10], [-10, 10], [-10, -10]]]})"),
++                                              slicer));
++    RenderGeoJSONSource renderSource(staticImmutableCast<GeoJSONSource::Impl>(source.baseImpl), test.threadPool);
++    CircleLayer layer("id", "source");
++    std::vector<Immutable<LayerProperties>> layers{
++        makeMutable<CircleLayerProperties>(staticImmutableCast<CircleLayer::Impl>(layer.baseImpl))};
++    auto update = [&] {
++        TileParameters parameters = test.tileParameters();
++        parameters.isUpdateSynchronous = source.isUpdateSynchronous();
++        static_cast<RenderSource&>(renderSource).update(source.baseImpl, layers, true, true, parameters);
++    };
++
++    update();
++    ASSERT_FALSE(slicer->tasks.empty());
++    EXPECT_FALSE(renderSource.isLoaded());
++
++    // The queued slices run in the background while the source turns
++    // synchronous and recreates its tiles, which slice the same index inline.
++    source.setOverrideSynchronousUpdate(true);
++    std::thread background([tasks = std::exchange(slicer->tasks, {})] {
++        for (const auto& task : tasks) {
++            task();
++        }
++    });
++    update();
++    background.join();
++    EXPECT_TRUE(renderSource.isLoaded()); // The new tiles complete within the update.
++
++    // The background slices reply to tiles that no longer exist.
++    test.loop.runOnce();
++    EXPECT_TRUE(renderSource.isLoaded());
++}
++
+ TEST(Source, SetMaxParentOverscaleFactor) {
+     SourceTest test;
+     test.transform.jumpTo(CameraOptions().withCenter(LatLng()).withZoom(8.0));
