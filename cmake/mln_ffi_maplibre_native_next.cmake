@@ -160,6 +160,18 @@ function(mln_ffi_add_maplibre_native_next_tests out_tests)
     # checks are wasm32's.
     mln_native_configure_browser_page(mln_next_c_api_test)
     mln_native_add_browser_test(next/c_api/browser mln_next_c_api_test)
+    # A WebGPU surface session on a canvas of the test's thread, resized while
+    # it renders.
+    add_executable(mln_next_surface_resize_test
+                   "${PROJECT_SOURCE_DIR}/src/next/tests/surface_resize_test.c")
+    set_target_properties(mln_next_surface_resize_test
+                          PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES)
+    target_link_libraries(
+      mln_next_surface_resize_test PRIVATE maplibre_native_c
+                                           MLN_FFI::RenderDependencies)
+    mln_native_configure_browser_page(mln_next_surface_resize_test)
+    mln_native_add_browser_test(next/surface_resize/browser
+                                mln_next_surface_resize_test)
     set(${out_tests} PARENT_SCOPE)
     return()
   endif()

@@ -45,8 +45,9 @@ pub struct CallerShared {
     format: u32,
     /// The map's latest update and its generation, for the host thread.
     update: Mutex<Option<(UpdateParameters, u64)>>,
-    /// A logical size to resize to at the next service.
-    resize: Mutex<Option<(MlnLogicalSize, Option<Completion>)>>,
+    /// A resize's completion, completed at the next service. The canvas
+    /// itself follows the map size of each frame (see `render`).
+    resize: Mutex<Option<Option<Completion>>>,
     driver_wake: Option<Wake>,
     driver_wake_armed: AtomicBool,
     /// Whether a service created the renderer (and graphics objects).
@@ -152,6 +153,9 @@ struct CallerEntry {
     parameters: Option<Arc<UpdateParameters>>,
     update_generation: u64,
     rendered_generation: u64,
+    /// The camera and extent of the last rendered frame, which its frame
+    /// results report.
+    rendered_view: Option<MlnMapView>,
     waiting: Vec<MlnFrameDemand>,
 }
 
@@ -211,6 +215,7 @@ fn create_entry(session: u64, shared: &Arc<SessionShared>) -> Result<CallerEntry
         parameters: None,
         update_generation: 0,
         rendered_generation: 0,
+        rendered_view: None,
         waiting: Vec::new(),
     })
 }
@@ -221,7 +226,7 @@ fn frame_result(entry: &CallerEntry, disposition: u32, token: u64) -> MlnRenderF
         token,
         map_update_generation: entry.update_generation,
         frame_generation: entry.shared.frame_generation.load(Ordering::SeqCst),
-        view: entry.shared.map.view(),
+        view: entry.rendered_view.unwrap_or_else(|| entry.shared.map.view()),
         mode: MLN_RENDER_MODE_FULL,
         ..Default::default()
     }
@@ -233,6 +238,15 @@ fn render(entry: &mut CallerEntry) -> bool {
         return false;
     };
     let rendered = catch_unwind(AssertUnwindSafe(|| {
+        // The canvas takes the map size this frame draws, in the same task
+        // as the draw. Resizing it as soon as the session resizes showed the
+        // old map size stretched to the new canvas until the map's resized
+        // update arrived.
+        let size = parameters.transform_state.get_size();
+        entry.backend.set_framebuffer_size(physical(
+            MlnLogicalSize { width: size.width, height: size.height },
+            entry.shared.map.scale_factor,
+        ));
         if !entry.backend.acquire_next_texture() {
             return Err("the surface has no texture to render to".to_owned());
         }
@@ -244,6 +258,14 @@ fn render(entry: &mut CallerEntry) -> bool {
     match rendered {
         Ok(Ok(())) => {
             entry.rendered_generation = entry.update_generation;
+            // What the frame shows, rather than the map's latest snapshot,
+            // which may already be ahead of it.
+            let mut view = entry.shared.map.view();
+            view.camera = map::camera_of(&parameters.transform_state.get_camera_options(None));
+            let size = parameters.transform_state.get_size();
+            view.extent =
+                MlnLogicalExtent { width: size.width, height: size.height, scale_factor: entry.shared.map.scale_factor };
+            entry.rendered_view = Some(view);
             entry.shared.frame_generation.fetch_add(1, Ordering::SeqCst);
             let handle = entry.shared.map.handle;
             entry.shared.map.runtime.post(move || {
@@ -370,7 +392,7 @@ pub fn resize(shared: &Arc<SessionShared>, logical_size: MlnLogicalSize, complet
         public.extent.width = logical_size.width;
         public.extent.height = logical_size.height;
     }
-    *shared.caller.as_ref().expect("a surface session").resize.lock().unwrap() = Some((logical_size, completion));
+    *shared.caller.as_ref().expect("a surface session").resize.lock().unwrap() = Some(completion);
     let handle = shared.map.handle;
     let size = Size::new(logical_size.width, logical_size.height);
     shared.map.runtime.post(move || {
@@ -581,11 +603,8 @@ pub unsafe extern "C" fn mln_render_session_service_driver_work(
                 entry.parameters = Some(Arc::new(parameters));
                 entry.update_generation = generation;
             }
-            if let Some((size, completion)) = caller.resize.lock().unwrap().take() {
-                entry.backend.set_framebuffer_size(physical(size, shared.map.scale_factor));
-                if let Some(completion) = completion {
-                    completion.ok();
-                }
+            if let Some(Some(completion)) = caller.resize.lock().unwrap().take() {
+                completion.ok();
             }
             process_demands(&mut entry);
             let barriers = std::mem::take(&mut *caller.barriers.lock().unwrap());
