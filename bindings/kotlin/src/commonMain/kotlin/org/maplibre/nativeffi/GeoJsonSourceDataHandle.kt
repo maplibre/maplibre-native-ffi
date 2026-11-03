@@ -53,8 +53,9 @@ internal constructor(
      *
      * Errors:
      *
-     * - `Status.INVALID_ARGUMENT` when `data` isn't valid GeoJSON, or when `options` turns on
-     *   clustering and `data` isn't a feature collection of points.
+     * - `Status.INVALID_ARGUMENT` when `data` isn't valid GeoJSON, when an option in `options` is
+     *   out of range, or when `options` turns on clustering and `data` isn't a feature collection
+     *   of points.
      */
     public fun create(
       data: String,

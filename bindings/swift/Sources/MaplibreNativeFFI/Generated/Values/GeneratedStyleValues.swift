@@ -241,7 +241,8 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   public var clusterProperties: String
   public var buffer: UInt32?
   public var clusterRadius: UInt32?
-  public var clusterMinPoints: UInt32?
+  /// At most 4294967295 on a 32-bit target.
+  public var clusterMinPoints: UInt64?
   public var lineMetrics: Bool?
   public var cluster: Bool?
   public init(
@@ -252,7 +253,7 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
     clusterProperties: String = "",
     buffer: UInt32? = nil,
     clusterRadius: UInt32? = nil,
-    clusterMinPoints: UInt32? = nil,
+    clusterMinPoints: UInt64? = nil,
     lineMetrics: Bool? = nil,
     cluster: Bool? = nil
   ) {
@@ -787,6 +788,9 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   public var tileSize: UInt32?
   public var vectorEncoding: StyleVectorTileEncoding?
   public var rasterEncoding: StyleRasterDemEncoding?
+  /// A GeoJSON source's options, with every field set. Data prepared with them
+  /// can replace the source's data.
+  public var geoJson: GeoJsonSourceOptions?
   public init(
     id: String = "",
     type: StyleSourceType = .init(rawValue: 0),
@@ -797,7 +801,8 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     bounds: LatLngBounds? = nil,
     tileSize: UInt32? = nil,
     vectorEncoding: StyleVectorTileEncoding? = nil,
-    rasterEncoding: StyleRasterDemEncoding? = nil
+    rasterEncoding: StyleRasterDemEncoding? = nil,
+    geoJson: GeoJsonSourceOptions? = nil
   ) {
     self.id = id
     self.type = type
@@ -809,6 +814,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     self.tileSize = tileSize
     self.vectorEncoding = vectorEncoding
     self.rasterEncoding = rasterEncoding
+    self.geoJson = geoJson
   }
 
   init(
@@ -835,6 +841,8 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     rasterEncoding = raw.fields & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
       .rawValue != 0 ?
       StyleRasterDemEncoding(rawValue: raw.raster_encoding.rawValue) : nil
+    geoJson = raw.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON
+      .rawValue != 0 ? try GeoJsonSourceOptions(raw: raw.geo_json) : nil
   }
 }
 

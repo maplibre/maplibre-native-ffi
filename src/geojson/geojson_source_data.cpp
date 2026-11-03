@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -342,6 +343,15 @@ auto validate_and_resolve_geojson_source_options(
     set_thread_error("cluster_radius must be at most 4095");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  // MapLibre Native counts cluster points in a size_t.
+  if constexpr (std::numeric_limits<size_t>::max() < UINT64_MAX) {
+    if (effective.cluster_min_points > std::numeric_limits<size_t>::max()) {
+      auto message = "cluster_min_points must be at most " +
+                     std::to_string(std::numeric_limits<size_t>::max());
+      set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
   return MLN_STATUS_OK;
 }
 
@@ -367,7 +377,7 @@ auto to_native_geojson_source_options(
   native.cluster = options.cluster;
   native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
   native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
-  native.clusterMinPoints = options.cluster_min_points;
+  native.clusterMinPoints = static_cast<size_t>(options.cluster_min_points);
 
   if (options.cluster_properties.size != 0) {
     auto document = mln::JSDocument{};
@@ -435,12 +445,58 @@ auto cluster_properties_equal(
 
 }  // namespace
 
+auto from_native_geojson_source_options(
+  const mln::style::GeoJSONOptions& options, std::string& out_cluster_properties
+) -> mln_geo_json_source_options {
+  auto result = geojson_source_options_default();
+  result.fields = static_cast<uint32_t>(MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) |
+                  MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM |
+                  MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE |
+                  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+                  MLN_GEO_JSON_SOURCE_OPTION_BUFFER |
+                  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS |
+                  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+                  MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS |
+                  MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
+  result.min_zoom = static_cast<double>(options.minzoom);
+  result.max_zoom = static_cast<double>(options.maxzoom);
+  result.tolerance = options.tolerance;
+  result.cluster_max_zoom = static_cast<double>(options.clusterMaxZoom);
+  result.buffer = options.buffer;
+  result.cluster_radius = options.clusterRadius;
+  result.cluster_min_points = options.clusterMinPoints;
+  result.line_metrics = options.lineMetrics;
+  result.cluster = options.cluster;
+
+  out_cluster_properties.clear();
+  if (!options.clusterProperties.empty()) {
+    // Each property is [reduce, map], the form the style spec's
+    // clusterProperties takes when its reduce operator is an expression.
+    auto properties = mln::PropertyMap{};
+    for (const auto& [key, expressions] : options.clusterProperties) {
+      const auto& [map_expression, reduce_expression] = expressions;
+      if (map_expression == nullptr || reduce_expression == nullptr) continue;
+      properties.emplace(
+        key, std::vector<mln::Value>{
+               reduce_expression->serialize(), map_expression->serialize()
+             }
+      );
+    }
+    out_cluster_properties =
+      serialize_json_value(mln::Value{std::move(properties)});
+  }
+  result.cluster_properties = {
+    .data = out_cluster_properties.data(), .size = out_cluster_properties.size()
+  };
+  return result;
+}
+
 auto geojson_source_options_equal(
   const mln::style::GeoJSONOptions& left,
   const mln::style::GeoJSONOptions& right
 ) -> bool {
-  return left.minzoom == right.minzoom && left.maxzoom == right.maxzoom &&
-         left.buffer == right.buffer && left.tolerance == right.tolerance &&
+  return left.maxzoom == right.maxzoom && left.buffer == right.buffer &&
+         left.tolerance == right.tolerance &&
          left.lineMetrics == right.lineMetrics &&
          left.cluster == right.cluster &&
          left.clusterRadius == right.clusterRadius &&

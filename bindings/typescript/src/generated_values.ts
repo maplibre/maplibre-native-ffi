@@ -671,7 +671,10 @@ export interface GeoJsonSourceOptions {
   clusterProperties?: unknown;
   buffer?: number;
   clusterRadius?: number;
-  clusterMinPoints?: number;
+  /**
+   * At most 4294967295 on a 32-bit target.
+   */
+  clusterMinPoints?: bigint;
   lineMetrics?: boolean;
   cluster?: boolean;
 }
@@ -3213,6 +3216,11 @@ export interface StyleSourceInfo {
   readonly tileSize?: number;
   readonly vectorEncoding?: StyleVectorTileEncoding;
   readonly rasterEncoding?: StyleRasterDemEncoding;
+  /**
+   * A GeoJSON source's options, with every field set. Data prepared with them
+   * can replace the source's data.
+   */
+  readonly geoJson?: GeoJsonSourceOptions;
 }
 
 /**

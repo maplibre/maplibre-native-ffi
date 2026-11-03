@@ -277,6 +277,58 @@ auto capture_element(
   } else {
     result.raster_encoding = {};
   }
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON) != 0) {
+    if ((source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) != 0) {
+    } else {
+      result.geo_json.min_zoom = {};
+    }
+    if ((source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM) != 0) {
+    } else {
+      result.geo_json.max_zoom = {};
+    }
+    if ((source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE) != 0) {
+    } else {
+      result.geo_json.tolerance = {};
+    }
+    if (
+      (source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) !=
+      0
+    ) {
+    } else {
+      result.geo_json.cluster_max_zoom = {};
+    }
+    result.geo_json.cluster_properties =
+      buffer(arena, source.geo_json.cluster_properties);
+    if ((source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_BUFFER) != 0) {
+    } else {
+      result.geo_json.buffer = {};
+    }
+    if (
+      (source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0
+    ) {
+    } else {
+      result.geo_json.cluster_radius = {};
+    }
+    if (
+      (source.geo_json.fields &
+       MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0
+    ) {
+    } else {
+      result.geo_json.cluster_min_points = {};
+    }
+    if (
+      (source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS) != 0
+    ) {
+    } else {
+      result.geo_json.line_metrics = {};
+    }
+    if ((source.geo_json.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER) != 0) {
+    } else {
+      result.geo_json.cluster = {};
+    }
+  } else {
+    result.geo_json = {};
+  }
   return result;
 }
 inline auto discard_element(

@@ -534,6 +534,42 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static GeoJsonSourceOptions CopyGeoJsonSourceOptions(
+        mln_geo_json_source_options value
+    ) =>
+        new()
+        {
+            MinZoom = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM)
+                ? value.min_zoom
+                : null,
+            MaxZoom = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM)
+                ? value.max_zoom
+                : null,
+            Tolerance = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE)
+                ? value.tolerance
+                : null,
+            ClusterMaxZoom = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
+                ? value.cluster_max_zoom
+                : null,
+            ClusterProperties = RuntimeStructs.CopyUtf8(
+                (sbyte*)value.cluster_properties.data,
+                value.cluster_properties.size
+            ),
+            Buffer = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_BUFFER) ? value.buffer : null,
+            ClusterRadius = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS)
+                ? value.cluster_radius
+                : null,
+            ClusterMinPoints = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS)
+                ? value.cluster_min_points
+                : null,
+            LineMetrics = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS)
+                ? value.line_metrics != 0
+                : null,
+            Cluster = value.fields.HasFlag(MLN_GEO_JSON_SOURCE_OPTION_CLUSTER)
+                ? value.cluster != 0
+                : null,
+        };
+
     internal static mln_geo_json_source_options NativeGeoJsonSourceOptions(
         GeoJsonSourceOptions value,
         NativeCallScope scope
@@ -2240,6 +2276,9 @@ internal static unsafe class GeneratedValues
                 : null,
             RasterEncoding = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
                 ? (global::Maplibre.NativeFfi.StyleRasterDemEncoding)value.raster_encoding
+                : null,
+            GeoJson = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_GEO_JSON)
+                ? CopyGeoJsonSourceOptions(value.geo_json)
                 : null,
         };
 

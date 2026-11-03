@@ -25,12 +25,12 @@ impl GeoJsonSourceDataHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidArgument` when `data` isn't valid GeoJSON, or when
-    ///   `options` turns on clustering and `data` isn't a feature collection of
-    ///   points.
+    /// - `Status::InvalidArgument` when `data` isn't valid GeoJSON, when an
+    ///   option in `options` is out of range, or when `options` turns on
+    ///   clustering and `data` isn't a feature collection of points.
     pub fn create(
         data: &str,
-        options: Option<&GeoJsonSourceOptions<'_>>,
+        options: Option<&GeoJsonSourceOptions>,
     ) -> Result<GeoJsonSourceDataHandle> {
         let mut call = Call::global();
         crate::abi::validate_abi_version()?;

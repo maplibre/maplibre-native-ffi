@@ -26,4 +26,10 @@ public sealed record StyleSourceInfo
     public uint? TileSize { get; init; }
     public StyleVectorTileEncoding? VectorEncoding { get; init; }
     public StyleRasterDemEncoding? RasterEncoding { get; init; }
+
+    /// <summary>
+    /// A GeoJSON source's options, with every field set. Data prepared with
+    /// them can replace the source's data.
+    /// </summary>
+    public GeoJsonSourceOptions? GeoJson { get; init; }
 }

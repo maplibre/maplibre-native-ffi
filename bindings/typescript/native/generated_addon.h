@@ -151,6 +151,9 @@ napi_value mln_ts_read_event_batch_view_events(
 napi_value mln_ts_read_free_camera(
   napi_env env, const mln_free_camera* source, size_t size
 );
+napi_value mln_ts_read_geo_json_source_options(
+  napi_env env, const mln_geo_json_source_options* source, size_t size
+);
 napi_value mln_ts_read_gpu_sync(
   napi_env env, const mln_gpu_sync* source, size_t size
 );

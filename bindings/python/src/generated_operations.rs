@@ -265,6 +265,90 @@ fn generated_copy_mln_free_camera(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_geo_json_source_options(
+    py: Python<'_>,
+    value: &sys::mln_geo_json_source_options,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "min_zoom",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM != 0,
+            || generated_value(py, value.min_zoom),
+        )?,
+    )?;
+    dict.set_item(
+        "max_zoom",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM != 0,
+            || generated_value(py, value.max_zoom),
+        )?,
+    )?;
+    dict.set_item(
+        "tolerance",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE != 0,
+            || generated_value(py, value.tolerance),
+        )?,
+    )?;
+    dict.set_item(
+        "cluster_max_zoom",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0,
+            || generated_value(py, value.cluster_max_zoom),
+        )?,
+    )?;
+    dict.set_item(
+        "cluster_properties",
+        generated_json(py, value.cluster_properties)?,
+    )?;
+    dict.set_item(
+        "buffer",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_BUFFER != 0,
+            || generated_value(py, value.buffer),
+        )?,
+    )?;
+    dict.set_item(
+        "cluster_radius",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS != 0,
+            || generated_value(py, value.cluster_radius),
+        )?,
+    )?;
+    dict.set_item(
+        "cluster_min_points",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0,
+            || generated_value(py, value.cluster_min_points),
+        )?,
+    )?;
+    dict.set_item(
+        "line_metrics",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS != 0,
+            || generated_value(py, value.line_metrics),
+        )?,
+    )?;
+    dict.set_item(
+        "cluster",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0,
+            || generated_value(py, value.cluster),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_gpu_sync(py: Python<'_>, value: &sys::mln_gpu_sync) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("kind", generated_value(py, value.kind)?)?;
@@ -1269,6 +1353,14 @@ fn generated_copy_mln_style_source_info(
             || generated_value(py, value.raster_encoding),
         )?,
     )?;
+    dict.set_item(
+        "geo_json",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_SOURCE_INFO_GEO_JSON != 0,
+            || generated_copy_mln_geo_json_source_options(py, &value.geo_json),
+        )?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1867,7 +1959,7 @@ fn generated_input_mln_geo_json_source_options<'py>(
         raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
     }
     if let Some(field) = generated_present(value, "cluster_min_points")? {
-        raw.cluster_min_points = field.extract::<u32>()?;
+        raw.cluster_min_points = field.extract::<u64>()?;
         raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
     }
     if let Some(field) = generated_present(value, "line_metrics")? {

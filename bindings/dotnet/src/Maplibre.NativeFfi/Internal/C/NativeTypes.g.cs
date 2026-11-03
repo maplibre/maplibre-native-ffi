@@ -293,7 +293,7 @@ internal unsafe struct mln_geo_json_source_options
     public mln_buffer_view cluster_properties;
     public uint buffer;
     public uint cluster_radius;
-    public uint cluster_min_points;
+    public ulong cluster_min_points;
     public byte line_metrics;
     public byte cluster;
 }
@@ -1170,6 +1170,7 @@ internal unsafe struct mln_style_source_info
     public uint tile_size;
     public mln_style_vector_tile_encoding vector_encoding;
     public mln_style_raster_dem_encoding raster_encoding;
+    public mln_geo_json_source_options geo_json;
 }
 
 internal unsafe struct mln_style_source_tile_info
@@ -2025,6 +2026,7 @@ internal enum mln_style_source_info_field : uint
     MLN_STYLE_SOURCE_INFO_TILE_SIZE = 4,
     MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 8,
     MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 16,
+    MLN_STYLE_SOURCE_INFO_GEO_JSON = 32,
 }
 
 internal enum mln_style_source_type : uint

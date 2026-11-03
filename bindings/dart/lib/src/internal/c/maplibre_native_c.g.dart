@@ -445,7 +445,7 @@ final class mln_geo_json_source_options extends Struct {
   external int buffer;
   @Uint32()
   external int cluster_radius;
-  @Uint32()
+  @Uint64()
   external int cluster_min_points;
   @Bool()
   external bool line_metrics;
@@ -1476,6 +1476,7 @@ final class mln_style_source_info extends Struct {
   external int vector_encoding;
   @Uint32()
   external int raster_encoding;
+  external mln_geo_json_source_options geo_json;
 }
 
 final class mln_style_source_tile_info extends Struct {
@@ -2235,6 +2236,7 @@ const MLN_STYLE_SOURCE_INFO_BOUNDS = 2;
 const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 4;
 const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 8;
 const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 16;
+const MLN_STYLE_SOURCE_INFO_GEO_JSON = 32;
 
 // mln_style_source_type
 const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;

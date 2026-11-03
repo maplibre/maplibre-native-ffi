@@ -1693,8 +1693,9 @@ impl MapHandle {
 
     /// Replaces the data of a GeoJSON source.
     ///
-    /// `data` must have been prepared with the same options as the source. It
-    /// can be released once this function returns.
+    /// `data` must have been prepared with the source's options, which
+    /// `MapHandle::get_style_source()` reports, though `min_zoom` may differ.
+    /// `data` can be released once this function returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2822,8 +2823,9 @@ impl MapHandleDiscarding<'_> {
 
     /// Replaces the data of a GeoJSON source.
     ///
-    /// `data` must have been prepared with the same options as the source. It
-    /// can be released once this function returns.
+    /// `data` must have been prepared with the source's options, which
+    /// `MapHandle::get_style_source()` reports, though `min_zoom` may differ.
+    /// `data` can be released once this function returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

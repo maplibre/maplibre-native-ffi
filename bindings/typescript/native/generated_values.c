@@ -833,6 +833,79 @@ napi_value mln_ts_read_free_camera(
   return result;
 }
 
+napi_value mln_ts_read_geo_json_source_options(
+  napi_env env, const mln_geo_json_source_options* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) != 0) {
+    if (!mln_ts_set(
+          env, result, "minZoom", mln_ts_number(env, (double)(source->min_zoom))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM) != 0) {
+    if (!mln_ts_set(
+          env, result, "maxZoom", mln_ts_number(env, (double)(source->max_zoom))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE) != 0) {
+    if (!mln_ts_set(
+          env, result, "tolerance",
+          mln_ts_number(env, (double)(source->tolerance))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0) {
+    if (!mln_ts_set(
+          env, result, "clusterMaxZoom",
+          mln_ts_number(env, (double)(source->cluster_max_zoom))
+        ))
+      return NULL;
+  }
+  if (!mln_ts_set(
+        env, result, "clusterProperties",
+        mln_ts_json(
+          env, (source->cluster_properties).data,
+          (source->cluster_properties).size
+        )
+      ))
+    return NULL;
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_BUFFER) != 0) {
+    if (!mln_ts_set(
+          env, result, "buffer", mln_ts_number(env, (double)(source->buffer))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0) {
+    if (!mln_ts_set(
+          env, result, "clusterRadius",
+          mln_ts_number(env, (double)(source->cluster_radius))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0) {
+    if (!mln_ts_set(
+          env, result, "clusterMinPoints",
+          mln_ts_u64(env, (uint64_t)(source->cluster_min_points))
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS) != 0) {
+    if (!mln_ts_set(
+          env, result, "lineMetrics", mln_ts_bool(env, source->line_metrics)
+        ))
+      return NULL;
+  }
+  if ((source->fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER) != 0) {
+    if (!mln_ts_set(env, result, "cluster", mln_ts_bool(env, source->cluster)))
+      return NULL;
+  }
+  return result;
+}
+
 napi_value mln_ts_read_gpu_sync(
   napi_env env, const mln_gpu_sync* source, size_t size
 ) {
@@ -2465,6 +2538,15 @@ napi_value mln_ts_read_style_source_info(
         ))
       return NULL;
   }
+  if ((source->fields & MLN_STYLE_SOURCE_INFO_GEO_JSON) != 0) {
+    if (!mln_ts_set(
+          env, result, "geoJson",
+          mln_ts_read_geo_json_source_options(
+            env, &(source->geo_json), sizeof(source->geo_json)
+          )
+        ))
+      return NULL;
+  }
   return result;
 }
 
@@ -3682,10 +3764,9 @@ bool mln_ts_write_geo_json_source_options(
   mln_ts_path(child, sizeof child, path, "clusterMinPoints");
   if (!mln_ts_is_absent(call, member)) {
     {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->cluster_min_points = (uint32_t)number;
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->cluster_min_points = (uint64_t)number;
     }
     out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
   }

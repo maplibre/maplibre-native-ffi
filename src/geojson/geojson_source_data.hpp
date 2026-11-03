@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 
 #include <mln/style/sources/geojson_source.hpp>
 #include <mln/util/geojson.hpp>
@@ -37,6 +38,14 @@ auto to_native_geojson_source_options(
   const mln_geo_json_source_options& options
 ) -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>>;
 
+// Reports a source's options with every field set. The result's
+// cluster_properties views out_cluster_properties, which holds the JSON.
+auto from_native_geojson_source_options(
+  const mln::style::GeoJSONOptions& options, std::string& out_cluster_properties
+) -> mln_geo_json_source_options;
+
+// Whether data prepared with one set of options can serve a source added with
+// the other: only the options that shape the prepared index count.
 auto geojson_source_options_equal(
   const mln::style::GeoJSONOptions& left,
   const mln::style::GeoJSONOptions& right

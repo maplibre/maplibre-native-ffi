@@ -431,6 +431,7 @@ pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 2;
 pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 4;
 pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 8;
 pub const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: mln_style_source_info_field = 16;
+pub const MLN_STYLE_SOURCE_INFO_GEO_JSON: mln_style_source_info_field = 32;
 pub type mln_style_source_type = u32;
 pub const MLN_STYLE_SOURCE_TYPE_UNKNOWN: mln_style_source_type = 0;
 pub const MLN_STYLE_SOURCE_TYPE_VECTOR: mln_style_source_type = 1;
@@ -747,7 +748,7 @@ pub struct mln_geo_json_source_options {
     pub cluster_properties: mln_buffer_view,
     pub buffer: u32,
     pub cluster_radius: u32,
-    pub cluster_min_points: u32,
+    pub cluster_min_points: u64,
     pub line_metrics: bool,
     pub cluster: bool,
 }
@@ -1572,6 +1573,7 @@ pub struct mln_style_source_info {
     pub tile_size: u32,
     pub vector_encoding: mln_style_vector_tile_encoding,
     pub raster_encoding: mln_style_raster_dem_encoding,
+    pub geo_json: mln_geo_json_source_options,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

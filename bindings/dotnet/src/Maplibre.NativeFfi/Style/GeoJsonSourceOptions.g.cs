@@ -24,7 +24,11 @@ public sealed record GeoJsonSourceOptions
     public string ClusterProperties { get; init; } = "";
     public uint? Buffer { get; init; }
     public uint? ClusterRadius { get; init; }
-    public uint? ClusterMinPoints { get; init; }
+
+    /// <summary>
+    /// At most 4294967295 on a 32-bit target.
+    /// </summary>
+    public ulong? ClusterMinPoints { get; init; }
     public bool? LineMetrics { get; init; }
     public bool? Cluster { get; init; }
 }
