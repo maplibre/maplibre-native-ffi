@@ -52,8 +52,9 @@ impl AcquiredFrameHandle {
     /// Gives an acquired frame back to the session once you're done reading it.
     ///
     /// `consumer_completion` says when your GPU work that reads the texture
-    /// finishes. Null means that the work has already finished. The session
-    /// waits for that point before it renders into the texture again.
+    /// finishes. Pass `GpuSyncKind::CpuComplete` when that work has already
+    /// finished. The session waits for that point before it renders into the
+    /// texture again.
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -63,13 +64,10 @@ impl AcquiredFrameHandle {
     /// - `Status::Unsupported` when
     ///   `RenderSessionCapabilities::consumer_sync_kinds` lacks the kind of
     ///   `consumer_completion`.
-    pub fn release(
-        self,
-        consumer_completion: Option<&GpuSync>,
-    ) -> std::result::Result<(), (Self, Error)> {
+    pub fn release(self, consumer_completion: &GpuSync) -> std::result::Result<(), (Self, Error)> {
         self.consume(|frame| {
             let mut call = Call::new(frame);
-            let consumer_completion = call.optional_reference(consumer_completion.as_ref())?;
+            let consumer_completion = call.reference(&consumer_completion)?;
             call.status(|frame, out_diagnostic| unsafe {
                 sys::mln_acquired_frame_release(frame, consumer_completion, out_diagnostic)
             })

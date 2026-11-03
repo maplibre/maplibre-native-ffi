@@ -351,13 +351,16 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
     );
   }
 
-  const mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
+  const mln_gpu_sync sync = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
   MLN_TEST_INVALID(mln_acquired_frame_release(MLN_HANDLE_NULL, &sync, NULL));
   mln_acquired_frame stale_copy = stale;
   MLN_TEST_INVALID_STATE(mln_acquired_frame_release(stale_copy, &sync, NULL));
   mln_gpu_sync refused = sync;
   refused.size = sizeof(mln_gpu_sync) - 1;
   MLN_TEST_INVALID(mln_acquired_frame_release(frame, &refused, NULL));
+  MLN_TEST_INVALID(mln_acquired_frame_release(frame, NULL, NULL));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   refused = sync;
   refused.kind = 999;
@@ -478,7 +481,9 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
     MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scopes[index], NULL));
     TEST_ASSERT_NOT_NULL(scopes[index]);
   }
-  mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
+  const mln_gpu_sync sync = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
   for (size_t index = 0; index < 2; index += 1) {
     const mln_acquired_frame held = frame;
     MLN_TEST_STATUS(
@@ -692,8 +697,7 @@ static mln_render_frame_result render_one(
   while (mln_render_session_acquire_frame(fixture->session, &frame, NULL) ==
            MLN_STATUS_OK &&
          frame != MLN_HANDLE_NULL) {
-    MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
-    frame = MLN_HANDLE_NULL;
+    mln_test_render_release_frame(&frame);
   }
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   return result;

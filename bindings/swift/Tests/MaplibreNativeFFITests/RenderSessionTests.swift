@@ -231,7 +231,7 @@ private func attachBorrowedTexture(
         #expect(try view.mtlDevice === graphics.metalDevice)
         #expect(texture.device === graphics.metalDevice)
       }
-      try frame.release(consumerCompletion: GpuSync())
+      try frame.release(consumerCompletion: GpuSync(kind: .cpuComplete))
     }
   }
 #endif
@@ -264,7 +264,7 @@ private func attachBorrowedTexture(
       try view.readTexture()
       #expect(try graphics.withTextureView(of: first) { $0.width } == 32)
       do {
-        try first.release(consumerCompletion: GpuSync())
+        try first.release(consumerCompletion: GpuSync(kind: .cpuComplete))
         Issue.record("release inside a view should be busy")
       } catch let error as MaplibreError {
         #expect(error.status == .busy)
@@ -283,9 +283,9 @@ private func attachBorrowedTexture(
     // The refused release left the frame open; a second release after the
     // accepted one is a no-op.
     #expect(!first.isClosed)
-    try first.release(consumerCompletion: nil)
+    try first.release(consumerCompletion: GpuSync(kind: .cpuComplete))
     #expect(first.isClosed)
-    try first.release(consumerCompletion: nil)
+    try first.release(consumerCompletion: GpuSync(kind: .cpuComplete))
     #expect(
       first.description
         == "AcquiredFrameHandle(id=0x\(String(first.id, radix: 16)), closed=true)"

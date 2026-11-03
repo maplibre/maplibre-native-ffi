@@ -56,12 +56,13 @@ and get its texture for your backend. The frame's slot is the index of its
 texture in your ring.
 
 When your reads finish, release the frame with
-[](api:mln_acquired_frame_release), so the session can render into that texture
+[](api:mln_acquired_frame_release) and a sync of kind
+[](api:MLN_GPU_SYNC_CPU_COMPLETE), so the session can render into that texture
 again. If your reads may still run on the GPU, pass a sync point of a kind that
-[](api:mln_render_session_capabilities) lists in its consumer sync kinds, and
-the session waits for it on the GPU. Keep at most one frame acquired, or the
-next frame waits for a free texture, and release every acquired frame before you
-close the session.
+[](api:mln_render_session_capabilities) lists in its consumer sync kinds
+instead, and the session waits for it on the GPU. Keep at most one frame
+acquired, or the next frame waits for a free texture, and release every acquired
+frame before you close the session.
 
 <Snippet page="texture" region="acquire" />
 

@@ -215,7 +215,6 @@ static napi_value mln_ts_export_mln_acquired_frame_release(
   mln_ts_call* call = &call_state;
   mln_acquired_frame arg_frame = 0;
   mln_gpu_sync arg_consumer_completion;
-  const void* present_consumer_completion = NULL;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 3)) return NULL;
@@ -225,21 +224,17 @@ static napi_value mln_ts_export_mln_acquired_frame_release(
     arg_frame = (mln_acquired_frame)number;
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    memset(&arg_consumer_completion, 0, sizeof arg_consumer_completion);
-    arg_consumer_completion.size = sizeof arg_consumer_completion;
-    if (!mln_ts_read_record(call, call->argv[2], "consumerCompletion"))
-      goto done;
-    if (!mln_ts_write_gpu_sync(
-          call, call->argv[2], &arg_consumer_completion, "consumerCompletion"
-        ))
-      goto done;
-    present_consumer_completion = &arg_consumer_completion;
-  }
+  memset(&arg_consumer_completion, 0, sizeof arg_consumer_completion);
+  arg_consumer_completion.size = sizeof arg_consumer_completion;
+  if (!mln_ts_read_record(call, call->argv[2], "consumerCompletion")) goto done;
+  if (!mln_ts_write_gpu_sync(
+        call, call->argv[2], &arg_consumer_completion, "consumerCompletion"
+      ))
+    goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_acquired_frame_release(
-    arg_frame, present_consumer_completion, &diagnostic
+    arg_frame, &arg_consumer_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;

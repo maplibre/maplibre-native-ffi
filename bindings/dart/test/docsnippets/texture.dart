@@ -23,7 +23,7 @@ void drawFrame() {
   // Sample the texture, and wait for those reads to finish.
   frame.withVulkanTexture((texture) => drawMap(texture.imageView));
 
-  frame.release();
+  frame.release(const GpuSync(kind: GpuSyncKind.cpuComplete));
   // #endregion acquire
 }
 

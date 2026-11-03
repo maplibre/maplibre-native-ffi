@@ -312,8 +312,9 @@ export class AcquiredFrameHandle extends Owner {
    * Gives an acquired frame back to the session once you're done reading it.
    *
    * `consumerCompletion` says when your GPU work that reads the texture
-   * finishes. Null means that the work has already finished. The session waits
-   * for that point before it renders into the texture again.
+   * finishes. Pass `GpuSyncKind.cpuComplete` when that work has already
+   * finished. The session waits for that point before it renders into the
+   * texture again.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -323,7 +324,7 @@ export class AcquiredFrameHandle extends Owner {
    * - `Status.unsupported` when `RenderSessionCapabilities.consumerSyncKinds`
    *   lacks the kind of `consumerCompletion`.
    */
-  release(consumerCompletion?: GpuSync): void {
+  release(consumerCompletion: GpuSync): void {
     closeSync(this, (handle, token) =>
       native.mln_acquired_frame_release(handle, token, consumerCompletion),
     );

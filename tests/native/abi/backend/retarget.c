@@ -274,7 +274,9 @@ static mln_status acquire(
 }
 
 static void release(mln_acquired_frame* frame) {
-  const mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
+  const mln_gpu_sync sync = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
   MLN_TEST_OK(mln_acquired_frame_release(*frame, &sync, NULL));
   *frame = MLN_HANDLE_NULL;
 }

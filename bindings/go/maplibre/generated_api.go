@@ -5634,8 +5634,8 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 // it.
 //
 // consumerCompletion says when your GPU work that reads the texture finishes.
-// Null means that the work has already finished. The session waits for that
-// point before it renders into the texture again.
+// Pass GpuSyncKindCpuComplete when that work has already finished. The session
+// waits for that point before it renders into the texture again.
 //
 // See mln_acquired_frame_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -5643,9 +5643,9 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 // Errors:
 //   - StatusUnsupported when RenderSessionCapabilities.ConsumerSyncKinds lacks
 //     the kind of consumerCompletion.
-func (receiver *AcquiredFrameHandle) Close(consumerCompletion *GpuSync) error {
+func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
 	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStoreOptional(consumerCompletion, arena, nativeGpuSync), diagnostic))
+		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStore(nativeGpuSync(consumerCompletion, arena), arena), diagnostic))
 	})
 }
 

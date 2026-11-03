@@ -251,13 +251,14 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             lambda raw: VulkanTextureFrame._from_native(raw),
         )
 
-    def close(self, consumer_completion: GpuSync | None = None) -> None:
+    def close(self, consumer_completion: GpuSync) -> None:
         """Gives an acquired frame back to the session once you're done reading
         it.
 
         `consumer_completion` says when your GPU work that reads the texture
-        finishes. Null means that the work has already finished. The session
-        waits for that point before it renders into the texture again.
+        finishes. Pass `GpuSyncKind.CPU_COMPLETE` when that work has already
+        finished. The session waits for that point before it renders into the
+        texture again.
 
         See `mln_acquired_frame_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

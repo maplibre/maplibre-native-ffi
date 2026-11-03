@@ -211,7 +211,7 @@ class KotlinLayoutTests(unittest.TestCase):
         # the consumer's completion.
         frame = owners[f"{GENERATED}/AcquiredFrameHandle.kt"]
         self.assertNotIn("AutoCloseable", frame)
-        self.assertIn("public fun release(consumerCompletion: GpuSync?): Unit =", frame)
+        self.assertIn("public fun release(consumerCompletion: GpuSync): Unit =", frame)
 
     def test_every_owner_has_the_same_handle_members(self):
         owners = emitted(kotlin, real_api())

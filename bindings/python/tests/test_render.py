@@ -34,6 +34,8 @@ from support import (
 
 WIDTH, HEIGHT = 32, 16
 EXTENT = mln.LogicalExtent(WIDTH, HEIGHT, 1.0)
+# Releases a frame whose reads have finished.
+DONE = mln.GpuSync(kind=mln.GpuSyncKind.CPU_COMPLETE)
 
 
 def _backends() -> list[str]:
@@ -486,7 +488,7 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
         assert frame is not None
 
         def inspect(view: object) -> int:
-            for release in (frame.close, target.session.abandon):
+            for release in (lambda: frame.close(DONE), target.session.abandon):
                 with pytest.raises(mln.MaplibreError) as raised:
                     release()
                 assert raised.value.status == mln.Status.BUSY
@@ -495,7 +497,7 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
         assert target.with_texture(frame, inspect) != 0
         frame.get_result()
         assert not frame.is_closed
-        frame.close()
+        frame.close(DONE)
         # A frame closes once, so a discard after close does nothing.
         frame.discard()
         assert frame.is_closed
@@ -538,13 +540,13 @@ def test_a_borrow_on_another_thread_holds_off_close(
             with pytest.raises(
                 mln.MaplibreError, check=lambda error: error.status == mln.Status.BUSY
             ):
-                frame.close()
+                frame.close(DONE)
         finally:
             release.set()
             borrower.join()
 
         assert not failures
-        frame.close()
+        frame.close(DONE)
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,

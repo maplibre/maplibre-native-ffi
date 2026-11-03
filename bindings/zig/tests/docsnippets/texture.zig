@@ -36,7 +36,7 @@ fn drawFrame() !void {
     // Sample the texture, and wait for those reads to finish.
     try frame.getVulkanTexture({}, drawMap, null);
 
-    try frame.release(null, null);
+    try frame.release(.{ .kind = .cpu_complete }, null);
     // #endregion acquire
 }
 

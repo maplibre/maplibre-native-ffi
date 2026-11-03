@@ -1,9 +1,9 @@
 // A frame can't be released while its view lends its textures.
-use maplibre_native_ffi::AcquiredFrameHandle;
+use maplibre_native_ffi::{AcquiredFrameHandle, GpuSync};
 
 fn release_during_view(frame: AcquiredFrameHandle) {
     let view = frame.view().unwrap();
-    let _ = frame.release(None);
+    let _ = frame.release(&GpuSync::default());
     drop(view);
 }
 

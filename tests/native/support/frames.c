@@ -230,7 +230,9 @@ mln_acquired_frame mln_test_render_and_acquire(
 }
 
 void mln_test_render_release_frame(mln_acquired_frame* frame) {
-  const mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
+  const mln_gpu_sync sync = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
   MLN_TEST_OK(mln_acquired_frame_release(*frame, &sync, NULL));
   *frame = MLN_HANDLE_NULL;
 }

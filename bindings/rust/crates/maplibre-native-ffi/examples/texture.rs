@@ -35,7 +35,11 @@ fn draw_frame(session: &RenderSessionHandle) -> Result<()> {
     // Sample the texture, and wait for those reads to finish.
     draw_map(frame.view()?.get_vulkan_texture()?.image_view);
 
-    frame.release(None).map_err(|(_, error)| error)?;
+    let done = GpuSync {
+        kind: GpuSyncKind::CpuComplete,
+        ..GpuSync::default()
+    };
+    frame.release(&done).map_err(|(_, error)| error)?;
     // #endregion acquire
 
     Ok(())

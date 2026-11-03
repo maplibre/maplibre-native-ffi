@@ -36,13 +36,16 @@ static void collect_frames(still_image_wait* wait) {
     }
   }
   mln_render_frame_batch_release(batch);
+  const mln_gpu_sync done = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   while (mln_render_session_acquire_frame(
            wait->fixture->session, &frame, MLN_TEST_DIAGNOSTIC
          ) == MLN_STATUS_OK &&
          frame != MLN_HANDLE_NULL) {
     const mln_status released =
-      mln_acquired_frame_release(frame, NULL, MLN_TEST_DIAGNOSTIC);
+      mln_acquired_frame_release(frame, &done, MLN_TEST_DIAGNOSTIC);
     if (released != MLN_STATUS_OK) {
       wait->failure = released;
       return;

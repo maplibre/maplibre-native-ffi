@@ -124,6 +124,7 @@ public sealed class RenderTests
                 var frame =
                     session.AcquireFrame()
                     ?? throw new InvalidOperationException("No rendered frame is ready");
+                var done = new GpuSync { Kind = GpuSyncKind.CpuComplete };
                 Assert.Equal(rendered.FrameGeneration, frame.GetResult().FrameGeneration);
 
                 Func<uint>? escapedWidth = null;
@@ -136,7 +137,7 @@ public sealed class RenderTests
                     // while it is in scope.
                     var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
                     Assert.Equal(Status.Busy, busy.Status);
-                    var inUse = Assert.Throws<MaplibreException>(() => frame.Release(null));
+                    var inUse = Assert.Throws<MaplibreException>(() => frame.Release(done));
                     Assert.Equal(Status.Busy, inUse.Status);
                     escapedWidth = width;
                     escapedTexture = texture;
@@ -174,7 +175,7 @@ public sealed class RenderTests
                 Assert.Equal(RenderFixture.Width, escapedWidth());
                 Assert.Throws<MaplibreException>(() => escapedTexture());
                 Assert.False(frame.IsClosed);
-                frame.Release(null);
+                frame.Release(done);
                 Assert.True(frame.IsClosed);
                 Assert.Equal(
                     $"AcquiredFrameHandle(id=0x{frame.Id:x}, closed=true)",

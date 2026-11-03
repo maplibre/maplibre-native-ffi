@@ -11,6 +11,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.GpuSync
+import org.maplibre.nativeffi.GpuSyncKind
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapHandle
@@ -115,7 +117,7 @@ internal class RenderSessionFixture(
   private fun releaseFrames() {
     while (true) {
       val frame = session.acquireFrame() ?: return
-      frame.release(null)
+      frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
     }
   }
 

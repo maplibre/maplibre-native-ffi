@@ -202,11 +202,10 @@ def outputs_signature(plan, values):
     return result_name
 
 
-def declaration(params, *, defaults=True):
-    """Kotlin parameter declarations, defaulting each nullable parameter to null
-    unless [defaults] is false."""
+def declaration(params):
+    """Kotlin parameter declarations, defaulting each nullable parameter to null."""
     return ", ".join(
-        f"{local}: {typ}" + (" = null" if defaults and typ.endswith("?") else "")
+        f"{local}: {typ}" + (" = null" if typ.endswith("?") else "")
         for local, typ in params
     )
 
@@ -679,10 +678,7 @@ def lifecycle(plan, values, native):
             f"val holder = {values.storage(slot)}.also {{ writeI64(it, handle) }}"
         )
         arguments[receiver_index] = "holder"
-    # A release states its arguments, such as the frame consumer's GPU
-    # completion, which a default would claim.
-    releases = receiver_value(plan).handle.release == plan.name
-    parameters = declaration(params, defaults=not releases)
+    parameters = declaration(params)
 
     def body(*completion):
         call = native.checked(plan.function, [*arguments, *completion])

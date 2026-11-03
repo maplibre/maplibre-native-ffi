@@ -41,7 +41,7 @@ internal static class Texture
             DrawMap(texture.ImageView)
         );
 
-        frame.Release(null);
+        frame.Release(new GpuSync { Kind = GpuSyncKind.CpuComplete });
         // #endregion acquire
     }
 

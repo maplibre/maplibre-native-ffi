@@ -423,10 +423,13 @@ def lower_input(
         else:
             body += read
             args.append(f"&{local}")
+        # A release states its inputs, such as the frame consumer's GPU
+        # completion, which a default would claim.
         optional = (
             not registration_value
             and not value.nullable
             and values.all_omittable(element)
+            and plan.shape not in {"release", "release_async"}
         )
         lowered.native_parameters.append(
             NativeParameter(
