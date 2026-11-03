@@ -19,8 +19,6 @@ public extension MapHandle {
   /// Errors:
   ///
   /// - `Status.invalidState` when the map already has a render session.
-  /// - `Status.unsupported` when `device` is null and this build's render
-  ///   backend can't create a device.
   /// - `Status.nativeError` when `device` is null and the platform can't create
   ///   a device.
   func attachOffscreen(

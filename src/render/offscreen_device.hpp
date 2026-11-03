@@ -41,8 +41,9 @@ struct HandleTraits<OffscreenDeviceObject> {
   static constexpr auto leasable = true;
 };
 
-// Each backend defines this, and gets validated options. A backend that
-// creates no device reports MLN_STATUS_UNSUPPORTED.
+// Each backend defines this, and gets validated options. It runs on any
+// thread, except in a browser WebGPU build: there only a session's core worker
+// calls it, and the device it makes serves that worker alone.
 auto create_backend_offscreen_device(
   const mln_offscreen_device_options& options,
   std::shared_ptr<OffscreenDevice>& out_device

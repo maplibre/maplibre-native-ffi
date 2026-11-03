@@ -1040,8 +1040,8 @@ auto driver_work_runnable_locked(
 
 // Work queued behind a pending driver result wakes nothing until
 // resume_driver_work() reports the result ready.
-// A frame that the frames in flight hold back wakes a caller driver once,
-// since only a service asks the backend to report their end.
+// A frame that the frames in flight hold back wakes the driver once, since
+// only the driver asks the backend to report their end.
 auto publish_driver_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
@@ -1300,37 +1300,60 @@ auto detach_disposed_session(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void;
 
+// Whether a frame that the frames in flight hold back still needs the backend
+// asked to report their end.
+auto gpu_report_needed_locked(const mln_render_session_object& session) noexcept
+  -> bool {
+  return frame_waits_for_gpu_locked(session) &&
+         !session.texture.gpu_wait_pending;
+}
+
 auto run_core_worker(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
   while (true) {
     auto work = RenderDriverWork{};
+    auto wait_for_gpu = false;
     {
       auto lock = std::unique_lock{session->control_mutex};
       // An abandon waiting for the previous call to end holds the next one
       // back, so the call it waited out is the last this worker makes.
-      session->worker_condition.wait(lock, [&]() noexcept {
+      session->worker_condition.wait_on_core_worker(lock, [&]() noexcept {
         return session->abandon_waiters == 0 &&
                (session->stop_worker || session->disposal_detach ||
-                driver_work_runnable_locked(*session));
+                driver_work_runnable_locked(*session) ||
+                gpu_report_needed_locked(*session));
       });
       if (session->disposal_detach) {
         lock.unlock();
         detach_disposed_session(session);
         return;
       }
-      if (
-        session->views_invalidated || session->disposal_requested ||
-        !driver_work_runnable_locked(*session)
-      )
+      if (session->views_invalidated || session->disposal_requested) return;
+      if (driver_work_runnable_locked(*session)) {
+        work = std::move(session->driver_work.front());
+        session->driver_work.pop_front();
+      } else if (!session->stop_worker && gpu_report_needed_locked(*session)) {
+        // A frame that the frames in flight hold back asks once for their end,
+        // as a caller driver's service does.
+        session->texture.gpu_wait_pending = true;
+        wait_for_gpu = true;
+      } else {
         return;
-      work = std::move(session->driver_work.front());
-      session->driver_work.pop_front();
+      }
       session->driver_call_in_flight = true;
       session->driver_call_thread = current_owner_thread();
     }
-    execute_driver_work(session, work);
-    mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
+    if (wait_for_gpu) {
+      // Asked without the lock, since a backend may report at once.
+      if (session->texture.backend != nullptr)
+        session->texture.backend->when_gpu_done(GpuWorkDone{session});
+      else
+        GpuWorkDone{session}.run();
+    } else {
+      execute_driver_work(session, work);
+      mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
+    }
     auto* parked = static_cast<RetirementTask*>(nullptr);
     {
       const auto lock = std::scoped_lock{session->control_mutex};

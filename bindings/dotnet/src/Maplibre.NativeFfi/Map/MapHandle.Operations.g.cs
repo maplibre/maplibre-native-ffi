@@ -507,9 +507,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidState</c> when the map already has a
     /// render session.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when <c>device</c> is null
-    /// and this build's render backend can't create a
-    /// device.</description></item>
     /// <item><description><c>Status.NativeError</c> when <c>device</c> is null
     /// and the platform can't create a device.</description></item>
     /// </list>

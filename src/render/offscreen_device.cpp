@@ -102,25 +102,13 @@ auto validate_offscreen_descriptor(const mln_offscreen_descriptor* descriptor)
 
 }  // namespace
 
-#if defined(MLN_RENDER_BACKEND_METAL) || defined(MLN_RENDER_BACKEND_VULKAN) || \
-  defined(MLN_FFI_OPENGL_PROVIDER_EGL) || defined(MLN_FFI_OPENGL_PROVIDER_WGL)
-constexpr auto backend_creates_devices = true;
+#if defined(MLN_RENDER_BACKEND_WEBGPU)
+// A browser's WebGPU device belongs to the worker that requested it, and the
+// browser answers the request asynchronously. So only a session's core worker
+// creates one, during the attach, and no caller can create one to share.
+constexpr auto backend_shares_devices = false;
 #else
-constexpr auto backend_creates_devices = false;
-
-// A browser host creates its WebGPU device or WebGL context in JavaScript, so
-// these builds carry no way to make one.
-auto create_backend_offscreen_device(
-  const mln_offscreen_device_options& options,
-  std::shared_ptr<OffscreenDevice>& out_device
-) -> mln_status {
-  (void)options;
-  (void)out_device;
-  set_thread_error(
-    "this build's render backend cannot create an offscreen device"
-  );
-  return MLN_STATUS_UNSUPPORTED;
-}
+constexpr auto backend_shares_devices = true;
 #endif
 
 auto offscreen_device_create(
@@ -135,6 +123,13 @@ auto offscreen_device_create(
   if (out_device == nullptr || *out_device != MLN_HANDLE_NULL) {
     set_thread_error("out_device must point to a null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!backend_shares_devices) {
+    set_thread_error(
+      "this build cannot create an offscreen device; attach without one, "
+      "and the session creates its own"
+    );
+    return MLN_STATUS_UNSUPPORTED;
   }
   auto device = std::shared_ptr<OffscreenDevice>{};
   const auto create_status = create_backend_offscreen_device(effective, device);
@@ -189,13 +184,6 @@ auto offscreen_attach_start(
   if (driver_status != MLN_STATUS_OK) {
     return driver_status;
   }
-  if (object == nullptr && !backend_creates_devices) {
-    set_thread_error(
-      "this build's render backend cannot create an offscreen device"
-    );
-    return MLN_STATUS_UNSUPPORTED;
-  }
-
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);

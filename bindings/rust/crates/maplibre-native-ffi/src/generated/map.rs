@@ -432,8 +432,6 @@ impl MapHandle {
     /// # Errors
     ///
     /// - `Status::InvalidState` when the map already has a render session.
-    /// - `Status::Unsupported` when `device` is null and this build's render
-    ///   backend can't create a device.
     /// - `Status::NativeError` when `device` is null and the platform can't
     ///   create a device.
     pub fn attach_offscreen(

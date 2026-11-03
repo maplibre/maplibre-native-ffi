@@ -26,7 +26,8 @@ public sealed record OffscreenDeviceOptions
     /// The OpenGL API that the device's sessions render with. An EGL device
     /// defaults to <c>OpenGlClientApi.Gles</c>, and takes
     /// <c>OpenGlClientApi.Gl</c> too on Linux and FreeBSD. A WGL device takes
-    /// only <c>OpenGlClientApi.Gl</c>, its default. Other devices take neither.
+    /// only <c>OpenGlClientApi.Gl</c>, its default, and a WebGL device only
+    /// <c>OpenGlClientApi.Gles</c>, its default. Other devices take neither.
     /// </summary>
     public OpenGlClientApi? ClientApi { get; init; }
 }

@@ -1,15 +1,13 @@
 // Offscreen devices that native code creates, and the readback-only offscreen
-// sessions that render on them. Metal, Vulkan, EGL, and WGL builds create a
-// device; browser builds report that they cannot, after they validate the
-// call.
+// sessions that render on them. A browser WebGPU build creates a device only
+// for a session that attaches without one, and reports that it cannot create
+// one for the caller, after it validates the call.
 
 #include "support/frames.h"
 #include "support/map.h"
 #include "support/test_support.h"
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL) ||                                    \
-  defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_OPENGL_EGL) || \
-  defined(MLN_FFI_TEST_OPENGL_WGL)
+#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 #define DEVICE_SUPPORTED 1
 #endif
 
@@ -63,26 +61,9 @@ static mln_render_session_attach_options core_worker_options(void) {
   return options;
 }
 
-static void expect_attach_status(
-  mln_status expected, mln_map map, mln_offscreen_device device,
-  const mln_offscreen_descriptor* descriptor,
-  const mln_render_session_attach_options* options
-) {
-  mln_render_session session = MLN_HANDLE_NULL;
-  mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_STATUS(
-    expected, mln_map_attach_offscreen(
-                map, descriptor, options, device, &session, &attach.descriptor,
-                MLN_TEST_DIAGNOSTIC
-              )
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
-  mln_test_completion_reject(&attach);
-  mln_test_completion_destroy(&attach);
-}
-
 // Only an EGL device renders with either OpenGL API. A WGL device renders
-// with desktop OpenGL alone, and other devices with no OpenGL API.
+// with desktop OpenGL alone, a WebGL device with OpenGL ES alone, and other
+// devices with no OpenGL API.
 #if !defined(MLN_FFI_TEST_OPENGL_EGL)
 static void create_reports_an_unusable_client_api(void) {
   mln_offscreen_device_options options = {
@@ -112,29 +93,7 @@ static void create_reports_an_unsupported_backend(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
 }
-
-// Other builds create the device on the session's core worker, but a browser
-// build can never create one, so the call itself rejects the attach.
-static void attach_without_a_device_reports_an_unsupported_backend(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  const mln_offscreen_descriptor descriptor = texture_descriptor();
-  const mln_render_session_attach_options options = core_worker_options();
-  expect_attach_status(
-    MLN_STATUS_UNSUPPORTED, map, MLN_HANDLE_NULL, &descriptor, &options
-  );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
 #endif
-
-#if defined(DEVICE_SUPPORTED)
-static mln_offscreen_device create_device(void) {
-  mln_offscreen_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_offscreen_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
-  return device;
-}
 
 // Attaches an offscreen session on `device` and waits until the driver owns it.
 static mln_test_render_fixture attach_offscreen_session(
@@ -194,6 +153,124 @@ static void render_red_frame(
   mln_render_frame_batch_release(batch);
 }
 
+static mln_map create_static_red_map(mln_runtime runtime) {
+  mln_map_options map_options = mln_test_map_options();
+  map_options.initial_extent = texture_descriptor().extent;
+  map_options.map_mode = MLN_MAP_MODE_STATIC;
+  mln_map map = mln_test_create_map_with_options(runtime, &map_options);
+  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
+  return map;
+}
+
+// The session creates its device on its core worker, before the attach
+// completes.
+static void a_session_without_a_device_renders_a_still_image(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_static_red_map(runtime);
+  mln_test_render_fixture fixture =
+    attach_offscreen_session(map, MLN_HANDLE_NULL);
+
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+  expect_red_pixels(&fixture);
+
+  detach_offscreen_session(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A WebGPU frame's GPU work can still run when the next demand reaches the
+// driver, which renders the next frame only once that work ends.
+static void a_session_without_a_device_renders_frames_in_turn(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture =
+    attach_offscreen_session(map, MLN_HANDLE_NULL);
+
+  for (uint64_t token = 1; token <= 4; token += 1) {
+    render_red_frame(map, &fixture, token);
+    expect_red_pixels(&fixture);
+  }
+
+  detach_offscreen_session(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void a_session_without_a_device_renders_still_images_in_turn(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_static_red_map(runtime);
+  mln_test_render_fixture fixture =
+    attach_offscreen_session(map, MLN_HANDLE_NULL);
+
+  for (int image = 0; image < 3; image += 1) {
+    MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+    expect_red_pixels(&fixture);
+  }
+
+  detach_offscreen_session(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void a_session_without_a_device_renders_a_demand_after_a_still_image(
+  void
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_static_red_map(runtime);
+  mln_test_render_fixture fixture =
+    attach_offscreen_session(map, MLN_HANDLE_NULL);
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+  expect_red_pixels(&fixture);
+
+  render_red_frame(map, &fixture, 1);
+  expect_red_pixels(&fixture);
+
+  detach_offscreen_session(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// Disposal detaches the session on its core worker, which then exits with the
+// device that the session created gone.
+static void disposing_a_session_without_a_device_ends_it(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_static_red_map(runtime);
+  mln_test_render_fixture fixture =
+    attach_offscreen_session(map, MLN_HANDLE_NULL);
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+  expect_red_pixels(&fixture);
+
+  MLN_TEST_OK(mln_test_render_session_dispose(fixture.session));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+#if defined(DEVICE_SUPPORTED)
+static void expect_attach_status(
+  mln_status expected, mln_map map, mln_offscreen_device device,
+  const mln_offscreen_descriptor* descriptor,
+  const mln_render_session_attach_options* options
+) {
+  mln_render_session session = MLN_HANDLE_NULL;
+  mln_test_completion attach = mln_test_completion_default(0);
+  MLN_TEST_STATUS(
+    expected, mln_map_attach_offscreen(
+                map, descriptor, options, device, &session, &attach.descriptor,
+                MLN_TEST_DIAGNOSTIC
+              )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  mln_test_completion_reject(&attach);
+  mln_test_completion_destroy(&attach);
+}
+
+static mln_offscreen_device create_device(void) {
+  mln_offscreen_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_offscreen_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
+  return device;
+}
+
 static void a_session_reads_back_after_its_device_is_released(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -219,26 +296,6 @@ static void a_session_reads_back_after_its_device_is_released(void) {
   );
 
   render_red_frame(map, &fixture, 7);
-  expect_red_pixels(&fixture);
-
-  detach_offscreen_session(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// The session creates its device on its core worker, before the attach
-// completes.
-static void a_session_without_a_device_renders_a_still_image(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options map_options = mln_test_map_options();
-  map_options.initial_extent = texture_descriptor().extent;
-  map_options.map_mode = MLN_MAP_MODE_STATIC;
-  mln_map map = mln_test_create_map_with_options(runtime, &map_options);
-  mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
-  mln_test_render_fixture fixture =
-    attach_offscreen_session(map, MLN_HANDLE_NULL);
-
-  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   expect_red_pixels(&fixture);
 
   detach_offscreen_session(&fixture);
@@ -370,9 +427,13 @@ MLN_TEST_GROUP {
 #if !defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(create_reports_an_unusable_client_api);
 #endif
+  RUN_TEST(a_session_without_a_device_renders_a_still_image);
+  RUN_TEST(a_session_without_a_device_renders_frames_in_turn);
+  RUN_TEST(a_session_without_a_device_renders_still_images_in_turn);
+  RUN_TEST(a_session_without_a_device_renders_a_demand_after_a_still_image);
+  RUN_TEST(disposing_a_session_without_a_device_ends_it);
 #if defined(DEVICE_SUPPORTED)
   RUN_TEST(a_session_reads_back_after_its_device_is_released);
-  RUN_TEST(a_session_without_a_device_renders_a_still_image);
   RUN_TEST(sessions_on_two_maps_take_turns_on_one_device);
   RUN_TEST(sessions_on_two_maps_share_one_device);
   RUN_TEST(attach_rejects_what_an_offscreen_session_cannot_take);
@@ -380,6 +441,5 @@ MLN_TEST_GROUP {
   RUN_TEST(create_reports_a_missing_adapter);
 #else
   RUN_TEST(create_reports_an_unsupported_backend);
-  RUN_TEST(attach_without_a_device_reports_an_unsupported_backend);
 #endif
 }

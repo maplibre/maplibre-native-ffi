@@ -199,8 +199,8 @@ internal suspend fun <T> withOwnedTexture(
 
 /**
  * Runs [block] against a map with an attached offscreen session of [width] x [height] that a core
- * worker renders, and abandons and closes the session afterwards. Browser builds create no device.
- * The map's runtime is created from [runtimeOptions], and [onFrameWake] runs on each frame wake.
+ * worker renders, and abandons and closes the session afterwards. The map's runtime is created from
+ * [runtimeOptions], and [onFrameWake] runs on each frame wake.
  */
 internal suspend fun <T> withOffscreenSession(
   width: Int = 32,

@@ -300,8 +300,6 @@ internal constructor(
    * Errors:
    *
    * - `Status.INVALID_STATE` when the map already has a render session.
-   * - `Status.UNSUPPORTED` when `device` is null and this build's render backend can't create a
-   *   device.
    * - `Status.NATIVE_ERROR` when `device` is null and the platform can't create a device.
    */
   public fun attachOffscreen(
