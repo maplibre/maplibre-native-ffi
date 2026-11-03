@@ -211,13 +211,15 @@ test(
     );
     const urls: string[] = [];
     await bounded(
-      fixture.runtime.setResourceTransform((kind, url, request) => {
-        if (kind === ResourceKind.style) {
-          urls.push(url);
-          transform(request);
-        } else {
-          request.close();
-        }
+      fixture.runtime.setResourceTransform({
+        callback: (kind, url, request) => {
+          if (kind === ResourceKind.style) {
+            urls.push(url);
+            transform(request);
+          } else {
+            request.close();
+          }
+        },
       }),
       "the resource transform",
     );

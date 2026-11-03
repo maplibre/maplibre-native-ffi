@@ -33,7 +33,14 @@ callback instead. It sets the headers of each request.
 To change a request's URL, such as to add an API key or to use another server,
 set a resource transform with [](api:mln_runtime_set_resource_transform).
 
-The callback answers each request with its new URL through
+To add query parameters, such as an API key, give the transform rules. Each rule
+matches a URL pattern and lists the parameters to add. As with headers, match
+only URLs on your own server.
+
+<Snippet page="network" region="query-rules" />
+
+For any other change, give the transform a callback instead. It answers each
+request with its new URL through
 [](api:mln_resource_transform_request_complete).
 
 <Snippet page="network" region="rewrite" />

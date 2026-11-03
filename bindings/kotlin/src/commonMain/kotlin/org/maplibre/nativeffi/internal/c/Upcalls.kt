@@ -168,7 +168,8 @@ internal object Upcalls {
     if (
       !upcall<ResourceTransform, Boolean>("mln_resource_transform_callback", userData, false) {
         value ->
-        value.callback(ResourceKind(kind.toUInt()), readViewString(url), requestOwner)
+        val invoke = value.callback ?: return@upcall false
+        invoke(ResourceKind(kind.toUInt()), readViewString(url), requestOwner)
         true
       }
     ) {

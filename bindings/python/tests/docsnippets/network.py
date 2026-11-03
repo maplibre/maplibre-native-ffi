@@ -42,6 +42,25 @@ def network(
     )
     # #endregion headers
 
+    # #region query-rules
+    runtime.discarding.set_resource_transform(
+        mln.ResourceTransform(
+            rules=[
+                mln.ResourceTransformRule(
+                    flags=mln.UrlMatchFlag.GLOB,
+                    url="https://tiles.example.com/**",
+                    parameters=[
+                        mln.UrlQueryParameter(
+                            name="key",
+                            value="my-api-key",
+                        )
+                    ],
+                )
+            ]
+        )
+    )
+    # #endregion query-rules
+
     # #region rewrite
     def add_api_key(
         kind: mln.ResourceKind,

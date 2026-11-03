@@ -1,9 +1,11 @@
+#include <algorithm>
 #include <bitset>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "resources/url_rules.hpp"
 
@@ -59,6 +61,42 @@ auto check_pattern(
       CompiledGlob::max_tokens
   ) {
     return reject(what, index, "exceeds the glob limit of 4096 tokens");
+  }
+  return MLN_STATUS_OK;
+}
+
+// Percent-encodes every byte except RFC 3986's unreserved characters.
+auto append_encoded(std::string& out, std::string_view text) -> void {
+  constexpr auto digits = std::string_view{"0123456789ABCDEF"};
+  for (const auto character : text) {
+    const auto byte = static_cast<unsigned char>(character);
+    if (
+      (byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') ||
+      (byte >= '0' && byte <= '9') || byte == '-' || byte == '.' ||
+      byte == '_' || byte == '~'
+    ) {
+      out.push_back(character);
+    } else {
+      out.push_back('%');
+      out.push_back(digits[byte >> 4U]);
+      out.push_back(digits[byte & 0x0FU]);
+    }
+  }
+}
+
+auto check_parameter_text(
+  std::size_t rule, std::size_t parameter, const char* what,
+  mln_buffer_view text
+) -> mln_status {
+  if (
+    !validate_c_string_view(text, what) ||
+    !is_valid_utf8(static_cast<const char*>(text.data), text.size)
+  ) {
+    set_thread_error(("resource transform rule " + std::to_string(rule) +
+                      " parameter " + std::to_string(parameter) + " has an " +
+                      "invalid " + what)
+                       .c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
 }
@@ -238,6 +276,91 @@ auto copy_header_rules(
     out.rules.push_back(std::move(copied));
   }
   return MLN_STATUS_OK;
+}
+
+auto copy_query_rules(
+  const mln_resource_transform_rule* rules, std::size_t count,
+  QueryRuleTable& out
+) -> mln_status {
+  if (rules == nullptr && count != 0) {
+    set_thread_error("rules must not be null with a nonzero rule_count");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out.rules.clear();
+  out.rules.reserve(count);
+  const auto* cursor = reinterpret_cast<const std::byte*>(rules);
+  for (std::size_t index = 0; index < count; ++index) {
+    const auto* element =
+      next_sized_element<mln_resource_transform_rule>(cursor);
+    if (element == nullptr) {
+      return reject("resource transform rule", index, "has an invalid size");
+    }
+    const auto& rule = *element;
+    const auto status = check_pattern(
+      "resource transform rule", index, rule.kinds, rule.flags, rule.url
+    );
+    if (status != MLN_STATUS_OK) return status;
+    if (rule.parameters == nullptr && rule.parameter_count != 0) {
+      return reject(
+        "resource transform rule", index,
+        "has null parameters with a nonzero parameter_count"
+      );
+    }
+    auto copied = QueryRuleTable::Rule{
+      .pattern = {rule.kinds, rule.flags, string_view_from_view(rule.url)},
+      .query = {},
+    };
+    for (std::size_t parameter = 0; parameter < rule.parameter_count;
+         ++parameter) {
+      const auto name = rule.parameters[parameter].name;
+      const auto value = rule.parameters[parameter].value;
+      // The validation diagnostic names the parameter, never its value.
+      if (name.size == 0) {
+        set_thread_error(("resource transform rule " + std::to_string(index) +
+                          " parameter " + std::to_string(parameter) +
+                          " has an empty name")
+                           .c_str());
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      for (const auto& [what, text] :
+           {std::pair{"name", name}, std::pair{"value", value}}) {
+        const auto checked = check_parameter_text(index, parameter, what, text);
+        if (checked != MLN_STATUS_OK) return checked;
+      }
+      if (!copied.query.empty()) copied.query.push_back('&');
+      append_encoded(copied.query, string_view_from_view(name));
+      copied.query.push_back('=');
+      append_encoded(copied.query, string_view_from_view(value));
+    }
+    out.rules.push_back(std::move(copied));
+  }
+  return MLN_STATUS_OK;
+}
+
+auto append_query(std::string_view url, std::string_view query) -> std::string {
+  const auto fragment = std::min(url.find('#'), url.size());
+  const auto base = url.substr(0, fragment);
+  auto rewritten = std::string{base};
+  rewritten.reserve(url.size() + query.size() + 1);
+  if (!query.empty()) {
+    const auto question = base.find('?');
+    if (question == std::string_view::npos) {
+      rewritten.push_back('?');
+    } else if (base.back() != '?' && base.back() != '&') {
+      rewritten.push_back('&');
+    }
+    rewritten.append(query);
+  }
+  rewritten.append(url.substr(fragment));
+  return rewritten;
+}
+
+auto QueryRuleTable::apply(mln_resource_kind kind, const std::string& url) const
+  -> std::string {
+  for (const auto& rule : rules) {
+    if (rule.pattern.matches(kind, url)) return append_query(url, rule.query);
+  }
+  return url;
 }
 
 auto header_rules_callback(

@@ -216,7 +216,7 @@ test "a transform request is answered from another thread after its callback" {
     defer fixture.destroy();
     try fixture.setProvider(.{ .callback = passThrough });
     var probe = TransformProbe{};
-    try support.expectCommitted(try fixture.runtime.setResourceTransform(.init(&probe, TransformProbe.transform, null), null));
+    try support.expectCommitted(try fixture.runtime.setResourceTransform(testing.allocator, .init(&probe, TransformProbe.transform, null), null));
 
     try fixture.map.discarding().setStyleUrl("unsupported://original.json", null);
     try probe.taken.waitFor(1);

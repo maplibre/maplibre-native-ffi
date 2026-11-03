@@ -254,6 +254,8 @@ struct ResourceProvider {
 struct ResourceTransformRegistration {
   mln_resource_transform_callback callback = nullptr;
   std::shared_ptr<RuntimeCallbackContext> context;
+  // Set in place of the callback for a rules transform.
+  std::shared_ptr<const QueryRuleTable> rules;
 };
 
 struct HttpHeaderTransformRegistration {
@@ -393,6 +395,7 @@ auto set_http_header_transform(
   mln_runtime runtime, const mln_http_header_transform* transform,
   const mln_completion* completion
 ) -> mln_status;
+auto is_valid_utf8(const char* value, std::size_t size) -> bool;
 auto validate_http_header(
   const char* name, size_t name_size, const char* value, size_t value_size
 ) -> mln_status;

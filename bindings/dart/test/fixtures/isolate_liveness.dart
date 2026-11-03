@@ -16,7 +16,9 @@ const _style = {
 Future<(RuntimeHandle, MapHandle)> _register() async {
   setLogCallback(LogHandler(callback: (_, _, _, _) {}));
   final runtime = RuntimeHandle.create(RuntimeOptions());
-  await runtime.setResourceTransform((_, _, request) => request.close());
+  await runtime.setResourceTransform(
+    ResourceTransform(callback: (_, _, request) => request.close()),
+  );
   await runtime.setResourceProvider(
     ResourceProvider(
       routes: [

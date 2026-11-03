@@ -1071,7 +1071,13 @@ internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
   allocate(w(32, 56), w(8, 8, 4)).also { putResourceProvider(it, value) }
 
 internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
-  writeU32(target, w(24, 40).toUInt())
+  writeU32(target, w(32, 56).toUInt())
+  writeAddress(
+    target + w(24, 40),
+    array(value.rules, w(28, 48), w(4, 8)) { at, item -> putResourceTransformRule(at, item) },
+  )
+  writeSize(target + w(28, 48), value.rules.size.toULong())
+  if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
@@ -1079,7 +1085,7 @@ internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransf
 }
 
 internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
-  allocate(w(24, 40), w(8, 8, 4)).also { putResourceTransform(it, value) }
+  allocate(w(32, 56), w(8, 8, 4)).also { putResourceTransform(it, value) }
 
 internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpressionInputs) {
   writeU32(target, w(72, 104, 68).toUInt())
@@ -1728,6 +1734,21 @@ internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
 internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
   allocate(w(20, 32), w(4, 8)).also { putResourceRoute(it, value) }
 
+internal fun NativeArena.putResourceTransformRule(target: Long, value: ResourceTransformRule) {
+  writeU32(target, w(28, 48).toUInt())
+  writeU32(target + 4, value.kinds.rawValue)
+  writeU32(target + 8, value.flags.rawValue)
+  putView(target + w(12, 16), value.url)
+  writeAddress(
+    target + w(20, 32),
+    array(value.parameters, w(16, 32), w(4, 8)) { at, item -> putUrlQueryParameter(at, item) },
+  )
+  writeSize(target + w(24, 40), value.parameters.size.toULong())
+}
+
+internal fun NativeArena.writeResourceTransformRule(value: ResourceTransformRule): Long =
+  allocate(w(28, 48), w(4, 8)).also { putResourceTransformRule(it, value) }
+
 internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
   putView(target, value.name)
   putView(target + w(8, 16), value.value)
@@ -1933,6 +1954,14 @@ internal fun NativeArena.putWebGlContextDescriptor(target: Long, value: WebGlCon
 
 internal fun NativeArena.writeWebGlContextDescriptor(value: WebGlContextDescriptor): Long =
   allocate(w(16, 24), w(4, 8)).also { putWebGlContextDescriptor(it, value) }
+
+internal fun NativeArena.putUrlQueryParameter(target: Long, value: UrlQueryParameter) {
+  putView(target, value.name)
+  putView(target + w(8, 16), value.value)
+}
+
+internal fun NativeArena.writeUrlQueryParameter(value: UrlQueryParameter): Long =
+  allocate(w(16, 32), w(4, 8)).also { putUrlQueryParameter(it, value) }
 
 internal fun readRuntimeEvent(source: Long): RuntimeEvent =
   RuntimeEvent(

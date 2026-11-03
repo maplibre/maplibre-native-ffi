@@ -68,14 +68,36 @@ struct HeaderRuleTable {
   std::vector<Rule> rules;
 };
 
+// The query parameters of a resource transform's rules, each rule's already
+// percent-encoded and joined with `&`.
+struct QueryRuleTable {
+  struct Rule {
+    UrlPattern pattern;
+    std::string query;
+  };
+  std::vector<Rule> rules;
+
+  // The URL with the first matching rule's parameters, or the URL unchanged.
+  [[nodiscard]] auto apply(mln_resource_kind kind, const std::string& url) const
+    -> std::string;
+};
+
+// Adds an encoded query to a URL, before any fragment.
+[[nodiscard]] auto append_query(std::string_view url, std::string_view query)
+  -> std::string;
+
 // Validate and copy the caller's arrays. A rejected table records a
 // diagnostic naming the index of the first invalid entry, and never a header
-// value.
+// or parameter value.
 auto copy_routes(
   const mln_resource_route* routes, std::size_t count, RouteTable& out
 ) -> mln_status;
 auto copy_header_rules(
   const mln_http_header_rule* rules, std::size_t count, HeaderRuleTable& out
+) -> mln_status;
+auto copy_query_rules(
+  const mln_resource_transform_rule* rules, std::size_t count,
+  QueryRuleTable& out
 ) -> mln_status;
 
 // The header transform callback that applies a table, which user_data points

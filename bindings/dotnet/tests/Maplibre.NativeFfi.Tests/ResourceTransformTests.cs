@@ -136,15 +136,16 @@ public sealed class ResourceTransformTests
             }
         );
         await fixture.Runtime.SetResourceTransformAsync(
-            new ResourceTransform(
-                (_, url, request) =>
+            new ResourceTransform
+            {
+                Callback = (_, url, request) =>
                 {
                     if (url == styleUrl)
                         received.TrySetResult(request);
                     else
                         request.Dispose();
-                }
-            )
+                },
+            }
         );
         var loaded = fixture.Map.SetStyleUrlAsync(styleUrl);
         var request = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);

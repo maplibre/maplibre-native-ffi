@@ -527,11 +527,15 @@ class Values:
         return f"({', '.join(parameters)}) => void"
 
     def absent(self, value: ValuePlan) -> bool:
-        """Whether a value may be absent, as `undefined`."""
+        """Whether a value may be absent, as `undefined`. A registration may
+        be when each of its callbacks may be and it has no other members, such
+        as rules that stand in for the callback."""
         if value.kind == "record" and value.registration:
             entry = self.registration(value)
-            return entry.form in {"queue", "wake", "native"} and all(
-                f.value.nullable for f in entry.callbacks
+            return (
+                entry.form in {"queue", "wake", "native"}
+                and all(f.value.nullable for f in entry.callbacks)
+                and not entry.members
             )
         return bool(value.nullable)
 

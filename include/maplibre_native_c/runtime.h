@@ -671,13 +671,54 @@ typedef struct mln_resource_transform_error {
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER");
 } mln_resource_transform_error;
 
-/** A resource transform callback, for mln_runtime_set_resource_transform(). */
+/**
+ * A query parameter that a resource transform rule adds to a URL.
+ *
+ * Pass `name` and `value` unencoded. The library percent-encodes every byte
+ * of them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+ * `name=value`.
+ */
+typedef struct mln_url_query_parameter {
+  mln_buffer_view name MLN_BINDING("required=true");
+  mln_buffer_view value;
+} mln_url_query_parameter;
+
+/**
+ * Query parameters to add to the URLs of requests that match a pattern.
+ *
+ * The library adds the parameters, in order, at the end of the URL's query and
+ * before any fragment. It writes `?` before them when the URL has no `?`, or
+ * `&` when the text before them ends with neither `?` nor `&`. It keeps the
+ * parameters that the URL already has, even one with the same name.
+ */
+typedef struct mln_resource_transform_rule {
+  uint32_t size;
+  /** The kinds of resource that the rule covers. Zero covers every kind. */
+  mln_resource_kind_flags kinds;
+  mln_url_match_flags flags;
+  mln_buffer_view url;
+  const mln_url_query_parameter* parameters
+    MLN_BINDING("length=parameter_count");
+  size_t parameter_count;
+} mln_resource_transform_rule;
+
+/**
+ * How to rewrite request URLs, for mln_runtime_set_resource_transform().
+ *
+ * Set either `callback` or `rules`, not both.
+ */
 typedef struct mln_resource_transform {
   uint32_t size;
-  mln_resource_transform_callback callback;
+  mln_resource_transform_callback callback MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
   mln_user_data_release release_user_data;
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
+  /**
+   * The first rule that matches a request adds its parameters, and no other.
+   * A request that no rule matches keeps its URL. Rules never fail a request.
+   */
+  const mln_resource_transform_rule* rules MLN_BINDING("length=rule_count");
+  size_t rule_count;
 } mln_resource_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -989,7 +1030,7 @@ MLN_API void mln_resource_request_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Rewrites the URLs of the runtime's network requests through a callback.
+ * Rewrites the URLs of the runtime's network requests.
  *
  * The transform replaces the one set before.
  */

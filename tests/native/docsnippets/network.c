@@ -115,6 +115,32 @@ void mln_doc_network(mln_runtime runtime, mln_map map) {
   }
 
   {
+    // #region query-rules
+    const mln_url_query_parameter key = {
+      .name = mln_buffer_view_from_cstr("key"),
+      .value = mln_buffer_view_from_cstr("my-api-key"),
+    };
+    const mln_resource_transform_rule rule = {
+      .size = sizeof(mln_resource_transform_rule),
+      .flags = MLN_URL_MATCH_GLOB,
+      .url =
+        mln_buffer_view_from_cstr("https://tiles.example.com/**"),
+      .parameters = &key,
+      .parameter_count = 1,
+    };
+    const mln_resource_transform transform = {
+      .size = sizeof(mln_resource_transform),
+      .rules = &rule,
+      .rule_count = 1,
+    };
+
+    mln_runtime_set_resource_transform(
+      runtime, &transform, NULL, NULL
+    );
+    // #endregion query-rules
+  }
+
+  {
     // #region rewrite
     const mln_resource_transform transform = {
       .size = sizeof(mln_resource_transform),

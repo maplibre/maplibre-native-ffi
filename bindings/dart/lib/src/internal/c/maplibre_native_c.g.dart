@@ -1225,6 +1225,9 @@ final class mln_resource_transform extends Struct {
   external mln_user_data_release release_user_data;
   @Uint64()
   external int queue;
+  external Pointer<mln_resource_transform_rule> rules;
+  @Size()
+  external int rule_count;
 }
 
 final class mln_resource_transform_error extends Struct {
@@ -1237,6 +1240,19 @@ final class mln_resource_transform_error extends Struct {
   external mln_buffer_view message;
   @Int64()
   external int retry_after_unix_ms;
+}
+
+final class mln_resource_transform_rule extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int kinds;
+  @Uint32()
+  external int flags;
+  external mln_buffer_view url;
+  external Pointer<mln_url_query_parameter> parameters;
+  @Size()
+  external int parameter_count;
 }
 
 final class mln_runtime_event extends Struct {
@@ -1570,6 +1586,11 @@ final class mln_unit_bezier extends Struct {
   external double x2;
   @Double()
   external double y2;
+}
+
+final class mln_url_query_parameter extends Struct {
+  external mln_buffer_view name;
+  external mln_buffer_view value;
 }
 
 final class mln_vec3 extends Struct {

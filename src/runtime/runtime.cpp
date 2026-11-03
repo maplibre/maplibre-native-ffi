@@ -1032,6 +1032,44 @@ auto queue_resource_transform(
   }
 }
 
+// Installs a transform whose rules rewrite each URL inside the call, without a
+// request handle or host code.
+auto set_resource_transform_rules(
+  const std::shared_ptr<RuntimeObject>& live,
+  const mln_resource_transform* transform, const mln_completion* completion
+) -> mln_status {
+  if (
+    transform->user_data != nullptr ||
+    transform->release_user_data != nullptr ||
+    transform->queue != MLN_HANDLE_NULL
+  ) {
+    set_thread_error(
+      "a rules resource transform must not carry user_data, "
+      "release_user_data, or a queue"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto rules = std::make_shared<QueryRuleTable>();
+  const auto copied =
+    copy_query_rules(transform->rules, transform->rule_count, *rules);
+  if (copied != MLN_STATUS_OK) return copied;
+  const auto registration = std::make_shared<ResourceTransformRegistration>(
+    ResourceTransformRegistration{
+      .callback = nullptr,
+      .context = std::make_shared<RuntimeCallbackContext>(nullptr, nullptr),
+      .rules = std::move(rules),
+    }
+  );
+  const auto state = live->resource_transform_state;
+  return submit_resource_configuration_command(
+    live, completion, [state, registration]() -> void {
+      replace_registration(
+        *state, &ResourceTransformState::registration, registration
+      );
+    }
+  );
+}
+
 }  // namespace
 
 auto set_resource_transform(
@@ -1046,6 +1084,19 @@ auto set_resource_transform(
   }
   if (transform->size < sizeof(mln_resource_transform)) {
     set_thread_error("mln_resource_transform.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (transform->callback == nullptr) {
+    if (transform->rule_count == 0) {
+      set_thread_error(
+        "a transform requires a callback or rules; use the clear function"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    return set_resource_transform_rules(live, transform, completion);
+  }
+  if (transform->rule_count != 0) {
+    set_thread_error("a resource transform callback takes no rules");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
@@ -1080,6 +1131,7 @@ auto set_resource_transform(
       .callback =
         queued != nullptr ? &queue_resource_transform : transform->callback,
       .context = context,
+      .rules = nullptr,
     }
   );
   auto transfer = RegistrationTransfer{*context};
@@ -1217,6 +1269,8 @@ auto http_header_names_equal(std::string_view left, std::string_view right)
   );
 }
 
+}  // namespace
+
 auto is_valid_utf8(const char* value, std::size_t size) -> bool {
   const auto bytes = reinterpret_cast<const unsigned char*>(value);
   std::size_t index = 0;
@@ -1281,8 +1335,6 @@ auto is_valid_utf8(const char* value, std::size_t size) -> bool {
   }
   return true;
 }
-
-}  // namespace
 
 auto validate_http_header(
   const char* name, size_t name_size, const char* value, size_t value_size
@@ -2624,6 +2676,10 @@ auto invoke_resource_transform(
   const auto registration = state->registration;
   if (registration == nullptr) {
     finished(url);
+    return;
+  }
+  if (registration->rules != nullptr) {
+    finished(registration->rules->apply(kind, url));
     return;
   }
   request_resource_transform(

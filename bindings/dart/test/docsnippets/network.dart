@@ -37,10 +37,30 @@ void network(RuntimeHandle runtime, MapHandle map) {
   );
   // #endregion headers
 
+  // #region query-rules
+  runtime.discarding.setResourceTransform(
+    ResourceTransform(
+      rules: [
+        ResourceTransformRule(
+          flags: UrlMatchFlag.glob,
+          url: 'https://tiles.example.com/**',
+          parameters: [
+            UrlQueryParameter(name: 'key', value: 'my-api-key'),
+          ],
+        ),
+      ],
+    ),
+  );
+  // #endregion query-rules
+
   // #region rewrite
-  runtime.discarding.setResourceTransform((_, url, request) {
-    request.complete(withApiKey(url));
-  });
+  runtime.discarding.setResourceTransform(
+    ResourceTransform(
+      callback: (_, url, request) {
+        request.complete(withApiKey(url));
+      },
+    ),
+  );
   // #endregion rewrite
 
   // #region provider

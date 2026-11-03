@@ -32,6 +32,20 @@ private func network(runtime: RuntimeHandle, map: MapHandle) throws {
     ]))
   // #endregion headers
 
+  // #region query-rules
+  try runtime.discarding
+    .setResourceTransform(ResourceTransform(rules: [
+      ResourceTransformRule(
+        flags: .glob,
+        url: "https://tiles.example.com/**",
+        parameters: [UrlQueryParameter(
+          name: "key",
+          value: "my-api-key"
+        )]
+      ),
+    ]))
+  // #endregion query-rules
+
   // #region rewrite
   let transform = ResourceTransform { _, url, request in
     // The answer ends the request whatever it returns. A failed one

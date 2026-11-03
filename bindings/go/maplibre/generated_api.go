@@ -4365,18 +4365,31 @@ func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resourc
 	return raw
 }
 
-// ResourceTransform corresponds to mln_resource_transform. A resource transform
-// callback, for RuntimeHandle.SetResourceTransform().
+// ResourceTransform corresponds to mln_resource_transform. How to rewrite
+// request URLs, for RuntimeHandle.SetResourceTransform().
+//
+// Set either callback or rules, not both.
 //
 // See mln_resource_transform in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceTransform struct {
+	// The first rule that matches a request adds its parameters, and no other. A
+	// request that no rule matches keeps its URL. Rules never fail a request.
+	Rules    []ResourceTransformRule
 	Callback func(kind ResourceKind, url string, request *ResourceTransformRequestHandle)
 }
 
 func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln_resource_transform {
 	raw := C.mln_resource_transform{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	{
+		raw.rules = (*C.mln_resource_transform_rule)(arena.array(len(input.Rules), unsafe.Sizeof(*raw.rules)))
+		items := unsafe.Slice(raw.rules, len(input.Rules))
+		raw.rule_count = bindingCountLike(raw.rule_count, len(input.Rules))
+		for i, item := range input.Rules {
+			items[i] = nativeResourceTransformRule(item, arena)
+		}
+	}
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -4406,6 +4419,41 @@ func nativeResourceTransformError(input ResourceTransformError, arena *bindingAr
 	raw.reason = C.mln_resource_error_reason(input.Reason)
 	raw.message = C.mln_buffer_view{data: arena.bytes([]byte(input.Message)), size: C.size_t(len(input.Message))}
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
+	return raw
+}
+
+// ResourceTransformRule corresponds to mln_resource_transform_rule. Query
+// parameters to add to the URLs of requests that match a pattern.
+//
+// The library adds the parameters, in order, at the end of the URL's query and
+// before any fragment. It writes ? before them when the URL has no ?, or & when
+// the text before them ends with neither ? nor &. It keeps the parameters that
+// the URL already has, even one with the same name.
+//
+// See mln_resource_transform_rule in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceTransformRule struct {
+	// The kinds of resource that the rule covers. Zero covers every kind.
+	Kinds      ResourceKindFlag
+	Flags      UrlMatchFlag
+	Url        string
+	Parameters []UrlQueryParameter
+}
+
+func nativeResourceTransformRule(input ResourceTransformRule, arena *bindingArena) C.mln_resource_transform_rule {
+	raw := C.mln_resource_transform_rule{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.kinds = C.mln_resource_kind_flags(input.Kinds)
+	raw.flags = C.mln_url_match_flags(input.Flags)
+	raw.url = C.mln_buffer_view{data: arena.bytes([]byte(input.Url)), size: C.size_t(len(input.Url))}
+	{
+		raw.parameters = (*C.mln_url_query_parameter)(arena.array(len(input.Parameters), unsafe.Sizeof(*raw.parameters)))
+		items := unsafe.Slice(raw.parameters, len(input.Parameters))
+		raw.parameter_count = bindingCountLike(raw.parameter_count, len(input.Parameters))
+		for i, item := range input.Parameters {
+			items[i] = nativeUrlQueryParameter(item, arena)
+		}
+	}
 	return raw
 }
 
@@ -5209,6 +5257,26 @@ func nativeUnitBezier(input UnitBezier, arena *bindingArena) C.mln_unit_bezier {
 	raw.y1 = C.double(input.Y1)
 	raw.x2 = C.double(input.X2)
 	raw.y2 = C.double(input.Y2)
+	return raw
+}
+
+// UrlQueryParameter corresponds to mln_url_query_parameter. A query parameter
+// that a resource transform rule adds to a URL.
+//
+// Pass name and value unencoded. The library percent-encodes every byte of them
+// except the letters, digits, -, ., _, and ~, and adds them as name=value.
+//
+// See mln_url_query_parameter in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type UrlQueryParameter struct {
+	Name  string
+	Value string
+}
+
+func nativeUrlQueryParameter(input UrlQueryParameter, arena *bindingArena) C.mln_url_query_parameter {
+	raw := C.mln_url_query_parameter{}
+	raw.name = C.mln_buffer_view{data: arena.bytes([]byte(input.Name)), size: C.size_t(len(input.Name))}
+	raw.value = C.mln_buffer_view{data: arena.bytes([]byte(input.Value)), size: C.size_t(len(input.Value))}
 	return raw
 }
 
@@ -8746,8 +8814,7 @@ func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*
 	}, completionCommand)
 }
 
-// SetResourceTransform rewrites the URLs of the runtime's network requests
-// through a callback.
+// SetResourceTransform rewrites the URLs of the runtime's network requests.
 //
 // The transform replaces the one set before.
 //
