@@ -86,8 +86,9 @@ def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
 JOBS = {
     "docs": ("docs", lambda target: False),
     "support-matrix": ("support-matrix", lambda target: False),
+    # Its own unit, so that the Android unit runs only the x64 targets.
     "android-multi": (
-        "android",
+        "android-multi-abi",
         lambda target: (
             target.platform == "android"
             and gaps.supported("kotlin-jvm", target, "package")

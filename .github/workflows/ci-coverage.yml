@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       units:
-        description: 'CI units as a JSON array, e.g. ["mingw"]. Leave blank for all units.'
+        description: 'CI units as a JSON array, e.g. ["mingw-arm64"]. Leave blank for all units.'
         required: false
         type: string
   pull_request:
