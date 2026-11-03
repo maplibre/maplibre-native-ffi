@@ -1090,7 +1090,8 @@ auto frame_published(void* context) -> bool {
   auto& published = *static_cast<PublishedFrame*>(context);
   return mln_test_drain_frame_results(
            published.fixture->render.session, &published.batch, nullptr
-         ) == MLN_STATUS_OK;
+         ) == MLN_STATUS_OK &&
+         published.batch != MLN_HANDLE_NULL;
 }
 
 struct DriverRelease {
@@ -1354,7 +1355,8 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   auto drained = mln_render_frame_batch{MLN_HANDLE_NULL};
   while (
     mln_test_drain_frame_results(fixture.render.session, &drained, nullptr) ==
-    MLN_STATUS_OK) {
+      MLN_STATUS_OK &&
+    drained != MLN_HANDLE_NULL) {
     mln_render_frame_batch_release(drained);
     drained = MLN_HANDLE_NULL;
   }
@@ -1693,7 +1695,8 @@ void probe_results(void* context, const mln_completion_result*) {
   auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
   probe.results_queued =
     mln_test_drain_frame_results(probe.session, &batch, nullptr) ==
-    MLN_STATUS_OK;
+      MLN_STATUS_OK &&
+    batch != MLN_HANDLE_NULL;
   if (probe.results_queued) mln_render_frame_batch_release(batch);
   probe.done = true;
   mln_test_pulse();

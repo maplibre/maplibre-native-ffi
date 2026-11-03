@@ -53,9 +53,10 @@ static void draw_frame(void) {
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   if (
     mln_render_session_acquire_frame(session, &frame, NULL) !=
-    MLN_STATUS_OK
+      MLN_STATUS_OK ||
+    frame == MLN_HANDLE_NULL
   ) {
-    return;  // No new frame yet.
+    return;  // The session failed, or no new frame is ready yet.
   }
 
   mln_vulkan_texture_frame texture = {

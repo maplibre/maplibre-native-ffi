@@ -27,9 +27,6 @@ EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, typescript, zig)
 # reports these declarations as unsupported with its reason.
 PROTOCOL_GAPS = {
     ("values", "rust"): {"mln_probe_roundtrip"},
-    ("absent_value", "dotnet"): {"mln_probe_read_level"},
-    ("absent_value", "kotlin"): {"mln_probe_read_level"},
-    ("absent_value", "python"): {"mln_probe_read_level"},
 }
 
 

@@ -82,27 +82,6 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         Ok(())
     }
 
-    /// Makes a call that returns a status, where `absent` reports that native
-    /// published no output rather than an error. Returns whether the output
-    /// holds a value.
-    pub(crate) fn status_unless(
-        &mut self,
-        absent: sys::mln_status,
-        call: impl FnOnce(H, *mut sys::mln_diagnostic) -> sys::mln_status,
-    ) -> Result<bool> {
-        let mut present = true;
-        crate::error::check(|diagnostic| {
-            let status = call(self.native, diagnostic);
-            if status != absent {
-                return status;
-            }
-            present = false;
-            sys::MLN_STATUS_OK
-        })?;
-        self.arena.accept_registrations();
-        Ok(present)
-    }
-
     pub(crate) fn run<R>(&mut self, call: impl FnOnce(H) -> R) -> R {
         let result = call(self.native);
         self.arena.accept_registrations();

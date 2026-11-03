@@ -101,30 +101,6 @@ func bindingGet[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	})
 }
 
-// bindingGetUnless runs a status-returning native call like bindingGet. When
-// native returns absent, which reports that the call published no output, it
-// returns the zero T and no error instead.
-func bindingGetUnless[T any](target bindingTarget, absent int32, call func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32, result func(arena *bindingArena) T) (T, error) {
-	return bindingCall(func() T {
-		return bindingRun(target, func(arena *bindingArena, raw uint64) T {
-			present := true
-			bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-				status := call(arena, raw, diagnostic)
-				if status != absent {
-					return status
-				}
-				present = false
-				return int32(C.MLN_STATUS_OK)
-			})
-			if !present {
-				var none T
-				return none
-			}
-			return result(arena)
-		}, true)
-	})
-}
-
 func bindingDirect[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T) (T, error) {
 	return bindingCall(func() T { return bindingRun(target, call, true) })
 }

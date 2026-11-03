@@ -36,7 +36,6 @@ GROUPS = (
     "keywords",
     "defaults",
     "absent_handle",
-    "absent_value",
     "strided_records",
     "map_close",
     "tagged_union",
@@ -63,7 +62,7 @@ typedef unsigned long long mln_reading_batch BIND(
 void mln_reading_batch_release(mln_reading_batch batch);
 BIND("execution=event_batch")
 mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );

@@ -507,10 +507,8 @@ static void expect_parked_demand(const mln_test_render_fixture* fixture) {
     )
   );
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY,
-    mln_test_drain_frame_results(fixture->session, &batch, NULL)
-  );
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture->session, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
 }
 
 // A binding's finalizer disposes a frame in place of a synchronized release.
@@ -692,7 +690,8 @@ static mln_render_frame_result render_one(
   mln_render_frame_batch_release(batch);
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   while (mln_render_session_acquire_frame(fixture->session, &frame, NULL) ==
-         MLN_STATUS_OK) {
+           MLN_STATUS_OK &&
+         frame != MLN_HANDLE_NULL) {
     MLN_TEST_OK(mln_acquired_frame_release(frame, NULL, NULL));
     frame = MLN_HANDLE_NULL;
   }

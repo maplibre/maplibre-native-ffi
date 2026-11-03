@@ -404,35 +404,32 @@ auto DeliveryQueueState::push_event(
   if (wake != nullptr) wake->notify();
 }
 
-auto DeliveryQueueState::dispatch() noexcept -> DispatchResult {
+auto DeliveryQueueState::dispatch() noexcept -> bool {
   // A dispatch that finds another running leaves this request for it. The
   // running one checks for requests again after it stops, so none is lost.
   dispatch_requested_.store(true, std::memory_order_release);
-  auto ran = false;
   auto acquired = false;
   while (!dispatching_.exchange(true, std::memory_order_acq_rel)) {
     acquired = true;
     while (dispatch_requested_.exchange(false, std::memory_order_acq_rel)) {
-      if (run_calls()) ran = true;
+      run_calls();
     }
     // An exchange, not a store, so a BUSY dispatch that saw this one running
     // has its request visible to the check below.
     dispatching_.exchange(false, std::memory_order_acq_rel);
     if (!dispatch_requested_.load(std::memory_order_acquire)) break;
   }
-  if (ran) return DispatchResult::Ran;
-  return acquired ? DispatchResult::Empty : DispatchResult::Busy;
+  return acquired;
 }
 
-auto DeliveryQueueState::run_calls() noexcept -> bool {
-  if (core::process_exiting()) return false;
+auto DeliveryQueueState::run_calls() noexcept -> void {
+  if (core::process_exiting()) return;
   {
     const auto lock = std::scoped_lock{mutex_};
-    if (closed_) return false;
+    if (closed_) return;
     running_ = std::exchange(head_, nullptr);
     tail_ = nullptr;
   }
-  auto ran = false;
   auto* exiting = static_cast<DeliveryItem*>(nullptr);
   while (true) {
     auto call = ItemPtr{};
@@ -448,10 +445,8 @@ auto DeliveryQueueState::run_calls() noexcept -> bool {
       running_ = std::exchange(call->next, nullptr);
     }
     run_call(*call);
-    ran = true;
   }
   abandon_items(exiting);
-  return ran;
 }
 
 auto DeliveryQueueState::close() noexcept -> void {
@@ -543,16 +538,11 @@ auto release_delivery_queue(mln_delivery_queue queue) noexcept -> void {
 auto dispatch_delivery_queue(mln_delivery_queue queue) -> mln_status {
   const auto state = resolve_delivery_queue(queue);
   if (state == nullptr) return core::recorded_handle_fault_status();
-  switch (state->dispatch()) {
-    case DispatchResult::Ran:
-      return MLN_STATUS_OK;
-    case DispatchResult::Empty:
-      return MLN_STATUS_NOT_READY;
-    case DispatchResult::Busy:
-      core::set_thread_error("the delivery queue is already dispatching");
-      return MLN_STATUS_BUSY;
+  if (!state->dispatch()) {
+    core::set_thread_error("the delivery queue is already dispatching");
+    return MLN_STATUS_BUSY;
   }
-  return MLN_STATUS_NATIVE_ERROR;
+  return MLN_STATUS_OK;
 }
 
 }  // namespace mln::delivery

@@ -102,7 +102,7 @@ mln_status mln_test_render_step_until(
     .service_status = MLN_STATUS_OK,
   };
   if (!mln_test_await_on_event_loop(step_ready, &step, deadline, what)) {
-    return MLN_STATUS_NOT_READY;
+    return MLN_TEST_RENDER_TIMED_OUT;
   }
   return step.service_status;
 }

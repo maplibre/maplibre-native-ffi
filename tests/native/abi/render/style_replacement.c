@@ -67,7 +67,8 @@ static void drain_requested_frame(replacement_wait* wait) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   const mln_status status =
     mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
-  if (status == MLN_STATUS_OK) {
+  MLN_TEST_OK(status);
+  if (batch != MLN_HANDLE_NULL) {
     const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
     TEST_ASSERT_EQUAL_size_t(1, view.result_count);
     const mln_render_frame_result result =
@@ -87,8 +88,6 @@ static void drain_requested_frame(replacement_wait* wait) {
     );
     TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, frame);
     mln_test_render_release_frame(&frame);
-  } else {
-    MLN_TEST_STATUS(MLN_STATUS_NOT_READY, status);
   }
   if (!wait->pending) request_next(wait);
 }

@@ -58,13 +58,11 @@ class Native:
             return self.call(function, arguments)
         return f"check({self.call(function, [*arguments, 'diagnostic'])})"
 
-    def present(self, plan, arguments):
-        """A call whose absence status returns false and whose other failures throw.
-
-        Kotlin has no C constants, so the call passes the status's value.
-        """
+    def published(self, plan, arguments, out):
+        """A call whose failures throw, and which returns whether native wrote
+        a handle other than the null handle to the slot at `out`."""
         call = self.call(plan.function, [*arguments, "diagnostic"])
-        return f"present({call}, absent = {plan.absence.value})"
+        return f"published({call}, {out})"
 
     def status(self, function, arguments):
         """The status-returning call for a runtime helper that checks it."""
@@ -442,7 +440,7 @@ def immediate(plan, values, native):
         setup.append("val raw = " + native.call(plan.function, arguments))
         decoded = result_value(result, values).replace("{raw}", "raw")
     elif plan.absence:
-        raise Unsupported("absence requires an owned handle output")
+        raise Unsupported("a nullable output requires an owned handle output")
     else:
         setup.append(native.checked(plan.function, arguments))
     if decoded:
@@ -526,7 +524,7 @@ def multiple_outputs(plan, values, native):
 
 def drain(plan, values, native):
     """A drain that copies its batch's slice and releases the batch, or returns
-    an empty list when nothing is queued."""
+    an empty list when native publishes no batch."""
     method, params, _inputs, result, result_type = signature(plan, values)
     batch, view = plan.drain.batch, plan.drain.view
     handle = batch.value.unwrapped.handle
@@ -542,7 +540,7 @@ def drain(plan, values, native):
     release = native.call(function, ["it"])
     body = (
         f"val batch = {values.storage(slot)}; val out = {allocation}; "
-        f"if ({native.present(plan, arguments)}) "
+        f"if ({native.published(plan, arguments, 'batch')}) "
         f"drain(batch, {{ {release} }}) {{ {decoded.replace('{out}', 'out')} }} "
         "else emptyList()"
     )
@@ -632,7 +630,7 @@ def owned(plan, values, native):
             if p.name == plan.owned_outputs[0].parameter
         )
         if plan.absence:
-            body = f"val out = {values.storage(slot)}; if ({native.present(plan, arguments)}) {adopted} else null"
+            body = f"val out = {values.storage(slot)}; if ({native.published(plan, arguments, 'out')}) {adopted} else null"
             head = head.removesuffix(" =") + "? ="
         else:
             body = f"val out = {values.storage(slot)}; {native.checked(plan.function, arguments)}; {adopted}"

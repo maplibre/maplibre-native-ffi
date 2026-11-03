@@ -64,7 +64,7 @@ typedef struct kind_wait {
 static bool dispatched_kind(void* context) {
   kind_wait* wait = context;
   const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
-  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+  if (status != MLN_STATUS_OK) {
     wait->failure = status;
     return true;
   }
@@ -86,9 +86,7 @@ static void dispatch_until(
 static void dispatch_reports_its_status(void) {
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
-  );
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
   MLN_TEST_INVALID(mln_delivery_queue_dispatch(MLN_HANDLE_NULL, NULL));
   mln_runtime runtime = mln_test_create_runtime();
   MLN_TEST_INVALID(mln_delivery_queue_dispatch(runtime, NULL));
@@ -264,9 +262,7 @@ static void a_dispatch_inside_a_call_is_busy(void) {
   MLN_TEST_OK(state.submitted);
   MLN_TEST_OK(state.fenced);
   TEST_ASSERT_EQUAL_STRING("AL", state.log.kinds);
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
-  );
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&state.log.off_thread));
 
   mln_test_destroy_map(state.map);

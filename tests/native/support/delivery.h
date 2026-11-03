@@ -145,7 +145,7 @@ typedef struct mln_test_call_wait {
 static inline bool mln_test_dispatched_calls(void* context) {
   mln_test_call_wait* wait = (mln_test_call_wait*)context;
   const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
-  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+  if (status != MLN_STATUS_OK) {
     wait->failure = status;
     return true;
   }

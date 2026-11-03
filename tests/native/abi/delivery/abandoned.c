@@ -67,7 +67,7 @@ typedef struct release_wait {
 static bool dispatched_release(void* context) {
   release_wait* wait = context;
   const mln_status status = mln_delivery_queue_dispatch(wait->queue, NULL);
-  if (status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY) {
+  if (status != MLN_STATUS_OK) {
     wait->failure = status;
     return true;
   }

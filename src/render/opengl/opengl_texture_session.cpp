@@ -1180,8 +1180,9 @@ class OpenGLTextureSessionBackend final
     auto guard = mln::gfx::BackendScope{backend_};
     const auto texture = backend_.texture();
     if (texture == 0) {
-      mln::core::set_thread_error("rendered OpenGL texture is not available");
-      return MLN_STATUS_NOT_READY;
+      throw mln::core::RenderTargetNotReady(
+        "rendered OpenGL texture is not available"
+      );
     }
     if (producer_sync_kind_ == MLN_GPU_SYNC_OPEN_GL_FENCE) {
       auto& fence = producer_fences_.at(frame.slot);

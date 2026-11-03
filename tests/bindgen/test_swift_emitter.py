@@ -217,7 +217,6 @@ class SwiftEmitterTests(unittest.TestCase):
                 "defaults",
                 "keywords",
                 "absent_handle",
-                "absent_value",
                 "strided_records",
             ),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION"),

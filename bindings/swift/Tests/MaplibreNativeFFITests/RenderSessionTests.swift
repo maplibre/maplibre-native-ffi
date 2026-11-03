@@ -236,8 +236,8 @@ private func attachBorrowedTexture(
   }
 #endif
 
-/// Before any demand, native reports the drain and the acquire as not ready,
-/// which reads as no results and no frame.
+/// Before any demand, the drain and the acquire write null handles, which read
+/// as no results and no frame.
 @Test func aDrainBeforeAnyDemandReturnsNoValue() async throws {
   try await withBorrowedTextureSession { rendered in
     let results = try rendered.session.drainFrameResults()

@@ -163,8 +163,6 @@ inline constexpr auto completion_capture = CompletionCapture{
 auto make_release_call(void* user_data, mln_user_data_release release)
   -> ItemPtr;
 
-enum class DispatchResult : std::uint8_t { Ran, Empty, Busy };
-
 class DeliveryQueueState;
 
 // The user_data of a registration that the queue reports to its abandon hook
@@ -246,8 +244,8 @@ class DeliveryQueueState final {
 
   // Runs every queued call in push order on the calling thread. A call that
   // closes the queue abandons the rest. While one dispatch runs, another
-  // returns Busy, and the running one also runs what was queued by then.
-  auto dispatch() noexcept -> DispatchResult;
+  // returns false, and the running one also runs what was queued by then.
+  auto dispatch() noexcept -> bool;
 
   // Refuses later pushes, stops the wake, discards queued calls, and reports
   // the user_data of each held registration and abandoned last call.
@@ -260,7 +258,7 @@ class DeliveryQueueState final {
   ) -> AbandonHold;
 
   // Runs the calls queued now. Returns whether it ran any.
-  auto run_calls() noexcept -> bool;
+  auto run_calls() noexcept -> void;
   // Appends under the lock, unlinking settled from the held registrations.
   auto append(ItemPtr& item, HeldUserData* settled) noexcept -> bool;
   // Unlinks and frees a hold unless close() already took it.

@@ -159,8 +159,8 @@ class Host {
       const auto status = mln_render_session_drain_frame_results(
         session_, &batch, &results, nullptr
       );
-      if (status == MLN_STATUS_NOT_READY) break;
       check(status);
+      if (batch == MLN_HANDLE_NULL) break;
       for (size_t i = 0; i < results.result_count; ++i) {
         const auto* result = reinterpret_cast<const mln_render_frame_result*>(
           reinterpret_cast<const char*>(results.results) +

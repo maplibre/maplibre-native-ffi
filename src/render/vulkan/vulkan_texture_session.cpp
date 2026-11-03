@@ -356,8 +356,9 @@ class VulkanTextureSessionBackend final
   ) -> mln_status override {
     const auto resources = backend_.frame_resources();
     if (resources.image == VK_NULL_HANDLE) {
-      mln::core::set_thread_error("rendered Vulkan image is not available");
-      return MLN_STATUS_NOT_READY;
+      throw mln::core::RenderTargetNotReady(
+        "rendered Vulkan image is not available"
+      );
     }
     out_metadata = mln_vulkan_texture_frame{
       .size = sizeof(mln_vulkan_texture_frame),

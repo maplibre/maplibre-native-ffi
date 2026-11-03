@@ -204,15 +204,17 @@ MLN_API mln_status mln_render_session_request_frame(
 /**
  * Takes the frame results that the session has queued.
  *
+ * When no result is queued, it succeeds and writes the null handle and an
+ * empty view.
+ *
  * Lifetimes:
- * Reports MLN_STATUS_NOT_READY, and writes no batch, when no result is queued.
  * `out_view` stays valid until you pass `out_batch` to
  * mln_render_frame_batch_release().
  */
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
-  mln_render_frame_batch* out_batch MLN_BINDING("direction=out"),
+  mln_render_frame_batch* out_batch MLN_BINDING("direction=out;nullable=true"),
   mln_render_frame_batch_view* out_view MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -227,20 +229,17 @@ MLN_API void mln_render_frame_batch_release(
  *
  * It takes the oldest frame that you haven't acquired. The session can render
  * over a frame before you acquire it. While you hold a frame in every texture
- * of the ring, new frames wait until you release one.
+ * of the ring, new frames wait until you release one. When no frame is ready,
+ * it succeeds and writes the null handle.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session lacks
  *   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.
  * - MLN_STATUS_INVALID_STATE when the session has failed.
- *
- * Lifetimes:
- * Reports MLN_STATUS_NOT_READY, and writes no frame, when no frame is ready.
  */
-MLN_BINDING("absent_on=MLN_STATUS_NOT_READY")
 MLN_API mln_status mln_render_session_acquire_frame(
   mln_render_session session,
-  mln_acquired_frame* out_frame MLN_BINDING("direction=out"),
+  mln_acquired_frame* out_frame MLN_BINDING("direction=out;nullable=true"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

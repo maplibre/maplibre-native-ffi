@@ -39,7 +39,8 @@ impl RenderSessionHandle {
     ///
     /// It takes the oldest frame that you haven't acquired. The session can
     /// render over a frame before you acquire it. While you hold a frame in
-    /// every texture of the ring, new frames wait until you release one.
+    /// every texture of the ring, new frames wait until you release one. When
+    /// no frame is ready, it succeeds and writes the null handle.
     ///
     /// See `mln_render_session_acquire_frame` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -52,12 +53,10 @@ impl RenderSessionHandle {
     pub fn acquire_frame(&self) -> Result<Option<AcquiredFrameHandle>> {
         let mut call = self.inner.call();
         let mut out_frame = sys::mln_acquired_frame(0);
-        if !call.status_unless(
-            sys::MLN_STATUS_NOT_READY,
-            |session, out_diagnostic| unsafe {
-                sys::mln_render_session_acquire_frame(session, &mut out_frame, out_diagnostic)
-            },
-        )? {
+        call.status(|session, out_diagnostic| unsafe {
+            sys::mln_render_session_acquire_frame(session, &mut out_frame, out_diagnostic)
+        })?;
+        if out_frame.0 == 0 {
             return Ok(None);
         }
         Ok(Some(AcquiredFrameHandle::adopt(out_frame)?))
@@ -175,6 +174,9 @@ impl RenderSessionHandle {
 
     /// Takes the frame results that the session has queued.
     ///
+    /// When no result is queued, it succeeds and writes the null handle and an
+    /// empty view.
+    ///
     /// See `mln_render_session_drain_frame_results` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn drain_frame_results(&self) -> Result<Vec<RenderFrameResult>> {
@@ -182,17 +184,15 @@ impl RenderSessionHandle {
         let mut out_batch = sys::mln_render_frame_batch(0);
         let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
         out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
-        if !call.status_unless(
-            sys::MLN_STATUS_NOT_READY,
-            |session, out_diagnostic| unsafe {
-                sys::mln_render_session_drain_frame_results(
-                    session,
-                    &mut out_batch,
-                    &mut out_view,
-                    out_diagnostic,
-                )
-            },
-        )? {
+        call.status(|session, out_diagnostic| unsafe {
+            sys::mln_render_session_drain_frame_results(
+                session,
+                &mut out_batch,
+                &mut out_view,
+                out_diagnostic,
+            )
+        })?;
+        if out_batch.0 == 0 {
             return Ok(Vec::new());
         }
         // SAFETY: native published the batch to this call alone.

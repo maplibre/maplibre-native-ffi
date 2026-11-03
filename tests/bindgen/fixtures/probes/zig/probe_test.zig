@@ -41,7 +41,7 @@ test "generated record defaults are zeroed with their size set" {
     try api.probeSettingsCheck(.{}, null);
 }
 
-test "generated absence returns null and other failures still report" {
+test "a null handle output returns null and failures still report" {
     try std.testing.expect(try api.probeTakeParcel(null) == null);
     var parcel = (try api.probeTakeParcel(null)).?;
     try std.testing.expectEqual(@as(u64, 42), parcel.raw);
@@ -49,8 +49,6 @@ test "generated absence returns null and other failures still report" {
     var diagnostic: api.Diagnostic = .{};
     try std.testing.expectError(error.InvalidArgument, api.probeTakeParcel(&diagnostic));
     try std.testing.expectEqualStrings("exhausted", diagnostic.message());
-    try std.testing.expect(try api.probeReadLevel(null) == null);
-    try std.testing.expectEqual(@as(?f64, 0.5), try api.probeReadLevel(null));
 }
 
 const callbacks = @import("callback.zig");

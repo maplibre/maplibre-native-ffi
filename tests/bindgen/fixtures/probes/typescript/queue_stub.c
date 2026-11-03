@@ -74,7 +74,7 @@ mln_status mln_delivery_queue_dispatch(
 ) {
   (void)out_diagnostic;
   probe_queue* queue = (probe_queue*)(uintptr_t)handle;
-  if (queue->count == 0) return MLN_STATUS_NOT_READY;
+  if (queue->count == 0) return MLN_STATUS_OK;
   probe_call* items = queue->items;
   size_t count = queue->count;
   queue->items = NULL;

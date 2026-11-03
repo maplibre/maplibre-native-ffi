@@ -135,8 +135,7 @@ static void complete_request(
 
 static void complete_from_wake(void* user_data) {
   completing_wake* wake = user_data;
-  while (mln_delivery_queue_dispatch(wake->queue, NULL) == MLN_STATUS_OK) {
-  }
+  (void)mln_delivery_queue_dispatch(wake->queue, NULL);
   mln_test_pulse();
 }
 

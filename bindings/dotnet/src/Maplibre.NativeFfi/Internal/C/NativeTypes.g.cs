@@ -1818,7 +1818,6 @@ internal enum mln_status : int
     MLN_STATUS_CANCELLED = -6,
     MLN_STATUS_BUSY = -7,
     MLN_STATUS_TARGET_LOST = -8,
-    MLN_STATUS_NOT_READY = -9,
     MLN_STATUS_NOT_FOUND = -10,
 }
 

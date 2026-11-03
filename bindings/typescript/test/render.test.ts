@@ -84,7 +84,7 @@ test(
 test("a drain before any demand returns no results", async () => {
   const map = await openRenderMap();
   const worker = await TestSession.offscreen(map);
-  // Native reports the drain as not ready, which reads as no results.
+  // Native writes a null batch, which reads as no results.
   assert.deepEqual(worker.session.drainFrameResults(), []);
 });
 

@@ -130,10 +130,9 @@ static void observe_end(
   did_change_search search = {
     .observation = observation, .generation = end->generation
   };
-  while (
-    mln_test_dispatch_events(observation->runtime, find_did_change, &search) ==
-    MLN_STATUS_OK) {
-  }
+  (void)mln_test_dispatch_events(
+    observation->runtime, find_did_change, &search
+  );
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   if (
     mln_map_get_snapshot(observation->map, &snapshot, NULL) == MLN_STATUS_OK
@@ -159,13 +158,11 @@ static bool transition_ended(void* context) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     const mln_status drained =
       mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
-    if (drained == MLN_STATUS_NOT_READY) {
-      return false;
-    }
     if (drained != MLN_STATUS_OK) {
       wait->failed = true;
       return true;
     }
+    if (batch == MLN_HANDLE_NULL) return false;
     mln_render_frame_batch_release(batch);
     wait->demand_pending = false;
   }
@@ -202,7 +199,8 @@ static bool settled_result(void* context) {
   const mln_test_render_fixture* fixture = context;
   if (
     mln_test_drain_frame_results(fixture->session, &batch, NULL) !=
-    MLN_STATUS_OK
+      MLN_STATUS_OK ||
+    batch == MLN_HANDLE_NULL
   ) {
     return false;
   }

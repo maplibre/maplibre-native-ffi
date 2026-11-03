@@ -28,7 +28,8 @@ public extension RenderSessionHandle {
   ///
   /// It takes the oldest frame that you haven't acquired. The session can
   /// render over a frame before you acquire it. While you hold a frame in every
-  /// texture of the ring, new frames wait until you release one.
+  /// texture of the ring, new frames wait until you release one. When no frame
+  /// is ready, it succeeds and writes the null handle.
   ///
   /// See `mln_render_session_acquire_frame` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -40,13 +41,16 @@ public extension RenderSessionHandle {
   /// - `Status.invalidState` when the session has failed.
   func acquireFrame() throws -> AcquiredFrameHandle? {
     var value0: mln_acquired_frame = 0
-    return try nativeInvoke(absentOn: MLN_STATUS_NOT_READY) { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_render_session_acquire_frame(
         raw,
         &value0,
         diagnostic
       )
-    } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
+    } result: {
+      guard value0 != 0 else { return nil }
+      return try AcquiredFrameHandle(adopting: value0, parent: self)
+    }
   }
 
   /// Ends the session's pending frame requests and waits for its earlier work.
@@ -162,13 +166,16 @@ public extension RenderSessionHandle {
 
   /// Takes the frame results that the session has queued.
   ///
+  /// When no result is queued, it succeeds and writes the null handle and an
+  /// empty view.
+  ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func drainFrameResults() throws -> [RenderFrameResult] {
     var value0: mln_render_frame_batch = 0
     var value1 = mln_render_frame_batch_view()
     value1.size = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
-    return try nativeInvoke(absentOn: MLN_STATUS_NOT_READY) { raw, _, diagnostic in
+    return try nativeInvoke { raw, _, diagnostic in
       mln_render_session_drain_frame_results(
         raw,
         &value0,
@@ -176,13 +183,14 @@ public extension RenderSessionHandle {
         diagnostic
       )
     } result: {
+      guard value0 != 0 else { return [] }
       defer { mln_render_frame_batch_release(value0) }
       return try NativeInputArena.copyStrided(
         value1.results,
         count: value1.result_count,
         stride: value1.result_size
       ) { item, _ in RenderFrameResult(raw: item) }
-    } ?? []
+    }
   }
 
   /// Logs debugging information about the session's renderer.

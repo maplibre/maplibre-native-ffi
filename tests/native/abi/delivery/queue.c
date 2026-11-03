@@ -30,9 +30,7 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   TEST_ASSERT_EQUAL_size_t(2, mln_test_calls.count);
   TEST_ASSERT_EQUAL_PTR((void*)1, mln_test_call_at(0)->user_data);
   TEST_ASSERT_EQUAL_PTR((void*)2, mln_test_call_at(1)->user_data);
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY, mln_delivery_queue_dispatch(queue.handle, NULL)
-  );
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
 
   // The dispatch re-armed the wake.
   const mln_completion third =

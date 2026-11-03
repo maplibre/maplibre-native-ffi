@@ -77,21 +77,6 @@ void main() {
   // A record built from its constructor defaults is zeroed with its size set.
   probeSettingsCheck(ProbeSettings());
 
-  // A status that the C API declares as absence returns null, and any other
-  // failure still reports its diagnostic.
-  check(probeReadLevel() == null, 'absent level');
-  final level = probeReadLevel();
-  check(level == 0.5, 'published level: $level');
-  try {
-    probeReadLevel();
-    check(false, 'an exhausted level was not reported');
-  } on NativeFailure catch (failure) {
-    check(
-      failure.status == -1 && failure.message == 'exhausted',
-      'exhausted level: ${failure.status} ${failure.message}',
-    );
-  }
-
   try {
     probeRoundtrip(ProbeOptions(right: List.filled(9, point)));
     check(false, 'native failure was not reported');

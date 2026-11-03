@@ -79,7 +79,7 @@ void main() {
   test('a drain before any demand returns no results', () async {
     final map = await openRenderMap(_redStyle);
     final worker = await WorkerSession.attach(map);
-    // Native reports the drain as not ready, which reads as no results.
+    // Native writes a null batch, which reads as no results.
     expect(worker.session.drainFrameResults(), isEmpty);
   });
 

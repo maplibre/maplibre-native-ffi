@@ -17,8 +17,6 @@ from .protocol import (
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
     DELIVERY_QUEUE,
-    NOT_READY,
-    STATUS,
     is_buffer_view,
     is_completion,
     is_status,
@@ -91,7 +89,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "kind",
         "length",
         "accepted_unless",
-        "absent_on",
         "view_owner",
         "blocks",
         "consumes",
@@ -344,15 +341,12 @@ class Conventions:
         return {**self.value(field.type, {**defaults, **explicit}), **defaults}
 
     def function(self, function: Function) -> dict[str, str]:
-        """A function without a completion runs immediately, and a drain
-        reports nothing queued as an absent output; a completion without a
-        result delivers none, and a result is one borrowed value."""
+        """A function without a completion runs immediately; a completion
+        without a result delivers none, and a result is one borrowed value."""
         explicit = function.metadata
         defaults = {}
         if not has_completion(function):
             defaults["execution"] = "immediate"
-            if explicit.get("execution") == "event_batch":
-                defaults["absent_on"] = NOT_READY
             if not is_status(function.return_type) and (
                 function.return_type.kind != "void"
             ):
@@ -801,8 +795,14 @@ def validate(api: Api) -> None:
             errors.append(
                 f"{context}: blocks requires an immediate function that returns a status"
             )
-        if "absent_on" in metadata:
-            errors.extend(absence_errors(api, function, context))
+        if any(
+            parameter.metadata.get("direction") == "out"
+            and "nullable" in parameter.metadata
+            for parameter in function.parameters
+        ):
+            errors.extend(nullable_output_errors(api, function, context))
+        if execution == "event_batch":
+            errors.extend(event_batch_errors(api, function, context))
         if function.variadic:
             errors.append(
                 f"{context}: variadic public functions cannot be generated safely"
@@ -1396,42 +1396,65 @@ def acceptance_errors(api: Api, function: Function, context: str) -> list[str]:
     return errors
 
 
-def absence_errors(api: Api, function: Function, context: str) -> list[str]:
-    """Check `absent_on`: a failure status that reports the one output absent.
-
-    A binding returns its language's empty form for that status instead of an
-    error, so the function must report its outcome synchronously through a
-    status and publish exactly one output.
-    """
-    errors = []
-    if not is_status(function.return_type) or has_completion(function):
-        errors.append(
-            f"{context}: absent_on requires a status return without a completion"
-        )
-    outputs = [
+def outputs_of(function: Function) -> list:
+    return [
         parameter
         for parameter in function.parameters
         if parameter.metadata.get("direction", "in") == "out"
     ]
-    # A drain publishes its owned batch with a slice view of it, and the status
-    # reports both absent.
-    drain = len(outputs) == 2 and any(
-        (typedef := api.typedefs_by_name.get(type_name(p.type.pointee or p.type)))
-        is not None
-        and typedef.metadata.get("kind") == "slice"
-        for p in outputs
-    )
-    if len(outputs) != 1 and not drain:
-        errors.append(f"{context}: absent_on requires exactly one output")
-    statuses = {
-        value.name: value.value
-        for enum in api.enums
-        if enum.name == STATUS
-        for value in enum.values
-    }
-    if statuses.get(function.metadata["absent_on"], 0) == 0:
-        errors.append(f"{context}: absent_on requires a failure enumerator of {STATUS}")
+
+
+def is_handle_output(api: Api, parameter) -> bool:
+    pointee = parameter.type.pointee
+    typedef = api.typedefs_by_name.get(type_name(pointee)) if pointee else None
+    return typedef is not None and typedef.metadata.get("kind") == "handle"
+
+
+def is_slice_output(api: Api, parameter) -> bool:
+    pointee = parameter.type.pointee
+    typedef = api.typedefs_by_name.get(type_name(pointee)) if pointee else None
+    return typedef is not None and typedef.metadata.get("kind") == "slice"
+
+
+def nullable_output_errors(api: Api, function: Function, context: str) -> list[str]:
+    """Check a nullable output: a handle that native leaves null on success
+    when it has nothing to return.
+
+    A binding returns its language's empty form for a null handle, so the
+    function reports its outcome synchronously through a status, and the
+    handle is its one output or the batch of a drain.
+    """
+    errors = []
+    if not is_status(function.return_type) or has_completion(function):
+        errors.append(
+            f"{context}: a nullable output requires a status return without a completion"
+        )
+    outputs = outputs_of(function)
+    nullable = [p for p in outputs if "nullable" in p.metadata]
+    if not all(is_handle_output(api, p) for p in nullable):
+        errors.append(f"{context}: a nullable output requires a handle")
+    if len(nullable) != 1 or (
+        len(outputs) != 1 and function.metadata.get("execution") != "event_batch"
+    ):
+        errors.append(
+            f"{context}: a nullable output requires it to be the one output or a drain's batch"
+        )
     return errors
+
+
+def event_batch_errors(api: Api, function: Function, context: str) -> list[str]:
+    """Check a drain: it publishes an owned batch with a slice view of it, and
+    a null batch with an empty view when nothing is queued."""
+    outputs = outputs_of(function)
+    slices = [p for p in outputs if is_slice_output(api, p)]
+    batches = [
+        p for p in outputs if is_handle_output(api, p) and "nullable" in p.metadata
+    ]
+    if len(outputs) != 2 or len(slices) != 1 or len(batches) != 1:
+        return [
+            f"{context}: event_batch requires a nullable handle output and a slice view output"
+        ]
+    return []
 
 
 def callback_result_errors(

@@ -58,7 +58,7 @@ typedef unsigned long long mln_reading_batch BIND(
 void mln_reading_batch_release(mln_reading_batch batch);
 BIND("execution=event_batch")
 mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
@@ -201,7 +201,6 @@ class DartEmitterTests(unittest.TestCase):
                 "values",
                 "keywords",
                 "defaults",
-                "absent_value",
             )
         )
         api = parse_sources({"api.h": header})
@@ -214,7 +213,6 @@ class DartEmitterTests(unittest.TestCase):
                 "mln_probe_batch_scores",
                 "mln_probe_zeros_json",
                 "mln_probe_zeros_text",
-                "mln_probe_read_level",
                 "mln_probe_roundtrip",
                 "mln_probe_settings_check",
             },

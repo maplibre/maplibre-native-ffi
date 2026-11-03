@@ -73,7 +73,7 @@ void a_failed_event_append_keeps_the_published_events_readable() {
       threw = true;
     }
   }
-  TEST_ASSERT_TRUE(queue.dispatch() == mln::delivery::DispatchResult::Ran);
+  TEST_ASSERT_TRUE(queue.dispatch());
   TEST_ASSERT_TRUE(threw);
   TEST_ASSERT_EQUAL_size_t(1, seen.calls);
   TEST_ASSERT_EQUAL_size_t(1, seen.count);
@@ -103,7 +103,7 @@ void queued_payload_text_outlives_later_appends() {
       glyphs, {}, &seen, see_events, {"Noto Sans Regular", "Arial"}
     );
   }
-  TEST_ASSERT_TRUE(queue.dispatch() == mln::delivery::DispatchResult::Ran);
+  TEST_ASSERT_TRUE(queue.dispatch());
   TEST_ASSERT_EQUAL_size_t(1, seen.calls);
   TEST_ASSERT_EQUAL_size_t(65, seen.count);
   TEST_ASSERT_EQUAL_STRING("failed", seen.first_message.c_str());

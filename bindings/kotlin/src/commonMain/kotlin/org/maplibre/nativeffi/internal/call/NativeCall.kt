@@ -57,13 +57,12 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
   }
 
   /**
-   * Checks [status] like [check], except that [absent] reports that native published no output.
-   * Returns whether the output holds a value.
+   * Checks [status] like [check], and returns whether native wrote a handle other than the null
+   * handle to [out].
    */
-  fun present(status: Int, absent: Int): Boolean {
-    if (status == absent) return false
+  fun published(status: Int, out: Long): Boolean {
     check(status)
-    return true
+    return readI64(out) != 0L
   }
 
   fun accept(owner: CallbackOwner) {

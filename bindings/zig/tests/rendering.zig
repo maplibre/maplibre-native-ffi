@@ -35,8 +35,8 @@ test "an offscreen session renders a frame that reads back as pixels" {
     }
 }
 
-// Before any demand, native reports the drain and the acquire as not ready,
-// which read as empty and as null.
+// Before any demand, the drain and the acquire write null handles, which read
+// as empty and as null.
 test "a drain before any demand returns no batch" {
     const fixture = try createFixture();
     defer fixture.destroy();

@@ -190,13 +190,8 @@ static void log_event(const mln_runtime_event* event, void* context) {
 // Drains without asserting, so a wait predicate may call it; the log records a
 // failure for the next assertion to report.
 static void log_drain_quietly(mln_runtime runtime, event_log* log) {
-  for (;;) {
-    const mln_status status = mln_test_dispatch_events(runtime, log_event, log);
-    if (status == MLN_STATUS_NOT_READY) return;
-    if (status != MLN_STATUS_OK) {
-      log->drain_failed = true;
-      return;
-    }
+  if (mln_test_dispatch_events(runtime, log_event, log) != MLN_STATUS_OK) {
+    log->drain_failed = true;
   }
 }
 

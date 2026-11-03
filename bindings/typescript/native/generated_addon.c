@@ -4435,8 +4435,8 @@ static napi_value mln_ts_export_mln_render_session_acquire_frame(
   diagnostic.message[0] = '\0';
   status =
     mln_render_session_acquire_frame(arg_session, &arg_out_frame, &diagnostic);
-  if (status == MLN_STATUS_NOT_READY) goto done;
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  if (arg_out_frame == MLN_HANDLE_NULL) goto done;
   call->result = mln_ts_u64(env, (uint64_t)arg_out_frame);
 done:
   return mln_ts_end(call);
@@ -4587,8 +4587,8 @@ static napi_value mln_ts_export_mln_render_session_drain_frame_results(
   status = mln_render_session_drain_frame_results(
     arg_session, &arg_out_batch, &arg_out_view, &diagnostic
   );
-  if (status == MLN_STATUS_NOT_READY) goto done;
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  if (arg_out_batch == MLN_HANDLE_NULL) goto done;
   call->result = mln_ts_read_render_frame_batch_view(
     env, &(arg_out_view), sizeof(arg_out_view)
   );

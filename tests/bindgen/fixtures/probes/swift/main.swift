@@ -76,8 +76,8 @@ do {
   )
 }
 
-// A status that the C API declares as absence returns nil, and any other
-// failure still reports its diagnostic.
+// A null handle output returns nil, and a failure still reports its
+// diagnostic.
 try check(probeTakeParcel() == nil, "absent parcel")
 let parcel = try probeTakeParcel()
 check(parcel?.id == 42, "published parcel: \(String(describing: parcel))")
@@ -99,9 +99,6 @@ let readings = try ledger.drain().map(\.value)
 check(readings == [7, 9], "strided readings: \(readings)")
 try check(ledger.drain().isEmpty, "drained readings")
 try ledger.close()
-
-try check(probeReadLevel() == nil, "absent level")
-try check(probeReadLevel() == 0.5, "published level")
 
 // Caller-sized text that fits the runtime's first storage, and text that
 // does not, which the runtime fetches again with enough storage.

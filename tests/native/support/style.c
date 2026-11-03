@@ -44,7 +44,9 @@ static bool frame_arrived(void* context) {
   frame_wait* wait = context;
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   if (
-    mln_test_drain_frame_results(wait->session, &batch, NULL) != MLN_STATUS_OK
+    mln_test_drain_frame_results(wait->session, &batch, NULL) !=
+      MLN_STATUS_OK ||
+    batch == MLN_HANDLE_NULL
   ) {
     return wait->found;
   }

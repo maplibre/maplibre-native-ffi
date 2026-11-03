@@ -104,8 +104,7 @@ auto queued_descriptor(mln_delivery_queue queue, void* user_data)
 
 auto dispatch_completions(mln_delivery_queue queue) -> QueuedCompletions {
   dispatched = {};
-  const auto status = mln_delivery_queue_dispatch(queue, nullptr);
-  if (status != MLN_STATUS_NOT_READY) MLN_TEST_OK(status);
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue, nullptr));
   return dispatched;
 }
 

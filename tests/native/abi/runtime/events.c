@@ -151,9 +151,8 @@ static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
       mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
     mln_test_thread_join(thread);
 
-    // The queue was drained above, so the accepted foreign drain finds it
-    // empty.
-    MLN_TEST_STATUS(MLN_STATUS_NOT_READY, probe.drain_status);
+    // The queue accepts a drain from a foreign thread.
+    MLN_TEST_OK(probe.drain_status);
     MLN_TEST_OK(probe.runtime_mask_status);
     MLN_TEST_OK(probe.map_mask_status);
 
@@ -231,7 +230,6 @@ static bool dispatch_until_completion(void* context) {
   event_completion_order* order = context;
   const mln_status status =
     mln_test_dispatch_events(order->runtime, order_event, order);
-  if (status == MLN_STATUS_NOT_READY) return false;
   MLN_TEST_OK(status);
   return order->completed;
 }

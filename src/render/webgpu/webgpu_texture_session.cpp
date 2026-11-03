@@ -1239,8 +1239,9 @@ class WebGPUTextureSessionBackend final
   ) -> mln_status override {
     auto* const texture = backend_.rendered_texture();
     if (texture == nullptr) {
-      mln::core::set_thread_error("rendered WebGPU texture is not available");
-      return MLN_STATUS_NOT_READY;
+      throw mln::core::RenderTargetNotReady(
+        "rendered WebGPU texture is not available"
+      );
     }
     out_metadata = mln_web_gpu_texture_frame{
       .size = sizeof(mln_web_gpu_texture_frame),

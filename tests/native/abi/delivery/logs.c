@@ -96,10 +96,7 @@ static mln_log_handler queue_handler(mln_delivery_queue queue, void* tag) {
 
 static void dispatch_all(mln_delivery_queue queue) {
   memset(&seen, 0, sizeof(seen));
-  mln_status status = MLN_STATUS_OK;
-  while ((status = mln_delivery_queue_dispatch(queue, NULL)) == MLN_STATUS_OK) {
-  }
-  MLN_TEST_STATUS(MLN_STATUS_NOT_READY, status);
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue, NULL));
   TEST_ASSERT_FALSE(seen.unterminated);
 }
 

@@ -100,13 +100,13 @@ auto report_command_buffer_failure(
                        std::to_string(failure.code) + ": " +
                        failure.description;
   mln::Log::Error(mln::Event::Render, message);
-  mln::core::set_thread_error(message.c_str());
   switch (failure.code) {
     case MTL::CommandBufferErrorDeviceRemoved:
     case MTL::CommandBufferErrorAccessRevoked:
+      mln::core::set_thread_error(message.c_str());
       return MLN_STATUS_TARGET_LOST;
     default:
-      return MLN_STATUS_NOT_READY;
+      throw mln::core::RenderTargetNotReady(message);
   }
 }
 
@@ -216,8 +216,9 @@ class MetalTextureSessionBackend final
   ) -> mln_status override {
     auto* metal_texture = backend_.metal_texture();
     if (metal_texture == nullptr) {
-      mln::core::set_thread_error("rendered Metal texture is not available");
-      return MLN_STATUS_NOT_READY;
+      throw mln::core::RenderTargetNotReady(
+        "rendered Metal texture is not available"
+      );
     }
     out_metadata = mln_metal_texture_frame{
       .size = sizeof(mln_metal_texture_frame),

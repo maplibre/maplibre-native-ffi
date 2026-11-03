@@ -88,11 +88,16 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   ));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, unread);
   mln_render_frame_batch empty = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY,
-    mln_test_drain_frame_results(fixture.session, &empty, &diagnostic)
-  );
+  const mln_render_frame_result stale = {.size = sizeof(stale)};
+  mln_render_frame_batch_view empty_view = {
+    .size = sizeof(empty_view), .results = &stale, .result_count = 1
+  };
+  MLN_TEST_OK(mln_render_session_drain_frame_results(
+    fixture.session, &empty, &empty_view, &diagnostic
+  ));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
+  TEST_ASSERT_NULL(empty_view.results);
+  TEST_ASSERT_EQUAL_size_t(0, empty_view.result_count);
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = 1U << 8U;
@@ -220,10 +225,7 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
     TEST_ASSERT_EQUAL_UINT64(demand_count - 1 + index, result.token);
   }
   mln_acquired_frame extra = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY,
-    mln_render_session_acquire_frame(fixture.session, &extra, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &extra, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, extra);
   mln_test_render_release_frame(&frames[0]);
   mln_test_render_release_frame(&frames[1]);
@@ -484,7 +486,7 @@ static bool still_completed_under_keepalive(void* context) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     const mln_status drained =
       mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
-    if (drained == MLN_STATUS_NOT_READY) {
+    if (drained == MLN_STATUS_OK && batch == MLN_HANDLE_NULL) {
       return false;
     }
     mln_render_frame_batch_release(batch);
@@ -493,7 +495,8 @@ static bool still_completed_under_keepalive(void* context) {
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     while (
       mln_render_session_acquire_frame(wait->fixture->session, &frame, NULL) ==
-      MLN_STATUS_OK) {
+        MLN_STATUS_OK &&
+      frame != MLN_HANDLE_NULL) {
       wait->failed |=
         mln_acquired_frame_release(frame, NULL, NULL) != MLN_STATUS_OK;
       frame = MLN_HANDLE_NULL;
@@ -561,10 +564,8 @@ static void expect_waiting(const mln_test_render_fixture* fixture) {
     )
   );
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_NOT_READY,
-    mln_test_drain_frame_results(fixture->session, &batch, NULL)
-  );
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture->session, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
 }
 
 static void move_camera(mln_map map, double zoom) {

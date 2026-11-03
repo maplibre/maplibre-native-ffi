@@ -10,7 +10,6 @@ import {
   probeBatchScores,
   probeZerosJson,
   probeZerosText,
-  probeReadLevel,
   probeRoundtrip,
   probeSettingsCheck,
   probeTakeParcel,
@@ -67,19 +66,15 @@ assert.deepEqual(keywordCombine(5, 2, 7, 11), { type: 3, defer: 7, raw: 11 });
 // An empty record is zeroed with its size set.
 probeSettingsCheck({});
 
-// A status that the C API declares as absence returns undefined, and any other
-// failure still reports its own diagnostic.
-assert.equal(probeReadLevel(), undefined);
-assert.equal(probeReadLevel(), 0.5);
-const exhausted = failure(() => probeReadLevel());
-assert.equal(exhausted.status, -1);
-assert.equal(exhausted.diagnostic, "exhausted");
-
+// A null handle output returns undefined, and a failure still reports its own
+// diagnostic.
 assert.equal(probeTakeParcel(), undefined);
 const parcel = probeTakeParcel();
 assert.equal(parcel?.id, 42n);
 parcel?.close();
-failure(() => probeTakeParcel());
+const exhausted = failure(() => probeTakeParcel());
+assert.equal(exhausted.status, -1);
+assert.equal(exhausted.diagnostic, "exhausted");
 
 const rejected = failure(() =>
   probeRoundtrip({ right: Array<typeof point>(9).fill(point) }),

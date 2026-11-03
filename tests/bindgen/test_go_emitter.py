@@ -30,7 +30,7 @@ typedef unsigned long long mln_reading_batch BIND(
 void mln_reading_batch_release(mln_reading_batch batch);
 BIND("execution=event_batch")
 mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
@@ -46,10 +46,8 @@ class GoEmitterTests(unittest.TestCase):
         # The copy runs only when native published a batch, and a deferred
         # release frees the batch even if the copy panics.
         self.assertIn(
-            "bindingGetUnless(bindingGlobal(), int32(C.MLN_STATUS_NOT_READY)", source
-        )
-        self.assertIn(
             "}, func(arena *bindingArena) []Reading {\n"
+            "if outBatch == 0 {\nreturn nil\n}\n"
             "defer C.mln_reading_batch_release(outBatch)\n",
             source,
         )

@@ -111,13 +111,6 @@ def checked_call(function: Function, arguments: str) -> str:
     return f"Check({native_call(function, arguments, 'Diagnostic')});"
 
 
-def present_call(plan: OperationPlan, arguments: str, absent: str = "null") -> str:
-    """Returns `absent` for the absence status, and checks every other status."""
-    call = native_call(plan.function, arguments, "Diagnostic")
-    assert plan.absence is not None
-    return f"if (!Present({call}, mln_status.{plan.absence.status})) return {absent};"
-
-
 def submitted(function: Function, args: list[str], start: str) -> list[str]:
     """Calls a completion-taking C function with the completion that `start`
     fills, leaving the call's task in `nativePending`.
@@ -495,7 +488,8 @@ def view(op: Operation, call: Call) -> tuple[str, str, set[str]]:
 
 def drain(op: Operation, call: Call) -> tuple[str, str, set[str]]:
     # The drain copies its slice, and releases the batch that holds it once
-    # the copy ends or fails. Nothing queued is an empty slice.
+    # the copy ends or fails. A null batch, when nothing is queued, is an
+    # empty slice.
     plan = op.plan
     assert plan.drain is not None
     if call.scoped or len(call.outputs) != 1:
@@ -505,7 +499,8 @@ def drain(op: Operation, call: Call) -> tuple[str, str, set[str]]:
     assert batch is not None
     release = op.bound.source.functions_by_name[batch.release]
     body = call.prologue + [
-        present_call(plan, call.arguments, "[]"),
+        checked_call(plan.function, call.arguments),
+        f"if ({camel(plan.drain.batch.name)}.Value == 0) return [];",
         "try",
         "{",
         f"    return {copied};",
@@ -549,9 +544,12 @@ def owned(op: Operation, call: Call) -> tuple[str, str, set[str]]:
     if plan.absence:
         # The scope accepts its inputs only after a call that publishes.
         if call.scoped:
-            raise Unsupported("absence requires a call without a native scope")
+            raise Unsupported(
+                "a nullable output requires a call without a native scope"
+            )
         body = call.prologue + [
-            present_call(plan, call.arguments),
+            checked_call(plan.function, call.arguments),
+            f"if ({local}.Value == 0) return null;",
             f"return {result_type}.Adopt({parent}{local});",
         ]
         return op.emit(call, result_type + "?", body)
@@ -604,7 +602,7 @@ def immediate(op: Operation, call: Call) -> tuple[str, str, set[str]]:
     else:
         result_type, result = "void", None
     if plan.absence:
-        raise Unsupported("absence requires an owned handle output")
+        raise Unsupported("a nullable output requires an owned handle output")
     body = prologue + [checked_call(function, call.arguments)]
     if call.text:
         storage, capacity, length = call.text

@@ -571,9 +571,7 @@ static void count_type(const mln_runtime_event* event, void* context) {
 
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
   type_count count = {.type = type};
-  while (mln_test_dispatch_events(runtime, count_type, &count) ==
-         MLN_STATUS_OK) {
-  }
+  (void)mln_test_dispatch_events(runtime, count_type, &count);
   return count.total;
 }
 
@@ -594,15 +592,14 @@ static void match_event(const mln_runtime_event* event, void* context) {
 // after it discarded.
 static bool drain_until_match(void* context) {
   event_search* search = context;
-  for (;;) {
-    const mln_status status =
-      mln_test_dispatch_events(search->runtime, match_event, search);
-    if (status == MLN_STATUS_NOT_READY) return search->matched;
-    if (status != MLN_STATUS_OK) {
-      search->drain_failed = true;
-      return true;
-    }
+  if (
+    mln_test_dispatch_events(search->runtime, match_event, search) !=
+    MLN_STATUS_OK
+  ) {
+    search->drain_failed = true;
+    return true;
   }
+  return search->matched;
 }
 
 bool mln_test_await_event_matching(
@@ -633,9 +630,7 @@ size_t mln_test_drain_counting_matching(
   mln_runtime runtime, mln_test_event_match match, void* context
 ) {
   match_count count = {.match = match, .context = context};
-  while (mln_test_dispatch_events(runtime, count_match, &count) ==
-         MLN_STATUS_OK) {
-  }
+  (void)mln_test_dispatch_events(runtime, count_match, &count);
   return count.total;
 }
 

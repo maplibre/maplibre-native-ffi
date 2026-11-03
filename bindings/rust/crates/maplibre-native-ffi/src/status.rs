@@ -25,8 +25,6 @@ pub enum Status {
     Busy,
     /// The render target can't be drawn to anymore.
     TargetLost,
-    /// There is nothing to return yet, such as when no new frame is ready.
-    NotReady,
     /// Nothing has the given ID.
     NotFound,
     Unknown(i32),
@@ -43,7 +41,6 @@ impl Status {
             -6 => Self::Cancelled,
             -7 => Self::Busy,
             -8 => Self::TargetLost,
-            -9 => Self::NotReady,
             -10 => Self::NotFound,
             value => Self::Unknown(value),
         }
@@ -59,7 +56,6 @@ impl Status {
             Self::Cancelled => -6,
             Self::Busy => -7,
             Self::TargetLost => -8,
-            Self::NotReady => -9,
             Self::NotFound => -10,
             Self::Unknown(value) => value,
         }
@@ -82,7 +78,6 @@ impl std::fmt::Display for Status {
             Self::Cancelled => f.write_str("CANCELLED"),
             Self::Busy => f.write_str("BUSY"),
             Self::TargetLost => f.write_str("TARGET_LOST"),
-            Self::NotReady => f.write_str("NOT_READY"),
             Self::NotFound => f.write_str("NOT_FOUND"),
             Self::Unknown(value) => write!(f, "UNKNOWN({value})"),
         }

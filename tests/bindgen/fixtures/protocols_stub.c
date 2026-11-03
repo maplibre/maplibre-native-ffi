@@ -10,7 +10,6 @@
 #define MLN_PROTOCOL_KEYWORDS
 #define MLN_PROTOCOL_DEFAULTS
 #define MLN_PROTOCOL_ABSENT_HANDLE
-#define MLN_PROTOCOL_ABSENT_VALUE
 #define MLN_PROTOCOL_STRIDED_RECORDS
 #include <stdlib.h>
 #include <string.h>
@@ -86,32 +85,23 @@ mln_status mln_probe_settings_check(
 
 // Reports the output of call `count` of an absence probe: none on the first,
 // `published` on the second, and a failure after that.
-static mln_status absence_status(
-  unsigned int count, mln_diagnostic* out_diagnostic
-) {
-  if (count == 0) return MLN_STATUS_NOT_READY;
-  if (count == 1) return MLN_STATUS_OK;
-  return fail(out_diagnostic, "exhausted");
-}
-
 void mln_probe_parcel_release(mln_probe_parcel parcel) { (void)parcel; }
 
+// Finds nothing, then publishes a parcel, then fails.
 mln_status mln_probe_take_parcel(
   mln_probe_parcel* out_parcel, mln_diagnostic* out_diagnostic
 ) {
   static unsigned int count = 0;
-  const mln_status status = absence_status(count++, out_diagnostic);
-  if (status == MLN_STATUS_OK) *out_parcel = 42;
-  return status;
-}
-
-mln_status mln_probe_read_level(
-  double* out_level, mln_diagnostic* out_diagnostic
-) {
-  static unsigned int count = 0;
-  const mln_status status = absence_status(count++, out_diagnostic);
-  if (status == MLN_STATUS_OK) *out_level = 0.5;
-  return status;
+  switch (count++) {
+    case 0:
+      *out_parcel = 0;
+      return MLN_STATUS_OK;
+    case 1:
+      *out_parcel = 42;
+      return MLN_STATUS_OK;
+    default:
+      return fail(out_diagnostic, "exhausted");
+  }
 }
 
 // Two readings with a stride wider than mln_probe_reading, as a later C API
@@ -148,7 +138,13 @@ mln_status mln_probe_ledger_drain(
   if (probe_reading_batch_held) {
     return fail(out_diagnostic, "the last batch is not released");
   }
-  if (probe_reading_batches++ > 0) return MLN_STATUS_NOT_READY;
+  if (probe_reading_batches++ > 0) {
+    *out_view = (mln_probe_reading_view){
+      .size = sizeof(mln_probe_reading_view),
+      .reading_size = sizeof(mln_probe_reading),
+    };
+    return MLN_STATUS_OK;
+  }
   typedef struct wide_reading {
     mln_probe_reading reading;
     uint64_t appended;

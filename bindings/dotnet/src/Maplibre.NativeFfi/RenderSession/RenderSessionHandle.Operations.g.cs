@@ -123,7 +123,8 @@ public sealed unsafe partial class RenderSessionHandle
     /// <remarks>
     /// <para>It takes the oldest frame that you haven't acquired. The session
     /// can render over a frame before you acquire it. While you hold a frame in
-    /// every texture of the ring, new frames wait until you release one.</para>
+    /// every texture of the ring, new frames wait until you release one. When
+    /// no frame is ready, it succeeds and writes the null handle.</para>
     /// <para>See <c>mln_render_session_acquire_frame</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -138,12 +139,8 @@ public sealed unsafe partial class RenderSessionHandle
     {
         using var call = Enter(this);
         MlnAcquiredFrame outFrame = default;
-        if (
-            !Present(
-                NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame, Diagnostic),
-                mln_status.MLN_STATUS_NOT_READY
-            )
-        )
+        Check(NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame, Diagnostic));
+        if (outFrame.Value == 0)
             return null;
         return AcquiredFrameHandle.Adopt(this, outFrame);
     }
@@ -266,8 +263,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// Takes the frame results that the session has queued.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_render_session_drain_frame_results</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// <para>When no result is queued, it succeeds and writes the null handle
+    /// and an empty view.</para>
+    /// <para>See <c>mln_render_session_drain_frame_results</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
     public RenderFrameResult[] DrainFrameResults()
     {
@@ -277,17 +276,15 @@ public sealed unsafe partial class RenderSessionHandle
         {
             size = (uint)sizeof(mln_render_frame_batch_view),
         };
-        if (
-            !Present(
-                NativeMethods.mln_render_session_drain_frame_results(
-                    Handle,
-                    &outBatch,
-                    &outView,
-                    Diagnostic
-                ),
-                mln_status.MLN_STATUS_NOT_READY
+        Check(
+            NativeMethods.mln_render_session_drain_frame_results(
+                Handle,
+                &outBatch,
+                &outView,
+                Diagnostic
             )
-        )
+        );
+        if (outBatch.Value == 0)
             return [];
         try
         {

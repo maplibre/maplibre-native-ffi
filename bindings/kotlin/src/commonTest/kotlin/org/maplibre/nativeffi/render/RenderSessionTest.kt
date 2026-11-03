@@ -65,7 +65,7 @@ class RenderSessionTest {
   @Test
   fun aDrainBeforeAnyDemandReturnsNoResults() = runSuspendTest {
     withBorrowedTexture {
-      // Native reports both calls as not ready, which read as no results and no frame.
+      // Native writes a null batch and a null frame, which read as no results and no frame.
       assertEquals(emptyList(), session.drainFrameResults())
       assertNull(session.acquireFrame())
     }

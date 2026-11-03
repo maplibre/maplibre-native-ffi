@@ -46,8 +46,8 @@ pub fn run() {
     let entry = keyword_combine(5.0, 2.0, 7.0, 11.0).unwrap();
     assert_eq!((entry.r#type, entry.defer, entry.raw), (3.0, 7.0, 11.0));
 
-    // A status that the C API declares as absence returns no value, and any
-    // other failure still reports its diagnostic.
+    // A null handle output returns no value, and a failure still reports its
+    // diagnostic.
     assert!(probe_take_parcel().unwrap().is_none());
     let parcel = probe_take_parcel().unwrap().unwrap();
     assert_eq!(parcel.id(), 42);
@@ -57,8 +57,6 @@ pub fn run() {
         (error.status(), error.diagnostic()),
         (Status::InvalidArgument, "exhausted")
     );
-    assert_eq!(probe_read_level().unwrap(), None);
-    assert_eq!(probe_read_level().unwrap(), Some(0.5));
 
     // A release consumes its owner.
     let map = MapHandle::adopt(maplibre_native_ffi_sys::mln_map(7)).unwrap();

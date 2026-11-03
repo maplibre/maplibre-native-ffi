@@ -58,7 +58,7 @@ typedef unsigned long long mln_reading_batch BIND(
 void mln_reading_batch_release(mln_reading_batch batch);
 BIND("execution=event_batch")
 mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out"),
+  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
   mln_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
@@ -282,7 +282,7 @@ class KotlinLayoutTests(unittest.TestCase):
         # throws, and nothing queued reads as an empty list.
         self.assertIn("public fun drainReadings(): List<Reading> =", api)
         self.assertIn(
-            "if (present(C.mln_drain_readings(batch, out, diagnostic), absent = -9)) "
+            "if (published(C.mln_drain_readings(batch, out, diagnostic), batch)) "
             "drain(batch, { C.mln_reading_batch_release(it) }) "
             "{ readReadingView(out) } else emptyList()",
             api,

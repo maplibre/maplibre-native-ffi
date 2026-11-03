@@ -6688,12 +6688,12 @@ impl RenderSessionHandle {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         let mut out_frame: sys::mln_acquired_frame = unsafe { std::mem::zeroed() };
-        let result = unsafe {
-            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
+        unsafe {
+            call.status(|diagnostic| {
                 sys::mln_render_session_acquire_frame(handle, &mut out_frame, diagnostic)
             })
-        };
-        if !result? {
+        }?;
+        if out_frame.0 == 0 {
             return Ok(py.None());
         }
         unsafe { AcquiredFrameHandle::adopt(py, out_frame, Vec::new()) }
@@ -6781,8 +6781,8 @@ impl RenderSessionHandle {
         let mut out_batch: sys::mln_render_frame_batch = unsafe { std::mem::zeroed() };
         let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
         out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
-        let result = unsafe {
-            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
+        unsafe {
+            call.status(|diagnostic| {
                 sys::mln_render_session_drain_frame_results(
                     handle,
                     &mut out_batch,
@@ -6790,8 +6790,8 @@ impl RenderSessionHandle {
                     diagnostic,
                 )
             })
-        };
-        if !result? {
+        }?;
+        if out_batch.0 == 0 {
             return Ok(PyList::empty(py).into_any().unbind());
         }
         let _out_batch =
