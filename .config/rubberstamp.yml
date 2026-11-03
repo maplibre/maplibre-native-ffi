@@ -165,19 +165,21 @@ ci:
     `cmake/platform/`, render backends, SDK setup, or packaging. A unit for one
     architecture of a platform, such as `linux-arm64` or `android-x86`, matters
     only when a change reaches what differs by architecture there; the
-    platform's own unit covers the rest. A test change matters only to units
-    that run that suite. `tools/ci/` plans each unit's jobs from the presets'
-    vendor blocks and runs each target job's suites, so changing a unit's vendor
-    block, jobs, or suites puts it at risk. Windows runs shared scripts
-    differently, with Git Bash and MSVC, and a tool configured for only some
-    operating systems puts those at risk. A public header change that adds a
-    macro, an inline function, or a construct new to the headers puts MSVC
-    (Windows x64) and Apple Clang and the Swift importer (macOS) at risk, since
-    the C tests and several bindings compile the headers there. A header change
-    that only edits declarations or docs does not. Release workflows don't run
-    on pull requests. Hygiene always runs formatting, lint, generated-code
-    checks, and the tests for `ci/`. Main runs every unit after merge, so a pull
-    request needs only the coverage a reviewer would expect.
+    platform's own unit covers the rest. A test change follows the same rule:
+    Linux x64 covers a test that every target runs, so another unit matters only
+    when the test exercises what that unit alone builds or runs. `tools/ci/`
+    plans each unit's jobs from the presets' vendor blocks and runs each target
+    job's suites, so changing a unit's vendor block, jobs, or suites puts it at
+    risk. Windows runs shared scripts differently, with Git Bash and MSVC, and a
+    tool configured for only some operating systems puts those at risk. A public
+    header change that adds a macro, an inline function, or a construct new to
+    the headers puts MSVC (Windows x64) and Apple Clang and the Swift importer
+    (macOS) at risk, since the C tests and several bindings compile the headers
+    there. A header change that only edits declarations or docs does not.
+    Release workflows don't run on pull requests. Hygiene always runs
+    formatting, lint, generated-code checks, and the tests for `ci/`. Main runs
+    every unit after merge, so a pull request needs only the coverage a reviewer
+    would expect.
   units:
     docs:
       covers: >-
