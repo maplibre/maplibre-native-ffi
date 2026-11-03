@@ -213,6 +213,15 @@ auto mln_map_fit_camera_to_geometry(
   });
 }
 
+auto mln_camera_for_tile(
+  mln_canonical_tile_id tile, mln_logical_size logical_size,
+  mln_camera_options* out_camera, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::camera_for_tile(tile, logical_size, out_camera);
+  });
+}
+
 auto mln_map_lat_lng_bounds_for_camera(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

@@ -2071,6 +2071,45 @@ final class VulkanTextureFrame extends _Value {
   ]);
 }
 
+/// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
+///
+/// See `mln_canonical_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class CanonicalTileId extends _Value {
+  const CanonicalTileId({this.z = 0, this.x = 0, this.y = 0});
+  final int z;
+  final int x;
+  final int y;
+
+  /// A copy of this value with the given members replaced.
+  CanonicalTileId copyWith({int? z, int? x, int? y}) =>
+      CanonicalTileId(z: z ?? this.z, x: x ?? this.x, y: y ?? this.y);
+
+  @override
+  List<Object?> get _members => [z, x, y];
+  @override
+  String toString() => _describe('CanonicalTileId', const ['z', 'x', 'y']);
+}
+
+/// A size in logical pixels, which the map's scale factor turns into pixels.
+///
+/// See `mln_logical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class LogicalSize extends _Value {
+  const LogicalSize({this.width = 0, this.height = 0});
+  final int width;
+  final int height;
+
+  /// A copy of this value with the given members replaced.
+  LogicalSize copyWith({int? width, int? height}) =>
+      LogicalSize(width: width ?? this.width, height: height ?? this.height);
+
+  @override
+  List<Object?> get _members => [width, height];
+  @override
+  String toString() => _describe('LogicalSize', const ['width', 'height']);
+}
+
 /// Options for a GeoJSON
 /// \[source\](https://maplibre.org/maplibre-style-spec/sources/#geojson).
 ///
@@ -2205,26 +2244,6 @@ typedef LogCallback =
       int code,
       String message,
     );
-
-/// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
-///
-/// See `mln_canonical_tile_id` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class CanonicalTileId extends _Value {
-  const CanonicalTileId({this.z = 0, this.x = 0, this.y = 0});
-  final int z;
-  final int x;
-  final int y;
-
-  /// A copy of this value with the given members replaced.
-  CanonicalTileId copyWith({int? z, int? x, int? y}) =>
-      CanonicalTileId(z: z ?? this.z, x: x ?? this.x, y: y ?? this.y);
-
-  @override
-  List<Object?> get _members => [z, x, y];
-  @override
-  String toString() => _describe('CanonicalTileId', const ['z', 'x', 'y']);
-}
 
 /// Asks for the data of a tile in a custom source.
 ///
@@ -2548,25 +2567,6 @@ final class CameraDelta extends _Value {
     'animation',
     'gesturePhase',
   ]);
-}
-
-/// A size in logical pixels, which the map's scale factor turns into pixels.
-///
-/// See `mln_logical_size` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class LogicalSize extends _Value {
-  const LogicalSize({this.width = 0, this.height = 0});
-  final int width;
-  final int height;
-
-  /// A copy of this value with the given members replaced.
-  LogicalSize copyWith({int? width, int? height}) =>
-      LogicalSize(width: width ?? this.width, height: height ?? this.height);
-
-  @override
-  List<Object?> get _members => [width, height];
-  @override
-  String toString() => _describe('LogicalSize', const ['width', 'height']);
 }
 
 /// A Metal texture of a borrowed ring.

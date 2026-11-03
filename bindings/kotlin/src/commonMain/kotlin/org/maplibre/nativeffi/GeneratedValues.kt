@@ -2124,6 +2124,29 @@ public class WebGpuTextureFrame(
 }
 
 /**
+ * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
+ *
+ * See `mln_canonical_tile_id` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CanonicalTileId(
+  public val z: UInt = 0u,
+  public val x: UInt = 0u,
+  public val y: UInt = 0u,
+)
+
+/**
+ * A size in logical pixels, which the map's scale factor turns into pixels.
+ *
+ * See `mln_logical_size` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class LogicalSize(
+  public val width: UInt = 0u,
+  public val height: UInt = 0u,
+)
+
+/**
  * Options for a GeoJSON
  * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/#geojson).
  *
@@ -2232,18 +2255,6 @@ public data class StyleExpressionOptions(
 )
 
 /**
- * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
- *
- * See `mln_canonical_tile_id` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class CanonicalTileId(
-  public val z: UInt = 0u,
-  public val x: UInt = 0u,
-  public val y: UInt = 0u,
-)
-
-/**
  * An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
  *
  * See `mln_premultiplied_rgba8_image` in the
@@ -2342,17 +2353,6 @@ public data class CameraDelta(
   public val anchor: ScreenPoint? = null,
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
-)
-
-/**
- * A size in logical pixels, which the map's scale factor turns into pixels.
- *
- * See `mln_logical_size` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class LogicalSize(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
 )
 
 /**

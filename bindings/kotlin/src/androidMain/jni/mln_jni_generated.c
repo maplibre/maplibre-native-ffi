@@ -112,6 +112,18 @@ static jint mln_c_version_jni(JNIEnv* env, jclass type) {
   return (jint)mln_c_version();
 }
 
+static jint mln_camera_for_tile_jni(
+  JNIEnv* env, jclass type, jlong tile, jlong logical_size, jlong out_camera,
+  jlong out_diagnostic
+) {
+  return (jint)mln_camera_for_tile(
+    MLN_JNI_RECORD(mln_canonical_tile_id, tile),
+    MLN_JNI_RECORD(mln_logical_size, logical_size),
+    MLN_JNI_POINTER(mln_camera_options*, out_camera),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_delivery_queue_create_jni(
   JNIEnv* env, jclass type, jlong options, jlong out_queue, jlong out_diagnostic
 ) {
@@ -2167,6 +2179,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_view_end_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
+  {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
@@ -2526,6 +2539,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_acquired_frame_view_end_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
+  {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},

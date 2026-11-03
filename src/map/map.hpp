@@ -541,6 +541,10 @@ auto projected_meters_for_lat_lng(
 auto lat_lng_for_projected_meters(
   mln_projected_meters meters, mln_lat_lng* out_coordinate
 ) -> mln_status;
+auto camera_for_tile(
+  mln_canonical_tile_id tile, mln_logical_size logical_size,
+  mln_camera_options* out_camera
+) -> mln_status;
 
 auto map_camera_for_lat_lng_bounds(
   MapObject& live, mln_lat_lng_bounds bounds,

@@ -7,6 +7,7 @@
 /dotnet/src/Maplibre.NativeFfi/Base/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Camera/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/GlobalUsings.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeMethods.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
@@ -295,6 +296,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseGlobalsOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedLoggingGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapMapOperations.swift linguist-generated=true

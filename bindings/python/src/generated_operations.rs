@@ -8388,6 +8388,27 @@ fn c_version(py: Python<'_>) -> PyResult<Py<PyAny>> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (tile, logical_size))]
+fn camera_for_tile(
+    py: Python<'_>,
+    tile: &Bound<'_, PyAny>,
+    logical_size: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py);
+    let storage = &mut call.storage;
+    let tile_value = generated_input_mln_canonical_tile_id(&tile.clone(), storage)?;
+    let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
+    let mut out_camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
+    out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
+    unsafe {
+        call.status(|diagnostic| {
+            sys::mln_camera_for_tile(tile_value, logical_size_value, &mut out_camera, diagnostic)
+        })
+    }?;
+    generated_copy_mln_camera_options(py, &out_camera)
+}
+
+#[pyfunction]
 #[pyo3(signature = (meters))]
 fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
@@ -8532,6 +8553,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<StyleExpressionHandle>()?;
     module.add_function(wrap_pyfunction!(init_android, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
+    module.add_function(wrap_pyfunction!(camera_for_tile, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
     module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(set_log_async_severity_mask, module)?)?;

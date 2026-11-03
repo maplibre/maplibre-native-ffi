@@ -103,6 +103,17 @@ int32_t mln_kw_mln_android_init(
 
 int32_t mln_kw_mln_c_version(void) { return (int32_t)mln_c_version(); }
 
+int32_t mln_kw_mln_camera_for_tile(
+  uintptr_t tile, uintptr_t logical_size, uintptr_t out_camera,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_camera_for_tile(
+    *(const mln_canonical_tile_id*)(uintptr_t)tile,
+    *(const mln_logical_size*)(uintptr_t)logical_size,
+    (mln_camera_options*)out_camera, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_delivery_queue_create(
   uintptr_t options, uintptr_t out_queue, uintptr_t out_diagnostic
 ) {

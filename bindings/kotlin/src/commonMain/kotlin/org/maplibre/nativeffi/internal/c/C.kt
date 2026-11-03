@@ -31,6 +31,8 @@ internal expect object C {
 
   fun mln_c_version(): Int
 
+  fun mln_camera_for_tile(tile: Long, logicalSize: Long, outCamera: Long, outDiagnostic: Long): Int
+
   fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int
 
   fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int

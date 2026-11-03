@@ -2432,6 +2432,21 @@ external int mln_c_version();
 
 @Native<
   Int32 Function(
+    mln_canonical_tile_id,
+    mln_logical_size,
+    Pointer<mln_camera_options>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_camera_for_tile(
+  mln_canonical_tile_id tile,
+  mln_logical_size logical_size,
+  Pointer<mln_camera_options> out_camera,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
     Pointer<mln_delivery_queue_options>,
     Pointer<mln_delivery_queue>,
     Pointer<mln_diagnostic>,

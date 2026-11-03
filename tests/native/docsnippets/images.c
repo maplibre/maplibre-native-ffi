@@ -21,15 +21,6 @@ static void wait_for_done(void) {
   }
 }
 
-// The center of tile z/x/y. The snippet leaves the tile math to the
-// reader.
-static mln_lat_lng tile_center(uint32_t z, uint32_t x, uint32_t y) {
-  (void)z;
-  (void)x;
-  (void)y;
-  return (mln_lat_lng){0};
-}
-
 static void copy_pixels(mln_buffer_view data, uint32_t stride) {
   (void)data;
   (void)stride;
@@ -156,14 +147,13 @@ void mln_doc_images_tile(
   mln_camera_update update = {
     .size = sizeof(mln_camera_update),
     .mode = MLN_CAMERA_UPDATE_MODE_JUMP,
-    .camera = {
-      .size = sizeof(mln_camera_options),
-      .fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM,
-      .center = tile_center(z, x, y),
-      // A 512-pixel map shows tile z/x/y at zoom z.
-      .zoom = z,
-    },
+    .camera = {.size = sizeof(mln_camera_options)},
   };
+  mln_camera_for_tile(
+    (mln_canonical_tile_id){.z = z, .x = x, .y = y},
+    (mln_logical_size){.width = 512, .height = 512}, &update.camera,
+    NULL
+  );
   mln_map_update_camera(map, &update, NULL, NULL);
   // #endregion tile
 

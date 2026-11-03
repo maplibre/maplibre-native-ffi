@@ -75,6 +75,14 @@ internal actual object C {
   @JvmStatic actual external fun mln_c_version(): Int
 
   @JvmStatic
+  actual external fun mln_camera_for_tile(
+    tile: Long,
+    logicalSize: Long,
+    outCamera: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_delivery_queue_create(
     options: Long,
     outQueue: Long,

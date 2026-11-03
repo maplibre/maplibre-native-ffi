@@ -41,6 +41,15 @@ internal actual object C {
   private val mln_android_init =
     Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_c_version = Ffm.downcall("mln_c_version", JAVA_INT)
+  private val mln_camera_for_tile =
+    Ffm.downcall(
+      "mln_camera_for_tile",
+      JAVA_INT,
+      mln_canonical_tile_id,
+      mln_logical_size,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_delivery_queue_create =
     Ffm.downcall("mln_delivery_queue_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_dispatch =
@@ -1316,6 +1325,19 @@ internal actual object C {
     mln_android_init.invokeExact(jniEnv, context, outDiagnostic) as Int
 
   actual fun mln_c_version(): Int = mln_c_version.invokeExact() as Int
+
+  actual fun mln_camera_for_tile(
+    tile: Long,
+    logicalSize: Long,
+    outCamera: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_camera_for_tile.invokeExact(
+      Ffm.value(tile, mln_canonical_tile_id),
+      Ffm.value(logicalSize, mln_logical_size),
+      outCamera,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     mln_delivery_queue_create.invokeExact(options, outQueue, outDiagnostic) as Int
@@ -3167,6 +3189,10 @@ internal actual object C {
 }
 
 // The layout of each record that C passes or returns by value, nested ones first.
+internal val mln_canonical_tile_id: GroupLayout =
+  Ffm.struct(JAVA_INT.withName("z"), JAVA_INT.withName("x"), JAVA_INT.withName("y"))
+internal val mln_logical_size: GroupLayout =
+  Ffm.struct(JAVA_INT.withName("width"), JAVA_INT.withName("height"))
 internal val mln_buffer_view: GroupLayout =
   Ffm.struct(ADDRESS.withName("data"), JAVA_LONG.withName("size"))
 internal val mln_projected_meters: GroupLayout =
@@ -3181,9 +3207,5 @@ internal val mln_lat_lng: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("latitude"), JAVA_DOUBLE.withName("longitude"))
 internal val mln_lat_lng_bounds: GroupLayout =
   Ffm.struct(mln_lat_lng.withName("southwest"), mln_lat_lng.withName("northeast"))
-internal val mln_canonical_tile_id: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("z"), JAVA_INT.withName("x"), JAVA_INT.withName("y"))
 internal val mln_screen_point: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("x"), JAVA_DOUBLE.withName("y"))
-internal val mln_logical_size: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("width"), JAVA_INT.withName("height"))

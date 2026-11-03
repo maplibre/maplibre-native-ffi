@@ -109,6 +109,19 @@ internal actual object C {
 
   actual fun mln_c_version(): Int = org.maplibre.nativeffi.internal.cinterop.mln_c_version().toInt()
 
+  actual fun mln_camera_for_tile(
+    tile: Long,
+    logicalSize: Long,
+    outCamera: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_camera_for_tile(
+      tile.toCPointer<mln_canonical_tile_id>()!!.pointed.readValue(),
+      logicalSize.toCPointer<mln_logical_size>()!!.pointed.readValue(),
+      outCamera.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_delivery_queue_create(options: Long, outQueue: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_create(
       options.toCPointer(),
