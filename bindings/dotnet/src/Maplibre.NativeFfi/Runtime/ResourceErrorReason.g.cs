@@ -10,7 +10,10 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public enum ResourceErrorReason : uint
 {
-    None = 0,
+    /// <summary>
+    /// A reason that no other value names.
+    /// </summary>
+    Other = 0,
     NotFound = 1,
 
     /// <summary>
@@ -23,5 +26,4 @@ public enum ResourceErrorReason : uint
     /// </summary>
     Connection = 3,
     RateLimit = 4,
-    Other = 5,
 }

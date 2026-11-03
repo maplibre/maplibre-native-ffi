@@ -1818,12 +1818,11 @@ internal enum mln_rendered_query_geometry_type : uint
 
 internal enum mln_resource_error_reason : uint
 {
-    MLN_RESOURCE_ERROR_REASON_NONE = 0,
+    MLN_RESOURCE_ERROR_REASON_OTHER = 0,
     MLN_RESOURCE_ERROR_REASON_NOT_FOUND = 1,
     MLN_RESOURCE_ERROR_REASON_SERVER = 2,
     MLN_RESOURCE_ERROR_REASON_CONNECTION = 3,
     MLN_RESOURCE_ERROR_REASON_RATE_LIMIT = 4,
-    MLN_RESOURCE_ERROR_REASON_OTHER = 5,
 }
 
 internal enum mln_resource_kind : uint
@@ -2133,7 +2132,6 @@ internal enum mln_tile_operation : uint
 
 internal enum mln_url_match_flag : uint
 {
-    MLN_URL_MATCH_EXACT = 0,
     MLN_URL_MATCH_GLOB = 1,
 }
 

@@ -198,7 +198,6 @@ class GeneratedShapesTest {
       (FrameDemandFlag.FORCE or FrameDemandFlag.WAIT_FOR_UPDATE).toString(),
     )
     assertEquals("INFO | WARNING | ERROR", LogSeverityFlag.ALL.toString())
-    assertEquals("EXACT", UrlMatchFlag.EXACT.toString())
     assertEquals("GLOB | 0x10", UrlMatchFlag(0x11u).toString())
   }
 }

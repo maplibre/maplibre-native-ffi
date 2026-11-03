@@ -11,10 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record ResourceTransformError
 {
-    /// <summary>
-    /// Must not be <c>ResourceErrorReason.None</c>.
-    /// </summary>
-    public required ResourceErrorReason Reason { get; init; }
+    public ResourceErrorReason Reason { get; init; }
     public string Message { get; init; } = "";
 
     /// <summary>

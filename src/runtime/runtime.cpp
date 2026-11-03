@@ -390,8 +390,6 @@ auto to_native_download_state(mln_offline_region_download_state state)
 auto to_c_resource_error_reason(mln::Response::Error::Reason reason)
   -> mln_resource_error_reason {
   switch (reason) {
-    case mln::Response::Error::Reason::Success:
-      return MLN_RESOURCE_ERROR_REASON_NONE;
     case mln::Response::Error::Reason::NotFound:
       return MLN_RESOURCE_ERROR_REASON_NOT_FOUND;
     case mln::Response::Error::Reason::Server:
@@ -400,6 +398,7 @@ auto to_c_resource_error_reason(mln::Response::Error::Reason reason)
       return MLN_RESOURCE_ERROR_REASON_CONNECTION;
     case mln::Response::Error::Reason::RateLimit:
       return MLN_RESOURCE_ERROR_REASON_RATE_LIMIT;
+    case mln::Response::Error::Reason::Success:
     case mln::Response::Error::Reason::Other:
       return MLN_RESOURCE_ERROR_REASON_OTHER;
   }

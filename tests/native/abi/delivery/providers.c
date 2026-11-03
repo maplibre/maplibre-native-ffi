@@ -357,7 +357,7 @@ static void invalid_routes_are_rejected(void) {
   MLN_TEST_OK(submit_routes(runtime, &long_route, 1, NULL));
   long_route.url.size = 4097;
   MLN_TEST_INVALID(submit_routes(runtime, &long_route, 1, NULL));
-  long_route.flags = MLN_URL_MATCH_EXACT;
+  long_route.flags = 0;
   MLN_TEST_OK(submit_routes(runtime, &long_route, 1, NULL));
 
   // An escaped byte and a run of * each count as one token, so 4095 escapes

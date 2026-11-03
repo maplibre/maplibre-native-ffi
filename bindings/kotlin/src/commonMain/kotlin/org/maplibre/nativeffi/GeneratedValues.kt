@@ -924,24 +924,23 @@ public value class RenderSessionState(public val rawValue: UInt) {
 public value class ResourceErrorReason(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
-      0u -> "NONE"
+      0u -> "OTHER"
       1u -> "NOT_FOUND"
       2u -> "SERVER"
       3u -> "CONNECTION"
       4u -> "RATE_LIMIT"
-      5u -> "OTHER"
       else -> "ResourceErrorReason($rawValue)"
     }
 
   public companion object {
-    public val NONE: ResourceErrorReason = ResourceErrorReason(0u)
+    /** A reason that no other value names. */
+    public val OTHER: ResourceErrorReason = ResourceErrorReason(0u)
     public val NOT_FOUND: ResourceErrorReason = ResourceErrorReason(1u)
     /** The server reported an error. */
     public val SERVER: ResourceErrorReason = ResourceErrorReason(2u)
     /** The server couldn't be reached. */
     public val CONNECTION: ResourceErrorReason = ResourceErrorReason(3u)
     public val RATE_LIMIT: ResourceErrorReason = ResourceErrorReason(4u)
-    public val OTHER: ResourceErrorReason = ResourceErrorReason(5u)
   }
 }
 
@@ -1667,7 +1666,8 @@ public value class TileOperation(public val rawValue: UInt) {
 /**
  * How a URL pattern matches a request's URL.
  *
- * A pattern matches the whole URL, query included.
+ * A pattern matches the whole URL, query included. Without flags, it matches only the URL that
+ * equals it exactly.
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
  *
@@ -1684,10 +1684,11 @@ public value class UrlMatchFlag(public val rawValue: UInt) {
   public operator fun contains(other: UrlMatchFlag): Boolean =
     (rawValue and other.rawValue) == other.rawValue
 
-  override fun toString(): String = flagLabel(rawValue.toULong(), "EXACT", listOf(1uL to "GLOB"))
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "GLOB"))
 
   public companion object {
-    public val EXACT: UrlMatchFlag = UrlMatchFlag(0u)
+    /** No flags. */
+    public val NONE: UrlMatchFlag = UrlMatchFlag(0u)
     /**
      * The URL matches the pattern as a glob. `*` matches any characters except `/`, `**` matches
      * any characters, and `?` matches one character except `/`. `\` makes the next character match
@@ -3594,7 +3595,7 @@ public data class WebGpuSurfaceReplacement(
 public data class ResourceResponse(
   public val status: ResourceResponseStatus = ResourceResponseStatus.OK,
   /** Why the request failed, for `ResourceResponseStatus.ERROR`. */
-  public val errorReason: ResourceErrorReason = ResourceErrorReason.NONE,
+  public val errorReason: ResourceErrorReason = ResourceErrorReason.OTHER,
   /** The resource, for `ResourceResponseStatus.OK`. */
   public val bytes: ByteArray = byteArrayOf(),
   /** A description of the error, for `ResourceResponseStatus.ERROR`. */
@@ -3635,8 +3636,7 @@ public data class ResourceResponse(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceTransformError(
-  /** Must not be `ResourceErrorReason.NONE`. */
-  public val reason: ResourceErrorReason,
+  public val reason: ResourceErrorReason = ResourceErrorReason.OTHER,
   public val message: String = "",
   /** When to retry, for `ResourceErrorReason.RATE_LIMIT`. */
   public val retryAfterUnixMs: Long? = null,
@@ -4007,7 +4007,7 @@ public data class HttpHeader(
 public data class HttpHeaderRule(
   /** The kinds of resource that the rule covers. Zero covers every kind. */
   public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
-  public val flags: UrlMatchFlag = UrlMatchFlag.EXACT,
+  public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
   public val headers: List<HttpHeader> = emptyList(),
 )
@@ -4084,7 +4084,7 @@ public data class ResourceRequestInfo(
 public data class ResourceRoute(
   /** The kinds of resource that the route covers. Zero covers every kind. */
   public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
-  public val flags: UrlMatchFlag = UrlMatchFlag.EXACT,
+  public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
 )
 

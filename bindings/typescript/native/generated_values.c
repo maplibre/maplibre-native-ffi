@@ -5896,11 +5896,13 @@ bool mln_ts_write_resource_transform_error(
   (void)child;
   if (!mln_ts_member(call, value, "reason", &member)) return false;
   mln_ts_path(child, sizeof child, path, "reason");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->reason = (mln_resource_error_reason)number;
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->reason = (mln_resource_error_reason)number;
+    }
   }
   if (!mln_ts_member(call, value, "message", &member)) return false;
   mln_ts_path(child, sizeof child, path, "message");

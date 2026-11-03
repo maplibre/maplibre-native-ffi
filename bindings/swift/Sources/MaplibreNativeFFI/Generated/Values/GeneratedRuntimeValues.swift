@@ -393,22 +393,21 @@ public struct ResourceErrorReason: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  public static let none: ResourceErrorReason = .init(rawValue: 0)
+  /// A reason that no other value names.
+  public static let other: ResourceErrorReason = .init(rawValue: 0)
   public static let notFound: ResourceErrorReason = .init(rawValue: 1)
   /// The server reported an error.
   public static let server: ResourceErrorReason = .init(rawValue: 2)
   /// The server couldn't be reached.
   public static let connection: ResourceErrorReason = .init(rawValue: 3)
   public static let rateLimit: ResourceErrorReason = .init(rawValue: 4)
-  public static let other: ResourceErrorReason = .init(rawValue: 5)
   public var description: String {
     switch rawValue {
-    case 0: return "none"
+    case 0: return "other"
     case 1: return "notFound"
     case 2: return "server"
     case 3: return "connection"
     case 4: return "rateLimit"
-    case 5: return "other"
     default: return "ResourceErrorReason(\(rawValue))"
     }
   }
@@ -948,13 +947,12 @@ public typealias ResourceTransformCallback = @Sendable (
 /// See `mln_resource_transform_error` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransformError: Equatable, Hashable, Sendable {
-  /// Must not be `ResourceErrorReason.none`.
   public var reason: ResourceErrorReason
   public var message: String
   /// When to retry, for `ResourceErrorReason.rateLimit`.
   public var retryAfterUnixMs: Int64?
   public init(
-    reason: ResourceErrorReason,
+    reason: ResourceErrorReason = .init(rawValue: 0),
     message: String = "",
     retryAfterUnixMs: Int64? = nil
   ) {
@@ -1634,7 +1632,8 @@ public struct TileOperation: RawRepresentable, CustomStringConvertible,
 
 /// How a URL pattern matches a request's URL.
 ///
-/// A pattern matches the whole URL, query included.
+/// A pattern matches the whole URL, query included. Without flags, it matches
+/// only the URL that equals it exactly.
 ///
 /// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1646,7 +1645,6 @@ public struct UrlMatchFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let exact: UrlMatchFlag = []
   /// The URL matches the pattern as a glob. `*` matches any characters except
   /// `/`, `**` matches any characters, and `?` matches one character except
   /// `/`. `\` makes the next character match only itself. For example,

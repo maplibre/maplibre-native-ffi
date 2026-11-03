@@ -3831,19 +3831,19 @@ native_enum! {
 /// See `mln_resource_error_reason` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum ResourceErrorReason: u32 {
-    None = 0,
+    /// A reason that no other value names.
+    Other = 0,
     NotFound = 1,
     /// The server reported an error.
     Server = 2,
     /// The server couldn't be reached.
     Connection = 3,
     RateLimit = 4,
-    Other = 5,
 } Unknown
 }
 impl Default for ResourceErrorReason {
     fn default() -> Self {
-        Self::None
+        Self::Other
     }
 }
 
@@ -4275,22 +4275,12 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
 ///
 /// See `mln_resource_transform_error` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceTransformError<'a> {
-    /// Must not be `ResourceErrorReason::None`.
     pub reason: ResourceErrorReason,
     pub message: &'a str,
     /// When to retry, for `ResourceErrorReason::RateLimit`.
     pub retry_after_unix_ms: Option<i64>,
-}
-impl<'a> ResourceTransformError<'a> {
-    pub fn new(reason: ResourceErrorReason) -> Self {
-        Self {
-            reason,
-            message: Default::default(),
-            retry_after_unix_ms: None,
-        }
-    }
 }
 impl<'a> ToNative<sys::mln_resource_transform_error> for ResourceTransformError<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_transform_error> {
@@ -5576,7 +5566,8 @@ impl ToNative<sys::mln_unit_bezier> for UnitBezier {
 native_flags! {
 /// How a URL pattern matches a request's URL.
 ///
-/// A pattern matches the whole URL, query included.
+/// A pattern matches the whole URL, query included. Without flags, it matches
+/// only the URL that equals it exactly.
 ///
 /// See `mln_url_match_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

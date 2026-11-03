@@ -66,7 +66,6 @@ static void serve_recorded_tile(
   const mln_resource_response response = {
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-    .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
     .bytes = tile->bytes,
     .byte_count = tile->byte_count,
   };

@@ -70,9 +70,7 @@ void globs_match_the_documented_pattern_language() {
       pattern.c_str()
     );
   }
-  const auto exact = mln::core::UrlPattern{
-    MLN_RESOURCE_KIND_FLAG_ALL, MLN_URL_MATCH_EXACT, "**"
-  };
+  const auto exact = mln::core::UrlPattern{MLN_RESOURCE_KIND_FLAG_ALL, 0, "**"};
   TEST_ASSERT_FALSE(exact.matches(MLN_RESOURCE_KIND_STYLE, style_url));
   TEST_ASSERT_TRUE(exact.matches(MLN_RESOURCE_KIND_STYLE, "**"));
 }
@@ -87,7 +85,7 @@ void routes_match_resolved_urls_and_selected_kinds() {
   const auto resolved = table_of({
     .size = sizeof(mln_resource_route),
     .kinds = MLN_RESOURCE_KIND_FLAG_STYLE | MLN_RESOURCE_KIND_FLAG_SOURCE,
-    .flags = MLN_URL_MATCH_EXACT,
+    .flags = 0,
     .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
   });
   TEST_ASSERT_TRUE(resolved.matches(MLN_RESOURCE_KIND_STYLE, style_url));
@@ -100,7 +98,7 @@ void routes_match_resolved_urls_and_selected_kinds() {
   const auto every_kind = table_of({
     .size = sizeof(mln_resource_route),
     .kinds = 0,
-    .flags = MLN_URL_MATCH_EXACT,
+    .flags = 0,
     .url = MLN_BUFFER_LITERAL("https://maps.localhost/style.json"),
   });
   for (const auto kind :
