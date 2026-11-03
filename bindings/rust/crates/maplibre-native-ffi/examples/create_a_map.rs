@@ -16,7 +16,7 @@ async fn attach_target(
 
 async fn create_a_map() -> Result<()> {
     // #region runtime
-    let runtime = RuntimeHandle::create(&RuntimeOptions::default())?;
+    let runtime = RuntimeHandle::create(None)?;
     // #endregion runtime
 
     // #region map

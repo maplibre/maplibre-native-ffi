@@ -164,7 +164,7 @@ class DartEmitterTests(unittest.TestCase):
         operations = dart.lower(real_api()).files[dart.OPERATIONS]
         runtime = operations.split("final class RuntimeHandle ")[1].split("\n}\n")[0]
         self.assertIn(
-            "  static RuntimeHandle create(RuntimeOptions options) => "
+            "  static RuntimeHandle create({RuntimeOptions? options}) => "
             "withNativeArena((arena) {\n    ensureAbiVersion();",
             runtime,
         )

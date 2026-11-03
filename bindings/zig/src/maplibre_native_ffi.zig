@@ -2234,7 +2234,7 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn create(options: RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
+    pub fn create(options: ?RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
         return call.invoke("mln_runtime_create", .none, {}, null, diagnostic, .{ options, call.adopt(Runtime) });
     }
 

@@ -19,10 +19,10 @@ fn record_region(_region_id: i64, _metadata: &[u8]) {}
 
 async fn offline() -> Result<()> {
     // #region cache-file
-    let runtime = RuntimeHandle::create(&RuntimeOptions {
+    let runtime = RuntimeHandle::create(Some(&RuntimeOptions {
         cache_path: "maplibre-cache.db",
         ..Default::default()
-    })?;
+    }))?;
     // #endregion cache-file
 
     // #region progress

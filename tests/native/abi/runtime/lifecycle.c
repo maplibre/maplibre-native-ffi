@@ -42,12 +42,20 @@ static void runtime_creation_validates_its_options(void) {
   );
 
   mln_runtime runtime = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_runtime_create(NULL, &runtime, NULL));
   MLN_TEST_INVALID(mln_runtime_create(&defaults, NULL, NULL));
 
   runtime = (mln_runtime)1;
   MLN_TEST_INVALID(mln_runtime_create(&defaults, &runtime, NULL));
   TEST_ASSERT_EQUAL_UINT64(1, runtime);
+}
+
+// Null options create a runtime with the defaults, which can host a map.
+static void null_options_create_a_runtime_with_the_defaults(void) {
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_runtime_create(NULL, &runtime, NULL));
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 static void expect_runtime_calls_reject(
@@ -468,6 +476,7 @@ static void a_map_release_completion_can_release_its_runtime(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(runtime_creation_validates_its_options);
+  RUN_TEST(null_options_create_a_runtime_with_the_defaults);
   RUN_TEST(runtime_calls_reject_a_value_that_names_no_runtime);
   RUN_TEST(map_creation_validates_its_options);
   RUN_TEST(map_creation_checks_its_output);

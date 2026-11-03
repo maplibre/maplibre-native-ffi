@@ -73,13 +73,13 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func create(options bindingArg0: RuntimeOptions) throws
+  static func create(options bindingArg0: RuntimeOptions? = nil) throws
     -> RuntimeHandle
   {
     var value0: mln_runtime = 0
     return try MaplibreNativeFFI
       .nativeInvoke { _, arena, diagnostic in try mln_runtime_create(
-        arena.store(bindingArg0.nativeValue(arena: arena)),
+        bindingArg0.map { try arena.store($0.nativeValue(arena: arena)) },
         &value0,
         diagnostic
       ) } result: { try RuntimeHandle(adopting: value0) }

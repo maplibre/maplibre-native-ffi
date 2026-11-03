@@ -67,11 +67,11 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn create(options: &RuntimeOptions<'_>) -> Result<RuntimeHandle> {
+    pub fn create(options: Option<&RuntimeOptions<'_>>) -> Result<RuntimeHandle> {
         let mut call = Call::global();
         crate::abi::validate_abi_version()?;
         let mut out_runtime = sys::mln_runtime(0);
-        let options = call.reference(&options)?;
+        let options = call.optional_reference(options.as_ref())?;
         call.status(|_, out_diagnostic| unsafe {
             sys::mln_runtime_create(options, &mut out_runtime, out_diagnostic)
         })?;

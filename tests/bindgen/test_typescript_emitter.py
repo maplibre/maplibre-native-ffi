@@ -314,7 +314,8 @@ class TypeScriptEmitterTests(unittest.TestCase):
 
     def test_only_a_required_member_must_be_given(self):
         # A member that a host leaves out is zero, as native reads it, except
-        # a required one, which makes its record a required argument too.
+        # a required one. Only a parameter that C marks nullable may be left
+        # out, however few required members its record has.
         generated = emitted(typescript, self.api)
         values = generated["bindings/typescript/src/generated_values.ts"]
         operations = generated["bindings/typescript/src/generated_operations.ts"]
@@ -323,9 +324,10 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("  assetPath?: string;\n", values)
         self.assertIn("createMap(options: MapOptions): NewMap", operations)
         self.assertIn(
-            "  static create(options: RuntimeOptions = {}): Promise<RuntimeHandle> {",
+            "  static create(options?: RuntimeOptions): Promise<RuntimeHandle> {",
             operations,
         )
+        self.assertIn("  resize(logicalSize: LogicalSize): void {", operations)
 
     def test_a_call_that_waits_for_a_thread_start_runs_on_its_own_thread(self):
         # A browser page cannot wait for a thread to start, so the export
@@ -339,14 +341,16 @@ class TypeScriptEmitterTests(unittest.TestCase):
             operations,
         )
         self.assertIn("so a browser page, which cannot block,", operations)
+        # An absent nullable argument copies only its absence.
         self.assertIn(
-            "  mln_status status = mln_runtime_create("
-            "&arguments->arg_options, &handle, diagnostic);\n",
+            "  mln_status status = mln_runtime_create(arguments->present_options "
+            "? &arguments->arg_options : NULL, &handle, diagnostic);\n",
             addon,
         )
         self.assertIn("  mln_runtime_dispose((mln_runtime)handle, NULL);\n", addon)
         self.assertIn(
-            "  arguments.arg_options = arg_options;\n"
+            "  arguments.present_options = present_options != NULL;\n"
+            "  if (present_options) arguments.arg_options = arg_options;\n"
             "  mln_ts_start_thread(call, call->argv[1], mln_ts_run_mln_runtime_create, "
             "mln_ts_dispose_mln_runtime_create, &arguments, sizeof arguments);\n",
             addon,

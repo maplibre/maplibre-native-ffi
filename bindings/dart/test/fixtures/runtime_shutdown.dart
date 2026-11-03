@@ -11,7 +11,7 @@ Future<void> closeRuntimes() async {
   for (var cycle = 0; cycle < 3; cycle++) {
     await Future.wait(
       List.generate(2, (_) async {
-        final runtime = RuntimeHandle.create(RuntimeOptions());
+        final runtime = RuntimeHandle.create();
         final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
         await ready;
         try {
@@ -39,7 +39,7 @@ const _emptyStyle = {
 /// Leaves a runtime and a map with a loaded style open, for the isolate's
 /// shutdown to finalize.
 Future<void> abandonHandles() async {
-  final runtime = RuntimeHandle.create(RuntimeOptions());
+  final runtime = RuntimeHandle.create();
   final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await ready;
   await map.setStyleJson(_emptyStyle);
@@ -50,7 +50,7 @@ Future<void> abandonHandles() async {
 /// with its runtime and map, for the isolate's shutdown to finalize while the
 /// process exits.
 Future<void> abandonSession() async {
-  final runtime = RuntimeHandle.create(RuntimeOptions());
+  final runtime = RuntimeHandle.create();
   final NewMap(:map, :ready) = runtime.createMap(
     MapOptions(
       initialExtent: LogicalExtent(width: 32, height: 32, scaleFactor: 1),
@@ -106,7 +106,7 @@ Future<void> abandonSession() async {
 /// port that the provider closes.
 Future<void> exitWithLiveCallbacks() async {
   setLogCallback(LogHandler(callback: (_, _, _, _) {}));
-  final runtime = RuntimeHandle.create(RuntimeOptions());
+  final runtime = RuntimeHandle.create();
   final waiting = ReceivePort();
   final served = Completer<void>();
   await runtime.setResourceProvider(

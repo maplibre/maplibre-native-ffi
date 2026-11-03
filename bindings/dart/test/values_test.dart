@@ -120,7 +120,9 @@ void main() {
   test('host strings use views and native-lent strings decode', () async {
     // Native rejects a NUL in a path view before a C-string consumer reads it.
     expect(
-      () => RuntimeHandle.create(RuntimeOptions(cachePath: 'cache\u0000tail')),
+      () => RuntimeHandle.create(
+        options: RuntimeOptions(cachePath: 'cache\u0000tail'),
+      ),
       throwsA(
         isA<MaplibreException>().having(
           (error) => error.status,

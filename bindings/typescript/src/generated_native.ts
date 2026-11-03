@@ -102,8 +102,8 @@ export interface NativeOperations {
   ): void;
   mln_c_version(): number;
   mln_camera_for_tile(
-    tile: CanonicalTileId | undefined,
-    logicalSize: LogicalSize | undefined,
+    tile: CanonicalTileId,
+    logicalSize: LogicalSize,
   ): CameraOptions;
   mln_geo_json_source_data_create(
     data: unknown,
@@ -113,11 +113,11 @@ export interface NativeOperations {
     data: bigint,
     token: object | undefined,
   ): void;
-  mln_lat_lng_for_projected_meters(meters: ProjectedMeters | undefined): LatLng;
+  mln_lat_lng_for_projected_meters(meters: ProjectedMeters): LatLng;
   mln_log_clear_callback(): void;
   mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
   mln_log_set_callback(handler: LogHandler): void;
-  mln_logical_extent_physical_size(extent: LogicalExtent | undefined): {
+  mln_logical_extent_physical_size(extent: LogicalExtent): {
     readonly width: number;
     readonly height: number;
   };
@@ -160,7 +160,7 @@ export interface NativeOperations {
   ): void;
   mln_map_apply_camera_delta(
     map: bigint,
-    delta: CameraDelta | undefined,
+    delta: CameraDelta,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_attach_metal_borrowed_texture(
@@ -230,7 +230,7 @@ export interface NativeOperations {
   ): void;
   mln_map_camera_for_lat_lng_bounds(
     map: bigint,
-    bounds: LatLngBounds | undefined,
+    bounds: LatLngBounds,
     fitOptions: CameraFitOptions | undefined,
     completion: NativeCompletion,
   ): void;
@@ -261,19 +261,19 @@ export interface NativeOperations {
   mln_map_fit_camera_to_geometry(
     map: bigint,
     geometry: unknown,
-    update: CameraFitUpdate | undefined,
+    update: CameraFitUpdate,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_fit_camera_to_lat_lng_bounds(
     map: bigint,
-    bounds: LatLngBounds | undefined,
-    update: CameraFitUpdate | undefined,
+    bounds: LatLngBounds,
+    update: CameraFitUpdate,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_fit_camera_to_lat_lngs(
     map: bigint,
     coordinates: readonly LatLng[],
-    update: CameraFitUpdate | undefined,
+    update: CameraFitUpdate,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_get_camera(map: bigint, completion: NativeCompletion): void;
@@ -332,24 +332,24 @@ export interface NativeOperations {
   mln_map_invalidate_custom_geometry_source_region(
     map: bigint,
     sourceId: string,
-    bounds: LatLngBounds | undefined,
+    bounds: LatLngBounds,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_invalidate_custom_geometry_source_tile(
     map: bigint,
     sourceId: string,
-    tileId: CanonicalTileId | undefined,
+    tileId: CanonicalTileId,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_invalidate_custom_vector_source_tile(
     map: bigint,
     sourceId: string,
-    tileId: CanonicalTileId | undefined,
+    tileId: CanonicalTileId,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_lat_lng_bounds_for_camera(
     map: bigint,
-    camera: CameraOptions | undefined,
+    camera: CameraOptions,
     completion: NativeCompletion,
   ): void;
   mln_map_list_style_layers(map: bigint, completion: NativeCompletion): void;
@@ -360,15 +360,15 @@ export interface NativeOperations {
     beforeLayerId: string,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_projection_create(view: MapView | undefined): bigint;
+  mln_map_projection_create(view: MapView): bigint;
   mln_map_projection_get_camera(projection: bigint): MapProjectionCameraResult;
   mln_map_projection_lat_lng_for_pixel(
     projection: bigint,
-    point: ScreenPoint | undefined,
+    point: ScreenPoint,
   ): LatLng;
   mln_map_projection_lat_lng_for_pixel_unwrapped(
     projection: bigint,
-    point: ScreenPoint | undefined,
+    point: ScreenPoint,
   ): LatLng;
   mln_map_projection_lat_lngs_for_pixels(
     projection: bigint,
@@ -384,7 +384,7 @@ export interface NativeOperations {
   ): number;
   mln_map_projection_pixel_for_lat_lng(
     projection: bigint,
-    coordinate: LatLng | undefined,
+    coordinate: LatLng,
   ): ScreenPoint;
   mln_map_projection_pixels_for_lat_lngs(
     projection: bigint,
@@ -396,7 +396,7 @@ export interface NativeOperations {
   ): void;
   mln_map_projection_set_camera(
     projection: bigint,
-    camera: CameraOptions | undefined,
+    camera: CameraOptions,
   ): void;
   mln_map_release(
     map: bigint,
@@ -430,32 +430,32 @@ export interface NativeOperations {
   mln_map_request_still_image(map: bigint, completion: NativeCompletion): void;
   mln_map_resize(
     map: bigint,
-    logicalSize: LogicalSize | undefined,
+    logicalSize: LogicalSize,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_bounds(
     map: bigint,
-    options: BoundOptions | undefined,
+    options: BoundOptions,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_geometry_source_tile_data(
     map: bigint,
     sourceId: string,
-    tileId: CanonicalTileId | undefined,
+    tileId: CanonicalTileId,
     data: unknown,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_geometry_source_tile_error(
     map: bigint,
     sourceId: string,
-    tileId: CanonicalTileId | undefined,
+    tileId: CanonicalTileId,
     message: string,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_custom_vector_source_tile_data(
     map: bigint,
     sourceId: string,
-    tileId: CanonicalTileId | undefined,
+    tileId: CanonicalTileId,
     encoding: StyleVectorTileEncoding,
     data: Uint8Array,
     completion: NativeCompletion | undefined,
@@ -463,7 +463,7 @@ export interface NativeOperations {
   mln_map_set_custom_vector_source_tile_error(
     map: bigint,
     sourceId: string,
-    tileId: CanonicalTileId | undefined,
+    tileId: CanonicalTileId,
     message: string,
     completion: NativeCompletion | undefined,
   ): void;
@@ -485,7 +485,7 @@ export interface NativeOperations {
   ): void;
   mln_map_set_free_camera_options(
     map: bigint,
-    options: FreeCameraOptions | undefined,
+    options: FreeCameraOptions,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_geo_json_source_data(
@@ -532,7 +532,7 @@ export interface NativeOperations {
   ): void;
   mln_map_set_projection_mode(
     map: bigint,
-    options: ProjectionModeOptions | undefined,
+    options: ProjectionModeOptions,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_rendering_stats_view_enabled(
@@ -578,7 +578,7 @@ export interface NativeOperations {
   ): void;
   mln_map_set_style_transition_options(
     map: bigint,
-    options: StyleTransitionOptions | undefined,
+    options: StyleTransitionOptions,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_url(
@@ -588,17 +588,17 @@ export interface NativeOperations {
   ): void;
   mln_map_set_tile_options(
     map: bigint,
-    options: MapTileOptions | undefined,
+    options: MapTileOptions,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_viewport_options(
     map: bigint,
-    options: MapViewportOptions | undefined,
+    options: MapViewportOptions,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_update_camera(
     map: bigint,
-    update: CameraUpdate | undefined,
+    update: CameraUpdate,
     completion: NativeCompletion | undefined,
   ): void;
   mln_network_get_status(): NetworkStatus;
@@ -609,9 +609,7 @@ export interface NativeOperations {
   mln_offscreen_device_release(device: bigint, token: object | undefined): void;
   mln_open_gl_supported_context_provider_mask(): OpenGlContextProviderFlag;
   mln_plugin_get_register_function_v1(): bigint;
-  mln_projected_meters_for_lat_lng(
-    coordinate: LatLng | undefined,
-  ): ProjectedMeters;
+  mln_projected_meters_for_lat_lng(coordinate: LatLng): ProjectedMeters;
   mln_render_session_abandon(session: bigint): RenderAbandonResult;
   mln_render_session_acquire_frame(session: bigint): bigint | undefined;
   mln_render_session_barrier(
@@ -622,10 +620,7 @@ export interface NativeOperations {
     session: bigint,
     completion: NativeCompletion,
   ): void;
-  mln_render_session_demand_frame(
-    session: bigint,
-    demand: FrameDemand | undefined,
-  ): void;
+  mln_render_session_demand_frame(session: bigint, demand: FrameDemand): void;
   mln_render_session_detach(
     session: bigint,
     completion: NativeCompletion,
@@ -682,7 +677,7 @@ export interface NativeOperations {
   ): void;
   mln_render_session_resize(
     session: bigint,
-    logicalSize: LogicalSize | undefined,
+    logicalSize: LogicalSize,
     completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
@@ -729,7 +724,7 @@ export interface NativeOperations {
   mln_resource_request_complete(
     handle: bigint,
     token: object | undefined,
-    response: ResourceResponse | undefined,
+    response: ResourceResponse,
   ): void;
   mln_resource_request_is_cancelled(handle: bigint): boolean;
   mln_resource_request_pass_through(
@@ -749,7 +744,7 @@ export interface NativeOperations {
   mln_resource_transform_request_fail(
     request: bigint,
     token: object | undefined,
-    error: ResourceTransformError | undefined,
+    error: ResourceTransformError,
   ): void;
   mln_resource_transform_request_release(
     request: bigint,

@@ -15,7 +15,7 @@ internal static class CreateAMap
     internal static async Task Run()
     {
         // #region runtime
-        var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        var runtime = RuntimeHandle.Create();
         // #endregion runtime
 
         // #region map

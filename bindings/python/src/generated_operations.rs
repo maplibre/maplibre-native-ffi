@@ -1594,9 +1594,6 @@ fn generated_input_mln_bound_options<'py>(
     let mut raw: sys::mln_bound_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_bound_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "bounds")? {
         raw.bounds = generated_input_mln_lat_lng_bounds(&field, storage)?;
         raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
@@ -1682,9 +1679,6 @@ fn generated_input_mln_camera_fit_options<'py>(
     let mut raw: sys::mln_camera_fit_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_fit_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "padding")? {
         raw.padding = generated_input_mln_edge_insets(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_FIT_OPTION_PADDING;
@@ -1721,9 +1715,6 @@ fn generated_input_mln_camera_options<'py>(
     let mut raw: sys::mln_camera_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "center")? {
         raw.center = generated_input_mln_lat_lng(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
@@ -2002,9 +1993,6 @@ fn generated_input_mln_free_camera_options<'py>(
     let mut raw: sys::mln_free_camera_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_free_camera_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "position")? {
         raw.position = generated_input_mln_vec3(&field, storage)?;
         raw.fields |= sys::MLN_FREE_CAMERA_OPTION_POSITION;
@@ -2023,9 +2011,6 @@ fn generated_input_mln_geo_json_source_options<'py>(
     let mut raw: sys::mln_geo_json_source_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_geo_json_source_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "min_zoom")? {
         raw.min_zoom = field.extract::<f64>()?;
         raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM;
@@ -2250,9 +2235,6 @@ fn generated_input_mln_map_tile_options<'py>(
     let mut raw: sys::mln_map_tile_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_map_tile_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "prefetch_zoom_delta")? {
         raw.prefetch_zoom_delta = field.extract::<u32>()?;
         raw.fields |= sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
@@ -2320,9 +2302,6 @@ fn generated_input_mln_map_viewport_options<'py>(
     let mut raw: sys::mln_map_viewport_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_map_viewport_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "north_orientation")? {
         raw.north_orientation = field.extract::<sys::mln_north_orientation>()?;
         raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
@@ -2498,9 +2477,6 @@ fn generated_input_mln_offscreen_device_options<'py>(
     let mut raw: sys::mln_offscreen_device_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_offscreen_device_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "adapter_index")? {
         raw.adapter_index = field.extract::<u32>()?;
         raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
@@ -2668,9 +2644,6 @@ fn generated_input_mln_projection_mode_options<'py>(
     let mut raw: sys::mln_projection_mode_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_projection_mode_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "axonometric")? {
         raw.axonometric = field.extract::<bool>()?;
         raw.fields |= sys::MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
@@ -2739,9 +2712,6 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
     let mut raw: sys::mln_rendered_feature_query_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_rendered_feature_query_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "layer_ids")? {
         raw.layer_ids = {
             let items = generated_items(&field, |item| storage.buffer(item, true))?;
@@ -2976,9 +2946,6 @@ fn generated_input_mln_runtime_options<'py>(
 ) -> PyResult<sys::mln_runtime_options> {
     let mut raw: sys::mln_runtime_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
-    if value.is_none() {
-        return Ok(raw);
-    }
     raw.asset_path = storage.buffer(value.getattr("asset_path")?, true)?;
     raw.cache_path = storage.buffer(value.getattr("cache_path")?, true)?;
     Ok(raw)
@@ -3027,9 +2994,6 @@ fn generated_input_mln_source_feature_query_options<'py>(
     let mut raw: sys::mln_source_feature_query_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_source_feature_query_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "source_layer_ids")? {
         raw.source_layer_ids = {
             let items = generated_items(&field, |item| storage.buffer(item, true))?;
@@ -3081,9 +3045,6 @@ fn generated_input_mln_style_expression_options<'py>(
     let mut raw: sys::mln_style_expression_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_expression_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "expected_type")? {
         raw.expected_type = generated_input_mln_style_expression_type(&field, storage)?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE;
@@ -3114,9 +3075,6 @@ fn generated_input_mln_style_image_options<'py>(
     let mut raw: sys::mln_style_image_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_image_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "stretch_x")? {
         raw.stretch_x = {
             let items = generated_items(&field, |item| {
@@ -3172,9 +3130,6 @@ fn generated_input_mln_style_transition_options<'py>(
     let mut raw: sys::mln_style_transition_options = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_style_transition_options>() as _;
     raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
     if let Some(field) = generated_present(value, "duration_ms")? {
         raw.duration_ms = field.extract::<f64>()?;
         raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DURATION;
@@ -5106,15 +5061,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (camera=None))]
+    #[pyo3(signature = (camera))]
     fn lat_lng_bounds_for_camera(
         &self,
         py: Python<'_>,
-        camera: Option<Bound<'_, PyAny>>,
+        camera: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let camera = camera.unwrap_or_else(|| py.None().into_bound(py));
         let camera_value = generated_input_mln_camera_options(&camera.clone(), storage)?;
         let handle = self.input();
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
@@ -5432,11 +5386,10 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
-    fn set_bounds(&self, py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (options))]
+    fn set_bounds(&self, py: Python<'_>, options: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_bound_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -5445,15 +5398,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn _discard_set_bounds(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_bound_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -5788,15 +5740,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn set_free_camera_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_free_camera_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -5805,15 +5756,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn _discard_set_free_camera_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_free_camera_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6162,15 +6112,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn set_projection_mode(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_projection_mode_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6179,15 +6128,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn _discard_set_projection_mode(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_projection_mode_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6496,15 +6444,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn set_style_transition_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_style_transition_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -6519,15 +6466,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn _discard_set_style_transition_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value =
             generated_input_mln_style_transition_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -6570,15 +6516,10 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
-    fn set_tile_options(
-        &self,
-        py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (options))]
+    fn set_tile_options(&self, py: Python<'_>, options: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_tile_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6587,15 +6528,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn _discard_set_tile_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_tile_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6604,15 +6544,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn set_viewport_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_viewport_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6621,15 +6560,14 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options=None))]
+    #[pyo3(signature = (options))]
     fn _discard_set_viewport_options(
         &self,
         py: Python<'_>,
-        options: Option<Bound<'_, PyAny>>,
+        options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
         let options_value = generated_input_mln_map_viewport_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -6897,11 +6835,10 @@ impl MapProjectionHandle {
         reservation.commit();
         Ok(py.None())
     }
-    #[pyo3(signature = (camera=None))]
-    fn set_camera(&self, py: Python<'_>, camera: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (camera))]
+    fn set_camera(&self, py: Python<'_>, camera: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let camera = camera.unwrap_or_else(|| py.None().into_bound(py));
         let camera_value = generated_input_mln_camera_options(&camera.clone(), storage)?;
         let handle = self.input();
         unsafe {
@@ -7795,11 +7732,17 @@ impl RuntimeHandle {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_input_mln_runtime_options(&options.clone(), storage)?;
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_runtime_options(&options, storage)
+        })?;
         let mut out_runtime: sys::mln_runtime = unsafe { std::mem::zeroed() };
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_runtime_create(&options_value, &mut out_runtime, diagnostic)
+                sys::mln_runtime_create(
+                    generated_pointer(&options_value),
+                    &mut out_runtime,
+                    diagnostic,
+                )
             })
         }?;
         unsafe { RuntimeHandle::adopt(py, out_runtime, Vec::new()) }

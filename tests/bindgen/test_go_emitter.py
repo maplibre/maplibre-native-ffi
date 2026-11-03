@@ -94,7 +94,7 @@ class GoEmitterTests(unittest.TestCase):
     def test_a_factory_is_new_and_a_global_names_its_verb_first(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
-            "func NewRuntime(options RuntimeOptions) (*RuntimeHandle, error) {",
+            "func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {",
             source,
         )
         self.assertNotIn("func RuntimeCreate(", source)

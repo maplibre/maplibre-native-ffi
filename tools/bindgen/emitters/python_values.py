@@ -118,9 +118,6 @@ class Values:
         self.records: dict[str, ValuePlan] = {}
         self.inputs: dict[str, ValuePlan] = {}
         self.outputs: set[str] = set()
-        # The records that an operation lets its caller omit, which convert
-        # None to their zero value.
-        self.omittable: set[str] = set()
         self.disposed: set[str] = set()
         self.enums: dict[str, ValuePlan] = {}
 
@@ -466,8 +463,6 @@ class Values:
                 lines.append(
                     f"raw.{rust_field(field.name)} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'};"
                 )
-        if name in self.omittable:
-            lines.append("if value.is_none() { return Ok(raw); }")
         for member, value, field in self.members(plan):
             # A record of only a union is presented as the selected variant.
             lines.append(

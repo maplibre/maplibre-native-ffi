@@ -423,25 +423,11 @@ def lower_input(
         else:
             body += read
             args.append(f"&{local}")
-        # A release states its inputs, such as the frame consumer's GPU
-        # completion, which a default would claim.
-        optional = (
-            not registration_value
-            and not value.nullable
-            and values.all_omittable(element)
-            and plan.shape not in {"release", "release_async"}
-        )
         lowered.native_parameters.append(
-            NativeParameter(
-                public_name_, ts + (" | undefined" if nullable or optional else "")
-            )
+            NativeParameter(public_name_, ts + (" | undefined" if nullable else ""))
         )
         lowered.parameters.append(
-            PublicParameter(
-                public_name_,
-                ts,
-                "undefined" if nullable else ("{}" if optional else None),
-            )
+            PublicParameter(public_name_, ts, "undefined" if nullable else None)
         )
         return
     values.check(value, "in")
@@ -459,9 +445,7 @@ def lower_input(
         locals_.append(f"{scalar_local(ctype)} {local};")
         body.append(f"memset(&{local}, 0, sizeof {local});")
     read = natives.read(value, js, local, path, "goto done")
-    absent = values.absent(value) or (
-        value.kind == "record" and values.all_omittable(value)
-    )
+    absent = values.absent(value)
     if absent:
         body.append(f"if (!mln_ts_is_absent(call, {js})) {{")
         body += [f"  {line}" for line in read]
@@ -477,7 +461,7 @@ def lower_input(
         PublicParameter(
             public_name_,
             ts,
-            "undefined" if values.absent(value) else ("{}" if absent else None),
+            "undefined" if absent else None,
         )
     )
 
@@ -819,7 +803,8 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
     A thread that a browser page starts runs only after the page yields, so
     the page cannot wait for one. The export copies the converted arguments,
     with the call memory that they point into, and returns at once; the call's
-    thread creates the owner and settles the Promise through the realm.
+    thread creates the owner and settles the Promise through the realm. An
+    absent nullable argument copies only its absence.
     """
     lowered = call.lowered
     plan = lowered.plan
@@ -844,14 +829,19 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
         if match:
             types[match.group(2)] = match.group(1)
     output = f"&arg_{owned.parameter}"
-    members, run_arguments = [], []
+    members, present, run_arguments = [], [], []
     for argument in call.args:
         name = argument.removeprefix("&")
+        nullable = re.fullmatch(r"present_(\w+)", argument)
         if argument == output:
             run_arguments.append("&handle")
         elif re.fullmatch(r"arg_\w+", name) and name in types:
             members.append(name)
             run_arguments.append(argument.replace(name, f"arguments->{name}"))
+        elif nullable and argument in types and f"arg_{nullable[1]}" in types:
+            value = f"arg_{nullable[1]}"
+            present.append((argument, value))
+            run_arguments.append(f"arguments->{argument} ? &arguments->{value} : NULL")
         else:
             raise Unsupported(f"blocks={plan.blocks} copies only converted arguments")
     name = plan.name
@@ -863,7 +853,10 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
     # diagnostic, which simple_disposer() allows.
     extra = len(cleanup.parameters) - 1 + bool(cleanup.diagnostic)
     dispose = ", ".join([f"({native})handle", *["NULL"] * extra])
-    fields = "".join(f"  {types[member]} {member};\n" for member in members)
+    fields = "".join(f"  {types[member]} {member};\n" for member in members) + "".join(
+        f"  {types[value]} {value};\n  bool {argument};\n"
+        for argument, value in present
+    )
     lowered.c_helpers = (
         f"typedef struct {structure} {{\n{fields}}} {structure};\n\n"
         f"static mln_status mln_ts_run_{name}(\n"
@@ -885,6 +878,14 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
     lowered.c_locals.append(f"{structure} arguments;")
     lowered.c_body += [
         *[f"arguments.{member} = {member};" for member in members],
+        *[
+            line
+            for argument, value in present
+            for line in (
+                f"arguments.{argument} = {argument} != NULL;",
+                f"if ({argument}) arguments.{value} = {value};",
+            )
+        ],
         (
             f"mln_ts_start_thread(call, call->argv[{call.index}], mln_ts_run_{name}, "
             f"mln_ts_dispose_{name}, &arguments, sizeof arguments);"

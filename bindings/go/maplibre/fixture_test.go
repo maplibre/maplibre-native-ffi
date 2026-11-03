@@ -127,7 +127,7 @@ func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 func newRuntimeFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
-	runtime, err := NewRuntime(RuntimeOptions{CachePath: ":memory:"})
+	runtime, err := NewRuntime(&RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
 		t.Fatalf("NewRuntime: %v", err)
 	}

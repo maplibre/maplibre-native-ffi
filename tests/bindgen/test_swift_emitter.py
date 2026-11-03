@@ -163,7 +163,7 @@ class SwiftEmitterTests(unittest.TestCase):
             "Generated/Operations/GeneratedRuntimeRuntimeOperations.swift"
         ]
         self.assertIn(
-            "static func `create`(`options` bindingArg0: RuntimeOptions) throws "
+            "static func `create`(`options` bindingArg0: RuntimeOptions? = nil) throws "
             "-> RuntimeHandle {",
             runtime.split("public extension RuntimeHandle {")[1],
         )

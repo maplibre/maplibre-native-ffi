@@ -492,11 +492,11 @@ internal constructor(
      * See `mln_runtime_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
      */
-    public suspend fun create(options: RuntimeOptions): RuntimeHandle =
+    public suspend fun create(options: RuntimeOptions? = null): RuntimeHandle =
       nativeThreadStart({ it.dispose() }) {
         val out = allocate(8, w(8, 8, 4))
         threadStart { diagnostic ->
-          C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic)
+          C.mln_runtime_create(options?.let { writeRuntimeOptions(it) } ?: 0L, out, diagnostic)
         }
         adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle(it) }
       }

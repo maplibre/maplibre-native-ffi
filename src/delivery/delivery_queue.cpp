@@ -506,10 +506,13 @@ auto resolve_delivery_queue(mln_delivery_queue queue)
 auto create_delivery_queue(
   const mln_delivery_queue_options* options, mln_delivery_queue* out_queue
 ) -> mln_status {
-  if (options == nullptr) {
-    core::set_thread_error("options must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  // Null options mean the defaults: no wake and no abandoned release.
+  const auto defaults = mln_delivery_queue_options{
+    .size = sizeof(mln_delivery_queue_options),
+    .wake = {},
+    .release_abandoned_user_data = nullptr,
+  };
+  if (options == nullptr) options = &defaults;
   if (options->size < sizeof(mln_delivery_queue_options)) {
     core::set_thread_error("mln_delivery_queue_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;

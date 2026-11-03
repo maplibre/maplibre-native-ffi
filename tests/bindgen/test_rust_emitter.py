@@ -205,7 +205,7 @@ class RustEmitterTests(unittest.TestCase):
         prefix = "crates/maplibre-native-ffi/src/generated/"
         self.assertIn("impl RuntimeHandle {", generated[prefix + "runtime.rs"])
         self.assertIn(
-            "    pub fn create(options: &RuntimeOptions<'_>) -> Result<RuntimeHandle> {",
+            "    pub fn create(options: Option<&RuntimeOptions<'_>>) -> Result<RuntimeHandle> {",
             generated[prefix + "runtime.rs"],
         )
         source = generated[prefix + "global.rs"]

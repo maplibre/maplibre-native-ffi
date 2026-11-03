@@ -181,11 +181,32 @@ static void releasing_from_the_wake_neither_deadlocks_nor_wakes_again(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Null options make a queue with no wake, which holds its calls until the
+// host dispatches it.
+static void null_options_make_a_queue_without_a_wake(void) {
+  mln_test_calls_reset();
+  mln_delivery_queue queue = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_delivery_queue_create(NULL, &queue, NULL));
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  const mln_completion completion = mln_test_queue_completion(queue, (void*)1);
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &completion, NULL));
+  MLN_TEST_OK(mln_test_map_fence(map));
+  TEST_ASSERT_EQUAL_size_t(0, mln_test_calls.count);
+  MLN_TEST_OK(mln_delivery_queue_dispatch(queue, NULL));
+  TEST_ASSERT_EQUAL_size_t(1, mln_test_calls.count);
+  TEST_ASSERT_EQUAL_PTR((void*)1, mln_test_call_at(0)->user_data);
+
+  mln_delivery_queue_release(queue);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void handles_report_their_status(void) {
   mln_delivery_queue_release(MLN_HANDLE_NULL);
 
   mln_delivery_queue unused = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_delivery_queue_create(NULL, &unused, NULL));
   mln_delivery_queue_options options = {.size = 1};
   MLN_TEST_INVALID(mln_delivery_queue_create(&options, &unused, NULL));
   options.size = sizeof(options);
@@ -208,5 +229,6 @@ MLN_TEST_GROUP {
   RUN_TEST(concurrent_dispatches_run_each_call_exactly_once);
   RUN_TEST(a_queued_call_outlives_its_runtime);
   RUN_TEST(releasing_from_the_wake_neither_deadlocks_nor_wakes_again);
+  RUN_TEST(null_options_make_a_queue_without_a_wake);
   RUN_TEST(handles_report_their_status);
 }

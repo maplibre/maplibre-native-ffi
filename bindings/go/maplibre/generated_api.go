@@ -8684,10 +8684,10 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[CommandCompleti
 //
 // See mln_runtime_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func NewRuntime(options RuntimeOptions) (*RuntimeHandle, error) {
+func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {
 	var outRuntime C.mln_runtime
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_create(bindingStore(nativeRuntimeOptions(options, arena), arena), &outRuntime, diagnostic))
+		return int32(C.mln_runtime_create(bindingStoreOptional(options, arena, nativeRuntimeOptions), &outRuntime, diagnostic))
 	}, func(arena *bindingArena) *RuntimeHandle {
 		adopted := adoptRuntimeHandle(uint64(outRuntime), nil)
 		return adopted

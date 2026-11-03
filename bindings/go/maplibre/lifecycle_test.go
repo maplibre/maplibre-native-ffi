@@ -150,7 +150,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 // that the runtime holds still receives the map's events.
 func TestChildKeepsItsParentAlive(t *testing.T) {
 	// No fixture: its cleanup would keep the runtime reachable.
-	runtime, err := NewRuntime(RuntimeOptions{CachePath: ":memory:"})
+	runtime, err := NewRuntime(&RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
