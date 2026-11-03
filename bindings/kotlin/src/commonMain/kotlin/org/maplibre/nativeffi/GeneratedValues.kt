@@ -2807,6 +2807,27 @@ public data class CameraQueryResult(
 )
 
 /**
+ * The ID of a feature in a source, as the source's data gives it.
+ *
+ * The map compares feature IDs as text, so a string and a number with the same text, such as "7"
+ * and 7, name the same feature. A number's text is its shortest decimal form without a trailing
+ * ".0", so 7, 7.0, and "7" name the same feature, and so do 1e21 and "1e21".
+ *
+ * See `mln_feature_id` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public sealed interface FeatureId {
+  public data class StringValue(public val value: String) : FeatureId
+
+  public data class UintValue(public val value: ULong) : FeatureId
+
+  public data class IntValue(public val value: Long) : FeatureId
+
+  /** A finite number. */
+  public data class DoubleValue(public val value: Double) : FeatureId
+}
+
+/**
  * The features whose state to set, read, or remove.
  *
  * See `mln_feature_state_selector` in the
@@ -2820,7 +2841,7 @@ public data class FeatureStateSelector(
    * The feature's ID. Setting or reading state needs it. Without it,
    * `MapHandle.removeFeatureState()` removes the state of every feature in the source layer.
    */
-  public val featureId: String? = null,
+  public val featureId: FeatureId? = null,
   /**
    * The one key that `MapHandle.removeFeatureState()` removes. It needs `feature_id`. Empty removes
    * every key.

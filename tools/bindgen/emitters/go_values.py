@@ -183,12 +183,23 @@ class Values:
     def union_input(self, union, expr, dest, tag):
         arms = []
         for variant in union.fields:
+            case = f"case {variant_name(self.union_name(union), variant)}: "
             converter = self.converter(variant.value)
-            if converter is None:
+            if converter is not None:
+                arms.append(
+                    case
+                    + f"bindingUnionStore({dest}[:], {converter}(variant.Value, arena))"
+                )
+            elif variant.value.kind == "buffer" and not variant.value.ctype.pointee:
+                # A buffer view carries its own size, so its conversion writes
+                # nothing outside the variant.
+                converted = self.native(variant.value, "variant.Value", "converted")
+                arms.append(
+                    case
+                    + f"var converted C.{variant.value.native}; {converted}; bindingUnionStore({dest}[:], converted)"
+                )
+            else:
                 self.fail(variant.value, "missing union variant conversion")
-            arms.append(
-                f"case {variant_name(self.union_name(union), variant)}: bindingUnionStore({dest}[:], {converter}(variant.Value, arena))"
-            )
         # A pointer to a variant, or a type embedding one, also satisfies the
         # sealed interface, so every union rejects what the switch doesn't name.
         arms.append('default: arena.fail("unknown input union variant")')

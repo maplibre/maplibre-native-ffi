@@ -332,15 +332,20 @@ def declaration(values, value):
         if value.native in values.bound.inputs
         else ""
     )
+    decoder = (
+        f"""  init(raw: {value.native}, recordBytes: UnsafeRawBufferPointer? = nil) throws {{
+{chr(10).join(decode_lines)}
+  }}
+"""
+        if value.native in values.bound.returned
+        else ""
+    )
     rendered = f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
   public init({", ".join(args)}) {{
 {chr(10).join(init)}
   }}
-  init(raw: {value.native}, recordBytes: UnsafeRawBufferPointer? = nil) throws {{
-{chr(10).join(decode_lines)}
-  }}
-{encoder}}}
+{decoder}{encoder}}}
 """
     return rendered
 

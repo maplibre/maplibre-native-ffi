@@ -478,6 +478,33 @@ internal static unsafe class GeneratedValues
         return copied;
     }
 
+    internal static mln_feature_id NativeFeatureId(FeatureId value, NativeCallScope scope)
+    {
+        var native = new mln_feature_id();
+        switch (value)
+        {
+            case FeatureId.StringValue selected:
+                native.type = mln_feature_id_type.MLN_FEATURE_ID_TYPE_STRING;
+                native.data.string_value = scope.Utf8(selected.Value);
+                break;
+            case FeatureId.UintValue selected:
+                native.type = mln_feature_id_type.MLN_FEATURE_ID_TYPE_UINT;
+                native.data.uint_value = selected.Value;
+                break;
+            case FeatureId.IntValue selected:
+                native.type = mln_feature_id_type.MLN_FEATURE_ID_TYPE_INT;
+                native.data.int_value = selected.Value;
+                break;
+            case FeatureId.DoubleValue selected:
+                native.type = mln_feature_id_type.MLN_FEATURE_ID_TYPE_DOUBLE;
+                native.data.double_value = selected.Value;
+                break;
+            default:
+                throw new ArgumentException("A union variant is required.", nameof(value));
+        }
+        return native;
+    }
+
     internal static mln_feature_state_selector NativeFeatureStateSelector(
         FeatureStateSelector value,
         NativeCallScope scope
@@ -496,7 +523,7 @@ internal static unsafe class GeneratedValues
             ref native.feature_id,
             MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
             scope,
-            static (present, scope) => scope.Utf8(present)
+            static (present, scope) => NativeFeatureId(present, scope)
         );
         native.state_key = scope.Utf8(value.StateKey);
         return native;

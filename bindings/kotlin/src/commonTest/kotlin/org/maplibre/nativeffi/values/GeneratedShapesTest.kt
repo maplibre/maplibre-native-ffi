@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
+import org.maplibre.nativeffi.FeatureId
 import org.maplibre.nativeffi.FeatureStateSelector
 import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.LatLng
@@ -85,13 +86,13 @@ class GeneratedShapesTest {
       assertFailsWithStatus(Status.INVALID_ARGUMENT) { map.setStyleUrl("custom://a\u0000b") }
 
       // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
-      val withNul = FeatureStateSelector("source", featureId = "a\u0000b")
+      val withNul = FeatureStateSelector("source", featureId = FeatureId.StringValue("a\u0000b"))
       map.setFeatureState(withNul, """{"hover":true}""").await()
       assertEquals("""{"hover":true}""", map.getFeatureState(withNul).awaitWithin("the state"))
       assertEquals(
         "{}",
         map
-          .getFeatureState(FeatureStateSelector("source", featureId = "a"))
+          .getFeatureState(FeatureStateSelector("source", featureId = FeatureId.StringValue("a")))
           .awaitWithin("the truncated ID's state"),
       )
     }
@@ -114,10 +115,18 @@ class GeneratedShapesTest {
       assertEquals(25.0, updated.bearing, 1e-6)
 
       // A selector's optional state key narrows a removal to one member.
-      val selector = FeatureStateSelector("source", featureId = "feature")
+      val selector = FeatureStateSelector("source", featureId = FeatureId.UintValue(7u))
       map.setFeatureState(selector, """{"hover":true,"radius":2}""").await()
       map.removeFeatureState(selector.copy(stateKey = "hover")).await()
       assertEquals("""{"radius":2}""", map.getFeatureState(selector).awaitWithin("the state"))
+      // A numeric ID crosses in its own union member, which native reads as the same feature's
+      // text.
+      assertEquals(
+        """{"radius":2}""",
+        map
+          .getFeatureState(selector.copy(featureId = FeatureId.StringValue("7")))
+          .awaitWithin("the state by text"),
+      )
     }
   }
 

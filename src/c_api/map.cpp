@@ -97,7 +97,8 @@ auto mln_map_set_event_mask(
 namespace {
 
 // Owns copies of the selector strings so a deferred command outlives the
-// caller's buffers.
+// caller's buffers. It keeps the feature ID as the text that the engine keys
+// feature state by.
 struct OwnedFeatureStateSelector {
   uint32_t fields = 0;
   std::string source_id;
@@ -109,7 +110,11 @@ struct OwnedFeatureStateSelector {
       : fields(selector.fields),
         source_id(copy_view(selector.source_id)),
         source_layer_id(copy_view(selector.source_layer_id)),
-        feature_id(copy_view(selector.feature_id)),
+        feature_id(
+          mln::core::optional_feature_id_string(selector).value_or(
+            std::string{}
+          )
+        ),
         state_key(copy_view(selector.state_key)) {}
 
   [[nodiscard]] auto view() const -> mln_feature_state_selector {
@@ -119,7 +124,11 @@ struct OwnedFeatureStateSelector {
       .source_id = {.data = source_id.data(), .size = source_id.size()},
       .source_layer_id =
         {.data = source_layer_id.data(), .size = source_layer_id.size()},
-      .feature_id = {.data = feature_id.data(), .size = feature_id.size()},
+      .feature_id =
+        {.type = MLN_FEATURE_ID_TYPE_STRING,
+         .data =
+           {.string_value =
+              {.data = feature_id.data(), .size = feature_id.size()}}},
       .state_key = {.data = state_key.data(), .size = state_key.size()},
     };
   }

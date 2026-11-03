@@ -65,6 +65,24 @@ class GoEmitterTests(unittest.TestCase):
         self.assertIn('default: arena.fail("unknown input union variant")', encode[0])
         self.assertNotIn("func (UnknownVariant) isRenderedQueryGeometry()", source)
 
+    def test_a_text_variant_converts_into_its_union(self):
+        api = parse(groups=("value_union",))
+        validate(api)
+        source = emitted(go, api)["generated_api.go"]
+        # A buffer view carries its size, so it converts in place, and a plain
+        # number goes through the scalar converter.
+        self.assertIn(
+            "case KeyTextVariant: var converted C.mln_buffer_view; converted = "
+            "C.mln_buffer_view{data: arena.bytes([]byte(variant.Value)), size: "
+            "C.size_t(len(variant.Value))}; bindingUnionStore(raw.data[:], converted)",
+            source,
+        )
+        self.assertIn(
+            "case KeyCountVariant: bindingUnionStore(raw.data[:], "
+            "bindingNumber[uint64, C.uint64_t](variant.Value, arena))",
+            source,
+        )
+
     def test_a_zero_literal_is_the_default(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertNotRegex(source, r"func Default[A-Z]")

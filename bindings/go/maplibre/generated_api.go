@@ -1679,6 +1679,43 @@ func (value WebGlContextKind) String() string {
 	return fmt.Sprintf("WebGlContextKind(%d)", value)
 }
 
+// FeatureId corresponds to mln_feature_id. The ID of a feature in a source, as
+// the source's data gives it.
+//
+// The map compares feature IDs as text, so a string and a number with the same
+// text, such as "7" and 7, name the same feature. A number's text is its
+// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+// same feature, and so do 1e21 and "1e21".
+//
+// See mln_feature_id in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type FeatureId interface {
+	bindingTag() uint32
+	isFeatureId()
+}
+
+type FeatureIdStringValueVariant struct{ Value string }
+
+func (FeatureIdStringValueVariant) bindingTag() uint32 { return uint32(C.MLN_FEATURE_ID_TYPE_STRING) }
+func (FeatureIdStringValueVariant) isFeatureId()       {}
+
+type FeatureIdUintValueVariant struct{ Value uint64 }
+
+func (FeatureIdUintValueVariant) bindingTag() uint32 { return uint32(C.MLN_FEATURE_ID_TYPE_UINT) }
+func (FeatureIdUintValueVariant) isFeatureId()       {}
+
+type FeatureIdIntValueVariant struct{ Value int64 }
+
+func (FeatureIdIntValueVariant) bindingTag() uint32 { return uint32(C.MLN_FEATURE_ID_TYPE_INT) }
+func (FeatureIdIntValueVariant) isFeatureId()       {}
+
+// FeatureIdDoubleValueVariant corresponds to mln_feature_id_data.double_value.
+// A finite number.
+type FeatureIdDoubleValueVariant struct{ Value float64 }
+
+func (FeatureIdDoubleValueVariant) bindingTag() uint32 { return uint32(C.MLN_FEATURE_ID_TYPE_DOUBLE) }
+func (FeatureIdDoubleValueVariant) isFeatureId()       {}
+
 // OfflineRegionDefinition corresponds to mln_offline_region_definition. The
 // area, zoom range, and style that an offline region covers.
 //
@@ -2383,6 +2420,29 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 	return raw
 }
 
+func nativeFeatureId(input FeatureId, arena *bindingArena) C.mln_feature_id {
+	raw := C.mln_feature_id{}
+	if input == nil {
+		arena.fail("missing union variant")
+	}
+	raw._type = C.mln_feature_id_type(input.bindingTag())
+	switch variant := input.(type) {
+	case FeatureIdStringValueVariant:
+		var converted C.mln_buffer_view
+		converted = C.mln_buffer_view{data: arena.bytes([]byte(variant.Value)), size: C.size_t(len(variant.Value))}
+		bindingUnionStore(raw.data[:], converted)
+	case FeatureIdUintValueVariant:
+		bindingUnionStore(raw.data[:], bindingNumber[uint64, C.uint64_t](variant.Value, arena))
+	case FeatureIdIntValueVariant:
+		bindingUnionStore(raw.data[:], bindingNumber[int64, C.int64_t](variant.Value, arena))
+	case FeatureIdDoubleValueVariant:
+		bindingUnionStore(raw.data[:], bindingNumber[float64, C.double](variant.Value, arena))
+	default:
+		arena.fail("unknown input union variant")
+	}
+	return raw
+}
+
 // FeatureStateSelector corresponds to mln_feature_state_selector. The features
 // whose state to set, read, or remove.
 //
@@ -2395,7 +2455,7 @@ type FeatureStateSelector struct {
 	// The feature's ID. Setting or reading state needs it. Without it,
 	// MapHandle.RemoveFeatureState() removes the state of every feature in the
 	// source layer.
-	FeatureId *string
+	FeatureId *FeatureId
 	// The one key that MapHandle.RemoveFeatureState() removes. It needs feature_id.
 	// Empty removes every key.
 	StateKey string
@@ -2407,10 +2467,7 @@ func nativeFeatureStateSelector(input FeatureStateSelector, arena *bindingArena)
 	raw.fields = 0
 	raw.source_id = C.mln_buffer_view{data: arena.bytes([]byte(input.SourceId)), size: C.size_t(len(input.SourceId))}
 	raw.source_layer_id = C.mln_buffer_view{data: arena.bytes([]byte(input.SourceLayerId)), size: C.size_t(len(input.SourceLayerId))}
-	if input.FeatureId != nil {
-		raw.feature_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.FeatureId))), size: C.size_t(len((*input.FeatureId)))}
-		raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-	}
+	bindingMasked(&raw.fields, C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, &raw.feature_id, input.FeatureId, arena, nativeFeatureId)
 	raw.state_key = C.mln_buffer_view{data: arena.bytes([]byte(input.StateKey)), size: C.size_t(len(input.StateKey))}
 	return raw
 }

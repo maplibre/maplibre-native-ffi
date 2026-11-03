@@ -35,6 +35,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/CameraUpdateMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ConstrainMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/EdgeInsets.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/FeatureId.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/FeatureStateSelector.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/FreeCamera.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/FreeCameraOptions.g.cs linguist-generated=true

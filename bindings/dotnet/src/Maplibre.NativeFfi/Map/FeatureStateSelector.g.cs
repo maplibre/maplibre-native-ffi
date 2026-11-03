@@ -23,7 +23,7 @@ public sealed record FeatureStateSelector
     /// <c>MapHandle.RemoveFeatureStateAsync()</c> removes the state of every
     /// feature in the source layer.
     /// </summary>
-    public string? FeatureId { get; init; }
+    public FeatureId? FeatureId { get; init; }
 
     /// <summary>
     /// The one key that <c>MapHandle.RemoveFeatureStateAsync()</c> removes. It

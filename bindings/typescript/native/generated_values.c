@@ -3599,6 +3599,65 @@ bool mln_ts_write_egl_context_descriptor(
   return true;
 }
 
+bool mln_ts_write_feature_id(
+  mln_ts_call* call, napi_value value, mln_feature_id* out, const char* path
+) {
+  if (!mln_ts_read_record(call, value, path)) return false;
+  {
+    static const char* const kinds[] = {
+      "stringValue", "uintValue", "intValue", "doubleValue"
+    };
+    napi_value arm;
+    char arm_path[256];
+    (void)arm;
+    (void)arm_path;
+    switch (mln_ts_read_kind(call, value, kinds, 4, path)) {
+      case 0:
+        out->type = MLN_FEATURE_ID_TYPE_STRING;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        if (!mln_ts_read_text_view(
+              call, arm, &out->data.string_value, arm_path
+            ))
+          return false;
+        break;
+      case 1:
+        out->type = MLN_FEATURE_ID_TYPE_UINT;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        {
+          uint64_t number = 0;
+          if (!mln_ts_read_u64(call, arm, &number, arm_path)) return false;
+          out->data.uint_value = (uint64_t)number;
+        }
+        break;
+      case 2:
+        out->type = MLN_FEATURE_ID_TYPE_INT;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        {
+          int64_t number = 0;
+          if (!mln_ts_read_i64(call, arm, &number, arm_path)) return false;
+          out->data.int_value = (int64_t)number;
+        }
+        break;
+      case 3:
+        out->type = MLN_FEATURE_ID_TYPE_DOUBLE;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        {
+          double number = 0;
+          if (!mln_ts_read_double(call, arm, &number, arm_path)) return false;
+          out->data.double_value = (double)number;
+        }
+        break;
+      default:
+        return false;
+    }
+  }
+  return true;
+}
+
 bool mln_ts_write_feature_state_selector(
   mln_ts_call* call, napi_value value, mln_feature_state_selector* out,
   const char* path
@@ -3619,7 +3678,9 @@ bool mln_ts_write_feature_state_selector(
   if (!mln_ts_member(call, value, "featureId", &member)) return false;
   mln_ts_path(child, sizeof child, path, "featureId");
   if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->feature_id, child))
+    memset(&out->feature_id, 0, sizeof out->feature_id);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_feature_id(call, member, &out->feature_id, child))
       return false;
     out->fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
   }

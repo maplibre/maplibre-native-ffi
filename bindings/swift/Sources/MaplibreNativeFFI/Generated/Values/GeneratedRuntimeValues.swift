@@ -75,17 +75,6 @@ public struct HttpHeader: Equatable, Hashable, Sendable {
     self.value = value
   }
 
-  init(
-    raw: mln_http_header,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    name = try NativeString.copyUTF8(data: raw.name.data, size: raw.name.size)
-    value = try NativeString.copyUTF8(
-      data: raw.value.data,
-      size: raw.value.size
-    )
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header {
     var raw = mln_http_header()
     raw.name = arena.view(name)
@@ -114,19 +103,6 @@ public struct HttpHeaderRule: Equatable, Hashable, Sendable {
     self.flags = flags
     self.url = url
     self.headers = headers
-  }
-
-  init(
-    raw: mln_http_header_rule,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    kinds = ResourceKindFlag(rawValue: raw.kinds)
-    flags = UrlMatchFlag(rawValue: raw.flags)
-    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
-    headers = try NativeInputArena.copyArray(
-      raw.headers,
-      count: Int(raw.header_count)
-    ).map { try HttpHeader(raw: $0) }
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_http_header_rule {
@@ -799,30 +775,6 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     self.retryAfterUnixMs = retryAfterUnixMs
   }
 
-  init(
-    raw: mln_resource_response,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    status = ResourceResponseStatus(rawValue: raw.status.rawValue)
-    errorReason = ResourceErrorReason(rawValue: raw.error_reason.rawValue)
-    bytes = try NativeString.copyData(
-      data: raw.bytes,
-      size: Int(raw.byte_count)
-    )
-    errorMessage = try NativeString.copyUTF8(
-      data: raw.error_message.data,
-      size: raw.error_message.size
-    )
-    mustRevalidate = raw.must_revalidate
-    modifiedUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_MODIFIED
-      .rawValue != 0 ? raw.modified_unix_ms : nil
-    expiresUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_EXPIRES
-      .rawValue != 0 ? raw.expires_unix_ms : nil
-    etag = try NativeString.copyUTF8(data: raw.etag.data, size: raw.etag.size)
-    retryAfterUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER
-      .rawValue != 0 ? raw.retry_after_unix_ms : nil
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_response {
     var raw = mln_resource_response()
     raw.fields = 0
@@ -896,15 +848,6 @@ public struct ResourceRoute: Equatable, Hashable, Sendable {
     self.kinds = kinds
     self.flags = flags
     self.url = url
-  }
-
-  init(
-    raw: mln_resource_route,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    kinds = ResourceKindFlag(rawValue: raw.kinds)
-    flags = UrlMatchFlag(rawValue: raw.flags)
-    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_route {
@@ -1018,19 +961,6 @@ public struct ResourceTransformError: Equatable, Hashable, Sendable {
     self.reason = reason
     self.message = message
     self.retryAfterUnixMs = retryAfterUnixMs
-  }
-
-  init(
-    raw: mln_resource_transform_error,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    reason = ResourceErrorReason(rawValue: raw.reason.rawValue)
-    message = try NativeString.copyUTF8(
-      data: raw.message.data,
-      size: raw.message.size
-    )
-    retryAfterUnixMs = raw.fields & MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER
-      .rawValue != 0 ? raw.retry_after_unix_ms : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -1615,20 +1545,6 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   public init(assetPath: String = "", cachePath: String = "") {
     self.assetPath = assetPath
     self.cachePath = cachePath
-  }
-
-  init(
-    raw: mln_runtime_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    assetPath = try NativeString.copyUTF8(
-      data: raw.asset_path.data,
-      size: raw.asset_path.size
-    )
-    cachePath = try NativeString.copyUTF8(
-      data: raw.cache_path.data,
-      size: raw.cache_path.size
-    )
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {

@@ -1871,6 +1871,32 @@ fn generated_input_mln_egl_context_descriptor<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_feature_id<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_feature_id> {
+    let mut raw: sys::mln_feature_id = unsafe { std::mem::zeroed() };
+    let field = value;
+    let tag = field.getattr("_tag")?.extract::<u32>()?;
+    match tag {
+        sys::MLN_FEATURE_ID_TYPE_STRING => {
+            raw.data.string_value = storage.buffer(field.getattr("value")?, true)?;
+        }
+        sys::MLN_FEATURE_ID_TYPE_UINT => {
+            raw.data.uint_value = field.getattr("value")?.extract::<u64>()?;
+        }
+        sys::MLN_FEATURE_ID_TYPE_INT => {
+            raw.data.int_value = field.getattr("value")?.extract::<i64>()?;
+        }
+        sys::MLN_FEATURE_ID_TYPE_DOUBLE => {
+            raw.data.double_value = field.getattr("value")?.extract::<f64>()?;
+        }
+        _ => {}
+    }
+    raw.type_ = tag;
+    Ok(raw)
+}
+
 fn generated_input_mln_feature_state_selector<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -1881,7 +1907,7 @@ fn generated_input_mln_feature_state_selector<'py>(
     raw.source_id = storage.buffer(value.getattr("source_id")?, true)?;
     raw.source_layer_id = storage.buffer(value.getattr("source_layer_id")?, true)?;
     if let Some(field) = generated_present(value, "feature_id")? {
-        raw.feature_id = storage.buffer(field, true)?;
+        raw.feature_id = generated_input_mln_feature_id(&field, storage)?;
         raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
     }
     raw.state_key = storage.buffer(value.getattr("state_key")?, true)?;

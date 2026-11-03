@@ -73,21 +73,6 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
     self.filter = filter
   }
 
-  init(
-    raw: mln_rendered_feature_query_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    layerIds = raw.fields & MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
-      .rawValue != 0 ? try NativeInputArena.copyArray(
-        raw.layer_ids,
-        count: Int(raw.layer_id_count)
-      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = try NativeString.copyUTF8(
-      data: raw.filter.data,
-      size: raw.filter.size
-    )
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_rendered_feature_query_options
   {
@@ -166,16 +151,6 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
     self.points = points
   }
 
-  init(
-    raw: mln_screen_line_string,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    points = try NativeInputArena.copyArray(
-      raw.points,
-      count: Int(raw.point_count)
-    ).map { ScreenPoint(raw: $0) }
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_screen_line_string {
     var raw = mln_screen_line_string()
     raw.points = arena.array(points.map { $0.nativeValue() })
@@ -227,22 +202,6 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   public init(sourceLayerIds: [String]? = nil, filter: String = "") {
     self.sourceLayerIds = sourceLayerIds
     self.filter = filter
-  }
-
-  init(
-    raw: mln_source_feature_query_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    sourceLayerIds = raw
-      .fields & MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
-      .rawValue != 0 ? try NativeInputArena.copyArray(
-        raw.source_layer_ids,
-        count: Int(raw.source_layer_id_count)
-      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = try NativeString.copyUTF8(
-      data: raw.filter.data,
-      size: raw.filter.size
-    )
   }
 
   func nativeValue(arena: NativeInputArena) throws

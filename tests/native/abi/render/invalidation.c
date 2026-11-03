@@ -47,7 +47,7 @@ static const mln_feature_state_selector point_one = {
   .size = sizeof(mln_feature_state_selector),
   .fields = MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
   .source_id = {.data = "point", .size = 5},
-  .feature_id = {.data = "1", .size = 1},
+  .feature_id = {.type = MLN_FEATURE_ID_TYPE_UINT, .data.uint_value = 1},
 };
 
 static void set_selected(mln_map map, const char* state) {

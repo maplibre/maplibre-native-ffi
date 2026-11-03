@@ -4309,7 +4309,7 @@ auto map_set_feature_state(
     live.feature_state.set(
       feature_state_string_from_view(selector->source_id),
       feature_state_source_layer(*selector),
-      feature_state_string_from_view(selector->feature_id), std::move(state)
+      feature_id_string(selector->feature_id), std::move(state)
     )
   ) {
     live.map->triggerRepaint();
@@ -4327,7 +4327,7 @@ auto map_get_feature_state_start(
   }
   auto source_id = feature_state_string_from_view(selector->source_id);
   auto source_layer = feature_state_source_layer(*selector);
-  auto feature_id = feature_state_string_from_view(selector->feature_id);
+  auto feature_id = feature_id_string(selector->feature_id);
   return start_map_string_operation<&mln_map_get_feature_state>(
     map, completion,
     [source_id = std::move(source_id), source_layer = std::move(source_layer),
@@ -4345,10 +4345,7 @@ auto map_remove_feature_state(
     live.feature_state.remove(
       feature_state_string_from_view(selector->source_id),
       feature_state_source_layer(*selector),
-      optional_selector_string(
-        *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
-      ),
-      optional_text(selector->state_key)
+      optional_feature_id_string(*selector), optional_text(selector->state_key)
     )
   ) {
     live.map->triggerRepaint();

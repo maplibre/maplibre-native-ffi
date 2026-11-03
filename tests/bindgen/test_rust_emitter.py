@@ -154,6 +154,16 @@ class RustEmitterTests(unittest.TestCase):
         self.assertIn("pub unsafe fn release(", frame)
         self.assertIn("pub fn resize(", session)
 
+    def test_a_plain_variant_is_copied_into_its_union_without_parentheses(self):
+        api = parse(groups=("value_union",))
+        validate(api)
+        values = emitted(rust, api)[
+            "crates/maplibre-native-ffi/src/generated/values.rs"
+        ]
+        # Clippy denies the parentheses that a bare `(*item)` would keep.
+        self.assertIn("raw.data.count = *item;", values)
+        self.assertIn("raw.data.text = to_native(&(*item), arena)?;", values)
+
     def test_a_record_with_a_required_member_takes_it_in_place_of_a_default(self):
         values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"

@@ -251,13 +251,35 @@ internal unsafe struct mln_event_batch_view
     public nuint event_count;
 }
 
+internal unsafe struct mln_feature_id
+{
+    public mln_feature_id_type type;
+    public mln_feature_id_data data;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_feature_id_data
+{
+    [FieldOffset(0)]
+    public mln_buffer_view string_value;
+
+    [FieldOffset(0)]
+    public ulong uint_value;
+
+    [FieldOffset(0)]
+    public long int_value;
+
+    [FieldOffset(0)]
+    public double double_value;
+}
+
 internal unsafe struct mln_feature_state_selector
 {
     public uint size;
     public mln_feature_state_selector_field fields;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer_id;
-    public mln_buffer_view feature_id;
+    public mln_feature_id feature_id;
     public mln_buffer_view state_key;
 }
 
@@ -1492,6 +1514,14 @@ internal enum mln_custom_vector_source_option_field : uint
 {
     MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1,
     MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2,
+}
+
+internal enum mln_feature_id_type : uint
+{
+    MLN_FEATURE_ID_TYPE_STRING = 1,
+    MLN_FEATURE_ID_TYPE_UINT = 2,
+    MLN_FEATURE_ID_TYPE_INT = 3,
+    MLN_FEATURE_ID_TYPE_DOUBLE = 4,
 }
 
 internal enum mln_feature_state_selector_field : uint

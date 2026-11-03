@@ -427,19 +427,6 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
     self.pixels = pixels
   }
 
-  init(
-    raw: mln_premultiplied_rgba8_image,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    width = raw.width
-    height = raw.height
-    self.stride = raw.stride
-    pixels = try NativeString.copyData(
-      data: raw.pixels,
-      size: Int(raw.byte_length)
-    )
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_premultiplied_rgba8_image
   {
@@ -570,37 +557,6 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
     self.pixelRatio = pixelRatio
     self.sdf = sdf
     self.keepUnused = keepUnused
-  }
-
-  init(
-    raw: mln_style_image_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    stretchX = raw.fields & MLN_STYLE_IMAGE_OPTION_STRETCH_X
-      .rawValue != 0 ? try NativeInputArena.copyArray(
-        raw.stretch_x,
-        count: Int(raw.stretch_x_count)
-      ).map { ImageStretch(raw: $0) } : nil
-    stretchY = raw.fields & MLN_STYLE_IMAGE_OPTION_STRETCH_Y
-      .rawValue != 0 ? try NativeInputArena.copyArray(
-        raw.stretch_y,
-        count: Int(raw.stretch_y_count)
-      ).map { ImageStretch(raw: $0) } : nil
-    content = raw.fields & MLN_STYLE_IMAGE_OPTION_CONTENT
-      .rawValue != 0 ? ImageContent(raw: raw.content) : nil
-    textFitWidth = raw.fields & MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
-      .rawValue != 0 ? StyleImageTextFit(
-        rawValue: raw.text_fit_width.rawValue
-      ) :
-      nil
-    textFitHeight = raw.fields & MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
-      .rawValue != 0 ?
-      StyleImageTextFit(rawValue: raw.text_fit_height.rawValue) : nil
-    pixelRatio = raw.fields & MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
-      .rawValue != 0 ? raw.pixel_ratio : nil
-    sdf = raw.fields & MLN_STYLE_IMAGE_OPTION_SDF.rawValue != 0 ? raw.sdf : nil
-    keepUnused = raw.fields & MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED
-      .rawValue != 0 ? raw.keep_unused : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_image_options {
