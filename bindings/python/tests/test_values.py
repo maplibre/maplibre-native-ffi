@@ -245,6 +245,6 @@ def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(
     )
     with pytest.raises(TypeError, match="not str"):
         map_handle.camera_for_lat_lngs(typing.cast(typing.Any, "coordinates"))
-    # The extent is the subject of a resize, which has no default.
+    # The logical size is the subject of a resize, which has no default.
     with pytest.raises(TypeError):
         typing.cast(typing.Any, map_handle).resize()

@@ -70,10 +70,10 @@ fn onFrameWake(_: ?*anyopaque) anyerror!void {
 
 // #region resize
 fn onWindowResized(width: u32, height: u32) !void {
+    // The window's new size in logical pixels.
     try session.discarding().resize(.{
         .width = width,
         .height = height,
-        .scale_factor = 2.0, // The scale factor the session has now.
     }, null);
 }
 // #endregion resize
@@ -100,15 +100,10 @@ fn surfaceLost() !void {
     // #endregion lost-surface
 }
 
-fn surfaceRestored(vulkan: maplibre.VulkanContextDescriptor, new_surface: u64) !void {
+fn surfaceRestored(new_surface: u64) !void {
     // #region lost-surface
     var replaced = try session.setVulkanSurfaceTarget(.{
-        .extent = .{
-            .width = 800,
-            .height = 600,
-            .scale_factor = 2.0,
-        },
-        .context = vulkan,
+        .logical_size = .{ .width = 800, .height = 600 },
         .surface = new_surface,
     }, null);
     defer replaced.deinit();
@@ -122,12 +117,9 @@ fn surfaceRestored(vulkan: maplibre.VulkanContextDescriptor, new_surface: u64) !
 fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, window_surface: u64) !void {
     // #region attach
     var attached = try map.attachVulkanSurface(.{
-        // The window's size in logical pixels, and its scale factor.
-        .extent = .{
-            .width = 800,
-            .height = 600,
-            .scale_factor = 2.0,
-        },
+        // The window's size in logical pixels. The map's scale factor
+        // turns it into pixels.
+        .logical_size = .{ .width = 800, .height = 600 },
         // Your VkInstance, VkPhysicalDevice,
         // VkDevice, and graphics VkQueue.
         .context = vulkan,

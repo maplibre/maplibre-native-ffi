@@ -39,7 +39,8 @@ fn draw_frame(session: &RenderSessionHandle) -> Result<()> {
         kind: GpuSyncKind::CpuComplete,
         ..GpuSync::default()
     };
-    frame.release(&done).map_err(|(_, error)| error)?;
+    // SAFETY: a CPU-complete sync names no graphics object.
+    unsafe { frame.release(&done) }.map_err(|(_, error)| error)?;
     // #endregion acquire
 
     Ok(())
@@ -74,7 +75,8 @@ async fn render_to_texture(
 
     // #region attach-borrowed
     let ring = VulkanBorrowedTextureDescriptor {
-        extent: LogicalExtent::new(800, 600, 2.0),
+        // The map's size in logical pixels.
+        logical_size: LogicalSize::new(800, 600),
         // The size of your textures in device pixels.
         physical_width: 1600,
         physical_height: 1200,
@@ -98,8 +100,8 @@ async fn render_to_texture(
     // #endregion attach-borrowed
 
     // #region resize-borrowed
-    let ring = VulkanBorrowedTextureDescriptor {
-        extent: LogicalExtent::new(1024, 768, 2.0),
+    let resized = VulkanBorrowedTextureReplacement {
+        logical_size: LogicalSize::new(1024, 768),
         physical_width: 2048,
         physical_height: 1536,
         // Your new textures, at the new size.
@@ -107,11 +109,10 @@ async fn render_to_texture(
             VulkanBorrowedTexture::new(new_images[0], new_views[0]),
             VulkanBorrowedTexture::new(new_images[1], new_views[1]),
         ],
-        ..ring
     };
 
     // SAFETY: the new textures outlive the session.
-    unsafe { session.set_vulkan_borrowed_texture_target(&ring)? }
+    unsafe { session.set_vulkan_borrowed_texture_target(&resized)? }
         .await?;
     // vkDestroyImageView and vkDestroyImage
     destroy_textures(images, views);

@@ -9,6 +9,7 @@ import {
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
   type VulkanBorrowedTextureDescriptor,
+  type VulkanBorrowedTextureReplacement,
   type VulkanContextDescriptor,
 } from "../../src/index.ts";
 
@@ -62,8 +63,9 @@ export async function renderToTexture(
   // #endregion attach-options
 
   // #region attach-borrowed
-  let ring: VulkanBorrowedTextureDescriptor = {
-    extent: { width: 800, height: 600, scaleFactor: 2 },
+  const ring: VulkanBorrowedTextureDescriptor = {
+    // The map's size in logical pixels.
+    logicalSize: { width: 800, height: 600 },
     // The size of your textures in device pixels.
     physicalWidth: 1600,
     physicalHeight: 1200,
@@ -83,9 +85,8 @@ export async function renderToTexture(
   // #endregion attach-borrowed
 
   // #region resize-borrowed
-  ring = {
-    ...ring,
-    extent: { width: 1024, height: 768, scaleFactor: 2 },
+  const resized: VulkanBorrowedTextureReplacement = {
+    logicalSize: { width: 1024, height: 768 },
     physicalWidth: 2048,
     physicalHeight: 1536,
     // Your new textures, at the new size.
@@ -95,7 +96,7 @@ export async function renderToTexture(
     ],
   };
 
-  await session.setVulkanBorrowedTextureTarget(ring);
+  await session.setVulkanBorrowedTextureTarget(resized);
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views);
   // #endregion resize-borrowed

@@ -4,15 +4,14 @@ namespace Maplibre.NativeFfi;
 
 /// <summary>
 /// A ring of your OpenGL textures, for
-/// <c>MapHandle.AttachOpenGlBorrowedTexture()</c> and
-/// <c>RenderSessionHandle.SetOpenGlBorrowedTextureTargetAsync()</c>.
+/// <c>MapHandle.AttachOpenGlBorrowedTexture()</c>.
 /// </summary>
 /// <remarks>
-/// <para><c>extent</c> sets the map's size and the session's scale factor, so
-/// give it the map's scale factor. <c>physical_width</c> and
-/// <c>physical_height</c> give the textures' size in pixels. The context must
-/// use <c>OpenGlContextOwnership.Shared</c>. Each texture must be in your
-/// context's share group, with storage of that size.</para>
+/// <para><c>logical_size</c> sets the map's size. <c>physical_width</c> and
+/// <c>physical_height</c> give the textures' size in pixels, which is usually
+/// <c>logical_size</c> times the map's scale factor. The context must use
+/// <c>OpenGlContextOwnership.Shared</c>. Each texture must be in your context's
+/// share group, with storage of that size.</para>
 /// <para>The session uses the textures until a replacement or release of the
 /// target completes, a detach or disposal of the session completes, or an
 /// abandon of it returns.</para>
@@ -23,7 +22,7 @@ public readonly partial record struct OpenGlBorrowedTextureDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public OpenGlBorrowedTextureDescriptor(
-        LogicalExtent Extent,
+        LogicalSize LogicalSize,
         uint PhysicalWidth,
         uint PhysicalHeight,
         OpenGlContextDescriptor Context,
@@ -31,7 +30,7 @@ public readonly partial record struct OpenGlBorrowedTextureDescriptor
         uint Target
     )
     {
-        this.Extent = Extent;
+        this.LogicalSize = LogicalSize;
         this.PhysicalWidth = PhysicalWidth;
         this.PhysicalHeight = PhysicalHeight;
         this.Context = Context;
@@ -39,7 +38,7 @@ public readonly partial record struct OpenGlBorrowedTextureDescriptor
         this.Target = Target;
     }
 
-    public required LogicalExtent Extent { get; init; }
+    public required LogicalSize LogicalSize { get; init; }
     public required uint PhysicalWidth { get; init; }
     public required uint PhysicalHeight { get; init; }
     public required OpenGlContextDescriptor Context { get; init; }

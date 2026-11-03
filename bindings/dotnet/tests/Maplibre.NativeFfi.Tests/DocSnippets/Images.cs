@@ -19,11 +19,10 @@ internal static class Images
     internal static async Task Run(RuntimeHandle runtime)
     {
         // #region map
-        var extent = new LogicalExtent(800, 600, 2);
         var map = runtime.CreateMap(
             new MapOptions
             {
-                InitialExtent = extent,
+                InitialExtent = new LogicalExtent(800, 600, 2),
                 MapMode = MapMode.Static,
             }
         );
@@ -38,7 +37,7 @@ internal static class Images
 
         // #region attach
         var session = map.AttachOffscreen(
-            new OffscreenDescriptor(extent),
+            new OffscreenDescriptor(new LogicalSize(800, 600)),
             // The library renders on its own thread.
             new RenderSessionAttachOptions
             {

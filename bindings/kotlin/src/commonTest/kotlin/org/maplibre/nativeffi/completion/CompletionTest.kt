@@ -15,7 +15,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapDebugFlag
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.MaplibreException
@@ -36,7 +36,7 @@ class CompletionTest {
       map.requestRepaint().await()
       assertEquals(MapDebugFlag.TILE_BORDERS, map.getSnapshot().debugOptions)
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-        map.discarding.resize(LogicalExtent(0u, 8u, 1.0))
+        map.discarding.resize(LogicalSize(0u, 8u))
       }
     }
   }

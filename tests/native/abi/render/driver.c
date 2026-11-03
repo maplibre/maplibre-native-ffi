@@ -88,16 +88,13 @@ static void an_attached_session_holds_its_map(void) {
   mln_map_snapshot before_resize = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &before_resize, NULL));
   mln_test_completion resize = mln_test_completion_default(0);
-  const mln_logical_extent extent = {
-    .width = 32, .height = 48, .scale_factor = 1.0
-  };
-  MLN_TEST_OK(mln_map_resize(map, extent, &resize.descriptor, NULL));
+  const mln_logical_size extent = {.width = 32, .height = 48};
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_test_completion_finish(&resize)
+    MLN_STATUS_INVALID_STATE,
+    mln_map_resize(map, extent, &resize.descriptor, MLN_TEST_DIAGNOSTIC)
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&resize)
-  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "resize the session"));
+  mln_test_completion_reject(&resize);
   mln_test_completion_destroy(&resize);
   mln_map_snapshot after_resize = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &after_resize, NULL));
@@ -147,11 +144,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   const mln_render_session detached = fixture.session;
   const mln_completion discard = mln_test_discard_completion();
   const mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  const mln_logical_extent extent = {
-    .width = 32,
-    .height = 32,
-    .scale_factor = 1.0,
-  };
+  const mln_logical_size extent = {.width = 32, .height = 32};
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
@@ -1129,53 +1122,6 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Set from MapLibre's logging threads, so it lives in static storage that
-// outlives any registration a failing case leaves behind.
-static atomic_bool render_warning_logged;
-
-static bool record_render_warning(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  mln_buffer_view message
-) {
-  (void)user_data;
-  (void)code;
-  (void)message;
-  if (severity == MLN_LOG_SEVERITY_WARNING && event == MLN_LOG_EVENT_RENDER) {
-    mln_test_flag_set(&render_warning_logged);
-  }
-  return false;
-}
-
-// The attach logs a warning because the map still selects imagery for its own
-// scale factor.
-static void a_target_scale_that_differs_from_the_map_attaches_with_a_warning(
-  void
-) {
-  atomic_store(&render_warning_logged, false);
-  const mln_log_handler handler = {
-    .size = sizeof(mln_log_handler), .callback = record_render_warning
-  };
-  MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
-  // The log callback belongs to the process, so a failed assertion still
-  // clears it.
-  if (TEST_PROTECT()) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map_options options = mln_test_map_options();
-    options.initial_extent.scale_factor = 3.0;
-    mln_map map = mln_test_create_map_with_options(runtime, &options);
-    mln_test_render_fixture fixture = {0};
-    TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_wait_for_flag(&render_warning_logged),
-      "the attach logged no render warning"
-    );
-    mln_test_render_fixture_destroy(&fixture);
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
-  }
-  (void)mln_log_clear_callback(NULL);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(an_attached_session_holds_its_map);
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
@@ -1195,5 +1141,4 @@ MLN_TEST_GROUP {
   RUN_TEST(wakes_may_call_back_into_the_session);
   RUN_TEST(attach_checks_the_queue_lock);
   RUN_TEST(attach_picks_a_producer_sync_kind);
-  RUN_TEST(a_target_scale_that_differs_from_the_map_attaches_with_a_warning);
 }

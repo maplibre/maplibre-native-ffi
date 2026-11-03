@@ -17,11 +17,11 @@ auto validate_metal_surface_descriptor(
     set_thread_error("mln_metal_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "surface dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   if (descriptor->layer == nullptr) {
     set_thread_error("Metal surface layer must not be null");
@@ -41,11 +41,11 @@ auto validate_vulkan_surface_descriptor(
     set_thread_error("mln_vulkan_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "surface dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   const auto context_status = validate_vulkan_context(
     descriptor->context, "Vulkan surface handles must not be null"
@@ -71,11 +71,11 @@ auto validate_webgpu_surface_descriptor(
     set_thread_error("mln_web_gpu_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "surface dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   const auto context_status = validate_webgpu_context(descriptor->context);
   if (context_status != MLN_STATUS_OK) {
@@ -105,11 +105,11 @@ auto validate_opengl_surface_descriptor(
     set_thread_error("mln_open_gl_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "surface dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   const auto context_status =
     validate_opengl_context(descriptor->context, require_supported_provider);
@@ -130,6 +130,77 @@ auto validate_opengl_surface_descriptor(
   }
   if (descriptor->surface == nullptr) {
     set_thread_error("OpenGL surface must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+namespace {
+
+template <typename Replacement>
+auto validate_surface_replacement(
+  const Replacement* replacement, const char* size_message
+) -> mln_status {
+  if (replacement == nullptr) {
+    set_thread_error("surface replacement must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (replacement->size < sizeof(Replacement)) {
+    set_thread_error(size_message);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return validate_logical_size(
+    replacement->logical_size, "surface dimensions must be positive"
+  );
+}
+
+}  // namespace
+
+auto validate_metal_surface_replacement(
+  const mln_metal_surface_replacement* replacement
+) -> mln_status {
+  const auto status = validate_surface_replacement(
+    replacement, "mln_metal_surface_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  if (replacement->layer == nullptr) {
+    set_thread_error("Metal surface layer must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_vulkan_surface_replacement(
+  const mln_vulkan_surface_replacement* replacement
+) -> mln_status {
+  const auto status = validate_surface_replacement(
+    replacement, "mln_vulkan_surface_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  if (replacement->surface == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL) {
+    set_thread_error("Vulkan surface handles must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_opengl_surface_replacement(
+  const mln_open_gl_surface_replacement* replacement
+) -> mln_status {
+  return validate_surface_replacement(
+    replacement, "mln_open_gl_surface_replacement.size is too small"
+  );
+}
+
+auto validate_webgpu_surface_replacement(
+  const mln_web_gpu_surface_replacement* replacement
+) -> mln_status {
+  const auto status = validate_surface_replacement(
+    replacement, "mln_web_gpu_surface_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  if (replacement->surface == nullptr) {
+    set_thread_error("WebGPU surface must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;

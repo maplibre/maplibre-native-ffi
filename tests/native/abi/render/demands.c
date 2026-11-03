@@ -313,20 +313,11 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   mln_test_render_demand_forced(&fixture, 301);
   const mln_render_frame_result old_frame = take_one_result(&fixture);
 
-  mln_logical_extent extent = {
-    .width = 96,
-    .height = 48,
-    .scale_factor = 2.0,
-  };
-  mln_completion rejected_scale = mln_test_discard_completion();
-  MLN_TEST_INVALID(
-    mln_render_session_resize(fixture.session, extent, &rejected_scale, NULL)
-  );
-  extent.scale_factor = 1.0;
+  const mln_logical_size extent = {.width = 96, .height = 48};
+  mln_completion rejected = mln_test_discard_completion();
   MLN_TEST_INVALID(mln_render_session_resize(
-    fixture.session,
-    (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.0},
-    &rejected_scale, NULL
+    fixture.session, (mln_logical_size){.width = 0, .height = 48}, &rejected,
+    NULL
   ));
   mln_test_render_demand_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
@@ -350,9 +341,7 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   TEST_ASSERT_DOUBLE_WITHIN(0.0, 1.0, snapshot.extent.scale_factor);
   TEST_ASSERT_EQUAL_UINT64(new_frame.generation, snapshot.generation);
 
-  mln_logical_extent second = extent;
-  second.width = 128;
-  second.height = 72;
+  const mln_logical_size second = {.width = 128, .height = 72};
   mln_test_completion first_resize = mln_test_completion_default(0);
   mln_test_completion second_resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
@@ -379,9 +368,7 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   detach(runtime, map, &fixture);
 }
 
-static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
-  void
-) {
+static void a_session_renders_at_its_maps_scale_factor(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
   options.initial_extent.scale_factor = 3.0;
@@ -394,15 +381,14 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session,
-      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+      fixture.session, (mln_logical_size){.width = 96, .height = 48},
       &completion.descriptor, NULL
     )
   );
   const mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.height);
-  TEST_ASSERT_DOUBLE_WITHIN(0.0, 1.0, snapshot.extent.scale_factor);
+  TEST_ASSERT_DOUBLE_WITHIN(0.0, 3.0, snapshot.extent.scale_factor);
   TEST_ASSERT_GREATER_THAN_UINT64(old_generation, snapshot.generation);
   mln_map_snapshot map_snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &map_snapshot, NULL));
@@ -449,8 +435,7 @@ static void a_resize_applies_while_a_command_group_holds_the_update(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session,
-      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+      fixture.session, (mln_logical_size){.width = 96, .height = 48},
       &completion.descriptor, NULL
     )
   );
@@ -717,7 +702,7 @@ MLN_TEST_GROUP {
   RUN_TEST(webgpu_a_demand_behind_unfinished_frames_wakes_the_driver);
 #endif
   RUN_TEST(resizes_apply_in_order_and_publish_generations);
-  RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);
+  RUN_TEST(a_session_renders_at_its_maps_scale_factor);
   RUN_TEST(attaching_sizes_the_map_to_the_target);
   RUN_TEST(a_resize_applies_while_a_command_group_holds_the_update);
   RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);

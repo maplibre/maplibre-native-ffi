@@ -6,6 +6,7 @@ import {
   AwaitableWake,
   FrameDemandFlag,
   type LogicalExtent,
+  type LogicalSize,
   type MapHandle,
   OpenGlClientApi,
   type OpenGlContextDescriptorData,
@@ -148,9 +149,12 @@ export const backend = buildBackend();
 const browser = backend === "webgl" || backend === "webgpu";
 
 export const renderSize = 32;
-export const renderExtent: LogicalExtent = {
+export const renderLogicalSize: LogicalSize = {
   width: renderSize,
   height: renderSize,
+};
+export const renderExtent: LogicalExtent = {
+  ...renderLogicalSize,
   scaleFactor: 1,
 };
 
@@ -175,7 +179,7 @@ function attachBorrowedTexture(
   const texture = addon.textureCreate(context.graphics, renderSize, renderSize);
   teardown(() => addon.textureDestroy(texture.texture));
   const ring = {
-    extent: renderExtent,
+    logicalSize: renderLogicalSize,
     physicalWidth: texture.width,
     physicalHeight: texture.height,
   };
@@ -274,7 +278,7 @@ export function attachSession(
   options: Partial<RenderSessionAttachOptions>,
 ): NewRenderSession {
   const attachment = map.attachOffscreen(
-    { extent: renderExtent },
+    { logicalSize: renderLogicalSize },
     { driver: RenderDriverKind.coreWorker, ...options },
   );
   teardown(() => releaseSession(attachment.session));

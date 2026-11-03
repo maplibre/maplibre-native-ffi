@@ -3,7 +3,7 @@ use maplibre_native_ffi::{AcquiredFrameHandle, GpuSync};
 
 fn release_during_view(frame: AcquiredFrameHandle) {
     let view = frame.view().unwrap();
-    let _ = frame.release(&GpuSync::default());
+    let _ = unsafe { frame.release(&GpuSync::default()) };
     drop(view);
 }
 

@@ -71,7 +71,8 @@ frame before you close the session.
 
 The session renders at the size of your textures, so to resize, give it new
 ones. First, release every acquired frame. Then create textures at the new size,
-and set them as the session's target, with as many textures as before. Once the
-replacement completes, destroy the old textures.
+and set them as the session's target, with as many textures as before. The
+session keeps the context and format that it attached with. Once the replacement
+completes, destroy the old textures.
 
 <Snippet page="texture" region="resize-borrowed" />

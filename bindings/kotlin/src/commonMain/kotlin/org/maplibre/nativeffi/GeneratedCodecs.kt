@@ -269,21 +269,21 @@ internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
   value: MetalBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(48, 56, 40).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  writeU32(target + w(24, 24, 20), value.physicalWidth)
-  writeU32(target + w(28, 28, 24), value.physicalHeight)
+  writeU32(target, w(32, 48).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
   writeAddress(
-    target + w(32, 32, 28),
+    target + w(20, 24),
     array(value.textures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) },
   )
-  writeSize(target + w(36, 40, 32), value.textures.size.toULong())
-  writeAddress(target + w(40, 48, 36), value.commandQueue.address)
+  writeSize(target + w(24, 32), value.textures.size.toULong())
+  writeAddress(target + w(28, 40), value.commandQueue.address)
 }
 
 internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
   value: MetalBorrowedTextureDescriptor,
-): Long = allocate(w(48, 56, 40), w(8, 8, 4)).also { putMetalBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(32, 48), w(4, 8)).also { putMetalBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeCall.putRenderSessionAttachOptions(
   target: Long,
@@ -301,120 +301,118 @@ internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAtta
   allocate(w(80, 112, 68), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
 
 internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
-  writeU32(target, w(32, 40, 28).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putMetalContextDescriptor(target + w(24, 24, 20), value.context)
-  writeAddress(target + w(28, 32, 24), value.layer.address)
+  writeU32(target, w(20, 32).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  putMetalContextDescriptor(target + w(12, 16), value.context)
+  writeAddress(target + w(16, 24), value.layer.address)
 }
 
 internal fun NativeArena.writeMetalSurfaceDescriptor(value: MetalSurfaceDescriptor): Long =
-  allocate(w(32, 40, 28), w(8, 8, 4)).also { putMetalSurfaceDescriptor(it, value) }
+  allocate(w(20, 32), w(4, 8)).also { putMetalSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putOffscreenDescriptor(target: Long, value: OffscreenDescriptor) {
-  writeU32(target, w(24, 24, 20).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
+  writeU32(target, 12.toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
 }
 
 internal fun NativeArena.writeOffscreenDescriptor(value: OffscreenDescriptor): Long =
-  allocate(w(24, 24, 20), w(8, 8, 4)).also { putOffscreenDescriptor(it, value) }
+  allocate(12, 4).also { putOffscreenDescriptor(it, value) }
 
 internal fun NativeArena.putOpenGlBorrowedTextureDescriptor(
   target: Long,
   value: OpenGlBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(72, 104, 68).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  writeU32(target + w(24, 24, 20), value.physicalWidth)
-  writeU32(target + w(28, 28, 24), value.physicalHeight)
-  putOpenGlContextDescriptor(target + w(32, 32, 28), value.context)
+  writeU32(target, w(60, 96).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  putOpenGlContextDescriptor(target + w(20, 24), value.context)
   writeAddress(
-    target + w(60, 80, 56),
+    target + w(48, 72),
     array(value.textures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) },
   )
-  writeSize(target + w(64, 88, 60), value.textures.size.toULong())
-  writeU32(target + w(68, 96, 64), value.target)
+  writeSize(target + w(52, 80), value.textures.size.toULong())
+  writeU32(target + w(56, 88), value.target)
 }
 
 internal fun NativeArena.writeOpenGlBorrowedTextureDescriptor(
   value: OpenGlBorrowedTextureDescriptor,
-): Long =
-  allocate(w(72, 104, 68), w(8, 8, 4)).also { putOpenGlBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(60, 96), w(4, 8)).also { putOpenGlBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putOpenGlSurfaceDescriptor(target: Long, value: OpenGlSurfaceDescriptor) {
-  writeU32(target, w(56, 80, 52).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putOpenGlContextDescriptor(target + w(24, 24, 20), value.context)
-  writeAddress(target + w(52, 72, 48), value.surface.address)
+  writeU32(target, w(44, 72).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  putOpenGlContextDescriptor(target + w(12, 16), value.context)
+  writeAddress(target + w(40, 64), value.surface.address)
 }
 
 internal fun NativeArena.writeOpenGlSurfaceDescriptor(value: OpenGlSurfaceDescriptor): Long =
-  allocate(w(56, 80, 52), w(8, 8, 4)).also { putOpenGlSurfaceDescriptor(it, value) }
+  allocate(w(44, 72), w(4, 8)).also { putOpenGlSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
   target: Long,
   value: VulkanBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(80, 120, 76).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  writeU32(target + w(24, 24, 20), value.physicalWidth)
-  writeU32(target + w(28, 28, 24), value.physicalHeight)
-  putVulkanContextDescriptor(target + w(32, 32, 28), value.context)
+  writeU32(target, w(68, 112).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  putVulkanContextDescriptor(target + w(20, 24), value.context)
   writeAddress(
-    target + w(60, 88, 56),
+    target + w(48, 80),
     array(value.textures, 16, w(8, 8, 4)) { at, item -> putVulkanBorrowedTexture(at, item) },
   )
-  writeSize(target + w(64, 96, 60), value.textures.size.toULong())
-  writeU32(target + w(68, 104, 64), value.format)
-  writeU32(target + w(72, 108, 68), value.finalLayout)
-  writeU32(target + w(76, 112, 72), value.owner.rawValue)
+  writeSize(target + w(52, 88), value.textures.size.toULong())
+  writeU32(target + w(56, 96), value.format)
+  writeU32(target + w(60, 100), value.finalLayout)
+  writeU32(target + w(64, 104), value.owner.rawValue)
 }
 
 internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
   value: VulkanBorrowedTextureDescriptor,
-): Long =
-  allocate(w(80, 120, 76), w(8, 8, 4)).also { putVulkanBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(68, 112), w(4, 8)).also { putVulkanBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanSurfaceDescriptor) {
-  writeU32(target, w(64, 88, 56).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putVulkanContextDescriptor(target + w(24, 24, 20), value.context)
-  writeU64(target + w(56, 80, 48), value.surface)
+  writeU32(target, w(48, 80).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  putVulkanContextDescriptor(target + w(12, 16), value.context)
+  writeU64(target + w(40, 72), value.surface)
 }
 
 internal fun NativeArena.writeVulkanSurfaceDescriptor(value: VulkanSurfaceDescriptor): Long =
-  allocate(w(64, 88, 56), w(8, 8, 4)).also { putVulkanSurfaceDescriptor(it, value) }
+  allocate(w(48, 80), w(8, 8, 4)).also { putVulkanSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putWebGpuBorrowedTextureDescriptor(
   target: Long,
   value: WebGpuBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(56, 80, 52).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  writeU32(target + w(24, 24, 20), value.physicalWidth)
-  writeU32(target + w(28, 28, 24), value.physicalHeight)
-  putWebGpuContextDescriptor(target + w(32, 32, 28), value.context)
+  writeU32(target, w(44, 72).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  putWebGpuContextDescriptor(target + w(20, 24), value.context)
   writeAddress(
-    target + w(44, 56, 40),
+    target + w(32, 48),
     array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebGpuBorrowedTexture(at, item) },
   )
-  writeSize(target + w(48, 64, 44), value.textures.size.toULong())
-  writeU32(target + w(52, 72, 48), value.format)
+  writeSize(target + w(36, 56), value.textures.size.toULong())
+  writeU32(target + w(40, 64), value.format)
 }
 
 internal fun NativeArena.writeWebGpuBorrowedTextureDescriptor(
   value: WebGpuBorrowedTextureDescriptor,
-): Long = allocate(w(56, 80, 52), w(8, 8, 4)).also { putWebGpuBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(44, 72), w(4, 8)).also { putWebGpuBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putWebGpuSurfaceDescriptor(target: Long, value: WebGpuSurfaceDescriptor) {
-  writeU32(target, w(48, 64, 40).toUInt())
-  putLogicalExtent(target + w(8, 8, 4), value.extent)
-  putWebGpuContextDescriptor(target + w(24, 24, 20), value.context)
-  writeAddress(target + w(36, 48, 32), value.surface.address)
-  writeU32(target + w(40, 56, 36), value.format)
+  writeU32(target, w(32, 56).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  putWebGpuContextDescriptor(target + w(12, 16), value.context)
+  writeAddress(target + w(24, 40), value.surface.address)
+  writeU32(target + w(28, 48), value.format)
 }
 
 internal fun NativeArena.writeWebGpuSurfaceDescriptor(value: WebGpuSurfaceDescriptor): Long =
-  allocate(w(48, 64, 40), w(8, 8, 4)).also { putWebGpuSurfaceDescriptor(it, value) }
+  allocate(w(32, 56), w(4, 8)).also { putWebGpuSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
   writeU32(target, 56.toUInt())
@@ -514,6 +512,14 @@ internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
 
 internal fun NativeArena.writeCameraOptions(value: CameraOptions): Long =
   allocate(120, w(8, 8, 4)).also { putCameraOptions(it, value) }
+
+internal fun NativeArena.putLogicalSize(target: Long, value: LogicalSize) {
+  writeU32(target, value.width)
+  writeU32(target + 4, value.height)
+}
+
+internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
+  allocate(8, 4).also { putLogicalSize(it, value) }
 
 internal fun NativeArena.putBoundOptions(target: Long, value: BoundOptions) {
   writeU32(target, 72.toUInt())
@@ -800,6 +806,127 @@ internal fun NativeArena.putSourceFeatureQueryOptions(
 
 internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQueryOptions): Long =
   allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
+
+internal fun NativeArena.putMetalBorrowedTextureReplacement(
+  target: Long,
+  value: MetalBorrowedTextureReplacement,
+) {
+  writeU32(target, w(28, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  writeAddress(
+    target + w(20, 24),
+    array(value.textures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(24, 32), value.textures.size.toULong())
+}
+
+internal fun NativeArena.writeMetalBorrowedTextureReplacement(
+  value: MetalBorrowedTextureReplacement,
+): Long = allocate(w(28, 40), w(4, 8)).also { putMetalBorrowedTextureReplacement(it, value) }
+
+internal fun NativeArena.putMetalSurfaceReplacement(target: Long, value: MetalSurfaceReplacement) {
+  writeU32(target, w(16, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.layer.address)
+}
+
+internal fun NativeArena.writeMetalSurfaceReplacement(value: MetalSurfaceReplacement): Long =
+  allocate(w(16, 24), w(4, 8)).also { putMetalSurfaceReplacement(it, value) }
+
+internal fun NativeArena.putOpenGlBorrowedTextureReplacement(
+  target: Long,
+  value: OpenGlBorrowedTextureReplacement,
+) {
+  writeU32(target, w(28, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  writeAddress(
+    target + w(20, 24),
+    array(value.textures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(24, 32), value.textures.size.toULong())
+}
+
+internal fun NativeArena.writeOpenGlBorrowedTextureReplacement(
+  value: OpenGlBorrowedTextureReplacement,
+): Long = allocate(w(28, 40), w(4, 8)).also { putOpenGlBorrowedTextureReplacement(it, value) }
+
+internal fun NativeArena.putOpenGlSurfaceReplacement(
+  target: Long,
+  value: OpenGlSurfaceReplacement,
+) {
+  writeU32(target, w(16, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.surface.address)
+}
+
+internal fun NativeArena.writeOpenGlSurfaceReplacement(value: OpenGlSurfaceReplacement): Long =
+  allocate(w(16, 24), w(4, 8)).also { putOpenGlSurfaceReplacement(it, value) }
+
+internal fun NativeArena.putVulkanBorrowedTextureReplacement(
+  target: Long,
+  value: VulkanBorrowedTextureReplacement,
+) {
+  writeU32(target, w(28, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  writeAddress(
+    target + w(20, 24),
+    array(value.textures, 16, w(8, 8, 4)) { at, item -> putVulkanBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(24, 32), value.textures.size.toULong())
+}
+
+internal fun NativeArena.writeVulkanBorrowedTextureReplacement(
+  value: VulkanBorrowedTextureReplacement,
+): Long = allocate(w(28, 40), w(4, 8)).also { putVulkanBorrowedTextureReplacement(it, value) }
+
+internal fun NativeArena.putVulkanSurfaceReplacement(
+  target: Long,
+  value: VulkanSurfaceReplacement,
+) {
+  writeU32(target, w(24, 24, 20).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU64(target + w(16, 16, 12), value.surface)
+}
+
+internal fun NativeArena.writeVulkanSurfaceReplacement(value: VulkanSurfaceReplacement): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putVulkanSurfaceReplacement(it, value) }
+
+internal fun NativeArena.putWebGpuBorrowedTextureReplacement(
+  target: Long,
+  value: WebGpuBorrowedTextureReplacement,
+) {
+  writeU32(target, w(28, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.physicalWidth)
+  writeU32(target + 16, value.physicalHeight)
+  writeAddress(
+    target + w(20, 24),
+    array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebGpuBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(24, 32), value.textures.size.toULong())
+}
+
+internal fun NativeArena.writeWebGpuBorrowedTextureReplacement(
+  value: WebGpuBorrowedTextureReplacement,
+): Long = allocate(w(28, 40), w(4, 8)).also { putWebGpuBorrowedTextureReplacement(it, value) }
+
+internal fun NativeArena.putWebGpuSurfaceReplacement(
+  target: Long,
+  value: WebGpuSurfaceReplacement,
+) {
+  writeU32(target, w(16, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.surface.address)
+}
+
+internal fun NativeArena.writeWebGpuSurfaceReplacement(value: WebGpuSurfaceReplacement): Long =
+  allocate(w(16, 24), w(4, 8)).also { putWebGpuSurfaceReplacement(it, value) }
 
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
   writeU32(target, w(72, 96, 68).toUInt())

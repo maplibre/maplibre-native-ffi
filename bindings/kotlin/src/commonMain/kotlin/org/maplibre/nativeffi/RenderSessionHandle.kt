@@ -454,8 +454,7 @@ internal constructor(
   /**
    * Resizes the session's target and its map.
    *
-   * `extent` must keep the session's scale factor. To change the scale factor, give the session a
-   * new target or attach a new session. Release every acquired frame first.
+   * The session renders at the map's scale factor. Release every acquired frame first.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -466,9 +465,11 @@ internal constructor(
    *   the new size instead.
    * - `Status.TARGET_LOST` when the session loses its target before the resize applies.
    */
-  public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
+  public fun resize(logicalSize: LogicalSize): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
-      check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
+      check(
+        C.mln_render_session_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic),
+      )
     }
 
   /**
@@ -490,21 +491,21 @@ internal constructor(
    * Replaces the OpenGL textures that a borrowed ring renders into.
    *
    * Use it to resize the ring, or to give the session textures again after
-   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. The new ring must
-   * have as many textures as the old one, and the same context. Once the replacement completes, the
-   * session no longer uses the old textures.
+   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
+   * completes, the session no longer uses the old textures. A replacement with the textures and
+   * sizes that the ring renders into already changes nothing.
    *
    * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   public fun setOpenGlBorrowedTextureTarget(
-    descriptor: OpenGlBorrowedTextureDescriptor,
+    replacement: OpenGlBorrowedTextureReplacement,
   ): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_open_gl_borrowed_texture_target(
           handle,
-          writeOpenGlBorrowedTextureDescriptor(descriptor),
+          writeOpenGlBorrowedTextureReplacement(replacement),
           completion,
           diagnostic,
         ),
@@ -514,19 +515,20 @@ internal constructor(
   /**
    * Replaces the OpenGL surface that the session presents to.
    *
-   * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, or to
-   * move it to another surface. The new surface must use the same context. Once the replacement
-   * completes, the session no longer uses the old surface.
+   * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
+   * it to another surface, or to resize it. Once the replacement completes, the session no longer
+   * uses the old surface. A replacement with the surface and logical size that the session presents
+   * to already changes nothing.
    *
    * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  public fun setOpenGlSurfaceTarget(descriptor: OpenGlSurfaceDescriptor): Deferred<Unit> =
+  public fun setOpenGlSurfaceTarget(replacement: OpenGlSurfaceReplacement): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_open_gl_surface_target(
           handle,
-          writeOpenGlSurfaceDescriptor(descriptor),
+          writeOpenGlSurfaceReplacement(replacement),
           completion,
           diagnostic,
         ),
@@ -552,8 +554,10 @@ internal constructor(internal val owner: RenderSessionHandle) {
     get() = owner.binding
 
   /** [RenderSessionHandle.resize] without its completion. */
-  public fun resize(extent: LogicalExtent): Unit =
+  public fun resize(logicalSize: LogicalSize): Unit =
     nativeDiscard(owner, binding) {
-      check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
+      check(
+        C.mln_render_session_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic),
+      )
     }
 }

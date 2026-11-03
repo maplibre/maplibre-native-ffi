@@ -17,12 +17,11 @@ func copyPixels(data []byte, stride uint32) {}
 
 func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #region map
-	extent := maplibre.LogicalExtent{
-		Width: 800, Height: 600, ScaleFactor: 2,
-	}
 	m, created, err := runtime.CreateMap(maplibre.MapOptions{
-		InitialExtent: extent,
-		MapMode:       maplibre.MapModeStatic,
+		InitialExtent: maplibre.LogicalExtent{
+			Width: 800, Height: 600, ScaleFactor: 2,
+		},
+		MapMode: maplibre.MapModeStatic,
 	})
 	if err != nil {
 		return err
@@ -43,7 +42,9 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 
 	// #region attach
 	session, attached, err := m.AttachOffscreen(
-		maplibre.OffscreenDescriptor{Extent: extent},
+		maplibre.OffscreenDescriptor{
+			LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+		},
 		// The library renders on its own thread.
 		maplibre.RenderSessionAttachOptions{
 			Driver: maplibre.RenderDriverKindCoreWorker,

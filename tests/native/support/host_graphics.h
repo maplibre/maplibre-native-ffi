@@ -129,16 +129,16 @@ mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
 
 // Submits the backend's borrowed-texture or surface set_target for the
 // fixture's session, naming the `count` `textures`, up to
-// MLN_TEXTURE_RING_MAX_DEPTH, or `surface`, and the context of `graphics`,
-// which created them. Returns the submission status, or MLN_STATUS_NATIVE_ERROR
-// when the target cannot be described.
+// MLN_TEXTURE_RING_MAX_DEPTH, or `surface`, at their own size in logical
+// pixels. Returns the submission status, or MLN_STATUS_NATIVE_ERROR when the
+// target cannot be described.
 mln_status mln_test_render_fixture_set_textures(
-  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_render_fixture* fixture,
   mln_test_graphics_texture* const* textures, size_t count,
   const mln_completion* completion
 );
 mln_status mln_test_render_fixture_set_surface(
-  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_render_fixture* fixture,
   const mln_test_graphics_surface* surface, const mln_completion* completion
 );
 #endif

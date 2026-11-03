@@ -51,9 +51,9 @@ void onFrameWake() {
 
 // #region resize
 void onWindowResized(int width, int height) {
-  // The scale factor the session has now.
+  // The window's new size in logical pixels.
   session.discarding.resize(
-    LogicalExtent(width: width, height: height, scaleFactor: 2),
+    LogicalSize(width: width, height: height),
   );
 }
 // #endregion resize
@@ -65,19 +65,11 @@ Future<void> surfaceLost() async {
   // #endregion lost-surface
 }
 
-Future<void> surfaceRestored(
-  VulkanContextDescriptor vulkan,
-  int newSurface,
-) async {
+Future<void> surfaceRestored(int newSurface) async {
   // #region lost-surface
   await session.setVulkanSurfaceTarget(
-    VulkanSurfaceDescriptor(
-      extent: const LogicalExtent(
-        width: 800,
-        height: 600,
-        scaleFactor: 2,
-      ),
-      context: vulkan,
+    VulkanSurfaceReplacement(
+      logicalSize: const LogicalSize(width: 800, height: 600),
       surface: newSurface,
     ),
   );
@@ -95,12 +87,9 @@ Future<void> renderToWindow(
   // #region attach
   final attachment = map.attachVulkanSurface(
     VulkanSurfaceDescriptor(
-      // The window's size in logical pixels, and its scale factor.
-      extent: const LogicalExtent(
-        width: 800,
-        height: 600,
-        scaleFactor: 2,
-      ),
+      // The window's size in logical pixels. The map's scale factor
+      // turns it into pixels.
+      logicalSize: const LogicalSize(width: 800, height: 600),
       // Your VkInstance, VkPhysicalDevice,
       // VkDevice, and graphics VkQueue.
       context: vulkan,

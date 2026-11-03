@@ -179,15 +179,16 @@ final class TestGraphics {
   final _textures = <Pointer<Void>>[];
   var _closed = false;
 
-  /// Attaches a ring of one texture on this device for a core worker. [close]
-  /// destroys the texture, so the session must retire first.
+  /// Attaches a ring of one texture on this device for a core worker, at
+  /// [size] on a map of scale factor 1. [close] destroys the texture, so the
+  /// session must retire first.
   NewRenderSession attachBorrowedTexture(
     MapHandle map,
-    LogicalExtent extent,
+    LogicalSize size,
     RenderSessionAttachOptions options,
   ) {
-    final width = (extent.width * extent.scaleFactor).round();
-    final height = (extent.height * extent.scaleFactor).round();
+    final width = size.width;
+    final height = size.height;
     final texture = _createTexture(width, height);
     final context = _context.ref;
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
@@ -195,7 +196,7 @@ final class TestGraphics {
       case _backendMetal:
         return map.attachMetalBorrowedTexture(
           MetalBorrowedTextureDescriptor(
-            extent: extent,
+            logicalSize: size,
             physicalWidth: width,
             physicalHeight: height,
             textures: [MetalBorrowedTexture(texture: texture.metalTexture)],
@@ -205,7 +206,7 @@ final class TestGraphics {
       case _backendVulkan:
         return map.attachVulkanBorrowedTexture(
           VulkanBorrowedTextureDescriptor(
-            extent: extent,
+            logicalSize: size,
             physicalWidth: width,
             physicalHeight: height,
             context: VulkanContextDescriptor(

@@ -31,6 +31,7 @@ from ._generated_values import (
     LatLngBounds,
     LogHandler,
     LogicalExtent,
+    LogicalSize,
     LogSeverityFlag,
     MapDebugFlag,
     MapOptions,
@@ -39,7 +40,9 @@ from ._generated_values import (
     MapView,
     MapViewportOptions,
     MetalBorrowedTextureDescriptor,
+    MetalBorrowedTextureReplacement,
     MetalSurfaceDescriptor,
+    MetalSurfaceReplacement,
     MetalTextureFrame,
     NetworkStatus,
     OfflineRegionDefinition,
@@ -49,8 +52,10 @@ from ._generated_values import (
     OffscreenDescriptor,
     OffscreenDeviceOptions,
     OpenGlBorrowedTextureDescriptor,
+    OpenGlBorrowedTextureReplacement,
     OpenGlContextProviderFlag,
     OpenGlSurfaceDescriptor,
+    OpenGlSurfaceReplacement,
     OpenGlTextureFrame,
     PremultipliedRgba8Image,
     ProjectedMeters,
@@ -85,7 +90,9 @@ from ._generated_values import (
     StyleVectorTileEncoding,
     TextureReadbackResult,
     VulkanBorrowedTextureDescriptor,
+    VulkanBorrowedTextureReplacement,
     VulkanSurfaceDescriptor,
+    VulkanSurfaceReplacement,
     VulkanTextureFrame,
     _maybe,
 )
@@ -1120,17 +1127,22 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.request_still_image()
 
-    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
+    def resize(self, logical_size: LogicalSize) -> Future[CommandCompletion]:
         """Sets the map's size.
 
-        `extent` must keep the scale factor that the map was created with. A
-        map with a render session takes its size from the session, so resize
-        the session with `RenderSessionHandle.resize()` instead.
+        A map with a render session takes its size from the session, so
+        resize the session with `RenderSessionHandle.resize()` instead.
 
         See `mln_map_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the map has a render session.
+        - `Status.INVALID_STATE` when a render session attached to the map
+          before the resize applied.
         """
-        return self._native.resize(extent)
+        return self._native.resize(logical_size)
 
     def set_bounds(
         self, options: BoundOptions | None = None
@@ -2044,12 +2056,11 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.release_target()
 
-    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
+    def resize(self, logical_size: LogicalSize) -> Future[CommandCompletion]:
         """Resizes the session's target and its map.
 
-        `extent` must keep the session's scale factor. To change the scale
-        factor, give the session a new target or attach a new session.
-        Release every acquired frame first.
+        The session renders at the map's scale factor. Release every acquired
+        frame first.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2061,7 +2072,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         - `Status.TARGET_LOST` when the session loses its target before the
           resize applies.
         """
-        return self._native.resize(extent)
+        return self._native.resize(logical_size)
 
     def service_driver_work(self) -> None:
         """Runs the session's ready graphics work on your graphics thread.
@@ -2078,15 +2089,15 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.service_driver_work()
 
     def set_metal_borrowed_texture_target(
-        self, descriptor: MetalBorrowedTextureDescriptor
+        self, replacement: MetalBorrowedTextureReplacement
     ) -> Future[None]:
         """Replaces the Metal textures that a borrowed ring renders into.
 
         Use it to resize the ring, or to give the session textures again
         after `RenderSessionHandle.release_target()`. Release every acquired
-        frame first. The new ring must have as many textures as the old one,
-        and the same device and command queue. Once the replacement
-        completes, the session no longer uses the old textures.
+        frame first. Once the replacement completes, the session no longer
+        uses the old textures. A replacement with the textures and sizes that
+        the ring renders into already changes nothing.
 
         See `mln_render_session_set_metal_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2096,85 +2107,82 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         - `Status.UNSUPPORTED` when the new textures have a different pixel
           format than the old ones. Attach a new session to change it.
         """
-        return self._native.set_metal_borrowed_texture_target(descriptor)
+        return self._native.set_metal_borrowed_texture_target(replacement)
 
     def set_metal_surface_target(
-        self, descriptor: MetalSurfaceDescriptor
+        self, replacement: MetalSurfaceReplacement
     ) -> Future[None]:
         """Replaces the Metal layer that the session renders to.
 
         Use it to give the session a layer again after
-        `RenderSessionHandle.release_target()`, or to move it to another
-        layer. The new layer must use the same device. Once the replacement
-        completes, the session no longer uses the old layer.
+        `RenderSessionHandle.release_target()`, to move it to another layer,
+        or to resize it. Once the replacement completes, the session no
+        longer uses the old layer. A replacement with the layer and logical
+        size that the session renders to already changes nothing.
 
         See `mln_render_session_set_metal_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
-        return self._native.set_metal_surface_target(descriptor)
+        return self._native.set_metal_surface_target(replacement)
 
     def set_open_gl_borrowed_texture_target(
-        self, descriptor: OpenGlBorrowedTextureDescriptor
+        self, replacement: OpenGlBorrowedTextureReplacement
     ) -> Future[None]:
         """Replaces the OpenGL textures that a borrowed ring renders into.
 
         Use it to resize the ring, or to give the session textures again
         after `RenderSessionHandle.release_target()`. Release every acquired
-        frame first. The new ring must have as many textures as the old one,
-        and the same context. Once the replacement completes, the session no
-        longer uses the old textures.
+        frame first. Once the replacement completes, the session no longer
+        uses the old textures. A replacement with the textures and sizes that
+        the ring renders into already changes nothing.
 
         See `mln_render_session_set_open_gl_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        return self._native.set_open_gl_borrowed_texture_target(descriptor)
+        return self._native.set_open_gl_borrowed_texture_target(replacement)
 
     def set_open_gl_surface_target(
-        self, descriptor: OpenGlSurfaceDescriptor
+        self, replacement: OpenGlSurfaceReplacement
     ) -> Future[None]:
         """Replaces the OpenGL surface that the session presents to.
 
         Use it to give the session a surface again after
-        `RenderSessionHandle.release_target()`, or to move it to another
-        surface. The new surface must use the same context. Once the
-        replacement completes, the session no longer uses the old surface.
+        `RenderSessionHandle.release_target()`, to move it to another
+        surface, or to resize it. Once the replacement completes, the session
+        no longer uses the old surface. A replacement with the surface and
+        logical size that the session presents to already changes nothing.
 
         See `mln_render_session_set_open_gl_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
-        return self._native.set_open_gl_surface_target(descriptor)
+        return self._native.set_open_gl_surface_target(replacement)
 
     def set_vulkan_borrowed_texture_target(
-        self, descriptor: VulkanBorrowedTextureDescriptor
+        self, replacement: VulkanBorrowedTextureReplacement
     ) -> Future[None]:
         """Replaces the Vulkan images that a borrowed ring renders into.
 
         Use it to resize the ring, or to give the session images again after
         `RenderSessionHandle.release_target()`. Release every acquired frame
-        first. The new ring must have as many images as the old one, and the
-        same context. Once the replacement completes, the session no longer
-        uses the old images.
+        first. Once the replacement completes, the session no longer uses the
+        old images. A replacement with the images and sizes that the ring
+        renders into already changes nothing.
 
         See `mln_render_session_set_vulkan_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-
-        Errors:
-
-        - `Status.UNSUPPORTED` when the new ring has a different `format`,
-          `final_layout`, or `owner` than the old one. Attach a new session
-          to change them.
         """
-        return self._native.set_vulkan_borrowed_texture_target(descriptor)
+        return self._native.set_vulkan_borrowed_texture_target(replacement)
 
     def set_vulkan_surface_target(
-        self, descriptor: VulkanSurfaceDescriptor
+        self, replacement: VulkanSurfaceReplacement
     ) -> Future[None]:
         """Replaces the Vulkan surface that the session presents to.
 
         Use it to give the session a surface again after
-        `RenderSessionHandle.release_target()`, or to move it to another
-        surface. The new surface must use the same context. Once the
-        replacement completes, the session no longer uses the old surface.
+        `RenderSessionHandle.release_target()`, to move it to another
+        surface, or to resize it. Once the replacement completes, the session
+        no longer uses the old surface. A replacement with the surface and
+        logical size that the session presents to already changes nothing.
 
         See `mln_render_session_set_vulkan_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -2185,7 +2193,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
           format or pre-rotation support than the old one. Attach a new
           session instead.
         """
-        return self._native.set_vulkan_surface_target(descriptor)
+        return self._native.set_vulkan_surface_target(replacement)
 
     @property
     def discarding(self) -> RenderSessionHandleDiscarding:
@@ -3072,17 +3080,20 @@ class MapHandleDiscarding:
         """
         return self._native._discard_request_repaint()
 
-    def resize(self, extent: LogicalExtent) -> None:
+    def resize(self, logical_size: LogicalSize) -> None:
         """Sets the map's size.
 
-        `extent` must keep the scale factor that the map was created with. A
-        map with a render session takes its size from the session, so resize
-        the session with `RenderSessionHandle.resize()` instead.
+        A map with a render session takes its size from the session, so
+        resize the session with `RenderSessionHandle.resize()` instead.
 
         See `mln_map_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the map has a render session.
         """
-        return self._native._discard_resize(extent)
+        return self._native._discard_resize(logical_size)
 
     def set_bounds(self, options: BoundOptions | None = None) -> None:
         """Limits the camera's center to an area, and its zoom and pitch to
@@ -3430,12 +3441,11 @@ class RenderSessionHandleDiscarding:
     def __init__(self, owner: _RenderSessionHandleOperations):
         self._native = owner._native
 
-    def resize(self, extent: LogicalExtent) -> None:
+    def resize(self, logical_size: LogicalSize) -> None:
         """Resizes the session's target and its map.
 
-        `extent` must keep the session's scale factor. To change the scale
-        factor, give the session a new target or attach a new session.
-        Release every acquired frame first.
+        The session renders at the map's scale factor. Release every acquired
+        frame first.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3445,7 +3455,7 @@ class RenderSessionHandleDiscarding:
         - `Status.UNSUPPORTED` when the session renders into a borrowed ring.
           Give it new textures of the new size instead.
         """
-        return self._native._discard_resize(extent)
+        return self._native._discard_resize(logical_size)
 
 
 class RuntimeHandleDiscarding:

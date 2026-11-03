@@ -97,7 +97,7 @@ private func attachOffscreenSession(
     try await fixture.map.setStyleJson(style)
     created = try fixture.map.attachOffscreen(
       descriptor: OffscreenDescriptor(
-        extent: LogicalExtent(width: 32, height: 32, scaleFactor: 1)
+        logicalSize: LogicalSize(width: 32, height: 32)
       ),
       options: RenderSessionAttachOptions(
         driver: .coreWorker,
@@ -315,7 +315,7 @@ private func attachBorrowedTexture(
     // Native code refuses an attach while the map still has a session.
     let next = try rendered.fixture.map.attachOffscreen(
       descriptor: OffscreenDescriptor(
-        extent: LogicalExtent(width: 32, height: 32, scaleFactor: 1)
+        logicalSize: LogicalSize(width: 32, height: 32)
       ),
       options: RenderSessionAttachOptions(driver: .coreWorker)
     )

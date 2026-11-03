@@ -72,10 +72,6 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     return slots_.at(selected_).framebuffer;
   }
 
-  [[nodiscard]] auto has_render_pass() const -> bool {
-    return static_cast<bool>(renderPass);
-  }
-
   // Renders into `slot` at `size` from here on, building whatever the slot
   // lacks. A slot whose frame the host holds is never selected, so its color
   // image survives a rebuild of another slot.
@@ -246,8 +242,8 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     return static_cast<vk::ImageLayout>(owner_.frame_layout());
   }
 
-  // Built once: a replacement target must match its format and final layout,
-  // which VulkanTextureBackend::matches_borrowed_target checks.
+  // Built once: a replacement keeps the format and final layout of the
+  // attach.
   void create_render_pass() {
     const auto& device = backend.getDevice();
     const auto& dispatcher = backend.getDispatcher();
@@ -430,36 +426,15 @@ auto VulkanTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
   return *this;
 }
 
-auto VulkanTextureBackend::matches_borrowed_target(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor
-) const -> bool {
-  // Nothing is built yet, so there is no render pass to be incompatible with.
-  if (
-    !resource ||
-    !getResource<VulkanTextureRenderableResource>().has_render_pass()
-  ) {
-    return true;
-  }
-  // The ring's pass was built around these, and mbgl keys its pipelines on the
-  // pass, so a replacement keeps them to keep those pipelines usable. It keeps
-  // the owner too, since the outgoing images may still be with it.
-  return descriptor.format == borrowed_descriptor_.format &&
-         descriptor.final_layout == borrowed_descriptor_.final_layout &&
-         descriptor.owner == borrowed_descriptor_.owner;
-}
-
 void VulkanTextureBackend::set_borrowed_target(
-  const VulkanBorrowedTarget& target
+  const VulkanBorrowedTextures& target
 ) {
-  const auto new_size = mln::Size{
-    target.descriptor.physical_width, target.descriptor.physical_height
-  };
+  const auto new_size = target.physical_size;
   // Once this wait returns, the session is done with the outgoing images, and
   // the host may destroy them when set_target completes. The queue drains past
   // the session's last frame and the handoffs that follow it. A device wait
   // would also need the host's other queues, which the session must not touch.
   if (context) graphicsQueue.waitIdle(dispatcher);
-  borrowed_descriptor_ = target.descriptor;
   borrowed_images_ = target.textures;
   setRenderableSize(new_size);
   // Each slot builds a framebuffer over its new image when it is next

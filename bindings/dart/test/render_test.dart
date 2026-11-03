@@ -21,7 +21,7 @@ const _redStyle = {
 };
 
 final _descriptor = OffscreenDescriptor(
-  extent: LogicalExtent(width: renderSize, height: renderSize, scaleFactor: 1),
+  logicalSize: LogicalSize(width: renderSize, height: renderSize),
 );
 
 void _expectRed(TextureReadbackResult image) {

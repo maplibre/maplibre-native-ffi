@@ -51,8 +51,7 @@ static mln_offscreen_descriptor texture_descriptor(void) {
   mln_offscreen_descriptor descriptor = {
     .size = sizeof(mln_offscreen_descriptor)
   };
-  descriptor.extent =
-    (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
+  descriptor.logical_size = (mln_logical_size){.width = 64, .height = 64};
   return descriptor;
 }
 
@@ -158,7 +157,8 @@ static void render_red_frame(
 
 static mln_map create_static_red_map(mln_runtime runtime) {
   mln_map_options map_options = mln_test_map_options();
-  map_options.initial_extent = texture_descriptor().extent;
+  map_options.initial_extent.width = texture_descriptor().logical_size.width;
+  map_options.initial_extent.height = texture_descriptor().logical_size.height;
   map_options.map_mode = MLN_MAP_MODE_STATIC;
   mln_map map = mln_test_create_map_with_options(runtime, &map_options);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
@@ -441,7 +441,7 @@ static void attach_rejects_what_an_offscreen_session_cannot_take(void) {
     MLN_STATUS_INVALID_ARGUMENT, map, device, &undersized, &options
   );
   mln_offscreen_descriptor empty = descriptor;
-  empty.extent.width = 0;
+  empty.logical_size.width = 0;
   expect_attach_status(
     MLN_STATUS_INVALID_ARGUMENT, map, device, &empty, &options
   );

@@ -12,7 +12,9 @@ namespace Maplibre.NativeFfi;
 public sealed record MapOptions
 {
     /// <summary>
-    /// The map's first size. Its scale factor stays fixed for the map's life.
+    /// The map's first size, and its scale factor. The scale factor stays fixed
+    /// for the map's life, and every render session of the map renders at it.
+    /// To render at another density, create a new map and attach a new session.
     /// </summary>
     public required LogicalExtent InitialExtent { get; init; }
     public MapMode MapMode { get; init; }

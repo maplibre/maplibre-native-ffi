@@ -57,18 +57,13 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // Follows a new physical size. Each ring slot keeps its image until the slot
   // is selected again, which rebuilds it at the new size.
   void set_ring_size(mln::Size new_size);
-  [[nodiscard]] auto matches_borrowed_target(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor
-  ) const -> bool;
-  void set_borrowed_target(const VulkanBorrowedTarget& target);
+  // Renders into new images, keeping the format, final layout, and owner that
+  // the ring's render pass was built for.
+  void set_borrowed_target(const VulkanBorrowedTextures& target);
   // Lets go of the borrowed images, keeping the render pass for the ring that
   // set_borrowed_target() hands over next.
   void release_borrowed_target();
   [[nodiscard]] auto frame_layout() const -> VkImageLayout;
-  [[nodiscard]] auto context_descriptor() const
-    -> const mln_vulkan_context_descriptor& {
-    return context_;
-  }
   auto readStillImage() -> mln::PremultipliedImage override;
   auto getRendererBackend() -> mln::gfx::RendererBackend* override;
   void activate() override;

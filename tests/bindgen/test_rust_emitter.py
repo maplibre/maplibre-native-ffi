@@ -120,6 +120,40 @@ class RustEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", values)
 
+    def test_an_integer_that_names_a_graphics_object_makes_its_call_unsafe(self):
+        # Native code uses the objects that these integers name as it would
+        # pointers. Add each new integer that names a graphics object here.
+        api = real_api()
+        typedefs = {typedef.name: typedef for typedef in api.typedefs}
+        fields = {
+            (record.name, field.name): field
+            for record in api.records
+            for field in record.fields
+        }
+        self.assertEqual(
+            "true",
+            typedefs["mln_vulkan_non_dispatchable_handle"].metadata.get(
+                "native_object"
+            ),
+        )
+        for name in [
+            ("mln_gpu_sync", "handle"),
+            ("mln_open_gl_borrowed_texture", "texture"),
+            ("mln_web_gl_context_descriptor", "context"),
+        ]:
+            with self.subTest(field=name):
+                self.assertEqual("true", fields[name].metadata.get("native_object"))
+        files = emitted(rust, api)
+        session = files["crates/maplibre-native-ffi/src/generated/render_session.rs"]
+        frame = files["crates/maplibre-native-ffi/src/generated/acquired_frame.rs"]
+        # A replacement carries only Vulkan handles or a GL texture name, and a
+        # consumer sync only an integer handle, with no pointer.
+        self.assertIn("pub unsafe fn set_vulkan_borrowed_texture_target(", session)
+        self.assertIn("pub unsafe fn set_vulkan_surface_target(", session)
+        self.assertIn("pub unsafe fn set_open_gl_borrowed_texture_target(", session)
+        self.assertIn("pub unsafe fn release(", frame)
+        self.assertIn("pub fn resize(", session)
+
     def test_a_record_with_a_required_member_takes_it_in_place_of_a_default(self):
         values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"

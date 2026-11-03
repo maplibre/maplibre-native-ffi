@@ -14,10 +14,9 @@ fn copy_pixels(_data: &[u8], _stride: u32) {}
 
 async fn images(runtime: &RuntimeHandle) -> Result<()> {
     // #region map
-    let extent = LogicalExtent::new(800, 600, 2.0);
     let map_options = MapOptions {
         map_mode: MapMode::Static,
-        ..MapOptions::new(extent)
+        ..MapOptions::new(LogicalExtent::new(800, 600, 2.0))
     };
 
     let (map, created) = runtime.create_map(&map_options)?;
@@ -30,7 +29,8 @@ async fn images(runtime: &RuntimeHandle) -> Result<()> {
     // #endregion style
 
     // #region attach
-    let offscreen = OffscreenDescriptor::new(extent);
+    let offscreen =
+        OffscreenDescriptor::new(LogicalSize::new(800, 600));
     // The library renders on its own thread.
     let attach_options =
         RenderSessionAttachOptions::new(RenderDriverKind::CoreWorker);

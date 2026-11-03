@@ -256,9 +256,9 @@ internal sealed class RenderFixture : IDisposable
     /// </summary>
     internal RenderSessionHandle Attach(RenderSessionAttachOptions options)
     {
-        var extent = new LogicalExtent(Width, Height, 1);
+        var logicalSize = new LogicalSize(Width, Height);
         if (Graphics is null)
-            return Map.AttachOffscreen(new OffscreenDescriptor(extent), options);
+            return Map.AttachOffscreen(new OffscreenDescriptor(logicalSize), options);
         var context = Graphics.Context;
         var infos = textures.Select(texture => texture.Info).ToArray();
         // Every texture of the ring shares the first one's format and size.
@@ -272,7 +272,7 @@ internal sealed class RenderFixture : IDisposable
                     || OperatingSystem.IsMacCatalyst() => Map.AttachMetalBorrowedTexture(
                 new MetalBorrowedTextureDescriptor
                 {
-                    Extent = extent,
+                    LogicalSize = logicalSize,
                     PhysicalWidth = first.Width,
                     PhysicalHeight = first.Height,
                     Textures =
@@ -291,7 +291,7 @@ internal sealed class RenderFixture : IDisposable
                     || OperatingSystem.IsWindows() => Map.AttachVulkanBorrowedTexture(
                 new VulkanBorrowedTextureDescriptor
                 {
-                    Extent = extent,
+                    LogicalSize = logicalSize,
                     PhysicalWidth = first.Width,
                     PhysicalHeight = first.Height,
                     Context = new VulkanContextDescriptor
@@ -319,7 +319,7 @@ internal sealed class RenderFixture : IDisposable
             TestGraphicsBackend.Egl => Map.AttachOpenGlBorrowedTexture(
                 new OpenGlBorrowedTextureDescriptor
                 {
-                    Extent = extent,
+                    LogicalSize = logicalSize,
                     PhysicalWidth = first.Width,
                     PhysicalHeight = first.Height,
                     Context = new OpenGlContextDescriptor(
@@ -344,7 +344,7 @@ internal sealed class RenderFixture : IDisposable
             TestGraphicsBackend.Wgl => Map.AttachOpenGlBorrowedTexture(
                 new OpenGlBorrowedTextureDescriptor
                 {
-                    Extent = extent,
+                    LogicalSize = logicalSize,
                     PhysicalWidth = first.Width,
                     PhysicalHeight = first.Height,
                     Context = new OpenGlContextDescriptor(

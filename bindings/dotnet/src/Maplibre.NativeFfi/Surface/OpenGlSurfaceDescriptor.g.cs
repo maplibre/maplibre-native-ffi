@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// An OpenGL surface to present to, for <c>MapHandle.AttachOpenGlSurface()</c>
-/// and <c>RenderSessionHandle.SetOpenGlSurfaceTargetAsync()</c>.
+/// An OpenGL surface to present to, for <c>MapHandle.AttachOpenGlSurface()</c>.
 /// </summary>
 /// <remarks>
 /// <para>The session uses the surface until a replacement or release of the
@@ -17,17 +16,17 @@ public readonly partial record struct OpenGlSurfaceDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public OpenGlSurfaceDescriptor(
-        LogicalExtent Extent,
+        LogicalSize LogicalSize,
         OpenGlContextDescriptor Context,
         NativePointer Surface
     )
     {
-        this.Extent = Extent;
+        this.LogicalSize = LogicalSize;
         this.Context = Context;
         this.Surface = Surface;
     }
 
-    public required LogicalExtent Extent { get; init; }
+    public required LogicalSize LogicalSize { get; init; }
     public required OpenGlContextDescriptor Context { get; init; }
 
     /// <summary>

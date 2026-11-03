@@ -13,11 +13,7 @@ import 'support/render.dart';
 
 typedef _ContextCallback = Void Function(Pointer<Void>);
 
-final _extent = LogicalExtent(
-  width: renderSize,
-  height: renderSize,
-  scaleFactor: 1,
-);
+final _size = LogicalSize(width: renderSize, height: renderSize);
 
 /// Only a Vulkan target takes a queue lock.
 final Object _vulkanSkip = buildAttachesVulkan
@@ -125,7 +121,7 @@ void main() {
     final releases = _Recorder();
     final attachment = TestGraphics.open().attachBorrowedTexture(
       map,
-      _extent,
+      _size,
       _options(queueLock: _queueLock(locks, releases)),
     );
     addTearDown(() => releaseSession(attachment.session));

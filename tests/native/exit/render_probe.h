@@ -25,10 +25,9 @@ typedef mln_status (*probe_attach_fn)(
 
 enum { probe_texture_size = 256 };
 
-static const mln_logical_extent probe_extent = {
+static const mln_logical_size probe_size = {
   .width = probe_texture_size,
   .height = probe_texture_size,
-  .scale_factor = 1.0,
 };
 
 // Counts the wakes that one receiver has been sent. Each signal has one

@@ -119,6 +119,7 @@ typedef struct mln_render_frame_batch_view {
 typedef struct mln_render_session_snapshot {
   uint32_t size;
   mln_render_session_state state;
+  /** The target's logical size, and the map's scale factor. */
   mln_logical_extent extent;
   uint64_t generation;
   uint64_t frame_generation;
@@ -336,9 +337,8 @@ MLN_API void mln_acquired_frame_view_end(
 /**
  * Resizes the session's target and its map.
  *
- * `extent` must keep the session's scale factor. To change the scale factor,
- * give the session a new target or attach a new session. Release every
- * acquired frame first.
+ * The session renders at the map's scale factor. Release every acquired frame
+ * first.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders into a borrowed ring. Give
@@ -350,7 +350,7 @@ MLN_API void mln_acquired_frame_view_end(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_render_session_resize(
-  mln_render_session session, mln_logical_extent extent,
+  mln_render_session session, mln_logical_size logical_size,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

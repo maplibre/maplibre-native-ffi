@@ -29,9 +29,7 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
         mln.MaplibreError,
         check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
     ):
-        map_handle.discarding.resize(
-            mln.LogicalExtent(width=0, height=8, scale_factor=1)
-        )
+        map_handle.discarding.resize(mln.LogicalSize(width=0, height=8))
 
 
 def test_a_done_callback_runs_off_the_dispatcher_thread_and_can_wait_on_native(

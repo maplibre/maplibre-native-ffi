@@ -3,8 +3,7 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// A Metal layer to render to, for `MapHandle.attachMetalSurface()` and
-/// `RenderSessionHandle.setMetalSurfaceTarget()`.
+/// A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
@@ -13,23 +12,23 @@ import Foundation
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
+  public var logicalSize: LogicalSize
   /// The MTLDevice to render with. A null device picks the system's default.
   public var context: MetalContextDescriptor
   /// Your CAMetalLayer.
   public var layer: NativePointer
   public init(
-    extent: LogicalExtent,
+    logicalSize: LogicalSize,
     context: MetalContextDescriptor = .init(),
     layer: NativePointer
   ) {
-    self.extent = extent
+    self.logicalSize = logicalSize
     self.context = context
     self.layer = layer
   }
 
   init(raw: mln_metal_surface_descriptor) {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
     context = MetalContextDescriptor(raw: raw.context)
     layer = NativePointer(bitPattern: unsafeBitCast(raw.layer, to: UInt.self))
   }
@@ -37,15 +36,45 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   func nativeValue() -> mln_metal_surface_descriptor {
     var raw = mln_metal_surface_descriptor()
     raw.size = UInt32(MemoryLayout<mln_metal_surface_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     raw.context = context.nativeValue()
     raw.layer = layer.unsafeMutableRawPointer
     return raw
   }
 }
 
-/// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
-/// `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+/// A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
+///
+/// The session renders to it with the device that it attached with. It uses the
+/// layer until a replacement or release of the target completes, a detach or
+/// disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_metal_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+public struct MetalSurfaceReplacement: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  /// Your CAMetalLayer.
+  public var layer: NativePointer
+  public init(logicalSize: LogicalSize, layer: NativePointer) {
+    self.logicalSize = logicalSize
+    self.layer = layer
+  }
+
+  init(raw: mln_metal_surface_replacement) {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    layer = NativePointer(bitPattern: unsafeBitCast(raw.layer, to: UInt.self))
+  }
+
+  func nativeValue() -> mln_metal_surface_replacement {
+    var raw = mln_metal_surface_replacement()
+    raw.size = UInt32(MemoryLayout<mln_metal_surface_replacement>.size)
+    raw.logical_size = logicalSize.nativeValue()
+    raw.layer = layer.unsafeMutableRawPointer
+    return raw
+  }
+}
+
+/// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
 ///
 /// The session uses the surface until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -54,16 +83,16 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
+  public var logicalSize: LogicalSize
   public var context: OpenGlContextDescriptor
   /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
   public var surface: NativePointer
   public init(
-    extent: LogicalExtent,
+    logicalSize: LogicalSize,
     context: OpenGlContextDescriptor,
     surface: NativePointer = .null
   ) {
-    self.extent = extent
+    self.logicalSize = logicalSize
     self.context = context
     self.surface = surface
   }
@@ -72,7 +101,7 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
     raw: mln_open_gl_surface_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
     context = try OpenGlContextDescriptor(raw: raw.context)
     surface = NativePointer(bitPattern: unsafeBitCast(
       raw.surface,
@@ -85,15 +114,49 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
   {
     var raw = mln_open_gl_surface_descriptor()
     raw.size = UInt32(MemoryLayout<mln_open_gl_surface_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     raw.context = try context.nativeValue(arena: arena)
     raw.surface = surface.unsafeMutableRawPointer
     return raw
   }
 }
 
-/// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()` and
-/// `RenderSessionHandle.setVulkanSurfaceTarget()`.
+/// A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+///
+/// The session presents to it with the context that it attached with. It uses
+/// the surface until a replacement or release of the target completes, a detach
+/// or disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_open_gl_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+public struct OpenGlSurfaceReplacement: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
+  /// leave it null.
+  public var surface: NativePointer
+  public init(logicalSize: LogicalSize, surface: NativePointer = .null) {
+    self.logicalSize = logicalSize
+    self.surface = surface
+  }
+
+  init(raw: mln_open_gl_surface_replacement) {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    surface = NativePointer(bitPattern: unsafeBitCast(
+      raw.surface,
+      to: UInt.self
+    ))
+  }
+
+  func nativeValue() -> mln_open_gl_surface_replacement {
+    var raw = mln_open_gl_surface_replacement()
+    raw.size = UInt32(MemoryLayout<mln_open_gl_surface_replacement>.size)
+    raw.logical_size = logicalSize.nativeValue()
+    raw.surface = surface.unsafeMutableRawPointer
+    return raw
+  }
+}
+
+/// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
 ///
 /// The device must have VK_KHR_swapchain enabled, and the queue family of
 /// `graphics_queue_family_index` must support presenting to the surface. The
@@ -104,22 +167,22 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
+  public var logicalSize: LogicalSize
   public var context: VulkanContextDescriptor
   /// Your VkSurfaceKHR.
   public var surface: UInt64
   public init(
-    extent: LogicalExtent,
+    logicalSize: LogicalSize,
     context: VulkanContextDescriptor,
     surface: UInt64
   ) {
-    self.extent = extent
+    self.logicalSize = logicalSize
     self.context = context
     self.surface = surface
   }
 
   init(raw: mln_vulkan_surface_descriptor) {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
     context = VulkanContextDescriptor(raw: raw.context)
     surface = raw.surface
   }
@@ -127,8 +190,41 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   func nativeValue() -> mln_vulkan_surface_descriptor {
     var raw = mln_vulkan_surface_descriptor()
     raw.size = UInt32(MemoryLayout<mln_vulkan_surface_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     raw.context = context.nativeValue()
+    raw.surface = surface
+    return raw
+  }
+}
+
+/// A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
+///
+/// The session presents to it with the context that it attached with, so the
+/// queue family of that context's `graphics_queue_family_index` must support
+/// presenting to the surface. It uses the surface until a replacement or
+/// release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+public struct VulkanSurfaceReplacement: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  /// Your VkSurfaceKHR.
+  public var surface: UInt64
+  public init(logicalSize: LogicalSize, surface: UInt64) {
+    self.logicalSize = logicalSize
+    self.surface = surface
+  }
+
+  init(raw: mln_vulkan_surface_replacement) {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    surface = raw.surface
+  }
+
+  func nativeValue() -> mln_vulkan_surface_replacement {
+    var raw = mln_vulkan_surface_replacement()
+    raw.size = UInt32(MemoryLayout<mln_vulkan_surface_replacement>.size)
+    raw.logical_size = logicalSize.nativeValue()
     raw.surface = surface
     return raw
   }

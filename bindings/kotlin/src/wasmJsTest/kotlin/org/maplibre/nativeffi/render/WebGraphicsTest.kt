@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.await
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.NativePointer
@@ -66,7 +66,7 @@ class WebGraphicsTest {
     val pointer = device.pointer
     val descriptor =
       WebGpuBorrowedTextureDescriptor(
-        extent,
+        logicalSize,
         physicalWidth = WIDTH.toUInt(),
         physicalHeight = HEIGHT.toUInt(),
         context =
@@ -113,7 +113,7 @@ class WebGraphicsTest {
     val pageTexture = webGlTexture(context.context, WIDTH, HEIGHT)
     val descriptor =
       OpenGlBorrowedTextureDescriptor(
-        extent,
+        logicalSize,
         physicalWidth = WIDTH.toUInt(),
         physicalHeight = HEIGHT.toUInt(),
         context =
@@ -163,7 +163,7 @@ class WebGraphicsTest {
   private companion object {
     const val WIDTH = 32
     const val HEIGHT = 16
-    val extent = LogicalExtent(WIDTH.toUInt(), HEIGHT.toUInt(), 1.0)
+    val logicalSize = LogicalSize(WIDTH.toUInt(), HEIGHT.toUInt())
   }
 }
 

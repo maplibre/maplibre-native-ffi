@@ -12,7 +12,7 @@ const (
 )
 
 func attachBorrowedTexture(
-	m *MapHandle, context testsupport.Context, extent LogicalExtent, textures []*testsupport.Texture,
+	m *MapHandle, context testsupport.Context, size LogicalSize, textures []*testsupport.Texture,
 	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
 	ring := make([]VulkanBorrowedTexture, len(textures))
@@ -21,7 +21,7 @@ func attachBorrowedTexture(
 	}
 	info := textures[0].Info
 	return m.AttachVulkanBorrowedTexture(VulkanBorrowedTextureDescriptor{
-		Extent:         extent,
+		LogicalSize:    size,
 		PhysicalWidth:  info.Width,
 		PhysicalHeight: info.Height,
 		Textures:       ring,

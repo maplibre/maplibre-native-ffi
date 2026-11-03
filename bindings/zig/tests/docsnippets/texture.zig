@@ -64,12 +64,9 @@ fn renderToTexture(
         .{ .image = images[0], .image_view = views[0] },
         .{ .image = images[1], .image_view = views[1] },
     };
-    var ring = maplibre.VulkanBorrowedTextureDescriptor{
-        .extent = .{
-            .width = 800,
-            .height = 600,
-            .scale_factor = 2.0,
-        },
+    const ring = maplibre.VulkanBorrowedTextureDescriptor{
+        // The map's size in logical pixels.
+        .logical_size = .{ .width = 800, .height = 600 },
         // The size of your textures in device pixels.
         .physical_width = 1600,
         .physical_height = 1200,
@@ -98,18 +95,16 @@ fn renderToTexture(
         .{ .image = new_images[0], .image_view = new_views[0] },
         .{ .image = new_images[1], .image_view = new_views[1] },
     };
-    ring.extent = .{
-        .width = 1024,
-        .height = 768,
-        .scale_factor = 2.0,
+    const resized = maplibre.VulkanBorrowedTextureReplacement{
+        .logical_size = .{ .width = 1024, .height = 768 },
+        .physical_width = 2048,
+        .physical_height = 1536,
+        .textures = &new_textures,
     };
-    ring.physical_width = 2048;
-    ring.physical_height = 1536;
-    ring.textures = &new_textures;
 
     var replaced = try session.setVulkanBorrowedTextureTarget(
         allocator,
-        ring,
+        resized,
         null,
     );
     defer replaced.deinit();

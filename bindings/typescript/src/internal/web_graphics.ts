@@ -89,7 +89,8 @@ export function importWebGpuDevice(device: object): ImportedWebGpuObject {
 }
 
 /**
- * Imports the `GPUCanvasContext` of a canvas for a `WebGpuSurfaceDescriptor`.
+ * Imports the `GPUCanvasContext` of a canvas for a `WebGpuSurfaceDescriptor`
+ * or a `WebGpuSurfaceReplacement`.
  *
  * Throws a `TypeError` when `canvasContext` is not a `GPUCanvasContext`.
  */

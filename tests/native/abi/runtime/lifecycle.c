@@ -260,7 +260,7 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
   );
   MLN_TEST_OK(probe.status);
 
-  const mln_logical_extent extent = {320, 240, 1.0};
+  const mln_logical_size extent = {320, 240};
   mln_test_completion resize = mln_test_completion_default(0);
   mln_status resize_status =
     mln_map_resize(probe.map, extent, &resize.descriptor, NULL);

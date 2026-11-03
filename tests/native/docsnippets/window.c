@@ -96,12 +96,9 @@ static void on_frame_wake(void* user_data) {
 
 // #region resize
 static void on_window_resized(uint32_t width, uint32_t height) {
-  const mln_logical_extent extent = {
-    .width = width,
-    .height = height,
-    .scale_factor = 2.0,  // The scale factor the session has now.
-  };
-  mln_render_session_resize(session, extent, NULL, NULL);
+  // The window's new size in logical pixels.
+  const mln_logical_size size = {.width = width, .height = height};
+  mln_render_session_resize(session, size, NULL, NULL);
 }
 // #endregion resize
 
@@ -129,23 +126,20 @@ void mln_doc_window_surface_lost(void) {
 }
 
 void mln_doc_window_surface_restored(
-  mln_vulkan_context_descriptor vulkan,
   mln_vulkan_non_dispatchable_handle new_surface
 );
 
 void mln_doc_window_surface_restored(
-  mln_vulkan_context_descriptor vulkan,
   mln_vulkan_non_dispatchable_handle new_surface
 ) {
   // #region lost-surface
-  const mln_vulkan_surface_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_surface_descriptor),
-    .extent = {.width = 800, .height = 600, .scale_factor = 2.0},
-    .context = vulkan,
+  const mln_vulkan_surface_replacement replacement = {
+    .size = sizeof(mln_vulkan_surface_replacement),
+    .logical_size = {.width = 800, .height = 600},
     .surface = new_surface,
   };
   mln_render_session_set_vulkan_surface_target(
-    session, &descriptor, &done, NULL
+    session, &replacement, &done, NULL
   );
   // #endregion lost-surface
   wait_for_done();
@@ -167,8 +161,9 @@ void mln_doc_window(
   // #region attach
   const mln_vulkan_surface_descriptor surface = {
     .size = sizeof(mln_vulkan_surface_descriptor),
-    // The window's size in logical pixels, and its scale factor.
-    .extent = {.width = 800, .height = 600, .scale_factor = 2.0},
+    // The window's size in logical pixels. The map's scale factor
+    // turns it into pixels.
+    .logical_size = {.width = 800, .height = 600},
     // Your VkInstance, VkPhysicalDevice,
     // VkDevice, and graphics VkQueue.
     .context = vulkan,

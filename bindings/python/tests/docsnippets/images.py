@@ -15,12 +15,12 @@ def copy_pixels(data: bytes, stride: int) -> None:
 
 def images(runtime: mln.RuntimeHandle) -> None:
     # #region map
-    extent = mln.LogicalExtent(
-        width=800, height=600, scale_factor=2.0
-    )
     map_handle, map_ready = runtime.create_map(
         mln.MapOptions(
-            initial_extent=extent, map_mode=mln.MapMode.STATIC
+            initial_extent=mln.LogicalExtent(
+                width=800, height=600, scale_factor=2.0
+            ),
+            map_mode=mln.MapMode.STATIC,
         )
     )
     map_ready.result()
@@ -34,7 +34,9 @@ def images(runtime: mln.RuntimeHandle) -> None:
 
     # #region attach
     session, session_ready = map_handle.attach_offscreen(
-        mln.OffscreenDescriptor(extent=extent),
+        mln.OffscreenDescriptor(
+            logical_size=mln.LogicalSize(width=800, height=600)
+        ),
         # The library renders on its own thread.
         mln.RenderSessionAttachOptions(
             driver=mln.RenderDriverKind.CORE_WORKER

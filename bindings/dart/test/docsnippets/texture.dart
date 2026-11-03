@@ -48,12 +48,9 @@ Future<void> renderToTexture(
   // #endregion attach-options
 
   // #region attach-borrowed
-  var ring = VulkanBorrowedTextureDescriptor(
-    extent: const LogicalExtent(
-      width: 800,
-      height: 600,
-      scaleFactor: 2,
-    ),
+  final ring = VulkanBorrowedTextureDescriptor(
+    // The map's size in logical pixels.
+    logicalSize: const LogicalSize(width: 800, height: 600),
     // The size of your textures in device pixels.
     physicalWidth: 1600,
     physicalHeight: 1200,
@@ -73,12 +70,8 @@ Future<void> renderToTexture(
   // #endregion attach-borrowed
 
   // #region resize-borrowed
-  ring = ring.copyWith(
-    extent: const LogicalExtent(
-      width: 1024,
-      height: 768,
-      scaleFactor: 2,
-    ),
+  final resized = VulkanBorrowedTextureReplacement(
+    logicalSize: const LogicalSize(width: 1024, height: 768),
     physicalWidth: 2048,
     physicalHeight: 1536,
     // Your new textures, at the new size.
@@ -94,7 +87,7 @@ Future<void> renderToTexture(
     ],
   );
 
-  await session.setVulkanBorrowedTextureTarget(ring);
+  await session.setVulkanBorrowedTextureTarget(resized);
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views);
   // #endregion resize-borrowed

@@ -244,9 +244,8 @@ static bool describe_ring(
 #endif
   out->textures = entries;
   out->texture_count = count;
-  out->extent = (mln_logical_extent){
-    .width = info.width, .height = info.height, .scale_factor = 1.0
-  };
+  out->logical_size =
+    (mln_logical_size){.width = info.width, .height = info.height};
   out->physical_width = info.width;
   out->physical_height = info.height;
   return true;
@@ -277,9 +276,8 @@ static bool describe_surface(
   };
   out->surface = info.opengl_surface;
 #endif
-  out->extent = (mln_logical_extent){
-    .width = info.width, .height = info.height, .scale_factor = 1.0
-  };
+  out->logical_size =
+    (mln_logical_size){.width = info.width, .height = info.height};
   out->context = host_context(context);
   return true;
 }
@@ -581,60 +579,87 @@ mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
 }
 
 mln_status mln_test_render_fixture_set_textures(
-  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_render_fixture* fixture,
   mln_test_graphics_texture* const* textures, size_t count,
   const mln_completion* completion
 ) {
-  mln_test_graphics_context context = {0};
+  // A replacement keeps the session's context, so the ring's goes unused.
+  const mln_test_graphics_context context = {0};
   borrowed_entry entries[MLN_TEXTURE_RING_MAX_DEPTH];
   borrowed_descriptor descriptor;
   if (
     count > MLN_TEXTURE_RING_MAX_DEPTH ||
-    !mln_test_graphics_get_context(graphics, &context) ||
     !describe_ring(&context, textures, count, entries, &descriptor)
   ) {
     return MLN_STATUS_NATIVE_ERROR;
   }
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const host_state* state = fixture->backend_state;
-  descriptor.command_queue = state == NULL ? NULL : state->command_queue;
+  const mln_metal_borrowed_texture_replacement replacement = {
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  const mln_vulkan_borrowed_texture_replacement replacement = {
+#else
+  const mln_open_gl_borrowed_texture_replacement replacement = {
+#endif
+    .size = sizeof(replacement),
+    .logical_size = descriptor.logical_size,
+    .physical_width = descriptor.physical_width,
+    .physical_height = descriptor.physical_height,
+    .textures = descriptor.textures,
+    .texture_count = descriptor.texture_count,
+  };
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
   return mln_render_session_set_metal_borrowed_texture_target(
-    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   return mln_render_session_set_vulkan_borrowed_texture_target(
-    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
   return mln_render_session_set_open_gl_borrowed_texture_target(
-    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
 }
 
 mln_status mln_test_render_fixture_set_surface(
-  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_render_fixture* fixture,
   const mln_test_graphics_surface* surface, const mln_completion* completion
 ) {
-  mln_test_graphics_context context = {0};
-  surface_descriptor descriptor;
-  if (
-    !mln_test_graphics_get_context(graphics, &context) ||
-    !describe_surface(&context, surface, &descriptor)
-  ) {
+  mln_test_graphics_surface_info info = {0};
+  if (!mln_test_graphics_surface_get_info(surface, &info)) {
+    report("the render fixture could not describe a surface");
     return MLN_STATUS_NATIVE_ERROR;
   }
+  const mln_logical_size logical_size = {
+    .width = info.width, .height = info.height
+  };
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  const mln_metal_surface_replacement replacement = {
+    .size = sizeof(replacement),
+    .logical_size = logical_size,
+    .layer = info.metal_layer,
+  };
   return mln_render_session_set_metal_surface_target(
-    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  const mln_vulkan_surface_replacement replacement = {
+    .size = sizeof(replacement),
+    .logical_size = logical_size,
+    .surface = info.vulkan_surface,
+  };
   return mln_render_session_set_vulkan_surface_target(
-    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
+  const mln_open_gl_surface_replacement replacement = {
+    .size = sizeof(replacement),
+    .logical_size = logical_size,
+    .surface = info.opengl_surface,
+  };
   return mln_render_session_set_open_gl_surface_target(
-    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
 }

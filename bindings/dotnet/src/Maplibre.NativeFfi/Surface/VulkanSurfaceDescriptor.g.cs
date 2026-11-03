@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A Vulkan surface to present to, for <c>MapHandle.AttachVulkanSurface()</c>
-/// and <c>RenderSessionHandle.SetVulkanSurfaceTargetAsync()</c>.
+/// A Vulkan surface to present to, for <c>MapHandle.AttachVulkanSurface()</c>.
 /// </summary>
 /// <remarks>
 /// <para>The device must have VK_KHR_swapchain enabled, and the queue family of
@@ -19,17 +18,17 @@ public readonly partial record struct VulkanSurfaceDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public VulkanSurfaceDescriptor(
-        LogicalExtent Extent,
+        LogicalSize LogicalSize,
         VulkanContextDescriptor Context,
         ulong Surface
     )
     {
-        this.Extent = Extent;
+        this.LogicalSize = LogicalSize;
         this.Context = Context;
         this.Surface = Surface;
     }
 
-    public required LogicalExtent Extent { get; init; }
+    public required LogicalSize LogicalSize { get; init; }
     public required VulkanContextDescriptor Context { get; init; }
 
     /// <summary>

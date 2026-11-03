@@ -22,6 +22,20 @@ auto validate_opengl_surface_descriptor(
 auto validate_webgpu_surface_descriptor(
   const mln_web_gpu_surface_descriptor* descriptor
 ) -> mln_status;
+auto validate_metal_surface_replacement(
+  const mln_metal_surface_replacement* replacement
+) -> mln_status;
+auto validate_vulkan_surface_replacement(
+  const mln_vulkan_surface_replacement* replacement
+) -> mln_status;
+// Whether the surface must be null, as with WebGL, depends on the context the
+// session attached with, which the backend checks.
+auto validate_opengl_surface_replacement(
+  const mln_open_gl_surface_replacement* replacement
+) -> mln_status;
+auto validate_webgpu_surface_replacement(
+  const mln_web_gpu_surface_replacement* replacement
+) -> mln_status;
 auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
@@ -43,19 +57,21 @@ auto webgpu_surface_attach_start(
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto metal_surface_set_target_start(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session session, const mln_metal_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status;
 auto vulkan_surface_set_target_start(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session session, const mln_vulkan_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status;
 auto opengl_surface_set_target_start(
-  mln_render_session session, const mln_open_gl_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_open_gl_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status;
 auto webgpu_surface_set_target_start(
-  mln_render_session session, const mln_web_gpu_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_web_gpu_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status;
 

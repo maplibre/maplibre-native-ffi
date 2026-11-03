@@ -21,6 +21,7 @@ import type {
   LogHandler,
   LogSeverityFlag,
   LogicalExtent,
+  LogicalSize,
   MapDebugFlag,
   MapOptions,
   MapSnapshot,
@@ -28,7 +29,9 @@ import type {
   MapView,
   MapViewportOptions,
   MetalBorrowedTextureDescriptor,
+  MetalBorrowedTextureReplacement,
   MetalSurfaceDescriptor,
+  MetalSurfaceReplacement,
   MetalTextureFrame,
   NetworkStatus,
   OfflineRegionDefinition,
@@ -36,8 +39,10 @@ import type {
   OffscreenDescriptor,
   OffscreenDeviceOptions,
   OpenGlBorrowedTextureDescriptor,
+  OpenGlBorrowedTextureReplacement,
   OpenGlContextProviderFlag,
   OpenGlSurfaceDescriptor,
+  OpenGlSurfaceReplacement,
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
@@ -66,10 +71,14 @@ import type {
   StyleTransitionOptions,
   StyleVectorTileEncoding,
   VulkanBorrowedTextureDescriptor,
+  VulkanBorrowedTextureReplacement,
   VulkanSurfaceDescriptor,
+  VulkanSurfaceReplacement,
   VulkanTextureFrame,
   WebGpuBorrowedTextureDescriptor,
+  WebGpuBorrowedTextureReplacement,
   WebGpuSurfaceDescriptor,
+  WebGpuSurfaceReplacement,
   WebGpuTextureFrame,
 } from "./generated_values.ts";
 import type { NativeCompletion, NativeThreadStart } from "./internal/addon.ts";
@@ -415,7 +424,7 @@ export interface NativeOperations {
   mln_map_request_still_image(map: bigint, completion: NativeCompletion): void;
   mln_map_resize(
     map: bigint,
-    extent: LogicalExtent | undefined,
+    logicalSize: LogicalSize | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_bounds(
@@ -667,48 +676,48 @@ export interface NativeOperations {
   ): void;
   mln_render_session_resize(
     session: bigint,
-    extent: LogicalExtent | undefined,
+    logicalSize: LogicalSize | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
   mln_render_session_set_metal_borrowed_texture_target(
     session: bigint,
-    descriptor: MetalBorrowedTextureDescriptor,
+    replacement: MetalBorrowedTextureReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_metal_surface_target(
     session: bigint,
-    descriptor: MetalSurfaceDescriptor,
+    replacement: MetalSurfaceReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_open_gl_borrowed_texture_target(
     session: bigint,
-    descriptor: OpenGlBorrowedTextureDescriptor,
+    replacement: OpenGlBorrowedTextureReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_open_gl_surface_target(
     session: bigint,
-    descriptor: OpenGlSurfaceDescriptor,
+    replacement: OpenGlSurfaceReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_vulkan_borrowed_texture_target(
     session: bigint,
-    descriptor: VulkanBorrowedTextureDescriptor,
+    replacement: VulkanBorrowedTextureReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_vulkan_surface_target(
     session: bigint,
-    descriptor: VulkanSurfaceDescriptor,
+    replacement: VulkanSurfaceReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_web_gpu_borrowed_texture_target(
     session: bigint,
-    descriptor: WebGpuBorrowedTextureDescriptor,
+    replacement: WebGpuBorrowedTextureReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_web_gpu_surface_target(
     session: bigint,
-    descriptor: WebGpuSurfaceDescriptor,
+    replacement: WebGpuSurfaceReplacement,
     completion: NativeCompletion,
   ): void;
   mln_resource_request_complete(

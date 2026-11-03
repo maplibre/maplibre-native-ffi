@@ -13,14 +13,7 @@
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 #include <objc/message.h>
 #include <objc/runtime.h>
-#define HOST_BACKEND MLN_TEST_GRAPHICS_BACKEND_METAL
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-#define HOST_BACKEND MLN_TEST_GRAPHICS_BACKEND_VULKAN
-#elif defined(MLN_FFI_TEST_OPENGL_WGL)
-#define HOST_BACKEND MLN_TEST_GRAPHICS_BACKEND_WGL
-#define HOST_OPENGL 1
-#else
-#define HOST_BACKEND MLN_TEST_GRAPHICS_BACKEND_EGL
+#elif !defined(MLN_FFI_TEST_BACKEND_VULKAN)
 #define HOST_OPENGL 1
 #endif
 
@@ -181,6 +174,10 @@ static void expect_offscreen_color(
   mln_test_completion_destroy(&readback);
 }
 
+static void release_target(
+  const mln_test_render_fixture* fixture, mln_status expected
+);
+
 typedef struct retarget_map {
   mln_runtime runtime;
   mln_map map;
@@ -231,8 +228,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_textures(
-      fixture, mln_test_render_fixture_graphics(fixture), &replacement, 1,
-      &completion.descriptor
+      fixture, &replacement, 1, &completion.descriptor
     ),
     mln_test_last_error()
   );
@@ -292,11 +288,9 @@ static void a_borrowed_retarget_is_refused_while_a_frame_is_acquired(void) {
 
   mln_test_completion refused = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
-    mln_test_render_fixture_set_textures(
-      fixture, mln_test_render_fixture_graphics(fixture), replacements, 2,
-      &refused.descriptor
-    )
+    MLN_STATUS_INVALID_STATE, mln_test_render_fixture_set_textures(
+                                fixture, replacements, 2, &refused.descriptor
+                              )
   );
   TEST_ASSERT_FALSE(mln_test_completion_poll(&refused));
   mln_test_completion_reject(&refused);
@@ -306,8 +300,7 @@ static void a_borrowed_retarget_is_refused_while_a_frame_is_acquired(void) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_textures(
-      fixture, mln_test_render_fixture_graphics(fixture), replacements, 2,
-      &completion.descriptor
+      fixture, replacements, 2, &completion.descriptor
     ),
     mln_test_last_error()
   );
@@ -347,8 +340,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_textures(
-      fixture, mln_test_render_fixture_graphics(fixture), replacements, 2,
-      &completion.descriptor
+      fixture, replacements, 2, &completion.descriptor
     ),
     mln_test_last_error()
   );
@@ -391,8 +383,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_textures(
-      fixture, mln_test_render_fixture_graphics(fixture), replacements, 2,
-      &completion.descriptor
+      fixture, replacements, 2, &completion.descriptor
     ),
     mln_test_last_error()
   );
@@ -455,8 +446,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_textures(
-      fixture, mln_test_render_fixture_graphics(fixture), &replacement, 1,
-      &completion.descriptor
+      fixture, &replacement, 1, &completion.descriptor
     ),
     mln_test_last_error()
   );
@@ -470,6 +460,62 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   close_map(&map);
 }
 
+// A host may hand the session its current target again, such as on every
+// frame. That changes nothing, so a demand that waits for an update keeps
+// waiting rather than rendering a frame the target already has.
+static void a_retarget_to_the_current_target_renders_nothing(void) {
+  retarget_map map = {0};
+  open_map(TARGET_BORROWED, &map);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  mln_test_graphics_texture* texture =
+    mln_test_render_fixture_new_texture(fixture);
+  TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
+  restore_fixture_context(fixture);
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK_MESSAGE(
+    mln_test_render_fixture_set_textures(
+      fixture, &texture, 1, &completion.descriptor
+    ),
+    mln_test_last_error()
+  );
+  finish(fixture, &completion, MLN_STATUS_OK, "the texture replacement");
+  mln_test_render_until_idle(map.runtime, map.map, fixture);
+
+  mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.token = 3500;
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
+  completion = mln_test_completion_default(0);
+  MLN_TEST_OK_MESSAGE(
+    mln_test_render_fixture_set_textures(
+      fixture, &texture, 1, &completion.descriptor
+    ),
+    mln_test_last_error()
+  );
+  finish(fixture, &completion, MLN_STATUS_OK, "the same texture again");
+  // The fence runs after the replacement. Dumping debug logs publishes no map
+  // update, which would end the wait.
+  mln_test_completion fence = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_dump_debug_logs(
+    fixture->session, &fence.descriptor, NULL
+  ));
+  finish(fixture, &fence, MLN_STATUS_OK, "the fence");
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture->session, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+
+  // A release ends the wait, which shows the demand was still waiting.
+  release_target(fixture, MLN_STATUS_OK);
+  batch = mln_test_render_wait_for_results(fixture);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
+  );
+  close_map(&map);
+}
+
 static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   enum { width = 48, height = 40 };
   retarget_map map = {0};
@@ -477,7 +523,6 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   const mln_test_render_fixture* fixture = &map.fixture;
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
 
-  mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
   mln_test_completion completion = mln_test_completion_default(0);
   mln_test_graphics_surface* surface = NULL;
   if (kind == TARGET_SURFACE) {
@@ -487,7 +532,7 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_surface(
-        fixture, graphics, surface, &completion.descriptor
+        fixture, surface, &completion.descriptor
       ),
       mln_test_last_error()
     );
@@ -498,7 +543,7 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_textures(
-        fixture, graphics, &texture, 1, &completion.descriptor
+        fixture, &texture, 1, &completion.descriptor
       ),
       mln_test_last_error()
     );
@@ -528,9 +573,6 @@ static void a_surface_retarget_sizes_the_map(void) {
 enum target_origin {
   // The graphics object the session attached with.
   ORIGIN_SESSION,
-  // A second graphics object of the preset's backend, with its own device or
-  // context.
-  ORIGIN_FOREIGN,
   // The session's Metal device, in a pixel format other than the session's.
   ORIGIN_OTHER_FORMAT,
 };
@@ -541,9 +583,9 @@ typedef struct refusal_row {
   enum target_kind replacement;
   enum target_origin origin;
   // The submission's status, and when that is OK, the completion's. The
-  // driver compares a replacement's context and format with the session's
-  // own, so those refusals arrive as completions, as each set_target's
-  // Completes-with list says.
+  // driver compares a replacement's format with the session's own, so that
+  // refusal arrives as a completion, as set_target's Completes-with list
+  // says.
   mln_status submission;
   mln_status completion;
   const char* diagnostic;
@@ -555,24 +597,15 @@ static const refusal_row refusal_rows[] = {
   {"a surface takes no texture", TARGET_SURFACE, TARGET_BORROWED,
    ORIGIN_SESSION, MLN_STATUS_UNSUPPORTED, MLN_STATUS_OK,
    "caller-owned texture"},
-// One Metal device serves the host, so a second graphics object would share
-// it. A Metal session refuses a texture of another pixel format instead.
+// The pixel format is a property of a Metal texture, so a Metal session
+// refuses a texture of another one.
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   {"a texture of another pixel format", TARGET_BORROWED, TARGET_BORROWED,
    ORIGIN_OTHER_FORMAT, MLN_STATUS_OK, MLN_STATUS_UNSUPPORTED, "pixel format"},
-#else
-  {"a texture from another context", TARGET_BORROWED, TARGET_BORROWED,
-   ORIGIN_FOREIGN, MLN_STATUS_OK, MLN_STATUS_INVALID_ARGUMENT,
-   "this session attached with"},
-  {"a surface from another context", TARGET_SURFACE, TARGET_SURFACE,
-   ORIGIN_FOREIGN, MLN_STATUS_OK, MLN_STATUS_INVALID_ARGUMENT,
-   "this session attached with"},
 #endif
 };
 
 typedef struct replacement {
-  mln_test_graphics* foreign;
-  mln_test_graphics* graphics;
   mln_test_graphics_texture* texture;
   mln_test_graphics_surface* surface;
   // An id<MTLTexture> the case made itself.
@@ -613,7 +646,7 @@ static void* new_rgba_texture(const mln_test_render_fixture* fixture) {
 static replacement make_replacement(
   const refusal_row* row, const mln_test_render_fixture* fixture
 ) {
-  replacement made = {.graphics = mln_test_render_fixture_graphics(fixture)};
+  replacement made = {0};
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   if (row->origin == ORIGIN_OTHER_FORMAT) {
     made.metal_texture = new_rgba_texture(fixture);
@@ -621,21 +654,7 @@ static replacement make_replacement(
     return made;
   }
 #endif
-  if (row->origin == ORIGIN_FOREIGN) {
-    made.foreign = mln_test_graphics_create(HOST_BACKEND);
-    TEST_ASSERT_NOT_NULL_MESSAGE(made.foreign, mln_test_graphics_last_error());
-    made.graphics = made.foreign;
-    if (row->replacement == TARGET_SURFACE) {
-      made.surface = mln_test_graphics_surface_create(
-        made.foreign, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-      );
-    } else {
-      made.texture = mln_test_graphics_texture_create(
-        made.foreign, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-      );
-    }
-    restore_fixture_context(fixture);
-  } else if (row->replacement == TARGET_SURFACE) {
+  if (row->replacement == TARGET_SURFACE) {
     made.surface = mln_test_render_fixture_new_surface(fixture);
   } else {
     made.texture = mln_test_render_fixture_new_texture(fixture);
@@ -653,12 +672,9 @@ static void release_replacement(replacement* made) {
       (id)made->metal_texture, sel_registerName("release")
     );
   }
+#else
+  (void)made;
 #endif
-  if (made->foreign != NULL) {
-    mln_test_graphics_surface_destroy(made->surface);
-    mln_test_graphics_texture_destroy(made->texture);
-    mln_test_graphics_destroy(made->foreign);
-  }
 }
 
 static void expect_old_target_rendering(
@@ -680,21 +696,18 @@ static mln_status submit_metal_texture(
   const mln_test_completion* completion
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_metal_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_metal_borrowed_texture_descriptor)
-  };
-  descriptor.extent = (mln_logical_extent){
-    .width = MLN_TEST_HOST_TARGET_SIZE,
-    .height = MLN_TEST_HOST_TARGET_SIZE,
-    .scale_factor = 1.0,
-  };
-  descriptor.physical_width = MLN_TEST_HOST_TARGET_SIZE;
-  descriptor.physical_height = MLN_TEST_HOST_TARGET_SIZE;
   const mln_metal_borrowed_texture entry = {.texture = texture};
-  descriptor.textures = &entry;
-  descriptor.texture_count = 1;
+  const mln_metal_borrowed_texture_replacement replacement = {
+    .size = sizeof(mln_metal_borrowed_texture_replacement),
+    .logical_size =
+      {.width = MLN_TEST_HOST_TARGET_SIZE, .height = MLN_TEST_HOST_TARGET_SIZE},
+    .physical_width = MLN_TEST_HOST_TARGET_SIZE,
+    .physical_height = MLN_TEST_HOST_TARGET_SIZE,
+    .textures = &entry,
+    .texture_count = 1,
+  };
   return mln_render_session_set_metal_borrowed_texture_target(
-    fixture->session, &descriptor, &completion->descriptor, MLN_TEST_DIAGNOSTIC
+    fixture->session, &replacement, &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
 #else
   (void)fixture;
@@ -722,10 +735,10 @@ static void refused_retargets_leave_the_old_target_rendering(void) {
         ? submit_metal_texture(fixture, made.metal_texture, &completion)
       : made.surface != NULL
         ? mln_test_render_fixture_set_surface(
-            fixture, made.graphics, made.surface, &completion.descriptor
+            fixture, made.surface, &completion.descriptor
           )
         : mln_test_render_fixture_set_textures(
-            fixture, made.graphics, &made.texture, 1, &completion.descriptor
+            fixture, &made.texture, 1, &completion.descriptor
           );
     TEST_ASSERT_EQUAL_INT_MESSAGE(row->submission, submitted, row->label);
     const char* diagnostic = mln_test_last_error();
@@ -783,7 +796,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_surface(
-        fixture, graphics, surface, &completion.descriptor
+        fixture, surface, &completion.descriptor
       ),
       mln_test_last_error()
     );
@@ -795,7 +808,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_textures(
-        fixture, graphics, &texture, 1, &completion.descriptor
+        fixture, &texture, 1, &completion.descriptor
       ),
       mln_test_last_error()
     );
@@ -820,7 +833,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_surface(
-        fixture, graphics, next, &completion.descriptor
+        fixture, next, &completion.descriptor
       ),
       mln_test_last_error()
     );
@@ -830,7 +843,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
       mln_test_render_fixture_set_textures(
-        fixture, graphics, &next_texture, 1, &completion.descriptor
+        fixture, &next_texture, 1, &completion.descriptor
       ),
       mln_test_last_error()
     );
@@ -885,14 +898,13 @@ static void a_released_target_keeps_the_renderer(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, list.status);
   TEST_ASSERT_EQUAL_size_t(1, list.count);
 
-  const mln_logical_extent extent = {
+  const mln_logical_size size = {
     .width = MLN_TEST_HOST_TARGET_SIZE / 2,
     .height = MLN_TEST_HOST_TARGET_SIZE / 2,
-    .scale_factor = 1.0,
   };
   mln_test_completion resized = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, extent, &resized.descriptor, MLN_TEST_DIAGNOSTIC
+    fixture.session, size, &resized.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   finish(&fixture, &resized, MLN_STATUS_OK, "the resize");
   TEST_ASSERT_EQUAL_UINT32(
@@ -1022,6 +1034,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_borrowed_retarget_returns_quarantined_slots_to_service);
   RUN_TEST(frames_published_before_a_retarget_cannot_be_acquired);
   RUN_TEST(a_borrowed_retarget_renders_a_waiting_demand);
+  RUN_TEST(a_retarget_to_the_current_target_renders_nothing);
   RUN_TEST(a_borrowed_retarget_sizes_the_map);
   RUN_TEST(a_surface_retarget_sizes_the_map);
   RUN_TEST(refused_retargets_leave_the_old_target_rendering);

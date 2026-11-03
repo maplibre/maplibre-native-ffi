@@ -5,7 +5,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.maplibre.nativeffi.AcquiredFrameHandle
 import org.maplibre.nativeffi.EglContextDescriptor
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MetalBorrowedTexture
 import org.maplibre.nativeffi.MetalBorrowedTextureDescriptor
@@ -213,7 +213,7 @@ internal object TestGraphics {
   ): NewRenderSession {
     val context = context()
     val texture = textures.first()
-    val extent = LogicalExtent(texture.width, texture.height, 1.0)
+    val logicalSize = LogicalSize(texture.width, texture.height)
     val openGlContext =
       when (backend) {
         TestBackend.EGL ->
@@ -244,7 +244,7 @@ internal object TestGraphics {
       }
     return map.attachOpenGlBorrowedTexture(
       OpenGlBorrowedTextureDescriptor(
-        extent,
+        logicalSize,
         physicalWidth = texture.width,
         physicalHeight = texture.height,
         context = OpenGlContextDescriptor(OpenGlContextOwnership.SHARED, openGlContext),
@@ -269,7 +269,7 @@ internal object TestGraphics {
   fun metalBorrowedTexture(textures: List<TestTexture>): MetalBorrowedTextureDescriptor {
     val texture = textures.first()
     return MetalBorrowedTextureDescriptor(
-      LogicalExtent(texture.width, texture.height, 1.0),
+      LogicalSize(texture.width, texture.height),
       physicalWidth = texture.width,
       physicalHeight = texture.height,
       textures = textures.map { MetalBorrowedTexture(pointer(it.metalTexture)) },
@@ -283,7 +283,7 @@ internal object TestGraphics {
   ): VulkanBorrowedTextureDescriptor {
     val texture = textures.first()
     return VulkanBorrowedTextureDescriptor(
-      LogicalExtent(texture.width, texture.height, 1.0),
+      LogicalSize(texture.width, texture.height),
       physicalWidth = texture.width,
       physicalHeight = texture.height,
       context =
@@ -308,7 +308,7 @@ internal object TestGraphics {
   ): WebGpuBorrowedTextureDescriptor {
     val texture = textures.first()
     return WebGpuBorrowedTextureDescriptor(
-      LogicalExtent(texture.width, texture.height, 1.0),
+      LogicalSize(texture.width, texture.height),
       physicalWidth = texture.width,
       physicalHeight = texture.height,
       // Sessions use no instance, and null names the device's default queue, as a browser host

@@ -81,7 +81,7 @@ void mln_doc_images(mln_runtime runtime) {
   // #region attach
   mln_offscreen_descriptor offscreen = {
     .size = sizeof(mln_offscreen_descriptor),
-    .extent = map_options.initial_extent,
+    .logical_size = {.width = 800, .height = 600},
   };
   mln_render_session_attach_options attach_options = {
     .size = sizeof(mln_render_session_attach_options),

@@ -45,7 +45,7 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
 
     // #region attach
     var attached = try map.attachOffscreen(
-        .{ .extent = map_options.initial_extent },
+        .{ .logical_size = .{ .width = 800, .height = 600 } },
         // The library renders on its own thread.
         .{ .driver = .core_worker },
         // With no device, the session creates its own.

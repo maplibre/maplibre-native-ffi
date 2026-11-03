@@ -234,9 +234,8 @@ bool mln_test_backend_attach_borrowed(
   mln_web_gpu_borrowed_texture_descriptor descriptor = {
     .size = sizeof(mln_web_gpu_borrowed_texture_descriptor)
   };
-  descriptor.extent.width = ring_texture_size;
-  descriptor.extent.height = ring_texture_size;
-  descriptor.extent.scale_factor = 1.0;
+  descriptor.logical_size.width = ring_texture_size;
+  descriptor.logical_size.height = ring_texture_size;
   descriptor.physical_width = ring_texture_size;
   descriptor.physical_height = ring_texture_size;
   descriptor.context = context;

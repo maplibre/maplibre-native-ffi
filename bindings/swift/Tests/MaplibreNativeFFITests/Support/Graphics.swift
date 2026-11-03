@@ -94,17 +94,13 @@ final class TestGraphics: @unchecked Sendable {
     guard let info = textures.last?.info else {
       throw FixtureError("a borrowed ring needs a texture")
     }
-    let extent = LogicalExtent(
-      width: info.width,
-      height: info.height,
-      scaleFactor: 1
-    )
+    let logicalSize = LogicalSize(width: info.width, height: info.height)
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
       #if canImport(Metal)
         return try map.attachMetalBorrowedTexture(
           descriptor: MetalBorrowedTextureDescriptor(
-            extent: extent,
+            logicalSize: logicalSize,
             physicalWidth: info.width,
             physicalHeight: info.height,
             textures: textures.map {
@@ -120,7 +116,7 @@ final class TestGraphics: @unchecked Sendable {
       #if os(Android) || os(Linux) || os(macOS) || os(Windows)
         return try map.attachVulkanBorrowedTexture(
           descriptor: VulkanBorrowedTextureDescriptor(
-            extent: extent,
+            logicalSize: logicalSize,
             physicalWidth: info.width,
             physicalHeight: info.height,
             context: VulkanContextDescriptor(
@@ -152,7 +148,7 @@ final class TestGraphics: @unchecked Sendable {
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
       return try map.attachOpenGlBorrowedTexture(
         descriptor: OpenGlBorrowedTextureDescriptor(
-          extent: extent,
+          logicalSize: logicalSize,
           physicalWidth: info.width,
           physicalHeight: info.height,
           context: OpenGlContextDescriptor(
@@ -172,7 +168,7 @@ final class TestGraphics: @unchecked Sendable {
     default:
       return try map.attachOpenGlBorrowedTexture(
         descriptor: OpenGlBorrowedTextureDescriptor(
-          extent: extent,
+          logicalSize: logicalSize,
           physicalWidth: info.width,
           physicalHeight: info.height,
           context: OpenGlContextDescriptor(

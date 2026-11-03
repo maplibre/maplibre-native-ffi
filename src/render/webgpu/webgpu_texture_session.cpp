@@ -42,13 +42,14 @@ constexpr uint32_t readback_row_alignment = 256;
 constexpr uint32_t readback_bytes_per_pixel = 4;
 
 using mln::core::WebGPUBorrowedTarget;
+using mln::core::WebGPUBorrowedTextures;
 
 // Runs on the driver, where the browser's WebGPU objects can be read.
 auto validate_webgpu_textures(
-  const WebGPUBorrowedTarget& target, mln::Size physical_size
+  const std::vector<mln_web_gpu_borrowed_texture>& textures,
+  WGPUTextureFormat format, mln::Size physical_size
 ) -> mln_status {
-  const auto format = static_cast<WGPUTextureFormat>(target.descriptor.format);
-  for (const auto& entry : target.textures) {
+  for (const auto& entry : textures) {
     auto* const texture = static_cast<WGPUTexture>(entry.texture);
     if (
       wgpuTextureGetWidth(texture) != physical_size.width ||
@@ -159,7 +160,12 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
         color_format_(
           static_cast<WGPUTextureFormat>(target.descriptor.format)
         ) {
-    take_borrowed_textures(target);
+    take_borrowed_textures(
+      target.textures,
+      mln::Size{
+        target.descriptor.physical_width, target.descriptor.physical_height
+      }
+    );
     try {
       initializeContext(target.descriptor.context);
       setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
@@ -327,33 +333,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   void set_ring_size(mln::Size new_size) { setRenderableSize(new_size); }
 
   // Whether a replacement target names the context this session attached with.
-  // A null queue names the device's default queue, as it does at attach. The
-  // instance is excluded: a texture session never uses it.
-  auto matches_context(const mln_web_gpu_context_descriptor& context) const
-    -> bool {
-    if (static_cast<WGPUDevice>(context.device) != device_) {
-      return false;
-    }
-    if (context.queue != nullptr) {
-      return static_cast<WGPUQueue>(context.queue) == queue_;
-    }
-    auto* const default_queue = wgpuDeviceGetQueue(device_);
-    const auto matches = default_queue == queue_;
-    wgpuQueueRelease(default_queue);
-    return matches;
-  }
-
-  // Whether replacement textures can be drawn by the pipelines already built.
-  // mbgl reads the color format off the target when it builds a render pipeline
-  // but does not key its cache on it, so a texture in another format would be
-  // drawn with pipelines built for this one.
-  auto matches_borrowed_target(
-    const mln_web_gpu_borrowed_texture_descriptor& descriptor
-  ) const -> bool {
-    return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
-  }
-
-  void set_borrowed_target(const WebGPUBorrowedTarget& target) {
+  void set_borrowed_target(const WebGPUBorrowedTextures& target) {
     // Reference the replacements before releasing the outgoing textures, so a
     // descriptor naming a texture this session already holds cannot drop its
     // last reference partway through.
@@ -361,12 +341,8 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     outgoing.push_back(ColorSlot{texture_, color_view_, color_texture_size_});
     texture_ = nullptr;
     color_view_ = nullptr;
-    setSize(
-      mln::Size{
-        target.descriptor.physical_width, target.descriptor.physical_height
-      }
-    );
-    take_borrowed_textures(target);
+    setSize(target.physical_size);
+    take_borrowed_textures(target.textures, target.physical_size);
     release_slots(outgoing);
   }
 
@@ -680,16 +656,14 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     color_texture_size_ = {0, 0};
   }
 
-  void take_borrowed_textures(const WebGPUBorrowedTarget& target) {
-    const auto size = mln::Size{
-      target.descriptor.physical_width, target.descriptor.physical_height
-    };
-    slots_.assign(target.textures.size(), ColorSlot{});
-    for (size_t index = 0; index < target.textures.size(); ++index) {
-      auto* const texture =
-        static_cast<WGPUTexture>(target.textures[index].texture);
+  void take_borrowed_textures(
+    const std::vector<mln_web_gpu_borrowed_texture>& textures, mln::Size size
+  ) {
+    slots_.assign(textures.size(), ColorSlot{});
+    for (size_t index = 0; index < textures.size(); ++index) {
+      auto* const texture = static_cast<WGPUTexture>(textures[index].texture);
       auto* const view =
-        static_cast<WGPUTextureView>(target.textures[index].texture_view);
+        static_cast<WGPUTextureView>(textures[index].texture_view);
       wgpuTextureAddRef(texture);
       wgpuTextureViewAddRef(view);
       slots_[index] = ColorSlot{texture, view, size};
@@ -920,18 +894,8 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     configureSurface();
   }
 
-  auto matches_context(const mln_web_gpu_context_descriptor& context) const
-    -> bool {
-    return static_cast<WGPUDevice>(context.device) == device_;
-  }
-
-  auto matches_format(const mln_web_gpu_surface_descriptor& descriptor) const
-    -> bool {
-    return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
-  }
-
-  void set_surface(const mln_web_gpu_surface_descriptor& descriptor) {
-    auto* const replacement = static_cast<WGPUSurface>(descriptor.surface);
+  void set_surface(void* surface, mln::Size size) {
+    auto* const replacement = static_cast<WGPUSurface>(surface);
     // Reference the replacement before releasing the outgoing one, so a
     // descriptor naming the surface this session already holds cannot drop its
     // last reference partway through.
@@ -942,16 +906,7 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
       wgpuSurfaceRelease(surface_);
     }
     surface_ = replacement;
-    setRenderableSize(
-      mln::Size{
-        mln::core::physical_dimension(
-          descriptor.extent.width, descriptor.extent.scale_factor
-        ),
-        mln::core::physical_dimension(
-          descriptor.extent.height, descriptor.extent.scale_factor
-        )
-      }
-    );
+    setRenderableSize(size);
     configureSurface();
   }
 
@@ -1137,22 +1092,10 @@ class WebGPUSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
-  auto set_webgpu_target(const mln_web_gpu_surface_descriptor& descriptor)
-    -> mln_status override {
-    if (!backend_.matches_context(descriptor.context)) {
-      mln::core::set_thread_error(
-        "WebGPU surface target must name the device this session attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (!backend_.matches_format(descriptor)) {
-      return mln::core::unsupported_retarget(
-        "WebGPU surface target must have the format this session's render "
-        "pipelines were built for; destroy the session and attach again to "
-        "change it"
-      );
-    }
-    backend_.set_surface(descriptor);
+  auto set_webgpu_target(
+    const mln_web_gpu_surface_replacement& replacement, mln::Size physical_size
+  ) -> mln_status override {
+    backend_.set_surface(replacement.surface, physical_size);
     return MLN_STATUS_OK;
   }
 
@@ -1188,30 +1131,14 @@ class WebGPUTextureSessionBackend final
     return backend_.start_readback(std::move(on_ready));
   }
 
-  auto set_webgpu_borrowed_target(const WebGPUBorrowedTarget& target)
+  auto set_webgpu_borrowed_target(const WebGPUBorrowedTextures& target)
     -> mln_status override {
     const auto texture_status = validate_webgpu_textures(
-      target,
-      mln::Size{
-        target.descriptor.physical_width, target.descriptor.physical_height
-      }
+      target.textures, static_cast<WGPUTextureFormat>(backend_.color_format()),
+      target.physical_size
     );
     if (texture_status != MLN_STATUS_OK) {
       return texture_status;
-    }
-    if (!backend_.matches_context(target.descriptor.context)) {
-      mln::core::set_thread_error(
-        "WebGPU texture target must name the device and queue this session "
-        "attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (!backend_.matches_borrowed_target(target.descriptor)) {
-      return mln::core::unsupported_retarget(
-        "WebGPU texture target must have the format this session's render "
-        "pipelines were built for; destroy the session and attach again to "
-        "change it"
-      );
     }
     backend_.set_borrowed_target(target);
     return MLN_STATUS_OK;
@@ -1317,9 +1244,12 @@ auto webgpu_borrowed_texture_attach_start(
   }
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_borrowed_session_extent(
-    *session, descriptor->extent, descriptor->physical_width,
+  size_new_borrowed_session(
+    *session, descriptor->logical_size, descriptor->physical_width,
     descriptor->physical_height
+  );
+  session->target_identity = render_target_identity(
+    std::span{descriptor->textures, descriptor->texture_count}
   );
   session->texture.mode = TextureSessionMode::Borrowed;
   session->producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
@@ -1328,7 +1258,10 @@ auto webgpu_borrowed_texture_attach_start(
                                 ) {
     const auto physical_size =
       mln::Size{live.physical_width, live.physical_height};
-    const auto texture_status = validate_webgpu_textures(target, physical_size);
+    const auto texture_status = validate_webgpu_textures(
+      target.textures, static_cast<WGPUTextureFormat>(target.descriptor.format),
+      physical_size
+    );
     if (texture_status != MLN_STATUS_OK) {
       return texture_status;
     }
@@ -1355,7 +1288,7 @@ auto webgpu_borrowed_texture_attach_start(
 
 auto webgpu_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_web_gpu_borrowed_texture_descriptor* descriptor,
+  const mln_web_gpu_borrowed_texture_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -1365,22 +1298,23 @@ auto webgpu_borrowed_texture_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status =
-    validate_webgpu_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status =
+    validate_webgpu_borrowed_texture_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
   const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
+    replacement->physical_width, replacement->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+  auto target = WebGPUBorrowedTextures{*replacement};
+  auto identity = render_target_identity(std::span{target.textures});
   return enqueue_borrowed_texture_retarget(
-    session, descriptor->texture_count, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [target =
-       WebGPUBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+    session, replacement->texture_count, replacement->logical_size,
+    target.physical_size, std::move(identity),
+    [target = std::move(target)](mln_render_session_object& live, mln::Size) {
       return live.texture.backend->set_webgpu_borrowed_target(target);
     },
     std::move(checked_completion),
@@ -1414,16 +1348,13 @@ auto webgpu_surface_attach_start(
   if (driver_status != MLN_STATUS_OK) {
     return driver_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_session_extent(*session, descriptor->extent);
+  const auto size_status = size_new_session(*session, descriptor->logical_size);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
+  session->target_identity = {render_target_handle(descriptor->surface)};
   const auto copied = *descriptor;
   session->initialize_backend = [copied](mln_render_session_object& target) {
     target.surface.backend = std::make_unique<WebGPUSurfaceSessionBackend>(
@@ -1448,7 +1379,8 @@ auto webgpu_surface_attach_start(
 }
 
 auto webgpu_surface_set_target_start(
-  mln_render_session session, const mln_web_gpu_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_web_gpu_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -1458,22 +1390,16 @@ auto webgpu_surface_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status =
+    validate_webgpu_surface_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  const auto copied = *descriptor;
+  const auto copied = *replacement;
   return enqueue_surface_retarget(
-    session, copied.extent,
-    [copied](mln_render_session_object& live) {
-      return live.surface.backend->set_webgpu_target(copied);
+    session, copied.logical_size, {render_target_handle(copied.surface)},
+    [copied](mln_render_session_object& live, mln::Size physical_size) {
+      return live.surface.backend->set_webgpu_target(copied, physical_size);
     },
     std::move(checked_completion),
     valueless_completion<&mln_render_session_set_web_gpu_surface_target>()

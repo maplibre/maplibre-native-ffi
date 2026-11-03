@@ -36,6 +36,7 @@ WIDTH, HEIGHT = 32, 16
 EXTENT = mln.LogicalExtent(WIDTH, HEIGHT, 1.0)
 # Releases a frame whose reads have finished.
 DONE = mln.GpuSync(kind=mln.GpuSyncKind.CPU_COMPLETE)
+SIZE = mln.LogicalSize(WIDTH, HEIGHT)
 
 
 def _backends() -> list[str]:
@@ -172,7 +173,7 @@ class Offscreen(_Target):
     def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
         assert self.map is not None
         return self.map.attach_offscreen(
-            mln.OffscreenDescriptor(extent=EXTENT), options
+            mln.OffscreenDescriptor(logical_size=SIZE), options
         )
 
     def render_red(self) -> mln.TextureReadbackResult:
@@ -287,7 +288,7 @@ class BorrowedTexture(_Target):
         if self.backend == "metal":
             return self.map.attach_metal_borrowed_texture(
                 mln.MetalBorrowedTextureDescriptor(
-                    extent=EXTENT,
+                    logical_size=SIZE,
                     physical_width=width,
                     physical_height=height,
                     textures=[
@@ -300,7 +301,7 @@ class BorrowedTexture(_Target):
         if self.backend == "vulkan":
             return self.map.attach_vulkan_borrowed_texture(
                 mln.VulkanBorrowedTextureDescriptor(
-                    extent=EXTENT,
+                    logical_size=SIZE,
                     physical_width=width,
                     physical_height=height,
                     context=mln.VulkanContextDescriptor(
@@ -326,7 +327,7 @@ class BorrowedTexture(_Target):
             )
         return self.map.attach_open_gl_borrowed_texture(
             mln.OpenGlBorrowedTextureDescriptor(
-                extent=EXTENT,
+                logical_size=SIZE,
                 physical_width=width,
                 physical_height=height,
                 context=_opengl_context(self.backend, context),

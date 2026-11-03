@@ -57,45 +57,47 @@ auto mln_map_attach_web_gpu_surface(
 }
 
 auto mln_render_session_set_metal_surface_target(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session session, const mln_metal_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::metal_surface_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }
 
 auto mln_render_session_set_vulkan_surface_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session session, const mln_vulkan_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::vulkan_surface_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }
 
 auto mln_render_session_set_open_gl_surface_target(
-  mln_render_session session, const mln_open_gl_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_open_gl_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::opengl_surface_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }
 
 auto mln_render_session_set_web_gpu_surface_target(
-  mln_render_session session, const mln_web_gpu_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_web_gpu_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::webgpu_surface_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }

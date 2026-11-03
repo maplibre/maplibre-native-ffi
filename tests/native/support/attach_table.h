@@ -2,11 +2,11 @@
 #define MLN_NATIVE_TESTS_ATTACH_TABLE_H
 
 // Validation tables for render target attach and set_target calls. A row edits
-// one call's arguments or its backend descriptor, and the runner submits it
+// one call's arguments or its backend descriptor or replacement, and the runner
+// submits it
 // with a completion that no accepted row may reach: every row here expects a
 // rejection, and a rejected attach must leave its output session as it was.
 
-#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -42,6 +42,14 @@ typedef struct mln_test_target_call {
     mln_open_gl_borrowed_texture_descriptor opengl_borrowed;
     mln_web_gpu_surface_descriptor webgpu_surface;
     mln_web_gpu_borrowed_texture_descriptor webgpu_borrowed;
+    mln_metal_surface_replacement metal_surface_replacement;
+    mln_metal_borrowed_texture_replacement metal_borrowed_replacement;
+    mln_vulkan_surface_replacement vulkan_surface_replacement;
+    mln_vulkan_borrowed_texture_replacement vulkan_borrowed_replacement;
+    mln_open_gl_surface_replacement opengl_surface_replacement;
+    mln_open_gl_borrowed_texture_replacement opengl_borrowed_replacement;
+    mln_web_gpu_surface_replacement webgpu_surface_replacement;
+    mln_web_gpu_borrowed_texture_replacement webgpu_borrowed_replacement;
   } descriptor;
   // Storage for a borrowed descriptor's textures array. A row works on a copy
   // of the call whose array still points at the original's storage, so an edit
@@ -62,9 +70,9 @@ typedef mln_status (*mln_test_attach_fn)(
   mln_diagnostic* diagnostic
 );
 
-// A backend's set_target function, with its descriptor type erased.
+// A backend's set_target function, with its replacement type erased.
 typedef mln_status (*mln_test_set_target_fn)(
-  mln_render_session session, const void* descriptor,
+  mln_render_session session, const void* replacement,
   const mln_completion* completion, mln_diagnostic* diagnostic
 );
 
@@ -171,50 +179,34 @@ static inline void mln_test_run_attach_table(
   );
 }
 
-// Defines the edits every descriptor checks itself, for the union member
-// `member` of type `type`: undersized, and with an extent of zero width.
-// MLN_TEST_DESCRIPTOR_CASES(member) names their rows, and
-// MLN_TEST_UNDERSIZED_CASE(member) names the first alone, for a set_target,
-// whose descriptor check is its attach's.
+// Defines the edits every descriptor and replacement checks itself, for the
+// union member `member` of type `type`: undersized, and with a logical size of
+// zero width. MLN_TEST_DESCRIPTOR_CASES(member) names their rows.
 #define MLN_TEST_DESCRIPTOR_EDITS(member, type)                               \
   static void member##_undersized(void* call) {                               \
     ((mln_test_target_call*)call)->descriptor.member.size = sizeof(type) - 1; \
   }                                                                           \
   static void member##_zero_width(void* call) {                               \
-    ((mln_test_target_call*)call)->descriptor.member.extent.width = 0;        \
+    ((mln_test_target_call*)call)->descriptor.member.logical_size.width = 0;  \
   }
 
-#define MLN_TEST_UNDERSIZED_CASE(member)                                      \
+#define MLN_TEST_DESCRIPTOR_CASES(member)                                     \
   {"undersized descriptor", member##_undersized, MLN_STATUS_INVALID_ARGUMENT, \
-   "size is too small"}
-
-#define MLN_TEST_DESCRIPTOR_CASES(member)                                   \
-  MLN_TEST_UNDERSIZED_CASE(member),                                         \
-    {"zero extent width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT, \
+   "size is too small"},                                                      \
+    {"zero logical width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT,  \
      "must be positive"}
 
-// Defines the remaining ways an extent breaks the positivity rule that every
-// descriptor shares, for one union member. MLN_TEST_EXTENT_RULE_CASES(member)
-// names their rows.
-#define MLN_TEST_EXTENT_RULE_EDITS(member)                                    \
+// Defines the other way a logical size breaks the positivity rule that every
+// descriptor shares, for one union member. MLN_TEST_SIZE_RULE_CASES(member)
+// names its row.
+#define MLN_TEST_SIZE_RULE_EDITS(member)                                      \
   static void member##_zero_height(void* call) {                              \
-    ((mln_test_target_call*)call)->descriptor.member.extent.height = 0;       \
-  }                                                                           \
-  static void member##_zero_scale(void* call) {                               \
-    ((mln_test_target_call*)call)->descriptor.member.extent.scale_factor = 0; \
-  }                                                                           \
-  static void member##_infinite_scale(void* call) {                           \
-    ((mln_test_target_call*)call)->descriptor.member.extent.scale_factor =    \
-      (double)INFINITY;                                                       \
+    ((mln_test_target_call*)call)->descriptor.member.logical_size.height = 0; \
   }
 
-#define MLN_TEST_EXTENT_RULE_CASES(member)                                  \
-  {"zero extent height", member##_zero_height, MLN_STATUS_INVALID_ARGUMENT, \
-   "must be positive"},                                                     \
-    {"zero scale factor", member##_zero_scale, MLN_STATUS_INVALID_ARGUMENT, \
-     "must be positive"},                                                   \
-    {"infinite scale factor", member##_infinite_scale,                      \
-     MLN_STATUS_INVALID_ARGUMENT, "must be positive"}
+#define MLN_TEST_SIZE_RULE_CASES(member)                                     \
+  {"zero logical height", member##_zero_height, MLN_STATUS_INVALID_ARGUMENT, \
+   "must be positive"}
 
 // Defines the edits every borrowed descriptor checks itself, for the union
 // member `member` whose entries live in the call's `textures.entries`: no
@@ -261,18 +253,18 @@ static inline void mln_test_run_attach_table(
     {"a ring too deep", member##_too_deep, MLN_STATUS_INVALID_ARGUMENT, \
      "MLN_TEXTURE_RING_MAX_DEPTH"}
 
-// For a target whose physical size follows from its extent: an extent that
-// overflows 32 bits once scaled. MLN_TEST_OVERFLOW_CASE(member) names its row.
-#define MLN_TEST_OVERFLOW_EDIT(member)                          \
-  static void member##_overflowing_extent(void* call) {         \
-    mln_logical_extent* extent =                                \
-      &((mln_test_target_call*)call)->descriptor.member.extent; \
-    extent->width = UINT32_MAX;                                 \
-    extent->scale_factor = 2.0;                                 \
+// For a target whose physical size follows from its logical size and the
+// map's scale factor: a width that overflows 32 bits once scaled by the map
+// that mln_test_create_target_map() creates. MLN_TEST_OVERFLOW_CASE(member)
+// names its row.
+#define MLN_TEST_OVERFLOW_EDIT(member)                                    \
+  static void member##_overflowing_size(void* call) {                     \
+    ((mln_test_target_call*)call)->descriptor.member.logical_size.width = \
+      UINT32_MAX;                                                         \
   }
 
-#define MLN_TEST_OVERFLOW_CASE(member)                               \
-  {"extent that overflows once scaled", member##_overflowing_extent, \
+#define MLN_TEST_OVERFLOW_CASE(member)                                   \
+  {"logical size that overflows once scaled", member##_overflowing_size, \
    MLN_STATUS_INVALID_ARGUMENT, "too large"}
 
 // Defines `name`, a validation-table call that submits through the backend
@@ -297,10 +289,10 @@ static inline void mln_test_run_attach_table(
 
 #define MLN_TEST_SET_TARGET_SUBMITTER(name, function)                 \
   static mln_status name##_call(                                      \
-    mln_render_session session, const void* descriptor,               \
+    mln_render_session session, const void* replacement,              \
     const mln_completion* completion, mln_diagnostic* diagnostic      \
   ) {                                                                 \
-    return function(session, descriptor, completion, diagnostic);     \
+    return function(session, replacement, completion, diagnostic);    \
   }                                                                   \
   static mln_status name(                                             \
     void* context, const void* call, mln_diagnostic* diagnostic       \
@@ -309,13 +301,19 @@ static inline void mln_test_run_attach_table(
     return mln_test_submit_set_target(name##_call, call, diagnostic); \
   }
 
-// A logical extent every descriptor default can take.
-static inline mln_logical_extent mln_test_target_extent(void) {
-  return (mln_logical_extent){
-    .width = 64,
-    .height = 64,
-    .scale_factor = 1.0,
-  };
+// A logical size every descriptor default can take.
+static inline mln_logical_size mln_test_target_size(void) {
+  return (mln_logical_size){.width = 64, .height = 64};
+}
+
+// A map for the attach tables, at a scale factor of 2, so that a logical size
+// of MLN_TEST_OVERFLOW_EDIT overflows once scaled.
+static inline mln_map mln_test_create_target_map(mln_runtime runtime) {
+  mln_map_options options = mln_test_map_options();
+  options.initial_extent.width = 64;
+  options.initial_extent.height = 64;
+  options.initial_extent.scale_factor = 2.0;
+  return mln_test_create_map_with_options(runtime, &options);
 }
 
 #endif

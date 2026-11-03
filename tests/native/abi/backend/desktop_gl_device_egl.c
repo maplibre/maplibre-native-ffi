@@ -62,9 +62,8 @@ static mln_test_render_fixture attach_offscreen_session(
   mln_offscreen_descriptor descriptor = {
     .size = sizeof(mln_offscreen_descriptor)
   };
-  descriptor.extent = (mln_logical_extent){
-    .width = extent, .height = extent, .scale_factor = 1.0
-  };
+  descriptor.logical_size =
+    (mln_logical_size){.width = extent, .height = extent};
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };

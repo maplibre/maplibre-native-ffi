@@ -54,10 +54,13 @@ typedef struct mln_offscreen_device_options {
     MLN_BINDING("mask=fields;bit=MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API");
 } mln_offscreen_device_options;
 
-/** The image that mln_map_attach_offscreen() renders. */
+/**
+ * The image that mln_map_attach_offscreen() renders. The session renders it
+ * at the map's scale factor.
+ */
 typedef struct mln_offscreen_descriptor {
   uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
+  mln_logical_size logical_size MLN_BINDING("required=true");
 } mln_offscreen_descriptor;
 
 /**

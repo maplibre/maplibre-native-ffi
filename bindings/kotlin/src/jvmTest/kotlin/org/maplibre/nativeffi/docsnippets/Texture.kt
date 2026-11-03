@@ -6,7 +6,7 @@ package org.maplibre.nativeffi.docsnippets
 import java.util.concurrent.locks.Lock
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.QueueLock
 import org.maplibre.nativeffi.RenderDriverKind
@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.VulkanBorrowedTexture
 import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.VulkanBorrowedTextureReplacement
 import org.maplibre.nativeffi.VulkanContextDescriptor
 import org.maplibre.nativeffi.Wake
 import org.maplibre.nativeffi.attachVulkanBorrowedTexture
@@ -70,10 +71,10 @@ private suspend fun renderToTexture(
   // #endregion attach-options
 
   // #region attach-borrowed
-  var ring =
+  val ring =
     VulkanBorrowedTextureDescriptor(
-      extent =
-        LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0),
+      // The map's size in logical pixels.
+      logicalSize = LogicalSize(width = 800u, height = 600u),
       // The size of your textures in device pixels.
       physicalWidth = 1600u,
       physicalHeight = 1200u,
@@ -102,14 +103,9 @@ private suspend fun renderToTexture(
   drawFrame()
 
   // #region resize-borrowed
-  ring =
-    ring.copy(
-      extent =
-        LogicalExtent(
-          width = 1024u,
-          height = 768u,
-          scaleFactor = 2.0,
-        ),
+  val resized =
+    VulkanBorrowedTextureReplacement(
+      logicalSize = LogicalSize(width = 1024u, height = 768u),
       physicalWidth = 2048u,
       physicalHeight = 1536u,
       // Your new textures, at the new size.
@@ -126,7 +122,7 @@ private suspend fun renderToTexture(
         ),
     )
 
-  session.setVulkanBorrowedTextureTarget(ring).await()
+  session.setVulkanBorrowedTextureTarget(resized).await()
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views)
   // #endregion resize-borrowed

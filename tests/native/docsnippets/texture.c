@@ -105,9 +105,10 @@ void mln_doc_texture(
     {.image = images[0], .image_view = views[0]},
     {.image = images[1], .image_view = views[1]},
   };
-  mln_vulkan_borrowed_texture_descriptor ring = {
+  const mln_vulkan_borrowed_texture_descriptor ring = {
     .size = sizeof(mln_vulkan_borrowed_texture_descriptor),
-    .extent = {.width = 800, .height = 600, .scale_factor = 2.0},
+    // The map's size in logical pixels.
+    .logical_size = {.width = 800, .height = 600},
     // The size of your textures in device pixels.
     .physical_width = 1600,
     .physical_height = 1200,
@@ -132,15 +133,17 @@ void mln_doc_texture(
     {.image = new_images[0], .image_view = new_views[0]},
     {.image = new_images[1], .image_view = new_views[1]},
   };
-  ring.extent = (mln_logical_extent){
-    .width = 1024, .height = 768, .scale_factor = 2.0
+  const mln_vulkan_borrowed_texture_replacement resized = {
+    .size = sizeof(mln_vulkan_borrowed_texture_replacement),
+    .logical_size = {.width = 1024, .height = 768},
+    .physical_width = 2048,
+    .physical_height = 1536,
+    .textures = new_textures,
+    .texture_count = 2,
   };
-  ring.physical_width = 2048;
-  ring.physical_height = 1536;
-  ring.textures = new_textures;
 
   mln_render_session_set_vulkan_borrowed_texture_target(
-    session, &ring, &done, NULL
+    session, &resized, &done, NULL
   );
   // #endregion resize-borrowed
   wait_for_done();

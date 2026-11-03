@@ -487,9 +487,8 @@ impl RenderSessionHandle {
 
     /// Resizes the session's target and its map.
     ///
-    /// `extent` must keep the session's scale factor. To change the scale
-    /// factor, give the session a new target or attach a new session. Release
-    /// every acquired frame first.
+    /// The session renders at the map's scale factor. Release every acquired
+    /// frame first.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -500,11 +499,11 @@ impl RenderSessionHandle {
     ///   Give it new textures of the new size instead.
     /// - `Status::TargetLost` when the session loses its target before the
     ///   resize applies.
-    pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<CommandCompletion>> {
+    pub fn resize(&self, logical_size: LogicalSize) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
-        let extent = call.input(&extent)?;
+        let logical_size = call.input(&logical_size)?;
         call.command(|session, completion, out_diagnostic| unsafe {
-            sys::mln_render_session_resize(session, extent, completion, out_diagnostic)
+            sys::mln_render_session_resize(session, logical_size, completion, out_diagnostic)
         })
     }
 
@@ -530,9 +529,9 @@ impl RenderSessionHandle {
     ///
     /// Use it to resize the ring, or to give the session textures again after
     /// `RenderSessionHandle::release_target()`. Release every acquired frame
-    /// first. The new ring must have as many textures as the old one, and the
-    /// same device and command queue. Once the replacement completes, the
-    /// session no longer uses the old textures.
+    /// first. Once the replacement completes, the session no longer uses the
+    /// old textures. A replacement with the textures and sizes that the ring
+    /// renders into already changes nothing.
     ///
     /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -552,15 +551,15 @@ impl RenderSessionHandle {
     ))]
     pub unsafe fn set_metal_borrowed_texture_target(
         &self,
-        descriptor: &MetalBorrowedTextureDescriptor,
+        replacement: &MetalBorrowedTextureReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_metal_borrowed_texture_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -572,9 +571,10 @@ impl RenderSessionHandle {
     /// Replaces the Metal layer that the session renders to.
     ///
     /// Use it to give the session a layer again after
-    /// `RenderSessionHandle::release_target()`, or to move it to another layer.
-    /// The new layer must use the same device. Once the replacement completes,
-    /// the session no longer uses the old layer.
+    /// `RenderSessionHandle::release_target()`, to move it to another layer, or
+    /// to resize it. Once the replacement completes, the session no longer uses
+    /// the old layer. A replacement with the layer and logical size that the
+    /// session renders to already changes nothing.
     ///
     /// See `mln_render_session_set_metal_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -589,15 +589,15 @@ impl RenderSessionHandle {
     ))]
     pub unsafe fn set_metal_surface_target(
         &self,
-        descriptor: &MetalSurfaceDescriptor,
+        replacement: &MetalSurfaceReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_metal_surface_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -610,9 +610,9 @@ impl RenderSessionHandle {
     ///
     /// Use it to resize the ring, or to give the session textures again after
     /// `RenderSessionHandle::release_target()`. Release every acquired frame
-    /// first. The new ring must have as many textures as the old one, and the
-    /// same context. Once the replacement completes, the session no longer uses
-    /// the old textures.
+    /// first. Once the replacement completes, the session no longer uses the
+    /// old textures. A replacement with the textures and sizes that the ring
+    /// renders into already changes nothing.
     ///
     /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -621,15 +621,15 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn set_open_gl_borrowed_texture_target(
         &self,
-        descriptor: &OpenGlBorrowedTextureDescriptor<'_>,
+        replacement: &OpenGlBorrowedTextureReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_open_gl_borrowed_texture_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -641,9 +641,10 @@ impl RenderSessionHandle {
     /// Replaces the OpenGL surface that the session presents to.
     ///
     /// Use it to give the session a surface again after
-    /// `RenderSessionHandle::release_target()`, or to move it to another
-    /// surface. The new surface must use the same context. Once the replacement
-    /// completes, the session no longer uses the old surface.
+    /// `RenderSessionHandle::release_target()`, to move it to another surface,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old surface. A replacement with the surface and logical size
+    /// that the session presents to already changes nothing.
     ///
     /// See `mln_render_session_set_open_gl_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -652,15 +653,15 @@ impl RenderSessionHandle {
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     pub unsafe fn set_open_gl_surface_target(
         &self,
-        descriptor: &OpenGlSurfaceDescriptor<'_>,
+        replacement: &OpenGlSurfaceReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_open_gl_surface_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -673,18 +674,12 @@ impl RenderSessionHandle {
     ///
     /// Use it to resize the ring, or to give the session images again after
     /// `RenderSessionHandle::release_target()`. Release every acquired frame
-    /// first. The new ring must have as many images as the old one, and the
-    /// same context. Once the replacement completes, the session no longer uses
-    /// the old images.
+    /// first. Once the replacement completes, the session no longer uses the
+    /// old images. A replacement with the images and sizes that the ring
+    /// renders into already changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when the new ring has a different `format`,
-    ///   `final_layout`, or `owner` than the old one. Attach a new session to
-    ///   change them.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -697,15 +692,15 @@ impl RenderSessionHandle {
     ))]
     pub unsafe fn set_vulkan_borrowed_texture_target(
         &self,
-        descriptor: &VulkanBorrowedTextureDescriptor,
+        replacement: &VulkanBorrowedTextureReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_vulkan_borrowed_texture_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -717,9 +712,10 @@ impl RenderSessionHandle {
     /// Replaces the Vulkan surface that the session presents to.
     ///
     /// Use it to give the session a surface again after
-    /// `RenderSessionHandle::release_target()`, or to move it to another
-    /// surface. The new surface must use the same context. Once the replacement
-    /// completes, the session no longer uses the old surface.
+    /// `RenderSessionHandle::release_target()`, to move it to another surface,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old surface. A replacement with the surface and logical size
+    /// that the session presents to already changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -741,15 +737,15 @@ impl RenderSessionHandle {
     ))]
     pub unsafe fn set_vulkan_surface_target(
         &self,
-        descriptor: &VulkanSurfaceDescriptor,
+        replacement: &VulkanSurfaceReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_vulkan_surface_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -762,32 +758,27 @@ impl RenderSessionHandle {
     ///
     /// Use it to resize the ring, or to give the session textures again after
     /// `RenderSessionHandle::release_target()`. Release every acquired frame
-    /// first. The new ring must have as many textures as the old one, and the
-    /// same context. Once the replacement completes, the session no longer uses
-    /// the old textures.
+    /// first. Once the replacement completes, the session no longer uses the
+    /// old textures. A replacement with the textures and sizes that the ring
+    /// renders into already changes nothing.
     ///
     /// See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when the new ring has a different `format` than
-    ///   the old one. Attach a new session to change it.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
     pub unsafe fn set_web_gpu_borrowed_texture_target(
         &self,
-        descriptor: &WebGpuBorrowedTextureDescriptor,
+        replacement: &WebGpuBorrowedTextureReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_web_gpu_borrowed_texture_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -799,32 +790,28 @@ impl RenderSessionHandle {
     /// Replaces the WebGPU surface that the session presents to.
     ///
     /// Use it to give the session a surface again after
-    /// `RenderSessionHandle::release_target()`, or to move it to another
-    /// surface. The new surface must use the same context. Once the replacement
-    /// completes, the session no longer uses the old surface.
+    /// `RenderSessionHandle::release_target()`, to move it to another surface,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old surface. A replacement with the surface and logical size
+    /// that the session presents to already changes nothing.
     ///
     /// See `mln_render_session_set_web_gpu_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when the new `format` differs from the old one.
-    ///   Attach a new session to change it.
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
     #[cfg(target_os = "emscripten")]
     pub unsafe fn set_web_gpu_surface_target(
         &self,
-        descriptor: &WebGpuSurfaceDescriptor,
+        replacement: &WebGpuSurfaceReplacement,
     ) -> Result<NativeFuture<()>> {
         let mut call = self.inner.call();
-        let descriptor = call.reference(&descriptor)?;
+        let replacement = call.reference(&replacement)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
                 sys::mln_render_session_set_web_gpu_surface_target(
                     session,
-                    descriptor,
+                    replacement,
                     completion,
                     out_diagnostic,
                 )
@@ -846,9 +833,8 @@ impl RenderSessionHandle {
 impl RenderSessionHandleDiscarding<'_> {
     /// Resizes the session's target and its map.
     ///
-    /// `extent` must keep the session's scale factor. To change the scale
-    /// factor, give the session a new target or attach a new session. Release
-    /// every acquired frame first.
+    /// The session renders at the map's scale factor. Release every acquired
+    /// frame first.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -857,11 +843,11 @@ impl RenderSessionHandleDiscarding<'_> {
     ///
     /// - `Status::Unsupported` when the session renders into a borrowed ring.
     ///   Give it new textures of the new size instead.
-    pub fn resize(&self, extent: LogicalExtent) -> Result<()> {
+    pub fn resize(&self, logical_size: LogicalSize) -> Result<()> {
         let mut call = self.0.inner.call();
-        let extent = call.input(&extent)?;
+        let logical_size = call.input(&logical_size)?;
         call.discard(|session, completion, out_diagnostic| unsafe {
-            sys::mln_render_session_resize(session, extent, completion, out_diagnostic)
+            sys::mln_render_session_resize(session, logical_size, completion, out_diagnostic)
         })
     }
 }

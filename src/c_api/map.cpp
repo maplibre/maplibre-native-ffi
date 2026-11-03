@@ -45,11 +45,11 @@ auto mln_map_get_snapshot(
 }
 
 auto mln_map_resize(
-  mln_map map, mln_logical_extent extent, const mln_completion* completion,
+  mln_map map, mln_logical_size logical_size, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_resize(map, extent, completion);
+    return mln::core::map_resize(map, logical_size, completion);
   });
 }
 

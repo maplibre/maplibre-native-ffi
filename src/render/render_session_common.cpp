@@ -85,6 +85,39 @@ auto logical_extent_physical_size(
   return MLN_STATUS_OK;
 }
 
+auto size_new_session(
+  mln_render_session_object& session, mln_logical_size logical_size
+) -> mln_status {
+  const auto size_status = validate_logical_size(
+    logical_size, "logical size dimensions must be positive"
+  );
+  if (size_status != MLN_STATUS_OK) return size_status;
+  const auto scale_factor = map_scale_factor(session.map);
+  const auto physical_status = validate_physical_size(
+    logical_size.width, logical_size.height, scale_factor,
+    "scaled target dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) return physical_status;
+  session.width = logical_size.width;
+  session.height = logical_size.height;
+  session.scale_factor = scale_factor;
+  session.physical_width = physical_dimension(logical_size.width, scale_factor);
+  session.physical_height =
+    physical_dimension(logical_size.height, scale_factor);
+  return MLN_STATUS_OK;
+}
+
+auto size_new_borrowed_session(
+  mln_render_session_object& session, mln_logical_size logical_size,
+  uint32_t physical_width, uint32_t physical_height
+) -> void {
+  session.width = logical_size.width;
+  session.height = logical_size.height;
+  session.scale_factor = map_scale_factor(session.map);
+  session.physical_width = physical_width;
+  session.physical_height = physical_height;
+}
+
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 #if defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   return MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL;
@@ -241,84 +274,6 @@ auto validate_opengl_context(
 
   set_thread_error("OpenGL context platform is invalid");
   return MLN_STATUS_INVALID_ARGUMENT;
-}
-
-auto vulkan_context_matches(
-  const mln_vulkan_context_descriptor& lhs,
-  const mln_vulkan_context_descriptor& rhs
-) -> bool {
-  return lhs.instance == rhs.instance &&
-         lhs.physical_device == rhs.physical_device &&
-         lhs.device == rhs.device && lhs.graphics_queue == rhs.graphics_queue &&
-         lhs.graphics_queue_family_index == rhs.graphics_queue_family_index;
-}
-
-auto opengl_context_matches(
-  const mln_open_gl_context_descriptor& lhs,
-  const mln_open_gl_context_descriptor& rhs, OpenGLContextMatch strictness
-) -> bool {
-  if (lhs.platform != rhs.platform) {
-    return false;
-  }
-  switch (lhs.platform) {
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_WGL:
-      if (lhs.ownership != rhs.ownership) {
-        return false;
-      }
-      // A dedicated context names no share context, so the device context it
-      // was created from is what identifies it under either strictness.
-      if (
-        (strictness == OpenGLContextMatch::Exact ||
-         lhs.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED) &&
-        lhs.data.wgl.device_context != rhs.data.wgl.device_context
-      ) {
-        return false;
-      }
-      return lhs.data.wgl.share_context == rhs.data.wgl.share_context;
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_EGL:
-      // EGL names its drawable in the target rather than in the context, so
-      // both strictnesses ask for the same three handles.
-      // A dedicated context names no share context, so its identity rests on
-      // the display, the config, and the API it was created for. A shared
-      // context takes its API from the share context, which leaves client_api
-      // ignored there and so outside its identity.
-      if (lhs.ownership != rhs.ownership) {
-        return false;
-      }
-      if (
-        lhs.ownership == MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED &&
-        lhs.data.egl.client_api != rhs.data.egl.client_api
-      ) {
-        return false;
-      }
-      return lhs.data.egl.display == rhs.data.egl.display &&
-             lhs.data.egl.config == rhs.data.egl.config &&
-             lhs.data.egl.share_context == rhs.data.egl.share_context;
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL:
-      if (lhs.data.web_gl.kind != rhs.data.web_gl.kind) {
-        return false;
-      }
-      if (lhs.data.web_gl.kind == MLN_WEB_GL_CONTEXT_EXISTING) {
-        return lhs.data.web_gl.context == rhs.data.web_gl.context;
-      }
-      return lhs.data.web_gl.canvas_selector.size ==
-               rhs.data.web_gl.canvas_selector.size &&
-             std::equal(
-               static_cast<const std::byte*>(
-                 lhs.data.web_gl.canvas_selector.data
-               ),
-               static_cast<const std::byte*>(
-                 lhs.data.web_gl.canvas_selector.data
-               ) +
-                 lhs.data.web_gl.canvas_selector.size,
-               static_cast<const std::byte*>(
-                 rhs.data.web_gl.canvas_selector.data
-               )
-             );
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED:
-      break;
-  }
-  return false;
 }
 
 }  // namespace mln::core
@@ -699,28 +654,6 @@ auto serialize_feature_extension_result(const mln::FeatureExtensionValue& value)
   }
   return mln::core::serialize_feature_collection(
     value.get<mln::FeatureCollection>()
-  );
-}
-
-// The map's scale factor is fixed at creation and selects sprites, glyphs, and
-// raster tiles; the session's drives geometry and shaders. A mismatch renders
-// correctly sized geometry against imagery chosen for a different density.
-auto warn_on_scale_factor_mismatch(mln_map map, double scale_factor) -> void {
-  constexpr auto tolerance = 1e-6;
-  const auto creation_scale_factor = mln::core::map_scale_factor(map);
-  if (std::abs(creation_scale_factor - scale_factor) <= tolerance) {
-    return;
-  }
-  mln::Log::Warning(
-    mln::Event::Render,
-    "render target scale_factor " + mln::util::toString(scale_factor) +
-      " differs from the map scale_factor " +
-      mln::util::toString(creation_scale_factor) +
-      "; the map value is fixed at creation and still selects sprites, "
-      "glyphs, "
-      "and raster tiles, so styled imagery will not match the rendered "
-      "geometry. Create the map with the scale factor you intend to render "
-      "at."
   );
 }
 
@@ -1837,8 +1770,6 @@ auto start_attach_render_session(
     },
     cancel_operation(async.operation)
   };
-  // Logged before the commit, so a throw while logging unwinds the attach.
-  warn_on_scale_factor_mismatch(session->map, session->scale_factor);
   {
     // Allocate the queue node before committing the attachment under the
     // lock. The wakes and the completion are accepted before the driver can
@@ -2011,8 +1942,8 @@ auto validate_render_session_retarget(
 
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
-  const mln_logical_extent& extent, uint32_t physical_width,
-  uint32_t physical_height, const RenderTargetReplacer& replace
+  mln_logical_size logical_size, mln::Size physical_size,
+  const RenderTargetIdentity& identity, const RenderTargetReplacer& replace
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_render_session_retarget(session, kind, live);
@@ -2020,23 +1951,28 @@ auto render_session_set_target(
     return status;
   }
 
-  const auto replace_status = replace(*live);
+  // Only driver work writes the target and its size, so these reads need no
+  // lock. A host that hands over its current target again, such as on every
+  // frame, must not make the session render a frame it already has.
+  if (
+    !live->target_released && live->target_identity == identity &&
+    live->width == logical_size.width && live->height == logical_size.height &&
+    live->physical_width == physical_size.width &&
+    live->physical_height == physical_size.height
+  ) {
+    return MLN_STATUS_OK;
+  }
+
+  const auto replace_status = replace(*live, physical_size);
   // Backends validate before they touch anything, so a reported failure leaves
   // the target and the renderer as they were.
   if (replace_status != MLN_STATUS_OK) {
     return replace_status;
   }
   live->target_released = false;
+  live->target_identity = identity;
 
-  // Land the session's own bookkeeping before anything that can fail again, so
-  // a later failure leaves only a session waiting for the map to catch up.
-  //
-  // As with a resize, the renderer carries its caches to the new target. Pixel
-  // ratio is the exception: it is baked into the renderer's shaders.
-  if (extent.scale_factor != live->scale_factor) {
-    live->renderer.reset();
-    reset_pushed_feature_state(*live);
-  }
+  // As with a resize, the renderer carries its caches to the new target.
   {
     // Snapshot readers see the extent and its generation together, as they do
     // across the sibling resize path.
@@ -2045,11 +1981,10 @@ auto render_session_set_target(
     live->rendered_update_generation = 0;
     live->rendered_target_generation = 0;
     live->pending_changes = true;
-    live->width = extent.width;
-    live->height = extent.height;
-    live->physical_width = physical_width;
-    live->physical_height = physical_height;
-    live->scale_factor = extent.scale_factor;
+    live->width = logical_size.width;
+    live->height = logical_size.height;
+    live->physical_width = physical_size.width;
+    live->physical_height = physical_size.height;
     ++live->generation;
     // No frame is acquired, which the check above and the submission's hold
     // on acquisition ensure. Each slot starts over with its new texture, which
@@ -2063,8 +1998,7 @@ auto render_session_set_target(
     resume_update_waiting_demands_locked(*live, wakes);
   }
 
-  // The submission already sized the map to this extent.
-  warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
+  // The submission already sized the map.
   return MLN_STATUS_OK;
 }
 
@@ -2073,16 +2007,18 @@ namespace {
 // Publishes both portions under the control lock so extent-changing
 // submissions reach the map and driver in the same order.
 auto submit_retarget(
-  mln_render_session session, const mln_logical_extent& extent,
+  mln_render_session session, mln_logical_size logical_size,
   RenderDriverCallable work, std::shared_ptr<Completion> completion,
   const ValuelessCompletion& valueless, RenderDriverAdmission admit
 ) -> mln_status {
   auto [deliver, make_work] = valueless_driver_work(std::move(work), valueless);
-  admit.commit = [extent,
+  admit.commit = [logical_size,
                   commit =
                     std::move(admit.commit)](mln_render_session_object& live) {
     if (commit) commit(live);
-    static_cast<void>(map_post_resize(live.map, extent.width, extent.height));
+    static_cast<void>(
+      map_post_resize(live.map, logical_size.width, logical_size.height)
+    );
   };
   return submit_driver_work(
     session, nullptr, std::move(deliver), make_work, admit,
@@ -2094,13 +2030,13 @@ auto submit_retarget(
 
 auto enqueue_borrowed_texture_retarget(
   mln_render_session session, std::size_t texture_count,
-  const mln_logical_extent& extent, uint32_t physical_width,
-  uint32_t physical_height, RenderTargetReplacer replace,
+  mln_logical_size logical_size, mln::Size physical_size,
+  RenderTargetIdentity identity, RenderTargetReplacer replace,
   std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status {
   return submit_retarget(
-    session, extent,
-    [extent, physical_width, physical_height,
+    session, logical_size,
+    [logical_size, physical_size, identity = std::move(identity),
      replace = std::move(replace)](mln_render_session_object& target) {
       // Acquisition resumes once the replacement has run, whatever it
       // reported: the slots then hold no frame of the replaced textures.
@@ -2117,8 +2053,8 @@ auto enqueue_borrowed_texture_retarget(
         }
       } settle{target};
       return render_session_set_target(
-        target.self, RetargetTargetKind::BorrowedTexture, extent,
-        physical_width, physical_height, replace
+        target.self, RetargetTargetKind::BorrowedTexture, logical_size,
+        physical_size, identity, replace
       );
     },
     completion, valueless,
@@ -2141,27 +2077,42 @@ auto enqueue_borrowed_texture_retarget(
           }
           return MLN_STATUS_OK;
         },
-      .commit =
-        [](mln_render_session_object& live) {
-          invalidate_unacquired_texture_frames_locked(live);
-          ++live.texture.pending_retargets;
-        },
+      // Published frames stay until the replacement runs, so one that names
+      // the ring's current textures again keeps them.
+      .commit = [](
+                  mln_render_session_object& live
+                ) { ++live.texture.pending_retargets; },
     }
   );
 }
 
 auto enqueue_surface_retarget(
-  mln_render_session session, const mln_logical_extent& extent,
-  RenderTargetReplacer replace, std::shared_ptr<Completion> completion,
-  ValuelessCompletion valueless
+  mln_render_session session, mln_logical_size logical_size,
+  RenderTargetIdentity identity, RenderTargetReplacer replace,
+  std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status {
+  auto scale_factor = 1.0;
+  {
+    const auto live = lease_render_session(session);
+    if (live == nullptr) return recorded_handle_fault_status();
+    scale_factor = live->scale_factor;
+  }
+  const auto physical_status = validate_physical_size(
+    logical_size.width, logical_size.height, scale_factor,
+    "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) return physical_status;
+  const auto physical_size = mln::Size{
+    physical_dimension(logical_size.width, scale_factor),
+    physical_dimension(logical_size.height, scale_factor)
+  };
   return submit_retarget(
-    session, extent,
-    [extent, replace = std::move(replace)](mln_render_session_object& target) {
+    session, logical_size,
+    [logical_size, physical_size, identity = std::move(identity),
+     replace = std::move(replace)](mln_render_session_object& target) {
       return render_session_set_target(
-        target.self, RetargetTargetKind::Surface, extent,
-        physical_dimension(extent.width, extent.scale_factor),
-        physical_dimension(extent.height, extent.scale_factor), replace
+        target.self, RetargetTargetKind::Surface, logical_size, physical_size,
+        identity, replace
       );
     },
     completion, valueless, {}
@@ -3975,10 +3926,10 @@ struct DriverMapCompletion {
 auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
   const std::shared_ptr<DriverMapCompletion>& completion,
-  mln_logical_extent extent
+  mln_logical_size logical_size
 ) -> RenderDriverWork {
   return RenderDriverWork{
-    [session, completion, extent]() {
+    [session, completion, logical_size]() {
       auto attached = false;
       {
         const auto lock = std::scoped_lock{session->control_mutex};
@@ -3992,11 +3943,12 @@ auto make_ordered_resize_work(
         );
         return;
       }
-      const auto width = physical_dimension(extent.width, extent.scale_factor);
+      const auto width =
+        physical_dimension(logical_size.width, session->scale_factor);
       const auto height =
-        physical_dimension(extent.height, extent.scale_factor);
+        physical_dimension(logical_size.height, session->scale_factor);
       // A released target has nothing to resize. The next target brings its
-      // own extent.
+      // own size.
       if (!session->target_released) {
         if (session->kind == RenderSessionKind::Surface)
           session->surface.backend->resize(width, height);
@@ -4006,8 +3958,8 @@ auto make_ordered_resize_work(
       {
         auto wakes = DeferredWakes{};
         const auto lock = std::scoped_lock{session->control_mutex};
-        session->width = extent.width;
-        session->height = extent.height;
+        session->width = logical_size.width;
+        session->height = logical_size.height;
         session->physical_width = width;
         session->physical_height = height;
         ++session->generation;
@@ -4026,15 +3978,20 @@ auto make_ordered_resize_work(
 }  // namespace
 
 auto render_session_resize_start(
-  mln_render_session session, mln_logical_extent extent,
+  mln_render_session session, mln_logical_size logical_size,
   const mln_completion* completion
 ) -> mln_status {
-  const auto valid = validate_logical_extent(
-    extent, "render target dimensions and scale factor must be positive"
+  const auto valid = validate_logical_size(
+    logical_size, "render target dimensions must be positive"
   );
   if (valid != MLN_STATUS_OK) return valid;
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
+  const auto physical_status = validate_physical_size(
+    logical_size.width, logical_size.height, live->scale_factor,
+    "scaled render target dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) return physical_status;
   mln::testing::hit(mln::testing::SyncPoint::RenderExtentSubmissionStarted);
   auto runtime = std::shared_ptr<RuntimeObject>{};
   {
@@ -4057,15 +4014,6 @@ auto render_session_resize_start(
     if (live->acquired_frame_count != 0) {
       set_thread_error("cannot resize while a texture frame is acquired");
       return MLN_STATUS_INVALID_STATE;
-    }
-    // The renderer bakes its pixel ratio into compiled shaders, so only an
-    // attachment or a target replacement can change the session's scale.
-    if (extent.scale_factor != live->scale_factor) {
-      set_thread_error(
-        "render session scale_factor is set at attachment or by a target "
-        "replacement; a resize cannot change it"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     runtime = live->map_object->runtime_state;
   }
@@ -4129,14 +4077,14 @@ auto render_session_resize_start(
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state == MLN_RENDER_SESSION_STATE_ATTACHED) {
-      auto work = make_ordered_resize_work(live, joined, extent);
+      auto work = make_ordered_resize_work(live, joined, logical_size);
       // Allocate the driver node before the map accepts its half. The lock
       // keeps the driver from taking it until both halves are published.
       live->driver_work.push_back(std::move(work));
       auto post = MLN_STATUS_OK;
       try {
         post = map_post_resize(
-          live->map, extent.width, extent.height, &map_completion
+          live->map, logical_size.width, logical_size.height, &map_completion
         );
       } catch (...) {
         live->driver_work.pop_back();

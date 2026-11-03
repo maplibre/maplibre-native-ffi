@@ -3,24 +3,25 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// The image that `MapHandle.attachOffscreen()` renders.
+/// The image that `MapHandle.attachOffscreen()` renders. The session renders it
+/// at the map's scale factor.
 ///
 /// See `mln_offscreen_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
 public struct OffscreenDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
-  public init(extent: LogicalExtent) {
-    self.extent = extent
+  public var logicalSize: LogicalSize
+  public init(logicalSize: LogicalSize) {
+    self.logicalSize = logicalSize
   }
 
   init(raw: mln_offscreen_descriptor) {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
   }
 
   func nativeValue() -> mln_offscreen_descriptor {
     var raw = mln_offscreen_descriptor()
     raw.size = UInt32(MemoryLayout<mln_offscreen_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     return raw
   }
 }

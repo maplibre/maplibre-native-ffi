@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.NativePointer
 import org.maplibre.nativeffi.OpenGlContextDescriptor
@@ -54,12 +54,12 @@ class CanvasSurfaceTest {
     canvas: TestCanvas,
     block: suspend RenderSessionFixture.() -> T,
   ): T {
-    val extent = LogicalExtent(SIZE.toUInt(), SIZE.toUInt(), 1.0)
+    val logicalSize = LogicalSize(SIZE.toUInt(), SIZE.toUInt())
     return when (TestGraphics.backend) {
       TestBackend.WEBGL -> {
         val descriptor =
           OpenGlSurfaceDescriptor(
-            extent,
+            logicalSize,
             OpenGlContextDescriptor(
               OpenGlContextOwnership.DEDICATED,
               OpenGlContextDescriptorData.WebGl(
@@ -82,7 +82,7 @@ class CanvasSurfaceTest {
         webGpuCanvasSurface(canvas).use { surface ->
           val descriptor =
             WebGpuSurfaceDescriptor(
-              extent,
+              logicalSize,
               WebGpuContextDescriptor(
                 NativePointer.NULL_POINTER,
                 NativePointer.ofAddress(context.webGpuDevice),

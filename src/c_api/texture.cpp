@@ -80,48 +80,48 @@ auto mln_map_attach_web_gpu_borrowed_texture(
 
 auto mln_render_session_set_metal_borrowed_texture_target(
   mln_render_session session,
-  const mln_metal_borrowed_texture_descriptor* descriptor,
+  const mln_metal_borrowed_texture_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::metal_borrowed_texture_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }
 
 auto mln_render_session_set_vulkan_borrowed_texture_target(
   mln_render_session session,
-  const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  const mln_vulkan_borrowed_texture_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::vulkan_borrowed_texture_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }
 
 auto mln_render_session_set_open_gl_borrowed_texture_target(
   mln_render_session session,
-  const mln_open_gl_borrowed_texture_descriptor* descriptor,
+  const mln_open_gl_borrowed_texture_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::opengl_borrowed_texture_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }
 
 auto mln_render_session_set_web_gpu_borrowed_texture_target(
   mln_render_session session,
-  const mln_web_gpu_borrowed_texture_descriptor* descriptor,
+  const mln_web_gpu_borrowed_texture_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::webgpu_borrowed_texture_set_target_start(
-      session, descriptor, completion
+      session, replacement, completion
     );
   });
 }

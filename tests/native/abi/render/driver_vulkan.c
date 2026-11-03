@@ -31,11 +31,7 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   mln_vulkan_borrowed_texture_descriptor descriptor = {
     .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
   };
-  descriptor.extent = (mln_logical_extent){
-    .width = 32,
-    .height = 32,
-    .scale_factor = 1.0,
-  };
+  descriptor.logical_size = (mln_logical_size){.width = 32, .height = 32};
   descriptor.physical_width = 32;
   descriptor.physical_height = 32;
   descriptor.context = (mln_vulkan_context_descriptor){

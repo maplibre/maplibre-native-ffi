@@ -102,26 +102,21 @@ public fun MapHandle.attachVulkanSurface(
  * Replaces the Vulkan images that a borrowed ring renders into.
  *
  * Use it to resize the ring, or to give the session images again after
- * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. The new ring must have
- * as many images as the old one, and the same context. Once the replacement completes, the session
- * no longer uses the old images.
+ * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
+ * completes, the session no longer uses the old images. A replacement with the images and sizes
+ * that the ring renders into already changes nothing.
  *
  * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when the new ring has a different `format`, `final_layout`, or `owner`
- *   than the old one. Attach a new session to change them.
  */
 public fun RenderSessionHandle.setVulkanBorrowedTextureTarget(
-  descriptor: VulkanBorrowedTextureDescriptor,
+  replacement: VulkanBorrowedTextureReplacement,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_vulkan_borrowed_texture_target(
         handle,
-        writeVulkanBorrowedTextureDescriptor(descriptor),
+        writeVulkanBorrowedTextureReplacement(replacement),
         completion,
         diagnostic,
       ),
@@ -131,9 +126,10 @@ public fun RenderSessionHandle.setVulkanBorrowedTextureTarget(
 /**
  * Replaces the Vulkan surface that the session presents to.
  *
- * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, or to
- * move it to another surface. The new surface must use the same context. Once the replacement
- * completes, the session no longer uses the old surface.
+ * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
+ * it to another surface, or to resize it. Once the replacement completes, the session no longer
+ * uses the old surface. A replacement with the surface and logical size that the session presents
+ * to already changes nothing.
  *
  * See `mln_render_session_set_vulkan_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -144,13 +140,13 @@ public fun RenderSessionHandle.setVulkanBorrowedTextureTarget(
  *   support than the old one. Attach a new session instead.
  */
 public fun RenderSessionHandle.setVulkanSurfaceTarget(
-  descriptor: VulkanSurfaceDescriptor,
+  replacement: VulkanSurfaceReplacement,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_vulkan_surface_target(
         handle,
-        writeVulkanSurfaceDescriptor(descriptor),
+        writeVulkanSurfaceReplacement(replacement),
         completion,
         diagnostic,
       ),

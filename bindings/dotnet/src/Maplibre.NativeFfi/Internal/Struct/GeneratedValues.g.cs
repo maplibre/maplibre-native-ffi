@@ -796,6 +796,14 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_logical_size NativeLogicalSize(LogicalSize value)
+    {
+        var native = new mln_logical_size();
+        native.width = value.Width;
+        native.height = value.Height;
+        return native;
+    }
+
     internal static mln_map_options NativeMapOptions(MapOptions value)
     {
         var native = new mln_map_options();
@@ -977,7 +985,7 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_metal_borrowed_texture_descriptor();
         native.size = (uint)sizeof(mln_metal_borrowed_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.textures = scope.Array<mln_metal_borrowed_texture, MetalBorrowedTexture>(
@@ -986,6 +994,24 @@ internal static unsafe class GeneratedValues
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.command_queue = (void*)value.CommandQueue.Address;
+        return native;
+    }
+
+    internal static mln_metal_borrowed_texture_replacement NativeMetalBorrowedTextureReplacement(
+        MetalBorrowedTextureReplacement value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_metal_borrowed_texture_replacement();
+        native.size = (uint)sizeof(mln_metal_borrowed_texture_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.physical_width = value.PhysicalWidth;
+        native.physical_height = value.PhysicalHeight;
+        native.textures = scope.Array<mln_metal_borrowed_texture, MetalBorrowedTexture>(
+            value.TexturesStorage.Items,
+            static (item, scope) => NativeMetalBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         return native;
     }
 
@@ -1004,8 +1030,19 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_metal_surface_descriptor();
         native.size = (uint)sizeof(mln_metal_surface_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.context = NativeMetalContextDescriptor(value.Context);
+        native.layer = (void*)value.Layer.Address;
+        return native;
+    }
+
+    internal static mln_metal_surface_replacement NativeMetalSurfaceReplacement(
+        MetalSurfaceReplacement value
+    )
+    {
+        var native = new mln_metal_surface_replacement();
+        native.size = (uint)sizeof(mln_metal_surface_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.layer = (void*)value.Layer.Address;
         return native;
     }
@@ -1153,7 +1190,7 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_offscreen_descriptor();
         native.size = (uint)sizeof(mln_offscreen_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         return native;
     }
 
@@ -1200,7 +1237,7 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_open_gl_borrowed_texture_descriptor();
         native.size = (uint)sizeof(mln_open_gl_borrowed_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeOpenGlContextDescriptor(value.Context, scope);
@@ -1210,6 +1247,24 @@ internal static unsafe class GeneratedValues
         );
         native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.target = value.Target;
+        return native;
+    }
+
+    internal static mln_open_gl_borrowed_texture_replacement NativeOpenGlBorrowedTextureReplacement(
+        OpenGlBorrowedTextureReplacement value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_open_gl_borrowed_texture_replacement();
+        native.size = (uint)sizeof(mln_open_gl_borrowed_texture_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.physical_width = value.PhysicalWidth;
+        native.physical_height = value.PhysicalHeight;
+        native.textures = scope.Array<mln_open_gl_borrowed_texture, OpenGlBorrowedTexture>(
+            value.TexturesStorage.Items,
+            static (item, scope) => NativeOpenGlBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         return native;
     }
 
@@ -1247,8 +1302,19 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_open_gl_surface_descriptor();
         native.size = (uint)sizeof(mln_open_gl_surface_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.context = NativeOpenGlContextDescriptor(value.Context, scope);
+        native.surface = (void*)value.Surface.Address;
+        return native;
+    }
+
+    internal static mln_open_gl_surface_replacement NativeOpenGlSurfaceReplacement(
+        OpenGlSurfaceReplacement value
+    )
+    {
+        var native = new mln_open_gl_surface_replacement();
+        native.size = (uint)sizeof(mln_open_gl_surface_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.surface = (void*)value.Surface.Address;
         return native;
     }
@@ -2282,7 +2348,7 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_vulkan_borrowed_texture_descriptor();
         native.size = (uint)sizeof(mln_vulkan_borrowed_texture_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeVulkanContextDescriptor(value.Context);
@@ -2294,6 +2360,24 @@ internal static unsafe class GeneratedValues
         native.format = value.Format;
         native.final_layout = value.FinalLayout;
         native.owner = (mln_vulkan_image_owner)value.Owner;
+        return native;
+    }
+
+    internal static mln_vulkan_borrowed_texture_replacement NativeVulkanBorrowedTextureReplacement(
+        VulkanBorrowedTextureReplacement value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_vulkan_borrowed_texture_replacement();
+        native.size = (uint)sizeof(mln_vulkan_borrowed_texture_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.physical_width = value.PhysicalWidth;
+        native.physical_height = value.PhysicalHeight;
+        native.textures = scope.Array<mln_vulkan_borrowed_texture, VulkanBorrowedTexture>(
+            value.TexturesStorage.Items,
+            static (item, scope) => NativeVulkanBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         return native;
     }
 
@@ -2318,8 +2402,19 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_vulkan_surface_descriptor();
         native.size = (uint)sizeof(mln_vulkan_surface_descriptor);
-        native.extent = NativeLogicalExtent(value.Extent);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.context = NativeVulkanContextDescriptor(value.Context);
+        native.surface = value.Surface;
+        return native;
+    }
+
+    internal static mln_vulkan_surface_replacement NativeVulkanSurfaceReplacement(
+        VulkanSurfaceReplacement value
+    )
+    {
+        var native = new mln_vulkan_surface_replacement();
+        native.size = (uint)sizeof(mln_vulkan_surface_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.surface = value.Surface;
         return native;
     }

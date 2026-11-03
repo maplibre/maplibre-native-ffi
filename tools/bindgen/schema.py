@@ -64,6 +64,11 @@ PLATFORMS = (
 # `view_owner` function names lends that function's output record, whose `lifetime=owner` fields stay valid only until
 # that handle's release or the end of its view scope. A binding guards those
 # fields, and only those, with the view's scope.
+#
+# native_object=true marks an integer that names a host graphics object, such as
+# a VkImage or an OpenGL texture name. Native code uses the object it names as
+# it would a pointer, so a binding treats it as one: Rust marks an operation
+# that takes one as unsafe.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),
@@ -77,6 +82,7 @@ ANNOTATION_VALUES = {
     "blocks": frozenset({"thread_start"}),
     "consumes": frozenset({"success"}),
     "required": frozenset({"true"}),
+    "native_object": frozenset({"true"}),
 }
 
 # Keys that every declaration kind accepts.
@@ -110,6 +116,7 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "kind",
         "stride",
         "required",
+        "native_object",
     }
 )
 # Field roles that hold control state rather than a value a host chooses, so a
@@ -142,6 +149,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "abandon",
         "queue_result",
         "synchronous",
+        "native_object",
     }
 )
 ENUM_KEYS = frozenset({"kind"})
@@ -182,6 +190,14 @@ INTEGER_RANGES = {
     "long long": (-(2**63), 2**63 - 1),
     "unsigned long long": (0, 2**64 - 1),
 }
+
+
+def integer_type(type_: CType) -> bool:
+    """Whether a type is an integer, through its typedefs."""
+    canonical = type_.canonical.removeprefix("const ")
+    return canonical in {"long", "unsigned long"} or (
+        canonical in INTEGER_RANGES and canonical not in {"_Bool", "bool"}
+    )
 
 
 def platforms(function: Function) -> frozenset[str]:
@@ -961,6 +977,8 @@ def validate(api: Api) -> None:
                 errors.append(f"{fcontext}: variant requires a declared enum value")
             if "bit" in field.metadata and field.metadata["bit"] not in enum_constants:
                 errors.append(f"{fcontext}: bit names an absent constant")
+            if "native_object" in field.metadata and not integer_type(field.type):
+                errors.append(f"{fcontext}: native_object requires an integer")
             if "variant" in field.metadata and record.kind != "union":
                 errors.append(f"{fcontext}: variant requires a union member")
             if "empty_variant" in field.metadata and "tag" not in field.metadata:
@@ -1027,6 +1045,8 @@ def validate(api: Api) -> None:
         errors.extend(
             metadata_errors(typedef.metadata, TYPEDEF_KEYS, context, KINDS["typedef"])
         )
+        if "native_object" in typedef.metadata and not integer_type(typedef.type):
+            errors.append(f"{context}: native_object requires an integer")
         for parameter in typedef.parameters:
             pcontext = f"{context} callback parameter {parameter.name}"
             errors.extend(

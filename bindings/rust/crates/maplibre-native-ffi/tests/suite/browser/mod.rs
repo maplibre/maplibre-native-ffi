@@ -18,15 +18,15 @@ use maplibre_native_ffi::*;
 
 use crate::support::*;
 
-const EXTENT: LogicalExtent = LogicalExtent::new(32, 16, 1.0);
+const SIZE: LogicalSize = LogicalSize::new(32, 16);
 
-/// A fixture whose map matches EXTENT, with the background style loaded and
+/// A fixture whose map matches SIZE, with the background style loaded and
 /// an update published for the first frame.
 fn styled_fixture() -> Fixture {
     let fixture = Fixture::with_map_options(MapOptions::new(LogicalExtent::new(
-        EXTENT.width,
-        EXTENT.height,
-        EXTENT.scale_factor,
+        SIZE.width,
+        SIZE.height,
+        1.0,
     )));
     fixture.load_style(BACKGROUND_STYLE_JSON);
     fixture.repaint();
@@ -34,10 +34,7 @@ fn styled_fixture() -> Fixture {
 }
 
 fn assert_background(pixels: &[u8]) {
-    assert_eq!(
-        pixels.len(),
-        EXTENT.width as usize * EXTENT.height as usize * 4
-    );
+    assert_eq!(pixels.len(), SIZE.width as usize * SIZE.height as usize * 4);
     for pixel in pixels.as_chunks::<4>().0 {
         assert_eq!(*pixel, BACKGROUND_RGBA);
     }
@@ -47,13 +44,13 @@ fn assert_background(pixels: &[u8]) {
 #[test]
 fn a_webgl_session_renders_into_a_host_texture() {
     let fixture = styled_fixture();
-    let texture = webgl::WebGlHostTexture::new(EXTENT.width, EXTENT.height).unwrap();
+    let texture = webgl::WebGlHostTexture::new(SIZE.width, SIZE.height).unwrap();
     let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
     // SAFETY: the texture and its context outlive the session, on this thread.
     let attachment = unsafe {
         fixture
             .map()
-            .attach_open_gl_borrowed_texture(&texture.descriptor(EXTENT), &options)
+            .attach_open_gl_borrowed_texture(&texture.descriptor(SIZE), &options)
     }
     .unwrap();
     let session = Session::finish_attach(attachment, wakes);
@@ -68,13 +65,13 @@ fn a_webgl_session_renders_into_a_host_texture() {
 fn a_webgpu_session_renders_into_a_host_texture() {
     let fixture = styled_fixture();
     let context = webgpu::WebGpuTestContext::new().unwrap();
-    let texture = webgpu::WebGpuHostTexture::new(&context, EXTENT.width, EXTENT.height).unwrap();
+    let texture = webgpu::WebGpuHostTexture::new(&context, SIZE.width, SIZE.height).unwrap();
     let (options, wakes) = Session::attach_options(RenderDriverKind::CallerGraphicsThread);
     // SAFETY: the texture and its device outlive the session, on this thread.
     let attachment = unsafe {
         fixture
             .map()
-            .attach_web_gpu_borrowed_texture(&texture.descriptor(EXTENT, &context), &options)
+            .attach_web_gpu_borrowed_texture(&texture.descriptor(SIZE, &context), &options)
     }
     .unwrap();
     let session = Session::finish_attach(attachment, wakes);
@@ -119,7 +116,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let reports = capture_reports();
 
     let fixture = styled_fixture();
-    let session = Session::offscreen(fixture.map(), EXTENT);
+    let session = Session::offscreen(fixture.map(), SIZE);
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let (runtime, map) = fixture.into_parts();
     // No explicit close: each drop disposes its handle, children first.

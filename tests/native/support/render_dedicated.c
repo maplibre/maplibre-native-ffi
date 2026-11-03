@@ -143,11 +143,8 @@ bool mln_test_dedicated_egl_surface_create(
   mln_open_gl_surface_descriptor descriptor = {
     .size = sizeof(mln_open_gl_surface_descriptor)
   };
-  descriptor.extent = (mln_logical_extent){
-    .width = surface.width,
-    .height = surface.height,
-    .scale_factor = 1.0,
-  };
+  descriptor.logical_size =
+    (mln_logical_size){.width = surface.width, .height = surface.height};
   descriptor.context = dedicated_context(state);
   descriptor.surface = surface.opengl_surface;
 

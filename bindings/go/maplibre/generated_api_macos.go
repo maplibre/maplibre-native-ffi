@@ -91,10 +91,10 @@ func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor,
 // ring renders into.
 //
 // Use it to resize the ring, or to give the session textures again after
-// RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. The
-// new ring must have as many textures as the old one, and the same device and
-// command queue. Once the replacement completes, the session no longer uses the
-// old textures.
+// RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
+// the replacement completes, the session no longer uses the old textures. A
+// replacement with the textures and sizes that the ring renders into already
+// changes nothing.
 //
 // See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -102,23 +102,24 @@ func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor,
 // Errors:
 //   - StatusUnsupported when the new textures have a different pixel format
 //     than the old ones. Attach a new session to change it.
-func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(replacement MetalBorrowedTextureReplacement) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureReplacement(replacement, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 
 // SetMetalSurfaceTarget replaces the Metal layer that the session renders to.
 //
 // Use it to give the session a layer again after
-// RenderSessionHandle.ReleaseTarget(), or to move it to another layer. The new
-// layer must use the same device. Once the replacement completes, the session
-// no longer uses the old layer.
+// RenderSessionHandle.ReleaseTarget(), to move it to another layer, or to
+// resize it. Once the replacement completes, the session no longer uses the old
+// layer. A replacement with the layer and logical size that the session renders
+// to already changes nothing.
 //
 // See mln_render_session_set_metal_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(replacement MetalSurfaceReplacement) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }

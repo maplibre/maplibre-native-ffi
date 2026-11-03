@@ -902,14 +902,19 @@ pub const Map = struct {
 
     /// Sets the map's size.
     ///
-    /// `extent` must keep the scale factor that the map was created with. A map
-    /// with a render session takes its size from the session, so resize the session
-    /// with `RenderSession.resize()` instead.
+    /// A map with a render session takes its size from the session, so resize the
+    /// session with `RenderSession.resize()` instead.
     ///
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn resize(self: Map, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_resize", .handle, self, call.command, null, diagnostic, .{extent});
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` when the map has a render session.
+    /// - `error.InvalidState` when a render session attached to the map before the
+    ///   resize applied.
+    pub fn resize(self: Map, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_resize", .handle, self, call.command, null, diagnostic, .{logical_size});
     }
 
     /// Limits the camera's center to an area, and its zoom and pitch to ranges.
@@ -1760,9 +1765,8 @@ pub const RenderSession = struct {
 
     /// Resizes the session's target and its map.
     ///
-    /// `extent` must keep the session's scale factor. To change the scale factor,
-    /// give the session a new target or attach a new session. Release every
-    /// acquired frame first.
+    /// The session renders at the map's scale factor. Release every acquired frame
+    /// first.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1773,8 +1777,8 @@ pub const RenderSession = struct {
     ///   new textures of the new size instead.
     /// - `error.TargetLost` when the session loses its target before the resize
     ///   applies.
-    pub fn resize(self: RenderSession, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_render_session_resize", .handle, self, call.command, null, diagnostic, .{extent});
+    pub fn resize(self: RenderSession, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_render_session_resize", .handle, self, call.command, null, diagnostic, .{logical_size});
     }
 
     /// Runs the session's ready graphics work on your graphics thread.
@@ -1794,10 +1798,10 @@ pub const RenderSession = struct {
     /// Replaces the Metal textures that a borrowed ring renders into.
     ///
     /// Use it to resize the ring, or to give the session textures again after
-    /// `RenderSession.releaseTarget()`. Release every acquired frame first. The new
-    /// ring must have as many textures as the old one, and the same device and
-    /// command queue. Once the replacement completes, the session no longer uses
-    /// the old textures.
+    /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
+    /// the replacement completes, the session no longer uses the old textures. A
+    /// replacement with the textures and sizes that the ring renders into already
+    /// changes nothing.
     ///
     /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1807,79 +1811,78 @@ pub const RenderSession = struct {
     /// - `error.Unsupported` when the new textures have a different pixel format
     ///   than the old ones. Attach a new session to change it.
     pub const setMetalBorrowedTextureTarget = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: RenderSession, allocator: std.mem.Allocator, descriptor: MetalBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_metal_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{descriptor});
+        fn function(self: RenderSession, allocator: std.mem.Allocator, replacement: MetalBorrowedTextureReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_metal_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{replacement});
         }
     }.function else {};
 
     /// Replaces the Metal layer that the session renders to.
     ///
     /// Use it to give the session a layer again after
-    /// `RenderSession.releaseTarget()`, or to move it to another layer. The new
-    /// layer must use the same device. Once the replacement completes, the session
-    /// no longer uses the old layer.
+    /// `RenderSession.releaseTarget()`, to move it to another layer, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// layer. A replacement with the layer and logical size that the session
+    /// renders to already changes nothing.
     ///
     /// See `mln_render_session_set_metal_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     pub const setMetalSurfaceTarget = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: RenderSession, descriptor: MetalSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_metal_surface_target", .handle, self, call.unit, null, diagnostic, .{descriptor});
+        fn function(self: RenderSession, replacement: MetalSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_metal_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
         }
     }.function else {};
 
     /// Replaces the OpenGL textures that a borrowed ring renders into.
     ///
     /// Use it to resize the ring, or to give the session textures again after
-    /// `RenderSession.releaseTarget()`. Release every acquired frame first. The new
-    /// ring must have as many textures as the old one, and the same context. Once
-    /// the replacement completes, the session no longer uses the old textures.
+    /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
+    /// the replacement completes, the session no longer uses the old textures. A
+    /// replacement with the textures and sizes that the ring renders into already
+    /// changes nothing.
     ///
     /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn setOpenGlBorrowedTextureTarget(self: RenderSession, allocator: std.mem.Allocator, descriptor: OpenGlBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_open_gl_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{descriptor});
+    pub fn setOpenGlBorrowedTextureTarget(self: RenderSession, allocator: std.mem.Allocator, replacement: OpenGlBorrowedTextureReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+        return call.submit("mln_render_session_set_open_gl_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{replacement});
     }
 
     /// Replaces the OpenGL surface that the session presents to.
     ///
     /// Use it to give the session a surface again after
-    /// `RenderSession.releaseTarget()`, or to move it to another surface. The new
-    /// surface must use the same context. Once the replacement completes, the
-    /// session no longer uses the old surface.
+    /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// surface. A replacement with the surface and logical size that the session
+    /// presents to already changes nothing.
     ///
     /// See `mln_render_session_set_open_gl_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub fn setOpenGlSurfaceTarget(self: RenderSession, descriptor: OpenGlSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_open_gl_surface_target", .handle, self, call.unit, null, diagnostic, .{descriptor});
+    pub fn setOpenGlSurfaceTarget(self: RenderSession, replacement: OpenGlSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+        return call.submit("mln_render_session_set_open_gl_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
     }
 
     /// Replaces the Vulkan images that a borrowed ring renders into.
     ///
     /// Use it to resize the ring, or to give the session images again after
-    /// `RenderSession.releaseTarget()`. Release every acquired frame first. The new
-    /// ring must have as many images as the old one, and the same context. Once the
-    /// replacement completes, the session no longer uses the old images.
+    /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
+    /// the replacement completes, the session no longer uses the old images. A
+    /// replacement with the images and sizes that the ring renders into already
+    /// changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when the new ring has a different `format`,
-    ///   `final_layout`, or `owner` than the old one. Attach a new session to
-    ///   change them.
     pub const setVulkanBorrowedTextureTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: RenderSession, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_vulkan_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{descriptor});
+        fn function(self: RenderSession, allocator: std.mem.Allocator, replacement: VulkanBorrowedTextureReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_vulkan_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{replacement});
         }
     }.function else {};
 
     /// Replaces the Vulkan surface that the session presents to.
     ///
     /// Use it to give the session a surface again after
-    /// `RenderSession.releaseTarget()`, or to move it to another surface. The new
-    /// surface must use the same context. Once the replacement completes, the
-    /// session no longer uses the old surface.
+    /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// surface. A replacement with the surface and logical size that the session
+    /// presents to already changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -1889,8 +1892,8 @@ pub const RenderSession = struct {
     /// - `error.Unsupported` when the new surface needs a different color format or
     ///   pre-rotation support than the old one. Attach a new session instead.
     pub const setVulkanSurfaceTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: RenderSession, descriptor: VulkanSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_vulkan_surface_target", .handle, self, call.unit, null, diagnostic, .{descriptor});
+        fn function(self: RenderSession, replacement: VulkanSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_vulkan_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
         }
     }.function else {};
 };
@@ -3771,6 +3774,27 @@ pub const LogicalExtent = struct {
     }
 };
 
+/// A size in logical pixels, which the map's scale factor turns into pixels.
+///
+/// See `mln_logical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const LogicalSize = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    pub fn toNative(self: LogicalSize) c.mln_logical_size {
+        var raw = std.mem.zeroes(c.mln_logical_size);
+        raw.width = self.width;
+        raw.height = self.height;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_logical_size) LogicalSize {
+        return .{
+            .width = raw.width,
+            .height = raw.height,
+        };
+    }
+};
+
 /// A debug overlay that the map draws.
 ///
 /// See `mln_map_debug_flag` in the
@@ -3811,7 +3835,9 @@ pub const MapMode = enum(u32) {
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapOptions = struct {
-    /// The map's first size. Its scale factor stays fixed for the map's life.
+    /// The map's first size, and its scale factor. The scale factor stays fixed
+    /// for the map's life, and every render session of the map renders at it.
+    /// To render at another density, create a new map and attach a new session.
     initial_extent: LogicalExtent,
     map_mode: MapMode = .continuous,
     /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -4004,13 +4030,12 @@ pub const MetalBorrowedTexture = struct {
     }
 };
 
-/// A ring of your Metal textures, for `Map.attachMetalBorrowedTexture()` and
-/// `RenderSession.setMetalBorrowedTextureTarget()`.
+/// A ring of your Metal textures, for `Map.attachMetalBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The textures must all have that size, one device,
-/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The textures must all have that size, one device, one
+/// pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -4019,7 +4044,7 @@ pub const MetalBorrowedTexture = struct {
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalBorrowedTextureDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     physical_width: u32,
     physical_height: u32,
     textures: []const MetalBorrowedTexture,
@@ -4030,7 +4055,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
     pub fn toNative(self: MetalBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_metal_borrowed_texture_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.textures = blk: {
@@ -4045,7 +4070,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_metal_borrowed_texture_descriptor) status.Error!MetalBorrowedTextureDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .textures = blk: {
@@ -4054,6 +4079,52 @@ pub const MetalBorrowedTextureDescriptor = struct {
                 break :blk copied;
             },
             .command_queue = raw.command_queue,
+        };
+    }
+};
+
+/// New Metal textures for a borrowed ring, for
+/// `RenderSession.setMetalBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
+/// textures follow its rules. The ring keeps its depth, device, and command
+/// queue, so give it as many textures as it attached with, on the same device.
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
+///
+/// See `mln_metal_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub const MetalBorrowedTextureReplacement = struct {
+    logical_size: LogicalSize,
+    physical_width: u32,
+    physical_height: u32,
+    textures: []const MetalBorrowedTexture,
+    pub fn toNative(self: MetalBorrowedTextureReplacement, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_texture_replacement {
+        var raw = std.mem.zeroes(c.mln_metal_borrowed_texture_replacement);
+        raw.size = @sizeOf(c.mln_metal_borrowed_texture_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = blk: {
+            const items = try allocator.alloc(c.mln_metal_borrowed_texture, self.textures.len);
+            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_metal_borrowed_texture_replacement) status.Error!MetalBorrowedTextureReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .physical_width = raw.physical_width,
+            .physical_height = raw.physical_height,
+            .textures = blk: {
+                const copied = try allocator.alloc(MetalBorrowedTexture, raw.texture_count);
+                for (try marshal.nativeSlice(c.mln_metal_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = MetalBorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
         };
     }
 };
@@ -4077,8 +4148,7 @@ pub const MetalContextDescriptor = struct {
     }
 };
 
-/// A Metal layer to render to, for `Map.attachMetalSurface()` and
-/// `RenderSession.setMetalSurfaceTarget()`.
+/// A Metal layer to render to, for `Map.attachMetalSurface()`.
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
@@ -4087,7 +4157,7 @@ pub const MetalContextDescriptor = struct {
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const MetalSurfaceDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     /// The MTLDevice to render with. A null device picks the system's default.
     context: MetalContextDescriptor = .{},
     /// Your CAMetalLayer.
@@ -4095,15 +4165,42 @@ pub const MetalSurfaceDescriptor = struct {
     pub fn toNative(self: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_surface_descriptor);
         raw.size = @sizeOf(c.mln_metal_surface_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         raw.context = self.context.toNative();
         raw.layer = self.layer;
         return raw;
     }
     pub fn fromNative(raw: c.mln_metal_surface_descriptor) MetalSurfaceDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .context = MetalContextDescriptor.fromNative(raw.context),
+            .layer = raw.layer,
+        };
+    }
+};
+
+/// A new Metal layer for `RenderSession.setMetalSurfaceTarget()`.
+///
+/// The session renders to it with the device that it attached with. It uses the
+/// layer until a replacement or release of the target completes, a detach or
+/// disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_metal_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub const MetalSurfaceReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your CAMetalLayer.
+    layer: ?*anyopaque,
+    pub fn toNative(self: MetalSurfaceReplacement) c.mln_metal_surface_replacement {
+        var raw = std.mem.zeroes(c.mln_metal_surface_replacement);
+        raw.size = @sizeOf(c.mln_metal_surface_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.layer = self.layer;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_metal_surface_replacement) MetalSurfaceReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .layer = raw.layer,
         };
     }
@@ -4341,21 +4438,22 @@ pub const OfflineTilePyramidRegionDefinition = struct {
     }
 };
 
-/// The image that `Map.attachOffscreen()` renders.
+/// The image that `Map.attachOffscreen()` renders. The session renders it at
+/// the map's scale factor.
 ///
 /// See `mln_offscreen_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
 pub const OffscreenDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     pub fn toNative(self: OffscreenDescriptor) c.mln_offscreen_descriptor {
         var raw = std.mem.zeroes(c.mln_offscreen_descriptor);
         raw.size = @sizeOf(c.mln_offscreen_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         return raw;
     }
     pub fn fromNative(raw: c.mln_offscreen_descriptor) OffscreenDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
         };
     }
 };
@@ -4413,14 +4511,13 @@ pub const OpenGlBorrowedTexture = struct {
     }
 };
 
-/// A ring of your OpenGL textures, for `Map.attachOpenGlBorrowedTexture()` and
-/// `RenderSession.setOpenGlBorrowedTextureTarget()`.
+/// A ring of your OpenGL textures, for `Map.attachOpenGlBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The context must use
-/// `OpenGlContextOwnership.shared`. Each texture must be in your context's
-/// share group, with storage of that size.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
+/// Each texture must be in your context's share group, with storage of that
+/// size.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -4429,7 +4526,7 @@ pub const OpenGlBorrowedTexture = struct {
 /// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenGlBorrowedTextureDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     physical_width: u32,
     physical_height: u32,
     context: OpenGlContextDescriptor,
@@ -4439,7 +4536,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
     pub fn toNative(self: OpenGlBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_open_gl_borrowed_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_open_gl_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_open_gl_borrowed_texture_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = try self.context.toNative();
@@ -4455,7 +4552,7 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_borrowed_texture_descriptor) status.Error!OpenGlBorrowedTextureDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
@@ -4465,6 +4562,52 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
                 break :blk copied;
             },
             .target = raw.target,
+        };
+    }
+};
+
+/// New OpenGL textures for a borrowed ring, for
+/// `RenderSession.setOpenGlBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
+/// the textures follow its rules. The ring keeps its depth, context, and
+/// texture target, so give it as many textures as it attached with, in the same
+/// share group. The session uses the textures until a replacement or release of
+/// the target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_open_gl_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub const OpenGlBorrowedTextureReplacement = struct {
+    logical_size: LogicalSize,
+    physical_width: u32,
+    physical_height: u32,
+    textures: []const OpenGlBorrowedTexture,
+    pub fn toNative(self: OpenGlBorrowedTextureReplacement, allocator: std.mem.Allocator) status.Error!c.mln_open_gl_borrowed_texture_replacement {
+        var raw = std.mem.zeroes(c.mln_open_gl_borrowed_texture_replacement);
+        raw.size = @sizeOf(c.mln_open_gl_borrowed_texture_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = blk: {
+            const items = try allocator.alloc(c.mln_open_gl_borrowed_texture, self.textures.len);
+            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_borrowed_texture_replacement) status.Error!OpenGlBorrowedTextureReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .physical_width = raw.physical_width,
+            .physical_height = raw.physical_height,
+            .textures = blk: {
+                const copied = try allocator.alloc(OpenGlBorrowedTexture, raw.texture_count);
+                for (try marshal.nativeSlice(c.mln_open_gl_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = OpenGlBorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
         };
     }
 };
@@ -4564,8 +4707,7 @@ pub const OpenGlContextProviderFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// An OpenGL surface to present to, for `Map.attachOpenGlSurface()` and
-/// `RenderSession.setOpenGlSurfaceTarget()`.
+/// An OpenGL surface to present to, for `Map.attachOpenGlSurface()`.
 ///
 /// The session uses the surface until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -4574,14 +4716,14 @@ pub const OpenGlContextProviderFlag = struct {
 /// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const OpenGlSurfaceDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     context: OpenGlContextDescriptor,
     /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
     surface: ?*anyopaque = null,
     pub fn toNative(self: OpenGlSurfaceDescriptor) status.Error!c.mln_open_gl_surface_descriptor {
         var raw = std.mem.zeroes(c.mln_open_gl_surface_descriptor);
         raw.size = @sizeOf(c.mln_open_gl_surface_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         raw.context = try self.context.toNative();
         raw.surface = self.surface;
         return raw;
@@ -4589,8 +4731,36 @@ pub const OpenGlSurfaceDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_surface_descriptor) status.Error!OpenGlSurfaceDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
+            .surface = raw.surface,
+        };
+    }
+};
+
+/// A new OpenGL surface for `RenderSession.setOpenGlSurfaceTarget()`.
+///
+/// The session presents to it with the context that it attached with. It uses
+/// the surface until a replacement or release of the target completes, a detach
+/// or disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_open_gl_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub const OpenGlSurfaceReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
+    /// leave it null.
+    surface: ?*anyopaque = null,
+    pub fn toNative(self: OpenGlSurfaceReplacement) c.mln_open_gl_surface_replacement {
+        var raw = std.mem.zeroes(c.mln_open_gl_surface_replacement);
+        raw.size = @sizeOf(c.mln_open_gl_surface_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.surface = self.surface;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_open_gl_surface_replacement) OpenGlSurfaceReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .surface = raw.surface,
         };
     }
@@ -5030,6 +5200,7 @@ pub const RenderSessionCapabilityFlag = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderSessionSnapshot = struct {
     state: RenderSessionState = @fromBackingInt(@intCast(0)),
+    /// The target's logical size, and the map's scale factor.
     extent: LogicalExtent = .{},
     generation: u64 = 0,
     frame_generation: u64 = 0,
@@ -6881,12 +7052,11 @@ pub const VulkanBorrowedTexture = struct {
     }
 };
 
-/// A ring of your Vulkan images, for `Map.attachVulkanBorrowedTexture()` and
-/// `RenderSession.setVulkanBorrowedTextureTarget()`.
+/// A ring of your Vulkan images, for `Map.attachVulkanBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the images'
-/// size in pixels. Each image must have that size, `format`, and
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the images' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. Each image must have that size, `format`, and
 /// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
@@ -6896,7 +7066,7 @@ pub const VulkanBorrowedTexture = struct {
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanBorrowedTextureDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     physical_width: u32,
     physical_height: u32,
     context: VulkanContextDescriptor,
@@ -6909,7 +7079,7 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     pub fn toNative(self: VulkanBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_descriptor {
         var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_descriptor);
         raw.size = @sizeOf(c.mln_vulkan_borrowed_texture_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = self.context.toNative();
@@ -6927,7 +7097,7 @@ pub const VulkanBorrowedTextureDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_borrowed_texture_descriptor) status.Error!VulkanBorrowedTextureDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .context = VulkanContextDescriptor.fromNative(raw.context),
@@ -6939,6 +7109,52 @@ pub const VulkanBorrowedTextureDescriptor = struct {
             .format = raw.format,
             .final_layout = raw.final_layout,
             .owner = VulkanImageOwner.fromNative(raw.owner),
+        };
+    }
+};
+
+/// New Vulkan images for a borrowed ring, for
+/// `RenderSession.setVulkanBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
+/// the images follow its rules. The ring keeps its depth, context, `format`,
+/// `final_layout`, and `owner`, so give it as many images as it attached with,
+/// in that format, on the same device. The session uses the images until a
+/// replacement or release of the target completes, a detach or disposal of the
+/// session completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub const VulkanBorrowedTextureReplacement = struct {
+    logical_size: LogicalSize,
+    physical_width: u32,
+    physical_height: u32,
+    textures: []const VulkanBorrowedTexture,
+    pub fn toNative(self: VulkanBorrowedTextureReplacement, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_replacement {
+        var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_replacement);
+        raw.size = @sizeOf(c.mln_vulkan_borrowed_texture_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = blk: {
+            const items = try allocator.alloc(c.mln_vulkan_borrowed_texture, self.textures.len);
+            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_borrowed_texture_replacement) status.Error!VulkanBorrowedTextureReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .physical_width = raw.physical_width,
+            .physical_height = raw.physical_height,
+            .textures = blk: {
+                const copied = try allocator.alloc(VulkanBorrowedTexture, raw.texture_count);
+                for (try marshal.nativeSlice(c.mln_vulkan_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = VulkanBorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
         };
     }
 };
@@ -7008,8 +7224,7 @@ pub const VulkanImageOwner = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// A Vulkan surface to present to, for `Map.attachVulkanSurface()` and
-/// `RenderSession.setVulkanSurfaceTarget()`.
+/// A Vulkan surface to present to, for `Map.attachVulkanSurface()`.
 ///
 /// The device must have VK_KHR_swapchain enabled, and the queue family of
 /// `graphics_queue_family_index` must support presenting to the surface. The
@@ -7020,22 +7235,51 @@ pub const VulkanImageOwner = enum(u32) {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const VulkanSurfaceDescriptor = struct {
-    extent: LogicalExtent,
+    logical_size: LogicalSize,
     context: VulkanContextDescriptor,
     /// Your VkSurfaceKHR.
     surface: u64,
     pub fn toNative(self: VulkanSurfaceDescriptor) c.mln_vulkan_surface_descriptor {
         var raw = std.mem.zeroes(c.mln_vulkan_surface_descriptor);
         raw.size = @sizeOf(c.mln_vulkan_surface_descriptor);
-        raw.extent = self.extent.toNative();
+        raw.logical_size = self.logical_size.toNative();
         raw.context = self.context.toNative();
         raw.surface = self.surface;
         return raw;
     }
     pub fn fromNative(raw: c.mln_vulkan_surface_descriptor) VulkanSurfaceDescriptor {
         return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .context = VulkanContextDescriptor.fromNative(raw.context),
+            .surface = raw.surface,
+        };
+    }
+};
+
+/// A new Vulkan surface for `RenderSession.setVulkanSurfaceTarget()`.
+///
+/// The session presents to it with the context that it attached with, so the
+/// queue family of that context's `graphics_queue_family_index` must support
+/// presenting to the surface. It uses the surface until a replacement or
+/// release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub const VulkanSurfaceReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your VkSurfaceKHR.
+    surface: u64,
+    pub fn toNative(self: VulkanSurfaceReplacement) c.mln_vulkan_surface_replacement {
+        var raw = std.mem.zeroes(c.mln_vulkan_surface_replacement);
+        raw.size = @sizeOf(c.mln_vulkan_surface_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.surface = self.surface;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_vulkan_surface_replacement) VulkanSurfaceReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
             .surface = raw.surface,
         };
     }
@@ -7475,9 +7719,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_request_repaint", .handle, map, null, diagnostic, .{});
     }
 
-    pub fn resize(self: MapDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn resize(self: MapDiscarding, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_resize", .handle, map, null, diagnostic, .{extent});
+        return call.discard("mln_map_resize", .handle, map, null, diagnostic, .{logical_size});
     }
 
     pub fn setBounds(self: MapDiscarding, options: BoundOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -7628,9 +7872,9 @@ pub const MapDiscarding = struct {
 
 pub const RenderSessionDiscarding = struct {
     receiver: RenderSession,
-    pub fn resize(self: RenderSessionDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn resize(self: RenderSessionDiscarding, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const session = self.receiver;
-        return call.discard("mln_render_session_resize", .handle, session, null, diagnostic, .{extent});
+        return call.discard("mln_render_session_resize", .handle, session, null, diagnostic, .{logical_size});
     }
 };
 

@@ -496,9 +496,9 @@ impl Session {
 
     /// Attaches an offscreen session on a device of its own, which the core's
     /// worker drives, and waits until it is attached.
-    pub fn offscreen(map: &MapHandle, extent: LogicalExtent) -> Self {
+    pub fn offscreen(map: &MapHandle, logical_size: LogicalSize) -> Self {
         let (options, wakes) = Self::attach_options(RenderDriverKind::CoreWorker);
-        let descriptor = OffscreenDescriptor::new(extent);
+        let descriptor = OffscreenDescriptor::new(logical_size);
         Self::finish_attach(
             map.attach_offscreen(&descriptor, &options, None).unwrap(),
             wakes,

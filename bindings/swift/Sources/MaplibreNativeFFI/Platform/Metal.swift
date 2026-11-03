@@ -47,13 +47,24 @@
     /// A surface that draws into `layer`, which an accepted attach retains
     /// before it returns.
     init(
-      extent: LogicalExtent,
+      logicalSize: LogicalSize,
       context: MetalContextDescriptor = .init(),
       layer: CAMetalLayer
     ) {
       self.init(
-        extent: extent,
+        logicalSize: logicalSize,
         context: context,
+        layer: NativePointer(retaining: layer)
+      )
+    }
+  }
+
+  public extension MetalSurfaceReplacement {
+    /// A replacement that draws into `layer`, which an accepted target
+    /// replacement retains before it returns.
+    init(logicalSize: LogicalSize, layer: CAMetalLayer) {
+      self.init(
+        logicalSize: logicalSize,
         layer: NativePointer(retaining: layer)
       )
     }

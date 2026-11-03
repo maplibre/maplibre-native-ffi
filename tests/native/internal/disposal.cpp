@@ -162,9 +162,7 @@ void disposal_drains_queued_work_and_map_cleanup() {
   auto still = Result{};
   const auto resize_completion = descriptor(resize);
   const auto still_completion = descriptor(still);
-  MLN_TEST_OK(
-    mln_map_resize(map, {300, 200, 1.0}, &resize_completion, nullptr)
-  );
+  MLN_TEST_OK(mln_map_resize(map, {300, 200}, &resize_completion, nullptr));
   MLN_TEST_OK(mln_map_request_still_image(map, &still_completion, nullptr));
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
   TEST_ASSERT_NULL_MESSAGE(

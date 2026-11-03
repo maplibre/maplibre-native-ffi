@@ -3592,14 +3592,14 @@ auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
 namespace {
 
 auto submit_map_resize(
-  mln_map map, mln_logical_extent extent, const mln_completion* completion,
+  mln_map map, mln_logical_size logical_size, const mln_completion* completion,
   bool from_session
 ) -> mln_status {
   struct ResizeTask final : MapCommandTask {
-    mln_logical_extent extent;
+    mln_logical_size logical_size;
     bool from_session;
-    ResizeTask(mln_logical_extent extent, bool from_session)
-        : extent(extent), from_session(from_session) {
+    ResizeTask(mln_logical_size logical_size, bool from_session)
+        : logical_size(logical_size), from_session(from_session) {
       command = true;
       run = [](ExecutorTask* base) noexcept {
         auto owner =
@@ -3609,6 +3609,7 @@ auto submit_map_resize(
       work = [](RuntimeCommandTask& base) {
         auto& self = static_cast<ResizeTask&>(base);
         auto& live = *self.map;
+        // Rechecked here: a session can attach after the call returned.
         if (!self.from_session) {
           auto attached = false;
           {
@@ -3628,18 +3629,19 @@ auto submit_map_resize(
         complete_map_command(
           self.completion,
           run_map_transaction(
-            self.map, [extent = self.extent](MapObject& live) -> mln_status {
+            self.map,
+            [size = self.logical_size](MapObject& live) -> mln_status {
               // Map::setSize publishes an update even when the size is
               // unchanged.
               if (
-                live.logical_extent.width == extent.width &&
-                live.logical_extent.height == extent.height
+                live.logical_extent.width == size.width &&
+                live.logical_extent.height == size.height
               )
                 return MLN_STATUS_OK;
-              live.logical_extent.width = extent.width;
-              live.logical_extent.height = extent.height;
+              live.logical_extent.width = size.width;
+              live.logical_extent.height = size.height;
               live.snapshot_camera_dirty = true;
-              live.map->setSize(mln::Size{extent.width, extent.height});
+              live.map->setSize(mln::Size{size.width, size.height});
               return MLN_STATUS_OK;
             }
           )
@@ -3652,16 +3654,21 @@ auto submit_map_resize(
       };
     }
   };
-  auto task = std::make_unique<ResizeTask>(extent, from_session);
+  auto task = std::make_unique<ResizeTask>(logical_size, from_session);
   const auto prepared = prepare_map_command_task(map, *task, completion);
   if (prepared != MLN_STATUS_OK) return prepared;
-  const auto extent_status = validate_logical_extent(
-    extent, "extent dimensions and scale factor must be positive"
+  const auto size_status = validate_logical_size(
+    logical_size, "logical size dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) return extent_status;
-  if (extent.scale_factor != task->map->logical_extent.scale_factor) {
-    set_thread_error("scale factor is fixed at map creation");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (size_status != MLN_STATUS_OK) return size_status;
+  if (!from_session) {
+    const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
+    if (task->map->render_target_session != nullptr) {
+      set_thread_error(
+        "map has an attached render session; resize the session instead"
+      );
+      return MLN_STATUS_INVALID_STATE;
+    }
   }
   const auto runtime = task->map->runtime_state;
   const auto status = submit_runtime_command_task(runtime, *task);
@@ -3672,9 +3679,9 @@ auto submit_map_resize(
 }  // namespace
 
 auto map_resize(
-  mln_map map, mln_logical_extent extent, const mln_completion* completion
+  mln_map map, mln_logical_size logical_size, const mln_completion* completion
 ) -> mln_status {
-  return submit_map_resize(map, extent, completion, false);
+  return submit_map_resize(map, logical_size, completion, false);
 }
 
 namespace {
@@ -3938,26 +3945,24 @@ auto map_request_still_image_start(
 }
 
 auto map_scale_factor(mln_map map) -> double {
-  const auto* live = handle_table<MapObject>().try_resolve(map);
+  // Read under the table lock: an attach calls this before it holds the map,
+  // so a concurrent release could otherwise free the map mid-read.
+  auto& table = handle_table<MapObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live = table.try_resolve_locked(map);
   return live == nullptr ? default_scale_factor
                          : live->logical_extent.scale_factor;
 }
 
 auto map_native(MapObject& map) -> mln::Map& { return *map.map; }
 
-// A render session sizes its map through the same ordered extent command as
-// public resize, so one path owns the logical extent after map creation. The
-// map keeps the scale factor it was created with, which may differ from the
-// session's.
+// A render session sizes its map through the same ordered command as public
+// resize, so one path owns the logical size after map creation.
 auto map_post_resize(
   mln_map map, uint32_t width, uint32_t height, const mln_completion* completion
 ) -> mln_status {
   return submit_map_resize(
-    map,
-    mln_logical_extent{
-      .width = width, .height = height, .scale_factor = map_scale_factor(map)
-    },
-    completion, true
+    map, mln_logical_size{.width = width, .height = height}, completion, true
   );
 }
 

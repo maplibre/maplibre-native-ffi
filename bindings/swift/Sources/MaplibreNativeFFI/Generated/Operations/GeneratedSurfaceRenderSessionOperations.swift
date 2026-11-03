@@ -8,15 +8,18 @@ public extension RenderSessionHandle {
     /// Replaces the Metal layer that the session renders to.
     ///
     /// Use it to give the session a layer again after
-    /// `RenderSessionHandle.releaseTarget()`, or to move it to another layer.
-    /// The
-    /// new layer must use the same device. Once the replacement completes, the
-    /// session no longer uses the old layer.
+    /// `RenderSessionHandle.releaseTarget()`, to move it to another layer, or
+    /// to
+    /// resize it. Once the replacement completes, the session no longer uses
+    /// the
+    /// old layer. A replacement with the layer and logical size that the
+    /// session
+    /// renders to already changes nothing.
     ///
     /// See `mln_render_session_set_metal_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     func setMetalSurfaceTarget(
-      descriptor bindingArg0: MetalSurfaceDescriptor
+      replacement bindingArg0: MetalSurfaceReplacement
     ) async throws {
       try await nativeUnit { raw, arena, completion, diagnostic in
         mln_render_session_set_metal_surface_target(
@@ -32,19 +35,20 @@ public extension RenderSessionHandle {
   /// Replaces the OpenGL surface that the session presents to.
   ///
   /// Use it to give the session a surface again after
-  /// `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-  /// The new surface must use the same context. Once the replacement completes,
-  /// the session no longer uses the old surface.
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another surface, or
+  /// to resize it. Once the replacement completes, the session no longer uses
+  /// the old surface. A replacement with the surface and logical size that the
+  /// session presents to already changes nothing.
   ///
   /// See `mln_render_session_set_open_gl_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func setOpenGlSurfaceTarget(
-    descriptor bindingArg0: OpenGlSurfaceDescriptor
+    replacement bindingArg0: OpenGlSurfaceReplacement
   ) async throws {
     try await nativeUnit { raw, arena, completion, diagnostic in
-      try mln_render_session_set_open_gl_surface_target(
+      mln_render_session_set_open_gl_surface_target(
         raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.store(bindingArg0.nativeValue()),
         completion,
         diagnostic
       )
@@ -55,10 +59,11 @@ public extension RenderSessionHandle {
     /// Replaces the Vulkan surface that the session presents to.
     ///
     /// Use it to give the session a surface again after
-    /// `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-    /// The new surface must use the same context. Once the replacement
-    /// completes,
-    /// the session no longer uses the old surface.
+    /// `RenderSessionHandle.releaseTarget()`, to move it to another surface, or
+    /// to resize it. Once the replacement completes, the session no longer uses
+    /// the old surface. A replacement with the surface and logical size that
+    /// the
+    /// session presents to already changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -70,7 +75,7 @@ public extension RenderSessionHandle {
     ///   or pre-rotation support than the old one. Attach a new session
     /// instead.
     func setVulkanSurfaceTarget(
-      descriptor bindingArg0: VulkanSurfaceDescriptor
+      replacement bindingArg0: VulkanSurfaceReplacement
     ) async throws {
       try await nativeUnit { raw, arena, completion, diagnostic in
         mln_render_session_set_vulkan_surface_target(

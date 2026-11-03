@@ -67,10 +67,9 @@ func onFrameWake() {
 
 // #region resize
 func onWindowResized(width, height uint32) error {
-	return session.Discarding().Resize(maplibre.LogicalExtent{
-		Width:       width,
-		Height:      height,
-		ScaleFactor: 2, // The scale factor the session has now.
+	// The window's new size in logical pixels.
+	return session.Discarding().Resize(maplibre.LogicalSize{
+		Width: width, Height: height,
 	})
 }
 
@@ -104,16 +103,13 @@ func surfaceLost(ctx context.Context) error {
 	return nil
 }
 
-func surfaceRestored(ctx context.Context, vulkan maplibre.VulkanContextDescriptor, newSurface uint64) error {
+func surfaceRestored(ctx context.Context, newSurface uint64) error {
 	// #region lost-surface
-	surface := maplibre.VulkanSurfaceDescriptor{
-		Extent: maplibre.LogicalExtent{
-			Width: 800, Height: 600, ScaleFactor: 2,
-		},
-		Context: vulkan,
-		Surface: newSurface,
+	replacement := maplibre.VulkanSurfaceReplacement{
+		LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+		Surface:     newSurface,
 	}
-	restored, err := session.SetVulkanSurfaceTarget(surface)
+	restored, err := session.SetVulkanSurfaceTarget(replacement)
 	if err != nil {
 		return err
 	}
@@ -128,10 +124,9 @@ func surfaceRestored(ctx context.Context, vulkan maplibre.VulkanContextDescripto
 func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.VulkanContextDescriptor, windowSurface uint64) error {
 	// #region attach
 	surface := maplibre.VulkanSurfaceDescriptor{
-		// The window's size in logical pixels, and its scale factor.
-		Extent: maplibre.LogicalExtent{
-			Width: 800, Height: 600, ScaleFactor: 2,
-		},
+		// The window's size in logical pixels. The map's scale factor
+		// turns it into pixels.
+		LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
 		// Your VkInstance, VkPhysicalDevice,
 		// VkDevice, and graphics VkQueue.
 		Context: vulkan,
@@ -187,5 +182,5 @@ func Example_window() {
 	ctx := context.Background()
 	_ = renderToWindow(ctx, nil, maplibre.VulkanContextDescriptor{}, 0)
 	_ = surfaceLost(ctx)
-	_ = surfaceRestored(ctx, maplibre.VulkanContextDescriptor{}, 0)
+	_ = surfaceRestored(ctx, 0)
 }

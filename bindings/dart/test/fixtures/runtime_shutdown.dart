@@ -50,10 +50,11 @@ Future<void> abandonHandles() async {
 /// with its runtime and map, for the isolate's shutdown to finalize while the
 /// process exits.
 Future<void> abandonSession() async {
-  final extent = LogicalExtent(width: 32, height: 32, scaleFactor: 1);
   final runtime = RuntimeHandle.create(RuntimeOptions());
   final NewMap(:map, :ready) = runtime.createMap(
-    MapOptions(initialExtent: extent),
+    MapOptions(
+      initialExtent: LogicalExtent(width: 32, height: 32, scaleFactor: 1),
+    ),
   );
   await ready;
   await map.setStyleJson({
@@ -69,7 +70,7 @@ Future<void> abandonSession() async {
   });
   var frames = Completer<void>();
   final attachment = map.attachOffscreen(
-    OffscreenDescriptor(extent: extent),
+    OffscreenDescriptor(logicalSize: LogicalSize(width: 32, height: 32)),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
       frameWake: Wake(

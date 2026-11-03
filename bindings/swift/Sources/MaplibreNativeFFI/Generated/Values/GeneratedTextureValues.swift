@@ -28,13 +28,12 @@ public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
   }
 }
 
-/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
-/// and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The textures must all have that size, one device,
-/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The textures must all have that size, one device, one
+/// pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -43,7 +42,7 @@ public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
+  public var logicalSize: LogicalSize
   public var physicalWidth: UInt32
   public var physicalHeight: UInt32
   public var textures: [MetalBorrowedTexture]
@@ -51,13 +50,13 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
   public var commandQueue: NativePointer
   public init(
-    extent: LogicalExtent,
+    logicalSize: LogicalSize,
     physicalWidth: UInt32,
     physicalHeight: UInt32,
     textures: [MetalBorrowedTexture],
     commandQueue: NativePointer = .null
   ) {
-    self.extent = extent
+    self.logicalSize = logicalSize
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.textures = textures
@@ -68,7 +67,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw: mln_metal_borrowed_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     textures = try NativeInputArena.copyArray(
@@ -86,12 +85,68 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   {
     var raw = mln_metal_borrowed_texture_descriptor()
     raw.size = UInt32(MemoryLayout<mln_metal_borrowed_texture_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
     raw.textures = arena.array(textures.map { $0.nativeValue() })
     raw.texture_count = try NativeInputArena.count(textures.count)
     raw.command_queue = commandQueue.unsafeMutableRawPointer
+    return raw
+  }
+}
+
+/// New Metal textures for a borrowed ring, for
+/// `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
+/// textures follow its rules. The ring keeps its depth, device, and command
+/// queue, so give it as many textures as it attached with, on the same device.
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
+///
+/// See `mln_metal_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct MetalBorrowedTextureReplacement: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
+  public var textures: [MetalBorrowedTexture]
+  public init(
+    logicalSize: LogicalSize,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    textures: [MetalBorrowedTexture]
+  ) {
+    self.logicalSize = logicalSize
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
+    self.textures = textures
+  }
+
+  init(
+    raw: mln_metal_borrowed_texture_replacement,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    physicalWidth = raw.physical_width
+    physicalHeight = raw.physical_height
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { MetalBorrowedTexture(raw: $0) }
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_metal_borrowed_texture_replacement
+  {
+    var raw = mln_metal_borrowed_texture_replacement()
+    raw.size = UInt32(MemoryLayout<mln_metal_borrowed_texture_replacement>.size)
+    raw.logical_size = logicalSize.nativeValue()
+    raw.physical_width = physicalWidth
+    raw.physical_height = physicalHeight
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     return raw
   }
 }
@@ -167,14 +222,13 @@ public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
 }
 
 /// A ring of your OpenGL textures, for
-/// `MapHandle.attachOpenGlBorrowedTexture()` and
-/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+/// `MapHandle.attachOpenGlBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The context must use
-/// `OpenGlContextOwnership.shared`. Each texture must be in your context's
-/// share group, with storage of that size.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
+/// Each texture must be in your context's share group, with storage of that
+/// size.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -183,7 +237,7 @@ public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
+  public var logicalSize: LogicalSize
   public var physicalWidth: UInt32
   public var physicalHeight: UInt32
   public var context: OpenGlContextDescriptor
@@ -191,14 +245,14 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// The textures' target. It must be GL_TEXTURE_2D.
   public var target: UInt32
   public init(
-    extent: LogicalExtent,
+    logicalSize: LogicalSize,
     physicalWidth: UInt32,
     physicalHeight: UInt32,
     context: OpenGlContextDescriptor,
     textures: [OpenGlBorrowedTexture],
     target: UInt32
   ) {
-    self.extent = extent
+    self.logicalSize = logicalSize
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.context = context
@@ -210,7 +264,7 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw: mln_open_gl_borrowed_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = try OpenGlContextDescriptor(raw: raw.context)
@@ -227,13 +281,71 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     var raw = mln_open_gl_borrowed_texture_descriptor()
     raw
       .size = UInt32(MemoryLayout<mln_open_gl_borrowed_texture_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
     raw.context = try context.nativeValue(arena: arena)
     raw.textures = arena.array(textures.map { $0.nativeValue() })
     raw.texture_count = try NativeInputArena.count(textures.count)
     raw.target = target
+    return raw
+  }
+}
+
+/// New OpenGL textures for a borrowed ring, for
+/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
+/// the textures follow its rules. The ring keeps its depth, context, and
+/// texture target, so give it as many textures as it attached with, in the same
+/// share group. The session uses the textures until a replacement or release of
+/// the target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_open_gl_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct OpenGlBorrowedTextureReplacement: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
+  public var textures: [OpenGlBorrowedTexture]
+  public init(
+    logicalSize: LogicalSize,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    textures: [OpenGlBorrowedTexture]
+  ) {
+    self.logicalSize = logicalSize
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
+    self.textures = textures
+  }
+
+  init(
+    raw: mln_open_gl_borrowed_texture_replacement,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    physicalWidth = raw.physical_width
+    physicalHeight = raw.physical_height
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { OpenGlBorrowedTexture(raw: $0) }
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_open_gl_borrowed_texture_replacement
+  {
+    var raw = mln_open_gl_borrowed_texture_replacement()
+    raw
+      .size = UInt32(MemoryLayout<mln_open_gl_borrowed_texture_replacement>
+        .size)
+    raw.logical_size = logicalSize.nativeValue()
+    raw.physical_width = physicalWidth
+    raw.physical_height = physicalHeight
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     return raw
   }
 }
@@ -356,12 +468,11 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
   }
 }
 
-/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`
-/// and `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the images'
-/// size in pixels. Each image must have that size, `format`, and
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the images' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. Each image must have that size, `format`, and
 /// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
@@ -371,7 +482,7 @@ public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
+  public var logicalSize: LogicalSize
   public var physicalWidth: UInt32
   public var physicalHeight: UInt32
   public var context: VulkanContextDescriptor
@@ -382,7 +493,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var finalLayout: UInt32
   public var owner: VulkanImageOwner
   public init(
-    extent: LogicalExtent,
+    logicalSize: LogicalSize,
     physicalWidth: UInt32,
     physicalHeight: UInt32,
     context: VulkanContextDescriptor,
@@ -391,7 +502,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     finalLayout: UInt32,
     owner: VulkanImageOwner = .init(rawValue: 0)
   ) {
-    self.extent = extent
+    self.logicalSize = logicalSize
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.context = context
@@ -405,7 +516,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw: mln_vulkan_borrowed_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = LogicalExtent(raw: raw.extent)
+    logicalSize = LogicalSize(raw: raw.logical_size)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = VulkanContextDescriptor(raw: raw.context)
@@ -423,7 +534,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   {
     var raw = mln_vulkan_borrowed_texture_descriptor()
     raw.size = UInt32(MemoryLayout<mln_vulkan_borrowed_texture_descriptor>.size)
-    raw.extent = extent.nativeValue()
+    raw.logical_size = logicalSize.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
     raw.context = context.nativeValue()
@@ -432,6 +543,63 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw.format = format
     raw.final_layout = finalLayout
     raw.owner = mln_vulkan_image_owner(rawValue: owner.rawValue)
+    return raw
+  }
+}
+
+/// New Vulkan images for a borrowed ring, for
+/// `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
+/// the images follow its rules. The ring keeps its depth, context, `format`,
+/// `final_layout`, and `owner`, so give it as many images as it attached with,
+/// in that format, on the same device. The session uses the images until a
+/// replacement or release of the target completes, a detach or disposal of the
+/// session completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct VulkanBorrowedTextureReplacement: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
+  public var textures: [VulkanBorrowedTexture]
+  public init(
+    logicalSize: LogicalSize,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    textures: [VulkanBorrowedTexture]
+  ) {
+    self.logicalSize = logicalSize
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
+    self.textures = textures
+  }
+
+  init(
+    raw: mln_vulkan_borrowed_texture_replacement,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    physicalWidth = raw.physical_width
+    physicalHeight = raw.physical_height
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { VulkanBorrowedTexture(raw: $0) }
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_vulkan_borrowed_texture_replacement
+  {
+    var raw = mln_vulkan_borrowed_texture_replacement()
+    raw
+      .size = UInt32(MemoryLayout<mln_vulkan_borrowed_texture_replacement>.size)
+    raw.logical_size = logicalSize.nativeValue()
+    raw.physical_width = physicalWidth
+    raw.physical_height = physicalHeight
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     return raw
   }
 }

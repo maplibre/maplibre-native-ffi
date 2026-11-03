@@ -350,9 +350,8 @@ public extension RenderSessionHandle {
 
   /// Resizes the session's target and its map.
   ///
-  /// `extent` must keep the session's scale factor. To change the scale factor,
-  /// give the session a new target or attach a new session. Release every
-  /// acquired frame first.
+  /// The session renders at the map's scale factor. Release every acquired
+  /// frame first.
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -364,7 +363,7 @@ public extension RenderSessionHandle {
   /// - `Status.targetLost` when the session loses its target before the resize
   ///   applies.
   @discardableResult
-  func resize(extent bindingArg0: LogicalExtent) async throws
+  func resize(logicalSize bindingArg0: LogicalSize) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
@@ -398,7 +397,7 @@ public extension RenderSessionHandle {
 }
 
 public extension RenderSessionHandleDiscarding {
-  func resize(extent bindingArg0: LogicalExtent) throws {
+  func resize(logicalSize bindingArg0: LogicalSize) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_render_session_resize(
       raw,
       bindingArg0.nativeValue(),

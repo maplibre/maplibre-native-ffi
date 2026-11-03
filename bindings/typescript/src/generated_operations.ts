@@ -23,6 +23,7 @@ import type {
   LogHandler,
   LogSeverityFlag,
   LogicalExtent,
+  LogicalSize,
   MapDebugFlag,
   MapOptions,
   MapSnapshot,
@@ -30,7 +31,9 @@ import type {
   MapView,
   MapViewportOptions,
   MetalBorrowedTextureDescriptor,
+  MetalBorrowedTextureReplacement,
   MetalSurfaceDescriptor,
+  MetalSurfaceReplacement,
   MetalTextureFrame,
   NetworkStatus,
   OfflineRegionDefinition,
@@ -40,8 +43,10 @@ import type {
   OffscreenDescriptor,
   OffscreenDeviceOptions,
   OpenGlBorrowedTextureDescriptor,
+  OpenGlBorrowedTextureReplacement,
   OpenGlContextProviderFlag,
   OpenGlSurfaceDescriptor,
+  OpenGlSurfaceReplacement,
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
@@ -76,10 +81,14 @@ import type {
   StyleVectorTileEncoding,
   TextureReadbackResult,
   VulkanBorrowedTextureDescriptor,
+  VulkanBorrowedTextureReplacement,
   VulkanSurfaceDescriptor,
+  VulkanSurfaceReplacement,
   VulkanTextureFrame,
   WebGpuBorrowedTextureDescriptor,
+  WebGpuBorrowedTextureReplacement,
   WebGpuSurfaceDescriptor,
+  WebGpuSurfaceReplacement,
   WebGpuTextureFrame,
 } from "./generated_values.ts";
 import { native } from "./internal/addon.ts";
@@ -1841,16 +1850,21 @@ export class MapHandle extends Owner {
   /**
    * Sets the map's size.
    *
-   * `extent` must keep the scale factor that the map was created with. A map
-   * with a render session takes its size from the session, so resize the
+   * A map with a render session takes its size from the session, so resize the
    * session with `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the map has a render session.
+   * - `Status.invalidState` when a render session attached to the map before
+   *   the resize applied.
    */
-  resize(extent: LogicalExtent = {}): Promise<CommandCompletion> {
+  resize(logicalSize: LogicalSize = {}): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_resize(this.id, extent, completion),
+      native.mln_map_resize(this.id, logicalSize, completion),
     );
   }
 
@@ -2868,15 +2882,18 @@ export class MapHandleDiscarding {
   /**
    * Sets the map's size.
    *
-   * `extent` must keep the scale factor that the map was created with. A map
-   * with a render session takes its size from the session, so resize the
+   * A map with a render session takes its size from the session, so resize the
    * session with `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when the map has a render session.
    */
-  resize(extent: LogicalExtent = {}): void {
-    native.mln_map_resize(this.#owner.id, extent, undefined);
+  resize(logicalSize: LogicalSize = {}): void {
+    native.mln_map_resize(this.#owner.id, logicalSize, undefined);
   }
 
   /**
@@ -4018,9 +4035,8 @@ export class RenderSessionHandle extends Owner {
   /**
    * Resizes the session's target and its map.
    *
-   * `extent` must keep the session's scale factor. To change the scale factor,
-   * give the session a new target or attach a new session. Release every
-   * acquired frame first.
+   * The session renders at the map's scale factor. Release every acquired frame
+   * first.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4032,9 +4048,9 @@ export class RenderSessionHandle extends Owner {
    * - `Status.targetLost` when the session loses its target before the resize
    *   applies.
    */
-  resize(extent: LogicalExtent = {}): Promise<CommandCompletion> {
+  resize(logicalSize: LogicalSize = {}): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_render_session_resize(this.id, extent, completion),
+      native.mln_render_session_resize(this.id, logicalSize, completion),
     );
   }
 
@@ -4059,9 +4075,9 @@ export class RenderSessionHandle extends Owner {
    *
    * Use it to resize the ring, or to give the session textures again after
    * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * The new ring must have as many textures as the old one, and the same device
-   * and command queue. Once the replacement completes, the session no longer
-   * uses the old textures.
+   * Once the replacement completes, the session no longer uses the old
+   * textures. A replacement with the textures and sizes that the ring renders
+   * into already changes nothing.
    *
    * See `mln_render_session_set_metal_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4072,12 +4088,12 @@ export class RenderSessionHandle extends Owner {
    *   than the old ones. Attach a new session to change it.
    */
   setMetalBorrowedTextureTarget(
-    descriptor: MetalBorrowedTextureDescriptor,
+    replacement: MetalBorrowedTextureReplacement,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_metal_borrowed_texture_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4087,18 +4103,19 @@ export class RenderSessionHandle extends Owner {
    * Replaces the Metal layer that the session renders to.
    *
    * Use it to give the session a layer again after
-   * `RenderSessionHandle.releaseTarget()`, or to move it to another layer. The
-   * new layer must use the same device. Once the replacement completes, the
-   * session no longer uses the old layer.
+   * `RenderSessionHandle.releaseTarget()`, to move it to another layer, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old layer. A replacement with the layer and logical size that the session
+   * renders to already changes nothing.
    *
    * See `mln_render_session_set_metal_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Promise<void> {
+  setMetalSurfaceTarget(replacement: MetalSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_metal_surface_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4109,20 +4126,20 @@ export class RenderSessionHandle extends Owner {
    *
    * Use it to resize the ring, or to give the session textures again after
    * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * The new ring must have as many textures as the old one, and the same
-   * context. Once the replacement completes, the session no longer uses the old
-   * textures.
+   * Once the replacement completes, the session no longer uses the old
+   * textures. A replacement with the textures and sizes that the ring renders
+   * into already changes nothing.
    *
    * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
   setOpenGlBorrowedTextureTarget(
-    descriptor: OpenGlBorrowedTextureDescriptor,
+    replacement: OpenGlBorrowedTextureReplacement,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_open_gl_borrowed_texture_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4132,18 +4149,19 @@ export class RenderSessionHandle extends Owner {
    * Replaces the OpenGL surface that the session presents to.
    *
    * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-   * The new surface must use the same context. Once the replacement completes,
-   * the session no longer uses the old surface.
+   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old surface. A replacement with the surface and logical size that the
+   * session presents to already changes nothing.
    *
    * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  setOpenGlSurfaceTarget(descriptor: OpenGlSurfaceDescriptor): Promise<void> {
+  setOpenGlSurfaceTarget(replacement: OpenGlSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_open_gl_surface_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4154,25 +4172,20 @@ export class RenderSessionHandle extends Owner {
    *
    * Use it to resize the ring, or to give the session images again after
    * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * The new ring must have as many images as the old one, and the same context.
    * Once the replacement completes, the session no longer uses the old images.
+   * A replacement with the images and sizes that the ring renders into already
+   * changes nothing.
    *
    * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the new ring has a different `format`,
-   *   `final_layout`, or `owner` than the old one. Attach a new session to
-   *   change them.
    */
   setVulkanBorrowedTextureTarget(
-    descriptor: VulkanBorrowedTextureDescriptor,
+    replacement: VulkanBorrowedTextureReplacement,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_vulkan_borrowed_texture_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4182,9 +4195,10 @@ export class RenderSessionHandle extends Owner {
    * Replaces the Vulkan surface that the session presents to.
    *
    * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-   * The new surface must use the same context. Once the replacement completes,
-   * the session no longer uses the old surface.
+   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old surface. A replacement with the surface and logical size that the
+   * session presents to already changes nothing.
    *
    * See `mln_render_session_set_vulkan_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -4194,11 +4208,11 @@ export class RenderSessionHandle extends Owner {
    * - `Status.unsupported` when the new surface needs a different color format
    *   or pre-rotation support than the old one. Attach a new session instead.
    */
-  setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Promise<void> {
+  setVulkanSurfaceTarget(replacement: VulkanSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_vulkan_surface_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4209,25 +4223,20 @@ export class RenderSessionHandle extends Owner {
    *
    * Use it to resize the ring, or to give the session textures again after
    * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * The new ring must have as many textures as the old one, and the same
-   * context. Once the replacement completes, the session no longer uses the old
-   * textures.
+   * Once the replacement completes, the session no longer uses the old
+   * textures. A replacement with the textures and sizes that the ring renders
+   * into already changes nothing.
    *
    * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the new ring has a different `format` than the
-   *   old one. Attach a new session to change it.
    */
   setWebGpuBorrowedTextureTarget(
-    descriptor: WebGpuBorrowedTextureDescriptor,
+    replacement: WebGpuBorrowedTextureReplacement,
   ): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_web_gpu_borrowed_texture_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4237,23 +4246,19 @@ export class RenderSessionHandle extends Owner {
    * Replaces the WebGPU surface that the session presents to.
    *
    * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-   * The new surface must use the same context. Once the replacement completes,
-   * the session no longer uses the old surface.
+   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old surface. A replacement with the surface and logical size that the
+   * session presents to already changes nothing.
    *
    * See `mln_render_session_set_web_gpu_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the new `format` differs from the old one.
-   *   Attach a new session to change it.
    */
-  setWebGpuSurfaceTarget(descriptor: WebGpuSurfaceDescriptor): Promise<void> {
+  setWebGpuSurfaceTarget(replacement: WebGpuSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_web_gpu_surface_target(
         this.id,
-        descriptor,
+        replacement,
         completion,
       ),
     );
@@ -4282,9 +4287,8 @@ export class RenderSessionHandleDiscarding {
   /**
    * Resizes the session's target and its map.
    *
-   * `extent` must keep the session's scale factor. To change the scale factor,
-   * give the session a new target or attach a new session. Release every
-   * acquired frame first.
+   * The session renders at the map's scale factor. Release every acquired frame
+   * first.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4294,8 +4298,8 @@ export class RenderSessionHandleDiscarding {
    * - `Status.unsupported` when the session renders into a borrowed ring. Give
    *   it new textures of the new size instead.
    */
-  resize(extent: LogicalExtent = {}): void {
-    native.mln_render_session_resize(this.#owner.id, extent, undefined);
+  resize(logicalSize: LogicalSize = {}): void {
+    native.mln_render_session_resize(this.#owner.id, logicalSize, undefined);
   }
 }
 

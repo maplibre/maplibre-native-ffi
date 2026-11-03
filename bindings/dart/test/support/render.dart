@@ -19,11 +19,7 @@ const renderSize = 32;
 /// that rendered.
 const _frameAttempts = 8;
 
-final _extent = LogicalExtent(
-  width: renderSize,
-  height: renderSize,
-  scaleFactor: 1,
-);
+final _size = LogicalSize(width: renderSize, height: renderSize);
 
 /// Opens a runtime and a map sized for the render targets, with [style]
 /// committed. Teardowns close both.
@@ -50,11 +46,11 @@ OffscreenDeviceHandle openOffscreenDevice() {
   return device;
 }
 
-/// Attaches an offscreen session of the render extent, on a device of its own.
+/// Attaches an offscreen session of the render size, on a device of its own.
 NewRenderSession attachOffscreenSession(
   MapHandle map,
   RenderSessionAttachOptions options,
-) => map.attachOffscreen(OffscreenDescriptor(extent: _extent), options);
+) => map.attachOffscreen(OffscreenDescriptor(logicalSize: _size), options);
 
 /// A session driven by its core worker, which a teardown closes before the
 /// map and any graphics context it uses.
@@ -74,7 +70,7 @@ final class WorkerSession {
   static Future<WorkerSession> attachBorrowedTexture(MapHandle map) {
     final graphics = TestGraphics.open();
     return _attach(
-      (options) => graphics.attachBorrowedTexture(map, _extent, options),
+      (options) => graphics.attachBorrowedTexture(map, _size, options),
     );
   }
 

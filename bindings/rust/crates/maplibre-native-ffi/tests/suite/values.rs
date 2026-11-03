@@ -22,10 +22,9 @@ fn discarded_commands_are_fenced_and_sync_rejections_return_errors() {
     let error = fixture
         .map()
         .discarding()
-        .resize(LogicalExtent {
+        .resize(LogicalSize {
             width: 0,
             height: 8,
-            scale_factor: 1.0,
         })
         .unwrap_err();
     assert_eq!(error.status(), Status::InvalidArgument);

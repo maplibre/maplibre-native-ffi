@@ -33,7 +33,7 @@ type renderFixture struct {
 	// graphics and textures are nil for an offscreen session.
 	graphics *testsupport.Graphics
 	textures []*testsupport.Texture
-	extent   LogicalExtent
+	size     LogicalSize
 	session  *RenderSessionHandle
 	attached *Future[struct{}]
 	// frames and driverWork receive the session's frame and driver-work wakes.
@@ -98,12 +98,12 @@ func newOffscreenFixture(t *testing.T) *renderFixture {
 // newMapFixture is newOffscreenFixture without the session.
 func newMapFixture(t *testing.T) *renderFixture {
 	t.Helper()
-	extent := LogicalExtent{Width: 32, Height: 16, ScaleFactor: 1}
+	size := LogicalSize{Width: 32, Height: 16}
 	mapOptions := testMapOptions()
-	mapOptions.InitialExtent = extent
+	mapOptions.InitialExtent = LogicalExtent{Width: size.Width, Height: size.Height, ScaleFactor: 1}
 	r := &renderFixture{
 		fixture:    newFixtureWith(t, mapOptions),
-		extent:     extent,
+		size:       size,
 		frames:     make(chan struct{}, 1),
 		driverWork: make(chan struct{}, 1),
 	}
@@ -125,9 +125,9 @@ func (r *renderFixture) options() RenderSessionAttachOptions {
 
 func (r *renderFixture) attachSession(options RenderSessionAttachOptions) (*RenderSessionHandle, *Future[struct{}], error) {
 	if r.graphics == nil {
-		return r.m.AttachOffscreen(OffscreenDescriptor{Extent: r.extent}, options, nil)
+		return r.m.AttachOffscreen(OffscreenDescriptor{LogicalSize: r.size}, options, nil)
 	}
-	return attachBorrowedTexture(r.m, r.graphics.Context, r.extent, r.textures, options)
+	return attachBorrowedTexture(r.m, r.graphics.Context, r.size, r.textures, options)
 }
 
 func (r *renderFixture) start(t *testing.T, options RenderSessionAttachOptions) {

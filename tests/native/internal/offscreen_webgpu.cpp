@@ -18,7 +18,7 @@ void attach_without_a_device(mln_map map, mln_test_render_fixture& fixture) {
   fixture.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   auto descriptor = mln_offscreen_descriptor{};
   descriptor.size = sizeof(descriptor);
-  descriptor.extent = {.width = 64, .height = 64, .scale_factor = 1.0};
+  descriptor.logical_size = {.width = 64, .height = 64};
   auto options = mln_render_session_attach_options{};
   options.size = sizeof(options);
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;

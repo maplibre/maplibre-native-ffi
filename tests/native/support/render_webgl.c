@@ -223,9 +223,8 @@ bool mln_test_backend_attach_borrowed(
   mln_open_gl_borrowed_texture_descriptor descriptor = {
     .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
-  descriptor.extent.width = 64;
-  descriptor.extent.height = 64;
-  descriptor.extent.scale_factor = 1.0;
+  descriptor.logical_size.width = 64;
+  descriptor.logical_size.height = 64;
   descriptor.physical_width = 64;
   descriptor.physical_height = 64;
   descriptor.context = context;
@@ -274,9 +273,8 @@ bool mln_test_transferred_webgl_surface_create(
   mln_open_gl_surface_descriptor descriptor = {
     .size = sizeof(mln_open_gl_surface_descriptor)
   };
-  descriptor.extent.width = 64;
-  descriptor.extent.height = 64;
-  descriptor.extent.scale_factor = 1.0;
+  descriptor.logical_size.width = 64;
+  descriptor.logical_size.height = 64;
   descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
   descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.web_gl = (mln_web_gl_context_descriptor){
