@@ -84,7 +84,7 @@ public sealed class GeneratedValueTests
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before"));
 
         // The layer ID comes back as text that native lends for the completion.
-        await fixture.Map.AddStyleLayerJsonAsync("""{"id":"café-层","type":"background"}""", "");
+        await fixture.Map.AddStyleLayerJsonAsync("""{"id":"café-层","type":"background"}""");
         Assert.Equal(["café-层"], (await fixture.Map.ListStyleLayersAsync()).Select(l => l.Id));
     }
 

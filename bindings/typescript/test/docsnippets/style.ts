@@ -83,15 +83,12 @@ export async function style(
   });
 
   // An empty layer ID draws the layer on top.
-  map.discarding.addStyleLayerJson(
-    {
-      id: "markers",
-      type: "symbol",
-      source: "points",
-      layout: { "icon-image": "marker" },
-    },
-    "",
-  );
+  map.discarding.addStyleLayerJson({
+    id: "markers",
+    type: "symbol",
+    source: "points",
+    layout: { "icon-image": "marker" },
+  });
   // #endregion image
 }
 

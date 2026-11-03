@@ -3773,16 +3773,17 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_json, before_layer_id))]
+    #[pyo3(signature = (layer_json, before_layer_id=None))]
     fn add_style_layer_json(
         &self,
         py: Python<'_>,
         layer_json: &Bound<'_, PyAny>,
-        before_layer_id: &Bound<'_, PyAny>,
+        before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_json_value = storage.json(layer_json.clone(), false)?;
+        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -3797,16 +3798,17 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_json, before_layer_id))]
+    #[pyo3(signature = (layer_json, before_layer_id=None))]
     fn _discard_add_style_layer_json(
         &self,
         py: Python<'_>,
         layer_json: &Bound<'_, PyAny>,
-        before_layer_id: &Bound<'_, PyAny>,
+        before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_json_value = storage.json(layer_json.clone(), false)?;
+        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -5129,16 +5131,17 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (layer_id, before_layer_id))]
+    #[pyo3(signature = (layer_id, before_layer_id=None))]
     fn move_style_layer(
         &self,
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
-        before_layer_id: &Bound<'_, PyAny>,
+        before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
+        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {
@@ -5153,16 +5156,17 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_id, before_layer_id))]
+    #[pyo3(signature = (layer_id, before_layer_id=None))]
     fn _discard_move_style_layer(
         &self,
         py: Python<'_>,
         layer_id: &Bound<'_, PyAny>,
-        before_layer_id: &Bound<'_, PyAny>,
+        before_layer_id: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
+        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
         let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
         let handle = self.input();
         unsafe {

@@ -101,7 +101,6 @@ private suspend fun style(map: MapHandle, pixels: ByteArray) {
       "layout": {"icon-image": "marker"}
     }
     """,
-    "",
   )
   // #endregion image
 }

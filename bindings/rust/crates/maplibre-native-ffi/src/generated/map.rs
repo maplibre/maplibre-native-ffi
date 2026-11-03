@@ -159,7 +159,7 @@ impl MapHandle {
     pub fn add_style_layer_json(
         &self,
         layer_json: &str,
-        before_layer_id: &str,
+        before_layer_id: Option<&str>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let layer_json = call.input(&layer_json)?;
@@ -1335,7 +1335,7 @@ impl MapHandle {
     pub fn move_style_layer(
         &self,
         layer_id: &str,
-        before_layer_id: &str,
+        before_layer_id: Option<&str>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
@@ -2331,7 +2331,11 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_add_style_layer_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_style_layer_json(&self, layer_json: &str, before_layer_id: &str) -> Result<()> {
+    pub fn add_style_layer_json(
+        &self,
+        layer_json: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<()> {
         let mut call = self.0.inner.call();
         let layer_json = call.input(&layer_json)?;
         let before_layer_id = call.input(&before_layer_id)?;
@@ -2613,7 +2617,7 @@ impl MapHandleDiscarding<'_> {
     ///
     /// See `mln_map_move_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn move_style_layer(&self, layer_id: &str, before_layer_id: &str) -> Result<()> {
+    pub fn move_style_layer(&self, layer_id: &str, before_layer_id: Option<&str>) -> Result<()> {
         let mut call = self.0.inner.call();
         let layer_id = call.input(&layer_id)?;
         let before_layer_id = call.input(&before_layer_id)?;

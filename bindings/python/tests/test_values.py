@@ -34,7 +34,7 @@ def test_host_strings_use_views_and_native_lent_strings_decode(
 
     # The ID comes back through a lookup that also takes an explicit-length
     # view.
-    result(map_handle.add_style_layer_json({"id": layer_id, "type": "background"}, ""))
+    result(map_handle.add_style_layer_json({"id": layer_id, "type": "background"}))
     assert [entry.id for entry in result(map_handle.list_style_layers())] == [layer_id]
 
     with pytest.raises(mln.MaplibreError) as raised:

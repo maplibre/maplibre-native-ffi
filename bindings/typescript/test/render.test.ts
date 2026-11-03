@@ -104,7 +104,7 @@ test("a custom source answers through the map it borrows, which it can't release
     "a command",
   );
   await bounded(
-    map.addStyleLayerJson({ id: "dots", type: "circle", source: "custom" }, ""),
+    map.addStyleLayerJson({ id: "dots", type: "circle", source: "custom" }),
     "a command",
   );
   const worker = await TestSession.offscreen(map);

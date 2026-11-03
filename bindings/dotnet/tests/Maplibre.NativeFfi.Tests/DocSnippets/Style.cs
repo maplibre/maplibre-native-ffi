@@ -93,8 +93,7 @@ internal static class Style
               "source": "points",
               "layout": {"icon-image": "marker"}
             }
-            """,
-            ""
+            """
         );
         // #endregion image
     }

@@ -69,7 +69,7 @@ test "a copy of a custom source's borrowed map can't release it" {
     };
     var probe = Probe{};
     try support.expectCommitted(try fixture.map.addCustomGeometrySource("custom", .init(&probe, Probe.fetchTile, null, null), null));
-    try support.expectCommitted(try fixture.map.addStyleLayerJson("{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"custom\"}", "", null));
+    try support.expectCommitted(try fixture.map.addStyleLayerJson("{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"custom\"}", null, null));
     const offscreen = try support.TextureSession.attachOffscreen(fixture.map, extent);
     defer offscreen.close();
     // The map asks for its tiles as it renders.

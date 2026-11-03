@@ -79,8 +79,7 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
             "type": "symbol",
             "source": "points",
             "layout": {"icon-image": "marker"},
-        },
-        "",
+        }
     )
     # #endregion image
 

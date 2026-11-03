@@ -108,7 +108,7 @@ void main() {
           'id': 'dots',
           'type': 'circle',
           'source': 'custom',
-        }, ''),
+        }),
         'layer add',
       );
       final worker = await WorkerSession.attach(map);

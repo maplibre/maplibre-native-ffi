@@ -85,6 +85,10 @@ PLATFORMS = (
 # failure came before native code saw it, so the handle's release returns
 # nothing and does nothing for a handle that the answer already ended.
 #
+# nullable=true on a text view parameter, which C passes by value, marks text
+# that the function documents an empty view as leaving out. A binding makes the
+# parameter optional and passes an empty view when the host leaves it out.
+#
 # native_object=true marks an integer that names a host graphics object, such as
 # a VkImage or an OpenGL texture name. Native code uses the object it names as
 # it would a pointer, so a binding treats it as one: Rust marks an operation
@@ -651,6 +655,7 @@ def validate(api: Api) -> None:
     safely translate a pointer, callback, tagged union, or foreign GPU object.
     """
     errors: list[str] = []
+    conventions = Conventions(api)
     enum_constants = {
         value.name: (enum.name, value.value)
         for enum in api.enums
@@ -875,6 +880,18 @@ def validate(api: Api) -> None:
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
             )
+            declared = api.typedefs_by_name.get(parameter.type.declaration or "")
+            if "nullable" in parameter.metadata and not (
+                conventions.resolve(parameter.type).kind == "pointer"
+                or (declared is not None and declared.metadata.get("kind") == "handle")
+                or (
+                    is_buffer_view(parameter.type)
+                    and parameter.metadata.get("encoding") == "utf8"
+                )
+            ):
+                errors.append(
+                    f"{pcontext}: a nullable parameter passed by value requires a text view"
+                )
             if parameter.metadata.get("direction") == "out":
                 if parameter.type.kind != "pointer":
                     errors.append(f"{pcontext}: output direction requires a pointer")
