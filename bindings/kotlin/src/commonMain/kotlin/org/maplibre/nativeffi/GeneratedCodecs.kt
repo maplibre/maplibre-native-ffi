@@ -1331,6 +1331,7 @@ internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
     frameGeneration = readU64(source + 32),
     acquiredFrameCount = readU32(source + 40),
     failureStatus = Status(readI32(source + 44)),
+    hasTarget = readBool(source + 48),
   )
 
 internal fun readRenderedFeature(source: Long): RenderedFeature =

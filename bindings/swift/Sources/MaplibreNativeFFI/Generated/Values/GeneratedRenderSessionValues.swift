@@ -200,13 +200,18 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   /// failed because it lost its target, or `Status.nativeError` when it failed
   /// for another reason.
   public var failureStatus: Status
+  /// Whether the session is attached and has a target to render to. It's false
+  /// from when `RenderSessionHandle.releaseTarget()` completes until you give
+  /// the session a new target.
+  public var hasTarget: Bool
   public init(
     state: RenderSessionState = .init(rawValue: 0),
     extent: LogicalExtent = .init(),
     generation: UInt64 = 0,
     frameGeneration: UInt64 = 0,
     acquiredFrameCount: UInt32 = 0,
-    failureStatus: Status = .init(rawValue: 0)
+    failureStatus: Status = .init(rawValue: 0),
+    hasTarget: Bool = false
   ) {
     self.state = state
     self.extent = extent
@@ -214,6 +219,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     self.frameGeneration = frameGeneration
     self.acquiredFrameCount = acquiredFrameCount
     self.failureStatus = failureStatus
+    self.hasTarget = hasTarget
   }
 
   init(raw: mln_render_session_snapshot) {
@@ -223,6 +229,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     frameGeneration = raw.frame_generation
     acquiredFrameCount = raw.acquired_frame_count
     failureStatus = Status(rawValue: raw.failure_status.rawValue)
+    hasTarget = raw.has_target
   }
 }
 

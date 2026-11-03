@@ -39,8 +39,6 @@ public extension MapHandle {
   /// Creates a session that renders the map into a ring of your OpenGL
   /// textures.
   ///
-  /// The session needs `RenderDriverKind.callerGraphicsThread`.
-  ///
   /// See `mln_map_attach_open_gl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   ///

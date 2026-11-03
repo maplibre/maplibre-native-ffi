@@ -52,9 +52,8 @@ session. You also pass a frame wake callback here, covered in the next section.
 
 The [](api:mln_render_session_attach_options.driver) picks which thread runs the
 session's graphics work. Usually that's the library's own thread. If the surface
-uses your OpenGL context, use your graphics thread instead, since an OpenGL
-context is current on only one thread at a time. See
-[Service driver work](#service-driver-work).
+uses your OpenGL or WebGPU context, use your graphics thread instead, since that
+context belongs to your thread. See [Service driver work](#service-driver-work).
 
 <Snippet page="window" region="attach" />
 

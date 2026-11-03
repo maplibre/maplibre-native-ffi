@@ -283,7 +283,7 @@ internal constructor(
    */
   public fun getSnapshot(): RenderSessionSnapshot =
     nativeCall(this, binding) {
-      val out = sized(48, w(8, 8, 4))
+      val out = sized(w(56, 56, 52), w(8, 8, 4))
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
     }
@@ -449,7 +449,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.UNSUPPORTED` when the session renders offscreen.
+   * - `Status.UNSUPPORTED` when the session renders offscreen, since the session owns that target.
    * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */

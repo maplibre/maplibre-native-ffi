@@ -17,11 +17,17 @@ namespace Maplibre.NativeFfi;
 /// it failed because it lost its target, or <c>Status.NativeError</c> when it
 /// failed for another reason.
 /// </param>
+/// <param name="HasTarget">
+/// Whether the session is attached and has a target to render to. It's false
+/// from when <c>RenderSessionHandle.ReleaseTargetAsync()</c> completes until
+/// you give the session a new target.
+/// </param>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     LogicalExtent Extent,
     ulong Generation,
     ulong FrameGeneration,
     uint AcquiredFrameCount,
-    Status FailureStatus
+    Status FailureStatus,
+    bool HasTarget
 );

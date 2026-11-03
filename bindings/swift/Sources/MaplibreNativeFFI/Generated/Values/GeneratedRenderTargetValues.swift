@@ -406,6 +406,18 @@ public struct RenderDriverKind: RawRepresentable, CustomStringConvertible,
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionAttachOptions: Sendable {
+  /// The thread that runs the session's graphics work. Whoever owns the
+  /// target's graphics context drives it:
+  ///
+  /// - `RenderDriverKind.callerGraphicsThread` for an OpenGL or WebGPU target
+  ///   that you pass, since its context belongs to your thread: a shared or
+  ///   dedicated EGL or WGL context, an existing WebGL context, or a browser's
+  ///   WebGPU device.
+  /// - `RenderDriverKind.coreWorker` for a target whose context the library
+  ///   owns: a transferred WebGL canvas, or an offscreen session.
+  /// - Either one for a Metal or Vulkan target.
+  ///
+  /// An attach with another driver fails with `Status.unsupported`.
   public var driver: RenderDriverKind
   /// The kinds of `GpuSync` that you can wait on before you read an acquired
   /// frame. The session uses one of them that its target supports. Zero lets

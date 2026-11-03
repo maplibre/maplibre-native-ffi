@@ -736,6 +736,7 @@ internal unsafe struct mln_render_session_snapshot
     public ulong frame_generation;
     public uint acquired_frame_count;
     public mln_status failure_status;
+    public byte has_target;
 }
 
 internal unsafe struct mln_rendered_feature

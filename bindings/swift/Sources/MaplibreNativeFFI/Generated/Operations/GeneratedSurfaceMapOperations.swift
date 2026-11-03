@@ -36,9 +36,6 @@ public extension MapHandle {
 
   /// Creates a session that renders the map to an OpenGL surface.
   ///
-  /// The session needs `RenderDriverKind.coreWorker` for a transferred WebGL
-  /// canvas, and `RenderDriverKind.callerGraphicsThread` for any other context.
-  ///
   /// See `mln_map_attach_open_gl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   ///

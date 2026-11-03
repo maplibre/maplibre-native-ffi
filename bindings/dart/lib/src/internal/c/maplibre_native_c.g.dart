@@ -981,6 +981,8 @@ final class mln_render_session_snapshot extends Struct {
   external int acquired_frame_count;
   @Int32()
   external int failure_status;
+  @Bool()
+  external bool has_target;
 }
 
 final class mln_rendered_feature extends Struct {

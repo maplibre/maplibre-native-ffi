@@ -124,6 +124,20 @@ typedef uint32_t mln_gpu_sync_kind_flags;
 /** Options for attaching a render session to a map. */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
+  /**
+   * The thread that runs the session's graphics work. Whoever owns the
+   * target's graphics context drives it:
+   *
+   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for an OpenGL or WebGPU target
+   *   that you pass, since its context belongs to your thread: a shared or
+   *   dedicated EGL or WGL context, an existing WebGL context, or a browser's
+   *   WebGPU device.
+   * - MLN_RENDER_DRIVER_CORE_WORKER for a target whose context the library
+   *   owns: a transferred WebGL canvas, or an offscreen session.
+   * - Either one for a Metal or Vulkan target.
+   *
+   * An attach with another driver fails with MLN_STATUS_UNSUPPORTED.
+   */
   mln_render_driver_kind driver MLN_BINDING("required=true");
   /**
    * The kinds of mln_gpu_sync that you can wait on before you read an acquired

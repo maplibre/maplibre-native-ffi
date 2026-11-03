@@ -96,8 +96,7 @@ MLN_API void mln_offscreen_device_release(
 /**
  * Attaches a render session that renders the map offscreen.
  *
- * Read each image's pixels with mln_render_session_read_texture(). `options`
- * must select MLN_RENDER_DRIVER_CORE_WORKER.
+ * Read each image's pixels with mln_render_session_read_texture().
  *
  * The session renders on `device`. When `device` is null, the session creates
  * a device with the default options, and releases it when the session ends.

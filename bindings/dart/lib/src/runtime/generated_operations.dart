@@ -1748,6 +1748,7 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   frameGeneration: source.frame_generation,
   acquiredFrameCount: source.acquired_frame_count,
   failureStatus: Status.fromRawValue(source.failure_status),
+  hasTarget: source.has_target,
 );
 
 Pointer<raw.mln_screen_box> _writeScreenBox(
@@ -4233,7 +4234,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Attaches a render session that renders the map offscreen.
   ///
   /// Read each image's pixels with `RenderSessionHandle.readTexture()`.
-  /// `options` must select `RenderDriverKind.coreWorker`.
   ///
   /// The session renders on `device`. When `device` is null, the session
   /// creates a device with the default options, and releases it when the
@@ -4283,8 +4283,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Creates a session that renders the map into a ring of your OpenGL
   /// textures.
   ///
-  /// The session needs `RenderDriverKind.callerGraphicsThread`.
-  ///
   /// See `mln_map_attach_open_gl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   ///
@@ -4325,9 +4323,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   }
 
   /// Creates a session that renders the map to an OpenGL surface.
-  ///
-  /// The session needs `RenderDriverKind.coreWorker` for a transferred WebGL
-  /// canvas, and `RenderDriverKind.callerGraphicsThread` for any other context.
   ///
   /// See `mln_map_attach_open_gl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -6533,7 +6528,8 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the session renders offscreen.
+  /// - `Status.unsupported` when the session renders offscreen, since the
+  ///   session owns that target.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.

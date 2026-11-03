@@ -391,8 +391,7 @@ pub const Map = struct {
 
     /// Attaches a render session that renders the map offscreen.
     ///
-    /// Read each image's pixels with `RenderSession.readTexture()`. `options` must
-    /// select `RenderDriverKind.core_worker`.
+    /// Read each image's pixels with `RenderSession.readTexture()`.
     ///
     /// The session renders on `device`. When `device` is null, the session creates
     /// a device with the default options, and releases it when the session ends.
@@ -412,8 +411,6 @@ pub const Map = struct {
 
     /// Creates a session that renders the map into a ring of your OpenGL textures.
     ///
-    /// The session needs `RenderDriverKind.caller_graphics_thread`.
-    ///
     /// See `mln_map_attach_open_gl_borrowed_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
@@ -428,9 +425,6 @@ pub const Map = struct {
     }
 
     /// Creates a session that renders the map to an OpenGL surface.
-    ///
-    /// The session needs `RenderDriverKind.core_worker` for a transferred WebGL
-    /// canvas, and `RenderDriverKind.caller_graphics_thread` for any other context.
     ///
     /// See `mln_map_attach_open_gl_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -1765,7 +1759,8 @@ pub const RenderSession = struct {
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` when the session renders offscreen.
+    /// - `error.Unsupported` when the session renders offscreen, since the session
+    ///   owns that target.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -5123,6 +5118,18 @@ pub const RenderResult = enum(u32) {
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderSessionAttachOptions = struct {
+    /// The thread that runs the session's graphics work. Whoever owns the
+    /// target's graphics context drives it:
+    ///
+    /// - `RenderDriverKind.caller_graphics_thread` for an OpenGL or WebGPU
+    ///   target that you pass, since its context belongs to your thread: a
+    ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
+    ///   a browser's WebGPU device.
+    /// - `RenderDriverKind.core_worker` for a target whose context the library
+    ///   owns: a transferred WebGL canvas, or an offscreen session.
+    /// - Either one for a Metal or Vulkan target.
+    ///
+    /// An attach with another driver fails with `error.Unsupported`.
     driver: RenderDriverKind,
     /// The kinds of `GpuSync` that you can wait on before you read an acquired
     /// frame. The session uses one of them that its target supports. Zero lets
@@ -5222,6 +5229,10 @@ pub const RenderSessionSnapshot = struct {
     /// failed because it lost its target, or `error.NativeError` when it failed
     /// for another reason.
     failure_status: Status = .ok,
+    /// Whether the session is attached and has a target to render to. It's
+    /// false from when `RenderSession.releaseTarget()` completes until you give
+    /// the session a new target.
+    has_target: bool = false,
     pub fn fromNative(raw: c.mln_render_session_snapshot) RenderSessionSnapshot {
         return .{
             .state = RenderSessionState.fromNative(raw.state),
@@ -5230,6 +5241,7 @@ pub const RenderSessionSnapshot = struct {
             .frame_generation = raw.frame_generation,
             .acquired_frame_count = raw.acquired_frame_count,
             .failure_status = Status.fromNative(raw.failure_status),
+            .has_target = raw.has_target,
         };
     }
 };

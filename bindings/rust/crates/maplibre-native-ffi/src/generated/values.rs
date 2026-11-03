@@ -3319,6 +3319,18 @@ impl Default for RenderResult {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone)]
 pub struct RenderSessionAttachOptions {
+    /// The thread that runs the session's graphics work. Whoever owns the
+    /// target's graphics context drives it:
+    ///
+    /// - `RenderDriverKind::CallerGraphicsThread` for an OpenGL or WebGPU
+    ///   target that you pass, since its context belongs to your thread: a
+    ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
+    ///   a browser's WebGPU device.
+    /// - `RenderDriverKind::CoreWorker` for a target whose context the library
+    ///   owns: a transferred WebGL canvas, or an offscreen session.
+    /// - Either one for a Metal or Vulkan target.
+    ///
+    /// An attach with another driver fails with `Status::Unsupported`.
     pub driver: RenderDriverKind,
     /// The kinds of `GpuSync` that you can wait on before you read an acquired
     /// frame. The session uses one of them that its target supports. Zero lets
@@ -3421,6 +3433,10 @@ pub struct RenderSessionSnapshot {
     /// failed because it lost its target, or `Status::NativeError` when it
     /// failed for another reason.
     pub failure_status: Status,
+    /// Whether the session is attached and has a target to render to. It's
+    /// false from when `RenderSessionHandle::release_target()` completes until
+    /// you give the session a new target.
+    pub has_target: bool,
 }
 impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
     unsafe fn from_native(raw: sys::mln_render_session_snapshot) -> Result<Self> {
@@ -3431,6 +3447,7 @@ impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
             frame_generation: raw.frame_generation,
             acquired_frame_count: raw.acquired_frame_count,
             failure_status: Status::from_raw(raw.failure_status),
+            has_target: raw.has_target,
         })
     }
 }

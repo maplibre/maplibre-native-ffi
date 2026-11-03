@@ -531,7 +531,6 @@ class _MapHandleOperations(GeneratedOperations):
         """Attaches a render session that renders the map offscreen.
 
         Read each image's pixels with `RenderSessionHandle.read_texture()`.
-        `options` must select `RenderDriverKind.CORE_WORKER`.
 
         The session renders on `device`. When `device` is null, the session
         creates a device with the default options, and releases it when the
@@ -562,8 +561,6 @@ class _MapHandleOperations(GeneratedOperations):
         """Creates a session that renders the map into a ring of your OpenGL
         textures.
 
-        The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.
-
         See `mln_map_attach_open_gl_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 
@@ -584,10 +581,6 @@ class _MapHandleOperations(GeneratedOperations):
         self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> MapAttachOpenGlSurfaceResult:
         """Creates a session that renders the map to an OpenGL surface.
-
-        The session needs `RenderDriverKind.CORE_WORKER` for a transferred
-        WebGL canvas, and `RenderDriverKind.CALLER_GRAPHICS_THREAD` for any
-        other context.
 
         See `mln_map_attach_open_gl_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -2057,7 +2050,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.UNSUPPORTED` when the session renders offscreen.
+        - `Status.UNSUPPORTED` when the session renders offscreen, since the
+          session owns that target.
         - `Status.UNSUPPORTED` when the target is a WebGL canvas.
         - `Status.TARGET_LOST` when the session loses its target before the
           release runs.

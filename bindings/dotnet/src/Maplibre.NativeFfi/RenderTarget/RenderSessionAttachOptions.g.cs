@@ -27,6 +27,25 @@ public readonly partial record struct RenderSessionAttachOptions
         this.QueueLock = QueueLock;
     }
 
+    /// <summary>
+    /// The thread that runs the session's graphics work. Whoever owns the
+    /// target's graphics context drives it:
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><description><c>RenderDriverKind.CallerGraphicsThread</c> for an
+    /// OpenGL or WebGPU target that you pass, since its context belongs to your
+    /// thread: a shared or dedicated EGL or WGL context, an existing WebGL
+    /// context, or a browser's WebGPU device.</description></item>
+    /// <item><description><c>RenderDriverKind.CoreWorker</c> for a target whose
+    /// context the library owns: a transferred WebGL canvas, or an offscreen
+    /// session.</description></item>
+    /// <item><description>Either one for a Metal or Vulkan
+    /// target.</description></item>
+    /// </list>
+    /// <para>An attach with another driver fails with
+    /// <c>Status.Unsupported</c>.</para>
+    /// </remarks>
     public required RenderDriverKind Driver { get; init; }
 
     /// <summary>

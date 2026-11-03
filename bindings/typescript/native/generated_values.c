@@ -1698,6 +1698,10 @@ napi_value mln_ts_read_render_session_snapshot(
         mln_ts_number(env, (double)(source->failure_status))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "hasTarget", mln_ts_bool(env, source->has_target)
+      ))
+    return NULL;
   return result;
 }
 
