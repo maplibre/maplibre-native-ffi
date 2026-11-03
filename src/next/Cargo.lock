@@ -870,6 +870,8 @@ dependencies = [
 [[package]]
 name = "maplibre-native-next"
 version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3173eaa48bc0c6f6aba9373f5f111fe676b41ccd0c6d34ad787a3b3f78b906b3"
 dependencies = [
  "bytemuck",
  "flate2",
@@ -890,6 +892,8 @@ dependencies = [
 [[package]]
 name = "maplibre-native-next-harfrust"
 version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddd16a6a9fce21a1ab7e972935d98b85a67748c6108ad56a6c13652293f057dc"
 dependencies = [
  "bitflags",
  "bytemuck",
