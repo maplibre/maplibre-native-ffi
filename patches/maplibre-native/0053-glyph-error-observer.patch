@@ -5,9 +5,10 @@ learns which font stack and range failed
 Upstream: not proposed
 
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
+index 256bb6db87..ff9480fbb4 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
-@@ -1139,6 +1139,7 @@ void RenderOrchestrator::onGlyphsError(const FontStack& fontStack,
+@@ -1141,6 +1141,7 @@ void RenderOrchestrator::onGlyphsError(const FontStack& fontStack,
      ss << " for font stack " << fontStackToString(fontStack) << ":( " << util::toString(error) << ")";
      auto errorDetail = ss.str();
      Log::Error(Event::Style, errorDetail);

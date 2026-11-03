@@ -3,7 +3,7 @@ once each command ends on its own. Needs 0015.
 Upstream: not proposed
 
 diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
-index 777c31eeaa07..052ede8bbbc5 100644
+index 777c31eeaa..052ede8bbb 100644
 --- a/include/mln/map/map.hpp
 +++ b/include/mln/map/map.hpp
 @@ -72,6 +72,10 @@ public:
@@ -18,7 +18,7 @@ index 777c31eeaa07..052ede8bbbc5 100644
      // Camera
      CameraOptions getCameraOptions(const std::optional<EdgeInsets>& = std::nullopt) const;
 diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
-index e4029bbe285a..4361df19b375 100644
+index e4029bbe28..4361df19b3 100644
 --- a/src/mln/map/map.cpp
 +++ b/src/mln/map/map.cpp
 @@ -145,6 +145,10 @@ bool Map::isPanning() const {

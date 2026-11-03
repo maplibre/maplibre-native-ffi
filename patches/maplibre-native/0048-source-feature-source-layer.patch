@@ -3,6 +3,7 @@ from. Applies after 0047.
 Upstream: not proposed
 
 diff --git a/include/mln/util/feature.hpp b/include/mln/util/feature.hpp
+index 914f90a447..f9012a0b17 100644
 --- a/include/mln/util/feature.hpp
 +++ b/include/mln/util/feature.hpp
 @@ -21,6 +21,8 @@ using GlobalStateMap = mapbox::base::ValueObject;                          // <p
@@ -15,6 +16,7 @@ diff --git a/include/mln/util/feature.hpp b/include/mln/util/feature.hpp
      /// The style layer a rendered-feature query matched. A feature that
      /// several layers render is returned once per layer. Empty for features
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
+index affdfbe8ce..f2eafddf0e 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
 @@ -590,7 +590,8 @@ void GeometryTile::querySourceFeatures(std::vector<Feature>& result,

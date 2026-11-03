@@ -5,6 +5,7 @@ region needed no tiles there.
 Upstream: not proposed
 
 diff --git a/platform/default/src/mln/storage/offline_download.cpp b/platform/default/src/mln/storage/offline_download.cpp
+index 863dbf7dd2..cda5c3d66a 100644
 --- a/platform/default/src/mln/storage/offline_download.cpp
 +++ b/platform/default/src/mln/storage/offline_download.cpp
 @@ -19,6 +19,7 @@
@@ -28,6 +29,7 @@ diff --git a/platform/default/src/mln/storage/offline_download.cpp b/platform/de
      assert(minZ >= 0);
      assert(maxZ >= 0);
 diff --git a/test/storage/offline_download.test.cpp b/test/storage/offline_download.test.cpp
+index c65e431a75..a46e31cfb1 100644
 --- a/test/storage/offline_download.test.cpp
 +++ b/test/storage/offline_download.test.cpp
 @@ -470,6 +470,29 @@ TEST(OfflineDownload, GetStatusStyleAndSourceComplete) {

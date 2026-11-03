@@ -7,7 +7,7 @@ held about 95 levels
 Upstream: not proposed
 
 diff --git a/include/mln/style/expression/parsing_context.hpp b/include/mln/style/expression/parsing_context.hpp
-index 25929ec..38aa8f9 100644
+index b7bf456eb2..a17e3780bb 100644
 --- a/include/mln/style/expression/parsing_context.hpp
 +++ b/include/mln/style/expression/parsing_context.hpp
 @@ -4,6 +4,7 @@
@@ -64,97 +64,8 @@ index 25929ec..38aa8f9 100644
  };
  
  bool isExpression(const std::string&) noexcept;
-diff --git a/src/mln/style/expression/parsing_context.cpp b/src/mln/style/expression/parsing_context.cpp
-index aadb01f..8c7fa55 100644
---- a/src/mln/style/expression/parsing_context.cpp
-+++ b/src/mln/style/expression/parsing_context.cpp
-@@ -89,7 +89,7 @@ ParseResult ParsingContext::parse(const Convertible& value,
-                                   std::size_t index_,
-                                   std::optional<type::Type> expected_,
-                                   const std::optional<TypeAnnotationOption>& typeAnnotationOption) {
--    ParsingContext child(key + "[" + util::toString(index_) + "]", errors, std::move(expected_), scope);
-+    ParsingContext child(key + "[" + util::toString(index_) + "]", errors, std::move(expected_), scope, depth + 1);
-     return child.parse(value, typeAnnotationOption);
- }
- 
-@@ -100,7 +100,8 @@ ParseResult ParsingContext::parse(const Convertible& value,
-     ParsingContext child(key + "[" + util::toString(index_) + "]",
-                          errors,
-                          std::move(expected_),
--                         std::make_shared<detail::Scope>(bindings, scope));
-+                         std::make_shared<detail::Scope>(bindings, scope),
-+                         depth + 1);
-     return child.parse(value);
- }
- 
-@@ -156,6 +157,11 @@ ParseResult ParsingContext::parse(const Convertible& value,
-     ParseResult parsed;
- 
-     if (isArray(value)) {
-+        if (depth >= maxExpressionDepth) {
-+            error("Expression nests more than " + util::toString(maxExpressionDepth) + " levels deep.");
-+            return ParseResult();
-+        }
-+
-         const std::size_t length = arrayLength(value);
-         if (length == 0) {
-             error(
-diff --git a/src/mln/style/expression/literal.cpp b/src/mln/style/expression/literal.cpp
-index 220d702..ffb6a80 100644
---- a/src/mln/style/expression/literal.cpp
-+++ b/src/mln/style/expression/literal.cpp
-@@ -16,8 +16,12 @@ std::optional<Value> checkNumber(T n) {
- }
- 
- using namespace mln::style::conversion;
--std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
-+std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx, std::size_t depth) {
-     if (isUndefined(value)) return {Null};
-+    if ((isObject(value) || isArray(value)) && depth >= maxExpressionDepth) {
-+        ctx.error("Expression nests more than " + util::toString(maxExpressionDepth) + " levels deep.");
-+        return std::nullopt;
-+    }
-     if (isObject(value)) {
-         std::unordered_map<std::string, Value> result;
-         bool error = false;
-@@ -25,7 +29,7 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
-                    [&](const std::string& k,
-                        const mln::style::conversion::Convertible& v) -> std::optional<conversion::Error> {
-                        if (!error) {
--                           std::optional<Value> memberValue = parseValue(v, ctx);
-+                           std::optional<Value> memberValue = parseValue(v, ctx, depth + 1);
-                            if (memberValue) {
-                                result.emplace(k, *memberValue);
-                            } else {
-@@ -41,7 +45,7 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
-         std::vector<Value> result;
-         const auto length = arrayLength(value);
-         for (std::size_t i = 0; i < length; i++) {
--            std::optional<Value> item = parseValue(arrayMember(value, i), ctx);
-+            std::optional<Value> item = parseValue(arrayMember(value, i), ctx, depth + 1);
-             if (item) {
-                 result.emplace_back(*item);
-             } else {
-@@ -75,7 +79,7 @@ ParseResult Literal::parse(const Convertible& value, ParsingContext& ctx) {
-                 util::toString(arrayLength(value) - 1) + " instead.");
-             return ParseResult();
-         }
--        std::optional<Value> parsedValue = parseValue(arrayMember(value, 1), ctx);
-+        std::optional<Value> parsedValue = parseValue(arrayMember(value, 1), ctx, ctx.getDepth() + 1);
-         if (!parsedValue) {
-             return ParseResult();
-         }
-@@ -94,7 +98,7 @@ ParseResult Literal::parse(const Convertible& value, ParsingContext& ctx) {
-         return ParseResult(std::make_unique<Literal>(std::move(*parsedValue)));
-     } else {
-         // bare primitive value (string, number, boolean, null)
--        const std::optional<Value> parsedValue = parseValue(value, ctx);
-+        const std::optional<Value> parsedValue = parseValue(value, ctx, ctx.getDepth());
-         return ParseResult(std::make_unique<Literal>(std::move(*parsedValue)));
-     }
- }
 diff --git a/src/mln/style/conversion/filter.cpp b/src/mln/style/conversion/filter.cpp
-index 4752c82..b8750cc 100644
+index 4752c82a4f..b8750cc39b 100644
 --- a/src/mln/style/conversion/filter.cpp
 +++ b/src/mln/style/conversion/filter.cpp
 @@ -15,9 +15,9 @@ namespace conversion {
@@ -248,8 +159,97 @@ index 4752c82..b8750cc 100644
                  : *op == "in"   ? convertLegacyInFilter(values, error)
                  : *op == "!in"  ? createExpression("!", convertLegacyInFilter(values, error), error)
                  : *op == "has"  ? convertLegacyHasFilter(values, error)
+diff --git a/src/mln/style/expression/literal.cpp b/src/mln/style/expression/literal.cpp
+index 220d702f46..ffb6a8033e 100644
+--- a/src/mln/style/expression/literal.cpp
++++ b/src/mln/style/expression/literal.cpp
+@@ -16,8 +16,12 @@ std::optional<Value> checkNumber(T n) {
+ }
+ 
+ using namespace mln::style::conversion;
+-std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
++std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx, std::size_t depth) {
+     if (isUndefined(value)) return {Null};
++    if ((isObject(value) || isArray(value)) && depth >= maxExpressionDepth) {
++        ctx.error("Expression nests more than " + util::toString(maxExpressionDepth) + " levels deep.");
++        return std::nullopt;
++    }
+     if (isObject(value)) {
+         std::unordered_map<std::string, Value> result;
+         bool error = false;
+@@ -25,7 +29,7 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
+                    [&](const std::string& k,
+                        const mln::style::conversion::Convertible& v) -> std::optional<conversion::Error> {
+                        if (!error) {
+-                           std::optional<Value> memberValue = parseValue(v, ctx);
++                           std::optional<Value> memberValue = parseValue(v, ctx, depth + 1);
+                            if (memberValue) {
+                                result.emplace(k, *memberValue);
+                            } else {
+@@ -41,7 +45,7 @@ std::optional<Value> parseValue(const Convertible& value, ParsingContext& ctx) {
+         std::vector<Value> result;
+         const auto length = arrayLength(value);
+         for (std::size_t i = 0; i < length; i++) {
+-            std::optional<Value> item = parseValue(arrayMember(value, i), ctx);
++            std::optional<Value> item = parseValue(arrayMember(value, i), ctx, depth + 1);
+             if (item) {
+                 result.emplace_back(*item);
+             } else {
+@@ -75,7 +79,7 @@ ParseResult Literal::parse(const Convertible& value, ParsingContext& ctx) {
+                 util::toString(arrayLength(value) - 1) + " instead.");
+             return ParseResult();
+         }
+-        std::optional<Value> parsedValue = parseValue(arrayMember(value, 1), ctx);
++        std::optional<Value> parsedValue = parseValue(arrayMember(value, 1), ctx, ctx.getDepth() + 1);
+         if (!parsedValue) {
+             return ParseResult();
+         }
+@@ -94,7 +98,7 @@ ParseResult Literal::parse(const Convertible& value, ParsingContext& ctx) {
+         return ParseResult(std::make_unique<Literal>(std::move(*parsedValue)));
+     } else {
+         // bare primitive value (string, number, boolean, null)
+-        const std::optional<Value> parsedValue = parseValue(value, ctx);
++        const std::optional<Value> parsedValue = parseValue(value, ctx, ctx.getDepth());
+         return ParseResult(std::make_unique<Literal>(std::move(*parsedValue)));
+     }
+ }
+diff --git a/src/mln/style/expression/parsing_context.cpp b/src/mln/style/expression/parsing_context.cpp
+index 9ea905a90c..19fe95e58e 100644
+--- a/src/mln/style/expression/parsing_context.cpp
++++ b/src/mln/style/expression/parsing_context.cpp
+@@ -89,7 +89,7 @@ ParseResult ParsingContext::parse(const Convertible& value,
+                                   std::size_t index_,
+                                   std::optional<type::Type> expected_,
+                                   const std::optional<TypeAnnotationOption>& typeAnnotationOption) {
+-    ParsingContext child(key + "[" + util::toString(index_) + "]", errors, std::move(expected_), scope);
++    ParsingContext child(key + "[" + util::toString(index_) + "]", errors, std::move(expected_), scope, depth + 1);
+     return child.parse(value, typeAnnotationOption);
+ }
+ 
+@@ -100,7 +100,8 @@ ParseResult ParsingContext::parse(const Convertible& value,
+     ParsingContext child(key + "[" + util::toString(index_) + "]",
+                          errors,
+                          std::move(expected_),
+-                         std::make_shared<detail::Scope>(bindings, scope));
++                         std::make_shared<detail::Scope>(bindings, scope),
++                         depth + 1);
+     return child.parse(value);
+ }
+ 
+@@ -156,6 +157,11 @@ ParseResult ParsingContext::parse(const Convertible& value,
+     ParseResult parsed;
+ 
+     if (isArray(value)) {
++        if (depth >= maxExpressionDepth) {
++            error("Expression nests more than " + util::toString(maxExpressionDepth) + " levels deep.");
++            return ParseResult();
++        }
++
+         const std::size_t length = arrayLength(value);
+         if (length == 0) {
+             error(
 diff --git a/test/style/expression/expression.test.cpp b/test/style/expression/expression.test.cpp
-index 8855da3..3ae4a96 100644
+index 8855da3ef9..3ae4a966d3 100644
 --- a/test/style/expression/expression.test.cpp
 +++ b/test/style/expression/expression.test.cpp
 @@ -50,6 +50,31 @@ TEST(Expression, NestedOverloadFailureParsesEachLevelOnce) {
@@ -285,7 +285,7 @@ index 8855da3..3ae4a96 100644
  
  TEST_P(ExpressionEqualityTest, ExpressionEquality) {
 diff --git a/test/style/filter.test.cpp b/test/style/filter.test.cpp
-index 26b0860..6ee9a7e 100644
+index 26b086022c..6ee9a7ebe9 100644
 --- a/test/style/filter.test.cpp
 +++ b/test/style/filter.test.cpp
 @@ -384,3 +384,21 @@ TEST(Filter, LegacyExpressionInvalidType) {

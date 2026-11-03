@@ -3,7 +3,7 @@ global state, not the previous one.
 Upstream: not proposed
 
 diff --git a/src/mln/renderer/layers/render_color_relief_layer.cpp b/src/mln/renderer/layers/render_color_relief_layer.cpp
-index 78d8564c0178..7aef68f3638f 100644
+index 78d8564c01..7aef68f363 100644
 --- a/src/mln/renderer/layers/render_color_relief_layer.cpp
 +++ b/src/mln/renderer/layers/render_color_relief_layer.cpp
 @@ -57,19 +57,20 @@ RenderColorReliefLayer::~RenderColorReliefLayer() = default;
@@ -38,7 +38,7 @@ index 78d8564c0178..7aef68f3638f 100644
  
      const auto previousProperties = staticImmutableCast<ColorReliefLayerProperties>(evaluatedProperties);
 diff --git a/src/mln/renderer/layers/render_heatmap_layer.cpp b/src/mln/renderer/layers/render_heatmap_layer.cpp
-index b71e0202aed3..43210802e61f 100644
+index 6e8011a691..563af75279 100644
 --- a/src/mln/renderer/layers/render_heatmap_layer.cpp
 +++ b/src/mln/renderer/layers/render_heatmap_layer.cpp
 @@ -48,7 +48,6 @@ RenderHeatmapLayer::~RenderHeatmapLayer() = default;
@@ -77,7 +77,7 @@ index b71e0202aed3..43210802e61f 100644
  
      const auto previousProperties = staticImmutableCast<HeatmapLayerProperties>(evaluatedProperties);
 diff --git a/src/mln/renderer/layers/render_line_layer.cpp b/src/mln/renderer/layers/render_line_layer.cpp
-index 730afbf2e8f5..06950e4f17f5 100644
+index 0f7112d04f..8535e9b809 100644
 --- a/src/mln/renderer/layers/render_line_layer.cpp
 +++ b/src/mln/renderer/layers/render_line_layer.cpp
 @@ -57,7 +57,6 @@ RenderLineLayer::~RenderLineLayer() = default;
@@ -116,10 +116,10 @@ index 730afbf2e8f5..06950e4f17f5 100644
  
      const auto previousProperties = staticImmutableCast<LineLayerProperties>(evaluatedProperties);
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index e3e4fa317cff..8a2bea8ee44b 100644
+index c3409abee9..b929e50e37 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2619,3 +2619,94 @@ INSTANTIATE_TEST_SUITE_P(GeoJSON,
+@@ -2689,3 +2689,94 @@ INSTANTIATE_TEST_SUITE_P(GeoJSON,
                               return std::string(synchronous ? "Synchronous" : "Asynchronous") +
                                      (withText ? "WithText" : "IconOnly");
                           });

@@ -3,7 +3,7 @@ errors from earlier OpenGL calls, so strict drivers report no false failures.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4578
 
 diff --git a/src/mln/gl/context.hpp b/src/mln/gl/context.hpp
-index 23b93b120525..e6691f91e582 100644
+index 2c23204737..bb2481d461 100644
 --- a/src/mln/gl/context.hpp
 +++ b/src/mln/gl/context.hpp
 @@ -9,6 +9,7 @@
@@ -33,7 +33,7 @@ index 23b93b120525..e6691f91e582 100644
  public:
      Context(RendererBackend&);
 diff --git a/src/mln/gl/resource_pool.cpp b/src/mln/gl/resource_pool.cpp
-index 5c9fb6452090..ee4e0def7812 100644
+index 4aa622c1db..ad9ed61803 100644
 --- a/src/mln/gl/resource_pool.cpp
 +++ b/src/mln/gl/resource_pool.cpp
 @@ -145,16 +145,16 @@ TextureID Texture2DPool::allocateGLMemory(const Texture2DDesc& desc) {
@@ -64,7 +64,7 @@ index 5c9fb6452090..ee4e0def7812 100644
      }
  
 diff --git a/src/mln/gl/uniform_buffer_gl.cpp b/src/mln/gl/uniform_buffer_gl.cpp
-index 3ebafe82ffab..6f0ff4a264f8 100644
+index 3ebafe82ff..6f0ff4a264 100644
 --- a/src/mln/gl/uniform_buffer_gl.cpp
 +++ b/src/mln/gl/uniform_buffer_gl.cpp
 @@ -84,14 +84,19 @@ UniformBufferGL::UniformBufferGL(const UniformBufferGL& other)
@@ -89,10 +89,10 @@ index 3ebafe82ffab..6f0ff4a264f8 100644
      }
  }
 diff --git a/src/mln/gl/upload_pass.cpp b/src/mln/gl/upload_pass.cpp
-index 2eb6ef73045e..6c6082f92086 100644
+index d0fc3cfcc4..49a9f32567 100644
 --- a/src/mln/gl/upload_pass.cpp
 +++ b/src/mln/gl/upload_pass.cpp
-@@ -35,8 +35,8 @@ std::unique_ptr<gfx::VertexBufferResource> UploadPass::createVertexBufferResourc
+@@ -36,8 +36,8 @@ std::unique_ptr<gfx::VertexBufferResource> UploadPass::createVertexBufferResourc
      // NOLINTNEXTLINE(performance-move-const-arg)
      UniqueBuffer result{std::move(id), {commandEncoder.context}};
      commandEncoder.context.vertexBuffer = result;
@@ -103,7 +103,7 @@ index 2eb6ef73045e..6c6082f92086 100644
          throw std::bad_alloc();
      }
      return std::make_unique<gl::VertexBufferResource>(std::move(result), static_cast<int>(size));
-@@ -63,8 +63,8 @@ std::unique_ptr<gfx::IndexBufferResource> UploadPass::createIndexBufferResource(
+@@ -64,8 +64,8 @@ std::unique_ptr<gfx::IndexBufferResource> UploadPass::createIndexBufferResource(
      UniqueBuffer result{std::move(id), {commandEncoder.context}};
      commandEncoder.context.bindVertexArray = 0;
      commandEncoder.context.globalVertexArrayState.indexBuffer = result;
@@ -115,7 +115,7 @@ index 2eb6ef73045e..6c6082f92086 100644
      }
      return std::make_unique<gl::IndexBufferResource>(std::move(result), static_cast<int>(size));
 diff --git a/test/gl/context.test.cpp b/test/gl/context.test.cpp
-index 93783c0363aa..fbe2701c52dd 100644
+index 93783c0363..fbe2701c52 100644
 --- a/test/gl/context.test.cpp
 +++ b/test/gl/context.test.cpp
 @@ -6,7 +6,12 @@
@@ -200,7 +200,7 @@ index 93783c0363aa..fbe2701c52dd 100644
 +
  #endif
 diff --git a/test/gl/resource_pool.test.cpp b/test/gl/resource_pool.test.cpp
-index 8cae45e2e373..e50ca47112c5 100644
+index 8cae45e2e3..e50ca47112 100644
 --- a/test/gl/resource_pool.test.cpp
 +++ b/test/gl/resource_pool.test.cpp
 @@ -7,8 +7,11 @@

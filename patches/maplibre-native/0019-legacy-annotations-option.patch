@@ -3,7 +3,7 @@ a style gains no annotation source.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4675
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 77756c64ef19..4e3ba384640a 100644
+index 77756c64ef..4e3ba38464 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
@@ -29,7 +29,7 @@ index 77756c64ef19..4e3ba384640a 100644
  if(MLN_CREATE_AMALGAMATION)
      target_compile_options(mbgl-core PRIVATE
 diff --git a/platform/default/src/mln/layermanager/layer_manager.cpp b/platform/default/src/mln/layermanager/layer_manager.cpp
-index bfad3dfcd8c6..891b56de761e 100644
+index 4c3ab03d9b..e3f23b2824 100644
 --- a/platform/default/src/mln/layermanager/layer_manager.cpp
 +++ b/platform/default/src/mln/layermanager/layer_manager.cpp
 @@ -123,7 +123,7 @@ LayerManager* LayerManager::get() noexcept {

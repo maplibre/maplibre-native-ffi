@@ -6,7 +6,7 @@ garbage or NUL bytes in it
 Upstream: not proposed
 
 diff --git a/src/mln/util/url.cpp b/src/mln/util/url.cpp
-index f8be4c7..4118d77 100644
+index f8be4c7b86..4118d77f63 100644
 --- a/src/mln/util/url.cpp
 +++ b/src/mln/util/url.cpp
 @@ -27,6 +27,13 @@ inline char toLowerHex(char c) {
@@ -51,7 +51,7 @@ index f8be4c7..4118d77 100644
      }
  
 diff --git a/test/util/url.test.cpp b/test/util/url.test.cpp
-index e06ad69..9aa9245 100644
+index e06ad69ff1..9aa9245a03 100644
 --- a/test/util/url.test.cpp
 +++ b/test/util/url.test.cpp
 @@ -12,6 +12,9 @@ TEST(URL, percentEncode) {

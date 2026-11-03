@@ -2,9 +2,10 @@ Rejects a flight whose derived duration does not fit Native's duration type.
 Upstream: not proposed
 
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
+index 7dd49c545d..e2bb728eeb 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
-@@ -319,7 +319,14 @@
+@@ -319,7 +319,14 @@ void Transform::flyTo(const CameraOptions& inputCamera,
          if (animation.velocity) {
              velocity = *animation.velocity / rho;
          }
@@ -21,6 +22,7 @@ diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
      const double startScale = state.getScale();
      const EdgeInsets startEdgeInsets = state.getEdgeInsets();
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+index 7ab06e333c..c15ea59769 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
 @@ -8,6 +8,8 @@
@@ -32,7 +34,7 @@ diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
  
  using namespace std::numbers;
  using namespace mln;
-@@ -1568,3 +1570,28 @@
+@@ -1592,3 +1594,28 @@ TEST(Transform, CancelTransitionsByIdLeavesOthersRunning) {
      EXPECT_EQ(bearingFinished, 1u);
      EXPECT_FALSE(transform.inTransition());
  }

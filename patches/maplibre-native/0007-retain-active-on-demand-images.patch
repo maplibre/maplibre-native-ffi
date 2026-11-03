@@ -3,10 +3,10 @@ request also needs missing images, so cache cleanup keeps them.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4575
 
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
-index 3fdccb67b68e..279446b6d6bf 100644
+index f169dc4909..0730fcaaa1 100644
 --- a/src/mln/renderer/image_manager.cpp
 +++ b/src/mln/renderer/image_manager.cpp
-@@ -222,6 +222,10 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+@@ -226,6 +226,10 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
      for (const auto& dependency : pair.first) {
          if (!images.contains(dependency.first)) {
              missingDependencies.emplace(dependency);
@@ -17,7 +17,7 @@ index 3fdccb67b68e..279446b6d6bf 100644
          }
      }
  
-@@ -273,12 +277,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+@@ -277,12 +281,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
                                            Scheduler::GetCurrent()->bindOnce(std::move(removePendingRequests)));
          }
      } else {
@@ -31,7 +31,7 @@ index 3fdccb67b68e..279446b6d6bf 100644
      }
  }
 diff --git a/test/renderer/image_manager.test.cpp b/test/renderer/image_manager.test.cpp
-index fbfded4b0fff..f9c7a3c8c2be 100644
+index edfe8551dc..237ff5d0ff 100644
 --- a/test/renderer/image_manager.test.cpp
 +++ b/test/renderer/image_manager.test.cpp
 @@ -6,6 +6,7 @@
@@ -42,7 +42,7 @@ index fbfded4b0fff..f9c7a3c8c2be 100644
  #include <mln/util/io.hpp>
  #include <mln/util/image.hpp>
  #include <mln/util/run_loop.hpp>
-@@ -359,3 +360,81 @@ TEST(ImageManager, RemoveUnusedStyleImages) {
+@@ -372,3 +373,81 @@ TEST(ImageManager, RemoveUnusedStyleImages) {
      ASSERT_TRUE(imageManager->getImage("1024px") == nullptr);
      ASSERT_FALSE(imageManager->getImage("sprite") == nullptr);
  }

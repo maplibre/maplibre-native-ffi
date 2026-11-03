@@ -6,7 +6,7 @@ loader already does, so the tile fetches again when it is next required
 Upstream: not proposed
 
 diff --git a/include/mln/style/sources/custom_geometry_source.hpp b/include/mln/style/sources/custom_geometry_source.hpp
-index 9a280fb..1975c87 100644
+index 9a280fbd36..1975c8769e 100644
 --- a/include/mln/style/sources/custom_geometry_source.hpp
 +++ b/include/mln/style/sources/custom_geometry_source.hpp
 @@ -43,6 +43,7 @@ public:
@@ -18,7 +18,7 @@ index 9a280fb..1975c87 100644
      void invalidateRegion(const LatLngBounds&);
      // Private implementation
 diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
-index f4fd6d2..dd0ae7d 100644
+index a7e306c460..08611ed8b4 100644
 --- a/src/mln/style/custom_tile_loader.cpp
 +++ b/src/mln/style/custom_tile_loader.cpp
 @@ -38,6 +38,8 @@ void CustomTileLoader::cancelTile(const OverscaledTileID& tileID) {
@@ -50,7 +50,7 @@ index f4fd6d2..dd0ae7d 100644
      std::scoped_lock guard(dataMutex);
      auto tileCallbacks = tileCallbackMap.find(tileID);
 diff --git a/src/mln/style/custom_tile_loader.hpp b/src/mln/style/custom_tile_loader.hpp
-index b2f3f83..08c6f55 100644
+index b2f3f838fd..08c6f55d30 100644
 --- a/src/mln/style/custom_tile_loader.hpp
 +++ b/src/mln/style/custom_tile_loader.hpp
 @@ -28,6 +28,7 @@ public:
@@ -62,7 +62,7 @@ index b2f3f83..08c6f55 100644
      void invalidateTile(const CanonicalTileID&);
      void invalidateRegion(const LatLngBounds&, Range<uint8_t>);
 diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
-index c2077ad..ee7c021 100644
+index b2b4fea7d8..ef9bf90f4b 100644
 --- a/src/mln/style/custom_vector_tile_loader.cpp
 +++ b/src/mln/style/custom_vector_tile_loader.cpp
 @@ -37,8 +37,6 @@ void CustomVectorTileLoader::cancelTile(const OverscaledTileID& tileID) {
@@ -84,7 +84,7 @@ index c2077ad..ee7c021 100644
  }
  
 diff --git a/src/mln/style/sources/custom_geometry_source.cpp b/src/mln/style/sources/custom_geometry_source.cpp
-index 0cfb975..4ea2844 100644
+index 0cfb9751d8..4ea2844727 100644
 --- a/src/mln/style/sources/custom_geometry_source.cpp
 +++ b/src/mln/style/sources/custom_geometry_source.cpp
 @@ -39,6 +39,10 @@ void CustomGeometrySource::setTileData(const CanonicalTileID& tileID, const GeoJ
@@ -99,7 +99,7 @@ index 0cfb975..4ea2844 100644
      loader->self().invoke(&CustomTileLoader::invalidateTile, tileID);
  }
 diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
-index da35f25..1172ecc 100644
+index da35f2556e..1172ecc634 100644
 --- a/src/mln/tile/custom_geometry_tile.cpp
 +++ b/src/mln/tile/custom_geometry_tile.cpp
 @@ -49,6 +49,11 @@ void CustomGeometryTile::setTileData(const GeoJSON& geoJSON) {
@@ -115,7 +115,7 @@ index da35f25..1172ecc 100644
      stale = true;
      observer->onTileChanged(*this);
 diff --git a/src/mln/tile/custom_geometry_tile.hpp b/src/mln/tile/custom_geometry_tile.hpp
-index 649edcf..1d83882 100644
+index 649edcfbd3..1d83882e0b 100644
 --- a/src/mln/tile/custom_geometry_tile.hpp
 +++ b/src/mln/tile/custom_geometry_tile.hpp
 @@ -25,6 +25,7 @@ public:

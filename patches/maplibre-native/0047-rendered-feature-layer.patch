@@ -3,6 +3,7 @@ moves the location indicator's layer ID out of the source-layer field. Needs 001
 Upstream: not proposed
 
 diff --git a/include/mln/util/feature.hpp b/include/mln/util/feature.hpp
+index 0603e5b6c8..914f90a447 100644
 --- a/include/mln/util/feature.hpp
 +++ b/include/mln/util/feature.hpp
 @@ -22,6 +22,10 @@ class Feature : public GeoJSONFeature {
@@ -17,6 +18,7 @@ diff --git a/include/mln/util/feature.hpp b/include/mln/util/feature.hpp
  
      using GeometryType = mapbox::geometry::geometry<double>;
 diff --git a/metrics/tests/location_indicator/query_test/expected.json b/metrics/tests/location_indicator/query_test/expected.json
+index 13dcc7a562..8ff07d3bab 100644
 --- a/metrics/tests/location_indicator/query_test/expected.json
 +++ b/metrics/tests/location_indicator/query_test/expected.json
 @@ -10,7 +10,6 @@
@@ -28,6 +30,7 @@ diff --git a/metrics/tests/location_indicator/query_test/expected.json b/metrics
    }
  ]
 diff --git a/metrics/tests/location_indicator/query_test_no_image/expected.json b/metrics/tests/location_indicator/query_test_no_image/expected.json
+index 13dcc7a562..8ff07d3bab 100644
 --- a/metrics/tests/location_indicator/query_test_no_image/expected.json
 +++ b/metrics/tests/location_indicator/query_test_no_image/expected.json
 @@ -10,7 +10,6 @@
@@ -39,9 +42,10 @@ diff --git a/metrics/tests/location_indicator/query_test_no_image/expected.json 
    }
  ]
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
+index 736bea05f7..23cb4804ac 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
-@@ -372,7 +372,7 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
+@@ -375,7 +375,7 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
          });
          if (hit) {
              assert(f.feature);
@@ -51,6 +55,7 @@ diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index
      }
  }
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+index 0df1d5116d..951b00d8c2 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
 @@ -493,11 +493,11 @@ public:
@@ -68,6 +73,7 @@ diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/m
  
      void release() {
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
+index 6bfde3d075..256bb6db87 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
 @@ -747,6 +747,9 @@ std::vector<Feature> RenderOrchestrator::queryRenderedFeatures(
@@ -81,6 +87,7 @@ diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_
          }
      }
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
+index ad758cea20..aefad61585 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -20,6 +20,8 @@
@@ -117,7 +124,7 @@ diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
  TEST(Query, QueryRenderedFeaturesFilter) {
      using namespace mln::style::expression::dsl;
  
-@@ -402,7 +422,8 @@ TEST(Query, LocationIndicatorTopImageOnly) {
+@@ -430,7 +450,8 @@ TEST(Query, LocationIndicatorTopImageOnly) {
      const RenderedQueryOptions options({{{"location"}}, {}});
      const auto features = test.frontend.getRenderer()->queryRenderedFeatures(center, options);
      ASSERT_EQ(features.size(), 1u);

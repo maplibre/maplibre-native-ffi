@@ -2,10 +2,10 @@ Evaluates hit-test paint properties at the camera zoom.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4703
 
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index 2edfd668fe642fcc055a868016c086cc9f74a330..ecfd8c9696438279fabce2ec4bbfb1a00a673706 100644
+index c688c40ff4..2a91013fe4 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
-@@ -290,9 +290,16 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+@@ -293,9 +293,16 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
  
          bool needsCrossTileIndex = renderLayer->baseImpl->getTypeInfo()->crossTileIndex ==
                                     style::LayerTypeInfo::CrossTileIndex::Required;
@@ -26,12 +26,12 @@ index 2edfd668fe642fcc055a868016c086cc9f74a330..ecfd8c9696438279fabce2ec4bbfb1a0
          }
  
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index dea165d1cf4e856ca5262b86355d35f451d12867..b94f10253df4cf7364875a8e80c27f65b7ee2b6a 100644
+index 70c543eb7e..ac31a8924e 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
-@@ -438,3 +438,59 @@ TEST(Query, QueryRenderedFeaturesLineOffsetEndpoint) {
-         EXPECT_TRUE(test.frontend.getRenderer()->queryRenderedFeatures(outside, {{{"layer"}}, {}}).empty());
-     }
+@@ -438,3 +438,59 @@ TEST(Query, LocationIndicatorTopImageOnly) {
+     EXPECT_TRUE(
+         test.frontend.getRenderer()->queryRenderedFeatures(ScreenCoordinate{center.x + 60, center.y}, options).empty());
  }
 +
 +TEST(Query, QueryRenderedFeaturesCompositePaintZoom) {

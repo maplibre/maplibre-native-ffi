@@ -5,7 +5,7 @@ that pool outside a TShader or TProgram.
 Upstream: not proposed
 
 diff --git a/src/mln/actor/scheduler.cpp b/src/mln/actor/scheduler.cpp
-index 6caba3b..e69ff4e 100644
+index 6caba3b1c2..e69ff4ebe9 100644
 --- a/src/mln/actor/scheduler.cpp
 +++ b/src/mln/actor/scheduler.cpp
 @@ -26,6 +26,12 @@ void Scheduler::SetCurrent(Scheduler* scheduler) {

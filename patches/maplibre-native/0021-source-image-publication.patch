@@ -3,7 +3,7 @@ removal (https://github.com/maplibre/maplibre-native-ffi/issues/736).
 Upstream: https://github.com/maplibre/maplibre-native/pull/4676
 
 diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
-index 111f9b4d851f4a0eb5043efe7c3c210064f38a5b..6240b4106283e5c9a728c89c5dd18f4967fc9db0 100644
+index 111f9b4d85..6240b41062 100644
 --- a/src/mln/style/style_impl.cpp
 +++ b/src/mln/style/style_impl.cpp
 @@ -258,6 +258,7 @@ void Style::Impl::addSource(std::unique_ptr<Source> source) {
@@ -31,7 +31,7 @@ index 111f9b4d851f4a0eb5043efe7c3c210064f38a5b..6240b4106283e5c9a728c89c5dd18f49
  
  std::optional<Immutable<style::Image::Impl>> Style::Impl::getImage(const std::string& id) const {
 diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
-index d3643568ddc12bd59d08681dd98c66bd9db34273..4ecbc1d83c9f6f1ae50034368774598002636653 100644
+index d3643568dd..4ecbc1d83c 100644
 --- a/test/style/style.test.cpp
 +++ b/test/style/style.test.cpp
 @@ -1,3 +1,5 @@

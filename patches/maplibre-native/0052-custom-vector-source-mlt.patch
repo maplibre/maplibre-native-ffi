@@ -5,7 +5,7 @@ with the map's FastPFOR option, as a vector source with "encoding": "mlt" does
 Upstream: not proposed
 
 diff --git a/include/mln/style/sources/custom_vector_source.hpp b/include/mln/style/sources/custom_vector_source.hpp
-index e02dcc1..6dd0b9c 100644
+index e02dcc18f1..6dd0b9cea4 100644
 --- a/include/mln/style/sources/custom_vector_source.hpp
 +++ b/include/mln/style/sources/custom_vector_source.hpp
 @@ -23,6 +23,7 @@ class CustomVectorTileLoader;
@@ -17,7 +17,7 @@ index e02dcc1..6dd0b9c 100644
  
  class CustomVectorSource final : public Source {
 diff --git a/src/mln/renderer/sources/render_custom_vector_source.cpp b/src/mln/renderer/sources/render_custom_vector_source.cpp
-index 07bcee0..36ac607 100644
+index 07bcee0337..36ac6078e3 100644
 --- a/src/mln/renderer/sources/render_custom_vector_source.cpp
 +++ b/src/mln/renderer/sources/render_custom_vector_source.cpp
 @@ -50,7 +50,7 @@ void RenderCustomVectorSource::update(Immutable<style::Source::Impl> baseImpl_,
@@ -30,7 +30,7 @@ index 07bcee0..36ac607 100644
  }
  
 diff --git a/src/mln/renderer/sources/render_custom_vector_source.hpp b/src/mln/renderer/sources/render_custom_vector_source.hpp
-index 187d06a..5178197 100644
+index 187d06af58..5178197fab 100644
 --- a/src/mln/renderer/sources/render_custom_vector_source.hpp
 +++ b/src/mln/renderer/sources/render_custom_vector_source.hpp
 @@ -15,8 +15,12 @@ public:
@@ -47,7 +47,7 @@ index 187d06a..5178197 100644
  
  } // namespace mln
 diff --git a/src/mln/tile/custom_vector_tile.cpp b/src/mln/tile/custom_vector_tile.cpp
-index a3890fc..bd2768b 100644
+index a3890fc996..bd2768b449 100644
 --- a/src/mln/tile/custom_vector_tile.cpp
 +++ b/src/mln/tile/custom_vector_tile.cpp
 @@ -1,4 +1,5 @@
@@ -79,7 +79,7 @@ index a3890fc..bd2768b 100644
              assert(false && "Unhandled TileDataFormat");
              GeometryTile::setData(nullptr);
 diff --git a/src/mln/tile/custom_vector_tile.hpp b/src/mln/tile/custom_vector_tile.hpp
-index 4bb9161..e017def 100644
+index 4bb91616bb..e017def198 100644
 --- a/src/mln/tile/custom_vector_tile.hpp
 +++ b/src/mln/tile/custom_vector_tile.hpp
 @@ -18,7 +18,8 @@ public:

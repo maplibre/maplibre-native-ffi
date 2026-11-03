@@ -87,13 +87,13 @@ index 765af27742..82fd19f0b1 100644
  
      void markContextLost();
 diff --git a/include/mln/text/glyph.hpp b/include/mln/text/glyph.hpp
-index 16174b1101..2343b9d1e2 100644
+index 17406f6187..bc971d7026 100644
 --- a/include/mln/text/glyph.hpp
 +++ b/include/mln/text/glyph.hpp
 @@ -45,6 +45,7 @@ union GlyphID {
  
-     operator char16_t() { return complex.code; }
-     operator char32_t() { return hash; }
+     operator char16_t() const { return complex.code; }
+     operator char32_t() const { return hash; }
 +    bool operator==(const GlyphID &other) const { return hash == other.hash; }
      bool operator<(const GlyphID &other) const { return hash < other.hash; }
      bool operator>(const GlyphID &other) const { return hash > other.hash; }
@@ -185,7 +185,7 @@ index ad4401ed90..c610a01cd3 100644
  
      void reset() override;
 diff --git a/platform/default/src/mln/gfx/headless_frontend.cpp b/platform/default/src/mln/gfx/headless_frontend.cpp
-index c483730d16..c8fc6d7515 100644
+index d80aa7866f..de4da9ecaf 100644
 --- a/platform/default/src/mln/gfx/headless_frontend.cpp
 +++ b/platform/default/src/mln/gfx/headless_frontend.cpp
 @@ -22,7 +22,8 @@ HeadlessFrontend::HeadlessFrontend(Size size_,
@@ -208,7 +208,7 @@ index c483730d16..c8fc6d7515 100644
  HeadlessFrontend::~HeadlessFrontend() = default;
  
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
-index ae33462bf2..2a53424375 100644
+index ff9480fbb4..705c55ab22 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
 @@ -134,9 +134,11 @@ public:
@@ -392,7 +392,7 @@ index 0000000000..03dbea93ad
 +
 +} // namespace mln
 diff --git a/src/mln/text/glyph_manager.cpp b/src/mln/text/glyph_manager.cpp
-index db25ceb205..ef5ad75a41 100644
+index cd67200e4e..3c3b34cb51 100644
 --- a/src/mln/text/glyph_manager.cpp
 +++ b/src/mln/text/glyph_manager.cpp
 @@ -18,9 +18,11 @@ namespace {
@@ -483,13 +483,13 @@ index db25ceb205..ef5ad75a41 100644
  Immutable<Glyph> GlyphManager::getGlyph(const FontStack& fontStack, GlyphID glyphID) {
 +    std::scoped_lock readWriteLock(rwLock);
      auto& entry = entries[fontStack];
--    if (entry.glyphs.find(glyphID) != entry.glyphs.end()) return entry.glyphs.at(glyphID);
+-    if (entry.glyphs.contains(glyphID)) return entry.glyphs.at(glyphID);
 +    if (auto glyph = findGlyph(entry, glyphID)) return *glyph;
  
      if (glyphID.complex.type != FontPBF) {
          auto shaper = getHBShaper(fontStack, glyphID.complex.type);
 diff --git a/src/mln/text/glyph_manager.hpp b/src/mln/text/glyph_manager.hpp
-index 46bd401eaf..8b4254236a 100644
+index 807137834c..e523c7fcdd 100644
 --- a/src/mln/text/glyph_manager.hpp
 +++ b/src/mln/text/glyph_manager.hpp
 @@ -1,6 +1,7 @@
@@ -581,7 +581,7 @@ index 0000000000..f9bc3438ed
 +
 +} // namespace mln
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index d9098c1fe3..e38657bc4a 100644
+index 34c8087c40..f91bfb2def 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
 @@ -80,6 +80,7 @@ add_library(

@@ -5,7 +5,7 @@ neither requested nor reported missing
 Upstream: not proposed
 
 diff --git a/src/mln/layout/pattern_layout.hpp b/src/mln/layout/pattern_layout.hpp
-index 14cfa79e78b7..732f1741e38f 100644
+index 14cfa79e78..732f1741e3 100644
 --- a/src/mln/layout/pattern_layout.hpp
 +++ b/src/mln/layout/pattern_layout.hpp
 @@ -100,6 +100,12 @@ public:
@@ -46,7 +46,7 @@ index 14cfa79e78b7..732f1741e38f 100644
                                                           PatternDependency{min.to.id(), mid.to.id(), max.to.id()});
                          }
 diff --git a/src/mln/layout/symbol_layout.cpp b/src/mln/layout/symbol_layout.cpp
-index 0793bb2a8291..1127b61eaebe 100644
+index e65269dc6a..24539b1eb7 100644
 --- a/src/mln/layout/symbol_layout.cpp
 +++ b/src/mln/layout/symbol_layout.cpp
 @@ -316,8 +316,12 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
@@ -65,10 +65,10 @@ index 0793bb2a8291..1127b61eaebe 100644
  
          if (ft.formattedText || ft.icon) {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 721452d9c3ea..5c6681aaa9b8 100644
+index b929e50e37..107c66f4da 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -1240,6 +1240,57 @@ TEST(Map, NoHangOnMissingImage) {
+@@ -1260,6 +1260,57 @@ TEST(Map, NoHangOnMissingImage) {
      test.frontend.render(test.map);
  }
  
@@ -127,7 +127,7 @@ index 721452d9c3ea..5c6681aaa9b8 100644
      MapTest<> test{1, MapMode::Continuous};
  
 diff --git a/test/src/mln/test/stub_map_observer.hpp b/test/src/mln/test/stub_map_observer.hpp
-index 86c4431466bc..e522f2ea9644 100644
+index 86c4431466..e522f2ea96 100644
 --- a/test/src/mln/test/stub_map_observer.hpp
 +++ b/test/src/mln/test/stub_map_observer.hpp
 @@ -88,6 +88,12 @@ public:
