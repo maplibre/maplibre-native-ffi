@@ -271,6 +271,37 @@ class RustEmitterTests(unittest.TestCase):
         )
         self.assertIn("call.discard(", source)
 
+    def test_a_release_keeps_after_release_functions_reachable(self):
+        api = parse(
+            DISPOSE_WITH_COMPLETION
+            + """
+BIND("after_release=true")
+mln_status mln_session_service(mln_session session, mln_diagnostic *out_diagnostic);
+""",
+            defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
+        )
+        validate(api)
+        self.assertEqual(rust.lower(api).unsupported, {})
+        source = emitted(rust, api)[
+            "crates/maplibre-native-ffi/src/generated/session.rs"
+        ]
+        # The release and the dispose consume the owner and hand back a value
+        # that names the retiring handle without owning it.
+        self.assertIn(
+            "pub fn release(self) -> std::result::Result<(NativeFuture<()>, RetiringSession), (Self, Error)> {",
+            source,
+        )
+        self.assertIn(".map(|value| (value, RetiringSession(session)))", source)
+        self.assertIn(
+            "pub fn dispose(self) -> std::result::Result<RetiringSession, (Self, Error)> {",
+            source,
+        )
+        self.assertIn(".map(|()| RetiringSession(session))", source)
+        self.assertIn("pub struct RetiringSession(sys::mln_session);", source)
+        retiring = source[source.index("impl RetiringSession {") :]
+        self.assertIn("pub fn service(&self) -> Result<()> {", retiring)
+        self.assertIn("let mut call = Call::new(self.0);", retiring)
+
     def test_only_runtime_event_sources_document_their_id_as_a_source(self):
         api = parse(
             """

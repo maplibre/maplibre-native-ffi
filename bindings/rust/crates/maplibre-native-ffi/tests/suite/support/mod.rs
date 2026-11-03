@@ -559,11 +559,16 @@ impl Session {
     }
 
     /// Releases the session and waits until it retires, after which the host
-    /// may destroy its graphics objects. Native rejects service calls on a
-    /// released session, so the wait services nothing.
+    /// may destroy its graphics objects. An attached caller-driven session
+    /// detaches at its next service, so the wait keeps servicing it.
     pub fn release(self) {
-        let released = self.handle.release().unwrap();
-        drive(&self.wakes.signal, released, || {}).unwrap();
+        let (released, retiring) = self.handle.release().unwrap();
+        drive(&self.wakes.signal, released, || {
+            // A core worker drives itself, and a retired session is stale, so
+            // both reject service calls.
+            let _ = retiring.service_driver_work();
+        })
+        .unwrap();
     }
 
     pub fn close(self) {

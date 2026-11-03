@@ -108,9 +108,12 @@ class Body:
     uses_call: bool = False
 
 
-def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, str]:
+def operation(
+    plan: OperationPlan, value_types, *, discard=False, retiring=False
+) -> tuple[str, str]:
     """An operation's owner module and method. With `discard`, the method
-    passes no completion."""
+    passes no completion. With `retiring`, the method belongs to the value
+    that a release leaves, which names the handle without owning it."""
     function = plan.function
     if plan.consumes == "always" and function.return_type.kind != "void":
         raise Unsupported(
@@ -181,8 +184,17 @@ def operation(plan: OperationPlan, value_types, *, discard=False) -> tuple[str, 
             )
         case _:
             assert_never(plan.shape)
+    retired = value_types.retiring.get(receiver or "")
     return module, method_code(
-        plan, value_types, body, method, public, ending, discard=discard
+        plan,
+        value_types,
+        body,
+        method,
+        public,
+        ending,
+        discard=discard,
+        retiring=retiring,
+        retired=retired,
     )
 
 
@@ -647,9 +659,13 @@ def method_code(
     ending: list[str],
     *,
     discard: bool,
+    retiring: bool = False,
+    retired: str | None = None,
 ) -> str:
     """The method around a call's ending: the receiver it takes or consumes,
-    its return type, and its documentation."""
+    its return type, and its documentation. A release of a handle with
+    after-release functions also returns `retired`, the value that keeps them
+    callable while the handle retires."""
     function = plan.function
     consuming = bool(plan.consumes)
     mutable = "mut " if body.uses_call or not plan.completion else ""
@@ -661,6 +677,15 @@ def method_code(
             raise Unsupported("consumption with outputs requires an owner transaction")
         if ending[0].startswith(f"{call}.status("):
             ending = [ending[0].removesuffix("?;")]
+        if retired is not None:
+            # Native accepted the release, so the handle is retiring, and the
+            # functions that stay callable until it retires need its value.
+            if public == "()":
+                public = retired
+                ending[-1] += f".map(|()| {retired}({body.target}))"
+            else:
+                public = f"({public}, {retired})"
+                ending[-1] += f".map(|value| (value, {retired}({body.target})))"
         # The call takes the owner, and a refusal hands it back with the
         # error, so no value outlives its handle.
         body.signature[0] = "self"
@@ -674,7 +699,9 @@ def method_code(
     else:
         receiver_self = "self.0" if discard else "self.owner" if plan.view else "self"
         lines = [
-            f"let {mutable}{call} = {receiver_self}.inner.call();"
+            f"let {mutable}{call} = Call::new(self.0);"
+            if retiring
+            else f"let {mutable}{call} = {receiver_self}.inner.call();"
             if body.target is not None
             else f"let {mutable}{call} = Call::global();"
         ]

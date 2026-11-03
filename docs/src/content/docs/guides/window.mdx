@@ -126,8 +126,9 @@ graphics thread, with the target's context current.
 
 The [](api:mln_render_session_attach_options.driver_work_wake) tells you when
 there's work to do. Each time it fires, schedule a service on your graphics
-thread, even while the frame loop is stopped. To close the session, detach it
-first with [](api:mln_render_session_detach) and keep servicing until the detach
-finishes, so the session can free its graphics objects on your context.
+thread, even while the frame loop is stopped, and until the session's disposal
+completes. A disposed session detaches at its next service, which frees its
+graphics objects on your context. If you release the map before that service,
+the session keeps its graphics objects until the process exits.
 
 <Snippet page="window" region="service" />

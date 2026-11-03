@@ -634,10 +634,17 @@ auto map_attach_render_target_session(
   mln_map map, void* session, MapObject*& out_map
 ) -> mln_status;
 auto map_detach_render_target_session(mln_map map, void* session) -> mln_status;
+// What a disposed session runs when its map closes.
+using RenderSessionMapClose = void (*)(mln_render_session) noexcept;
 // Records that the host disposed `session`, so that release accepts the map
 // and retires it once the session detaches. Does nothing unless `session` is
-// the map's attached session.
-auto map_dispose_render_target_session(mln_map map, void* session) noexcept
-  -> void;
+// the map's attached session. A set `on_close` runs with `handle` once the
+// map's release or dispose begins, or before this returns when the map is
+// already closing, unless the session detaches first. It runs on the calling
+// thread, without the map's locks.
+auto map_dispose_render_target_session(
+  mln_map map, void* session, RenderSessionMapClose on_close = nullptr,
+  mln_render_session handle = MLN_HANDLE_NULL
+) noexcept -> void;
 
 }  // namespace mln::core

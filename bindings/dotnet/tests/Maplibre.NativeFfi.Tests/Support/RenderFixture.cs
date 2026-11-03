@@ -188,6 +188,39 @@ internal sealed class RenderFixture : IDisposable
         return operation.Result;
     }
 
+    /// <summary>
+    /// Closes the session and waits until it retires, servicing it meanwhile, since an attached
+    /// caller-driven session detaches at its next service. Returns how many services ran.
+    /// </summary>
+    internal int CloseSession()
+    {
+        var closed = Session.CloseAsync();
+        closed.ContinueWith(
+            _ => Signal(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
+        var elapsed = Stopwatch.StartNew();
+        var serviced = 0;
+        while (!closed.IsCompleted)
+        {
+            try
+            {
+                Session.ServiceDriverWork();
+                serviced++;
+            }
+            catch (MaplibreException error) when (error.Status == Status.InvalidState)
+            {
+                // The session retired, and native reports its handle stale.
+            }
+            if (!closed.IsCompleted)
+                TestWaits.Wait(wake, elapsed, "the session to retire");
+        }
+        closed.GetAwaiter().GetResult();
+        return serviced;
+    }
+
     internal RenderFrameResult RenderFrame()
     {
         var elapsed = Stopwatch.StartNew();

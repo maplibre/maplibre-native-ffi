@@ -412,11 +412,11 @@ auto wake_released(const std::atomic_bool& released) -> bool {
   return await([&] { return released.load(); }, "the wake release");
 }
 
-// Disposing an attached core-worker session detaches it on its worker after
-// the call in flight, which frees its renderer rather than quarantining it.
-// Work queued behind that call completes as abandoned. A caller driver never
-// runs again after disposal, so its session is abandoned instead.
-void disposal_detaches_an_attached_core_worker_session() {
+// Disposing an attached session detaches it on its driver after the call in
+// flight, which frees its renderer rather than quarantining it: a core worker
+// at once, a caller driver at the host's next service. Work queued behind that
+// call completes as abandoned.
+void disposal_detaches_an_attached_session_on_its_driver() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
@@ -437,6 +437,7 @@ void disposal_detaches_an_attached_core_worker_session() {
   ));
   MLN_TEST_OK(mln_render_session_dispose(fixture.session, nullptr, nullptr));
   mln_test_gate_release(blocker.gate.get());
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
   MLN_TEST_STATUS(
     core_worker ? MLN_STATUS_OK : MLN_STATUS_TARGET_LOST,
     mln_test_completion_settle(&blocker.completion)
@@ -444,9 +445,48 @@ void disposal_detaches_an_attached_core_worker_session() {
   blocker.submitted = false;
   MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, mln_test_completion_settle(&queued));
   TEST_ASSERT_TRUE(wake_released(released));
-  TEST_ASSERT_EQUAL_INT(
-    core_worker ? 1 : 0, sync_points.hits(SyncPoint::RenderDisposalDetached)
-  );
+  TEST_ASSERT_EQUAL_INT(1, sync_points.hits(SyncPoint::RenderDisposalDetached));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A host's abandon that leased its session before a disposal finds the
+// disposal there and changes nothing, so the detach that the disposal queued
+// still runs at the next service, and the disposal completes.
+void an_abandon_that_races_a_disposal_leaves_it_to_its_service() {
+  auto sync_points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  auto fixture = mln_test_render_fixture{};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed_ring(
+    map, &fixture, 2, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+  ));
+  mln_test_render_demand_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
+
+  sync_points.hold(SyncPoint::RenderAbandonLeased);
+  auto abandon_status = std::atomic_int{MLN_STATUS_OK};
+  auto abandoner = std::thread{[&] {
+    auto result =
+      mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+    abandon_status =
+      mln_render_session_abandon(fixture.session, &result, nullptr);
+    mln_test_pulse();
+  }};
+  const auto leased =
+    sync_points.wait_for_hits(SyncPoint::RenderAbandonLeased, 1);
+  auto disposed = mln_test_completion_default(0);
+  const auto dispose_status =
+    mln_render_session_dispose(fixture.session, &disposed.descriptor, nullptr);
+  sync_points.release(SyncPoint::RenderAbandonLeased);
+  abandoner.join();
+  TEST_ASSERT_TRUE(leased);
+  MLN_TEST_OK(dispose_status);
+  MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, abandon_status.load());
+  MLN_TEST_OK(mln_test_render_fixture_finish_disposal(&fixture, &disposed));
+  TEST_ASSERT_EQUAL_INT(1, sync_points.hits(SyncPoint::RenderDisposalDetached));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -455,7 +495,8 @@ void disposal_detaches_an_attached_core_worker_session() {
 // A map releases as soon as its session is disposed, which reverse-order
 // scoped cleanup does, and its release completes once the session has released
 // its attachment. A core worker keeps the attachment until its driver call
-// ends; a caller driver's session is abandoned on the teardown lane.
+// ends; a caller driver's session, which the case never services again, is
+// abandoned on the teardown lane once the map's release begins.
 void a_map_releases_while_its_disposed_session_retires() {
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
@@ -901,7 +942,8 @@ MLN_TEST_GROUP {
   RUN_TEST(a_running_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(a_serviced_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
-  RUN_TEST(disposal_detaches_an_attached_core_worker_session);
+  RUN_TEST(disposal_detaches_an_attached_session_on_its_driver);
+  RUN_TEST(an_abandon_that_races_a_disposal_leaves_it_to_its_service);
   RUN_TEST(a_map_releases_while_its_disposed_session_retires);
   RUN_TEST(disposal_abandons_a_session_with_an_acquired_frame);
   RUN_TEST(finalization_abandons_an_attached_session);

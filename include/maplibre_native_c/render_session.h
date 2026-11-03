@@ -440,9 +440,13 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * Use it with MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and call it from the
  * same thread every time. Call it each time
  * mln_render_session_attach_options.driver_work_wake is called, even while you
- * demand no frames, and until a detach completes. It returns once no work is
- * ready.
+ * demand no frames, and until a detach or disposal completes. It returns once
+ * no work is ready.
+ *
+ * It accepts a disposed session until the session retires. The service after
+ * the disposal detaches the session and frees its graphics objects.
  */
+MLN_BINDING("after_release=true")
 MLN_API mln_status mln_render_session_service_driver_work(
   mln_render_session session, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -474,6 +478,12 @@ MLN_API mln_status mln_render_session_detach(
  * the call returns, the library no longer uses your graphics objects, and you
  * can attach another session to the map. Dispose the session afterward.
  *
+ * Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
+ * keeps them until the process exits, reports how many it kept, and logs a
+ * warning. Detach the session instead to free them. A disposal that another
+ * thread starts first retires the session itself, and the abandon then fails
+ * as it does for any released session.
+ *
  * Returns:
  * - MLN_STATUS_BUSY while mln_render_session_service_driver_work() runs for the
  *   session on another thread, or while a view that
@@ -488,12 +498,14 @@ MLN_API mln_status mln_render_session_abandon(
 /**
  * Releases the session in any state.
  *
- * An attached session driven by MLN_RENDER_DRIVER_CORE_WORKER detaches first
- * unless you hold one of its frames. Any other session is abandoned as
- * mln_render_session_abandon() does. To free the graphics objects of a session
- * driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, detach it before you
- * dispose it. Once the disposal completes, the library no longer uses your
- * graphics objects.
+ * An attached session detaches first, and frees its graphics objects, unless
+ * you hold one of its frames. A session driven by
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD detaches at your next
+ * mln_render_session_service_driver_work(), so keep servicing it until the
+ * disposal completes. If you release or dispose its map before that service,
+ * the session is abandoned instead. Any other session is abandoned as
+ * mln_render_session_abandon() does. Once the disposal completes, the library
+ * no longer uses your graphics objects.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_render_session_dispose(

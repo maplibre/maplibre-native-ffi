@@ -120,8 +120,16 @@ mln_status mln_test_render_session_failure(
   mln_render_session session, char* message, size_t capacity
 );
 
-// Disposes `session` and waits until it retires. Returns the completion's
-// status, or the status that rejected the disposal.
+// Waits for `completion`, the disposal's of the fixture's session, servicing
+// the session meanwhile when it uses the caller-driver, and returns its
+// status, or MLN_TEST_RENDER_TIMED_OUT when it never arrives.
+mln_status mln_test_render_fixture_finish_disposal(
+  const mln_test_render_fixture* fixture, mln_test_completion* completion
+);
+
+// Disposes `session` and waits until it retires, servicing it meanwhile when
+// it uses the caller-driver. Returns the completion's status, or the status
+// that rejected the disposal.
 mln_status mln_test_render_session_dispose(mln_render_session session);
 
 // Releases the graphics device this thread cached. Every thread must call this

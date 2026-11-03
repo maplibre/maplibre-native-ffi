@@ -927,9 +927,10 @@ struct mln_render_session_object
   // call while any wait.
   std::size_t abandon_waiters = 0;
   bool stop_worker = false;
-  // Disposal found an attached core-worker session with no acquired frame, so
-  // the worker detaches it and frees its graphics objects instead of
-  // quarantining them.
+  // Disposal found an attached session with no acquired frame, so its driver
+  // detaches it and frees its graphics objects instead of quarantining them:
+  // the core worker at once, or the host's next service. If the host never
+  // services, the map's close hands the session to the teardown lane.
   bool disposal_detach = false;
   // Disposal came from a finalizer that can run while the process exits, so
   // the abandon that retires the session keeps every graphics object.

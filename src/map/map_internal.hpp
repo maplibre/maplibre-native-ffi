@@ -86,6 +86,10 @@ struct MapObject {
   // Whether the host disposed the attached session, which then still holds
   // the map until it retires. Guarded by the map handle table's mutex.
   bool render_target_session_disposed = false;
+  // What the disposed session asked the map to run once the map closes, and
+  // its argument. Guarded by the map handle table's mutex.
+  void (*render_target_session_on_close)(mln_render_session) noexcept = nullptr;
+  mln_render_session render_target_session_handle = MLN_HANDLE_NULL;
 
   MapObject() = default;
   MapObject(const MapObject&) = delete;

@@ -709,10 +709,16 @@ enum class AbandonedGraphics : std::uint8_t {
   Keep,
 };
 
+// Who abandons a session. The host's abandon leased a handle that a disposal
+// may have released since; only the disposal's own retirement may abandon a
+// disposed session.
+enum class AbandonCaller : std::uint8_t { Host, Disposal };
+
 auto abandon_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
   mln_render_abandon_result* out_result,
-  AbandonedGraphics graphics = AbandonedGraphics::DestroyWhenSafe
+  AbandonedGraphics graphics = AbandonedGraphics::DestroyWhenSafe,
+  AbandonCaller caller = AbandonCaller::Host
 ) -> mln_status;
 auto destroy_render_session(
   const std::shared_ptr<mln_render_session_object>& live
@@ -1209,8 +1215,13 @@ auto reap_core_worker(mln_render_session_object& session) -> void {
   }
 }
 
+// Whether the disposal detach marks its own driver call, as the core worker
+// does, or runs inside a service that has marked it.
+enum class DisposalDriverCall : std::uint8_t { Mark, AlreadyMarked };
+
 auto detach_disposed_session(
-  const std::shared_ptr<mln_render_session_object>& session
+  const std::shared_ptr<mln_render_session_object>& session,
+  DisposalDriverCall call
 ) noexcept -> void;
 
 // Whether a frame that the frames in flight hold back still needs the backend
@@ -1239,7 +1250,7 @@ auto run_core_worker(
       });
       if (session->disposal_detach) {
         lock.unlock();
-        detach_disposed_session(session);
+        detach_disposed_session(session, DisposalDriverCall::Mark);
         return;
       }
       if (session->views_invalidated || session->disposal_requested) return;
@@ -3390,11 +3401,13 @@ auto render_session_demand_frame(
 
 auto render_session_service_driver_work(mln_render_session session)
   -> mln_status {
-  const auto live = lease_render_session(session);
+  // A disposed session stays serviceable until its driver takes the detach
+  // that disposal queued.
+  const auto live = handle_table<mln_render_session_object>().lease(session);
   if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    if (live->disposal_requested.load()) {
+    if (live->disposal_requested.load() && !live->disposal_detach) {
       return report_handle_fault(
         HandleTraits<mln_render_session_object>::kind, session,
         HandleFault::Stale
@@ -3440,17 +3453,24 @@ auto render_session_service_driver_work(mln_render_session session)
         session->driver_call_thread.reset();
         parked = take_parked_retirements_locked(*session);
         session->worker_condition.notify_all();
-        session->driver_wake_pending = driver_work_runnable_locked(*session);
+        session->driver_wake_pending =
+          session->disposal_detach || driver_work_runnable_locked(*session);
         if (session->driver_wake_pending) wakes.driver(session->driver_wake);
       }
       resubmit_parked_retirements(parked);
     }
   } guard{live};
   auto wait_for_gpu = false;
+  auto disposal_detach = false;
   while (true) {
     auto item = RenderDriverWork{};
     {
       const auto lock = std::scoped_lock{live->control_mutex};
+      // Disposal skips the work queued before it, as a core worker does.
+      // Taking the detach here keeps the map's close from abandoning the
+      // session under it.
+      disposal_detach = std::exchange(live->disposal_detach, false);
+      if (disposal_detach) break;
       if (!driver_work_runnable_locked(*live)) {
         // A frame that the frames in flight hold back asks once for their end.
         wait_for_gpu = frame_waits_for_gpu_locked(*live) &&
@@ -3461,6 +3481,10 @@ auto render_session_service_driver_work(mln_render_session session)
       live->driver_work.pop_front();
     }
     execute_driver_work(live, item);
+  }
+  if (disposal_detach) {
+    detach_disposed_session(live, DisposalDriverCall::AlreadyMarked);
+    return MLN_STATUS_OK;
   }
   // Asked without the lock, since a backend may report at once.
   if (wait_for_gpu) live->texture.backend->when_gpu_done(GpuWorkDone{live});
@@ -4297,6 +4321,7 @@ auto render_session_abandon(
   }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
+  mln::testing::hit(mln::testing::SyncPoint::RenderAbandonLeased);
   return abandon_render_session(live, out_result);
 }
 
@@ -4344,7 +4369,8 @@ struct AbandonedObjects {
 };
 
 auto retire_abandoned_objects(
-  mln_render_session_object& session, AbandonedObjects& objects
+  mln_render_session_object& session, AbandonedObjects& objects,
+  const char*& out_reason
 ) -> uint32_t {
   const auto teardown_allowed = [&] {
     if (objects.surface != nullptr)
@@ -4355,13 +4381,27 @@ auto retire_abandoned_objects(
   };
   // Once exit begins, the host's runtime and its graphics driver may already
   // be gone.
-  if (process_exiting() || !teardown_allowed()) return objects.keep();
+  if (process_exiting()) {
+    out_reason = "the process is exiting";
+    return objects.keep();
+  }
+  if (!teardown_allowed()) {
+    out_reason =
+      "its graphics objects can only be destroyed on its driver thread; "
+      "detach the session, or keep servicing it until its disposal "
+      "completes, to free them";
+    return objects.keep();
+  }
   const auto prepared = (objects.surface == nullptr ||
                          objects.surface->prepare_off_thread_teardown()) &&
                         (objects.texture == nullptr ||
                          objects.texture->prepare_off_thread_teardown());
   // A Vulkan drain that exit refused waited for nothing.
-  if (!prepared || process_exiting()) return objects.keep();
+  if (!prepared || process_exiting()) {
+    out_reason = "its GPU work could not be drained";
+    return objects.keep();
+  }
+  out_reason = "their destruction failed";
   // The driver thread created these objects, and this thread destroys them.
   // Vulkan and Metal objects have no thread affinity. mbgl's vulkan::Context
   // checks its creating thread with MBGL_VERIFY_THREAD, which only builds
@@ -4381,9 +4421,24 @@ auto retire_abandoned_objects(
   return objects.keep();
 }
 
+// Quarantined objects stay allocated until the process exits, so the leak is
+// reported rather than silent.
+auto warn_on_quarantine(uint32_t kept, const char* reason) noexcept -> void {
+  try {
+    mln::Log::Warning(
+      mln::Event::Render, "render session kept " + std::to_string(kept) +
+                            " graphics objects until the process exits, "
+                            "because " +
+                            reason
+    );
+  } catch (...) {
+  }
+}
+
 auto abandon_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
-  mln_render_abandon_result* out_result, AbandonedGraphics graphics
+  mln_render_abandon_result* out_result, AbandonedGraphics graphics,
+  AbandonCaller caller
 ) -> mln_status {
   auto discarded = std::deque<RenderDriverWork>{};
   auto frame_wake = std::shared_ptr<Wake>{};
@@ -4409,6 +4464,16 @@ auto abandon_render_session(
       live->worker_condition.notify_all();
     };
     while (true) {
+      // A disposal that came after the host's lease owns the session's
+      // retirement, which may be a detach queued for its driver, so the
+      // abandon changes nothing and reports the handle released.
+      if (caller == AbandonCaller::Host && live->disposal_requested.load()) {
+        stop_waiting();
+        return report_handle_fault(
+          HandleTraits<mln_render_session_object>::kind, live->self,
+          HandleFault::Stale
+        );
+      }
       if (live->active_views) {
         stop_waiting();
         set_thread_error("render session has active borrowed views");
@@ -4491,9 +4556,13 @@ auto abandon_render_session(
   map_quiesce_render_workers(live->map);
   // Retired before the map's slot is released, because the renderer holds
   // the map's forwarding observer, as detach explains.
+  const char* reason =
+    "it was finalized or abandoned at shutdown, when graphics calls are "
+    "unsafe";
   const auto kept = graphics == AbandonedGraphics::Keep
                       ? objects.keep()
-                      : retire_abandoned_objects(*live, objects);
+                      : retire_abandoned_objects(*live, objects, reason);
+  if (kept != 0) warn_on_quarantine(kept, reason);
   static_cast<void>(map_detach_render_target_session(live->map, live.get()));
   live->map_object = nullptr;
   {
@@ -4524,15 +4593,18 @@ auto abandon_driver_work(std::deque<RenderDriverWork>& queue) noexcept -> void {
   queue.clear();
 }
 
-// Runs on a disposed session's core worker, which exits afterwards. The host
-// keeps its graphics objects alive until the session's wakes are released,
-// which happens only after this returns, so the worker can still detach and
-// free the renderer and backends. Anything that keeps the detach from
-// finishing falls back to the teardown lane's abandon, which retires whatever
-// the session still holds.
+// Runs on a disposed session's driver: its core worker, which exits
+// afterwards, or the host's service, which has marked the driver call itself.
+// The host keeps its graphics objects alive until the session's wakes are
+// released, which happens only after this returns, so the driver can still
+// detach and free the renderer and backends. Anything that keeps the detach
+// from finishing falls back to the teardown lane's abandon, which retires
+// whatever the session still holds.
 auto detach_disposed_session(
-  const std::shared_ptr<mln_render_session_object>& session
+  const std::shared_ptr<mln_render_session_object>& session,
+  DisposalDriverCall call
 ) noexcept -> void {
+  const auto marks_call = call == DisposalDriverCall::Mark;
   auto discarded = std::deque<RenderDriverWork>{};
   auto detaching = false;
   {
@@ -4547,8 +4619,10 @@ auto detach_disposed_session(
     if (detaching) {
       session->state = MLN_RENDER_SESSION_STATE_DETACHING;
       ++session->generation;
-      session->driver_call_in_flight = true;
-      session->driver_call_thread = current_owner_thread();
+      if (marks_call) {
+        session->driver_call_in_flight = true;
+        session->driver_call_thread = current_owner_thread();
+      }
       discarded.swap(session->driver_work);
     }
   }
@@ -4567,8 +4641,10 @@ auto detach_disposed_session(
   {
     const auto lock = std::scoped_lock{session->control_mutex};
     if (detaching) {
-      session->driver_call_in_flight = false;
-      session->driver_call_thread.reset();
+      if (marks_call) {
+        session->driver_call_in_flight = false;
+        session->driver_call_thread.reset();
+      }
       // Work the detach itself queued, such as a demand resumed by a frame
       // release, targets nothing now.
       discarded.swap(session->driver_work);
@@ -4580,43 +4656,77 @@ auto detach_disposed_session(
   abandon_driver_work(discarded);
   if (status == MLN_STATUS_OK)
     mln::testing::hit(mln::testing::SyncPoint::RenderDisposalDetached);
+  // A service still marks its call, so the lane parks the retirement until
+  // the service returns.
   session_teardown_lane().submit(session->disposal_task);
+}
+
+// Runs when the map of a disposed caller-driven session closes before the
+// host serviced the session's detach. The session then retires as abandon
+// does, so the map's retirement never waits on a service that may not come.
+auto abandon_unserviced_disposal(mln_render_session handle) noexcept -> void {
+  const auto live = handle_table<mln_render_session_object>().try_lease(handle);
+  if (live == nullptr) return;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    // A service that already took the detach hands the session on itself.
+    if (!std::exchange(live->disposal_detach, false)) return;
+    live->views_invalidated = true;
+    live->stop_worker = true;
+    live->worker_condition.notify_all();
+  }
+  session_teardown_lane().submit(live->disposal_task);
 }
 
 // Whether disposal may detach an eligible session and destroy the graphics
 // objects of the others as abandon does, or keeps the graphics objects of
 // every session, which makes no graphics call.
-enum class DisposalTeardown : std::uint8_t { DetachOnWorker, Quarantine };
+enum class DisposalTeardown : std::uint8_t { Detach, Quarantine };
 
 // Disposal owns an embedded node and a self-reference.
-// Unless the caller asks for quarantine, an attached core-worker session with
-// no acquired frame detaches on its worker, which then hands it to the
-// teardown lane. Any other session goes to the lane directly. A driver call or
-// a borrowed view still running when the lane reaches the node parks it on the
-// session, and the call or view that leaves the session idle returns it to the
-// lane, which abandons the target outside registry locks.
+// Unless the caller asks for quarantine, an attached session with no acquired
+// frame detaches on its driver, which then hands it to the teardown lane: a
+// core worker at once, a caller driver at the host's next service, or the
+// lane itself once the map closes without one. Any other session goes to the
+// lane directly. A driver call or a borrowed view still running when the lane
+// reaches the node parks it on the session, and the call or view that leaves
+// the session idle returns it to the lane, which abandons the target outside
+// registry locks.
 // Returns false, accepting nothing, when another disposal of the session came
 // first.
 auto dispose_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
   DisposalTeardown teardown, const CompletionOperation& async = {}
 ) noexcept -> bool {
-  auto detach_on_worker = false;
+  auto detach_on_driver = false;
+  auto caller_driven = false;
   {
+    // Declared before the lock, so the driver wake runs after it.
+    auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->disposal_requested.exchange(true)) return false;
     live->disposal_keeps_graphics = teardown == DisposalTeardown::Quarantine;
     // Accepted before the retirement is queued, so the lane delivers it.
     live->disposal_completion = async.operation;
     if (async.completion != nullptr) async.completion->accept();
-    detach_on_worker =
-      teardown == DisposalTeardown::DetachOnWorker &&
-      live->capabilities.driver == MLN_RENDER_DRIVER_CORE_WORKER &&
-      live->state == MLN_RENDER_SESSION_STATE_ATTACHED &&
-      !live->views_invalidated && live->acquired_frame_count == 0 &&
-      live->active_views == 0;
-    if (detach_on_worker) {
+    caller_driven =
+      live->capabilities.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+    detach_on_driver = teardown == DisposalTeardown::Detach &&
+                       (caller_driven || live->capabilities.driver ==
+                                           MLN_RENDER_DRIVER_CORE_WORKER) &&
+                       live->state == MLN_RENDER_SESSION_STATE_ATTACHED &&
+                       !live->views_invalidated &&
+                       live->acquired_frame_count == 0 &&
+                       live->active_views == 0;
+    if (detach_on_driver) {
       live->disposal_detach = true;
+      if (
+        caller_driven && live->driver_wake != nullptr &&
+        !live->driver_wake_pending
+      ) {
+        live->driver_wake_pending = true;
+        wakes.driver(live->driver_wake);
+      }
     } else {
       live->views_invalidated = true;
       live->stop_worker = true;
@@ -4636,7 +4746,8 @@ auto dispose_render_session(
       static_cast<void>(abandon_render_session(
         owned, &result,
         session.disposal_keeps_graphics ? AbandonedGraphics::Keep
-                                        : AbandonedGraphics::DestroyWhenSafe
+                                        : AbandonedGraphics::DestroyWhenSafe,
+        AbandonCaller::Disposal
       ));
       static_cast<void>(destroy_render_session(owned));
       // Taken before the owner goes, which can destroy the session.
@@ -4647,8 +4758,14 @@ auto dispose_render_session(
     };
     live->worker_condition.notify_all();
   }
-  map_dispose_render_target_session(live->map, live.get());
-  if (!detach_on_worker) session_teardown_lane().submit(live->disposal_task);
+  if (detach_on_driver && caller_driven) {
+    map_dispose_render_target_session(
+      live->map, live.get(), abandon_unserviced_disposal, live->self
+    );
+  } else {
+    map_dispose_render_target_session(live->map, live.get());
+  }
+  if (!detach_on_driver) session_teardown_lane().submit(live->disposal_task);
   return true;
 }
 
@@ -4671,7 +4788,7 @@ auto render_session_dispose(
     );
     if (status != MLN_STATUS_OK) return status;
   }
-  if (!dispose_render_session(live, DisposalTeardown::DetachOnWorker, async))
+  if (!dispose_render_session(live, DisposalTeardown::Detach, async))
     return disposal_raced(session);
   return MLN_STATUS_OK;
 }

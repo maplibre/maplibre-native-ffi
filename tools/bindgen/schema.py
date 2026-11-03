@@ -65,6 +65,11 @@ PLATFORMS = (
 # that handle's release or the end of its view scope. A binding guards those
 # fields, and only those, with the view's scope.
 #
+# after_release=true marks a function that stays callable on a handle after
+# native accepted its release or dispose, until the handle retires; native
+# reports the handle stale afterwards. A binding whose release consumes its
+# owner keeps the function reachable through what the release returns.
+#
 # native_object=true marks an integer that names a host graphics object, such as
 # a VkImage or an OpenGL texture name. Native code uses the object it names as
 # it would a pointer, so a binding treats it as one: Rust marks an operation
@@ -83,6 +88,7 @@ ANNOTATION_VALUES = {
     "consumes": frozenset({"success"}),
     "required": frozenset({"true"}),
     "native_object": frozenset({"true"}),
+    "after_release": frozenset({"true"}),
 }
 
 # Keys that every declaration kind accepts.
@@ -99,6 +105,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "blocks",
         "consumes",
         "platforms",
+        "after_release",
     }
 )
 PARAMETER_KEYS = COMMON_KEYS | frozenset(
@@ -805,6 +812,23 @@ def validate(api: Api) -> None:
                         f"{context}: a function without a return value takes no "
                         f"value metadata ({', '.join(extra)})"
                     )
+        if "after_release" in metadata:
+            receiver = (
+                api.typedefs_by_name.get(function.parameters[0].type.declaration or "")
+                if function.parameters
+                else None
+            )
+            if (
+                receiver is None
+                or receiver.metadata.get("kind") != "handle"
+                or "release" not in receiver.metadata
+                or execution not in {None, "immediate"}
+                or not returns_status
+            ):
+                errors.append(
+                    f"{context}: after_release requires an immediate function "
+                    "that returns a status and takes a released handle first"
+                )
         if "blocks" in metadata and (
             execution not in {None, "immediate"} or not returns_status
         ):
