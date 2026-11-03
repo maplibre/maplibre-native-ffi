@@ -1820,6 +1820,16 @@ static jint mln_resource_transform_request_complete_jni(
   );
 }
 
+static jint mln_resource_transform_request_fail_jni(
+  JNIEnv* env, jclass type, jlong request, jlong error, jlong out_diagnostic
+) {
+  return (jint)mln_resource_transform_request_fail(
+    (mln_resource_transform_request)request,
+    MLN_JNI_POINTER(const mln_resource_transform_error*, error),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static void mln_resource_transform_request_release_jni(
   JNIEnv* env, jclass type, jlong request
 ) {
@@ -2452,6 +2462,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_resource_request_set_cancel_callback_jni},
   {"mln_resource_transform_request_complete", "(JJJ)I",
    (void*)mln_resource_transform_request_complete_jni},
+  {"mln_resource_transform_request_fail", "(JJJ)I",
+   (void*)mln_resource_transform_request_fail_jni},
   {"mln_resource_transform_request_release", "(J)V",
    (void*)mln_resource_transform_request_release_jni},
   {"mln_runtime_clear_event_handler", "(JJJ)I",
@@ -2812,6 +2824,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_resource_request_set_cancel_callback_jni},
   {"mln_resource_transform_request_complete", "(JJJ)I",
    (void*)mln_resource_transform_request_complete_jni},
+  {"mln_resource_transform_request_fail", "(JJJ)I",
+   (void*)mln_resource_transform_request_fail_jni},
   {"mln_resource_transform_request_release", "(J)V",
    (void*)mln_resource_transform_request_release_jni},
   {"mln_runtime_clear_event_handler", "(JJJ)I",

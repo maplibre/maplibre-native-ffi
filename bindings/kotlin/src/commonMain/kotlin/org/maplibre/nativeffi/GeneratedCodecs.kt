@@ -981,6 +981,21 @@ internal fun NativeCall.writeResourceRequestCancelHandler(
   value: ResourceRequestCancelHandler,
 ): Long = allocate(w(24, 40), w(8, 8, 4)).also { putResourceRequestCancelHandler(it, value) }
 
+internal fun NativeArena.putResourceTransformError(target: Long, value: ResourceTransformError) {
+  writeU32(target, w(32, 40, 28).toUInt())
+  var fields = 0u
+  writeU32(target + 8, value.reason.rawValue)
+  putView(target + w(12, 16), value.message)
+  value.retryAfterUnixMs?.let {
+    fields = fields or 1u
+    writeI64(target + w(24, 32, 20), it)
+  }
+  writeU32(target + 4, fields)
+}
+
+internal fun NativeArena.writeResourceTransformError(value: ResourceTransformError): Long =
+  allocate(w(32, 40, 28), w(8, 8, 4)).also { putResourceTransformError(it, value) }
+
 internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
   writeU32(target, w(48, 48, 44).toUInt())
   var fields = 0u

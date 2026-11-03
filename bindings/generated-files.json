@@ -145,6 +145,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceStoragePolicy.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransform.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformCallback.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformError.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformRequestHandle.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs",

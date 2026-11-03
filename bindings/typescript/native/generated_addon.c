@@ -5683,6 +5683,39 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_resource_transform_request_fail(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_resource_transform_request arg_request = 0;
+  mln_resource_transform_error arg_error;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "request")) goto done;
+    arg_request = (mln_resource_transform_request)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  memset(&arg_error, 0, sizeof arg_error);
+  arg_error.size = sizeof arg_error;
+  if (!mln_ts_read_record(call, call->argv[2], "error")) goto done;
+  if (!mln_ts_write_resource_transform_error(
+        call, call->argv[2], &arg_error, "error"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_resource_transform_request_fail(arg_request, &arg_error, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_consume(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_resource_transform_request_release(
   napi_env env, napi_callback_info info
 ) {
@@ -7115,6 +7148,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_resource_request_set_cancel_callback},
   {"mln_resource_transform_request_complete",
    mln_ts_export_mln_resource_transform_request_complete},
+  {"mln_resource_transform_request_fail",
+   mln_ts_export_mln_resource_transform_request_fail},
   {"mln_resource_transform_request_release",
    mln_ts_export_mln_resource_transform_request_release},
   {"mln_runtime_clear_event_handler",

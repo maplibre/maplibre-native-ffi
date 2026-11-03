@@ -45,7 +45,29 @@ internal constructor(
     }
 
   /**
+   * Fails a resource transform request without sending it.
+   *
+   * The library retries a request that failed for a reason it retries, such as
+   * `ResourceErrorReason.CONNECTION`, and the retry calls the transform again.
+   *
+   * See `mln_resource_transform_request_fail` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun fail(error: ResourceTransformError): Unit =
+    nativeAnswer(this, binding) {
+      check(
+        C.mln_resource_transform_request_fail(
+          handle,
+          writeResourceTransformError(error),
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Releases a resource transform request.
+   *
+   * Releasing a request without an answer fails it with `ResourceErrorReason.OTHER`.
    *
    * See `mln_resource_transform_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

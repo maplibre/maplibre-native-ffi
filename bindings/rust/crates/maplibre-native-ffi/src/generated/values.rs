@@ -4181,6 +4181,42 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
     }
 }
 
+/// Why a resource transform fails a request.
+///
+/// See `mln_resource_transform_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResourceTransformError<'a> {
+    /// Must not be `ResourceErrorReason::None`.
+    pub reason: ResourceErrorReason,
+    pub message: &'a str,
+    /// When to retry, for `ResourceErrorReason::RateLimit`.
+    pub retry_after_unix_ms: Option<i64>,
+}
+impl<'a> ResourceTransformError<'a> {
+    pub fn new(reason: ResourceErrorReason) -> Self {
+        Self {
+            reason,
+            message: Default::default(),
+            retry_after_unix_ms: None,
+        }
+    }
+}
+impl<'a> ToNative<sys::mln_resource_transform_error> for ResourceTransformError<'a> {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_transform_error> {
+        let mut raw: sys::mln_resource_transform_error = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_resource_transform_error>() as _;
+        raw.fields = 0;
+        raw.reason = to_native(&self.reason, arena)?;
+        raw.message = to_native(&self.message, arena)?;
+        if let Some(item) = &self.retry_after_unix_ms {
+            raw.fields |= sys::MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
+            raw.retry_after_unix_ms = *item;
+        }
+        Ok(raw)
+    }
+}
+
 native_enum! {
 /// Whether a request loads a resource for a map or an offline region.
 ///

@@ -292,6 +292,8 @@ pub const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED: mln_resource_response_statu
 pub type mln_resource_storage_policy = u32;
 pub const MLN_RESOURCE_STORAGE_POLICY_PERMANENT: mln_resource_storage_policy = 0;
 pub const MLN_RESOURCE_STORAGE_POLICY_VOLATILE: mln_resource_storage_policy = 1;
+pub type mln_resource_transform_error_field = u32;
+pub const MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER: mln_resource_transform_error_field = 1;
 pub type mln_resource_usage = u32;
 pub const MLN_RESOURCE_USAGE_ONLINE: mln_resource_usage = 0;
 pub const MLN_RESOURCE_USAGE_OFFLINE: mln_resource_usage = 1;
@@ -1345,6 +1347,15 @@ pub struct mln_resource_transform {
     pub queue: mln_delivery_queue,
 }
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_resource_transform_error {
+    pub size: u32,
+    pub fields: mln_resource_transform_error_fields,
+    pub reason: mln_resource_error_reason,
+    pub message: mln_buffer_view,
+    pub retry_after_unix_ms: i64,
+}
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_runtime_event {
     pub type_: mln_runtime_event_type,
@@ -1876,6 +1887,7 @@ pub type mln_resource_transform_callback = Option<
         request: mln_resource_transform_request,
     ),
 >;
+pub type mln_resource_transform_error_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_resource_transform_request(pub u64);
@@ -2874,6 +2886,11 @@ unsafe extern "C" {
     pub fn mln_resource_transform_request_complete(
         request: mln_resource_transform_request,
         url: mln_buffer_view,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_resource_transform_request_fail(
+        request: mln_resource_transform_request,
+        error: *const mln_resource_transform_error,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_transform_request_release(request: mln_resource_transform_request);

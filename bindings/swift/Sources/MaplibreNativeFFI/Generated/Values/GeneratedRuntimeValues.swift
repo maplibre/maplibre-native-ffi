@@ -987,8 +987,10 @@ private func invokeResourceTransformCallback(
 /// Rewrites the URL of a network request before the library sends it.
 ///
 /// The request waits until you answer with
-/// `ResourceTransformRequestHandle.complete()` or release `request` to keep
-/// `url`. You can answer now or later, from any thread.
+/// `ResourceTransformRequestHandle.complete()` or
+/// `ResourceTransformRequestHandle.fail()`. To keep `url`, complete with it.
+/// Releasing `request` without an answer fails the request. You can answer now
+/// or later, from any thread.
 ///
 /// See `mln_resource_transform_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -997,6 +999,55 @@ public typealias ResourceTransformCallback = @Sendable (
   _ url: String,
   _ request: ResourceTransformRequestHandle
 ) -> Void
+
+/// Why a resource transform fails a request.
+///
+/// See `mln_resource_transform_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceTransformError: Equatable, Hashable, Sendable {
+  /// Must not be `ResourceErrorReason.none`.
+  public var reason: ResourceErrorReason
+  public var message: String
+  /// When to retry, for `ResourceErrorReason.rateLimit`.
+  public var retryAfterUnixMs: Int64?
+  public init(
+    reason: ResourceErrorReason,
+    message: String = "",
+    retryAfterUnixMs: Int64? = nil
+  ) {
+    self.reason = reason
+    self.message = message
+    self.retryAfterUnixMs = retryAfterUnixMs
+  }
+
+  init(
+    raw: mln_resource_transform_error,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    reason = ResourceErrorReason(rawValue: raw.reason.rawValue)
+    message = try NativeString.copyUTF8(
+      data: raw.message.data,
+      size: raw.message.size
+    )
+    retryAfterUnixMs = raw.fields & MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER
+      .rawValue != 0 ? raw.retry_after_unix_ms : nil
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_resource_transform_error
+  {
+    var raw = mln_resource_transform_error()
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_resource_transform_error>.size)
+    raw.reason = mln_resource_error_reason(rawValue: reason.rawValue)
+    raw.message = arena.view(message)
+    if let item = retryAfterUnixMs {
+      raw.fields |= MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER.rawValue; raw
+        .retry_after_unix_ms = item
+    }
+    return raw
+  }
+}
 
 /// Whether a request loads a resource for a map or an offline region.
 ///

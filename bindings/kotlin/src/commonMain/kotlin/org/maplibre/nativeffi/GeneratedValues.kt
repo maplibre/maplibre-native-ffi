@@ -3604,6 +3604,20 @@ public data class ResourceResponse(
 }
 
 /**
+ * Why a resource transform fails a request.
+ *
+ * See `mln_resource_transform_error` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceTransformError(
+  /** Must not be `ResourceErrorReason.NONE`. */
+  public val reason: ResourceErrorReason,
+  public val message: String = "",
+  /** When to retry, for `ResourceErrorReason.RATE_LIMIT`. */
+  public val retryAfterUnixMs: Long? = null,
+)
+
+/**
  * Options for `RuntimeHandle.createMap()`.
  *
  * See `mln_map_options` in the
@@ -4392,8 +4406,9 @@ public data class ResourceTransform(
 /**
  * Rewrites the URL of a network request before the library sends it.
  *
- * The request waits until you answer with `ResourceTransformRequestHandle.complete()` or release
- * `request` to keep `url`. You can answer now or later, from any thread.
+ * The request waits until you answer with `ResourceTransformRequestHandle.complete()` or
+ * `ResourceTransformRequestHandle.fail()`. To keep `url`, complete with it. Releasing `request`
+ * without an answer fails the request. You can answer now or later, from any thread.
  *
  * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
  * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.

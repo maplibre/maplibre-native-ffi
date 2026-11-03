@@ -1800,6 +1800,25 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_resource_transform_error NativeResourceTransformError(
+        ResourceTransformError value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Message, "ResourceTransformError.Message must not be null.");
+        var native = new mln_resource_transform_error();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_resource_transform_error);
+        native.reason = (mln_resource_error_reason)value.Reason;
+        native.message = scope.Utf8(value.Message);
+        native.fields |= Put(
+            value.RetryAfterUnixMs,
+            ref native.retry_after_unix_ms,
+            MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER
+        );
+        return native;
+    }
+
     internal static RuntimeEvent CopyRuntimeEvent(
         mln_runtime_event value,
         byte* record = null,

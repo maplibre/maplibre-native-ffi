@@ -38,6 +38,10 @@ The callback answers each request with its new URL through
 
 <Snippet page="network" region="rewrite" />
 
+To stop a request instead, such as when the callback can't get a credential,
+fail it with [](api:mln_resource_transform_request_fail). A request that the
+callback releases without an answer also fails.
+
 ## Serve resources
 
 You might not need code for this. The library already reads `file://` URLs,

@@ -61,6 +61,7 @@ import type {
   ResourceRequestCancelHandler,
   ResourceResponse,
   ResourceTransform,
+  ResourceTransformError,
   RuntimeEventFlag,
   RuntimeEventHandler,
   RuntimeOptions,
@@ -758,6 +759,11 @@ export interface NativeOperations {
     request: bigint,
     token: object | undefined,
     url: string,
+  ): void;
+  mln_resource_transform_request_fail(
+    request: bigint,
+    token: object | undefined,
+    error: ResourceTransformError,
   ): void;
   mln_resource_transform_request_release(
     request: bigint,

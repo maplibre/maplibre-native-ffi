@@ -326,7 +326,10 @@ static void record_image_resource_kind(
     );
     mln_test_flag_set(&probe->resource_seen);
   }
-  mln_resource_transform_request_release(request);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_resource_transform_request_complete(request, url_view, NULL)
+  );
 }
 
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED

@@ -75,6 +75,7 @@ from ._generated_values import (
     ResourceRequestCancelHandler,
     ResourceResponse,
     ResourceTransform,
+    ResourceTransformError,
     RuntimeEventFlag,
     RuntimeEventHandler,
     RuntimeOptions,
@@ -2353,8 +2354,23 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
         """
         return self._native.complete(url)
 
+    def fail(self, error: ResourceTransformError) -> None:
+        """Fails a resource transform request without sending it.
+
+        The library retries a request that failed for a reason it retries,
+        such as `ResourceErrorReason.CONNECTION`, and the retry calls the
+        transform again.
+
+        See `mln_resource_transform_request_fail` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native.fail(error)
+
     def close(self) -> None:
         """Releases a resource transform request.
+
+        Releasing a request without an answer fails it with
+        `ResourceErrorReason.OTHER`.
 
         See `mln_resource_transform_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

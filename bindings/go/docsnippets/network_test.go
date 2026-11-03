@@ -48,7 +48,7 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 			request *maplibre.ResourceTransformRequestHandle,
 		) {
 			if err := request.Complete(withAPIKey(url)); err != nil {
-				// Closing the request without an answer keeps the old URL.
+				// Closing the request without an answer fails it.
 				request.Close()
 			}
 		},

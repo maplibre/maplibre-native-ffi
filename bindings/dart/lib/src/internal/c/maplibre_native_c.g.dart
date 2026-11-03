@@ -1201,6 +1201,18 @@ final class mln_resource_transform extends Struct {
   external int queue;
 }
 
+final class mln_resource_transform_error extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Uint32()
+  external int reason;
+  external mln_buffer_view message;
+  @Int64()
+  external int retry_after_unix_ms;
+}
+
 final class mln_runtime_event extends Struct {
   @Uint32()
   external int type;
@@ -2076,6 +2088,9 @@ const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3;
 // mln_resource_storage_policy
 const MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0;
 const MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1;
+
+// mln_resource_transform_error_field
+const MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER = 1;
 
 // mln_resource_usage
 const MLN_RESOURCE_USAGE_ONLINE = 0;
@@ -4489,6 +4504,19 @@ external int mln_resource_request_set_cancel_callback(
 external int mln_resource_transform_request_complete(
   int request,
   mln_buffer_view url,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_resource_transform_request,
+    Pointer<mln_resource_transform_error>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_resource_transform_request_fail(
+  int request,
+  Pointer<mln_resource_transform_error> error,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

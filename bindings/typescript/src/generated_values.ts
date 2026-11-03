@@ -2490,6 +2490,24 @@ export type ResourceTransform = (
 ) => void;
 
 /**
+ * Why a resource transform fails a request.
+ *
+ * See `mln_resource_transform_error` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface ResourceTransformError {
+  /**
+   * Must not be `ResourceErrorReason.none`.
+   */
+  reason: ResourceErrorReason;
+  message?: string;
+  /**
+   * When to retry, for `ResourceErrorReason.rateLimit`.
+   */
+  retryAfterUnixMs?: bigint;
+}
+
+/**
  * Whether a request loads a resource for a map or an offline region.
  *
  * See `mln_resource_usage` in the

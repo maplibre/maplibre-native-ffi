@@ -1222,6 +1222,13 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
+  @JvmStatic
+  actual external fun mln_resource_transform_request_fail(
+    request: Long,
+    error: Long,
+    outDiagnostic: Long,
+  ): Int
+
   @JvmStatic actual external fun mln_resource_transform_request_release(request: Long): Unit
 
   @JvmStatic

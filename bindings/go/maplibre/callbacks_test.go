@@ -89,8 +89,8 @@ func TestCameraEndHandlerSurvivesACollectionUntilItRuns(t *testing.T) {
 }
 
 // A panic in a callback stays in the binding, which settles what native waits
-// for: a transform's request keeps its URL, and a provider's request fails.
-// The binding logs each panic through the default slog logger.
+// for by failing the transform's or provider's request. The binding logs each
+// panic through the default slog logger.
 func TestCallbackPanicIsContained(t *testing.T) {
 	panics := capturePanicLogs(t)
 	f := newFixture(t)
@@ -103,7 +103,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	if _, err := f.m.SetStyleUrl(base + "/original.json"); err != nil {
 		t.Fatal(err)
 	}
-	f.awaitEvent(t, "the style load from the original URL", isStyleLoaded)
+	f.awaitEvent(t, "the transform's loading failure", isLoadingFailure("without an answer"))
 	receive(t, panicked, "the transform's panic")
 	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed"}) {
 		t.Fatalf("logged %+v", got)

@@ -2078,7 +2078,22 @@ pub const ResourceTransformRequest = struct {
         self.closed = true;
     }
 
+    /// Fails a resource transform request without sending it.
+    ///
+    /// The library retries a request that failed for a reason it retries, such as
+    /// `ResourceErrorReason.connection`, and the retry calls the transform again.
+    ///
+    /// See `mln_resource_transform_request_fail` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    pub fn fail(self: *ResourceTransformRequest, @"error": ResourceTransformError, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        try call.invoke("mln_resource_transform_request_fail", .handle, self.*, null, diagnostic, .{@"error"});
+        self.closed = true;
+    }
+
     /// Releases a resource transform request.
+    ///
+    /// Releasing a request without an answer fails it with
+    /// `ResourceErrorReason.other`.
     ///
     /// See `mln_resource_transform_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6106,6 +6121,35 @@ pub const ResourceTransform = struct {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
+        };
+    }
+};
+
+/// Why a resource transform fails a request.
+///
+/// See `mln_resource_transform_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceTransformError = struct {
+    /// Must not be `ResourceErrorReason.none`.
+    reason: ResourceErrorReason,
+    message: []const u8 = &.{},
+    /// When to retry, for `ResourceErrorReason.rate_limit`.
+    retry_after_unix_ms: ?i64 = null,
+    pub fn toNative(self: ResourceTransformError) status.Error!c.mln_resource_transform_error {
+        var raw = std.mem.zeroes(c.mln_resource_transform_error);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_resource_transform_error);
+        raw.reason = self.reason.toNative();
+        raw.message = marshal.view(self.message);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_transform_error) status.Error!ResourceTransformError {
+        return .{
+            .reason = ResourceErrorReason.fromNative(raw.reason),
+            .message = try marshal.copyView(allocator, raw.message),
+            .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
         };
     }
 };

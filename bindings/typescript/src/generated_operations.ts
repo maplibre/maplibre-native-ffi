@@ -66,6 +66,7 @@ import type {
   ResourceRequestCancelHandler,
   ResourceResponse,
   ResourceTransform,
+  ResourceTransformError,
   RuntimeEventFlag,
   RuntimeEventHandler,
   RuntimeOptions,
@@ -4659,6 +4660,9 @@ export class ResourceTransformRequestHandle extends Owner {
   /**
    * Releases a resource transform request.
    *
+   * Releasing a request without an answer fails it with
+   * `ResourceErrorReason.other`.
+   *
    * See `mln_resource_transform_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
@@ -4679,6 +4683,21 @@ export class ResourceTransformRequestHandle extends Owner {
   complete(url: string): void {
     answerSync(this, (handle, token) =>
       native.mln_resource_transform_request_complete(handle, token, url),
+    );
+  }
+
+  /**
+   * Fails a resource transform request without sending it.
+   *
+   * The library retries a request that failed for a reason it retries, such as
+   * `ResourceErrorReason.connection`, and the retry calls the transform again.
+   *
+   * See `mln_resource_transform_request_fail` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  fail(error: ResourceTransformError): void {
+    answerSync(this, (handle, token) =>
+      native.mln_resource_transform_request_fail(handle, token, error),
     );
   }
 }

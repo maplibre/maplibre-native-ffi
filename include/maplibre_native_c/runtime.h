@@ -628,8 +628,10 @@ typedef struct mln_http_header_rule {
  * Rewrites the URL of a network request before the library sends it.
  *
  * The request waits until you answer with
- * mln_resource_transform_request_complete() or release `request` to keep
- * `url`. You can answer now or later, from any thread.
+ * mln_resource_transform_request_complete() or
+ * mln_resource_transform_request_fail(). To keep `url`, complete with it.
+ * Releasing `request` without an answer fails the request. You can answer now
+ * or later, from any thread.
  *
  * Lifetimes:
  * `url` stays valid until the callback returns. The callback owns `request`.
@@ -638,6 +640,28 @@ typedef void (*mln_resource_transform_callback)(
   void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request MLN_BINDING("ownership=owned")
 );
+
+/** The fields that mln_resource_transform_error sets. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_resource_transform_error_field : uint32_t {
+  MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER = 1U << 0U,
+} mln_resource_transform_error_field;
+
+/** A set of mln_resource_transform_error_field bits. */
+typedef uint32_t mln_resource_transform_error_fields;
+
+/** Why a resource transform fails a request. */
+typedef struct mln_resource_transform_error {
+  uint32_t size;
+  mln_resource_transform_error_fields fields;
+  /** Must not be MLN_RESOURCE_ERROR_REASON_NONE. */
+  mln_resource_error_reason reason MLN_BINDING("required=true");
+  mln_buffer_view message;
+  /** When to retry, for MLN_RESOURCE_ERROR_REASON_RATE_LIMIT. */
+  int64_t retry_after_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER");
+} mln_resource_transform_error;
 
 /** A resource transform callback, for mln_runtime_set_resource_transform(). */
 typedef struct mln_resource_transform {
@@ -981,7 +1005,25 @@ MLN_API mln_status mln_resource_transform_request_complete(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Releases a resource transform request. */
+/**
+ * Fails a resource transform request without sending it.
+ *
+ * The library retries a request that failed for a reason it retries, such as
+ * MLN_RESOURCE_ERROR_REASON_CONNECTION, and the retry calls the transform
+ * again.
+ */
+MLN_BINDING("consumes=success")
+MLN_API mln_status mln_resource_transform_request_fail(
+  mln_resource_transform_request request,
+  const mln_resource_transform_error* error, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a resource transform request.
+ *
+ * Releasing a request without an answer fails it with
+ * MLN_RESOURCE_ERROR_REASON_OTHER.
+ */
 MLN_API void mln_resource_transform_request_release(
   mln_resource_transform_request request
 ) MLN_NOEXCEPT;

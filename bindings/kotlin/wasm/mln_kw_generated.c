@@ -1597,6 +1597,15 @@ int32_t mln_kw_mln_resource_transform_request_complete(
   );
 }
 
+int32_t mln_kw_mln_resource_transform_request_fail(
+  int64_t request, uintptr_t error, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_resource_transform_request_fail(
+    (mln_resource_transform_request)request,
+    (const mln_resource_transform_error*)error, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 void mln_kw_mln_resource_transform_request_release(int64_t request) {
   mln_resource_transform_request_release(
     (mln_resource_transform_request)request
