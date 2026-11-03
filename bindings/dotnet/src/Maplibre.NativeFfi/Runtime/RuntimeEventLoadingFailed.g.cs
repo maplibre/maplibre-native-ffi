@@ -3,10 +3,10 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The details of <c>RuntimeEventType.MapRenderMapFinished</c>.
+/// The details of <c>RuntimeEventType.MapLoadingFailed</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_runtime_event_render_map</c> in the <see
+/// See <c>mln_runtime_event_loading_failed</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct RuntimeEventRenderMap(RenderMode Mode);
+public readonly partial record struct RuntimeEventLoadingFailed(MapLoadError Error);

@@ -174,9 +174,29 @@ class OfflineRegionDefinitionGeometryVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeEventCameraChangeVariant:
+    value: RuntimeEventCameraChange
+    _tag = 1
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventCameraChange._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventLoadingFailedVariant:
+    value: RuntimeEventLoadingFailed
+    _tag = 2
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventLoadingFailed._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeEventRenderFrameVariant:
     value: RuntimeEventRenderFrame
-    _tag = 1
+    _tag = 3
 
     @classmethod
     def _from_native(cls, raw):
@@ -184,19 +204,19 @@ class RuntimeEventRenderFrameVariant:
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeEventRenderMapVariant:
-    value: RuntimeEventRenderMap
-    _tag = 2
+class RuntimeEventStyleImageVariant:
+    value: RuntimeEventStyleImage
+    _tag = 4
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(RuntimeEventRenderMap._from_native(raw))
+        return cls(RuntimeEventStyleImage._from_native(raw))
 
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventTileActionVariant:
     value: RuntimeEventTileAction
-    _tag = 3
+    _tag = 5
 
     @classmethod
     def _from_native(cls, raw):
@@ -204,9 +224,19 @@ class RuntimeEventTileActionVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeEventSourceChangedVariant:
+    value: RuntimeEventSourceChanged
+    _tag = 6
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(RuntimeEventSourceChanged._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionStatusVariant:
     value: RuntimeEventOfflineRegionStatus
-    _tag = 4
+    _tag = 7
 
     @classmethod
     def _from_native(cls, raw):
@@ -216,7 +246,7 @@ class RuntimeEventOfflineRegionStatusVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionResponseErrorVariant:
     value: RuntimeEventOfflineRegionResponseError
-    _tag = 5
+    _tag = 8
 
     @classmethod
     def _from_native(cls, raw):
@@ -226,7 +256,7 @@ class RuntimeEventOfflineRegionResponseErrorVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionTileCountLimitVariant:
     value: RuntimeEventOfflineRegionTileCountLimit
-    _tag = 6
+    _tag = 9
 
     @classmethod
     def _from_native(cls, raw):
@@ -236,7 +266,7 @@ class RuntimeEventOfflineRegionTileCountLimitVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventGlyphsVariant:
     value: RuntimeEventGlyphs
-    _tag = 7
+    _tag = 10
 
     @classmethod
     def _from_native(cls, raw):
@@ -246,7 +276,7 @@ class RuntimeEventGlyphsVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventSpriteVariant:
     value: RuntimeEventSprite
-    _tag = 8
+    _tag = 11
 
     @classmethod
     def _from_native(cls, raw):
@@ -461,6 +491,18 @@ class MapDebugFlag(IntFlag):
     OVERDRAW = 32
     STENCIL_CLIP = 64
     DEPTH_BUFFER = 128
+
+
+class MapLoadError(UnknownIntEnum):
+    """Why a map failed to load a style.
+
+    See `mln_map_load_error` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    UNKNOWN = 0
+    STYLE_PARSE = 1
+    STYLE_LOAD = 2
 
 
 class MapMode(UnknownIntEnum):
@@ -792,6 +834,10 @@ class RuntimeEventSourceType(UnknownIntEnum):
 
 class RuntimeEventType(UnknownIntEnum):
     """The kind of an event.
+
+    An event's `payload_type` names the member of its payload that holds the
+    event's details. An event that reports a failure carries the error's text
+    in `message`.
 
     Only maps in `MapMode.CONTINUOUS` raise
     `RuntimeEventType.MAP_LOADING_FINISHED`, `RuntimeEventType.MAP_IDLE`, and
@@ -3706,22 +3752,16 @@ class RuntimeEvent:
     includes what the event reports. Zero for a runtime event.
     """
 
-    code: int
-    """The `CameraChangeMode` for `RuntimeEventType.MAP_CAMERA_WILL_CHANGE` and
-    `RuntimeEventType.MAP_CAMERA_DID_CHANGE`.
-    """
-
     message: str
-    """The error for an event that reports a failure, the image ID for
-    `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`, or the source ID for
-    `RuntimeEventType.MAP_SOURCE_CHANGED` and
-    `RuntimeEventType.MAP_TILE_ACTION`.
-    """
+    """The error's text for an event that reports a failure, or empty."""
 
     payload: (
-        RuntimeEventRenderFrameVariant
-        | RuntimeEventRenderMapVariant
+        RuntimeEventCameraChangeVariant
+        | RuntimeEventLoadingFailedVariant
+        | RuntimeEventRenderFrameVariant
+        | RuntimeEventStyleImageVariant
         | RuntimeEventTileActionVariant
+        | RuntimeEventSourceChangedVariant
         | RuntimeEventOfflineRegionStatusVariant
         | RuntimeEventOfflineRegionResponseErrorVariant
         | RuntimeEventOfflineRegionTileCountLimitVariant
@@ -3738,14 +3778,16 @@ class RuntimeEvent:
             source_type=RuntimeEventSourceType(raw["source_type"]),
             source=raw["source"],
             generation=raw["generation"],
-            code=raw["code"],
             message=raw["message"],
             payload=_copy_variant(
                 raw["payload"],
                 {
+                    "camera_change": RuntimeEventCameraChangeVariant,
+                    "loading_failed": RuntimeEventLoadingFailedVariant,
                     "render_frame": RuntimeEventRenderFrameVariant,
-                    "render_map": RuntimeEventRenderMapVariant,
+                    "style_image": RuntimeEventStyleImageVariant,
                     "tile_action": RuntimeEventTileActionVariant,
+                    "source_changed": RuntimeEventSourceChangedVariant,
                     "offline_region_status": RuntimeEventOfflineRegionStatusVariant,
                     "offline_region_response_error": RuntimeEventOfflineRegionResponseErrorVariant,
                     "offline_region_tile_count_limit": RuntimeEventOfflineRegionTileCountLimitVariant,
@@ -3755,6 +3797,22 @@ class RuntimeEvent:
                 0,
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventCameraChange:
+    """The details of `RuntimeEventType.MAP_CAMERA_WILL_CHANGE` and
+    `RuntimeEventType.MAP_CAMERA_DID_CHANGE`.
+
+    See `mln_runtime_event_camera_change` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    mode: CameraChangeMode
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(mode=CameraChangeMode(raw["mode"]))
 
 
 @dataclass(frozen=True, slots=True)
@@ -3799,6 +3857,21 @@ class RuntimeEventHandler:
     def _invoke_callback(self, events):
         callback = self.callback
         return callback(tuple(RuntimeEvent._from_native(item) for item in events))
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEventLoadingFailed:
+    """The details of `RuntimeEventType.MAP_LOADING_FAILED`.
+
+    See `mln_runtime_event_loading_failed` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    error: MapLoadError
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(error=MapLoadError(raw["error"]))
 
 
 @dataclass(frozen=True, slots=True)
@@ -3888,18 +3961,18 @@ class RuntimeEventRenderFrame:
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeEventRenderMap:
-    """The details of `RuntimeEventType.MAP_RENDER_MAP_FINISHED`.
+class RuntimeEventSourceChanged:
+    """The details of `RuntimeEventType.MAP_SOURCE_CHANGED`.
 
-    See `mln_runtime_event_render_map` in the
+    See `mln_runtime_event_source_changed` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    mode: RenderMode
+    source_id: str
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(mode=RenderMode(raw["mode"]))
+        return cls(source_id=raw["source_id"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -3922,12 +3995,30 @@ class RuntimeEventSprite:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeEventStyleImage:
+    """The details of `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`.
+
+    See `mln_runtime_event_style_image` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    image_id: str
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(image_id=raw["image_id"])
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeEventTileAction:
     """The details of `RuntimeEventType.MAP_TILE_ACTION`.
 
     See `mln_runtime_event_tile_action` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
+
+    source_id: str
+    """The source that the tile belongs to."""
 
     operation: TileOperation
 
@@ -3936,6 +4027,7 @@ class RuntimeEventTileAction:
     @classmethod
     def _from_native(cls, raw):
         return cls(
+            source_id=raw["source_id"],
             operation=TileOperation(raw["operation"]),
             tile_id=TileId._from_native(raw["tile_id"]),
         )

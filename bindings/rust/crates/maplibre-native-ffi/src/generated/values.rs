@@ -1957,6 +1957,26 @@ pub struct MapDebugFlag: u32 {
 }
 
 native_enum! {
+/// Why a map failed to load a style.
+///
+/// See `mln_map_load_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub enum MapLoadError: u32 {
+    Unknown = 0,
+    /// The style document isn't a valid style.
+    StyleParse = 1,
+    /// The style's request failed, for any reason, including a 404 or a missing
+    /// file.
+    StyleLoad = 2,
+} Unrecognized
+}
+impl Default for MapLoadError {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
+native_enum! {
 /// When a map renders.
 ///
 /// See `mln_map_mode` in the
@@ -4386,13 +4406,7 @@ pub struct RuntimeEvent {
     /// For a map event, a map snapshot with this generation or a later one
     /// includes what the event reports. Zero for a runtime event.
     pub generation: u64,
-    /// The `CameraChangeMode` for `RuntimeEventType::MapCameraWillChange` and
-    /// `RuntimeEventType::MapCameraDidChange`.
-    pub code: u32,
-    /// The error for an event that reports a failure, the image ID for
-    /// `RuntimeEventType::MapStyleImageMissing`, or the source ID for
-    /// `RuntimeEventType::MapSourceChanged` and
-    /// `RuntimeEventType::MapTileAction`.
+    /// The error's text for an event that reports a failure, or empty.
     pub message: String,
     pub payload: RuntimeEventPayload,
 }
@@ -4403,20 +4417,36 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
             source_type: RuntimeEventSourceType::from_raw(raw.source_type),
             source: raw.source,
             generation: raw.generation,
-            code: raw.code,
             message: unsafe { from_native(raw.message) }?,
             payload: match raw.payload_type {
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE => {
+                    RuntimeEventPayload::CameraChange(unsafe {
+                        from_native(raw.payload.camera_change)
+                    }?)
+                }
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED => {
+                    RuntimeEventPayload::LoadingFailed(unsafe {
+                        from_native(raw.payload.loading_failed)
+                    }?)
+                }
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => {
                     RuntimeEventPayload::RenderFrame(unsafe {
                         from_native(raw.payload.render_frame)
                     }?)
                 }
-                sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => {
-                    RuntimeEventPayload::RenderMap(unsafe { from_native(raw.payload.render_map) }?)
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE => {
+                    RuntimeEventPayload::StyleImage(unsafe {
+                        from_native(raw.payload.style_image)
+                    }?)
                 }
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => {
                     RuntimeEventPayload::TileAction(unsafe {
                         from_native(raw.payload.tile_action)
+                    }?)
+                }
+                sys::MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED => {
+                    RuntimeEventPayload::SourceChanged(unsafe {
+                        from_native(raw.payload.source_changed)
                     }?)
                 }
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => {
@@ -4443,6 +4473,23 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE => RuntimeEventPayload::Empty,
                 tag => RuntimeEventPayload::Unknown(tag as u32),
             },
+        })
+    }
+}
+
+/// The details of `RuntimeEventType::MapCameraWillChange` and
+/// `RuntimeEventType::MapCameraDidChange`.
+///
+/// See `mln_runtime_event_camera_change` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RuntimeEventCameraChange {
+    pub mode: CameraChangeMode,
+}
+impl FromNative<sys::mln_runtime_event_camera_change> for RuntimeEventCameraChange {
+    unsafe fn from_native(raw: sys::mln_runtime_event_camera_change) -> Result<Self> {
+        Ok(Self {
+            mode: CameraChangeMode::from_raw(raw.mode),
         })
     }
 }
@@ -4564,6 +4611,22 @@ impl ToNative<sys::mln_runtime_event_handler> for RuntimeEventHandler {
     }
 }
 
+/// The details of `RuntimeEventType::MapLoadingFailed`.
+///
+/// See `mln_runtime_event_loading_failed` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RuntimeEventLoadingFailed {
+    pub error: MapLoadError,
+}
+impl FromNative<sys::mln_runtime_event_loading_failed> for RuntimeEventLoadingFailed {
+    unsafe fn from_native(raw: sys::mln_runtime_event_loading_failed) -> Result<Self> {
+        Ok(Self {
+            error: MapLoadError::from_raw(raw.error),
+        })
+    }
+}
+
 /// The details of `RuntimeEventType::OfflineRegionResponseError`.
 ///
 /// See `mln_runtime_event_offline_region_response_error` in the
@@ -4634,9 +4697,12 @@ impl FromNative<sys::mln_runtime_event_offline_region_tile_count_limit>
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub enum RuntimeEventPayload {
+    CameraChange(RuntimeEventCameraChange),
+    LoadingFailed(RuntimeEventLoadingFailed),
     RenderFrame(RuntimeEventRenderFrame),
-    RenderMap(RuntimeEventRenderMap),
+    StyleImage(RuntimeEventStyleImage),
     TileAction(RuntimeEventTileAction),
+    SourceChanged(RuntimeEventSourceChanged),
     OfflineRegionStatus(RuntimeEventOfflineRegionStatus),
     OfflineRegionResponseError(RuntimeEventOfflineRegionResponseError),
     OfflineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit),
@@ -4673,18 +4739,18 @@ impl FromNative<sys::mln_runtime_event_render_frame> for RuntimeEventRenderFrame
     }
 }
 
-/// The details of `RuntimeEventType::MapRenderMapFinished`.
+/// The details of `RuntimeEventType::MapSourceChanged`.
 ///
-/// See `mln_runtime_event_render_map` in the
+/// See `mln_runtime_event_source_changed` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct RuntimeEventRenderMap {
-    pub mode: RenderMode,
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RuntimeEventSourceChanged {
+    pub source_id: String,
 }
-impl FromNative<sys::mln_runtime_event_render_map> for RuntimeEventRenderMap {
-    unsafe fn from_native(raw: sys::mln_runtime_event_render_map) -> Result<Self> {
+impl FromNative<sys::mln_runtime_event_source_changed> for RuntimeEventSourceChanged {
+    unsafe fn from_native(raw: sys::mln_runtime_event_source_changed) -> Result<Self> {
         Ok(Self {
-            mode: RenderMode::from_raw(raw.mode),
+            source_id: unsafe { from_native(raw.source_id) }?,
         })
     }
 }
@@ -4725,18 +4791,37 @@ impl FromNative<sys::mln_runtime_event_sprite> for RuntimeEventSprite {
     }
 }
 
+/// The details of `RuntimeEventType::MapStyleImageMissing`.
+///
+/// See `mln_runtime_event_style_image` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RuntimeEventStyleImage {
+    pub image_id: String,
+}
+impl FromNative<sys::mln_runtime_event_style_image> for RuntimeEventStyleImage {
+    unsafe fn from_native(raw: sys::mln_runtime_event_style_image) -> Result<Self> {
+        Ok(Self {
+            image_id: unsafe { from_native(raw.image_id) }?,
+        })
+    }
+}
+
 /// The details of `RuntimeEventType::MapTileAction`.
 ///
 /// See `mln_runtime_event_tile_action` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct RuntimeEventTileAction {
+    /// The source that the tile belongs to.
+    pub source_id: String,
     pub operation: TileOperation,
     pub tile_id: TileId,
 }
 impl FromNative<sys::mln_runtime_event_tile_action> for RuntimeEventTileAction {
     unsafe fn from_native(raw: sys::mln_runtime_event_tile_action) -> Result<Self> {
         Ok(Self {
+            source_id: unsafe { from_native(raw.source_id) }?,
             operation: TileOperation::from_raw(raw.operation),
             tile_id: unsafe { from_native(raw.tile_id) }?,
         })
@@ -4745,6 +4830,10 @@ impl FromNative<sys::mln_runtime_event_tile_action> for RuntimeEventTileAction {
 
 native_enum! {
 /// The kind of an event.
+///
+/// An event's `payload_type` names the member of its payload that holds the
+/// event's details. An event that reports a failure carries the error's text in
+/// `message`.
 ///
 /// Only maps in `MapMode::Continuous` raise
 /// `RuntimeEventType::MapLoadingFinished`, `RuntimeEventType::MapIdle`, and the
@@ -4755,8 +4844,10 @@ native_enum! {
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum RuntimeEventType: u32 {
+    /// The camera is about to change. Its details are in `camera_change`.
     MapCameraWillChange = 1,
     MapCameraIsChanging = 2,
+    /// The camera changed. Its details are in `camera_change`.
     MapCameraDidChange = 3,
     MapStyleLoaded = 4,
     /// The map started to load a style.
@@ -4764,35 +4855,53 @@ pub enum RuntimeEventType: u32 {
     /// The map loaded its style and everything that the current view needs, and
     /// rendered the result.
     MapLoadingFinished = 6,
+    /// The map failed to load a style. Its details are in `loading_failed`, and
+    /// the error's text is in `message`.
     MapLoadingFailed = 7,
     /// The map rendered a complete frame and has nothing left to load, animate,
     /// or redraw.
     MapIdle = 8,
+    /// The map failed to render. The error's text is in `message`.
     MapRenderError = 9,
     MapRenderFrameStarted = 10,
+    /// The map rendered a frame. Its details are in `render_frame`.
     MapRenderFrameFinished = 11,
     MapRenderMapStarted = 12,
     MapRenderMapFinished = 13,
+    /// The style uses an image that it doesn't have. Its details are in
+    /// `style_image`.
     MapStyleImageMissing = 14,
-    /// A tile moved to another step of loading.
+    /// A tile moved to another step of loading. Its details are in
+    /// `tile_action`.
     MapTileAction = 15,
+    /// A source changed. Its details are in `source_changed`.
     MapSourceChanged = 16,
+    /// The region's status changed. Its details are in `offline_region_status`.
     OfflineRegionStatusChanged = 17,
-    /// A resource that the region needs failed to download.
+    /// A resource that the region needs failed to download. Its details are in
+    /// `offline_region_response_error`, and the error's text is in `message`.
     OfflineRegionResponseError = 18,
     /// The region's download became inactive because the cache file's offline
     /// regions reached their limit of 6000 tiles from MapLibre's demo tile
-    /// server.
+    /// server. Its details are in `offline_region_tile_count_limit`.
     ///
     /// Only tiles of sources on the demo server count toward the limit: sources
     /// with a `maplibre://` URL, which resolves to
     /// https://demotiles.maplibre.org. Tiles from other servers never count.
     OfflineRegionTileCountLimitExceeded = 19,
+    /// The map requested a range of glyphs. Its details are in `glyphs`.
     MapGlyphsRequested = 20,
+    /// A range of glyphs loaded. Its details are in `glyphs`.
     MapGlyphsLoaded = 21,
+    /// A range of glyphs failed to load. Its details are in `glyphs`, and the
+    /// error's text is in `message`.
     MapGlyphsError = 22,
+    /// The map requested a sprite. Its details are in `sprite`.
     MapSpriteRequested = 23,
+    /// A sprite loaded. Its details are in `sprite`.
     MapSpriteLoaded = 24,
+    /// A sprite failed to load. Its details are in `sprite`, and the error's
+    /// text is in `message`.
     MapSpriteError = 25,
 } Unknown
 }

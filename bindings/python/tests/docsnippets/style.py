@@ -92,16 +92,13 @@ def style_events(
     # Runs on the binding's dispatcher thread.
     def on_events(events: tuple[mln.RuntimeEvent, ...]) -> None:
         for event in events:
-            if (
-                event.source != map_handle.id
-                or event.type
-                != mln.RuntimeEventType.MAP_STYLE_IMAGE_MISSING
-            ):
+            if event.source != map_handle.id:
                 continue
-            # The message holds the image's ID.
-            map_handle.discarding.set_style_image(
-                event.message, draw_image(event.message)
-            )
+            match event.payload:
+                case mln.RuntimeEventStyleImageVariant(value=missing):
+                    map_handle.discarding.set_style_image(
+                        missing.image_id, draw_image(missing.image_id)
+                    )
 
     runtime.discarding.set_event_handler(
         mln.RuntimeEventHandler(on_events)

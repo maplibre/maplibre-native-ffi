@@ -153,6 +153,10 @@ pub const MLN_MAP_DEBUG_COLLISION: mln_map_debug_flag = 16;
 pub const MLN_MAP_DEBUG_OVERDRAW: mln_map_debug_flag = 32;
 pub const MLN_MAP_DEBUG_STENCIL_CLIP: mln_map_debug_flag = 64;
 pub const MLN_MAP_DEBUG_DEPTH_BUFFER: mln_map_debug_flag = 128;
+pub type mln_map_load_error = u32;
+pub const MLN_MAP_LOAD_ERROR_UNKNOWN: mln_map_load_error = 0;
+pub const MLN_MAP_LOAD_ERROR_STYLE_PARSE: mln_map_load_error = 1;
+pub const MLN_MAP_LOAD_ERROR_STYLE_LOAD: mln_map_load_error = 2;
 pub type mln_map_mode = u32;
 pub const MLN_MAP_MODE_CONTINUOUS: mln_map_mode = 0;
 pub const MLN_MAP_MODE_STATIC: mln_map_mode = 1;
@@ -333,16 +337,19 @@ pub const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS: mln_runtime_event_flag = 91
 pub const MLN_RUNTIME_EVENT_FLAG_ALL: mln_runtime_event_flag = 67108862;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 1;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP: mln_runtime_event_payload_type = 2;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION: mln_runtime_event_payload_type = 3;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS: mln_runtime_event_payload_type = 4;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE: mln_runtime_event_payload_type = 1;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED: mln_runtime_event_payload_type = 2;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 3;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE: mln_runtime_event_payload_type = 4;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION: mln_runtime_event_payload_type = 5;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED: mln_runtime_event_payload_type = 6;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS: mln_runtime_event_payload_type = 7;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_payload_type =
-    5;
+    8;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
-    mln_runtime_event_payload_type = 6;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS: mln_runtime_event_payload_type = 7;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE: mln_runtime_event_payload_type = 8;
+    mln_runtime_event_payload_type = 9;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS: mln_runtime_event_payload_type = 10;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE: mln_runtime_event_payload_type = 11;
 pub type mln_runtime_event_source_type = u32;
 pub const MLN_RUNTIME_EVENT_SOURCE_RUNTIME: mln_runtime_event_source_type = 0;
 pub const MLN_RUNTIME_EVENT_SOURCE_MAP: mln_runtime_event_source_type = 1;
@@ -1391,10 +1398,14 @@ pub struct mln_runtime_event {
     pub source_type: mln_runtime_event_source_type,
     pub source: u64,
     pub generation: u64,
-    pub code: u32,
     pub payload_type: mln_runtime_event_payload_type,
     pub message: mln_buffer_view,
     pub payload: mln_runtime_event_payload,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_runtime_event_camera_change {
+    pub mode: mln_camera_change_mode,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1413,6 +1424,11 @@ pub struct mln_runtime_event_handler {
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_runtime_event_loading_failed {
+    pub error: mln_map_load_error,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1435,9 +1451,12 @@ pub struct mln_runtime_event_offline_region_tile_count_limit {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union mln_runtime_event_payload {
+    pub camera_change: mln_runtime_event_camera_change,
+    pub loading_failed: mln_runtime_event_loading_failed,
     pub render_frame: mln_runtime_event_render_frame,
-    pub render_map: mln_runtime_event_render_map,
+    pub style_image: mln_runtime_event_style_image,
     pub tile_action: mln_runtime_event_tile_action,
+    pub source_changed: mln_runtime_event_source_changed,
     pub offline_region_status: mln_runtime_event_offline_region_status,
     pub offline_region_response_error: mln_runtime_event_offline_region_response_error,
     pub offline_region_tile_count_limit: mln_runtime_event_offline_region_tile_count_limit,
@@ -1454,8 +1473,8 @@ pub struct mln_runtime_event_render_frame {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_runtime_event_render_map {
-    pub mode: mln_render_mode,
+pub struct mln_runtime_event_source_changed {
+    pub source_id: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1465,7 +1484,13 @@ pub struct mln_runtime_event_sprite {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_runtime_event_style_image {
+    pub image_id: mln_buffer_view,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_event_tile_action {
+    pub source_id: mln_buffer_view,
     pub operation: mln_tile_operation,
     pub tile_id: mln_tile_id,
 }

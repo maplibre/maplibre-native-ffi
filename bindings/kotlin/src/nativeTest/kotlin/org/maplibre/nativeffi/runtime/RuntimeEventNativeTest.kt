@@ -34,7 +34,6 @@ class RuntimeEventNativeTest {
         event.source_type = stridedSourceType(index).toUInt()
         event.source = stridedSource(index)
         event.generation = stridedGeneration(index)
-        event.code = stridedCode(index)
         event.payload_type = stridedPayloadType(index).toUInt()
         event.message.data = messages + stridedMessageOffset(index)
         event.message.size = stridedMessageSize(index).convert()
@@ -99,8 +98,6 @@ private fun stridedSource(index: Int): ULong = 0xff00_0000_0000_005auL + index.t
 /** A generation past 32 bits, so a narrowed carrier would lose it. */
 private fun stridedGeneration(index: Int): ULong = 0x1_0000_0000uL + index.toULong()
 
-private fun stridedCode(index: Int): UInt = 920u + index.toUInt()
-
 private fun stridedPayloadType(index: Int): Int = 930 + index
 
 private fun stridedMessageOffset(index: Int): Long = if (index == 0) 0L else 6L
@@ -118,7 +115,6 @@ private fun assertStridedBatchDecoded(events: List<RuntimeEvent>, payloadSize: I
     assertEquals(stridedSourceType(index).toUInt(), event.sourceType.rawValue)
     assertEquals(stridedSource(index), event.source)
     assertEquals(stridedGeneration(index), event.generation)
-    assertEquals(stridedCode(index), event.code)
     assertEquals(listOf("first", "second")[index], event.message)
     val payload = assertIs<RuntimeEventPayload.Unknown>(event.payload)
     assertEquals(stridedPayloadType(index).toUInt(), payload.tag)

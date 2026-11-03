@@ -135,12 +135,12 @@ func styleEvents(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 			if event.Source != m.Id() {
 				continue
 			}
-			if event.Type != maplibre.RuntimeEventTypeMapStyleImageMissing {
+			missing, ok := event.Payload.(maplibre.RuntimeEventPayloadStyleImageVariant)
+			if !ok {
 				continue
 			}
-			// The message holds the image's ID.
-			image := drawImage(event.Message)
-			err := m.Discarding().SetStyleImage(event.Message, image, nil)
+			id := missing.Value.ImageId
+			err := m.Discarding().SetStyleImage(id, drawImage(id), nil)
 			if err != nil {
 				log.Print(err)
 			}

@@ -465,6 +465,34 @@ func (value MapDebugFlag) String() string {
 	return bindingFlagString(uint64(value), []bindingFlag{{2, "MapDebugFlagTileBorders"}, {4, "MapDebugFlagParseStatus"}, {8, "MapDebugFlagTimestamps"}, {16, "MapDebugFlagCollision"}, {32, "MapDebugFlagOverdraw"}, {64, "MapDebugFlagStencilClip"}, {128, "MapDebugFlagDepthBuffer"}})
 }
 
+// MapLoadError corresponds to mln_map_load_error. Why a map failed to load a
+// style.
+//
+// See mln_map_load_error in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type MapLoadError uint32
+
+const (
+	MapLoadErrorUnknown MapLoadError = MapLoadError(C.MLN_MAP_LOAD_ERROR_UNKNOWN)
+	// The style document isn't a valid style.
+	MapLoadErrorStyleParse MapLoadError = MapLoadError(C.MLN_MAP_LOAD_ERROR_STYLE_PARSE)
+	// The style's request failed, for any reason, including a 404 or a missing
+	// file.
+	MapLoadErrorStyleLoad MapLoadError = MapLoadError(C.MLN_MAP_LOAD_ERROR_STYLE_LOAD)
+)
+
+func (value MapLoadError) String() string {
+	switch value {
+	case 0:
+		return "MapLoadErrorUnknown"
+	case 1:
+		return "MapLoadErrorStyleParse"
+	case 2:
+		return "MapLoadErrorStyleLoad"
+	}
+	return fmt.Sprintf("MapLoadError(%d)", value)
+}
+
 // MapMode corresponds to mln_map_mode. When a map renders.
 //
 // See mln_map_mode in the C API reference:
@@ -1108,6 +1136,10 @@ func (value RuntimeEventSourceType) String() string {
 
 // RuntimeEventType corresponds to mln_runtime_event_type. The kind of an event.
 //
+// An event's payload_type names the member of its payload that holds the
+// event's details. An event that reports a failure carries the error's text in
+// message.
+//
 // Only maps in MapModeContinuous raise RuntimeEventTypeMapLoadingFinished,
 // RuntimeEventTypeMapIdle, and the render frame and render map events. Offline
 // region events come only for the regions and types that
@@ -1118,44 +1150,63 @@ func (value RuntimeEventSourceType) String() string {
 type RuntimeEventType uint32
 
 const (
+	// The camera is about to change. Its details are in camera_change.
 	RuntimeEventTypeMapCameraWillChange RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)
 	RuntimeEventTypeMapCameraIsChanging RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING)
-	RuntimeEventTypeMapCameraDidChange  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
-	RuntimeEventTypeMapStyleLoaded      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
+	// The camera changed. Its details are in camera_change.
+	RuntimeEventTypeMapCameraDidChange RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventTypeMapStyleLoaded     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
 	// The map started to load a style.
 	RuntimeEventTypeMapLoadingStarted RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED)
 	// The map loaded its style and everything that the current view needs, and
 	// rendered the result.
 	RuntimeEventTypeMapLoadingFinished RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED)
-	RuntimeEventTypeMapLoadingFailed   RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
+	// The map failed to load a style. Its details are in loading_failed, and the
+	// error's text is in message.
+	RuntimeEventTypeMapLoadingFailed RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
 	// The map rendered a complete frame and has nothing left to load, animate, or
 	// redraw.
-	RuntimeEventTypeMapIdle                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
-	RuntimeEventTypeMapRenderError         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
-	RuntimeEventTypeMapRenderFrameStarted  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
+	RuntimeEventTypeMapIdle RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
+	// The map failed to render. The error's text is in message.
+	RuntimeEventTypeMapRenderError        RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
+	RuntimeEventTypeMapRenderFrameStarted RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
+	// The map rendered a frame. Its details are in render_frame.
 	RuntimeEventTypeMapRenderFrameFinished RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)
 	RuntimeEventTypeMapRenderMapStarted    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED)
 	RuntimeEventTypeMapRenderMapFinished   RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)
-	RuntimeEventTypeMapStyleImageMissing   RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)
-	// A tile moved to another step of loading.
-	RuntimeEventTypeMapTileAction              RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
-	RuntimeEventTypeMapSourceChanged           RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
+	// The style uses an image that it doesn't have. Its details are in style_image.
+	RuntimeEventTypeMapStyleImageMissing RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)
+	// A tile moved to another step of loading. Its details are in tile_action.
+	RuntimeEventTypeMapTileAction RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
+	// A source changed. Its details are in source_changed.
+	RuntimeEventTypeMapSourceChanged RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
+	// The region's status changed. Its details are in offline_region_status.
 	RuntimeEventTypeOfflineRegionStatusChanged RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
-	// A resource that the region needs failed to download.
+	// A resource that the region needs failed to download. Its details are in
+	// offline_region_response_error, and the error's text is in message.
 	RuntimeEventTypeOfflineRegionResponseError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	// The region's download became inactive because the cache file's offline
 	// regions reached their limit of 6000 tiles from MapLibre's demo tile server.
+	// Its details are in offline_region_tile_count_limit.
 	//
 	// Only tiles of sources on the demo server count toward the limit: sources with
 	// a maplibre:// URL, which resolves to https://demotiles.maplibre.org. Tiles
 	// from other servers never count.
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventTypeMapGlyphsRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
-	RuntimeEventTypeMapGlyphsLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
-	RuntimeEventTypeMapGlyphsError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
-	RuntimeEventTypeMapSpriteRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
-	RuntimeEventTypeMapSpriteLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
-	RuntimeEventTypeMapSpriteError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
+	// The map requested a range of glyphs. Its details are in glyphs.
+	RuntimeEventTypeMapGlyphsRequested RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
+	// A range of glyphs loaded. Its details are in glyphs.
+	RuntimeEventTypeMapGlyphsLoaded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
+	// A range of glyphs failed to load. Its details are in glyphs, and the error's
+	// text is in message.
+	RuntimeEventTypeMapGlyphsError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
+	// The map requested a sprite. Its details are in sprite.
+	RuntimeEventTypeMapSpriteRequested RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
+	// A sprite loaded. Its details are in sprite.
+	RuntimeEventTypeMapSpriteLoaded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
+	// A sprite failed to load. Its details are in sprite, and the error's text is
+	// in message.
+	RuntimeEventTypeMapSpriteError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
 )
 
 func (value RuntimeEventType) String() string {
@@ -1824,6 +1875,20 @@ type RuntimeEventPayload interface {
 
 func (UnknownVariant) isRuntimeEventPayload() {}
 
+type RuntimeEventPayloadCameraChangeVariant struct{ Value RuntimeEventCameraChange }
+
+func (RuntimeEventPayloadCameraChangeVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE)
+}
+func (RuntimeEventPayloadCameraChangeVariant) isRuntimeEventPayload() {}
+
+type RuntimeEventPayloadLoadingFailedVariant struct{ Value RuntimeEventLoadingFailed }
+
+func (RuntimeEventPayloadLoadingFailedVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED)
+}
+func (RuntimeEventPayloadLoadingFailedVariant) isRuntimeEventPayload() {}
+
 type RuntimeEventPayloadRenderFrameVariant struct{ Value RuntimeEventRenderFrame }
 
 func (RuntimeEventPayloadRenderFrameVariant) bindingTag() uint32 {
@@ -1831,12 +1896,12 @@ func (RuntimeEventPayloadRenderFrameVariant) bindingTag() uint32 {
 }
 func (RuntimeEventPayloadRenderFrameVariant) isRuntimeEventPayload() {}
 
-type RuntimeEventPayloadRenderMapVariant struct{ Value RuntimeEventRenderMap }
+type RuntimeEventPayloadStyleImageVariant struct{ Value RuntimeEventStyleImage }
 
-func (RuntimeEventPayloadRenderMapVariant) bindingTag() uint32 {
-	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP)
+func (RuntimeEventPayloadStyleImageVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE)
 }
-func (RuntimeEventPayloadRenderMapVariant) isRuntimeEventPayload() {}
+func (RuntimeEventPayloadStyleImageVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadTileActionVariant struct{ Value RuntimeEventTileAction }
 
@@ -1844,6 +1909,13 @@ func (RuntimeEventPayloadTileActionVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION)
 }
 func (RuntimeEventPayloadTileActionVariant) isRuntimeEventPayload() {}
+
+type RuntimeEventPayloadSourceChangedVariant struct{ Value RuntimeEventSourceChanged }
+
+func (RuntimeEventPayloadSourceChangedVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED)
+}
+func (RuntimeEventPayloadSourceChangedVariant) isRuntimeEventPayload() {}
 
 type RuntimeEventPayloadOfflineRegionStatusVariant struct {
 	Value RuntimeEventOfflineRegionStatus
@@ -4470,12 +4542,7 @@ type RuntimeEvent struct {
 	// For a map event, a map snapshot with this generation or a later one includes
 	// what the event reports. Zero for a runtime event.
 	Generation uint64
-	// The CameraChangeMode for RuntimeEventTypeMapCameraWillChange and
-	// RuntimeEventTypeMapCameraDidChange.
-	Code uint32
-	// The error for an event that reports a failure, the image ID for
-	// RuntimeEventTypeMapStyleImageMissing, or the source ID for
-	// RuntimeEventTypeMapSourceChanged and RuntimeEventTypeMapTileAction.
+	// The error's text for an event that reports a failure, or empty.
 	Message string
 	Payload RuntimeEventPayload
 }
@@ -4486,16 +4553,21 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	result.SourceType = RuntimeEventSourceType(raw.source_type)
 	result.Source = uint64(raw.source)
 	result.Generation = uint64(raw.generation)
-	result.Code = uint32(raw.code)
 	result.Message = bindingString(raw.message.data, uint64(raw.message.size))
 	result.Payload = func() RuntimeEventPayload {
 		switch raw.payload_type {
+		case C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE:
+			return RuntimeEventPayloadCameraChangeVariant{Value: copyRuntimeEventCameraChange(bindingUnionLoad[C.mln_runtime_event_camera_change](raw.payload[:]))}
+		case C.MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED:
+			return RuntimeEventPayloadLoadingFailedVariant{Value: copyRuntimeEventLoadingFailed(bindingUnionLoad[C.mln_runtime_event_loading_failed](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME:
 			return RuntimeEventPayloadRenderFrameVariant{Value: copyRuntimeEventRenderFrame(bindingUnionLoad[C.mln_runtime_event_render_frame](raw.payload[:]))}
-		case C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP:
-			return RuntimeEventPayloadRenderMapVariant{Value: copyRuntimeEventRenderMap(bindingUnionLoad[C.mln_runtime_event_render_map](raw.payload[:]))}
+		case C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE:
+			return RuntimeEventPayloadStyleImageVariant{Value: copyRuntimeEventStyleImage(bindingUnionLoad[C.mln_runtime_event_style_image](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
 			return RuntimeEventPayloadTileActionVariant{Value: copyRuntimeEventTileAction(bindingUnionLoad[C.mln_runtime_event_tile_action](raw.payload[:]))}
+		case C.MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED:
+			return RuntimeEventPayloadSourceChangedVariant{Value: copyRuntimeEventSourceChanged(bindingUnionLoad[C.mln_runtime_event_source_changed](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS:
 			return RuntimeEventPayloadOfflineRegionStatusVariant{Value: copyRuntimeEventOfflineRegionStatus(bindingUnionLoad[C.mln_runtime_event_offline_region_status](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR:
@@ -4511,6 +4583,20 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 		}
 		return UnknownVariant{Tag: uint32(raw.payload_type)}
 	}()
+	return result
+}
+
+// RuntimeEventCameraChange corresponds to mln_runtime_event_camera_change. The
+// details of RuntimeEventTypeMapCameraWillChange and
+// RuntimeEventTypeMapCameraDidChange.
+//
+// See mln_runtime_event_camera_change in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type RuntimeEventCameraChange struct{ Mode CameraChangeMode }
+
+func copyRuntimeEventCameraChange(raw C.mln_runtime_event_camera_change) RuntimeEventCameraChange {
+	var result RuntimeEventCameraChange
+	result.Mode = CameraChangeMode(raw.mode)
 	return result
 }
 
@@ -4564,6 +4650,19 @@ func nativeRuntimeEventHandler(input RuntimeEventHandler, arena *bindingArena) C
 		}
 	}
 	return raw
+}
+
+// RuntimeEventLoadingFailed corresponds to mln_runtime_event_loading_failed.
+// The details of RuntimeEventTypeMapLoadingFailed.
+//
+// See mln_runtime_event_loading_failed in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type RuntimeEventLoadingFailed struct{ Error MapLoadError }
+
+func copyRuntimeEventLoadingFailed(raw C.mln_runtime_event_loading_failed) RuntimeEventLoadingFailed {
+	var result RuntimeEventLoadingFailed
+	result.Error = MapLoadError(raw.error)
+	return result
 }
 
 // RuntimeEventOfflineRegionResponseError corresponds to
@@ -4643,16 +4742,16 @@ func copyRuntimeEventRenderFrame(raw C.mln_runtime_event_render_frame) RuntimeEv
 	return result
 }
 
-// RuntimeEventRenderMap corresponds to mln_runtime_event_render_map. The
-// details of RuntimeEventTypeMapRenderMapFinished.
+// RuntimeEventSourceChanged corresponds to mln_runtime_event_source_changed.
+// The details of RuntimeEventTypeMapSourceChanged.
 //
-// See mln_runtime_event_render_map in the C API reference:
+// See mln_runtime_event_source_changed in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventRenderMap struct{ Mode RenderMode }
+type RuntimeEventSourceChanged struct{ SourceId string }
 
-func copyRuntimeEventRenderMap(raw C.mln_runtime_event_render_map) RuntimeEventRenderMap {
-	var result RuntimeEventRenderMap
-	result.Mode = RenderMode(raw.mode)
+func copyRuntimeEventSourceChanged(raw C.mln_runtime_event_source_changed) RuntimeEventSourceChanged {
+	var result RuntimeEventSourceChanged
+	result.SourceId = bindingString(raw.source_id.data, uint64(raw.source_id.size))
 	return result
 }
 
@@ -4675,18 +4774,34 @@ func copyRuntimeEventSprite(raw C.mln_runtime_event_sprite) RuntimeEventSprite {
 	return result
 }
 
+// RuntimeEventStyleImage corresponds to mln_runtime_event_style_image. The
+// details of RuntimeEventTypeMapStyleImageMissing.
+//
+// See mln_runtime_event_style_image in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type RuntimeEventStyleImage struct{ ImageId string }
+
+func copyRuntimeEventStyleImage(raw C.mln_runtime_event_style_image) RuntimeEventStyleImage {
+	var result RuntimeEventStyleImage
+	result.ImageId = bindingString(raw.image_id.data, uint64(raw.image_id.size))
+	return result
+}
+
 // RuntimeEventTileAction corresponds to mln_runtime_event_tile_action. The
 // details of RuntimeEventTypeMapTileAction.
 //
 // See mln_runtime_event_tile_action in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventTileAction struct {
+	// The source that the tile belongs to.
+	SourceId  string
 	Operation TileOperation
 	TileId    TileId
 }
 
 func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEventTileAction {
 	var result RuntimeEventTileAction
+	result.SourceId = bindingString(raw.source_id.data, uint64(raw.source_id.size))
 	result.Operation = TileOperation(raw.operation)
 	result.TileId = copyTileId(raw.tile_id)
 	return result

@@ -76,7 +76,7 @@ Add an image to the style by its ID and premultiplied RGBA pixels with
 <Snippet page="style" region="image" />
 
 When a layer asks for an image the style doesn't have, the map sends a
-missing-image event with the image's ID as its message. Set the image when the
-event arrives.
+missing-image event, whose [](api:mln_runtime_event_style_image.image_id) names
+the image. Set the image when the event arrives.
 
 <Snippet page="style" region="missing-image" />

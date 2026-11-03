@@ -222,6 +222,34 @@ public final class HttpHeaderTransformResponse: @unchecked Sendable {
   }
 }
 
+/// Why a map failed to load a style.
+///
+/// See `mln_map_load_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct MapLoadError: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let unknown: MapLoadError = .init(rawValue: 0)
+  /// The style document isn't a valid style.
+  public static let styleParse: MapLoadError = .init(rawValue: 1)
+  /// The style's request failed, for any reason, including a 404 or a missing
+  /// file.
+  public static let styleLoad: MapLoadError = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "unknown"
+    case 1: return "styleParse"
+    case 2: return "styleLoad"
+    default: return "MapLoadError(\(rawValue))"
+    }
+  }
+}
+
 /// Whether the library may use the network.
 ///
 /// See `mln_network_status` in the
@@ -1072,12 +1100,7 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   /// For a map event, a map snapshot with this generation or a later one
   /// includes what the event reports. Zero for a runtime event.
   public var generation: UInt64
-  /// The `CameraChangeMode` for `RuntimeEventType.mapCameraWillChange` and
-  /// `RuntimeEventType.mapCameraDidChange`.
-  public var code: UInt32
-  /// The error for an event that reports a failure, the image ID for
-  /// `RuntimeEventType.mapStyleImageMissing`, or the source ID for
-  /// `RuntimeEventType.mapSourceChanged` and `RuntimeEventType.mapTileAction`.
+  /// The error's text for an event that reports a failure, or empty.
   public var message: String
   public var payload: RuntimeEventPayload
   public init(
@@ -1085,7 +1108,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
     sourceType: RuntimeEventSourceType = .init(rawValue: 0),
     source: UInt64 = 0,
     generation: UInt64 = 0,
-    code: UInt32 = 0,
     message: String = "",
     payload: RuntimeEventPayload = .none
   ) {
@@ -1093,7 +1115,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
     self.sourceType = sourceType
     self.source = source
     self.generation = generation
-    self.code = code
     self.message = message
     self.payload = payload
   }
@@ -1106,7 +1127,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
     sourceType = RuntimeEventSourceType(rawValue: raw.source_type.rawValue)
     source = raw.source
     generation = raw.generation
-    code = raw.code
     message = try NativeString.copyUTF8(
       data: raw.message.data,
       size: raw.message.size
@@ -1115,16 +1135,36 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
       switch raw.payload_type
         .rawValue
       {
-      case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
-        .rawValue: return .renderFrame(RuntimeEventRenderFrame(raw: raw.payload
-            .render_frame)) case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-                  .rawValue: return .renderMap(RuntimeEventRenderMap(raw: raw
+      case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE
+        .rawValue: return .cameraChange(RuntimeEventCameraChange(raw: raw
             .payload
-            .render_map)) case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
-                  .rawValue: return .tileAction(RuntimeEventTileAction(raw: raw
+            .camera_change)) case MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED
+                  .rawValue: return .loadingFailed(
+          RuntimeEventLoadingFailed(raw: raw
             .payload
-            .tile_action)) case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
-                  .rawValue: return .offlineRegionStatus(
+            .loading_failed)
+        ) case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
+        .rawValue: return .renderFrame(
+          RuntimeEventRenderFrame(raw: raw
+            .payload
+            .render_frame)
+        ) case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE
+        .rawValue: return try .styleImage(
+          RuntimeEventStyleImage(raw: raw
+            .payload
+            .style_image)
+        ) case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
+        .rawValue: return try .tileAction(
+          RuntimeEventTileAction(raw: raw
+            .payload
+            .tile_action)
+        ) case MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED
+        .rawValue: return try .sourceChanged(
+          RuntimeEventSourceChanged(raw: raw
+            .payload
+            .source_changed)
+        ) case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
+        .rawValue: return .offlineRegionStatus(
           RuntimeEventOfflineRegionStatus(raw: raw
             .payload
             .offline_region_status)
@@ -1165,6 +1205,22 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public typealias RuntimeEventCallback = @Sendable (_ events: [RuntimeEvent])
   -> Void
+
+/// The details of `RuntimeEventType.mapCameraWillChange` and
+/// `RuntimeEventType.mapCameraDidChange`.
+///
+/// See `mln_runtime_event_camera_change` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventCameraChange: Equatable, Hashable, Sendable {
+  public var mode: CameraChangeMode
+  public init(mode: CameraChangeMode = .init(rawValue: 0)) {
+    self.mode = mode
+  }
+
+  init(raw: mln_runtime_event_camera_change) {
+    mode = CameraChangeMode(rawValue: raw.mode.rawValue)
+  }
+}
 
 /// An event type, as a bit in a set.
 ///
@@ -1305,6 +1361,21 @@ private func invokeRuntimeEventHandlerCallback(
   }
 }
 
+/// The details of `RuntimeEventType.mapLoadingFailed`.
+///
+/// See `mln_runtime_event_loading_failed` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventLoadingFailed: Equatable, Hashable, Sendable {
+  public var error: MapLoadError
+  public init(error: MapLoadError = .init(rawValue: 0)) {
+    self.error = error
+  }
+
+  init(raw: mln_runtime_event_loading_failed) {
+    error = MapLoadError(rawValue: raw.error.rawValue)
+  }
+}
+
 /// The details of `RuntimeEventType.offlineRegionResponseError`.
 ///
 /// See `mln_runtime_event_offline_region_response_error` in the
@@ -1373,9 +1444,12 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
 /// See `mln_runtime_event_payload` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
+  case cameraChange(RuntimeEventCameraChange)
+  case loadingFailed(RuntimeEventLoadingFailed)
   case renderFrame(RuntimeEventRenderFrame)
-  case renderMap(RuntimeEventRenderMap)
+  case styleImage(RuntimeEventStyleImage)
   case tileAction(RuntimeEventTileAction)
+  case sourceChanged(RuntimeEventSourceChanged)
   case offlineRegionStatus(RuntimeEventOfflineRegionStatus)
   case offlineRegionResponseError(RuntimeEventOfflineRegionResponseError)
   case offlineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit)
@@ -1414,18 +1488,24 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
   }
 }
 
-/// The details of `RuntimeEventType.mapRenderMapFinished`.
+/// The details of `RuntimeEventType.mapSourceChanged`.
 ///
-/// See `mln_runtime_event_render_map` in the
+/// See `mln_runtime_event_source_changed` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
-  public var mode: RenderMode
-  public init(mode: RenderMode = .init(rawValue: 0)) {
-    self.mode = mode
+public struct RuntimeEventSourceChanged: Equatable, Hashable, Sendable {
+  public var sourceId: String
+  public init(sourceId: String = "") {
+    self.sourceId = sourceId
   }
 
-  init(raw: mln_runtime_event_render_map) {
-    mode = RenderMode(rawValue: raw.mode.rawValue)
+  init(
+    raw: mln_runtime_event_source_changed,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    sourceId = try NativeString.copyUTF8(
+      data: raw.source_id.data,
+      size: raw.source_id.size
+    )
   }
 }
 
@@ -1475,28 +1555,64 @@ public struct RuntimeEventSprite: Equatable, Hashable, Sendable {
   }
 }
 
+/// The details of `RuntimeEventType.mapStyleImageMissing`.
+///
+/// See `mln_runtime_event_style_image` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct RuntimeEventStyleImage: Equatable, Hashable, Sendable {
+  public var imageId: String
+  public init(imageId: String = "") {
+    self.imageId = imageId
+  }
+
+  init(
+    raw: mln_runtime_event_style_image,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    imageId = try NativeString.copyUTF8(
+      data: raw.image_id.data,
+      size: raw.image_id.size
+    )
+  }
+}
+
 /// The details of `RuntimeEventType.mapTileAction`.
 ///
 /// See `mln_runtime_event_tile_action` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
+  /// The source that the tile belongs to.
+  public var sourceId: String
   public var operation: TileOperation
   public var tileId: TileId
   public init(
+    sourceId: String = "",
     operation: TileOperation = .init(rawValue: 0),
     tileId: TileId = .init()
   ) {
+    self.sourceId = sourceId
     self.operation = operation
     self.tileId = tileId
   }
 
-  init(raw: mln_runtime_event_tile_action) {
+  init(
+    raw: mln_runtime_event_tile_action,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    sourceId = try NativeString.copyUTF8(
+      data: raw.source_id.data,
+      size: raw.source_id.size
+    )
     operation = TileOperation(rawValue: raw.operation.rawValue)
     tileId = TileId(raw: raw.tile_id)
   }
 }
 
 /// The kind of an event.
+///
+/// An event's `payload_type` names the member of its payload that holds the
+/// event's details. An event that reports a failure carries the error's text in
+/// `message`.
 ///
 /// Only maps in `MapMode.continuous` raise
 /// `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
@@ -1513,8 +1629,10 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
+  /// The camera is about to change. Its details are in `camera_change`.
   public static let mapCameraWillChange: RuntimeEventType = .init(rawValue: 1)
   public static let mapCameraIsChanging: RuntimeEventType = .init(rawValue: 2)
+  /// The camera changed. Its details are in `camera_change`.
   public static let mapCameraDidChange: RuntimeEventType = .init(rawValue: 3)
   public static let mapStyleLoaded: RuntimeEventType = .init(rawValue: 4)
   /// The map started to load a style.
@@ -1522,40 +1640,57 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   /// The map loaded its style and everything that the current view needs, and
   /// rendered the result.
   public static let mapLoadingFinished: RuntimeEventType = .init(rawValue: 6)
+  /// The map failed to load a style. Its details are in `loading_failed`, and
+  /// the error's text is in `message`.
   public static let mapLoadingFailed: RuntimeEventType = .init(rawValue: 7)
   /// The map rendered a complete frame and has nothing left to load, animate,
   /// or redraw.
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
+  /// The map failed to render. The error's text is in `message`.
   public static let mapRenderError: RuntimeEventType = .init(rawValue: 9)
   public static let mapRenderFrameStarted: RuntimeEventType =
     .init(rawValue: 10)
+  /// The map rendered a frame. Its details are in `render_frame`.
   public static let mapRenderFrameFinished: RuntimeEventType =
     .init(rawValue: 11)
   public static let mapRenderMapStarted: RuntimeEventType = .init(rawValue: 12)
   public static let mapRenderMapFinished: RuntimeEventType = .init(rawValue: 13)
+  /// The style uses an image that it doesn't have. Its details are in
+  /// `style_image`.
   public static let mapStyleImageMissing: RuntimeEventType = .init(rawValue: 14)
-  /// A tile moved to another step of loading.
+  /// A tile moved to another step of loading. Its details are in `tile_action`.
   public static let mapTileAction: RuntimeEventType = .init(rawValue: 15)
+  /// A source changed. Its details are in `source_changed`.
   public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 16)
+  /// The region's status changed. Its details are in `offline_region_status`.
   public static let offlineRegionStatusChanged: RuntimeEventType =
     .init(rawValue: 17)
-  /// A resource that the region needs failed to download.
+  /// A resource that the region needs failed to download. Its details are in
+  /// `offline_region_response_error`, and the error's text is in `message`.
   public static let offlineRegionResponseError: RuntimeEventType =
     .init(rawValue: 18)
   /// The region's download became inactive because the cache file's offline
   /// regions reached their limit of 6000 tiles from MapLibre's demo tile
-  /// server.
+  /// server. Its details are in `offline_region_tile_count_limit`.
   ///
   /// Only tiles of sources on the demo server count toward the limit: sources
   /// with a `maplibre://` URL, which resolves to
   /// https://demotiles.maplibre.org. Tiles from other servers never count.
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 19)
+  /// The map requested a range of glyphs. Its details are in `glyphs`.
   public static let mapGlyphsRequested: RuntimeEventType = .init(rawValue: 20)
+  /// A range of glyphs loaded. Its details are in `glyphs`.
   public static let mapGlyphsLoaded: RuntimeEventType = .init(rawValue: 21)
+  /// A range of glyphs failed to load. Its details are in `glyphs`, and the
+  /// error's text is in `message`.
   public static let mapGlyphsError: RuntimeEventType = .init(rawValue: 22)
+  /// The map requested a sprite. Its details are in `sprite`.
   public static let mapSpriteRequested: RuntimeEventType = .init(rawValue: 23)
+  /// A sprite loaded. Its details are in `sprite`.
   public static let mapSpriteLoaded: RuntimeEventType = .init(rawValue: 24)
+  /// A sprite failed to load. Its details are in `sprite`, and the error's text
+  /// is in `message`.
   public static let mapSpriteError: RuntimeEventType = .init(rawValue: 25)
   public var description: String {
     switch rawValue {

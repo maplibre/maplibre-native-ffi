@@ -102,15 +102,15 @@ void styleEvents(RuntimeHandle runtime, MapHandle map) {
   // The handler runs in this isolate. The binding queues each call.
   runtime.discarding.setEventHandler((events) {
     for (final event in events) {
-      if (event.source != map.id ||
-          event.type != RuntimeEventType.mapStyleImageMissing) {
-        continue;
+      if (event.source != map.id) continue;
+      if (event.payload case RuntimeEventPayloadStyleImage(
+        :final value,
+      )) {
+        map.discarding.setStyleImage(
+          value.imageId,
+          drawImage(value.imageId),
+        );
       }
-      // The message holds the image's ID.
-      map.discarding.setStyleImage(
-        event.message,
-        drawImage(event.message),
-      );
     }
   });
   // #endregion missing-image

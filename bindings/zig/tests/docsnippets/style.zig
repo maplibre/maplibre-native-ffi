@@ -123,12 +123,14 @@ fn onEvents(
 ) anyerror!void {
     for (events) |event| {
         if (event.source != map.id()) continue;
-        if (event.type != .map_style_image_missing) continue;
-        // The message holds the image's ID.
+        const missing = switch (event.payload) {
+            .style_image => |value| value,
+            else => continue,
+        };
         try map.discarding().setStyleImage(
             allocator,
-            event.message,
-            drawImage(event.message),
+            missing.image_id,
+            drawImage(missing.image_id),
             null,
             null,
         );

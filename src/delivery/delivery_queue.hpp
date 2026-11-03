@@ -31,9 +31,10 @@ inline auto event_message(std::string_view message) -> std::string_view {
 
 // Points the views of `event`'s payload at `strings`, which hold the payload's
 // text in the order that its type takes it: a font stack's names for GLYPHS,
-// and the ID then the URL for SPRITE. A font stack's array is `views`, which
-// this fills. The event borrows both until it is delivered. A payload type
-// without text leaves the event unchanged.
+// the ID then the URL for SPRITE, and the one ID for STYLE_IMAGE, TILE_ACTION,
+// and SOURCE_CHANGED. A font stack's array is `views`, which this fills. The
+// event borrows both until it is delivered. A payload type without text leaves
+// the event unchanged.
 auto bind_event_strings(
   mln_runtime_event& event, const std::vector<std::string>& strings,
   std::vector<mln_buffer_view>& views

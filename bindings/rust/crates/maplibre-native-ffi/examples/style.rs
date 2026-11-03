@@ -103,16 +103,17 @@ fn style_events(
                 return;
             };
             for event in events {
-                if event.source != map.id()
-                    || event.r#type
-                        != RuntimeEventType::MapStyleImageMissing
-                {
+                if event.source != map.id() {
                     continue;
                 }
-                // The message holds the image's ID.
-                let image = draw_image(&event.message);
+                let RuntimeEventPayload::StyleImage(missing) =
+                    &event.payload
+                else {
+                    continue;
+                };
+                let image = draw_image(&missing.image_id);
                 let _ = map.discarding().set_style_image(
-                    &event.message,
+                    &missing.image_id,
                     &image,
                     None,
                 );

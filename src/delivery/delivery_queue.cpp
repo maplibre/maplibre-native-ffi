@@ -23,6 +23,14 @@ auto string_view_of(const std::string& text) noexcept -> mln_buffer_view {
   return mln_buffer_view{.data = text.c_str(), .size = text.size()};
 }
 
+auto only_string(const std::vector<std::string>& strings)
+  -> const std::string& {
+  if (strings.size() != 1) {
+    throw std::logic_error{"the payload takes one ID"};
+  }
+  return strings.front();
+}
+
 }  // namespace
 
 auto bind_event_strings(
@@ -43,6 +51,17 @@ auto bind_event_strings(
       }
       event.payload.sprite.id = string_view_of(strings[0]);
       event.payload.sprite.url = string_view_of(strings[1]);
+      return;
+    case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE:
+      event.payload.style_image.image_id = string_view_of(only_string(strings));
+      return;
+    case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
+      event.payload.tile_action.source_id =
+        string_view_of(only_string(strings));
+      return;
+    case MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED:
+      event.payload.source_changed.source_id =
+        string_view_of(only_string(strings));
       return;
     default:
       return;

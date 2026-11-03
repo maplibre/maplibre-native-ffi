@@ -49,11 +49,11 @@ public sealed unsafe class RuntimeEventTests
                 type = mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
                 source_type = mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
                 payload_type = mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-                message = sourceId,
                 payload = new mln_runtime_event_payload
                 {
                     tile_action = new mln_runtime_event_tile_action
                     {
+                        source_id = sourceId,
                         operation = mln_tile_operation.MLN_TILE_OPERATION_END_PARSE,
                         tile_id = new mln_tile_id
                         {
@@ -78,9 +78,9 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal("render failed", copied[0].Message);
         Assert.IsType<RuntimeEvent.PayloadValue.None>(copied[0].Payload);
 
-        // The tile action carries its source ID as the event message.
-        Assert.Equal("source-1", copied[1].Message);
+        Assert.Equal("", copied[1].Message);
         var tileAction = Assert.IsType<RuntimeEvent.PayloadValue.TileAction>(copied[1].Payload);
+        Assert.Equal("source-1", tileAction.Value.SourceId);
         Assert.Equal(TileOperation.EndParse, tileAction.Value.Operation);
         Assert.Equal(new TileId(4, -1, 3, 2, 1), tileAction.Value.TileId);
     }
@@ -142,14 +142,12 @@ public sealed unsafe class RuntimeEventTests
                 type = mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
                 source_type = mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP,
                 source = ulong.MaxValue,
-                code = uint.MaxValue,
             },
             new mln_runtime_event { type = (mln_runtime_event_type)uint.MaxValue },
         };
         var copied = EventBatches.Decode(events, EventBatches.Stride);
 
         Assert.Equal(ulong.MaxValue, copied[0].Source);
-        Assert.Equal(uint.MaxValue, copied[0].Code);
         Assert.Equal(uint.MaxValue, (uint)copied[1].Type);
     }
 }

@@ -2344,6 +2344,14 @@ OfflineRegionStatus _readOfflineRegionStatus(
   complete: source.complete,
 );
 
+RuntimeEventCameraChange _readRuntimeEventCameraChange(
+  raw.mln_runtime_event_camera_change source,
+) => RuntimeEventCameraChange(mode: CameraChangeMode.fromRawValue(source.mode));
+
+RuntimeEventLoadingFailed _readRuntimeEventLoadingFailed(
+  raw.mln_runtime_event_loading_failed source,
+) => RuntimeEventLoadingFailed(error: MapLoadError.fromRawValue(source.error));
+
 RenderingStats _readRenderingStats(raw.mln_rendering_stats source) =>
     RenderingStats(
       encodingTimeMs: source.encoding_time_ms,
@@ -2362,9 +2370,11 @@ RuntimeEventRenderFrame _readRuntimeEventRenderFrame(
   stats: _readRenderingStats(source.stats),
 );
 
-RuntimeEventRenderMap _readRuntimeEventRenderMap(
-  raw.mln_runtime_event_render_map source,
-) => RuntimeEventRenderMap(mode: RenderMode.fromRawValue(source.mode));
+RuntimeEventStyleImage _readRuntimeEventStyleImage(
+  raw.mln_runtime_event_style_image source,
+) => RuntimeEventStyleImage(
+  imageId: utf8.decode(_copyBufferView(source.image_id)),
+);
 
 TileId _readTileId(raw.mln_tile_id source) => TileId(
   overscaledZ: source.overscaled_z,
@@ -2377,8 +2387,15 @@ TileId _readTileId(raw.mln_tile_id source) => TileId(
 RuntimeEventTileAction _readRuntimeEventTileAction(
   raw.mln_runtime_event_tile_action source,
 ) => RuntimeEventTileAction(
+  sourceId: utf8.decode(_copyBufferView(source.source_id)),
   operation: TileOperation.fromRawValue(source.operation),
   tileId: _readTileId(source.tile_id),
+);
+
+RuntimeEventSourceChanged _readRuntimeEventSourceChanged(
+  raw.mln_runtime_event_source_changed source,
+) => RuntimeEventSourceChanged(
+  sourceId: utf8.decode(_copyBufferView(source.source_id)),
 );
 
 RuntimeEventOfflineRegionStatus _readRuntimeEventOfflineRegionStatus(
@@ -2433,37 +2450,45 @@ RuntimeEvent _readRuntimeEvent(
   sourceType: RuntimeEventSourceType.fromRawValue(source.source_type),
   source: source.source,
   generation: source.generation,
-  code: source.code,
   message: utf8.decode(_copyBufferView(source.message)),
   payload: switch (source.payload_type) {
-    1 => RuntimeEventPayloadRenderFrame(
+    1 => RuntimeEventPayloadCameraChange(
+      _readRuntimeEventCameraChange(source.payload.camera_change),
+    ),
+    2 => RuntimeEventPayloadLoadingFailed(
+      _readRuntimeEventLoadingFailed(source.payload.loading_failed),
+    ),
+    3 => RuntimeEventPayloadRenderFrame(
       _readRuntimeEventRenderFrame(source.payload.render_frame),
     ),
-    2 => RuntimeEventPayloadRenderMap(
-      _readRuntimeEventRenderMap(source.payload.render_map),
+    4 => RuntimeEventPayloadStyleImage(
+      _readRuntimeEventStyleImage(source.payload.style_image),
     ),
-    3 => RuntimeEventPayloadTileAction(
+    5 => RuntimeEventPayloadTileAction(
       _readRuntimeEventTileAction(source.payload.tile_action),
     ),
-    4 => RuntimeEventPayloadOfflineRegionStatus(
+    6 => RuntimeEventPayloadSourceChanged(
+      _readRuntimeEventSourceChanged(source.payload.source_changed),
+    ),
+    7 => RuntimeEventPayloadOfflineRegionStatus(
       _readRuntimeEventOfflineRegionStatus(
         source.payload.offline_region_status,
       ),
     ),
-    5 => RuntimeEventPayloadOfflineRegionResponseError(
+    8 => RuntimeEventPayloadOfflineRegionResponseError(
       _readRuntimeEventOfflineRegionResponseError(
         source.payload.offline_region_response_error,
       ),
     ),
-    6 => RuntimeEventPayloadOfflineRegionTileCountLimit(
+    9 => RuntimeEventPayloadOfflineRegionTileCountLimit(
       _readRuntimeEventOfflineRegionTileCountLimit(
         source.payload.offline_region_tile_count_limit,
       ),
     ),
-    7 => RuntimeEventPayloadGlyphs(
+    10 => RuntimeEventPayloadGlyphs(
       _readRuntimeEventGlyphs(source.payload.glyphs),
     ),
-    8 => RuntimeEventPayloadSprite(
+    11 => RuntimeEventPayloadSprite(
       _readRuntimeEventSprite(source.payload.sprite),
     ),
     0 => const RuntimeEventPayloadNone(),

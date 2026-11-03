@@ -319,7 +319,8 @@ static const immediate_case immediate_cases[] = {
 
 static bool is_immediate_change(const mln_runtime_event* event, void* context) {
   return event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE &&
-         event->code == MLN_CAMERA_CHANGE_MODE_IMMEDIATE &&
+         event->payload.camera_change.mode ==
+           MLN_CAMERA_CHANGE_MODE_IMMEDIATE &&
          event->generation == *(const uint64_t*)context;
 }
 

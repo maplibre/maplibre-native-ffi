@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.PremultipliedRgba8Image
 import org.maplibre.nativeffi.RuntimeEventHandler
-import org.maplibre.nativeffi.RuntimeEventType
+import org.maplibre.nativeffi.RuntimeEventPayload
 import org.maplibre.nativeffi.RuntimeHandle
 
 private fun drawImage(imageId: String): PremultipliedRgba8Image =
@@ -111,17 +111,11 @@ private fun styleEvents(runtime: RuntimeHandle, map: MapHandle) {
   runtime.discarding.setEventHandler(
     RuntimeEventHandler { events ->
       for (event in events) {
-        if (
-          event.source != map.id ||
-            event.type != RuntimeEventType.MAP_STYLE_IMAGE_MISSING
-        ) {
-          continue
-        }
-        // The message holds the image's ID.
-        map.discarding.setStyleImage(
-          event.message,
-          drawImage(event.message),
-        )
+        if (event.source != map.id) continue
+        val missing =
+          event.payload as? RuntimeEventPayload.StyleImage ?: continue
+        val id = missing.value.imageId
+        map.discarding.setStyleImage(id, drawImage(id))
       }
     },
   )

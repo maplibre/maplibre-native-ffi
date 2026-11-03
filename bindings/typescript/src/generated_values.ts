@@ -1058,6 +1058,29 @@ export const MapDebugFlag = {
 export type MapDebugFlag = number;
 
 /**
+ * Why a map failed to load a style.
+ *
+ * See `mln_map_load_error` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export const MapLoadError = {
+  unknown: 0,
+  /**
+   * The style document isn't a valid style.
+   */
+  styleParse: 1,
+  /**
+   * The style's request failed, for any reason, including a 404 or a missing
+   * file.
+   */
+  styleLoad: 2,
+} as const;
+/** One of the MapLoadError values, or a value this binding does not know. */
+export type MapLoadError =
+  | (typeof MapLoadError)[keyof typeof MapLoadError]
+  | (number & {});
+
+/**
  * When a map renders.
  *
  * See `mln_map_mode` in the
@@ -2620,17 +2643,21 @@ export interface RuntimeEvent {
    */
   readonly generation: bigint;
   /**
-   * The `CameraChangeMode` for `RuntimeEventType.mapCameraWillChange` and
-   * `RuntimeEventType.mapCameraDidChange`.
-   */
-  readonly code: number;
-  /**
-   * The error for an event that reports a failure, the image ID for
-   * `RuntimeEventType.mapStyleImageMissing`, or the source ID for
-   * `RuntimeEventType.mapSourceChanged` and `RuntimeEventType.mapTileAction`.
+   * The error's text for an event that reports a failure, or empty.
    */
   readonly message: string;
   readonly payload: RuntimeEventPayload;
+}
+
+/**
+ * The details of `RuntimeEventType.mapCameraWillChange` and
+ * `RuntimeEventType.mapCameraDidChange`.
+ *
+ * See `mln_runtime_event_camera_change` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface RuntimeEventCameraChange {
+  readonly mode: CameraChangeMode;
 }
 
 /**
@@ -2700,6 +2727,16 @@ export interface RuntimeEventGlyphs {
 export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
 
 /**
+ * The details of `RuntimeEventType.mapLoadingFailed`.
+ *
+ * See `mln_runtime_event_loading_failed` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface RuntimeEventLoadingFailed {
+  readonly error: MapLoadError;
+}
+
+/**
  * The details of `RuntimeEventType.offlineRegionResponseError`.
  *
  * See `mln_runtime_event_offline_region_response_error` in the
@@ -2743,9 +2780,18 @@ export interface RuntimeEventOfflineRegionTileCountLimit {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export type RuntimeEventPayload =
+  | { readonly kind: "cameraChange"; readonly value: RuntimeEventCameraChange }
+  | {
+      readonly kind: "loadingFailed";
+      readonly value: RuntimeEventLoadingFailed;
+    }
   | { readonly kind: "renderFrame"; readonly value: RuntimeEventRenderFrame }
-  | { readonly kind: "renderMap"; readonly value: RuntimeEventRenderMap }
+  | { readonly kind: "styleImage"; readonly value: RuntimeEventStyleImage }
   | { readonly kind: "tileAction"; readonly value: RuntimeEventTileAction }
+  | {
+      readonly kind: "sourceChanged";
+      readonly value: RuntimeEventSourceChanged;
+    }
   | {
       readonly kind: "offlineRegionStatus";
       readonly value: RuntimeEventOfflineRegionStatus;
@@ -2781,13 +2827,13 @@ export interface RuntimeEventRenderFrame {
 }
 
 /**
- * The details of `RuntimeEventType.mapRenderMapFinished`.
+ * The details of `RuntimeEventType.mapSourceChanged`.
  *
- * See `mln_runtime_event_render_map` in the
+ * See `mln_runtime_event_source_changed` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export interface RuntimeEventRenderMap {
-  readonly mode: RenderMode;
+export interface RuntimeEventSourceChanged {
+  readonly sourceId: string;
 }
 
 /**
@@ -2819,18 +2865,36 @@ export interface RuntimeEventSprite {
 }
 
 /**
+ * The details of `RuntimeEventType.mapStyleImageMissing`.
+ *
+ * See `mln_runtime_event_style_image` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface RuntimeEventStyleImage {
+  readonly imageId: string;
+}
+
+/**
  * The details of `RuntimeEventType.mapTileAction`.
  *
  * See `mln_runtime_event_tile_action` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export interface RuntimeEventTileAction {
+  /**
+   * The source that the tile belongs to.
+   */
+  readonly sourceId: string;
   readonly operation: TileOperation;
   readonly tileId: TileId;
 }
 
 /**
  * The kind of an event.
+ *
+ * An event's `payload_type` names the member of its payload that holds the
+ * event's details. An event that reports a failure carries the error's text in
+ * `message`.
  *
  * Only maps in `MapMode.continuous` raise
  * `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
@@ -2841,8 +2905,14 @@ export interface RuntimeEventTileAction {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 export const RuntimeEventType = {
+  /**
+   * The camera is about to change. Its details are in `camera_change`.
+   */
   mapCameraWillChange: 1,
   mapCameraIsChanging: 2,
+  /**
+   * The camera changed. Its details are in `camera_change`.
+   */
   mapCameraDidChange: 3,
   mapStyleLoaded: 4,
   /**
@@ -2854,42 +2924,84 @@ export const RuntimeEventType = {
    * rendered the result.
    */
   mapLoadingFinished: 6,
+  /**
+   * The map failed to load a style. Its details are in `loading_failed`, and
+   * the error's text is in `message`.
+   */
   mapLoadingFailed: 7,
   /**
    * The map rendered a complete frame and has nothing left to load, animate, or
    * redraw.
    */
   mapIdle: 8,
+  /**
+   * The map failed to render. The error's text is in `message`.
+   */
   mapRenderError: 9,
   mapRenderFrameStarted: 10,
+  /**
+   * The map rendered a frame. Its details are in `render_frame`.
+   */
   mapRenderFrameFinished: 11,
   mapRenderMapStarted: 12,
   mapRenderMapFinished: 13,
+  /**
+   * The style uses an image that it doesn't have. Its details are in
+   * `style_image`.
+   */
   mapStyleImageMissing: 14,
   /**
-   * A tile moved to another step of loading.
+   * A tile moved to another step of loading. Its details are in `tile_action`.
    */
   mapTileAction: 15,
+  /**
+   * A source changed. Its details are in `source_changed`.
+   */
   mapSourceChanged: 16,
+  /**
+   * The region's status changed. Its details are in `offline_region_status`.
+   */
   offlineRegionStatusChanged: 17,
   /**
-   * A resource that the region needs failed to download.
+   * A resource that the region needs failed to download. Its details are in
+   * `offline_region_response_error`, and the error's text is in `message`.
    */
   offlineRegionResponseError: 18,
   /**
    * The region's download became inactive because the cache file's offline
    * regions reached their limit of 6000 tiles from MapLibre's demo tile server.
+   * Its details are in `offline_region_tile_count_limit`.
    *
    * Only tiles of sources on the demo server count toward the limit: sources
    * with a `maplibre://` URL, which resolves to https://demotiles.maplibre.org.
    * Tiles from other servers never count.
    */
   offlineRegionTileCountLimitExceeded: 19,
+  /**
+   * The map requested a range of glyphs. Its details are in `glyphs`.
+   */
   mapGlyphsRequested: 20,
+  /**
+   * A range of glyphs loaded. Its details are in `glyphs`.
+   */
   mapGlyphsLoaded: 21,
+  /**
+   * A range of glyphs failed to load. Its details are in `glyphs`, and the
+   * error's text is in `message`.
+   */
   mapGlyphsError: 22,
+  /**
+   * The map requested a sprite. Its details are in `sprite`.
+   */
   mapSpriteRequested: 23,
+  /**
+   * A sprite loaded. Its details are in `sprite`.
+   */
   mapSpriteLoaded: 24,
+  /**
+   * A sprite failed to load. Its details are in `sprite`, and the error's text
+   * is in `message`.
+   */
   mapSpriteError: 25,
 } as const;
 /** One of the RuntimeEventType values, or a value this binding does not know. */
