@@ -869,9 +869,9 @@ dependencies = [
 
 [[package]]
 name = "maplibre-native-next"
-version = "0.0.2"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64c9eebd0ecb0c09564164f8475e3dc1bebc6d42b14a2f288b6ebdeae923053f"
+checksum = "24288dc381edd896072b1d1035ca47a9712923392142cf4c62aebf2e74495955"
 dependencies = [
  "bytemuck",
  "flate2",
