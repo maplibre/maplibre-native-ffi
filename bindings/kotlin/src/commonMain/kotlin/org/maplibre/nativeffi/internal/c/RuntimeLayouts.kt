@@ -14,17 +14,16 @@ internal object CompletionLayout {
 }
 
 internal object CompletionResultLayout {
-  val SIZEOF: Int = w(48, 64)
+  val SIZEOF: Int = w(48, 64, 44)
   val ALIGNOF: Int = w(8, 8, 4)
   val SIZE: Int = 0
   val STATUS: Int = 4
-  val DISPOSITION: Int = 8
-  val VALUE_SIZE: Int = 12
-  val GENERATION: Int = 16
-  val RENDER_UPDATE_GENERATION: Int = 24
-  val DIAGNOSTIC: Int = 32
-  val VALUE: Int = w(40, 48)
-  val VALUE_COUNT: Int = w(44, 56)
+  val VALUE_SIZE: Int = 8
+  val GENERATION: Int = w(16, 16, 12)
+  val RENDER_UPDATE_GENERATION: Int = w(24, 24, 20)
+  val DIAGNOSTIC: Int = w(32, 32, 28)
+  val VALUE: Int = w(40, 48, 36)
+  val VALUE_COUNT: Int = w(44, 56, 40)
 }
 
 internal object DiagnosticLayout {

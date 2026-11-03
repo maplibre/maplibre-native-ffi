@@ -356,10 +356,6 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &second_resize)
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED,
-    mln_test_completion_disposition(&second_resize)
-  );
   mln_test_completion_destroy(&first_resize);
   mln_test_completion_destroy(&second_resize);
   snapshot = read_snapshot(fixture.session);

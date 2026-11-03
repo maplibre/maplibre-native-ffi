@@ -481,7 +481,7 @@ def submitted(method: Method) -> str:
 
 
 def commanded(plan: OperationPlan, method: Method) -> str:
-    """A command, whose completion reports its disposition."""
+    """A command, whose completion reports its map generations."""
     start = submitted(method)
     if plan.result:
         raise Unsupported("command requires a resultless receipt")

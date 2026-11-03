@@ -447,14 +447,12 @@ mod tests {
     fn a_failed_or_cancelled_command_fails_its_wait_with_its_status_diagnostic_and_generation() {
         let diagnostic = b"style parse failed";
         let mut failed = result(sys::MLN_STATUS_INVALID_ARGUMENT);
-        failed.disposition = sys::MLN_COMMAND_DISPOSITION_FAILED;
         failed.generation = 7;
         failed.diagnostic = sys::mln_buffer_view {
             data: diagnostic.as_ptr().cast(),
             size: diagnostic.len(),
         };
-        let mut cancelled = result(sys::MLN_STATUS_CANCELLED);
-        cancelled.disposition = sys::MLN_COMMAND_DISPOSITION_CANCELLED;
+        let cancelled = result(sys::MLN_STATUS_CANCELLED);
         for (delivered, status, diagnostic, generation) in [
             (
                 failed,

@@ -99,15 +99,9 @@ void mln_delivery_queue_release(mln_delivery_queue queue);
 #ifdef MLN_PROTOCOL_COMPLETION_RUNTIME
 // The completion types as the C API declares them, for a probe that compiles
 // a binding's handwritten completion runtime.
-typedef enum mln_command_disposition : uint32_t {
-  MLN_COMMAND_DISPOSITION_COMMITTED = 0,
-  MLN_COMMAND_DISPOSITION_FAILED = 1,
-  MLN_COMMAND_DISPOSITION_CANCELLED = 2,
-} mln_command_disposition;
 typedef struct mln_completion_result {
   uint32_t size;
   mln_status status;
-  mln_command_disposition disposition;
   uint32_t value_size;
   uint64_t generation;
   uint64_t render_update_generation;

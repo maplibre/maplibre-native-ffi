@@ -444,10 +444,6 @@ static void every_camera_delta_field_follows_its_convention(void) {
       row->label
     );
     MLN_TEST_OK_MESSAGE(mln_test_completion_finish(&completion), row->label);
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      MLN_COMMAND_DISPOSITION_COMMITTED,
-      mln_test_completion_disposition(&completion), row->label
-    );
     mln_test_completion_destroy(&completion);
 
     const mln_camera after = query_camera(map).camera;

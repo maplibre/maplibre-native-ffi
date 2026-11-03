@@ -43,10 +43,9 @@ class CompletionSink final {
   // literal is, since the callback borrows it. When `owner` keeps alive every
   // byte view in the value, a queue holds it instead of copying those bytes.
   auto deliver(
-    mln_status status, mln_command_disposition disposition,
-    CommandGenerations generations, std::string_view diagnostic,
-    const void* value, std::size_t value_count, std::uint32_t value_size,
-    const delivery::CompletionCapture* capture,
+    mln_status status, CommandGenerations generations,
+    std::string_view diagnostic, const void* value, std::size_t value_count,
+    std::uint32_t value_size, const delivery::CompletionCapture* capture,
     std::shared_ptr<const void> owner = nullptr
   ) const noexcept -> void;
 
@@ -155,13 +154,11 @@ auto complete_failure(
 ) noexcept -> void;
 
 auto complete_command(
-  Completion* completion, mln_command_disposition disposition,
-  mln_status status, CommandGenerations generations = {},
-  std::string diagnostic = {}
+  Completion* completion, mln_status status,
+  CommandGenerations generations = {}, std::string diagnostic = {}
 ) noexcept -> void;
 auto complete_command(
-  const std::shared_ptr<Completion>& completion,
-  mln_command_disposition disposition, mln_status status,
+  const std::shared_ptr<Completion>& completion, mln_status status,
   CommandGenerations generations = {}, std::string diagnostic = {}
 ) noexcept -> void;
 

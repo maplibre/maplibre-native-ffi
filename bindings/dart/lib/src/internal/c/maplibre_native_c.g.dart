@@ -302,8 +302,6 @@ final class mln_completion_result extends Struct {
   @Int32()
   external int status;
   @Uint32()
-  external int disposition;
-  @Uint32()
   external int value_size;
   @Uint64()
   external int generation;
@@ -1862,11 +1860,6 @@ const MLN_CAMERA_TRANSITION_OUTCOME_REPLACED = 3;
 const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
 const MLN_CAMERA_UPDATE_MODE_EASE = 1;
 const MLN_CAMERA_UPDATE_MODE_FLY = 2;
-
-// mln_command_disposition
-const MLN_COMMAND_DISPOSITION_COMMITTED = 0;
-const MLN_COMMAND_DISPOSITION_FAILED = 1;
-const MLN_COMMAND_DISPOSITION_CANCELLED = 2;
 
 // mln_constrain_mode
 const MLN_CONSTRAIN_MODE_NONE = 0;

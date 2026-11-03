@@ -68,15 +68,14 @@ auto copy_result(
 }  // namespace
 
 auto CompletionSink::deliver(
-  mln_status status, mln_command_disposition disposition,
-  CommandGenerations generations, std::string_view diagnostic,
-  const void* value, std::size_t value_count, std::uint32_t value_size,
-  const delivery::CompletionCapture* capture, std::shared_ptr<const void> owner
+  mln_status status, CommandGenerations generations,
+  std::string_view diagnostic, const void* value, std::size_t value_count,
+  std::uint32_t value_size, const delivery::CompletionCapture* capture,
+  std::shared_ptr<const void> owner
 ) const noexcept -> void {
   const auto result = mln_completion_result{
     .size = sizeof(mln_completion_result),
     .status = status,
-    .disposition = disposition,
     .value_size = value == nullptr ? 0 : value_size,
     .generation = generations.snapshot,
     .render_update_generation = generations.render_update,
@@ -148,7 +147,6 @@ auto CompletionSink::deliver_queued(
       mln_completion_result{
         .size = sizeof(mln_completion_result),
         .status = MLN_STATUS_NATIVE_ERROR,
-        .disposition = result.disposition,
         .value_size = 0,
         .generation = result.generation,
         .render_update_generation = result.render_update_generation,
@@ -170,8 +168,7 @@ auto ErasedCompletionValue::deliver(
   std::shared_ptr<const void> owner
 ) noexcept -> void {
   sink.deliver(
-    MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, {}, {}, value, count,
-    size, capture, std::move(owner)
+    MLN_STATUS_OK, {}, {}, value, count, size, capture, std::move(owner)
   );
 }
 
@@ -181,16 +178,13 @@ auto deliver_failure(
   if (status == MLN_STATUS_OK) {
     assert(false && "a failure delivery reported success");
     sink.deliver(
-      MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_COMMITTED, {},
+      MLN_STATUS_NATIVE_ERROR, {},
       "native completion reported success without its result", nullptr, 0, 0,
       nullptr
     );
     return;
   }
-  sink.deliver(
-    status, MLN_COMMAND_DISPOSITION_COMMITTED, {}, diagnostic, nullptr, 0, 0,
-    nullptr
-  );
+  sink.deliver(status, {}, diagnostic, nullptr, 0, 0, nullptr);
 }
 
 auto ValuelessCompletion::deliver(
@@ -222,8 +216,8 @@ Completion::Completion(CompletionSink sink, delivery::ItemPtr fallback) noexcept
 Completion::~Completion() {
   if (state_.load() == State::Accepted) {
     sink_.deliver(
-      MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, {},
-      "asynchronous work was abandoned", nullptr, 0, 0, nullptr
+      MLN_STATUS_CANCELLED, {}, "asynchronous work was abandoned", nullptr, 0,
+      0, nullptr
     );
     release();
   }
@@ -248,8 +242,8 @@ auto Completion::set_submission_lease(ControlLease lease) noexcept -> void {
 
 auto Completion::deliver_undelivered() noexcept -> void {
   sink_.deliver(
-    MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_FAILED, {},
-    "the completion result could not be delivered", nullptr, 0, 0, nullptr
+    MLN_STATUS_NATIVE_ERROR, {}, "the completion result could not be delivered",
+    nullptr, 0, 0, nullptr
   );
 }
 
@@ -364,26 +358,20 @@ auto complete_failure(
 }
 
 auto complete_command(
-  const std::shared_ptr<Completion>& completion,
-  mln_command_disposition disposition, mln_status status,
+  const std::shared_ptr<Completion>& completion, mln_status status,
   CommandGenerations generations, std::string diagnostic
 ) noexcept -> void {
   complete_command(
-    completion.get(), disposition, status, generations, std::move(diagnostic)
+    completion.get(), status, generations, std::move(diagnostic)
   );
 }
 
 auto complete_command(
-  Completion* completion, mln_command_disposition disposition,
-  mln_status status, CommandGenerations generations, std::string diagnostic
+  Completion* completion, mln_status status, CommandGenerations generations,
+  std::string diagnostic
 ) noexcept -> void {
-  if (status != MLN_STATUS_OK) {
-    disposition = status == MLN_STATUS_CANCELLED
-                    ? MLN_COMMAND_DISPOSITION_CANCELLED
-                    : MLN_COMMAND_DISPOSITION_FAILED;
-  }
   if (completion == nullptr) {
-    if (disposition == MLN_COMMAND_DISPOSITION_FAILED) {
+    if (status != MLN_STATUS_OK && status != MLN_STATUS_CANCELLED) {
       try {
         mln::Log::Warning(
           mln::Event::General, "discarded command failed (status " +
@@ -394,12 +382,10 @@ auto complete_command(
     }
     return;
   }
-  completion->resolve([disposition, status, generations,
+  completion->resolve([status, generations,
                        diagnostic =
                          std::move(diagnostic)](const CompletionSink& sink) {
-    sink.deliver(
-      status, disposition, generations, diagnostic, nullptr, 0, 0, nullptr
-    );
+    sink.deliver(status, generations, diagnostic, nullptr, 0, 0, nullptr);
   });
 }
 

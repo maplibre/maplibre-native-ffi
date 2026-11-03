@@ -15,13 +15,6 @@
 extern "C" {
 #endif
 
-/** Whether a command's change was applied. */
-typedef enum mln_command_disposition : uint32_t {
-  MLN_COMMAND_DISPOSITION_COMMITTED = 0,
-  MLN_COMMAND_DISPOSITION_FAILED = 1,
-  MLN_COMMAND_DISPOSITION_CANCELLED = 2,
-} mln_command_disposition;
-
 /**
  * The result of an asynchronous function.
  *
@@ -34,7 +27,6 @@ typedef enum mln_command_disposition : uint32_t {
 typedef struct mln_completion_result {
   uint32_t size;
   mln_status status;
-  mln_command_disposition disposition;
   uint32_t value_size;
   /**
    * For a map command, the first mln_map_snapshot generation that includes the

@@ -47,10 +47,6 @@ static void expect_cancelled(mln_test_completion* completion) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_CANCELLED, mln_test_completion_finish(completion)
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_CANCELLED,
-    mln_test_completion_disposition(completion)
-  );
   mln_test_completion_destroy(completion);
 }
 
@@ -154,9 +150,6 @@ static void a_style_url_load_completes_after_its_style_parses(void) {
     mln_test_provider_request_at(provider, url, 0)->handle, &parsed
   );
   MLN_TEST_OK(mln_test_completion_finish(&load));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&load)
-  );
   mln_test_completion_destroy(&load);
   TEST_ASSERT_TRUE(source_exists(map, "from-style"));
   TEST_ASSERT_FALSE(source_exists(map, "before"));
@@ -217,9 +210,6 @@ static void expect_failed(
 ) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(completion)
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(completion)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_completion_diagnostic(completion), fragment),

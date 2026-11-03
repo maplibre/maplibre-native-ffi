@@ -32,12 +32,11 @@ internal class HandDeliveredCompletion<T>(
   private val userData: Long,
   private val releaseUserData: Long,
 ) {
-  fun deliver(status: Int, generation: ULong, diagnostic: String = "", disposition: UInt = 0u) {
+  fun deliver(status: Int, generation: ULong, diagnostic: String = "") {
     NativeArena().use { arena ->
       val result = arena.allocate(CompletionResultLayout.SIZEOF)
       writeU32(result + CompletionResultLayout.SIZE, CompletionResultLayout.SIZEOF.toUInt())
       writeI32(result + CompletionResultLayout.STATUS, status)
-      writeU32(result + CompletionResultLayout.DISPOSITION, disposition)
       writeU64(result + CompletionResultLayout.GENERATION, generation)
       if (diagnostic.isNotEmpty())
         arena.putView(result + CompletionResultLayout.DIAGNOSTIC, diagnostic)
@@ -55,10 +54,6 @@ internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 
 /** Calls the completion's `mln_user_data_release` at [release] on this thread. */
 internal expect fun callCompletionRelease(release: Long, userData: Long)
-
-// The mln_command_disposition values; the bridge reads only the status.
-private const val DISPOSITION_FAILED = 1u
-private const val DISPOSITION_CANCELLED = 2u
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
 private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
@@ -143,24 +138,14 @@ class CompletionBridgeTest {
   @Test
   fun aFailedOrCancelledCommandFailsWithItsStatusDiagnosticAndGeneration() = runSuspendTest {
     val failed = handDeliveredCommand()
-    failed.deliver(
-      Status.NOT_FOUND.rawValue,
-      9u,
-      "the source does not exist",
-      DISPOSITION_FAILED,
-    )
+    failed.deliver(Status.NOT_FOUND.rawValue, 9u, "the source does not exist")
     failed.release()
     val failure = assertFailsWithStatus(Status.NOT_FOUND) { failed.deferred.await() }
     assertEquals("the source does not exist", failure.diagnostic)
     assertEquals(9uL, failure.generation)
 
     val cancelled = handDeliveredCommand()
-    cancelled.deliver(
-      Status.CANCELLED.rawValue,
-      0u,
-      "asynchronous work was abandoned",
-      DISPOSITION_CANCELLED,
-    )
+    cancelled.deliver(Status.CANCELLED.rawValue, 0u, "asynchronous work was abandoned")
     cancelled.release()
     val cancellation = assertFailsWithStatus(Status.CANCELLED) { cancelled.deferred.await() }
     assertEquals("asynchronous work was abandoned", cancellation.diagnostic)

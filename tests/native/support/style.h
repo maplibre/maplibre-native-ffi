@@ -38,10 +38,6 @@ extern "C" {
     TEST_ASSERT_EQUAL_INT_MESSAGE(                                            \
       (terminal_status), mln_test_completion_finish(&completion), #expression \
     );                                                                        \
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(                                         \
-      MLN_COMMAND_DISPOSITION_FAILED,                                         \
-      mln_test_completion_disposition(&completion), #expression               \
-    );                                                                        \
     TEST_ASSERT_NOT_NULL_MESSAGE(                                             \
       strstr(mln_test_completion_diagnostic(&completion), (fragment)),        \
       mln_test_completion_diagnostic(&completion)                             \

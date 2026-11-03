@@ -183,7 +183,8 @@ static void missing_style_ids_report_not_found(void) {
     )
   );
 
-  // A query that reads one attribute of a missing layer has no disposition.
+  // A query of one attribute of a missing layer completes with
+  // MLN_STATUS_NOT_FOUND too.
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NOT_FOUND, mln_map_get_style_layer_property(
                             map, layer, MLN_BUFFER_LITERAL("circle-radius"),

@@ -950,17 +950,12 @@ auto execute_resource_configuration_command(
 ) noexcept -> void {
   try {
     std::invoke(std::forward<Mutation>(mutation));
-    complete_command(
-      completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, {}, {}
-    );
+    complete_command(completion, MLN_STATUS_OK, {}, {});
   } catch (const std::exception& exception) {
-    complete_command(
-      completion, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, {},
-      exception.what()
-    );
+    complete_command(completion, MLN_STATUS_NATIVE_ERROR, {}, exception.what());
   } catch (...) {
     complete_command(
-      completion, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, {},
+      completion, MLN_STATUS_NATIVE_ERROR, {},
       "resource configuration command failed"
     );
   }

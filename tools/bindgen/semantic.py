@@ -21,13 +21,11 @@ from .names import type_name
 from .protocol import (
     ABI_VERSION,
     BUFFER_VIEW,
-    COMPLETION_RESULT,
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
     DELIVERY_QUEUE,
     RUNTIME_EVENT_SOURCE,
     RUNTIME_EVENT_SOURCE_PREFIX,
-    STATUS,
     is_completion,
     is_status,
 )
@@ -426,7 +424,7 @@ class AbsencePlan:
 #   but is no release.
 # - "thread_start": an immediate call that waits for a native thread to start.
 # - "attach": a completion that readies the owner the call creates at once.
-# - "command": a completion that reports a disposition.
+# - "command": a completion that reports map generations.
 # - "query": a completion that delivers a result.
 # - "run": any other completion, which reports only success.
 # - "view": a call inside its owner's borrowed view scope.
@@ -704,8 +702,7 @@ class BoundApi:
 
     @functools.cached_property
     def control_enums(self) -> frozenset[str]:
-        """Enums that only presence masks, union tags, and completion results
-        use, other than the status that every runtime names.
+        """Enums that only presence masks and union tags use.
 
         A binding writes and reads those fields itself, so no host code names
         the enum, and a binding keeps its values private.
@@ -723,13 +720,7 @@ class BoundApi:
             for member in value.fields:
                 visit(
                     member.value,
-                    control
-                    if member.role in {"presence_mask", "tag"}
-                    or (
-                        value.native == COMPLETION_RESULT
-                        and member.value.native != STATUS
-                    )
-                    else used,
+                    control if member.role in {"presence_mask", "tag"} else used,
                 )
         for operation in (*self.operations, *self.runtime_operations):
             for parameter in (*operation.inputs, *operation.outputs):

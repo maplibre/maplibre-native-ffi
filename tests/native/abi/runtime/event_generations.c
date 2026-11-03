@@ -191,7 +191,6 @@ typedef mln_status (*map_command)(
 
 typedef struct probed_result {
   mln_status status;
-  uint32_t disposition;
   uint64_t generation;
   // Recorder entries [start, end) are the events that reached the handler
   // before the completion.
@@ -212,7 +211,6 @@ static probed_result run_probed(mln_map map, map_command command) {
   MLN_TEST_OK(command(map, &probed));
   probed_result result = {
     .status = mln_test_completion_finish(&completion),
-    .disposition = mln_test_completion_disposition(&completion),
     .generation = mln_test_completion_generation(&completion),
     .start = start,
     .end = probe.count_at_completion,
@@ -334,7 +332,6 @@ static void a_failed_command_reports_the_generation_of_its_events(void) {
 
   const probed_result failed = run_probed(map, set_malformed_style);
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, failed.status);
-  TEST_ASSERT_EQUAL_UINT32(MLN_COMMAND_DISPOSITION_FAILED, failed.disposition);
   TEST_ASSERT_GREATER_THAN_UINT64(0, failed.generation);
   TEST_ASSERT_EQUAL_size_t(
     1, count_in_range(&failed, map, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)

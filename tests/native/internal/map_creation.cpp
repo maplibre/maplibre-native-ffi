@@ -92,9 +92,6 @@ void work_queued_on_a_failed_map_reports_invalid_state() {
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
 
   TEST_ASSERT_TRUE(mln_test_completion_wait(&command, -1));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&command)
-  );
   MLN_TEST_INVALID_STATE(mln_test_completion_settle(&command));
   MLN_TEST_INVALID_STATE(mln_test_completion_settle(&still));
 

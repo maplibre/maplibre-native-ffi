@@ -52,10 +52,6 @@ pub type mln_camera_update_mode = u32;
 pub const MLN_CAMERA_UPDATE_MODE_JUMP: mln_camera_update_mode = 0;
 pub const MLN_CAMERA_UPDATE_MODE_EASE: mln_camera_update_mode = 1;
 pub const MLN_CAMERA_UPDATE_MODE_FLY: mln_camera_update_mode = 2;
-pub type mln_command_disposition = u32;
-pub const MLN_COMMAND_DISPOSITION_COMMITTED: mln_command_disposition = 0;
-pub const MLN_COMMAND_DISPOSITION_FAILED: mln_command_disposition = 1;
-pub const MLN_COMMAND_DISPOSITION_CANCELLED: mln_command_disposition = 2;
 pub type mln_constrain_mode = u32;
 pub const MLN_CONSTRAIN_MODE_NONE: mln_constrain_mode = 0;
 pub const MLN_CONSTRAIN_MODE_HEIGHT_ONLY: mln_constrain_mode = 1;
@@ -638,7 +634,6 @@ pub struct mln_completion {
 pub struct mln_completion_result {
     pub size: u32,
     pub status: mln_status,
-    pub disposition: mln_command_disposition,
     pub value_size: u32,
     pub generation: u64,
     pub render_update_generation: u64,
