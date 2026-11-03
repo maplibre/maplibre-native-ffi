@@ -24,23 +24,6 @@ void main() {
     expect(request.kind, ResourceKind.style);
     expect(handle.isCancelled(), isFalse);
 
-    // A response the C API cannot represent is refused and leaves the
-    // request open for a valid one.
-    expect(
-      () => handle.complete(
-        ResourceResponse(
-          status: ResourceResponseStatus.error,
-          errorMessage: 'bad\u0000message',
-        ),
-      ),
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidArgument,
-        ),
-      ),
-    );
     handle.complete(emptyStyleResponse);
     await expectCommitted(loaded);
 
@@ -63,6 +46,48 @@ void main() {
     );
     expect(handle.passThrough, isInvalidState);
     expect(handle.isCancelled, isInvalidState);
+  });
+
+  test('a refused answer closes its request and fails it', () async {
+    const styleUrl = 'custom://refused-style.json';
+    final handed = Completer<ResourceRequestHandle>();
+    final fixture = await openRuntime(
+      provider: routedProvider([
+        styleRoute(styleUrl),
+      ], (_, handle) => handed.complete(handle)),
+    );
+    final map = await fixture.openMap();
+
+    final loading = map.setStyleUrl(styleUrl);
+    final handle = await within(handed.future, 'the provider');
+    // A response the C API cannot represent is refused, and the refused
+    // answer still ends the request.
+    expect(
+      () => handle.complete(
+        ResourceResponse(
+          status: ResourceResponseStatus.error,
+          errorMessage: 'bad\u0000message',
+        ),
+      ),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.invalidArgument,
+        ),
+      ),
+    );
+    expect(handle.isClosed, isTrue);
+    await expectLater(
+      within(loading, 'a command'),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.nativeError,
+        ),
+      ),
+    );
   });
 
   test(

@@ -704,7 +704,7 @@ typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
 typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
 typedef void (*provider)(void *context, request ticket BIND("ownership=owned"));
-BIND("consumes=success") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+BIND("consumes=always") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("accepted_unless=cancelled") mln_status on_cancel(
   request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
@@ -715,10 +715,12 @@ void release_request(request value);
         self.assertEqual(
             (ticket.value.kind, ticket.value.ownership), ("handle", "owned")
         )
-        # An answer consumes the request it answers, as its release does, but
-        # is no release: it keeps its name, and a repeated one reaches native.
+        # An answer ends the request it answers whatever it returns, as its
+        # release does, but is no release: it keeps its name, and a repeated
+        # one reaches native.
         answer = model.operations_by_name["answer"]
-        self.assertEqual((answer.consumes, answer.release), ("success", False))
+        self.assertEqual((answer.consumes, answer.release), ("always", False))
+        self.assertTrue(answer.answers)
         self.assertTrue(model.operations_by_name["release_request"].release)
         (registration,) = model.operations_by_name["on_cancel"].registrations
         self.assertEqual(
@@ -726,7 +728,20 @@ void release_request(request value);
             ("release", "cancelled"),
         )
         for before, after, error in (
-            ("consumes=success", "consumes=always", "consumes"),
+            ("consumes=always", "consumes=success", "consumes"),
+            # An answer ends its handle before it returns.
+            (
+                'BIND("consumes=always")',
+                'BIND("execution=snapshot;consumes=always")',
+                "an answer requires an immediate call",
+            ),
+            # A binding releases the handle after a failed answer, which a
+            # release that reports a stale handle would refuse.
+            (
+                "void release_request(request value);",
+                "mln_status release_request(request value, mln_diagnostic *out_diagnostic);",
+                "release returns nothing",
+            ),
             ("accepted_unless=cancelled", "accepted_unless=value", "boolean output"),
             (
                 "const cancel_handler *handler",
@@ -747,7 +762,7 @@ BIND("execution=lifecycle") mln_status release_root(
 mln_status close_child(child value, mln_diagnostic *out_diagnostic);
 mln_status abandon_child(child value, mln_diagnostic *out_diagnostic);
 void release_request(request value);
-BIND("consumes=success") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+BIND("consumes=always") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 BIND("blocks=thread_start") mln_status start(root *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=lifecycle") mln_status attach(
   root parent, child *owner BIND("direction=out"),

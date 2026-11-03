@@ -690,6 +690,11 @@ void mln_ts_owner_consume(mln_ts_owner* owner) {
   owner_end(owner, false);
 }
 
+void mln_ts_owner_dispose(mln_ts_owner* owner) {
+  // As in mln_ts_owner_consume(), the owner stays in its realm's list.
+  owner_end(owner, true);
+}
+
 static void owner_finalize(napi_env env, void* data, void* hint) {
   (void)env;
   (void)hint;

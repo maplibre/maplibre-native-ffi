@@ -32,8 +32,26 @@ public sealed class ResourceProviderTests
         var loaded = fixture.Map.SetStyleUrlAsync(StyleUrl);
         var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
-        // Native rejects a malformed etag while the request stays open for another answer.
-        Assert.Throws<MaplibreException>(() =>
+        handle.Complete(StyleResponse());
+        await loaded.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+
+        // The answer consumed the handle, so a second answer fails.
+        Assert.True(handle.IsClosed);
+        Assert.Throws<MaplibreException>(() => handle.Complete(StyleResponse()));
+    }
+
+    // A refused answer still ends the request, which fails as a dispose fails it.
+    [Fact]
+    public async Task ARefusedAnswerClosesItsRequestAndFailsIt()
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        var loading = fixture.Map.SetStyleUrlAsync(StyleUrl);
+        var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+
+        var refusal = Assert.Throws<MaplibreException>(() =>
             handle.Complete(
                 new ResourceResponse
                 {
@@ -43,13 +61,12 @@ public sealed class ResourceProviderTests
                 }
             )
         );
-        Assert.False(handle.IsClosed);
-        handle.Complete(StyleResponse());
-        await loaded.WaitAsync(TestWaits.Deadline, TestWaits.Token);
-
-        // The answer consumed the handle, so a second answer fails.
+        Assert.Equal(Status.InvalidArgument, refusal.Status);
         Assert.True(handle.IsClosed);
-        Assert.Throws<MaplibreException>(() => handle.Complete(StyleResponse()));
+        var failure = await Assert.ThrowsAsync<MaplibreException>(() =>
+            loading.WaitAsync(TestWaits.Deadline, TestWaits.Token)
+        );
+        Assert.Equal(Status.NativeError, failure.Status);
     }
 
     // A request outside the routes passes through to native loading, which refuses the scheme.

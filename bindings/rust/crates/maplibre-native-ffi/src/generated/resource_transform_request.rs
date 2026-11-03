@@ -16,12 +16,14 @@ native_owner! {
 impl ResourceTransformRequestHandle {
     /// Answers a resource transform request with the URL to load instead.
     ///
-    /// `url` must not be empty.
+    /// `url` must not be empty. A failed answer fails the request with
+    /// `ResourceErrorReason::Other`, as
+    /// `ResourceTransformRequestHandle::release()` does.
     ///
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn complete(self, url: &str) -> std::result::Result<(), (Self, Error)> {
-        self.consume(|request| {
+    pub fn complete(self, url: &str) -> Result<()> {
+        self.consume_always(|request| {
             let mut call = Call::new(request);
             let url = call.input(&url)?;
             call.status(|request, out_diagnostic| unsafe {
@@ -34,15 +36,14 @@ impl ResourceTransformRequestHandle {
     ///
     /// The library retries a request that failed for a reason it retries, such
     /// as `ResourceErrorReason::Connection`, and the retry calls the transform
-    /// again.
+    /// again. When this call fails, the request fails with
+    /// `ResourceErrorReason::Other`, as
+    /// `ResourceTransformRequestHandle::release()` does.
     ///
     /// See `mln_resource_transform_request_fail` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn fail(
-        self,
-        error: &ResourceTransformError<'_>,
-    ) -> std::result::Result<(), (Self, Error)> {
-        self.consume(|request| {
+    pub fn fail(self, error: &ResourceTransformError<'_>) -> Result<()> {
+        self.consume_always(|request| {
             let mut call = Call::new(request);
             let error = call.reference(&error)?;
             call.status(|request, out_diagnostic| unsafe {

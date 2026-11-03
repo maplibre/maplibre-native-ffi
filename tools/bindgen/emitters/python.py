@@ -744,6 +744,8 @@ def operation(
         public_result = "None"
         native_result = "Any"
         expression = f"self._native.{name}({', '.join(python_arguments)})"
+        if plan.answers:
+            expression = f"_answer(self, lambda: {expression})"
         if plan.drain:
             # The batch releases when this frame ends, after the copy or as
             # the copy fails.
@@ -1159,7 +1161,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         f"from ._generated_values import {name}" for name in sorted(imported)
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _view\nfrom ._generated_values import _copy_variant, _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join(OWNERS.values()) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom contextlib import AbstractContextManager\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_value, _answer, _view\nfrom ._generated_values import _copy_variant, _maybe\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join(OWNERS.values()) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"

@@ -71,6 +71,27 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     try destroy(value)
     lock.withLock { closed = true }
   }
+
+  /// Runs an answer, which ends the handle whatever it returns. Native ends a
+  /// live handle on every outcome, and a failure releases the handle in case
+  /// the failure came before native saw it. A repeated answer reaches native,
+  /// which reports the handle stale.
+  func answer(_ call: (Handle) throws -> Void) throws {
+    guard !borrowed else {
+      throw MaplibreError.invalidState(
+        "\(typeName) is borrowed by a callback, which can't release it"
+      )
+    }
+    defer { withExtendedLifetime(parent) {} }
+    do {
+      try call(value)
+    } catch {
+      _ = value.disposeAbandoned()
+      lock.withLock { closed = true }
+      throw error
+    }
+    lock.withLock { closed = true }
+  }
 }
 
 private final class NativeRetirement<Handle: NativeHandle>: @unchecked Sendable {

@@ -158,15 +158,11 @@ mln_resource_response mln_test_error_response(
 void mln_test_request_answer(
   mln_resource_request handle, const mln_resource_response* response
 ) {
-  if (mln_resource_request_complete(handle, response, NULL) != MLN_STATUS_OK) {
-    mln_resource_request_release(handle);
-  }
+  (void)mln_resource_request_complete(handle, response, NULL);
 }
 
 void mln_test_request_pass_through(mln_resource_request handle) {
-  if (mln_resource_request_pass_through(handle, NULL) != MLN_STATUS_OK) {
-    mln_resource_request_release(handle);
-  }
+  (void)mln_resource_request_pass_through(handle, NULL);
 }
 
 static void copy_text(mln_buffer_view text, char* out, size_t capacity) {

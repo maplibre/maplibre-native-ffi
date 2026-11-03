@@ -37,6 +37,27 @@ internal open class HandleState(
     return call().also { released.store(true) }
   }
 
+  /**
+   * Runs the answer [call], which ends the handle whatever it returns. Native ends a live handle on
+   * every outcome, and a failure disposes the handle in case it came before native saw the answer.
+   */
+  fun answer(call: () -> Unit) {
+    checkReleasable()
+    try {
+      call()
+    } catch (error: Throwable) {
+      if (released.compareAndSet(false, true)) {
+        try {
+          dispose(handle)
+        } catch (cleanup: Throwable) {
+          error.addSuppressed(cleanup)
+        }
+      }
+      throw error
+    }
+    released.store(true)
+  }
+
   /** Refuses to release a handle that a callback borrows. */
   protected fun checkReleasable() {
     if (borrowed) {

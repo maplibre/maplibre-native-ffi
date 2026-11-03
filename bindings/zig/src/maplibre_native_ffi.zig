@@ -2046,6 +2046,9 @@ pub const ResourceRequest = struct {
     pub const deinit = methods.deinit;
     /// Answers a resource request.
     ///
+    /// A failed answer fails the request with `ResourceErrorReason.other`, as
+    /// `ResourceRequest.release()` does.
+    ///
     /// See `mln_resource_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     ///
@@ -2053,6 +2056,7 @@ pub const ResourceRequest = struct {
     ///
     /// - `error.InvalidState` when the library cancelled the request.
     pub fn complete(self: *ResourceRequest, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        errdefer self.deinit();
         try call.invoke("mln_resource_request_complete", .handle, self.*, null, diagnostic, .{response});
         self.closed = true;
     }
@@ -2067,6 +2071,9 @@ pub const ResourceRequest = struct {
 
     /// Hands a resource request back to the library to load as usual.
     ///
+    /// A failed call fails the request with `ResourceErrorReason.other`, as
+    /// `ResourceRequest.release()` does.
+    ///
     /// See `mln_resource_request_pass_through` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     ///
@@ -2074,6 +2081,7 @@ pub const ResourceRequest = struct {
     ///
     /// - `error.InvalidState` when the library cancelled the request.
     pub fn passThrough(self: *ResourceRequest, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        errdefer self.deinit();
         try call.invoke("mln_resource_request_pass_through", .handle, self.*, null, diagnostic, .{});
         self.closed = true;
     }
@@ -2121,11 +2129,13 @@ pub const ResourceTransformRequest = struct {
     pub const deinit = methods.deinit;
     /// Answers a resource transform request with the URL to load instead.
     ///
-    /// `url` must not be empty.
+    /// `url` must not be empty. A failed answer fails the request with
+    /// `ResourceErrorReason.other`, as `ResourceTransformRequest.release()` does.
     ///
     /// See `mln_resource_transform_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn complete(self: *ResourceTransformRequest, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        errdefer self.deinit();
         try call.invoke("mln_resource_transform_request_complete", .handle, self.*, null, diagnostic, .{url});
         self.closed = true;
     }
@@ -2134,10 +2144,13 @@ pub const ResourceTransformRequest = struct {
     ///
     /// The library retries a request that failed for a reason it retries, such as
     /// `ResourceErrorReason.connection`, and the retry calls the transform again.
+    /// When this call fails, the request fails with `ResourceErrorReason.other`, as
+    /// `ResourceTransformRequest.release()` does.
     ///
     /// See `mln_resource_transform_request_fail` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn fail(self: *ResourceTransformRequest, @"error": ResourceTransformError, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        errdefer self.deinit();
         try call.invoke("mln_resource_transform_request_fail", .handle, self.*, null, diagnostic, .{@"error"});
         self.closed = true;
     }

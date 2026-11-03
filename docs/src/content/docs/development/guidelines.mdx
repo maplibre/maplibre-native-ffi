@@ -55,7 +55,9 @@ function runs. The generator uses them to write safe wrappers in each binding.
 
 ### General API design
 
-- A function that returns an error status must not change any state.
+- A function that returns an error status must not change any state, except an
+  answer to a request, such as `mln_resource_request_complete`. An answer ends
+  its handle whatever it returns, and carries `MLN_BINDING("consumes=always")`.
 - An asynchronous function takes an `mln_completion`, which receives its result.
 - Annotate each function with how it runs, as in
   `MLN_BINDING("execution=command")`:

@@ -5440,9 +5440,10 @@ static napi_value mln_ts_export_mln_resource_request_complete(
   diagnostic.message[0] = '\0';
   status =
     mln_resource_request_complete(arg_handle, &arg_response, &diagnostic);
-  if (status == MLN_STATUS_OK) mln_ts_consume(call);
+  mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
+  mln_ts_dispose_unconsumed(call);
   return mln_ts_end(call);
 }
 
@@ -5491,9 +5492,10 @@ static napi_value mln_ts_export_mln_resource_request_pass_through(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_resource_request_pass_through(arg_handle, &diagnostic);
-  if (status == MLN_STATUS_OK) mln_ts_consume(call);
+  mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
+  mln_ts_dispose_unconsumed(call);
   return mln_ts_end(call);
 }
 
@@ -5575,9 +5577,10 @@ static napi_value mln_ts_export_mln_resource_transform_request_complete(
   diagnostic.message[0] = '\0';
   status =
     mln_resource_transform_request_complete(arg_request, arg_url, &diagnostic);
-  if (status == MLN_STATUS_OK) mln_ts_consume(call);
+  mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
+  mln_ts_dispose_unconsumed(call);
   return mln_ts_end(call);
 }
 
@@ -5608,9 +5611,10 @@ static napi_value mln_ts_export_mln_resource_transform_request_fail(
   diagnostic.message[0] = '\0';
   status =
     mln_resource_transform_request_fail(arg_request, &arg_error, &diagnostic);
-  if (status == MLN_STATUS_OK) mln_ts_consume(call);
+  mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
+  mln_ts_dispose_unconsumed(call);
   return mln_ts_end(call);
 }
 

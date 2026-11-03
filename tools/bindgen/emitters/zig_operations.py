@@ -115,7 +115,11 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
     takes the receiver as `self`. `taken` names the declarations of that
     type, which no parameter may shadow."""
     function = plan.function
-    if plan.consumes == "always" and function.return_type.kind != "void":
+    if (
+        plan.consumes == "always"
+        and function.return_type.kind != "void"
+        and not plan.answers
+    ):
         raise failure(
             function,
             "status-returning unconditional consumption requires a commit-on-error adapter",
@@ -394,18 +398,25 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
 def consume(function, receiver, body, return_type, infallible=False, release=True):
     """Close the receiver once native accepts its release. A synchronous release
     of a closed receiver does nothing; an asynchronous one, and an answer that
-    consumes its receiver, reach native, which reports a stale handle."""
+    consumes its receiver, reach native, which reports a stale handle. An
+    answer closes its receiver whatever it returns: a failed one deinits the
+    receiver, which releases a handle that the failure left live."""
     if not release:
         if len(body) != 1 or not body[0].startswith("return "):
             raise failure(function, "an answer with outputs needs an owner transaction")
         answer = body[0].removeprefix("return ").removesuffix(";")
         if return_type != "void":
             return [
+                f"errdefer {receiver}.deinit();",
                 f"const answered = try {answer};",
                 f"{receiver}.closed = true;",
                 "return answered;",
             ]
-        return [f"try {answer};", f"{receiver}.closed = true;"]
+        return [
+            f"errdefer {receiver}.deinit();",
+            f"try {answer};",
+            f"{receiver}.closed = true;",
+        ]
     if infallible and return_type == "void":
         return [
             f"if ({receiver}.closed) return;",

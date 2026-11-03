@@ -926,14 +926,16 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
 /**
  * Answers a resource request.
  *
+ * A failed answer fails the request with MLN_RESOURCE_ERROR_REASON_OTHER, as
+ * mln_resource_request_release() does.
+ *
  * Returns:
  * - MLN_STATUS_INVALID_STATE when the library cancelled the request.
  *
  * Lifetimes:
- * A successful call ends `handle`. After a failed one, the caller still owns
- * it.
+ * The call ends `handle` whatever it returns.
  */
-MLN_BINDING("consumes=success")
+MLN_BINDING("consumes=always")
 MLN_API mln_status mln_resource_request_complete(
   mln_resource_request handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
@@ -942,14 +944,16 @@ MLN_API mln_status mln_resource_request_complete(
 /**
  * Hands a resource request back to the library to load as usual.
  *
+ * A failed call fails the request with MLN_RESOURCE_ERROR_REASON_OTHER, as
+ * mln_resource_request_release() does.
+ *
  * Returns:
  * - MLN_STATUS_INVALID_STATE when the library cancelled the request.
  *
  * Lifetimes:
- * A successful call ends `handle`. After a failed one, the caller still owns
- * it.
+ * The call ends `handle` whatever it returns.
  */
-MLN_BINDING("consumes=success")
+MLN_BINDING("consumes=always")
 MLN_API mln_status mln_resource_request_pass_through(
   mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -1005,9 +1009,14 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
 /**
  * Answers a resource transform request with the URL to load instead.
  *
- * `url` must not be empty.
+ * `url` must not be empty. A failed answer fails the request with
+ * MLN_RESOURCE_ERROR_REASON_OTHER, as mln_resource_transform_request_release()
+ * does.
+ *
+ * Lifetimes:
+ * The call ends `request` whatever it returns.
  */
-MLN_BINDING("consumes=success")
+MLN_BINDING("consumes=always")
 MLN_API mln_status mln_resource_transform_request_complete(
   mln_resource_transform_request request, mln_buffer_view url,
   mln_diagnostic* out_diagnostic
@@ -1018,9 +1027,14 @@ MLN_API mln_status mln_resource_transform_request_complete(
  *
  * The library retries a request that failed for a reason it retries, such as
  * MLN_RESOURCE_ERROR_REASON_CONNECTION, and the retry calls the transform
- * again.
+ * again. When this call fails, the request fails with
+ * MLN_RESOURCE_ERROR_REASON_OTHER, as mln_resource_transform_request_release()
+ * does.
+ *
+ * Lifetimes:
+ * The call ends `request` whatever it returns.
  */
-MLN_BINDING("consumes=success")
+MLN_BINDING("consumes=always")
 MLN_API mln_status mln_resource_transform_request_fail(
   mln_resource_transform_request request,
   const mln_resource_transform_error* error, mln_diagnostic* out_diagnostic

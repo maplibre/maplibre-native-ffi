@@ -131,6 +131,21 @@ macro_rules! native_owner {
                 }
             }
 
+            /// Runs an answer, which ends this owner whatever it returns.
+            /// Native ends a live handle on every outcome, and dropping the
+            /// owner after a failure releases a handle that the failure left
+            /// live, as one before native saw the answer does.
+            #[allow(dead_code)]
+            pub(crate) fn consume_always<R>(
+                self,
+                close: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
+            ) -> $crate::Result<R> {
+                self.consume(close).map_err(|(owner, error)| {
+                    drop(owner);
+                    error
+                })
+            }
+
             $(#[$id_meta])*
             pub fn id(&self) -> u64 {
                 self.inner.id()

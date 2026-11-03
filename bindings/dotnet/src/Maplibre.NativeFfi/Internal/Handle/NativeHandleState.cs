@@ -120,14 +120,47 @@ internal sealed unsafe class NativeHandleState<T>
 
     internal void Retire() => Release(disposeAbandoned ?? destroy);
 
-    // Returns whether this call ended the handle, rather than finding it closed.
-    internal bool Release(StatusDestroy<T> release, bool idempotent = true)
+    // Runs an answer, which ends the handle whatever it returns: native ends a
+    // live handle on every outcome. A repeated answer reaches native, which
+    // reports the handle stale.
+    internal void Answer(StatusDestroy<T> answer)
+    {
+        CheckReleasable();
+        try
+        {
+            mln_diagnostic diagnostic;
+            NativeStatus.Check(answer(handle, NativeDiagnostic.Prepare(&diagnostic)), &diagnostic);
+        }
+        finally
+        {
+            lock (gate)
+                closed = true;
+            GC.SuppressFinalize(this);
+            GC.KeepAlive(retainedParent);
+        }
+    }
+
+    // Ends a handle whose answer failed before it reached native, as a release
+    // does. Does nothing once the handle is closed, or for a borrowed handle.
+    internal void EndAnswer()
+    {
+        if (!borrowed)
+            Release(disposeAbandoned ?? destroy);
+    }
+
+    private void CheckReleasable()
     {
         if (borrowed)
             throw new MaplibreException(
                 global::Maplibre.NativeFfi.Status.InvalidState,
                 $"{typeName} is borrowed by a callback, which can't release it."
             );
+    }
+
+    // Returns whether this call ended the handle, rather than finding it closed.
+    internal bool Release(StatusDestroy<T> release, bool idempotent = true)
+    {
+        CheckReleasable();
         lock (gate)
         {
             if (idempotent && closed)

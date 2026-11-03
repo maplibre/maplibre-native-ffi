@@ -201,9 +201,7 @@ static inline void probe_provide(
     response.status = MLN_RESOURCE_RESPONSE_STATUS_ERROR;
     response.error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND;
   }
-  if (mln_resource_request_complete(handle, &response, NULL) != MLN_STATUS_OK) {
-    mln_resource_request_release(handle);
-  }
+  (void)mln_resource_request_complete(handle, &response, NULL);
 }
 
 // Writes the probe's data and installs the process-global log callback,

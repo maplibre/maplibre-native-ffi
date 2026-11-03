@@ -216,12 +216,6 @@ static void the_host_answers_a_dispatched_transform_later(void) {
   TEST_ASSERT_TRUE(kept.url_terminated);
   TEST_ASSERT_EQUAL_STRING(original, kept.url);
 
-  MLN_TEST_INVALID(
-    mln_resource_transform_request_complete(request, (mln_buffer_view){0}, NULL)
-  );
-  MLN_TEST_INVALID(mln_resource_transform_request_complete(
-    request, MLN_BUFFER_LITERAL("custom://before\0after"), NULL
-  ));
   MLN_TEST_OK(mln_resource_transform_request_complete(
     request, mln_buffer_view_from_cstr(rewritten), NULL
   ));
@@ -272,19 +266,14 @@ static void the_host_fails_a_dispatched_transform(void) {
   const mln_resource_transform_request request =
     await_transform(queue.handle, &tag);
 
-  mln_resource_transform_error error = {
-    .size = sizeof(mln_resource_transform_error),
-    .reason = (mln_resource_error_reason)99,
-  };
-  MLN_TEST_INVALID(mln_resource_transform_request_fail(request, NULL, NULL));
-  MLN_TEST_INVALID(mln_resource_transform_request_fail(request, &error, NULL));
-  error.reason = MLN_RESOURCE_ERROR_REASON_RATE_LIMIT;
-  error.fields = 1U << 31U;
-  MLN_TEST_INVALID(mln_resource_transform_request_fail(request, &error, NULL));
   // A retry time in the past retries now instead of after the default delay.
-  error.fields = MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
-  error.retry_after_unix_ms = (int64_t)time(NULL) * 1000;
-  error.message = mln_buffer_view_from_cstr("no credential yet");
+  const mln_resource_transform_error error = {
+    .size = sizeof(mln_resource_transform_error),
+    .fields = MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER,
+    .reason = MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
+    .message = mln_buffer_view_from_cstr("no credential yet"),
+    .retry_after_unix_ms = (int64_t)time(NULL) * 1000,
+  };
   MLN_TEST_OK(mln_resource_transform_request_fail(request, &error, NULL));
   MLN_TEST_INVALID_STATE(
     mln_resource_transform_request_fail(request, &error, NULL)
@@ -350,6 +339,80 @@ static void a_zeroed_transform_error_fails_its_request(void) {
 
   MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_delivery_queue_release(&queue);
+  mln_test_http_server_stop(server);
+}
+
+// Each answer that native refuses ends the request as a release does.
+static void a_refused_transform_answer_fails_its_request(void) {
+  mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
+  char original[256];
+  mln_test_http_server_url(
+    server, "/original.json", original, sizeof(original)
+  );
+  mln_test_delivery_queue queue;
+  mln_test_delivery_queue_create(&queue);
+  const mln_resource_transform transform = queue_transform(queue.handle, NULL);
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  const mln_resource_transform_error unknown_fields = {
+    .size = sizeof(mln_resource_transform_error),
+    .fields = 1U << 31U,
+    .reason = MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
+  };
+  const mln_resource_transform_error unknown_reason = {
+    .size = sizeof(mln_resource_transform_error),
+    .reason = (mln_resource_error_reason)99,
+  };
+  for (int answer = 0; answer < 5; ++answer) {
+    mln_map map = mln_test_create_map(runtime);
+    MLN_TEST_OK(mln_test_map_set_style_url(map, original));
+    const mln_resource_transform_request request =
+      await_transform(queue.handle, NULL);
+    switch (answer) {
+      case 0:
+        MLN_TEST_INVALID(mln_resource_transform_request_complete(
+          request, (mln_buffer_view){0}, NULL
+        ));
+        break;
+      case 1:
+        MLN_TEST_INVALID(mln_resource_transform_request_complete(
+          request, MLN_BUFFER_LITERAL("custom://before\0after"), NULL
+        ));
+        break;
+      case 2:
+        MLN_TEST_INVALID(
+          mln_resource_transform_request_fail(request, NULL, NULL)
+        );
+        break;
+      case 3:
+        MLN_TEST_INVALID(
+          mln_resource_transform_request_fail(request, &unknown_fields, NULL)
+        );
+        break;
+      default:
+        MLN_TEST_INVALID(
+          mln_resource_transform_request_fail(request, &unknown_reason, NULL)
+        );
+        break;
+    }
+    // The refused answer ended the handle.
+    MLN_TEST_INVALID_STATE(mln_resource_transform_request_complete(
+      request, mln_buffer_view_from_cstr(original), NULL
+    ));
+    char message[512];
+    TEST_ASSERT_TRUE(
+      mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+    );
+    TEST_ASSERT_NOT_NULL(strstr(message, "without an answer"));
+    mln_test_destroy_map(map);
+  }
+  TEST_ASSERT_EQUAL_INT(
+    0, mln_test_http_server_requests(server, "/original.json")
+  );
+
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   mln_test_destroy_runtime(runtime);
   mln_test_delivery_queue_release(&queue);
   mln_test_http_server_stop(server);
@@ -607,6 +670,7 @@ MLN_TEST_GROUP {
   RUN_TEST(the_host_answers_a_dispatched_transform_later);
   RUN_TEST(the_host_fails_a_dispatched_transform);
   RUN_TEST(a_zeroed_transform_error_fails_its_request);
+  RUN_TEST(a_refused_transform_answer_fails_its_request);
   RUN_TEST(an_unanswered_transform_fails_its_request);
   RUN_TEST(the_release_follows_the_last_transform);
 #endif

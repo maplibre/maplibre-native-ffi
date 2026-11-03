@@ -96,17 +96,6 @@ test(
     assert.deepEqual(requests, [claimed]);
     assert.equal(handle.isCancelled(), false);
 
-    // A response that native code refuses, such as a message with an
-    // embedded NUL, leaves the request open for a valid one.
-    assert.throws(
-      () =>
-        handle.complete({
-          status: ResourceResponseStatus.error,
-          errorMessage: "bad\u0000message",
-          etag: "",
-        }),
-      isStatus(Status.invalidArgument),
-    );
     handle.complete(styleResponse());
     await bounded(loaded, "the style load");
 
@@ -116,6 +105,43 @@ test(
   },
   { needs: ["httpOrigin"] },
 );
+
+test("a refused answer closes its request and fails it", async () => {
+  const refusals: [string, (handle: ResourceRequestHandle) => void, unknown][] =
+    [
+      // Native code refuses a message with an embedded NUL.
+      [
+        "custom://refused-by-native.json",
+        (handle) =>
+          handle.complete({
+            status: ResourceResponseStatus.error,
+            errorMessage: "bad\u0000message",
+            etag: "",
+          }),
+        isStatus(Status.invalidArgument),
+      ],
+      // The binding refuses a response it can't convert, before native code
+      // sees the answer.
+      [
+        "custom://refused-by-binding.json",
+        (handle) => handle.complete({ status: "ok" } as never),
+        TypeError,
+      ],
+    ];
+  for (const [url, answer, error] of refusals) {
+    const { handed, provider } = handoff();
+    const fixture = await openRuntime({ provider: provider(url) });
+    const map = await fixture.openMap();
+    const loading = map.setStyleUrl(url);
+    const [, handle] = await callbackArrival(handed, "the provider");
+    assert.throws(() => answer(handle), error as never);
+    assert.equal(handle.isClosed, true);
+    await assert.rejects(
+      bounded(loading, "a command"),
+      isStatus(Status.nativeError),
+    );
+  }
+});
 
 test("a provider callback error is reported and fails the request", async () => {
   const errors = captureReportedErrors();

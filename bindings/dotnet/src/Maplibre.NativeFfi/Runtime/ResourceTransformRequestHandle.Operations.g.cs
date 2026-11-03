@@ -64,19 +64,32 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// Answers a resource transform request with the URL to load instead.
     /// </summary>
     /// <remarks>
-    /// <para><c>url</c> must not be empty.</para>
+    /// <para><c>url</c> must not be empty. A failed answer fails the request
+    /// with <c>ResourceErrorReason.Other</c>, as
+    /// <c>ResourceTransformRequestHandle.Dispose()</c> does.</para>
     /// <para>See <c>mln_resource_transform_request_complete</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void Complete(string url)
     {
-        using var scope = new NativeCallScope();
-        var nativeUrl = scope.Utf8(url);
-        state.Release(
-            (live, diagnostic) =>
-                NativeMethods.mln_resource_transform_request_complete(live, nativeUrl, diagnostic),
-            idempotent: false
-        );
+        try
+        {
+            using var scope = new NativeCallScope();
+            var nativeUrl = scope.Utf8(url);
+            state.Answer(
+                (live, diagnostic) =>
+                    NativeMethods.mln_resource_transform_request_complete(
+                        live,
+                        nativeUrl,
+                        diagnostic
+                    )
+            );
+        }
+        catch
+        {
+            state.EndAnswer();
+            throw;
+        }
     }
 
     /// <summary>
@@ -85,18 +98,27 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// <remarks>
     /// <para>The library retries a request that failed for a reason it retries,
     /// such as <c>ResourceErrorReason.Connection</c>, and the retry calls the
-    /// transform again.</para>
+    /// transform again. When this call fails, the request fails with
+    /// <c>ResourceErrorReason.Other</c>, as
+    /// <c>ResourceTransformRequestHandle.Dispose()</c> does.</para>
     /// <para>See <c>mln_resource_transform_request_fail</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void Fail(ResourceTransformError error)
     {
-        using var scope = new NativeCallScope();
-        var nativeError = scope.Value(NativeResourceTransformError(error, scope));
-        state.Release(
-            (live, diagnostic) =>
-                NativeMethods.mln_resource_transform_request_fail(live, nativeError, diagnostic),
-            idempotent: false
-        );
+        try
+        {
+            using var scope = new NativeCallScope();
+            var nativeError = scope.Value(NativeResourceTransformError(error, scope));
+            state.Answer(
+                (live, diagnostic) =>
+                    NativeMethods.mln_resource_transform_request_fail(live, nativeError, diagnostic)
+            );
+        }
+        catch
+        {
+            state.EndAnswer();
+            throw;
+        }
     }
 }

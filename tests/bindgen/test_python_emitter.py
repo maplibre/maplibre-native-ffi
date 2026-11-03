@@ -52,6 +52,7 @@ class PythonEmitterTests(unittest.TestCase):
                 "_operation",
                 GeneratedOperations=GeneratedOperations,
                 _adopt_value=None,
+                _answer=None,
                 _view=None,
             ),
             "fixture._lifecycle": module(

@@ -25,9 +25,10 @@ type bindingTarget struct {
 	// consumes reports that native consumes the receiver when the call
 	// succeeds.
 	consumes bool
-	// repeatReachesNative reports that a call on a receiver already consumed
-	// reaches native, which reports it, where a repeated close does nothing.
-	repeatReachesNative bool
+	// answers reports a call that ends the receiver whatever it returns. A
+	// call on a receiver already ended reaches native, which reports it, where
+	// a repeated close does nothing.
+	answers bool
 }
 
 func bindingGlobal() bindingTarget { return bindingTarget{} }
@@ -40,7 +41,7 @@ func bindingClosing(owner *bindingOwner) bindingTarget {
 }
 
 func bindingAnswering(owner *bindingOwner) bindingTarget {
-	return bindingTarget{handle: true, owner: owner, consumes: true, repeatReachesNative: true}
+	return bindingTarget{handle: true, owner: owner, consumes: true, answers: true}
 }
 
 // bindingScoped gives a nil response a scope that has already expired.
@@ -72,9 +73,18 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	if target.consumes && state.borrowed {
 		panic(bindingFailure{newBindingError(StatusInvalidState, state.typeName+" is borrowed by a callback, which can't release it")})
 	}
-	if target.consumes && synchronous && !target.repeatReachesNative && state.released.Load() {
+	if target.consumes && synchronous && !target.answers && state.released.Load() {
 		var zero T
 		return zero
+	}
+	if target.answers {
+		// Native ends a live handle on every outcome. A failure releases the
+		// handle in case it came before native saw the answer.
+		defer func() {
+			if !state.released.Swap(true) {
+				state.dispose(state.raw)
+			}
+		}()
 	}
 	value := call(arena, state.raw)
 	if target.consumes {

@@ -24,7 +24,7 @@ namespace mln::core {
 // from any thread at any time.
 struct ResourceTransformRequestObject {
   std::mutex mutex;
-  // Empty once the request is answered.
+  // Empty once an answer is posted.
   mln::ResourceTransform::FinishedCallback finished;
 };
 
@@ -85,12 +85,18 @@ auto answer(
   const auto live =
     handle_table<ResourceTransformRequestObject>().lease(request);
   if (live == nullptr) return recorded_handle_fault_status();
-  const auto finished = take_answer(*live);
-  if (!finished) {
-    set_thread_error("resource transform request is already answered");
-    return MLN_STATUS_INVALID_STATE;
+  {
+    const auto lock = std::scoped_lock{live->mutex};
+    if (!live->finished) {
+      set_thread_error("resource transform request is already answered");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    // MapLibre's callback posts the answer, which can throw. The callback
+    // stays until the post succeeds, so the release that follows a failed
+    // answer can still fail the request.
+    live->finished(std::move(result));
+    live->finished = nullptr;
   }
-  finished(std::move(result));
   static_cast<void>(
     handle_table<ResourceTransformRequestObject>().remove(request)
   );

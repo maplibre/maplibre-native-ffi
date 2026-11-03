@@ -271,6 +271,29 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 	f.awaitEvent(t, "the deferred style load", isStyleLoaded)
 }
 
+// A refused answer still closes the request's handle, and the request fails
+// as a close fails it.
+func TestARefusedAnswerClosesItsRequest(t *testing.T) {
+	f := newFixture(t)
+	requests := make(chan *ResourceRequestHandle, 1)
+	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
+		offer(requests, request)
+	}})))
+	if _, err := f.m.SetStyleUrl("custom://refused.json"); err != nil {
+		t.Fatal(err)
+	}
+	request := receive(t, requests, "the provider's request")
+	if err := request.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Etag: "bad\x00tag"}); !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("Complete = %v, want StatusInvalidArgument", err)
+	}
+	if !request.IsClosed() {
+		t.Fatal("the refused answer left the handle open")
+	}
+	f.awaitEvent(t, "the refused style's loading failure", func(event RuntimeEvent) bool {
+		return event.Type == RuntimeEventTypeMapLoadingFailed && strings.Contains(event.Message, "released without a response")
+	})
+}
+
 // A provider's routes reach native code: a request that a route matches
 // reaches the callback, and any other passes through to native loading.
 func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {

@@ -6,6 +6,9 @@ import Foundation
 public extension ResourceRequestHandle {
   /// Answers a resource request.
   ///
+  /// A failed answer fails the request with `ResourceErrorReason.other`, as
+  /// `ResourceRequestHandle.close()` does.
+  ///
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   ///
@@ -15,7 +18,7 @@ public extension ResourceRequestHandle {
   func complete(response: ResourceResponse) throws {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
-    try handle.closeOnce(idempotent: false) { live in
+    try handle.answer { live in
       let raw = live.raw
       try checkStatus { diagnostic in try mln_resource_request_complete(
         raw,
@@ -78,6 +81,9 @@ public extension ResourceRequestHandle {
 public extension ResourceRequestHandle {
   /// Hands a resource request back to the library to load as usual.
   ///
+  /// A failed call fails the request with `ResourceErrorReason.other`, as
+  /// `ResourceRequestHandle.close()` does.
+  ///
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   ///
@@ -87,7 +93,7 @@ public extension ResourceRequestHandle {
   func passThrough() throws {
     let arena = NativeInputArena()
     defer { withExtendedLifetime(arena) {} }
-    try handle.closeOnce(idempotent: false) { live in
+    try handle.answer { live in
       let raw = live.raw
       try checkStatus { diagnostic in mln_resource_request_pass_through(
         raw,

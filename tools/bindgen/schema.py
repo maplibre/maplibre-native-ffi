@@ -78,6 +78,13 @@ PLATFORMS = (
 # and the bag has no member that a conversion could leave out but native
 # requires.
 #
+# consumes=always marks a call that answers its handle once and ends it,
+# whatever the call returns, as a resource request's completion does. A failed
+# answer ends a live handle as its release would. A binding ends its owner on
+# every outcome and, when the call fails, releases the handle in case the
+# failure came before native code saw it, so the handle's release returns
+# nothing and does nothing for a handle that the answer already ended.
+#
 # native_object=true marks an integer that names a host graphics object, such as
 # a VkImage or an OpenGL texture name. Native code uses the object it names as
 # it would a pointer, so a binding treats it as one: Rust marks an operation
@@ -93,7 +100,7 @@ ANNOTATION_VALUES = {
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
     "blocks": frozenset({"thread_start"}),
-    "consumes": frozenset({"success"}),
+    "consumes": frozenset({"always"}),
     "required": frozenset({"true"}),
     "native_object": frozenset({"true"}),
     "after_release": frozenset({"true"}),

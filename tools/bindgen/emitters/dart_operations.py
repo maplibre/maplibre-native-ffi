@@ -66,8 +66,12 @@ def lower_function(
         assert plan.completion is not None
         disposed = plan.completion.parameter
         plan = replace(plan, completion=None, shape="release")
-    if plan.consumes == "always" and (
-        plan.completion or function.return_type.kind != "void"
+    # An answer ends its receiver on every outcome, through its own
+    # adapter; any other call that always consumes is a void release.
+    if (
+        plan.consumes == "always"
+        and not plan.answers
+        and (plan.completion or function.return_type.kind != "void")
     ):
         raise Unsupported("unconditional consumption requires a void immediate release")
     if plan.scoped_receiver:
