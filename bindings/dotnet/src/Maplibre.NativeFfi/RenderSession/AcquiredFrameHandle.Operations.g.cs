@@ -240,9 +240,9 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// </summary>
     /// <remarks>
     /// <para><c>consumerCompletion</c> says when your GPU work that reads the
-    /// texture finishes. Null means that the work has already finished. The
-    /// session waits for that point before it renders into the texture
-    /// again.</para>
+    /// texture finishes. Pass <c>GpuSyncKind.CpuComplete</c> when that work has
+    /// already finished. The session waits for that point before it renders
+    /// into the texture again.</para>
     /// <para>See <c>mln_acquired_frame_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -252,12 +252,10 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// <c>consumerCompletion</c>.</description></item>
     /// </list>
     /// </remarks>
-    public void Release(GpuSync? consumerCompletion)
+    public void Release(GpuSync consumerCompletion)
     {
         using var scope = new NativeCallScope();
-        var nativeConsumerCompletion = consumerCompletion is null
-            ? null
-            : scope.Value(NativeGpuSync(consumerCompletion.Value));
+        var nativeConsumerCompletion = scope.Value(NativeGpuSync(consumerCompletion));
         state.Release(
             (live, diagnostic) =>
                 NativeMethods.mln_acquired_frame_release(live, nativeConsumerCompletion, diagnostic)

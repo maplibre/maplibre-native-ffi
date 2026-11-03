@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 
 import {
+  GpuSyncKind,
   type MapHandle,
   MaplibreError,
   QueueLock,
@@ -110,6 +111,7 @@ test("a frame view expires with its scope and holds off release inside it", asyn
   const session = await frameSession(map);
   const frame = session.acquireFrame();
   assert.ok(frame, "the session exposed no frame");
+  const done = { kind: GpuSyncKind.cpuComplete };
 
   // Reads a view's width, a plain value, and the texture object it lends.
   type Reader = { width(): number; texture(): unknown };
@@ -136,7 +138,7 @@ test("a frame view expires with its scope and holds off release inside it", asyn
     // The view borrows the frame, so native refuses to release the frame or
     // abandon its session while the view is open.
     assert.throws(
-      () => frame.release(),
+      () => frame.release(done),
       (error) => error instanceof MaplibreError,
     );
     assert.throws(
@@ -155,7 +157,7 @@ test("a frame view expires with its scope and holds off release inside it", asyn
       error instanceof MaplibreError && error.status === Status.invalidState,
   );
 
-  frame.release();
+  frame.release(done);
   // A released frame reaches native code, which reports it stale.
   assert.throws(
     () => frame.getResult(),

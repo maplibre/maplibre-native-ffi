@@ -19,20 +19,6 @@ class NativeHandleMixin:
         or ``with`` block exit of the handle."""
         return bool(self._native._is_closed)
 
-    def close(self) -> object:
-        """Release the private native handle.
-
-        Synchronous close is idempotent. Repeated asynchronous releases reach
-        native and report an invalid-state error.
-
-        A handle whose release reports asynchronous teardown returns a future
-        here, and a host that must observe teardown calls ``close`` itself and
-        waits. Leaving the ``with`` block disposes such a handle instead, as
-        ``dispose`` does, without observing teardown. Leaving the block after an explicit close
-        does nothing.
-        """
-        return self._native.close()
-
     def __repr__(self) -> str:
         closed = "true" if self.is_closed else "false"
         return f"{type(self).__name__}(id={self._native.id:#x}, closed={closed})"
@@ -51,6 +37,20 @@ class NativeHandleMixin:
 
 class ScopedHandleMixin(NativeHandleMixin):
     """The ``with`` block of a handle whose scope can clean it up."""
+
+    def close(self) -> object:
+        """Release the private native handle.
+
+        Synchronous close is idempotent. Repeated asynchronous releases reach
+        native and report an invalid-state error.
+
+        A handle whose release reports asynchronous teardown returns a future
+        here, and a host that must observe teardown calls ``close`` itself and
+        waits. Leaving the ``with`` block disposes such a handle instead, as
+        ``dispose`` does, without observing teardown. Leaving the block after an explicit close
+        does nothing.
+        """
+        return self._native.close()
 
     def __enter__(self) -> Self:
         return self

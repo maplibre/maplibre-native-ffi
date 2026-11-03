@@ -128,8 +128,9 @@ pub const AcquiredFrame = struct {
     /// Gives an acquired frame back to the session once you're done reading it.
     ///
     /// `consumer_completion` says when your GPU work that reads the texture
-    /// finishes. Null means that the work has already finished. The session waits
-    /// for that point before it renders into the texture again.
+    /// finishes. Pass `GpuSyncKind.cpu_complete` when that work has already
+    /// finished. The session waits for that point before it renders into the
+    /// texture again.
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -138,7 +139,7 @@ pub const AcquiredFrame = struct {
     ///
     /// - `error.Unsupported` when `RenderSessionCapabilities.consumer_sync_kinds`
     ///   lacks the kind of `consumer_completion`.
-    pub fn release(self: *AcquiredFrame, consumer_completion: ?GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn release(self: *AcquiredFrame, consumer_completion: GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         if (self.closed) return;
         try call.invoke("mln_acquired_frame_release", .handle, self.*, null, diagnostic, .{consumer_completion});
         self.closed = true;

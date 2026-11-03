@@ -610,6 +610,7 @@ void a_view_and_its_own_abandonment_keep_a_session_busy() {
   mln_acquired_frame_view_end(scope);
   auto sync = mln_gpu_sync{};
   sync.size = sizeof(mln_gpu_sync);
+  sync.kind = MLN_GPU_SYNC_CPU_COMPLETE;
   MLN_TEST_OK(mln_acquired_frame_release(fake.frame, &sync, nullptr));
   MLN_TEST_OK(mln_render_session_abandon(session, &result, nullptr));
   MLN_TEST_OK(reentrant_dispose_status.load());

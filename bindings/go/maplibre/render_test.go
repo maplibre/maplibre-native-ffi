@@ -324,7 +324,7 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 		// This goroutine holds its OS thread, so another one runs elsewhere.
 		foreign := make(chan [2]error, 1)
 		go func() {
-			foreign <- [2]error{readTexture(view), frame.Close(nil)}
+			foreign <- [2]error{readTexture(view), frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete})}
 		}()
 		result := <-foreign
 		if !errors.Is(result[0], StatusInvalidState) {
@@ -344,7 +344,7 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	if width := expired.Width(); width != 32 {
 		t.Fatalf("expired view width = %d, want 32", width)
 	}
-	if err := frame.Close(&GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
+	if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("frame close after the view: %v", err)
 	}
 	if err := withFrameView(frame, func(frameView) error { return nil }); !errors.Is(err, StatusInvalidState) {
@@ -367,7 +367,7 @@ func TestFrameDiscardsOnce(t *testing.T) {
 			t.Fatalf("AcquiredFrameHandle.Discard: %v", err)
 		}
 	}
-	if err := frame.Close(nil); err != nil {
+	if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("AcquiredFrameHandle.Close after Discard: %v, want a no-op", err)
 	}
 	checkHandleMembers(t, frame, "AcquiredFrameHandle", true)
@@ -385,7 +385,7 @@ func TestFrameViewSurvivesYielding(t *testing.T) {
 		t.Fatalf("AcquireFrame = %v, %v; want a rendered frame", frame, err)
 	}
 	defer func() {
-		if err := frame.Close(nil); err != nil {
+		if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 			t.Errorf("frame close: %v", err)
 		}
 	}()

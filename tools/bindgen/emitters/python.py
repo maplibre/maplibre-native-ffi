@@ -378,15 +378,14 @@ def operation(
         if (receiver and parameter.name == receiver.name) or parameter.name in counts:
             continue
         value = parameter.value
-        # An options record with no required member may be omitted, as may a
-        # release's inputs, since every handle closes with no arguments. Any
-        # other record is the subject of the call, which C requires.
+        # An options record with no required member may be omitted. Any other
+        # record is the subject of the call, which C requires.
         record = value.element if value.kind == "reference" else value
         has_default = bool(
             record
             and record.kind == "record"
             and not any(required_member(f) for f in record.fields if f.public)
-            and (release or exit or record.native.endswith("_options"))
+            and record.native.endswith("_options")
         )
         if has_default:
             values.omittable.add(record.native)

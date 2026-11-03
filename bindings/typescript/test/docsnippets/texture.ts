@@ -2,6 +2,7 @@
 // with the tests, which never run them.
 
 import {
+  GpuSyncKind,
   type MapHandle,
   QueueLock,
   RenderDriverKind,
@@ -33,7 +34,7 @@ export function drawFrame(): void {
   // Sample the texture, and wait for those reads to finish.
   frame.withVulkanTexture((texture) => drawMap(texture.imageView));
 
-  frame.release();
+  frame.release({ kind: GpuSyncKind.cpuComplete });
   // #endregion acquire
 }
 

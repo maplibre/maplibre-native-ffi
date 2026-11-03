@@ -67,7 +67,10 @@ static void draw_frame(void) {
   // Sample the texture, and wait for those reads to finish.
   draw_map(texture.image_view);
 
-  mln_acquired_frame_release(frame, NULL, NULL);
+  const mln_gpu_sync done = {
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
+  mln_acquired_frame_release(frame, &done, NULL);
   // #endregion acquire
 }
 

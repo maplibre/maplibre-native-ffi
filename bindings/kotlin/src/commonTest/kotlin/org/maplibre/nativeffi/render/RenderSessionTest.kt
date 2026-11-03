@@ -58,7 +58,7 @@ class RenderSessionTest {
 
       val frame = assertNotNull(session.acquireFrame())
       assertEquals(32u to 16u, TestGraphics.frameTextureSize(frame))
-      frame.release(null)
+      frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
     }
   }
 
@@ -89,7 +89,9 @@ class RenderSessionTest {
         kind = sync.kind
         val handle = sync.handle
         // The view borrows the frame, so neither the frame nor its session can go away under it.
-        assertFailsWithStatus(Status.BUSY) { frame.release(null) }
+        assertFailsWithStatus(Status.BUSY) {
+          frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
+        }
         assertFailsWithStatus(Status.BUSY) { session.abandon() }
         // Discarding another frame leaves this view readable until its block ends.
         assertFalse(sibling.isClosed)
@@ -101,7 +103,7 @@ class RenderSessionTest {
       // Only the sync object that the frame lends expires with the block.
       assertEquals(kind, escaped!!.kind)
       assertFailsWith<IllegalStateException> { escaped.handle }
-      frame.release(null)
+      frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
       assertFailsWithStatus(Status.INVALID_STATE) { frame.withProducerSync {} }
     }
   }

@@ -4,6 +4,8 @@
 package org.maplibre.nativeffi.docsnippets
 
 import java.util.concurrent.locks.Lock
+import org.maplibre.nativeffi.GpuSync
+import org.maplibre.nativeffi.GpuSyncKind
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.QueueLock
@@ -38,7 +40,7 @@ private fun drawFrame() {
   // Sample the texture, and wait for those reads to finish.
   frame.withVulkanTexture { texture -> drawMap(texture.imageView) }
 
-  frame.release(consumerCompletion = null)
+  frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
   // #endregion acquire
 }
 

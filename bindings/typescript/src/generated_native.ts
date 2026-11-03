@@ -86,7 +86,7 @@ export interface NativeOperations {
   mln_acquired_frame_release(
     frame: bigint,
     token: object | undefined,
-    consumerCompletion: GpuSync | undefined,
+    consumerCompletion: GpuSync,
   ): void;
   mln_c_version(): number;
   mln_geo_json_source_data_create(

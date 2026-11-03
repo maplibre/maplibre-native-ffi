@@ -102,9 +102,9 @@ internal constructor(
   /**
    * Gives an acquired frame back to the session once you're done reading it.
    *
-   * `consumerCompletion` says when your GPU work that reads the texture finishes. Null means that
-   * the work has already finished. The session waits for that point before it renders into the
-   * texture again.
+   * `consumerCompletion` says when your GPU work that reads the texture finishes. Pass
+   * `GpuSyncKind.CPU_COMPLETE` when that work has already finished. The session waits for that
+   * point before it renders into the texture again.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -114,15 +114,9 @@ internal constructor(
    * - `Status.UNSUPPORTED` when `RenderSessionCapabilities.consumerSyncKinds` lacks the kind of
    *   `consumerCompletion`.
    */
-  public fun release(consumerCompletion: GpuSync?): Unit =
+  public fun release(consumerCompletion: GpuSync): Unit =
     nativeClose(this, binding) {
-      check(
-        C.mln_acquired_frame_release(
-          handle,
-          consumerCompletion?.let { writeGpuSync(it) } ?: 0L,
-          diagnostic,
-        ),
-      )
+      check(C.mln_acquired_frame_release(handle, writeGpuSync(consumerCompletion), diagnostic))
     }
 
   override fun toString(): String =

@@ -91,6 +91,7 @@ void main() {
       await worker.renderFrame();
       final session = worker.session;
       final frame = session.acquireFrame()!;
+      const done = GpuSync(kind: GpuSyncKind.cpuComplete);
 
       final escaped = _openFrameView(frame, (view) {
         expect(view.width(), renderSize);
@@ -98,7 +99,7 @@ void main() {
         // The view borrows the frame, so neither the frame nor its session
         // can go away while it is open.
         expect(
-          () => frame.release(consumerCompletion: GpuSync()),
+          () => frame.release(done),
           throwsA(
             isA<MaplibreException>().having(
               (error) => error.status,
@@ -126,9 +127,9 @@ void main() {
       // The refused release left the frame open; a second release after the
       // accepted one is a no-op.
       expect(frame.isClosed, isFalse);
-      frame.release();
+      frame.release(done);
       expect(frame.isClosed, isTrue);
-      frame.release();
+      frame.release(done);
       expect(
         frame.toString(),
         'AcquiredFrameHandle(id=0x${frame.id.toRadixString(16)}, closed=true)',

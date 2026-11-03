@@ -1999,9 +1999,6 @@ fn generated_input_mln_gpu_sync<'py>(
     let _ = storage;
     let mut raw: sys::mln_gpu_sync = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
-    if value.is_none() {
-        return Ok(raw);
-    }
     raw.kind = value.getattr("kind")?.extract::<sys::mln_gpu_sync_kind>()?;
     raw.handle = value.getattr("handle")?.extract::<u64>()?;
     raw.value = value.getattr("value")?.extract::<u64>()?;
@@ -3260,30 +3257,19 @@ impl AcquiredFrameHandle {
         }?;
         generated_copy_mln_vulkan_texture_frame(py, &out_frame)
     }
-    #[pyo3(signature = (consumer_completion=None))]
-    fn close(
-        &self,
-        py: Python<'_>,
-        consumer_completion: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (consumer_completion))]
+    fn close(&self, py: Python<'_>, consumer_completion: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let consumer_completion = consumer_completion.unwrap_or_else(|| py.None().into_bound(py));
         let consumer_completion_value =
-            generated_maybe(&consumer_completion, |consumer_completion| {
-                generated_input_mln_gpu_sync(&consumer_completion, storage)
-            })?;
+            generated_input_mln_gpu_sync(&consumer_completion.clone(), storage)?;
         let Some(mut reservation) = self.reserve(true)? else {
             return Ok(py.None());
         };
         let handle = reservation.handle();
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_acquired_frame_release(
-                    handle,
-                    generated_pointer(&consumer_completion_value),
-                    diagnostic,
-                )
+                sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
             })
         }?;
         reservation.commit();

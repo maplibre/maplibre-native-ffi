@@ -77,7 +77,7 @@ test "a scoped frame view holds its frame until the scope returns" {
         fn inspect(self: @This(), _: maplibre.GpuSync) anyerror!void {
             // The native scope keeps the frame and its session busy.
             var diagnostic: maplibre.Diagnostic = .{};
-            try testing.expectError(error.Busy, self.frame.release(.{}, &diagnostic));
+            try testing.expectError(error.Busy, self.frame.release(.{ .kind = .cpu_complete }, &diagnostic));
             try testing.expectEqual(.busy, diagnostic.status);
             try testing.expectError(error.Busy, self.session.abandon(null));
             try self.sibling.discard(null);
@@ -89,10 +89,10 @@ test "a scoped frame view holds its frame until the scope returns" {
     };
     try testing.expectError(error.HostConsumerFailed, frame.getProducerSync(Probe{ .frame = &frame, .sibling = &sibling, .session = borrowed.session }, Probe.inspect, null));
     try testing.expect(sibling.isClosed() and !frame.isClosed());
-    try frame.release(null, null);
+    try frame.release(.{ .kind = .cpu_complete }, null);
     try testing.expect(frame.isClosed());
     // Either consuming call on a closed frame does nothing.
-    try frame.release(null, null);
+    try frame.release(.{ .kind = .cpu_complete }, null);
     try frame.discard(null);
 }
 

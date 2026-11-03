@@ -492,13 +492,16 @@ static bool still_completed_under_keepalive(void* context) {
     mln_render_frame_batch_release(batch);
     wait->failed = drained != MLN_STATUS_OK;
     wait->demand_pending = false;
+    const mln_gpu_sync done = {
+      .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+    };
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     while (
       mln_render_session_acquire_frame(wait->fixture->session, &frame, NULL) ==
         MLN_STATUS_OK &&
       frame != MLN_HANDLE_NULL) {
       wait->failed |=
-        mln_acquired_frame_release(frame, NULL, NULL) != MLN_STATUS_OK;
+        mln_acquired_frame_release(frame, &done, NULL) != MLN_STATUS_OK;
       frame = MLN_HANDLE_NULL;
     }
   }

@@ -3813,10 +3813,11 @@ auto acquired_frame_release(
     set_thread_error("frame must be a live acquired frame handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto copied =
-    consumer_completion != nullptr
-      ? *consumer_completion
-      : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
+  if (consumer_completion == nullptr) {
+    set_thread_error("consumer_completion must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto copied = *consumer_completion;
   if (copied.size < sizeof(mln_gpu_sync)) {
     set_thread_error("mln_gpu_sync.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;

@@ -30,7 +30,7 @@
     try frame
       .withVulkanTexture { texture in try drawMap(texture.imageView) }
 
-    try frame.release(consumerCompletion: nil)
+    try frame.release(consumerCompletion: GpuSync(kind: .cpuComplete))
     // #endregion acquire
   }
 

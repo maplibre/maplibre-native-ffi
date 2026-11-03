@@ -171,6 +171,7 @@ class Host {
           check(mln_render_session_acquire_frame(session_, &frame, nullptr));
           auto sync = mln_gpu_sync{};
           sync.size = sizeof(mln_gpu_sync);
+          sync.kind = MLN_GPU_SYNC_CPU_COMPLETE;
           check(mln_acquired_frame_release(frame, &sync, nullptr));
           frames.fetch_add(1);
         }

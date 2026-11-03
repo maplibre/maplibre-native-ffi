@@ -491,7 +491,10 @@ void a_failed_release_submission_preserves_the_acquired_frame() {
   TEST_ASSERT_EQUAL_UINT32(1, session->acquired_frame_count);
   TEST_ASSERT_TRUE(session->driver_work.empty());
   // The host can retry once its GPU work is complete.
-  MLN_TEST_OK(mln_acquired_frame_release(handle, nullptr, nullptr));
+  const auto complete = mln_gpu_sync{
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(handle, &complete, nullptr));
   TEST_ASSERT_EQUAL_UINT32(0, session->acquired_frame_count);
   TEST_ASSERT_FALSE(session->texture.slots[0].acquired);
 }
@@ -1431,7 +1434,10 @@ void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
   auto frame = mln_test_render_and_acquire(&fixture.render, 141);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
-  MLN_TEST_OK(mln_acquired_frame_release(frame, nullptr, nullptr));
+  const auto complete = mln_gpu_sync{
+    .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_CPU_COMPLETE
+  };
+  MLN_TEST_OK(mln_acquired_frame_release(frame, &complete, nullptr));
 
   auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
   auto* releasing =

@@ -5,7 +5,7 @@ error[E0505]: cannot move out of `frame` because it is borrowed
   |                        ----- binding `frame` declared here
 5 |     let view = frame.view().unwrap();
   |                ----- borrow of `frame` occurs here
-6 |     let _ = frame.release(None);
+6 |     let _ = frame.release(&GpuSync::default());
   |             ^^^^^ move out of `frame` occurs here
 7 |     drop(view);
   |          ---- borrow later used here

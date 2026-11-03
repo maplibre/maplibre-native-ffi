@@ -3074,8 +3074,9 @@ final class AcquiredFrameHandle implements Finalizable {
   /// Gives an acquired frame back to the session once you're done reading it.
   ///
   /// `consumerCompletion` says when your GPU work that reads the texture
-  /// finishes. Null means that the work has already finished. The session waits
-  /// for that point before it renders into the texture again.
+  /// finishes. Pass `GpuSyncKind.cpuComplete` when that work has already
+  /// finished. The session waits for that point before it renders into the
+  /// texture again.
   ///
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3084,13 +3085,11 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// - `Status.unsupported` when `RenderSessionCapabilities.consumerSyncKinds`
   ///   lacks the kind of `consumerCompletion`.
-  void release({GpuSync? consumerCompletion}) => _state.close(
+  void release(GpuSync consumerCompletion) => _state.close(
     (handle) => withNativeArena(
       (arena) => raw.mln_acquired_frame_release(
         handle.raw,
-        consumerCompletion == null
-            ? nullptr
-            : _writeGpuSync(consumerCompletion, arena),
+        _writeGpuSync(consumerCompletion, arena),
         nativeDiagnostic,
       ),
     ),

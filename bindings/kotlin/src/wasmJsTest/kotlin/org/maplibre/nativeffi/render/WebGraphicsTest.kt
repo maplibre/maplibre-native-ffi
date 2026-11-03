@@ -10,6 +10,8 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.await
+import org.maplibre.nativeffi.GpuSync
+import org.maplibre.nativeffi.GpuSyncKind
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapMode
@@ -91,7 +93,7 @@ class WebGraphicsTest {
         readCenterPixel(pageDevice, named, WIDTH, HEIGHT)
       }
       assertEquals("255,0,0,255", center.await<JsString>().toString())
-      frame.release(null)
+      frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
 
       complete(session.detach())
     }
@@ -143,7 +145,7 @@ class WebGraphicsTest {
           listOf(255, 0, 0, 255),
           webGlTexturePixel(context.context, name, WIDTH / 2, HEIGHT / 2),
         )
-        frame.release(null)
+        frame.release(GpuSync(kind = GpuSyncKind.CPU_COMPLETE))
 
         complete(session.detach())
       }

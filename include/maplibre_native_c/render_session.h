@@ -276,8 +276,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * Gives an acquired frame back to the session once you're done reading it.
  *
  * `consumer_completion` says when your GPU work that reads the texture
- * finishes. Null means that the work has already finished. The session waits
- * for that point before it renders into the texture again.
+ * finishes. Pass MLN_GPU_SYNC_CPU_COMPLETE when that work has already finished.
+ * The session waits for that point before it renders into the texture again.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when
@@ -289,8 +289,7 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * OpenGL fence that `consumer_completion` names.
  */
 MLN_API mln_status mln_acquired_frame_release(
-  mln_acquired_frame frame,
-  const mln_gpu_sync* consumer_completion MLN_BINDING("nullable=true"),
+  mln_acquired_frame frame, const mln_gpu_sync* consumer_completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

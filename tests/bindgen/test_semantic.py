@@ -679,8 +679,7 @@ mln_status release_frame(
 typedef unsigned long frame BIND("kind=handle;release=release_frame;discard=discard_frame");
 typedef struct sync { unsigned kind; unsigned long object; } sync;
 mln_status release_frame(
-  frame value, const sync *consumer BIND("nullable=true"),
-  mln_diagnostic *out_diagnostic);
+  frame value, const sync *consumer, mln_diagnostic *out_diagnostic);
 mln_status discard_frame(frame value, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
