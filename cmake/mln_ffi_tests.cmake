@@ -655,12 +655,20 @@ function(mln_ffi_add_native_tests)
   mln_native_fetch_unity()
   mln_native_add_test_plugin()
   mln_native_add_abi_suite(abi_sources)
-  mln_native_add_internal_suite(internal_sources)
+  # The internal suite and the benchmark reach into src/, the internals of the
+  # C++ implementation, which a maplibre-native-next build doesn't compile.
+  set(internal_sources)
+  if(NOT MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+    mln_native_add_internal_suite(internal_sources)
+  endif()
   mln_native_add_doc_snippets()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
      AND MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
-    add_subdirectory(tests/native/bench)
+    # Like the internal suite, the benchmark needs the C++ implementation.
+    if(TARGET maplibre_native_c_objects)
+      add_subdirectory(tests/native/bench)
+    endif()
   endif()
 
   if(EMSCRIPTEN)

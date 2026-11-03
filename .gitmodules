@@ -10,3 +10,11 @@
 	# nested vendor submodules once the top level is skipped, so this one entry
 	# covers them. sync-submodules passes --checkout to opt back in.
 	update = none
+[submodule "third_party/maplibre-native-next"]
+	path = third_party/maplibre-native-next
+	url = https://github.com/louwers/maplibre-native-next.git
+	shallow = true
+	ignore = dirty
+	# Only MLN_FFI_IMPLEMENTATION=maplibre-native-next builds this checkout. It
+	# stays out of Cargo's and SwiftPM's fetches for the reason given above.
+	update = none

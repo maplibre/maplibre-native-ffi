@@ -50,6 +50,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 include(mln_ffi_options)
 include(mln_ffi_maplibre_native)
+include(mln_ffi_maplibre_native_next)
 include(mln_ffi_c_api)
 include(mln_ffi_components)
 include(mln_ffi_install)
@@ -57,16 +58,24 @@ include(mln_ffi_install)
 include(mln_ffi_emscripten)
 mln_ffi_configure_options()
 mln_ffi_validate_platform()
-mln_ffi_add_maplibre_native()
+if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+  mln_ffi_locate_maplibre_native_next()
+else()
+  mln_ffi_add_maplibre_native()
+endif()
 mln_ffi_select_platform()
 # Before the render backend, which only looks for a graphics loader when the
 # test harness that links it is being built.
 include(CTest)
 
-mln_ffi_select_render_backend()
-mln_ffi_add_c_api_library(maplibre_native_c)
-mln_ffi_add_core_components(maplibre_native_c)
-mln_ffi_install_c_api_library(maplibre_native_c)
+if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+  mln_ffi_add_maplibre_native_next_library(maplibre_native_c)
+else()
+  mln_ffi_select_render_backend()
+  mln_ffi_add_c_api_library(maplibre_native_c)
+  mln_ffi_add_core_components(maplibre_native_c)
+  mln_ffi_install_c_api_library(maplibre_native_c)
+endif()
 
 # The namespace is the repository, not the target: `maplibre_native_c` is the C
 # component of `maplibre-native-ffi`, the same split the other bindings publish

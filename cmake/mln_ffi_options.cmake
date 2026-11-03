@@ -12,6 +12,18 @@ function(mln_ffi_configure_options)
   set(MLN_WITH_LEGACY_ANNOTATIONS OFF
       CACHE BOOL "Build MapLibre Native legacy annotations" FORCE)
 
+  # maplibre-native-next is a port of MapLibre Native's core to Rust that
+  # implements this C API. See cmake/mln_ffi_maplibre_native_next.cmake.
+  set(MLN_FFI_IMPLEMENTATION "maplibre-native"
+      CACHE STRING "MapLibre Native implementation that the C API runs on")
+  set_property(
+    CACHE MLN_FFI_IMPLEMENTATION
+    PROPERTY STRINGS maplibre-native maplibre-native-next)
+  if(NOT MLN_FFI_IMPLEMENTATION MATCHES
+     "^(maplibre-native|maplibre-native-next)$")
+    message(FATAL_ERROR "Unsupported implementation: ${MLN_FFI_IMPLEMENTATION}")
+  endif()
+
   set(MLN_FFI_RENDER_BACKEND ""
       CACHE STRING "Render backend for this wrapper build")
   set_property(
