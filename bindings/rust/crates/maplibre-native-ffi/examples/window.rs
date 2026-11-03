@@ -31,10 +31,9 @@ struct MapWindow {
 
 // #region frame-loop
 impl MapWindow {
-    fn request_frame(&mut self) -> Result<()> {
-        self.session.request_frame(&FrameDemand {
-            flags: FrameDemandFlag::PRESENT
-                | FrameDemandFlag::WAIT_FOR_UPDATE,
+    fn demand_frame(&mut self) -> Result<()> {
+        self.session.demand_frame(&FrameDemand {
+            flags: FrameDemandFlag::WAIT_FOR_UPDATE,
             ..Default::default()
         })
     }
@@ -51,7 +50,7 @@ impl MapWindow {
             // Close the session and attach a new one.
             self.replace_session();
         } else if !self.paused {
-            run_at_next_refresh(MapWindow::request_frame);
+            run_at_next_refresh(MapWindow::demand_frame);
         }
         Ok(())
     }
@@ -123,7 +122,7 @@ async fn surface_restored(
         .await?;
 
     window.paused = false;
-    window.request_frame()?;
+    window.demand_frame()?;
     // #endregion lost-surface
 
     Ok(())
@@ -169,7 +168,7 @@ async fn render_to_window(
     };
     // #endregion attach
 
-    window.request_frame()?;
+    window.demand_frame()?;
     window.on_window_resized(1024, 768)?;
 
     // #region service

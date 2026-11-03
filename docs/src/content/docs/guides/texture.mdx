@@ -48,8 +48,8 @@ you replace them, or until the session detaches.
 
 ## Draw each frame
 
-Run the window's frame loop, but without [](api:MLN_FRAME_DEMAND_PRESENT), since
-your renderer shows the frames instead.
+Run the window's frame loop. Your renderer shows the frames instead of the
+session.
 
 When a frame renders, acquire it with [](api:mln_render_session_acquire_frame)
 and get its texture for your backend. It takes the newest frame, and drops older

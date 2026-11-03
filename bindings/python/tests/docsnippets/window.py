@@ -36,12 +36,9 @@ session: mln.RenderSessionHandle
 paused = False
 
 
-def request_frame() -> None:
-    session.request_frame(
-        mln.FrameDemand(
-            flags=mln.FrameDemandFlag.PRESENT
-            | mln.FrameDemandFlag.WAIT_FOR_UPDATE
-        )
+def demand_frame() -> None:
+    session.demand_frame(
+        mln.FrameDemand(flags=mln.FrameDemandFlag.WAIT_FOR_UPDATE)
     )
 
 
@@ -55,7 +52,7 @@ def drain_frame_results() -> None:
     ):
         replace_session()  # Close the session and attach a new one.
     elif not paused:
-        run_at_next_refresh(request_frame)
+        run_at_next_refresh(demand_frame)
 
 
 # #endregion frame-loop
@@ -120,7 +117,7 @@ def surface_restored(
         )
     ).result()
     paused = False
-    request_frame()
+    demand_frame()
     # #endregion lost-surface
 
 
@@ -152,7 +149,7 @@ def render_to_window(
     ready.result()
     # #endregion attach
 
-    request_frame()
+    demand_frame()
     on_window_resized(1024, 768)
 
     # #region service

@@ -62,11 +62,11 @@ The map updates on the runtime's thread whenever something changes, like the
 camera moving or a tile loading. Your app decides when to show those updates, at
 most once per display refresh.
 
-When you're ready for a frame, call [](api:mln_render_session_request_frame)
-with [](api:MLN_FRAME_DEMAND_PRESENT) and
-[](api:MLN_FRAME_DEMAND_WAIT_FOR_UPDATE). The session waits until the map has
-something new to show, then draws and presents it. After the frame's result
-arrives, call it again at the next display refresh.
+When you're ready for a frame, call [](api:mln_render_session_demand_frame) with
+[](api:MLN_FRAME_DEMAND_WAIT_FOR_UPDATE). You can start as soon as the attach
+call returns. The session waits until the map has something new to show, then
+draws and presents it. After the frame's result arrives, demand the next frame
+at the next display refresh.
 
 ```mermaid
 sequenceDiagram
@@ -90,7 +90,7 @@ results on your event loop with [](api:mln_render_session_drain_frame_results).
 <Snippet page="window" region="frame-wake" />
 
 If a result is [](api:MLN_RENDER_RESULT_FAILED), close the session and attach a
-new one. To end the loop, such as before you close the session, stop requesting
+new one. To end the loop, such as before you close the session, stop demanding
 frames.
 
 <Snippet page="window" region="frame-loop" />

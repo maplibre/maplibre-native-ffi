@@ -78,9 +78,9 @@ static void a_queued_frame_wake_runs_once_in_dispatch(void) {
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
   mln_test_completion_destroy(&attach);
 
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
-  mln_test_render_request_forced(&fixture, 2);
+  mln_test_render_demand_forced(&fixture, 2);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   TEST_ASSERT_EQUAL_INT(0, wake.calls);
 

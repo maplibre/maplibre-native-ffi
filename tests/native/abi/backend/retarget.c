@@ -113,16 +113,12 @@ static void paint_background_blue(mln_map map) {
   ));
 }
 
-static uint32_t render_frame(
-  const mln_test_render_fixture* fixture, uint32_t flags
-) {
+static uint32_t render_frame(const mln_test_render_fixture* fixture) {
   static uint64_t next_token = 1;
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  demand.flags = MLN_FRAME_DEMAND_FORCE | flags;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = next_token++;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
@@ -226,9 +222,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
   retarget_map map = {0};
   open_map(TARGET_BORROWED, &map);
   const mln_test_render_fixture* fixture = &map.fixture;
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   expect_texture_color(fixture, NULL, red, "the first texture");
 
   mln_test_graphics_texture* replacement =
@@ -246,9 +240,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
 
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   expect_texture_color(fixture, replacement, blue, "the replacement");
   expect_texture_color(fixture, NULL, red, "the replaced texture");
   close_map(&map);
@@ -294,9 +286,7 @@ static void a_borrowed_retarget_is_refused_while_a_frame_is_acquired(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(replacements[0], mln_test_graphics_last_error());
   TEST_ASSERT_NOT_NULL_MESSAGE(replacements[1], mln_test_graphics_last_error());
   restore_fixture_context(fixture);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   mln_acquired_frame held = MLN_HANDLE_NULL;
   MLN_TEST_OK(acquire(fixture, &held));
 
@@ -341,9 +331,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(replacements[1], mln_test_graphics_last_error());
   restore_fixture_context(fixture);
   for (int index = 0; index < 2; index += 1) {
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-    );
+    TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(acquire(fixture, &frame));
     MLN_TEST_OK(mln_acquired_frame_discard(frame, NULL));
@@ -353,7 +341,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
   demand.token = 2000;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
+    mln_render_session_demand_frame(fixture->session, &demand, NULL)
   );
 
   mln_test_completion completion = mln_test_completion_default(0);
@@ -366,9 +354,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
 
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   MLN_TEST_OK(acquire(fixture, &frame));
   uint32_t slot = UINT32_MAX;
@@ -394,18 +380,14 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(replacements[0], mln_test_graphics_last_error());
   TEST_ASSERT_NOT_NULL_MESSAGE(replacements[1], mln_test_graphics_last_error());
   restore_fixture_context(fixture);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
 
   // Forced, since the map may have published nothing newer than the frame
   // above.
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = 1000;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_textures(
@@ -430,9 +412,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
 
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   MLN_TEST_OK(acquire(fixture, &frame));
   uint32_t slot = UINT32_MAX;
   const uint64_t texture = mln_test_frame_texture_handle(frame, &slot);
@@ -460,9 +440,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 3000;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   // The fence runs after the driver evaluated the demand, which then waits.
   // Dumping debug logs publishes no map update, which would end the wait.
   mln_test_completion fence = mln_test_completion_default(0);
@@ -497,10 +475,7 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   retarget_map map = {0};
   open_map(kind, &map);
   const mln_test_render_fixture* fixture = &map.fixture;
-  const uint32_t flags = kind == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
 
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
   mln_test_completion completion = mln_test_completion_default(0);
@@ -538,9 +513,7 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   MLN_TEST_OK(mln_map_get_snapshot(map.map, &snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT32(width, snapshot.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(height, snapshot.view.extent.height);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   close_map(&map);
 }
 
@@ -694,10 +667,8 @@ static void expect_old_target_rendering(
   const mln_test_render_fixture* fixture = &map->fixture;
   paint_background_blue(map->map);
   MLN_TEST_OK(mln_test_map_fence(map->map));
-  const uint32_t flags =
-    row->session == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
   TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags), row->label
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture), row->label
   );
   if (row->session == TARGET_BORROWED) {
     expect_texture_color(fixture, NULL, blue, row->label);
@@ -741,11 +712,7 @@ static void refused_retargets_leave_the_old_target_rendering(void) {
     open_map(row->session, &map);
     const mln_test_render_fixture* fixture = &map.fixture;
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      MLN_RENDER_RESULT_RENDERED,
-      render_frame(
-        fixture, row->session == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0
-      ),
-      row->label
+      MLN_RENDER_RESULT_RENDERED, render_frame(fixture), row->label
     );
 
     replacement made = make_replacement(row, fixture);
@@ -803,7 +770,6 @@ static void a_released_target_can_be_destroyed_before_the_next(
   open_map(kind, &map);
   const mln_test_render_fixture* fixture = &map.fixture;
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(fixture);
-  const uint32_t flags = kind == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
 
   // A target that the case owns, so that it can destroy it.
   mln_test_graphics_texture* texture = NULL;
@@ -835,16 +801,14 @@ static void a_released_target_can_be_destroyed_before_the_next(
     );
   }
   finish(fixture, &completion, MLN_STATUS_OK, "the first replacement");
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
 
   release_target(fixture, MLN_STATUS_OK);
   mln_test_graphics_surface_destroy(surface);
   mln_test_graphics_texture_destroy(texture);
   restore_fixture_context(fixture);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_TARGET_NOT_READY, render_frame(fixture, flags)
+    MLN_RENDER_RESULT_TARGET_NOT_READY, render_frame(fixture)
   );
 
   completion = mln_test_completion_default(0);
@@ -874,9 +838,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
   finish(fixture, &completion, MLN_STATUS_OK, "the next target");
   paint_background_blue(map.map);
   MLN_TEST_OK(mln_test_map_fence(map.map));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, flags)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   if (next_texture != NULL) {
     expect_texture_color(fixture, next_texture, blue, "the next texture");
   }
@@ -934,8 +896,7 @@ static void a_released_target_keeps_the_renderer(void) {
   ));
   finish(&fixture, &resized, MLN_STATUS_OK, "the resize");
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_TARGET_NOT_READY,
-    render_frame(&fixture, MLN_FRAME_DEMAND_PRESENT)
+    MLN_RENDER_RESULT_TARGET_NOT_READY, render_frame(&fixture)
   );
 
   mln_test_render_fixture_destroy(&fixture);
@@ -952,9 +913,7 @@ static void a_release_finishes_a_waiting_demand(void) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = 4000;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   // The fence runs after the driver evaluated the demand, which then waits.
   mln_test_completion fence = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_dump_debug_logs(
@@ -1024,9 +983,7 @@ static void an_offscreen_session_refuses_targets(void) {
   mln_test_completion_reject(&refused);
   mln_test_completion_destroy(&refused);
 
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   expect_offscreen_color(fixture, red, "the offscreen session's own texture");
   close_map(&offscreen);
 }
@@ -1036,9 +993,7 @@ static void releases_that_a_ring_refuses(void) {
   retarget_map map = {0};
   open_borrowed_ring(&map, MLN_TEST_PRESET_DRIVER);
   const mln_test_render_fixture* fixture = &map.fixture;
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   mln_acquired_frame held = MLN_HANDLE_NULL;
   MLN_TEST_OK(acquire(fixture, &held));
   TEST_ASSERT_EQUAL_INT(
@@ -1051,9 +1006,7 @@ static void releases_that_a_ring_refuses(void) {
   mln_test_completion_destroy(&refused);
   release(&held);
 
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
-  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   release_target(fixture, MLN_STATUS_OK);
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   MLN_TEST_OK(acquire(fixture, &frame));

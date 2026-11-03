@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a frame request finished.
+/// How a frame demand finished.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_result</c> in the <see
@@ -19,13 +19,13 @@ public enum RenderResult : uint
 
     /// <summary>
     /// The target couldn't take a frame, such as while a window is hidden or
-    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Request a frame
+    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Demand a frame
     /// again later.
     /// </summary>
     TargetNotReady = 2,
 
     /// <summary>
-    /// A later request with the same flags replaced this one.
+    /// A later demand with the same flags replaced this one.
     /// </summary>
     Superseded = 3,
 

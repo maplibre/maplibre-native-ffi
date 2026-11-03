@@ -194,7 +194,7 @@ internal sealed class RenderFixture : IDisposable
         while (true)
         {
             var demand = ++token;
-            Session.RequestFrame(new FrameDemand { Token = demand });
+            Session.DemandFrame(new FrameDemand { Token = demand });
             RenderFrameResult? result = null;
             while (result is null)
             {

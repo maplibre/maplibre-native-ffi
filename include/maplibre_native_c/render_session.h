@@ -21,17 +21,17 @@
 extern "C" {
 #endif
 
-/** How a frame request finished. */
+/** How a frame demand finished. */
 typedef enum mln_render_result : uint32_t {
   MLN_RENDER_RESULT_RENDERED = 0,
   /** The map had nothing new to draw. */
   MLN_RENDER_RESULT_NO_UPDATE = 1,
   /**
    * The target couldn't take a frame, such as while a window is hidden or
-   * after mln_render_session_release_target(). Request a frame again later.
+   * after mln_render_session_release_target(). Demand a frame again later.
    */
   MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
-  /** A later request with the same flags replaced this one. */
+  /** A later demand with the same flags replaced this one. */
   MLN_RENDER_RESULT_SUPERSEDED = 3,
   /**
    * The session failed, and mln_render_session_get_failure() reports why. Once
@@ -50,15 +50,19 @@ typedef enum mln_render_session_state : uint32_t {
   MLN_RENDER_SESSION_STATE_ABANDONED = 6U,
 } mln_render_session_state;
 
-/** How a frame request behaves. */
+/**
+ * How a frame demand behaves.
+ *
+ * Without flags, a demand draws a frame when the map changed since the last
+ * one, and otherwise finishes with MLN_RENDER_RESULT_NO_UPDATE. A session with
+ * a surface target shows each frame that it draws.
+ */
 typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
   /**
    * Draws a frame even when nothing changed since the last one. It can't be
    * combined with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE.
    */
   MLN_FRAME_DEMAND_FORCE = 1U << 0U,
-  /** Shows the frame on a surface target. */
-  MLN_FRAME_DEMAND_PRESENT = 1U << 1U,
   /**
    * When the map has nothing new to draw, waits for its next update instead of
    * finishing with MLN_RENDER_RESULT_NO_UPDATE.
@@ -71,19 +75,19 @@ typedef uint32_t mln_frame_demand_flags;
 
 /**
  * The token of the frame results that a session adds when it renders an image
- * for mln_map_request_still_image(). Your own requests can't use it.
+ * for mln_map_request_still_image(). Your own demands can't use it.
  */
 #define MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE UINT64_MAX
 
-/** A request for one frame. */
+/** A demand for one frame. */
 typedef struct mln_frame_demand {
   uint32_t size;
   mln_frame_demand_flags flags;
-  /** A value of your choice that the request's frame result carries. */
+  /** A value of your choice that the demand's frame result carries. */
   uint64_t token;
 } mln_frame_demand;
 
-/** How one frame request finished. */
+/** How one frame demand finished. */
 typedef struct mln_render_frame_result {
   uint32_t size;
   mln_render_result disposition;
@@ -186,15 +190,20 @@ MLN_API mln_status mln_render_session_get_failure(
 /**
  * Asks the session to render a frame.
  *
- * Call it once the attach completes. Every request finishes with one frame
- * result that carries its token, and mln_render_session_drain_frame_results()
- * takes it. A request without MLN_FRAME_DEMAND_FORCE replaces each pending
- * request with the same flags.
+ * You can call it once the attach call returns. While the attach runs, the
+ * demand waits for it to complete. Every demand finishes with one frame result
+ * that carries its token, and mln_render_session_drain_frame_results() takes
+ * it. A demand without MLN_FRAME_DEMAND_FORCE replaces each pending demand with
+ * the same flags.
  *
  * Returns:
- * - MLN_STATUS_INVALID_STATE when the session has failed.
+ * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
+ *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
+ *   carries the failure's message.
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, or disposed the
+ *   session, or discarded a frame from every texture of its ring.
  */
-MLN_API mln_status mln_render_session_request_frame(
+MLN_API mln_status mln_render_session_demand_frame(
   mln_render_session session, const mln_frame_demand* demand,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -234,7 +243,11 @@ MLN_API void mln_render_frame_batch_release(
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session lacks
  *   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.
- * - MLN_STATUS_INVALID_STATE when the session has failed.
+ * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
+ *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
+ *   carries the failure's message.
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, or disposed the
+ *   session.
  */
 MLN_API mln_status mln_render_session_acquire_frame(
   mln_render_session session,
@@ -347,7 +360,7 @@ MLN_API mln_status mln_render_session_resize(
  *
  * Use it when the platform takes a surface away, such as when your app goes to
  * the background. Release every acquired frame first. Until you give the
- * session a new target, frame requests finish with
+ * session a new target, frame demands finish with
  * MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes, you can
  * destroy the old target.
  *
@@ -366,9 +379,9 @@ MLN_API mln_status mln_render_session_release_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Ends the session's pending frame requests and waits for its earlier work.
+ * Ends the session's pending frame demands and waits for its earlier work.
  *
- * Frame requests that haven't started, including those that wait for a map
+ * Frame demands that haven't started, including those that wait for a map
  * update, finish with MLN_RENDER_RESULT_NO_UPDATE.
  *
  * Completes with:
@@ -427,7 +440,7 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * Use it with MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and call it from the
  * same thread every time. Call it each time
  * mln_render_session_attach_options.driver_work_wake is called, even while you
- * request no frames, and until a detach completes. It returns once no work is
+ * demand no frames, and until a detach completes. It returns once no work is
  * ready.
  */
 MLN_API mln_status mln_render_session_service_driver_work(
@@ -437,7 +450,7 @@ MLN_API mln_status mln_render_session_service_driver_work(
 /**
  * Detaches the session from its map and frees its graphics objects.
  *
- * Release every acquired frame first. Pending frame requests finish with
+ * Release every acquired frame first. Pending frame demands finish with
  * MLN_RENDER_RESULT_TARGET_NOT_READY. Once the detach completes, the library no
  * longer uses your graphics objects, and you can attach another session to the
  * map. Dispose the session afterward.
@@ -457,7 +470,7 @@ MLN_API mln_status mln_render_session_detach(
  *
  * Use it when the target's graphics objects are going away and a detach can't
  * finish first. Pending work completes with MLN_STATUS_TARGET_LOST, and
- * pending frame requests finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once
+ * pending frame demands finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once
  * the call returns, the library no longer uses your graphics objects, and you
  * can attach another session to the map. Dispose the session afterward.
  *

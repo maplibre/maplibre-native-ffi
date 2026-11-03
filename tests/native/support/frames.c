@@ -26,15 +26,13 @@ void mln_test_render_prepare_map(mln_map map) {
   MLN_TEST_OK(mln_test_map_fence(map));
 }
 
-void mln_test_render_request_forced(
+void mln_test_render_demand_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = token;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
 }
 
 typedef struct results_wait {
@@ -191,7 +189,7 @@ void mln_test_render_until_idle(
     mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
     demand.flags = flags;
     MLN_TEST_OK(
-      mln_render_session_request_frame(fixture->session, &demand, NULL)
+      mln_render_session_demand_frame(fixture->session, &demand, NULL)
     );
     const mln_render_frame_batch batch =
       mln_test_render_wait_for_results(fixture);
@@ -216,7 +214,7 @@ void mln_test_render_until_idle(
 mln_acquired_frame mln_test_render_and_acquire(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);

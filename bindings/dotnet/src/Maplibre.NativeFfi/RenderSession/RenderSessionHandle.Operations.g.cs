@@ -99,7 +99,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <remarks>
     /// <para>Use it when the target's graphics objects are going away and a
     /// detach can't finish first. Pending work completes with
-    /// <c>Status.TargetLost</c>, and pending frame requests finish with
+    /// <c>Status.TargetLost</c>, and pending frame demands finish with
     /// <c>RenderResult.TargetNotReady</c>. Once the call returns, the library
     /// no longer uses your graphics objects, and you can attach another session
     /// to the map. Dispose the session afterward.</para>
@@ -133,8 +133,12 @@ public sealed unsafe partial class RenderSessionHandle
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the session lacks
     /// <c>RenderSessionCapabilityFlag.FrameAcquisition</c>.</description></item>
-    /// <item><description><c>Status.InvalidState</c> when the session has
-    /// failed.</description></item>
+    /// <item><description><c>RenderSessionSnapshot.FailureStatus</c>,
+    /// <c>Status.TargetLost</c> or <c>Status.NativeError</c>, when the session
+    /// has failed. The diagnostic carries the failure's
+    /// message.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when you detached,
+    /// abandoned, or disposed the session.</description></item>
     /// </list>
     /// </remarks>
     public AcquiredFrameHandle? AcquireFrame()
@@ -148,11 +152,10 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Ends the session's pending frame requests and waits for its earlier
-    /// work.
+    /// Ends the session's pending frame demands and waits for its earlier work.
     /// </summary>
     /// <remarks>
-    /// <para>Frame requests that haven't started, including those that wait for
+    /// <para>Frame demands that haven't started, including those that wait for
     /// a map update, finish with <c>RenderResult.NoUpdate</c>.</para>
     /// <para>See <c>mln_render_session_barrier</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
@@ -200,10 +203,40 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Asks the session to render a frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>You can call it once the attach call returns. While the attach
+    /// runs, the demand waits for it to complete. Every demand finishes with
+    /// one frame result that carries its token, and
+    /// <c>RenderSessionHandle.DrainFrameResults()</c> takes it. A demand
+    /// without <c>FrameDemandFlag.Force</c> replaces each pending demand with
+    /// the same flags.</para>
+    /// <para>See <c>mln_render_session_demand_frame</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>RenderSessionSnapshot.FailureStatus</c>,
+    /// <c>Status.TargetLost</c> or <c>Status.NativeError</c>, when the session
+    /// has failed. The diagnostic carries the failure's
+    /// message.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when you detached,
+    /// abandoned, or disposed the session, or discarded a frame from every
+    /// texture of its ring.</description></item>
+    /// </list>
+    /// </remarks>
+    public void DemandFrame(FrameDemand demand)
+    {
+        using var call = Enter(this);
+        var nativeDemand = NativeFrameDemand(demand);
+        Check(NativeMethods.mln_render_session_demand_frame(Handle, &nativeDemand, Diagnostic));
+    }
+
+    /// <summary>
     /// Detaches the session from its map and frees its graphics objects.
     /// </summary>
     /// <remarks>
-    /// <para>Release every acquired frame first. Pending frame requests finish
+    /// <para>Release every acquired frame first. Pending frame demands finish
     /// with <c>RenderResult.TargetNotReady</c>. Once the detach completes, the
     /// library no longer uses your graphics objects, and you can attach another
     /// session to the map. Dispose the session afterward.</para>
@@ -586,7 +619,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <remarks>
     /// <para>Use it when the platform takes a surface away, such as when your
     /// app goes to the background. Release every acquired frame first. Until
-    /// you give the session a new target, frame requests finish with
+    /// you give the session a new target, frame demands finish with
     /// <c>RenderResult.TargetNotReady</c>. Once the release completes, you can
     /// destroy the old target.</para>
     /// <para>See <c>mln_render_session_release_target</c> in the <see
@@ -611,30 +644,6 @@ public sealed unsafe partial class RenderSessionHandle
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Asks the session to render a frame.
-    /// </summary>
-    /// <remarks>
-    /// <para>Call it once the attach completes. Every request finishes with one
-    /// frame result that carries its token, and
-    /// <c>RenderSessionHandle.DrainFrameResults()</c> takes it. A request
-    /// without <c>FrameDemandFlag.Force</c> replaces each pending request with
-    /// the same flags.</para>
-    /// <para>See <c>mln_render_session_request_frame</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when the session has
-    /// failed.</description></item>
-    /// </list>
-    /// </remarks>
-    public void RequestFrame(FrameDemand demand)
-    {
-        using var call = Enter(this);
-        var nativeDemand = NativeFrameDemand(demand);
-        Check(NativeMethods.mln_render_session_request_frame(Handle, &nativeDemand, Diagnostic));
     }
 
     /// <summary>
@@ -675,7 +684,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it with <c>RenderDriverKind.CallerGraphicsThread</c>, and call
     /// it from the same thread every time. Call it each time
     /// <c>RenderSessionAttachOptions.DriverWorkWake</c> is called, even while
-    /// you request no frames, and until a detach completes. It returns once no
+    /// you demand no frames, and until a detach completes. It returns once no
     /// work is ready.</para>
     /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
     /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress

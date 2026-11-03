@@ -162,8 +162,12 @@ func (value ConstrainMode) String() string {
 	return fmt.Sprintf("ConstrainMode(%d)", value)
 }
 
-// FrameDemandFlag corresponds to mln_frame_demand_flag. How a frame request
+// FrameDemandFlag corresponds to mln_frame_demand_flag. How a frame demand
 // behaves.
+//
+// Without flags, a demand draws a frame when the map changed since the last
+// one, and otherwise finishes with RenderResultNoUpdate. A session with a
+// surface target shows each frame that it draws.
 //
 // See mln_frame_demand_flag in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -173,8 +177,6 @@ const (
 	// Draws a frame even when nothing changed since the last one. It can't be
 	// combined with FrameDemandFlagWaitForUpdate.
 	FrameDemandFlagForce FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_FORCE)
-	// Shows the frame on a surface target.
-	FrameDemandFlagPresent FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
 	// When the map has nothing new to draw, waits for its next update instead of
 	// finishing with RenderResultNoUpdate.
 	FrameDemandFlagWaitForUpdate FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_WAIT_FOR_UPDATE)
@@ -183,7 +185,7 @@ const (
 func (value FrameDemandFlag) Has(flags FrameDemandFlag) bool { return value&flags == flags }
 
 func (value FrameDemandFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "FrameDemandFlagForce"}, {2, "FrameDemandFlagPresent"}, {4, "FrameDemandFlagWaitForUpdate"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "FrameDemandFlagForce"}, {4, "FrameDemandFlagWaitForUpdate"}})
 }
 
 // GesturePhase corresponds to mln_gesture_phase. Where a camera change falls in
@@ -690,7 +692,7 @@ func (value RenderMode) String() string {
 	return fmt.Sprintf("RenderMode(%d)", value)
 }
 
-// RenderResult corresponds to mln_render_result. How a frame request finished.
+// RenderResult corresponds to mln_render_result. How a frame demand finished.
 //
 // See mln_render_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -701,9 +703,9 @@ const (
 	// The map had nothing new to draw.
 	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
 	// The target couldn't take a frame, such as while a window is hidden or after
-	// RenderSessionHandle.ReleaseTarget(). Request a frame again later.
+	// RenderSessionHandle.ReleaseTarget(). Demand a frame again later.
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
-	// A later request with the same flags replaced this one.
+	// A later demand with the same flags replaced this one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
 	// The session failed, and RenderSessionHandle.GetFailure() reports why. Once
 	// RenderSessionHandle.Close() completes, you can attach a new session.
@@ -2322,13 +2324,13 @@ func nativeFeatureStateSelector(input FeatureStateSelector, arena *bindingArena)
 	return raw
 }
 
-// FrameDemand corresponds to mln_frame_demand. A request for one frame.
+// FrameDemand corresponds to mln_frame_demand. A demand for one frame.
 //
 // See mln_frame_demand in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type FrameDemand struct {
 	Flags FrameDemandFlag
-	// A value of your choice that the request's frame result carries.
+	// A value of your choice that the demand's frame result carries.
 	Token uint64
 }
 
@@ -3544,7 +3546,7 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 }
 
 // RenderFrameResult corresponds to mln_render_frame_result. How one frame
-// request finished.
+// demand finished.
 //
 // See mln_render_frame_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7252,7 +7254,7 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 //
 // Use it when the target's graphics objects are going away and a detach can't
 // finish first. Pending work completes with StatusTargetLost, and pending frame
-// requests finish with RenderResultTargetNotReady. Once the call returns, the
+// demands finish with RenderResultTargetNotReady. Once the call returns, the
 // library no longer uses your graphics objects, and you can attach another
 // session to the map. Dispose the session afterward.
 //
@@ -7282,7 +7284,10 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 // Errors:
 //   - StatusUnsupported when the session lacks
 //     RenderSessionCapabilityFlagFrameAcquisition.
-//   - StatusInvalidState when the session has failed.
+//   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
+//     StatusNativeError, when the session has failed. The diagnostic carries
+//     the failure's message.
+//   - StatusInvalidState when you detached, abandoned, or disposed the session.
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
 	var outFrame C.mln_acquired_frame
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
@@ -7296,10 +7301,10 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 	})
 }
 
-// Barrier ends the session's pending frame requests and waits for its earlier
+// Barrier ends the session's pending frame demands and waits for its earlier
 // work.
 //
-// Frame requests that haven't started, including those that wait for a map
+// Frame demands that haven't started, including those that wait for a map
 // update, finish with RenderResultNoUpdate.
 //
 // See mln_render_session_barrier in the C API reference:
@@ -7328,9 +7333,32 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 	}, completionUnit)
 }
 
+// DemandFrame asks the session to render a frame.
+//
+// You can call it once the attach call returns. While the attach runs, the
+// demand waits for it to complete. Every demand finishes with one frame result
+// that carries its token, and RenderSessionHandle.DrainFrameResults() takes it.
+// A demand without FrameDemandFlagForce replaces each pending demand with the
+// same flags.
+//
+// See mln_render_session_demand_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+//
+// Errors:
+//   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
+//     StatusNativeError, when the session has failed. The diagnostic carries
+//     the failure's message.
+//   - StatusInvalidState when you detached, abandoned, or disposed the session,
+//     or discarded a frame from every texture of its ring.
+func (receiver *RenderSessionHandle) DemandFrame(demand FrameDemand) error {
+	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_demand_frame(C.mln_render_session(raw), bindingStore(nativeFrameDemand(demand, arena), arena), diagnostic))
+	})
+}
+
 // Detach detaches the session from its map and frees its graphics objects.
 //
-// Release every acquired frame first. Pending frame requests finish with
+// Release every acquired frame first. Pending frame demands finish with
 // RenderResultTargetNotReady. Once the detach completes, the library no longer
 // uses your graphics objects, and you can attach another session to the map.
 // Dispose the session afterward.
@@ -7534,7 +7562,7 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 //
 // Use it when the platform takes a surface away, such as when your app goes to
 // the background. Release every acquired frame first. Until you give the
-// session a new target, frame requests finish with RenderResultTargetNotReady.
+// session a new target, frame demands finish with RenderResultTargetNotReady.
 // Once the release completes, you can destroy the old target.
 //
 // See mln_render_session_release_target in the C API reference:
@@ -7549,24 +7577,6 @@ func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[struct{}], error) 
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_release_target(C.mln_render_session(raw), completion, diagnostic))
 	}, completionUnit)
-}
-
-// RequestFrame asks the session to render a frame.
-//
-// Call it once the attach completes. Every request finishes with one frame
-// result that carries its token, and RenderSessionHandle.DrainFrameResults()
-// takes it. A request without FrameDemandFlagForce replaces each pending
-// request with the same flags.
-//
-// See mln_render_session_request_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-//
-// Errors:
-//   - StatusInvalidState when the session has failed.
-func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
-	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_request_frame(C.mln_render_session(raw), bindingStore(nativeFrameDemand(demand, arena), arena), diagnostic))
-	})
 }
 
 // Resize resizes the session's target and its map.
@@ -7594,8 +7604,8 @@ func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[Comma
 //
 // Use it with RenderDriverKindCallerGraphicsThread, and call it from the same
 // thread every time. Call it each time
-// RenderSessionAttachOptions.DriverWorkWake is called, even while you request
-// no frames, and until a detach completes. It returns once no work is ready.
+// RenderSessionAttachOptions.DriverWorkWake is called, even while you demand no
+// frames, and until a detach completes. It returns once no work is ready.
 //
 // See mln_render_session_service_driver_work in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html

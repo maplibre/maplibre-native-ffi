@@ -280,16 +280,16 @@ static void host_demands_and_a_still_image_demand_never_replace_each_other(
   render_until_tile_requested(&fixture, &held);
 
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  demand.flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE;
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_request_frame(
+    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_demand_frame(
                                    fixture.session, &demand, MLN_TEST_DIAGNOSTIC
                                  )
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "reserved"));
   demand.token = 7;
-  MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture.session, &demand, NULL));
 
   answer_held_tile(&held);
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &still));

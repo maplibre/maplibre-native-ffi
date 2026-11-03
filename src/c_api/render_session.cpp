@@ -24,12 +24,12 @@ auto mln_render_session_get_snapshot(
   });
 }
 
-auto mln_render_session_request_frame(
+auto mln_render_session_demand_frame(
   mln_render_session session, const mln_frame_demand* demand,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_request_frame(session, demand);
+    return mln::core::render_session_demand_frame(session, demand);
   });
 }
 

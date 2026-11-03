@@ -27,7 +27,7 @@ extern "C" {
 void mln_test_render_prepare_map(mln_map map);
 
 // Every forced demand remains independent.
-void mln_test_render_request_forced(
+void mln_test_render_demand_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 );
 

@@ -1660,7 +1660,6 @@ const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1;
 
 // mln_frame_demand_flag
 const MLN_FRAME_DEMAND_FORCE = 1;
-const MLN_FRAME_DEMAND_PRESENT = 2;
 const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
 // mln_free_camera_option_field
@@ -3908,6 +3907,19 @@ external int mln_render_session_clear_data(
 @Native<
   Int32 Function(
     mln_render_session,
+    Pointer<mln_frame_demand>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_demand_frame(
+  int session,
+  Pointer<mln_frame_demand> demand,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -4095,19 +4107,6 @@ external int mln_render_session_reduce_memory_use(
 external int mln_render_session_release_target(
   int session,
   Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_frame_demand>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_request_frame(
-  int session,
-  Pointer<mln_frame_demand> demand,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

@@ -1267,6 +1267,12 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_render_session_clear_data(session, word(completion), word(outDiagnostic))
 
+  actual fun mln_render_session_demand_frame(
+    session: Long,
+    demand: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_render_session_demand_frame(session, word(demand), word(outDiagnostic))
+
   actual fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_detach(session, word(completion), word(outDiagnostic))
 
@@ -1389,12 +1395,6 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int = mln_kw_mln_render_session_release_target(session, word(completion), word(outDiagnostic))
-
-  actual fun mln_render_session_request_frame(
-    session: Long,
-    demand: Long,
-    outDiagnostic: Long,
-  ): Int = mln_kw_mln_render_session_request_frame(session, word(demand), word(outDiagnostic))
 
   actual fun mln_render_session_resize(
     session: Long,
@@ -2774,6 +2774,11 @@ private fun mln_kw_mln_render_session_clear_data(p0: Long, p1: Int, p2: Int): In
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_clear_data(p0, p1, p2)",
   )
 
+private fun mln_kw_mln_render_session_demand_frame(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_demand_frame(p0, p1, p2)",
+  )
+
 private fun mln_kw_mln_render_session_detach(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_detach(p0, p1, p2)",
@@ -2869,11 +2874,6 @@ private fun mln_kw_mln_render_session_reduce_memory_use(p0: Long, p1: Int, p2: I
 private fun mln_kw_mln_render_session_release_target(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_release_target(p0, p1, p2)",
-  )
-
-private fun mln_kw_mln_render_session_request_frame(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_request_frame(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_resize(p0: Long, p1: Int, p2: Int, p3: Int): Int =

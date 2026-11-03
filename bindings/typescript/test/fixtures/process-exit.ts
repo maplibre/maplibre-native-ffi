@@ -5,7 +5,7 @@
 
 import process from "node:process";
 
-import { requestFrame } from "../support/graphics.ts";
+import { demandFrame } from "../support/graphics.ts";
 import { execute } from "../support/harness.ts";
 import { liveNativeWork } from "../support/scenarios.ts";
 
@@ -24,7 +24,7 @@ await execute({
     // runs before this one and abandons the session.
     const exiting = () => {
       try {
-        requestFrame(session, 200n);
+        demandFrame(session, 200n);
         console.log("the session was still live at exit");
       } catch (error) {
         console.log(`the session was abandoned at exit: ${String(error)}`);

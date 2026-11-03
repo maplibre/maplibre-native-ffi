@@ -350,7 +350,7 @@ private func attachBorrowedTexture(
 
     // A demand that waits for the style's first update wakes the thread when
     // the update arrives.
-    try session.requestFrame(demand: FrameDemand(flags: [], token: 1))
+    try session.demandFrame(FrameDemand(flags: [], token: 1))
     try await fixture.map.setStyleJson(redStyle)
     #expect(try await session.awaitRenderedFrame()?.disposition == .rendered)
 

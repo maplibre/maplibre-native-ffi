@@ -197,8 +197,8 @@ class GeneratedShapesTest {
   fun flagSetsNameTheirSingleBitsAndKeepUnknownBits() {
     assertEquals("NONE", FrameDemandFlag.NONE.toString())
     assertEquals(
-      "PRESENT | WAIT_FOR_UPDATE",
-      (FrameDemandFlag.PRESENT or FrameDemandFlag.WAIT_FOR_UPDATE).toString(),
+      "FORCE | WAIT_FOR_UPDATE",
+      (FrameDemandFlag.FORCE or FrameDemandFlag.WAIT_FOR_UPDATE).toString(),
     )
     assertEquals("INFO | WARNING | ERROR", LogSeverityFlag.ALL.toString())
     assertEquals("EXACT", UrlMatchFlag.EXACT.toString())

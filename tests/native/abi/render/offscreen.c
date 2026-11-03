@@ -147,7 +147,7 @@ static void render_red_frame(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
   MLN_TEST_OK(mln_test_map_fence(map));
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);

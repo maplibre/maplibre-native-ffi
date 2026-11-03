@@ -1363,7 +1363,6 @@ internal enum mln_feature_state_selector_field : uint
 internal enum mln_frame_demand_flag : uint
 {
     MLN_FRAME_DEMAND_FORCE = 1,
-    MLN_FRAME_DEMAND_PRESENT = 2,
     MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4,
 }
 

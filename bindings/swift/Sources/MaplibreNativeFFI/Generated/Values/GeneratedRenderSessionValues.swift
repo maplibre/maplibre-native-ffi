@@ -3,13 +3,13 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// A request for one frame.
+/// A demand for one frame.
 ///
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FrameDemand: Equatable, Hashable, Sendable {
   public var flags: FrameDemandFlag
-  /// A value of your choice that the request's frame result carries.
+  /// A value of your choice that the demand's frame result carries.
   public var token: UInt64
   public init(flags: FrameDemandFlag = .init(rawValue: 0), token: UInt64 = 0) {
     self.flags = flags
@@ -30,7 +30,11 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a frame request behaves.
+/// How a frame demand behaves.
+///
+/// Without flags, a demand draws a frame when the map changed since the last
+/// one, and otherwise finishes with `RenderResult.noUpdate`. A session with a
+/// surface target shows each frame that it draws.
 ///
 /// See `mln_frame_demand_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -45,8 +49,6 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   /// Draws a frame even when nothing changed since the last one. It can't be
   /// combined with `FrameDemandFlag.waitForUpdate`.
   public static let force: FrameDemandFlag = .init(rawValue: 1)
-  /// Shows the frame on a surface target.
-  public static let present: FrameDemandFlag = .init(rawValue: 2)
   /// When the map has nothing new to draw, waits for its next update instead of
   /// finishing with `RenderResult.noUpdate`.
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
@@ -98,7 +100,7 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
   }
 }
 
-/// How one frame request finished.
+/// How one frame demand finished.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -147,7 +149,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a frame request finished.
+/// How a frame demand finished.
 ///
 /// See `mln_render_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -163,9 +165,9 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// The map had nothing new to draw.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
   /// The target couldn't take a frame, such as while a window is hidden or
-  /// after `RenderSessionHandle.releaseTarget()`. Request a frame again later.
+  /// after `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
   public static let targetNotReady: RenderResult = .init(rawValue: 2)
-  /// A later request with the same flags replaced this one.
+  /// A later demand with the same flags replaced this one.
   public static let superseded: RenderResult = .init(rawValue: 3)
   /// The session failed, and `RenderSessionHandle.getFailure()` reports why.
   /// Once `RenderSessionHandle.close()` completes, you can attach a new

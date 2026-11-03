@@ -987,6 +987,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_demand_frame(
+        MlnRenderSession session,
+        mln_frame_demand* demand,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_detach(
         MlnRenderSession session,
         mln_completion* completion,
@@ -1086,13 +1093,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_render_session_release_target(
         MlnRenderSession session,
         mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_request_frame(
-        MlnRenderSession session,
-        mln_frame_demand* demand,
         mln_diagnostic* out_diagnostic
     );
 

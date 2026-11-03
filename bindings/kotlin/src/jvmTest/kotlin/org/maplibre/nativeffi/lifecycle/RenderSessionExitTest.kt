@@ -69,7 +69,7 @@ object RenderSessionExitProbe {
       renderStill()
       val rendered = renderFrame().disposition
       check(rendered == RenderResult.RENDERED) { "the last forced frame resolved as $rendered" }
-      session.requestFrame(
+      session.demandFrame(
         FrameDemand(flags = FrameDemandFlag.WAIT_FOR_UPDATE, token = PARKED_TOKEN),
       )
       // The fence completes after the driver evaluates every earlier demand, and dumping debug

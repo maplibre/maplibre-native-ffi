@@ -75,7 +75,6 @@ pub type mln_feature_state_selector_field = u32;
 pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 1;
 pub type mln_frame_demand_flag = u32;
 pub const MLN_FRAME_DEMAND_FORCE: mln_frame_demand_flag = 1;
-pub const MLN_FRAME_DEMAND_PRESENT: mln_frame_demand_flag = 2;
 pub const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE: mln_frame_demand_flag = 4;
 pub type mln_free_camera_option_field = u32;
 pub const MLN_FREE_CAMERA_OPTION_POSITION: mln_free_camera_option_field = 1;
@@ -2558,6 +2557,11 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_render_session_demand_frame(
+        session: mln_render_session,
+        demand: *const mln_frame_demand,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_render_session_detach(
         session: mln_render_session,
         completion: *const mln_completion,
@@ -2633,11 +2637,6 @@ unsafe extern "C" {
     pub fn mln_render_session_release_target(
         session: mln_render_session,
         completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_request_frame(
-        session: mln_render_session,
-        demand: *const mln_frame_demand,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_resize(

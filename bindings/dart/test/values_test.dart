@@ -289,11 +289,11 @@ void main() {
     );
     expect(FrameDemandFlag.none.toString(), 'FrameDemandFlag.none');
     expect(
-      (FrameDemandFlag.present |
+      (FrameDemandFlag.force |
               FrameDemandFlag.waitForUpdate |
               const FrameDemandFlag.fromRawValue(0x100))
           .toString(),
-      'FrameDemandFlag.present | FrameDemandFlag.waitForUpdate | 0x100',
+      'FrameDemandFlag.force | FrameDemandFlag.waitForUpdate | 0x100',
     );
     expect(RuntimeEventFlag.all.toString(), 'RuntimeEventFlag.all');
   });

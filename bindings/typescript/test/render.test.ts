@@ -21,7 +21,7 @@ import {
   NativeProbe,
   renderExtent,
   renderSize,
-  requestFrame,
+  demandFrame,
   TestSession,
 } from "./support/graphics.ts";
 import { bounded, test } from "./support/harness.ts";
@@ -57,10 +57,10 @@ test(
     const map = await openRenderMap();
     const { session, ready } = attachSession(map, {});
     await bounded(ready, "the attachment");
-    requestFrame(session, 1n);
+    demandFrame(session, 1n);
     session[Symbol.dispose]();
     session[Symbol.dispose]();
-    assert.throws(() => requestFrame(session, 2n), MaplibreError);
+    assert.throws(() => demandFrame(session, 2n), MaplibreError);
     await bounded(map.close(), "the map release");
   },
   { needs: ["disposers"] },
@@ -72,7 +72,7 @@ test(
     const map = await openRenderMap();
     const { session, ready } = attachSession(map, {});
     await bounded(ready, "the attachment");
-    requestFrame(session, 1n);
+    demandFrame(session, 1n);
     await bounded(session[Symbol.asyncDispose](), "the disposal");
     await session[Symbol.asyncDispose]();
     // Native code refuses an attach while the map still has a session.
@@ -187,7 +187,7 @@ test("a native registration reaches native unchanged, a call consumes it, and a 
   const frameWake = nativeWake(probe);
   const { session, ready } = attachSession(map, { frameWake });
   await bounded(ready, "the attachment");
-  requestFrame(session, 1n);
+  demandFrame(session, 1n);
   await probe.arrival("wake");
 
   // The attach call consumed the registration, so another call throws before
@@ -248,7 +248,7 @@ test("a native queue lock reaches a session whose target takes one", async () =>
   }
   const { session, ready } = attachVulkanSession(map, { queueLock });
   await bounded(ready, "the attachment");
-  requestFrame(session, 1n);
+  demandFrame(session, 1n);
   await probe.arrival("unlock");
   await bounded(session.detach(), "the detach");
   session.dispose();

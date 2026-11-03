@@ -119,7 +119,7 @@ static void maps_of_one_runtime_render_the_glyphs_they_share(void) {
 
   mln_test_render_fixture_destroy(&first);
   mln_test_destroy_map(first_map);
-  mln_test_render_request_forced(&second, 1);
+  mln_test_render_demand_forced(&second, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&second));
   mln_texture_image_info info = {0};
   MLN_TEST_OK(mln_test_render_read_back(&second, &info, actual, pixel_bytes));

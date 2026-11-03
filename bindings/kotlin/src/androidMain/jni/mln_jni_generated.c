@@ -1425,6 +1425,16 @@ static jint mln_render_session_clear_data_jni(
   );
 }
 
+static jint mln_render_session_demand_frame_jni(
+  JNIEnv* env, jclass type, jlong session, jlong demand, jlong out_diagnostic
+) {
+  return (jint)mln_render_session_demand_frame(
+    (mln_render_session)session,
+    MLN_JNI_POINTER(const mln_frame_demand*, demand),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_render_session_detach_jni(
   JNIEnv* env, jclass type, jlong session, jlong completion,
   jlong out_diagnostic
@@ -1589,16 +1599,6 @@ static jint mln_render_session_release_target_jni(
   return (jint)mln_render_session_release_target(
     (mln_render_session)session,
     MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_request_frame_jni(
-  JNIEnv* env, jclass type, jlong session, jlong demand, jlong out_diagnostic
-) {
-  return (jint)mln_render_session_request_frame(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_frame_demand*, demand),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2345,6 +2345,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_barrier_jni},
   {"mln_render_session_clear_data", "(JJJ)I",
    (void*)mln_render_session_clear_data_jni},
+  {"mln_render_session_demand_frame", "(JJJ)I",
+   (void*)mln_render_session_demand_frame_jni},
   {"mln_render_session_detach", "(JJJ)I", (void*)mln_render_session_detach_jni},
   {"mln_render_session_dispose", "(JJJ)I",
    (void*)mln_render_session_dispose_jni},
@@ -2370,8 +2372,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_reduce_memory_use_jni},
   {"mln_render_session_release_target", "(JJJ)I",
    (void*)mln_render_session_release_target_jni},
-  {"mln_render_session_request_frame", "(JJJ)I",
-   (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
@@ -2701,6 +2701,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_barrier_jni},
   {"mln_render_session_clear_data", "(JJJ)I",
    (void*)mln_render_session_clear_data_jni},
+  {"mln_render_session_demand_frame", "(JJJ)I",
+   (void*)mln_render_session_demand_frame_jni},
   {"mln_render_session_detach", "(JJJ)I", (void*)mln_render_session_detach_jni},
   {"mln_render_session_dispose", "(JJJ)I",
    (void*)mln_render_session_dispose_jni},
@@ -2726,8 +2728,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_reduce_memory_use_jni},
   {"mln_render_session_release_target", "(JJJ)I",
    (void*)mln_render_session_release_target_jni},
-  {"mln_render_session_request_frame", "(JJJ)I",
-   (void*)mln_render_session_request_frame_jni},
   {"mln_render_session_resize", "(JJJJ)I",
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",

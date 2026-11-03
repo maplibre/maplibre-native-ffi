@@ -24,14 +24,12 @@
 
 #if !defined(__EMSCRIPTEN__)
 static uint32_t render_frame(
-  const mln_test_render_fixture* fixture, uint64_t token, uint32_t flags
+  const mln_test_render_fixture* fixture, uint64_t token
 ) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  demand.flags = MLN_FRAME_DEMAND_FORCE | flags;
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = token;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
@@ -160,7 +158,7 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   );
 
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
   mln_acquired_frame first = MLN_HANDLE_NULL;
   const uint32_t first_slot = acquire_ring_frame(&fixture, &first);
@@ -171,7 +169,7 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
 
   paint_background_blue(runtime, map);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   mln_acquired_frame second = MLN_HANDLE_NULL;
   const uint32_t second_slot = acquire_ring_frame(&fixture, &second);
@@ -188,7 +186,7 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   // Both textures are held, so the next demand parks. The maintenance command
   // runs after it on the driver, so once that completes the demand has had its
   // chance to render.
-  mln_test_render_request_forced(&fixture, 3);
+  mln_test_render_demand_forced(&fixture, 3);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_reduce_memory_use(
@@ -265,7 +263,7 @@ static void queue_ordered_frames_share_the_hosts_queue(void) {
   for (uint64_t index = 0; index < 2; index += 1) {
     if (index == 1) paint_background_blue(runtime, map);
     TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1)
     );
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(
@@ -292,7 +290,7 @@ static void queue_ordered_frames_share_the_hosts_queue(void) {
   // Detach right after a queue-ordered frame and its release, which may both
   // still run on the queue, waits for them before it destroys the ring.
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 3, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 3)
   );
   mln_acquired_frame last = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &last, NULL));
@@ -342,7 +340,7 @@ static void a_queue_ordered_ring_takes_new_textures_after_the_hosts_reads(
       MLN_TEST_OK(mln_test_map_fence(map));
     }
     TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1)
     );
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(
@@ -420,7 +418,7 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
 
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
   mln_acquired_frame first = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
@@ -460,7 +458,7 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
 
   paint_background_blue(runtime, map);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   mln_acquired_frame second = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
@@ -513,7 +511,7 @@ static void vulkan_images_go_to_their_owner_between_frames(void) {
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
   for (uint64_t index = 0; index < 2; index += 1) {
     TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1)
     );
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(
@@ -589,7 +587,7 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
   for (uint64_t index = 0; index < 2; index += 1) {
     if (index == 1) paint_background_blue(runtime, map);
     TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
+      MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1)
     );
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(
@@ -684,7 +682,7 @@ static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
 
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
   mln_acquired_frame first = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
@@ -729,7 +727,7 @@ static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
 
   paint_background_blue(runtime, map);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   mln_acquired_frame second = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
@@ -809,7 +807,7 @@ static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
   );
 
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
   mln_acquired_frame first = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
@@ -844,7 +842,7 @@ static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
 
   paint_background_blue(runtime, map);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   mln_acquired_frame second = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
@@ -904,7 +902,7 @@ static void borrowed_opengl_frames_support_gpu_fences(void) {
   TEST_ASSERT_NOT_NULL(finish);
 
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
   mln_acquired_frame first = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &first, NULL));
@@ -943,7 +941,7 @@ static void borrowed_opengl_frames_support_gpu_fences(void) {
 
   paint_background_blue(runtime, map);
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   mln_acquired_frame second = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture.session, &second, NULL));
@@ -983,8 +981,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
     mln_test_graphics_last_error()
   );
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED,
-    render_frame(&fixture, 1, MLN_FRAME_DEMAND_PRESENT)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
   MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
 
@@ -1000,7 +997,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
     )
   );
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   const mln_render_session_snapshot snapshot = read_snapshot(&fixture);
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.width);
@@ -1024,7 +1021,7 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
     mln_test_graphics_last_error()
   );
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
   );
 
   mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
@@ -1052,7 +1049,7 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
     )
   );
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
   );
   TEST_ASSERT_EQUAL_DOUBLE(2.0, read_snapshot(&fixture).extent.scale_factor);
 

@@ -724,6 +724,15 @@ internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
 internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
   allocate(16, w(8, 8, 4)).also { putScreenPoint(it, value) }
 
+internal fun NativeArena.putFrameDemand(target: Long, value: FrameDemand) {
+  writeU32(target, 16.toUInt())
+  writeU32(target + 4, value.flags.rawValue)
+  writeU64(target + 8, value.token)
+}
+
+internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long =
+  allocate(16, w(8, 8, 4)).also { putFrameDemand(it, value) }
+
 internal fun NativeArena.putRenderedQueryGeometry(target: Long, value: RenderedQueryGeometry) {
   writeU32(target, 40.toUInt())
   when (val variant = value) {
@@ -791,15 +800,6 @@ internal fun NativeArena.putSourceFeatureQueryOptions(
 
 internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQueryOptions): Long =
   allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
-
-internal fun NativeArena.putFrameDemand(target: Long, value: FrameDemand) {
-  writeU32(target, 16.toUInt())
-  writeU32(target + 4, value.flags.rawValue)
-  writeU64(target + 8, value.token)
-}
-
-internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long =
-  allocate(16, w(8, 8, 4)).also { putFrameDemand(it, value) }
 
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
   writeU32(target, w(72, 96, 68).toUInt())

@@ -103,14 +103,14 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   demand.flags = 1U << 8U;
   demand.token = 200;
   MLN_TEST_INVALID(
-    mln_render_session_request_frame(fixture.session, &demand, NULL)
+    mln_render_session_demand_frame(fixture.session, &demand, NULL)
   );
   frame_wake_wait wake = {
     .fixture = &fixture, .before = atomic_load(&fixture.frame_wakes)
   };
   demand = (mln_frame_demand){.size = sizeof(mln_frame_demand)};
   demand.token = 201;
-  MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture.session, &demand, NULL));
   MLN_TEST_OK(mln_test_render_step_until(
     &fixture, frame_woke, &wake, mln_test_deadline_default(), "a frame wake"
   ));
@@ -147,7 +147,7 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(capabilities.producer_sync_kind, producer.kind);
 
-  mln_test_render_request_forced(&fixture, 203);
+  mln_test_render_demand_forced(&fixture, 203);
   mln_test_completion barrier = mln_test_completion_default(0);
   MLN_TEST_OK(
     mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
@@ -170,7 +170,7 @@ static void a_barrier_ends_a_demand_while_the_ring_stays_acquired(void) {
 
   // The parked demand gets a result whichever of the release and the detach
   // reaches it first.
-  mln_test_render_request_forced(&fixture, 503);
+  mln_test_render_demand_forced(&fixture, 503);
   fence_driver(&fixture);
   mln_test_render_release_frame(&first);
   mln_test_render_release_frame(&second);
@@ -199,7 +199,7 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
   for (uint64_t token = 1; token <= demand_count; token += 1) {
-    mln_test_render_request_forced(&fixture, token);
+    mln_test_render_demand_forced(&fixture, token);
   }
   mln_render_frame_result results[demand_count];
   mln_test_render_wait_for_result_list(&fixture, demand_count, results);
@@ -247,7 +247,7 @@ static void webgpu_demands_past_the_ring_depth_wait_for_the_gpu(void) {
   );
   const uint64_t depth = capabilities.texture_ring_depth;
   for (uint64_t token = 1; token <= depth + 1; token += 1) {
-    mln_test_render_request_forced(&fixture, token);
+    mln_test_render_demand_forced(&fixture, token);
   }
 
   // One service runs every queued demand without returning to the event loop.
@@ -283,7 +283,7 @@ static void webgpu_a_demand_behind_unfinished_frames_wakes_the_driver(void) {
   );
   const uint64_t depth = capabilities.texture_ring_depth;
   for (uint64_t token = 1; token <= depth; token += 1) {
-    mln_test_render_request_forced(&fixture, token);
+    mln_test_render_demand_forced(&fixture, token);
   }
   MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
@@ -294,7 +294,7 @@ static void webgpu_a_demand_behind_unfinished_frames_wakes_the_driver(void) {
   mln_render_frame_batch_release(batch);
 
   const unsigned before = atomic_load(&fixture.driver_wakes);
-  mln_test_render_request_forced(&fixture, depth + 1);
+  mln_test_render_demand_forced(&fixture, depth + 1);
   TEST_ASSERT_GREATER_THAN_UINT(before, atomic_load(&fixture.driver_wakes));
   batch = mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result last = mln_test_render_batch_result(batch, 0);
@@ -310,7 +310,7 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach_offscreen(&runtime, &map, &fixture);
-  mln_test_render_request_forced(&fixture, 301);
+  mln_test_render_demand_forced(&fixture, 301);
   const mln_render_frame_result old_frame = take_one_result(&fixture);
 
   mln_logical_extent extent = {
@@ -328,7 +328,7 @@ static void resizes_apply_in_order_and_publish_generations(void) {
     (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.0},
     &rejected_scale, NULL
   ));
-  mln_test_render_request_forced(&fixture, 302);
+  mln_test_render_demand_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
@@ -338,7 +338,7 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   TEST_ASSERT_EQUAL_UINT64(
     old_frame.generation, take_one_result(&fixture).generation
   );
-  mln_test_render_request_forced(&fixture, 303);
+  mln_test_render_demand_forced(&fixture, 303);
   const mln_render_frame_result new_frame = take_one_result(&fixture);
   TEST_ASSERT_GREATER_THAN_UINT64(old_frame.generation, new_frame.generation);
   TEST_ASSERT_GREATER_THAN_UINT64(
@@ -432,7 +432,7 @@ static void attaching_sizes_the_map_to_the_target(void) {
   MLN_TEST_OK(mln_test_map_fence(map));
   expect_map_size(map, 64, 64);
 
-  mln_test_render_request_forced(&fixture, 701);
+  mln_test_render_demand_forced(&fixture, 701);
   const mln_render_frame_result result = take_one_result(&fixture);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   detach(runtime, map, &fixture);
@@ -507,7 +507,7 @@ static bool still_completed_under_keepalive(void* context) {
   }
   const mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   wait->failed =
-    mln_render_session_request_frame(wait->fixture->session, &demand, NULL) !=
+    mln_render_session_demand_frame(wait->fixture->session, &demand, NULL) !=
     MLN_STATUS_OK;
   wait->demand_pending = !wait->failed;
   return wait->failed;
@@ -541,16 +541,14 @@ static void still_image_completes_under_if_needed_keepalive_demands(void) {
   detach(runtime, map, &fixture);
 }
 
-// Requests a demand that renders only if needed and waits for a map update.
-static void request_waiting(
+// Demands a frame that renders only if needed and waits for a map update.
+static void demand_waiting(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
 }
 
 // The fence runs after the driver evaluated every earlier demand, so a
@@ -591,7 +589,7 @@ static void a_waiting_demand_renders_the_next_map_update(void) {
   MLN_TEST_OK(mln_map_get_snapshot(map, &idle, NULL));
   const uint64_t idle_generation = idle.latest_render_update_generation;
 
-  request_waiting(&fixture, 601);
+  demand_waiting(&fixture, 601);
   expect_waiting(&fixture);
   move_camera(map, 2.0);
   const mln_render_frame_result result = take_one_result(&fixture);
@@ -625,7 +623,7 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_render_until_idle(runtime, map, &fixture);
-  request_waiting(&fixture, 621);
+  demand_waiting(&fixture, 621);
   expect_waiting(&fixture);
 
   // A query publishes no render update, so parking the worker in its
@@ -661,7 +659,7 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   TEST_ASSERT_EQUAL_UINT64(
     snapshot.latest_render_update_generation, rendered.map_update_generation
   );
-  request_waiting(&fixture, 622);
+  demand_waiting(&fixture, 622);
   expect_waiting(&fixture);
   detach(runtime, map, &fixture);
 }
@@ -674,13 +672,13 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   mln_frame_demand forced_wait = {.size = sizeof(mln_frame_demand)};
   forced_wait.flags = MLN_FRAME_DEMAND_FORCE | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   MLN_TEST_INVALID(
-    mln_render_session_request_frame(fixture.session, &forced_wait, NULL)
+    mln_render_session_demand_frame(fixture.session, &forced_wait, NULL)
   );
   mln_test_render_until_idle(runtime, map, &fixture);
 
-  request_waiting(&fixture, 611);
+  demand_waiting(&fixture, 611);
   expect_waiting(&fixture);
-  request_waiting(&fixture, 612);
+  demand_waiting(&fixture, 612);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
@@ -696,7 +694,7 @@ static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   TEST_ASSERT_EQUAL_UINT64(612, ended.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, ended.disposition);
 
-  request_waiting(&fixture, 613);
+  demand_waiting(&fixture, 613);
   expect_waiting(&fixture);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,

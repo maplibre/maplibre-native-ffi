@@ -112,7 +112,7 @@ static void an_attached_session_holds_its_map(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
   );
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED,
@@ -158,7 +158,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   };
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_request_frame(detached, &demand, NULL)
+    mln_render_session_demand_frame(detached, &demand, NULL)
   );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
@@ -300,11 +300,11 @@ static void maintenance_commands_run_in_order_with_frames(void) {
     .user_data = &probe,
     .release_user_data = maintenance_released,
   };
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   MLN_TEST_OK(
     mln_render_session_reduce_memory_use(fixture.session, &completion, NULL)
   );
-  mln_test_render_request_forced(&fixture, 2);
+  mln_test_render_demand_forced(&fixture, 2);
   probe_wait wait = {.fixture = &fixture, .probe = &probe};
   MLN_TEST_OK(mln_test_render_step_until(
     &fixture, maintenance_settled, &wait, mln_test_deadline_default(),
@@ -384,7 +384,7 @@ static void abandon_at_exit_keeps_every_graphics_object(void) {
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   mln_render_abandon_result abandoned = {
@@ -461,7 +461,7 @@ static void abandon_from_a_driver_completion_is_busy(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   // A rendered frame gives the maintenance command a renderer to act on.
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   for (size_t row = 0;
@@ -580,6 +580,85 @@ static void abandon_from_an_attach_completion_is_busy(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// What the frame results held when an attach completed.
+typedef struct attach_demand_probe {
+  atomic_bool published;
+  maintenance_probe results;
+} attach_demand_probe;
+
+static void drain_once_attach_returns(
+  void* user_data, const mln_completion_result* result
+) {
+  attach_demand_probe* probe = user_data;
+  probe->results.status = result->status;
+  // The driver delivers the attach, so waiting here holds the demand behind
+  // it until the case publishes the handle.
+  if (mln_test_wait_for_flag(&probe->published)) {
+    drain_tokens(&probe->results);
+  } else {
+    probe->results.drain_failed = true;
+  }
+  mln_test_flag_set(&probe->results.completed);
+}
+
+static bool attach_completed(void* context) {
+  const attach_demand_probe* probe = context;
+  return atomic_load(&probe->results.completed);
+}
+
+// A caller driver attaches only when the case services it, so the demand
+// reaches a session that is still attaching; a core worker may have attached
+// first.
+static void a_demand_made_while_attaching_renders_after_the_attach(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  attach_demand_probe probe = {0};
+  atomic_init(&probe.published, false);
+  atomic_init(&probe.results.completed, false);
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  options.frame_wake = mln_test_pulse_wake();
+  options.driver_work_wake = mln_test_pulse_wake();
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = drain_once_attach_returns,
+    .user_data = &probe,
+    .release_user_data = maintenance_released,
+  };
+  mln_test_render_fixture fixture = {0};
+  MLN_TEST_OK(
+    mln_test_render_fixture_start_attach(map, &options, &completion, &fixture)
+  );
+  if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_SESSION_STATE_ATTACHING, read_snapshot(fixture.session).state
+    );
+  }
+  mln_test_render_demand_forced(&fixture, 1);
+  probe.results.session = fixture.session;
+  mln_test_flag_set(&probe.published);
+
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, attach_completed, &probe, mln_test_deadline_default(),
+    "an attach with a demand behind it"
+  ));
+  MLN_TEST_OK(probe.results.status);
+  TEST_ASSERT_FALSE(probe.results.drain_failed);
+  TEST_ASSERT_EQUAL_size_t(0, probe.results.token_count);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(&fixture);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(1, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void count_nothing(void* context) { (void)context; }
 
 static void flag_release(void* context) { mln_test_flag_set(context); }
@@ -652,7 +731,7 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
   mln_test_completion_destroy(&attach);
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   mln_test_completion queued = mln_test_completion_default(0);
@@ -692,7 +771,7 @@ static void dispose_completes_once_the_session_has_retired(
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   if (state == DISPOSED_DETACHED) {
     MLN_TEST_RENDER_AWAIT(
@@ -1035,7 +1114,7 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_test_render_fixture fixture = {0};
   attach_reentrant_host(map, &fixture);
 
-  mln_test_render_request_forced(&fixture, reentrant.token);
+  mln_test_render_demand_forced(&fixture, reentrant.token);
   TEST_ASSERT_TRUE(mln_test_await(
     reentrant_frame_rendered, &reentrant, mln_test_deadline_default(),
     "a frame result drained inside the frame wake"
@@ -1105,6 +1184,7 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_at_exit_keeps_every_graphics_object);
   RUN_TEST(abandon_from_a_driver_completion_is_busy);
   RUN_TEST(abandon_from_an_attach_completion_is_busy);
+  RUN_TEST(a_demand_made_while_attaching_renders_after_the_attach);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(a_disposed_attached_session_releases_its_wakes_before_the_device);
   RUN_TEST(dispose_completes_after_retiring_an_attached_session);

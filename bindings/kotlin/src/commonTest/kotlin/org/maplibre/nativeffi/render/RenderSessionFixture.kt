@@ -81,7 +81,7 @@ internal class RenderSessionFixture(
         pending != null -> false
         done(last) -> true
         else -> {
-          pending = requestForcedFrame()
+          pending = demandForcedFrame()
           false
         }
       }
@@ -121,9 +121,9 @@ internal class RenderSessionFixture(
     }
   }
 
-  private fun requestForcedFrame(): ULong {
+  private fun demandForcedFrame(): ULong {
     val token = nextToken++
-    session.requestFrame(FrameDemand(flags = FrameDemandFlag.FORCE, token = token))
+    session.demandFrame(FrameDemand(flags = FrameDemandFlag.FORCE, token = token))
     return token
   }
 

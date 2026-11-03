@@ -960,14 +960,14 @@ impl<'a> ToNative<sys::mln_feature_state_selector> for FeatureStateSelector<'a> 
     }
 }
 
-/// A request for one frame.
+/// A demand for one frame.
 ///
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct FrameDemand {
     pub flags: FrameDemandFlag,
-    /// A value of your choice that the request's frame result carries.
+    /// A value of your choice that the demand's frame result carries.
     pub token: u64,
 }
 impl ToNative<sys::mln_frame_demand> for FrameDemand {
@@ -981,7 +981,11 @@ impl ToNative<sys::mln_frame_demand> for FrameDemand {
 }
 
 native_flags! {
-/// How a frame request behaves.
+/// How a frame demand behaves.
+///
+/// Without flags, a demand draws a frame when the map changed since the last
+/// one, and otherwise finishes with `RenderResult::NoUpdate`. A session with a
+/// surface target shows each frame that it draws.
 ///
 /// See `mln_frame_demand_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -989,8 +993,6 @@ pub struct FrameDemandFlag: u32 {
     /// Draws a frame even when nothing changed since the last one. It can't be
     /// combined with `FrameDemandFlag::WAIT_FOR_UPDATE`.
     const FORCE = 1;
-    /// Shows the frame on a surface target.
-    const PRESENT = 2;
     /// When the map has nothing new to draw, waits for its next update instead
     /// of finishing with `RenderResult::NoUpdate`.
     const WAIT_FOR_UPDATE = 4;
@@ -3045,7 +3047,7 @@ pub enum RenderDriverKind: u32 {
 } Unknown
 }
 
-/// How one frame request finished.
+/// How one frame demand finished.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3097,7 +3099,7 @@ impl Default for RenderMode {
 }
 
 native_enum! {
-/// How a frame request finished.
+/// How a frame demand finished.
 ///
 /// See `mln_render_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3106,10 +3108,10 @@ pub enum RenderResult: u32 {
     /// The map had nothing new to draw.
     NoUpdate = 1,
     /// The target couldn't take a frame, such as while a window is hidden or
-    /// after `RenderSessionHandle::release_target()`. Request a frame again
+    /// after `RenderSessionHandle::release_target()`. Demand a frame again
     /// later.
     TargetNotReady = 2,
-    /// A later request with the same flags replaced this one.
+    /// A later demand with the same flags replaced this one.
     Superseded = 3,
     /// The session failed, and `RenderSessionHandle::get_failure()` reports
     /// why. Once `RenderSessionHandle::release()` completes, you can attach a

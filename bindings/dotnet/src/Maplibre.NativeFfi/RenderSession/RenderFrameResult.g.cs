@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How one frame request finished.
+/// How one frame demand finished.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_frame_result</c> in the <see
