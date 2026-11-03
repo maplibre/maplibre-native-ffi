@@ -7795,18 +7795,6 @@ impl RuntimeHandle {
         reservation.commit();
         Ok(py.None())
     }
-    #[pyo3(signature = ())]
-    fn get_event_mask(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        let mut out_mask: sys::mln_runtime_event_flags = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_runtime_get_event_mask(handle, &mut out_mask, diagnostic)
-            })
-        }?;
-        generated_value(py, out_mask)
-    }
     #[pyo3(signature = (region_id))]
     fn get_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -7984,19 +7972,6 @@ impl RuntimeHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (mask))]
-    fn set_event_mask(
-        &self,
-        py: Python<'_>,
-        mask: sys::mln_runtime_event_flags,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.status(|diagnostic| sys::mln_runtime_set_event_mask(handle, mask, diagnostic))
-        }?;
-        Ok(py.None())
-    }
     #[pyo3(signature = (transform))]
     fn set_http_header_transform(
         &self,
@@ -8088,12 +8063,12 @@ impl RuntimeHandle {
             )
         }
     }
-    #[pyo3(signature = (region_id, observed))]
+    #[pyo3(signature = (region_id, events))]
     fn set_offline_region_observed(
         &self,
         py: Python<'_>,
         region_id: i64,
-        observed: bool,
+        events: sys::mln_runtime_event_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -8102,7 +8077,7 @@ impl RuntimeHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_runtime_set_offline_region_observed(
-                        handle, region_id, observed, completion, diagnostic,
+                        handle, region_id, events, completion, diagnostic,
                     )
                 },
                 convert,

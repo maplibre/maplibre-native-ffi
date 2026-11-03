@@ -4616,13 +4616,6 @@ external int mln_runtime_dispose(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Int32 Function(mln_runtime, Pointer<Uint64>, Pointer<mln_diagnostic>)>()
-external int mln_runtime_get_event_mask(
-  int runtime,
-  Pointer<Uint64> out_mask,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<
   Int32 Function(
     mln_runtime,
@@ -4731,13 +4724,6 @@ external int mln_runtime_set_event_handler(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Int32 Function(mln_runtime, Uint64, Pointer<mln_diagnostic>)>()
-external int mln_runtime_set_event_mask(
-  int runtime,
-  int mask,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<
   Int32 Function(
     mln_runtime,
@@ -4789,7 +4775,7 @@ external int mln_runtime_set_offline_region_download_state(
   Int32 Function(
     mln_runtime,
     Int64,
-    Bool,
+    Uint64,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -4797,7 +4783,7 @@ external int mln_runtime_set_offline_region_download_state(
 external int mln_runtime_set_offline_region_observed(
   int runtime,
   int region_id,
-  bool observed,
+  int events,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

@@ -5958,31 +5958,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_runtime_get_event_mask(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_runtime arg_runtime = 0;
-  mln_runtime_event_flags arg_out_mask;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "runtime")) goto done;
-    arg_runtime = (mln_runtime)number;
-  }
-  memset(&arg_out_mask, 0, sizeof arg_out_mask);
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_runtime_get_event_mask(arg_runtime, &arg_out_mask, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)(arg_out_mask));
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_runtime_get_offline_region(
   napi_env env, napi_callback_info info
 ) {
@@ -6281,35 +6256,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_runtime_set_event_mask(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_runtime arg_runtime = 0;
-  mln_runtime_event_flags arg_mask;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "runtime")) goto done;
-    arg_runtime = (mln_runtime)number;
-  }
-  memset(&arg_mask, 0, sizeof arg_mask);
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[1], &number, "mask")) goto done;
-    arg_mask = (mln_runtime_event_flags)number;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_runtime_set_event_mask(arg_runtime, arg_mask, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_runtime_set_http_header_transform(
   napi_env env, napi_callback_info info
 ) {
@@ -6442,7 +6388,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_observed(
   mln_ts_call* call = &call_state;
   mln_runtime arg_runtime = 0;
   mln_offline_region_id arg_region_id;
-  bool arg_observed;
+  mln_runtime_event_flags arg_events;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -6459,11 +6405,11 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_observed(
     if (!mln_ts_read_i64(call, call->argv[1], &number, "regionId")) goto done;
     arg_region_id = (int64_t)number;
   }
-  memset(&arg_observed, 0, sizeof arg_observed);
+  memset(&arg_events, 0, sizeof arg_events);
   {
-    bool flag = false;
-    if (!mln_ts_read_bool(call, call->argv[2], &flag, "observed")) goto done;
-    arg_observed = flag;
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[2], &number, "events")) goto done;
+    arg_events = (mln_runtime_event_flags)number;
   }
   if (!mln_ts_read_completion(
         call, call->argv[3], false, NULL, &arg_completion, &present_completion
@@ -6472,7 +6418,7 @@ static napi_value mln_ts_export_mln_runtime_set_offline_region_observed(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_runtime_set_offline_region_observed(
-    arg_runtime, arg_region_id, arg_observed, present_completion, &diagnostic
+    arg_runtime, arg_region_id, arg_events, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -7066,7 +7012,6 @@ static const mln_ts_export exports[] = {
   {"mln_runtime_delete_offline_region",
    mln_ts_export_mln_runtime_delete_offline_region},
   {"mln_runtime_dispose", mln_ts_export_mln_runtime_dispose},
-  {"mln_runtime_get_event_mask", mln_ts_export_mln_runtime_get_event_mask},
   {"mln_runtime_get_offline_region",
    mln_ts_export_mln_runtime_get_offline_region},
   {"mln_runtime_get_offline_region_status",
@@ -7082,7 +7027,6 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_runtime_run_cache_database_operation},
   {"mln_runtime_set_event_handler",
    mln_ts_export_mln_runtime_set_event_handler},
-  {"mln_runtime_set_event_mask", mln_ts_export_mln_runtime_set_event_mask},
   {"mln_runtime_set_http_header_transform",
    mln_ts_export_mln_runtime_set_http_header_transform},
   {"mln_runtime_set_maximum_ambient_cache_size",

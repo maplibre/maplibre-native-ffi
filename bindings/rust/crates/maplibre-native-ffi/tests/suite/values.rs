@@ -90,12 +90,13 @@ fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     // Only bit 63 is set, so a mask truncated to 32 bits would read as empty
     // and be accepted.
     let error = fixture
-        .runtime()
+        .map()
+        .discarding()
         .set_event_mask(RuntimeEventFlag::from_bits_retain(1 << 63))
         .unwrap_err();
     assert_eq!(error.status(), Status::InvalidArgument);
     assert_eq!(
-        fixture.runtime().get_event_mask().unwrap(),
+        fixture.map().get_snapshot().unwrap().event_mask,
         RuntimeEventFlag::ALL
     );
 }

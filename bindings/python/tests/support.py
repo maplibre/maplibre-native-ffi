@@ -162,7 +162,7 @@ def close_if_live(owner: mln.MapHandle | mln.RuntimeHandle) -> None:
         if isinstance(owner, mln.MapHandle):
             owner.get_snapshot()
         else:
-            owner.get_event_mask()
+            owner.discarding.clear_resource_transform()
     except mln.MaplibreError as error:
         if error.status == mln.Status.INVALID_STATE:
             return

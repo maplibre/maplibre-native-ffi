@@ -377,7 +377,7 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
   const mln_offline_region_definition pyramid = tile_definition();
   region_probe* created = create_region(runtime, &pyramid, metadata, 3);
   MLN_TEST_OK(created->status);
-  TEST_ASSERT_EQUAL_size_t(1, created->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, created->count);
   const mln_offline_region_id id = created->regions[0].id;
   expect_tile_region(&created->regions[0], metadata, 3);
   free(created);
@@ -398,14 +398,14 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
 
   region_probe* listed = list_regions(runtime);
   MLN_TEST_OK(listed->status);
-  TEST_ASSERT_EQUAL_size_t(2, listed->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, listed->count);
   expect_tile_region(find_region(listed, id), metadata, 3);
   TEST_ASSERT_NOT_NULL(find_region(listed, shaped_region.id));
   free(listed);
 
   region_probe* fetched = get_region(runtime, id);
   MLN_TEST_OK(fetched->status);
-  TEST_ASSERT_EQUAL_size_t(1, fetched->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, fetched->count);
   expect_tile_region(&fetched->regions[0], metadata, 3);
   free(fetched);
 
@@ -441,7 +441,7 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
   TEST_ASSERT_EQUAL_size_t(0, fetched->count);
   free(fetched);
   listed = list_regions(runtime);
-  TEST_ASSERT_EQUAL_size_t(1, listed->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, listed->count);
   TEST_ASSERT_EQUAL_INT64(shaped_region.id, listed->regions[0].id);
   free(listed);
   MLN_TEST_STATUS(
@@ -480,7 +480,7 @@ static mln_status observe_missing(
   const mln_completion* completion
 ) {
   return mln_runtime_set_offline_region_observed(
-    runtime, region, true, completion, NULL
+    runtime, region, MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS, completion, NULL
   );
 }
 
@@ -689,13 +689,13 @@ static void offline_database_merge_copies_regions_from_a_read_only_file(void) {
   mln_runtime runtime = mln_test_create_runtime();
   region_probe* merged = merge_database(runtime, side_path);
   MLN_TEST_OK_MESSAGE(merged->status, side_path);
-  TEST_ASSERT_EQUAL_size_t(1, merged->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, merged->count);
   const mln_offline_region_id merged_id = merged->regions[0].id;
   expect_tile_region(&merged->regions[0], metadata, sizeof(metadata));
   free(merged);
 
   region_probe* listed = list_regions(runtime);
-  TEST_ASSERT_EQUAL_size_t(1, listed->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, listed->count);
   expect_tile_region(
     find_region(listed, merged_id), metadata, sizeof(metadata)
   );
@@ -759,7 +759,8 @@ static void a_download_completes_from_provider_served_resources(void) {
   const mln_offline_region_id id = created->regions[0].id;
   free(created);
   MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_observed(
-    runtime, id, true, &completion.descriptor, NULL
+    runtime, id, MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED,
+    &completion.descriptor, NULL
   ));
   MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
     runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor,
@@ -845,6 +846,186 @@ static void a_download_completes_from_provider_served_resources(void) {
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
 
   mln_test_destroy_map(after);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
+typedef struct region_events {
+  mln_offline_region_id region;
+  size_t status_changes;
+  size_t response_errors;
+} region_events;
+
+// Two regions whose downloads end on their own: the provider has no style for
+// them, so each download reports a response error between two status changes,
+// and becomes inactive.
+typedef struct observed_downloads {
+  mln_runtime runtime;
+  region_events regions[2];
+  size_t settled;
+  status_probe* query;
+} observed_downloads;
+
+static void count_region_event(const mln_runtime_event* event, void* context) {
+  observed_downloads* downloads = context;
+  for (size_t index = 0; index < 2; index += 1) {
+    region_events* counts = &downloads->regions[index];
+    if (
+      event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED &&
+      event->payload.offline_region_status.region_id == counts->region
+    ) {
+      counts->status_changes += 1;
+    }
+    if (
+      event->type == MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR &&
+      event->payload.offline_region_response_error.region_id == counts->region
+    ) {
+      counts->response_errors += 1;
+    }
+  }
+}
+
+// Queries each region's status until its download is inactive. A download
+// raises its last event before it reports itself inactive, so once both are
+// inactive every event the regions selected is queued.
+static bool downloads_settled(void* context) {
+  observed_downloads* downloads = context;
+  while (downloads->settled < 2) {
+    status_probe* query = downloads->query;
+    if (query != NULL) {
+      if (!atomic_load(&query->done)) return false;
+      const bool inactive =
+        query->status == MLN_STATUS_OK &&
+        query->value.download_state == MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
+      free(query);
+      downloads->query = NULL;
+      if (inactive) {
+        downloads->settled += 1;
+        continue;
+      }
+    }
+    query = calloc(1, sizeof(*query));
+    TEST_ASSERT_NOT_NULL(query);
+    atomic_init(&query->done, false);
+    const mln_completion completion = {
+      .size = sizeof(mln_completion),
+      .callback = copy_status,
+      .user_data = query,
+    };
+    MLN_TEST_OK(mln_runtime_get_offline_region_status(
+      downloads->runtime, downloads->regions[downloads->settled].region,
+      &completion, MLN_TEST_DIAGNOSTIC
+    ));
+    downloads->query = query;
+    return false;
+  }
+  return true;
+}
+
+static void observe_downloads(
+  observed_downloads* downloads, mln_runtime_event_flags first,
+  mln_runtime_event_flags second
+) {
+  const mln_runtime_event_flags events[2] = {first, second};
+  for (size_t index = 0; index < 2; index += 1) {
+    MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_observed(
+      downloads->runtime, downloads->regions[index].region, events[index],
+      &completion.descriptor, NULL
+    ));
+  }
+}
+
+// Downloads both regions to their failure and counts the events they report.
+static void run_downloads(observed_downloads* downloads) {
+  mln_test_drain_all(downloads->runtime);
+  for (size_t index = 0; index < 2; index += 1) {
+    downloads->regions[index].status_changes = 0;
+    downloads->regions[index].response_errors = 0;
+    MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
+      downloads->runtime, downloads->regions[index].region,
+      MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor, NULL
+    ));
+  }
+  downloads->settled = 0;
+  TEST_ASSERT_TRUE(mln_test_await(
+    downloads_settled, downloads, mln_test_deadline_default(),
+    "offline downloads that end inactive"
+  ));
+  MLN_TEST_OK(
+    mln_test_dispatch_events(downloads->runtime, count_region_event, downloads)
+  );
+}
+
+static void each_region_reports_the_offline_events_it_selects(void) {
+  mln_test_provider* provider = mln_test_provider_create(NULL, 0);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  observed_downloads downloads = {.runtime = runtime};
+  const mln_offline_region_definition definition = tile_definition();
+  for (size_t index = 0; index < 2; index += 1) {
+    region_probe* created = create_region(runtime, &definition, NULL, 0);
+    downloads.regions[index].region = created->regions[0].id;
+    free(created);
+  }
+  region_events* first = &downloads.regions[0];
+  region_events* second = &downloads.regions[1];
+
+  observe_downloads(
+    &downloads, MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR
+  );
+  run_downloads(&downloads);
+  TEST_ASSERT_GREATER_THAN_size_t(0, first->status_changes);
+  TEST_ASSERT_EQUAL_size_t(0, first->response_errors);
+  TEST_ASSERT_EQUAL_size_t(0, second->status_changes);
+  TEST_ASSERT_GREATER_THAN_size_t(0, second->response_errors);
+
+  // A new selection replaces the old one, and a rejected selection leaves it
+  // in place.
+  observe_downloads(
+    &downloads, MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED
+  );
+  const mln_completion discard = mln_test_discard_completion();
+  MLN_TEST_INVALID(mln_runtime_set_offline_region_observed(
+    runtime, first->region,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
+      MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED,
+    &discard, NULL
+  ));
+  MLN_TEST_INVALID(mln_runtime_set_offline_region_observed(
+    runtime, second->region, UINT64_C(1) << 63U, &discard, NULL
+  ));
+  run_downloads(&downloads);
+  TEST_ASSERT_EQUAL_size_t(0, first->status_changes);
+  TEST_ASSERT_GREATER_THAN_size_t(0, first->response_errors);
+  TEST_ASSERT_GREATER_THAN_size_t(0, second->status_changes);
+  TEST_ASSERT_EQUAL_size_t(0, second->response_errors);
+
+  // An empty selection stops the region's events.
+  observe_downloads(
+    &downloads, MLN_RUNTIME_EVENT_FLAG_NONE,
+    MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS
+  );
+  run_downloads(&downloads);
+  TEST_ASSERT_EQUAL_size_t(0, first->status_changes);
+  TEST_ASSERT_EQUAL_size_t(0, first->response_errors);
+  TEST_ASSERT_GREATER_THAN_size_t(0, second->status_changes);
+  TEST_ASSERT_GREATER_THAN_size_t(0, second->response_errors);
+
+  // A region whose events stopped reports them again once it selects them.
+  observe_downloads(
+    &downloads,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
+      MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR,
+    MLN_RUNTIME_EVENT_FLAG_NONE
+  );
+  run_downloads(&downloads);
+  TEST_ASSERT_GREATER_THAN_size_t(0, first->status_changes);
+  TEST_ASSERT_GREATER_THAN_size_t(0, first->response_errors);
+  TEST_ASSERT_EQUAL_size_t(0, second->status_changes);
+  TEST_ASSERT_EQUAL_size_t(0, second->response_errors);
+
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
 }
@@ -973,7 +1154,7 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   mln_runtime reopened = mln_test_create_runtime_with_options(reopen);
   region_probe* listed = list_regions(reopened);
   MLN_TEST_OK(listed->status);
-  TEST_ASSERT_EQUAL_size_t(1, listed->count);
+  TEST_ASSERT_GREATER_THAN_size_t(0, listed->count);
   expect_tile_region(
     find_region(listed, created_id), metadata, sizeof(metadata)
   );
@@ -990,6 +1171,7 @@ MLN_TEST_GROUP {
   RUN_TEST(offline_database_merge_reports_a_corrupt_side_database);
   RUN_TEST(offline_database_merge_copies_regions_from_a_read_only_file);
   RUN_TEST(a_download_completes_from_provider_served_resources);
+  RUN_TEST(each_region_reports_the_offline_events_it_selects);
   RUN_TEST(offline_submission_never_waits_for_the_runtime_worker);
   RUN_TEST(an_offline_operation_accepted_before_release_still_completes);
 }

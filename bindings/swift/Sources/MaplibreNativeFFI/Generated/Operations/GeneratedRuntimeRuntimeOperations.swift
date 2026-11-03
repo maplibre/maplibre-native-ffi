@@ -95,19 +95,6 @@ public extension RuntimeHandle {
     try nativeClose { raw, diagnostic in mln_runtime_dispose(raw, diagnostic) }
   }
 
-  /// Reads the runtime's event mask.
-  ///
-  /// See `mln_runtime_get_event_mask` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func getEventMask() throws -> RuntimeEventFlag {
-    var value0: mln_runtime_event_flags = 0
-    return try nativeInvoke { raw, _, diagnostic in mln_runtime_get_event_mask(
-      raw,
-      &value0,
-      diagnostic
-    ) } result: { RuntimeEventFlag(rawValue: value0) }
-  }
-
   /// Releases a runtime.
   ///
   /// Release the runtime's maps first.
@@ -162,21 +149,6 @@ public extension RuntimeHandle {
         diagnostic
       )
     }
-  }
-
-  /// Selects the runtime's own events that reach the event callback.
-  ///
-  /// Each map selects its events with `MapHandle.setEventMask()` instead. A
-  /// runtime starts with every event selected.
-  ///
-  /// See `mln_runtime_set_event_mask` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setEventMask(_ bindingArg0: RuntimeEventFlag) throws {
-    try nativeInvoke { raw, _, diagnostic in mln_runtime_set_event_mask(
-      raw,
-      bindingArg0.rawValue,
-      diagnostic
-    ) }
   }
 
   /// Adds headers to the runtime's HTTP requests.

@@ -2511,14 +2511,6 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.delete_offline_region(region_id)
 
-    def get_event_mask(self) -> RuntimeEventFlag:
-        """Reads the runtime's event mask.
-
-        See `mln_runtime_get_event_mask` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return RuntimeEventFlag(self._native.get_event_mask())
-
     def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
         """Reads the offline region `region_id`.
 
@@ -2632,17 +2624,6 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.set_event_handler(handler)
 
-    def set_event_mask(self, mask: RuntimeEventFlag) -> None:
-        """Selects the runtime's own events that reach the event callback.
-
-        Each map selects its events with `MapHandle.set_event_mask()`
-        instead. A runtime starts with every event selected.
-
-        See `mln_runtime_set_event_mask` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return self._native.set_event_mask(mask)
-
     def set_http_header_transform(
         self, transform: HttpHeaderTransform
     ) -> Future[CommandCompletion]:
@@ -2689,10 +2670,14 @@ class _RuntimeHandleOperations(GeneratedOperations):
         return self._native.set_offline_region_download_state(region_id, state)
 
     def set_offline_region_observed(
-        self, region_id: int, observed: bool
+        self, region_id: int, events: RuntimeEventFlag
     ) -> Future[None]:
-        """Sets whether the runtime reports the download progress of the offline
-        region `region_id` as events.
+        """Selects the events that the runtime reports about the download of the
+        offline region `region_id`.
+
+        `events` holds bits of `RuntimeEventFlag.ALL_RUNTIME_EVENTS` and
+        replaces the region's previous selection. `RuntimeEventFlag.NONE`
+        stops the region's events.
 
         See `mln_runtime_set_offline_region_observed` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2701,7 +2686,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         - `Status.NOT_FOUND` when the cache file has no region `region_id`.
         """
-        return self._native.set_offline_region_observed(region_id, observed)
+        return self._native.set_offline_region_observed(region_id, events)
 
     def set_resource_provider(
         self, provider: ResourceProvider

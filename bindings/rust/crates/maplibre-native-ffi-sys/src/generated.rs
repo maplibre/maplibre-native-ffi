@@ -2955,11 +2955,6 @@ unsafe extern "C" {
         runtime: mln_runtime,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_get_event_mask(
-        runtime: mln_runtime,
-        out_mask: *mut mln_runtime_event_flags,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_runtime_get_offline_region(
         runtime: mln_runtime,
         region_id: mln_offline_region_id,
@@ -3006,11 +3001,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_set_event_mask(
-        runtime: mln_runtime,
-        mask: mln_runtime_event_flags,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_runtime_set_http_header_transform(
         runtime: mln_runtime,
         transform: *const mln_http_header_transform,
@@ -3033,7 +3023,7 @@ unsafe extern "C" {
     pub fn mln_runtime_set_offline_region_observed(
         runtime: mln_runtime,
         region_id: mln_offline_region_id,
-        observed: bool,
+        events: mln_runtime_event_flags,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

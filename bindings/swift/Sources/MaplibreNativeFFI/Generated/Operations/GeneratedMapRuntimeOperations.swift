@@ -212,8 +212,12 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Sets whether the runtime reports the download progress of the offline
-  /// region `regionId` as events.
+  /// Selects the events that the runtime reports about the download of the
+  /// offline region `regionId`.
+  ///
+  /// `events` holds bits of `RuntimeEventFlag.allRuntimeEvents` and replaces
+  /// the region's previous selection. `RuntimeEventFlag.none` stops the
+  /// region's events.
   ///
   /// See `mln_runtime_set_offline_region_observed` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -223,13 +227,13 @@ public extension RuntimeHandle {
   /// - `Status.notFound` when the cache file has no region `regionId`.
   func setOfflineRegionObserved(
     _ bindingArg0: Int64,
-    observed bindingArg1: Bool
+    events bindingArg1: RuntimeEventFlag
   ) async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_runtime_set_offline_region_observed(
         raw,
         bindingArg0,
-        bindingArg1,
+        bindingArg1.rawValue,
         completion,
         diagnostic
       )

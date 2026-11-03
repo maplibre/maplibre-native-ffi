@@ -7,7 +7,7 @@ import Testing
 @Test func aFailedCallMapsItsStatusAndCarriesItsDiagnostic() async throws {
   try await withMapFixture { fixture in
     let native = await expectMaplibreError(.invalidArgument) {
-      try fixture.runtime
+      try fixture.map.discarding
         .setEventMask(RuntimeEventFlag(rawValue: 1 << 63))
     }
     #expect(native?.diagnostic.isEmpty == false)

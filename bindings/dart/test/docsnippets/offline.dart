@@ -79,7 +79,10 @@ Future<void> offline() async {
   // #endregion download
 
   // #region progress
-  await runtime.setOfflineRegionObserved(region.id, true);
+  await runtime.setOfflineRegionObserved(
+    region.id,
+    RuntimeEventFlag.allRuntimeEvents,
+  );
   // #endregion progress
 
   // #region manage

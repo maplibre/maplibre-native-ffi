@@ -1692,15 +1692,6 @@ int32_t mln_kw_mln_runtime_dispose(int64_t runtime, uintptr_t out_diagnostic) {
   );
 }
 
-int32_t mln_kw_mln_runtime_get_event_mask(
-  int64_t runtime, uintptr_t out_mask, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_runtime_get_event_mask(
-    (mln_runtime)runtime, (mln_runtime_event_flags*)out_mask,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_runtime_get_offline_region(
   int64_t runtime, int64_t region_id, uintptr_t completion,
   uintptr_t out_diagnostic
@@ -1780,15 +1771,6 @@ int32_t mln_kw_mln_runtime_set_event_handler(
   );
 }
 
-int32_t mln_kw_mln_runtime_set_event_mask(
-  int64_t runtime, int64_t mask, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_runtime_set_event_mask(
-    (mln_runtime)runtime, (mln_runtime_event_flags)mask,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_runtime_set_http_header_transform(
   int64_t runtime, uintptr_t transform, uintptr_t completion,
   uintptr_t out_diagnostic
@@ -1820,12 +1802,13 @@ int32_t mln_kw_mln_runtime_set_offline_region_download_state(
 }
 
 int32_t mln_kw_mln_runtime_set_offline_region_observed(
-  int64_t runtime, int64_t region_id, int32_t observed, uintptr_t completion,
+  int64_t runtime, int64_t region_id, int64_t events, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_runtime_set_offline_region_observed(
-    (mln_runtime)runtime, (mln_offline_region_id)region_id, (bool)observed,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+    (mln_runtime)runtime, (mln_offline_region_id)region_id,
+    (mln_runtime_event_flags)events, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

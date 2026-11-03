@@ -246,21 +246,6 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Reads the runtime's event mask.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_runtime_get_event_mask</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
-    /// </remarks>
-    public RuntimeEventFlag GetEventMask()
-    {
-        using var call = Enter(this);
-        ulong outMask = default;
-        Check(NativeMethods.mln_runtime_get_event_mask(Handle, &outMask, Diagnostic));
-        return (global::Maplibre.NativeFfi.RuntimeEventFlag)outMask;
-    }
-
-    /// <summary>
     /// Reads the offline region <c>regionId</c>.
     /// </summary>
     /// <remarks>
@@ -490,22 +475,6 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Selects the runtime's own events that reach the event callback.
-    /// </summary>
-    /// <remarks>
-    /// <para>Each map selects its events with
-    /// <c>MapHandle.SetEventMaskAsync()</c> instead. A runtime starts with
-    /// every event selected.</para>
-    /// <para>See <c>mln_runtime_set_event_mask</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public void SetEventMask(RuntimeEventFlag mask)
-    {
-        using var call = Enter(this);
-        Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask, Diagnostic));
-    }
-
-    /// <summary>
     /// Adds headers to the runtime's HTTP requests.
     /// </summary>
     /// <remarks>
@@ -586,10 +555,14 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Sets whether the runtime reports the download progress of the offline
-    /// region <c>regionId</c> as events.
+    /// Selects the events that the runtime reports about the download of the
+    /// offline region <c>regionId</c>.
     /// </summary>
     /// <remarks>
+    /// <para><c>events</c> holds bits of
+    /// <c>RuntimeEventFlag.AllRuntimeEvents</c> and replaces the region's
+    /// previous selection. <c>RuntimeEventFlag.None</c> stops the region's
+    /// events.</para>
     /// <para>See <c>mln_runtime_set_offline_region_observed</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -598,14 +571,14 @@ public sealed unsafe partial class RuntimeHandle
     /// region <c>regionId</c>.</description></item>
     /// </list>
     /// </remarks>
-    public Task SetOfflineRegionObservedAsync(long regionId, bool observed)
+    public Task SetOfflineRegionObservedAsync(long regionId, RuntimeEventFlag events)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_offline_region_observed(
             Handle,
             regionId,
-            (byte)(observed ? 1 : 0),
+            (ulong)events,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );

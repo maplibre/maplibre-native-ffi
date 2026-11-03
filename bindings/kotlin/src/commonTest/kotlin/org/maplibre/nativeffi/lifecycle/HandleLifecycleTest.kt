@@ -36,7 +36,6 @@ class HandleLifecycleTest {
 
     val runtime = RuntimeHandle.create(RuntimeOptions())
     runtime.release().awaitWithin("the runtime teardown")
-    assertFailsWithStatus(Status.INVALID_STATE) { runtime.getEventMask() }
     // Native refuses a released handle, whether to release it again or to use it.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.clearResourceTransform() }
@@ -90,12 +89,11 @@ class HandleLifecycleTest {
     // Native refuses to release a runtime with a live map, so the call throws and the runtime
     // stays usable.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
-    runtime.getEventMask()
     runtime.clearResourceTransform().awaitWithin("a command on the refused runtime")
 
     map.release().awaitWithin("the map release")
     runtime.release().awaitWithin("the retried runtime release")
-    assertFailsWithStatus(Status.INVALID_STATE) { runtime.getEventMask() }
+    assertFailsWithStatus(Status.INVALID_STATE) { runtime.clearResourceTransform() }
   }
 
   @Test

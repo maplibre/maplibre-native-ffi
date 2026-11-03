@@ -190,7 +190,8 @@ void mln_doc_offline(void) {
 
   // #region progress
   mln_runtime_set_offline_region_observed(
-    runtime, region_id, true, &done, NULL
+    runtime, region_id, MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS,
+    &done, NULL
   );
   // #endregion progress
   wait_for_done();

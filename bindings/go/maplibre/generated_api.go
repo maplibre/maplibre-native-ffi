@@ -1110,8 +1110,8 @@ func (value RuntimeEventSourceType) String() string {
 //
 // Only maps in MapModeContinuous raise RuntimeEventTypeMapLoadingFinished,
 // RuntimeEventTypeMapIdle, and the render frame and render map events. Offline
-// region events come only for the regions that
-// RuntimeHandle.SetOfflineRegionObserved() observes.
+// region events come only for the regions and types that
+// RuntimeHandle.SetOfflineRegionObserved() selects.
 //
 // See mln_runtime_event_type in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8543,19 +8543,6 @@ func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[stru
 	}, completionUnit)
 }
 
-// EventMask reads the runtime's event mask.
-//
-// See mln_runtime_get_event_mask in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) EventMask() (RuntimeEventFlag, error) {
-	var outMask C.mln_runtime_event_flags
-	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_get_event_mask(C.mln_runtime(raw), &outMask, diagnostic))
-	}, func(arena *bindingArena) RuntimeEventFlag {
-		return RuntimeEventFlag(outMask)
-	})
-}
-
 // GetOfflineRegion reads the offline region regionId.
 //
 // The result is null when the cache file has no region with that ID.
@@ -8665,19 +8652,6 @@ func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Fu
 	}, completionCommand)
 }
 
-// SetEventMask selects the runtime's own events that reach the event callback.
-//
-// Each map selects its events with MapHandle.SetEventMask() instead. A runtime
-// starts with every event selected.
-//
-// See mln_runtime_set_event_mask in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventFlag) error {
-	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_set_event_mask(C.mln_runtime(raw), C.mln_runtime_event_flags(mask), diagnostic))
-	})
-}
-
 // SetHttpHeaderTransform adds headers to the runtime's HTTP requests.
 //
 // The transform replaces the one set before. In a browser or on OpenHarmony,
@@ -8724,17 +8698,20 @@ func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, sta
 	}, completionUnit)
 }
 
-// SetOfflineRegionObserved sets whether the runtime reports the download
-// progress of the offline region regionId as events.
+// SetOfflineRegionObserved selects the events that the runtime reports about
+// the download of the offline region regionId.
+//
+// events holds bits of RuntimeEventFlagAllRuntimeEvents and replaces the
+// region's previous selection. RuntimeEventFlagNone stops the region's events.
 //
 // See mln_runtime_set_offline_region_observed in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 //
 // Errors:
 //   - StatusNotFound when the cache file has no region regionId.
-func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed bool) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, events RuntimeEventFlag) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_set_offline_region_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.bool(observed), completion, diagnostic))
+		return int32(C.mln_runtime_set_offline_region_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.mln_runtime_event_flags(events), completion, diagnostic))
 	}, completionUnit)
 }
 

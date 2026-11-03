@@ -1272,7 +1272,7 @@ public value class RuntimeEventSourceType(public val rawValue: UInt) {
  *
  * Only maps in `MapMode.CONTINUOUS` raise `RuntimeEventType.MAP_LOADING_FINISHED`,
  * `RuntimeEventType.MAP_IDLE`, and the render frame and render map events. Offline region events
- * come only for the regions that `RuntimeHandle.setOfflineRegionObserved()` observes.
+ * come only for the regions and types that `RuntimeHandle.setOfflineRegionObserved()` selects.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *

@@ -2794,7 +2794,7 @@ export interface RuntimeEventTileAction {
  * Only maps in `MapMode.continuous` raise
  * `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
  * render frame and render map events. Offline region events come only for the
- * regions that `RuntimeHandle.setOfflineRegionObserved()` observes.
+ * regions and types that `RuntimeHandle.setOfflineRegionObserved()` selects.
  *
  * See `mln_runtime_event_type` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

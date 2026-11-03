@@ -835,7 +835,8 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
   log_reset(&scenario_log);
 
   MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_observed(
-    runtime, info.id, true, &completion.descriptor, NULL
+    runtime, info.id, MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS,
+    &completion.descriptor, NULL
   ));
   MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,

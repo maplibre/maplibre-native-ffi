@@ -107,7 +107,7 @@ func offline(ctx context.Context) error {
 	// #endregion download
 
 	// #region progress
-	observed, err := runtime.SetOfflineRegionObserved(region.Id, true)
+	observed, err := runtime.SetOfflineRegionObserved(region.Id, maplibre.RuntimeEventFlagAllRuntimeEvents)
 	if err != nil {
 		return err
 	}

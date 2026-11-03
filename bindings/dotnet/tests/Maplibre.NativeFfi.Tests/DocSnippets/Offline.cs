@@ -103,7 +103,10 @@ internal static class Offline
         // #endregion download
 
         // #region progress
-        await runtime.SetOfflineRegionObservedAsync(region.Id, true);
+        await runtime.SetOfflineRegionObservedAsync(
+            region.Id,
+            RuntimeEventFlag.AllRuntimeEvents
+        );
         // #endregion progress
 
         // #region manage

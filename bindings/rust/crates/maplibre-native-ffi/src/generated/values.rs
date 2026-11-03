@@ -4694,7 +4694,8 @@ native_enum! {
 /// Only maps in `MapMode::Continuous` raise
 /// `RuntimeEventType::MapLoadingFinished`, `RuntimeEventType::MapIdle`, and the
 /// render frame and render map events. Offline region events come only for the
-/// regions that `RuntimeHandle::set_offline_region_observed()` observes.
+/// regions and types that `RuntimeHandle::set_offline_region_observed()`
+/// selects.
 ///
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

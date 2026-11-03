@@ -74,7 +74,7 @@ private func offline() async throws {
   // #region progress
   try await runtime.setOfflineRegionObserved(
     region.id,
-    observed: true
+    events: .allRuntimeEvents
   )
   // #endregion progress
 

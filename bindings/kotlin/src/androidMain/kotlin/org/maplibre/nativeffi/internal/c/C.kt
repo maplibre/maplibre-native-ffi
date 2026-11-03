@@ -1271,13 +1271,6 @@ internal actual object C {
   @JvmStatic actual external fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
 
   @JvmStatic
-  actual external fun mln_runtime_get_event_mask(
-    runtime: Long,
-    outMask: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_runtime_get_offline_region(
     runtime: Long,
     regionId: Long,
@@ -1336,13 +1329,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_runtime_set_event_mask(
-    runtime: Long,
-    mask: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_runtime_set_http_header_transform(
     runtime: Long,
     transform: Long,
@@ -1371,7 +1357,7 @@ internal actual object C {
   actual external fun mln_runtime_set_offline_region_observed(
     runtime: Long,
     regionId: Long,
-    observed: Boolean,
+    events: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

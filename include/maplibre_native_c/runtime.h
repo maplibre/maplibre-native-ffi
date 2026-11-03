@@ -100,7 +100,7 @@ typedef struct mln_offline_region_status {
  * Only maps in MLN_MAP_MODE_CONTINUOUS raise
  * MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED, MLN_RUNTIME_EVENT_MAP_IDLE, and the
  * render frame and render map events. Offline region events come only for the
- * regions that mln_runtime_set_offline_region_observed() observes.
+ * regions and types that mln_runtime_set_offline_region_observed() selects.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -1112,24 +1112,6 @@ MLN_API mln_status mln_runtime_set_event_handler(
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_clear_event_handler(
   mln_runtime runtime, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Selects the runtime's own events that reach the event callback.
- *
- * Each map selects its events with mln_map_set_event_mask() instead. A runtime
- * starts with every event selected.
- */
-MLN_API mln_status mln_runtime_set_event_mask(
-  mln_runtime runtime, mln_runtime_event_flags mask,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/** Reads the runtime's event mask. */
-MLN_API mln_status mln_runtime_get_event_mask(
-  mln_runtime runtime,
-  mln_runtime_event_flags* out_mask MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

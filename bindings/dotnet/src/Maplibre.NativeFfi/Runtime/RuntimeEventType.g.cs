@@ -8,8 +8,8 @@ namespace Maplibre.NativeFfi;
 /// <para>Only maps in <c>MapMode.Continuous</c> raise
 /// <c>RuntimeEventType.MapLoadingFinished</c>, <c>RuntimeEventType.MapIdle</c>,
 /// and the render frame and render map events. Offline region events come only
-/// for the regions that <c>RuntimeHandle.SetOfflineRegionObservedAsync()</c>
-/// observes.</para>
+/// for the regions and types that
+/// <c>RuntimeHandle.SetOfflineRegionObservedAsync()</c> selects.</para>
 /// <para>See <c>mln_runtime_event_type</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
 /// </remarks>
