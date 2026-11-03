@@ -1138,15 +1138,15 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_debug_options(
+  actual fun mln_map_set_debug_flags(
     map: Long,
-    options: Int,
+    flags: Int,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_debug_options(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_debug_flags(
       map.toULong(),
-      options.toUInt(),
+      flags.toUInt(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

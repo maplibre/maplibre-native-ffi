@@ -714,9 +714,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_debug_options(
+    internal static partial mln_status mln_map_set_debug_flags(
         MlnMap map,
-        uint options,
+        uint flags,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

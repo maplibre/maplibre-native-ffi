@@ -90,7 +90,7 @@ static void discarded_commands_publish_state_and_events_before_a_later_query(
   MLN_TEST_OK(mln_map_begin_command_group(map, NULL, NULL));
   MLN_TEST_OK(mln_map_resize(map, extent, NULL, NULL));
   MLN_TEST_OK(
-    mln_map_set_debug_options(map, MLN_MAP_DEBUG_TILE_BORDERS, NULL, NULL)
+    mln_map_set_debug_flags(map, MLN_MAP_DEBUG_TILE_BORDERS, NULL, NULL)
   );
   MLN_TEST_OK(mln_map_update_camera(map, &camera, NULL, NULL));
   MLN_TEST_OK(mln_map_end_command_group(map, NULL, NULL));
@@ -103,7 +103,7 @@ static void discarded_commands_publish_state_and_events_before_a_later_query(
   TEST_ASSERT_GREATER_THAN_UINT64(before.generation, after.generation);
   TEST_ASSERT_EQUAL_UINT32(96, after.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(80, after.view.extent.height);
-  TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, after.debug_options);
+  TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, after.debug_flags);
   mln_camera observed;
   MLN_TEST_OK(mln_test_map_get_camera(map, &observed));
   TEST_ASSERT_EQUAL_DOUBLE(4, observed.zoom);
@@ -119,13 +119,13 @@ static void a_later_command_completion_fences_discarded_commands(void) {
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_OK(mln_map_set_event_mask(map, 0, NULL, NULL));
   MLN_TEST_OK(
-    mln_map_set_debug_options(map, MLN_MAP_DEBUG_TILE_BORDERS, NULL, NULL)
+    mln_map_set_debug_flags(map, MLN_MAP_DEBUG_TILE_BORDERS, NULL, NULL)
   );
   MLN_TEST_AWAIT_OK(mln_map_request_repaint(map, &completion.descriptor, NULL));
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT64(0, snapshot.event_mask);
-  TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, snapshot.debug_options);
+  TEST_ASSERT_EQUAL_UINT32(MLN_MAP_DEBUG_TILE_BORDERS, snapshot.debug_flags);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

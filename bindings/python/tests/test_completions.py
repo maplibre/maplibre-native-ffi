@@ -19,12 +19,10 @@ from support import (
 def test_discarded_commands_are_fenced_and_sync_rejection_raises(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    assert (
-        map_handle.discarding.set_debug_options(mln.MapDebugFlag.TILE_BORDERS) is None
-    )
+    assert map_handle.discarding.set_debug_flags(mln.MapDebugFlag.TILE_BORDERS) is None
     # A later command on the same map completes after the discarded one.
     result(map_handle.request_repaint())
-    assert map_handle.get_snapshot().debug_options == mln.MapDebugFlag.TILE_BORDERS
+    assert map_handle.get_snapshot().debug_flags == mln.MapDebugFlag.TILE_BORDERS
     with pytest.raises(
         mln.MaplibreError,
         check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,

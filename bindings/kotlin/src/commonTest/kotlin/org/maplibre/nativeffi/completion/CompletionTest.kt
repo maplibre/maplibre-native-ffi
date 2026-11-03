@@ -31,10 +31,10 @@ class CompletionTest {
   @Test
   fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows() = runSuspendTest {
     withMap {
-      map.discarding.setDebugOptions(MapDebugFlag.TILE_BORDERS)
+      map.discarding.setDebugFlags(MapDebugFlag.TILE_BORDERS)
       // A later command on the same map completes after the discarded one.
       map.requestRepaint().await()
-      assertEquals(MapDebugFlag.TILE_BORDERS, map.getSnapshot().debugOptions)
+      assertEquals(MapDebugFlag.TILE_BORDERS, map.getSnapshot().debugFlags)
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
         map.discarding.resize(LogicalSize(0u, 8u))
       }

@@ -196,8 +196,8 @@ static void a_command_validates_a_present_completion(void) {
   mln_map map = mln_test_create_map(runtime);
 
   const mln_completion completion = {.size = sizeof(mln_completion)};
-  MLN_TEST_INVALID(mln_map_set_debug_options(map, 0, &completion, NULL));
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_set_debug_flags(map, 0, &completion, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, NULL, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -216,10 +216,10 @@ static void a_later_completion_follows_earlier_queued_completions(void) {
   MLN_TEST_OK(
     mln_map_set_style_json(map, mln_test_background_style_json, &command, NULL)
   );
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, NULL, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, NULL, NULL));
   const mln_completion later =
     mln_test_queue_completion(queue.handle, &later_tag);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &later, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &later, NULL));
 
   mln_test_dispatch_until_calls(queue.handle, 2);
   TEST_ASSERT_EQUAL_size_t(2, mln_test_calls.count);
@@ -284,7 +284,7 @@ static void a_completion_for_a_released_queue_is_discarded(void) {
   mln_test_gate gate;
   mln_test_gate_init(&gate);
   const mln_completion parked = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_set_debug_options(parking, 0, &parked, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(parking, 0, &parked, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );

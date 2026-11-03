@@ -630,8 +630,8 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_debug_options =
-    Ffm.downcall("mln_map_set_debug_options", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
+  private val mln_map_set_debug_flags =
+    Ffm.downcall("mln_map_set_debug_flags", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_event_mask =
     Ffm.downcall("mln_map_set_event_mask", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_feature_state =
@@ -2196,12 +2196,12 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_debug_options(
+  actual fun mln_map_set_debug_flags(
     map: Long,
-    options: Int,
+    flags: Int,
     completion: Long,
     outDiagnostic: Long,
-  ): Int = mln_map_set_debug_options.invokeExact(map, options, completion, outDiagnostic) as Int
+  ): Int = mln_map_set_debug_flags.invokeExact(map, flags, completion, outDiagnostic) as Int
 
   actual fun mln_map_set_event_mask(
     map: Long,

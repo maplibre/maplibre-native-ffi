@@ -1009,8 +1009,8 @@ napi_value mln_ts_read_map_snapshot(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "debugOptions",
-        mln_ts_number(env, (double)(source->debug_options))
+        env, result, "debugFlags",
+        mln_ts_number(env, (double)(source->debug_flags))
       ))
     return NULL;
   if (!mln_ts_set(

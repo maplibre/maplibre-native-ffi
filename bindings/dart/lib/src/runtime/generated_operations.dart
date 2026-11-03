@@ -1414,7 +1414,7 @@ FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
     );
 
 MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
-  debugOptions: MapDebugFlag.fromRawValue(source.debug_options),
+  debugFlags: MapDebugFlag.fromRawValue(source.debug_flags),
   generation: source.generation,
   fullyLoaded: source.fully_loaded,
   renderingStatsViewEnabled: source.rendering_stats_view_enabled,
@@ -3634,10 +3634,10 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setDebugOptions(MapDebugFlag options) => _discard(
-    (arena, completion) => raw.mln_map_set_debug_options(
+  void setDebugFlags(MapDebugFlag flags) => _discard(
+    (arena, completion) => raw.mln_map_set_debug_flags(
       _handle.raw,
-      options.rawValue,
+      flags.rawValue,
       completion,
       nativeDiagnostic,
     ),
@@ -5225,14 +5225,14 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Draws debugging overlays, such as tile borders, on the map.
   ///
-  /// `options` replaces the overlays set before.
+  /// `flags` replaces the overlays set before.
   ///
-  /// See `mln_map_set_debug_options` in the
+  /// See `mln_map_set_debug_flags` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> setDebugOptions(MapDebugFlag options) => _command(
-    (arena, completion) => raw.mln_map_set_debug_options(
+  Future<CommandCompletion> setDebugFlags(MapDebugFlag flags) => _command(
+    (arena, completion) => raw.mln_map_set_debug_flags(
       _handle.raw,
-      options.rawValue,
+      flags.rawValue,
       completion,
       nativeDiagnostic,
     ),

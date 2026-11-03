@@ -507,7 +507,7 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_set_debug_options(map: Long, options: Int, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_set_debug_flags(map: Long, flags: Int, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_set_event_mask(map: Long, mask: Long, completion: Long, outDiagnostic: Long): Int
 

@@ -11,12 +11,12 @@ fn discarded_commands_are_fenced_and_sync_rejections_return_errors() {
     fixture
         .map()
         .discarding()
-        .set_debug_options(MapDebugFlag::TILE_BORDERS)
+        .set_debug_flags(MapDebugFlag::TILE_BORDERS)
         .unwrap();
     // A later command on the same map completes after the discarded one.
     wait_for(fixture.map().request_repaint());
     assert_eq!(
-        fixture.map().get_snapshot().unwrap().debug_options,
+        fixture.map().get_snapshot().unwrap().debug_flags,
         MapDebugFlag::TILE_BORDERS
     );
     let error = fixture

@@ -3714,7 +3714,7 @@ final class FreeCameraOptions extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapSnapshot extends _Value {
   const MapSnapshot({
-    this.debugOptions = MapDebugFlag.none,
+    this.debugFlags = MapDebugFlag.none,
     this.generation = 0,
     this.fullyLoaded = false,
     this.renderingStatsViewEnabled = false,
@@ -3727,7 +3727,7 @@ final class MapSnapshot extends _Value {
     this.freeCamera = const FreeCameraOptions(),
     this.view = const MapView(),
   });
-  final MapDebugFlag debugOptions;
+  final MapDebugFlag debugFlags;
 
   /// Grows with each change to the map's state.
   final int generation;
@@ -3748,7 +3748,7 @@ final class MapSnapshot extends _Value {
 
   @override
   List<Object?> get _members => [
-    debugOptions,
+    debugFlags,
     generation,
     fullyLoaded,
     renderingStatsViewEnabled,
@@ -3763,7 +3763,7 @@ final class MapSnapshot extends _Value {
   ];
   @override
   String toString() => _describe('MapSnapshot', const [
-    'debugOptions',
+    'debugFlags',
     'generation',
     'fullyLoaded',
     'renderingStatsViewEnabled',

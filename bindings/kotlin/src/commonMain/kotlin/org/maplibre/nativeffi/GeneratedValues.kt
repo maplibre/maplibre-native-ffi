@@ -2854,7 +2854,7 @@ public data class FreeCameraOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MapSnapshot(
-  public val debugOptions: MapDebugFlag,
+  public val debugFlags: MapDebugFlag,
   /** Grows with each change to the map's state. */
   public val generation: ULong,
   /** Whether the style and every resource that the view needs have loaded. */

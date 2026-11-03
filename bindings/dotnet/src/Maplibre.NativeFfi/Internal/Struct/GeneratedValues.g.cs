@@ -829,7 +829,7 @@ internal static unsafe class GeneratedValues
 
     internal static MapSnapshot CopyMapSnapshot(mln_map_snapshot value) =>
         new(
-            (global::Maplibre.NativeFfi.MapDebugFlag)value.debug_options,
+            (global::Maplibre.NativeFfi.MapDebugFlag)value.debug_flags,
             value.generation,
             value.fully_loaded != 0,
             value.rendering_stats_view_enabled != 0,

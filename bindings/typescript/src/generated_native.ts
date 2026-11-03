@@ -461,9 +461,9 @@ export interface NativeOperations {
     message: string,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_set_debug_options(
+  mln_map_set_debug_flags(
     map: bigint,
-    options: MapDebugFlag,
+    flags: MapDebugFlag,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_event_mask(

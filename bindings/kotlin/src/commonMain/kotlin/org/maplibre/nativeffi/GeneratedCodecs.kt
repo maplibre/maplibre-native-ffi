@@ -1213,7 +1213,7 @@ internal fun readCameraQueryResult(source: Long): CameraQueryResult =
 
 internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
-    debugOptions = MapDebugFlag(readU32(source + 4)),
+    debugFlags = MapDebugFlag(readU32(source + 4)),
     generation = readU64(source + 8),
     fullyLoaded = readBool(source + 16),
     renderingStatsViewEnabled = readBool(source + 17),

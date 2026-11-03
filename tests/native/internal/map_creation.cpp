@@ -84,7 +84,7 @@ void work_queued_on_a_failed_map_reports_invalid_state() {
     runtime, &options, &map, &created.descriptor, nullptr
   ));
   auto command = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &command.descriptor, nullptr));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &command.descriptor, nullptr));
   auto still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, nullptr));
   const auto status = mln_test_completion_settle(&created);

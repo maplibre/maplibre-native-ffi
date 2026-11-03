@@ -1045,12 +1045,12 @@ static jint mln_map_set_custom_vector_source_tile_error_jni(
   );
 }
 
-static jint mln_map_set_debug_options_jni(
-  JNIEnv* env, jclass type, jlong map, jint options, jlong completion,
+static jint mln_map_set_debug_flags_jni(
+  JNIEnv* env, jclass type, jlong map, jint flags, jlong completion,
   jlong out_diagnostic
 ) {
-  return (jint)mln_map_set_debug_options(
-    (mln_map)map, (mln_map_debug_flags)options,
+  return (jint)mln_map_set_debug_flags(
+    (mln_map)map, (mln_map_debug_flags)flags,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2287,8 +2287,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_set_custom_vector_source_tile_data_jni},
   {"mln_map_set_custom_vector_source_tile_error", "(JJJJJJ)I",
    (void*)mln_map_set_custom_vector_source_tile_error_jni},
-  {"mln_map_set_debug_options", "(JIJJ)I",
-   (void*)mln_map_set_debug_options_jni},
+  {"mln_map_set_debug_flags", "(JIJJ)I", (void*)mln_map_set_debug_flags_jni},
   {"mln_map_set_event_mask", "(JJJJ)I", (void*)mln_map_set_event_mask_jni},
   {"mln_map_set_feature_state", "(JJJJJ)I",
    (void*)mln_map_set_feature_state_jni},
@@ -2643,8 +2642,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_set_custom_vector_source_tile_data_jni},
   {"mln_map_set_custom_vector_source_tile_error", "(JJJJJJ)I",
    (void*)mln_map_set_custom_vector_source_tile_error_jni},
-  {"mln_map_set_debug_options", "(JIJJ)I",
-   (void*)mln_map_set_debug_options_jni},
+  {"mln_map_set_debug_flags", "(JIJJ)I", (void*)mln_map_set_debug_flags_jni},
   {"mln_map_set_event_mask", "(JJJJ)I", (void*)mln_map_set_event_mask_jni},
   {"mln_map_set_feature_state", "(JJJJJ)I",
    (void*)mln_map_set_feature_state_jni},

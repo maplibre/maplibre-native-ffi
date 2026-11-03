@@ -6,11 +6,11 @@ const support = @import("fixture.zig");
 test "discarded commands are fenced and synchronous rejection returns an error" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    try fixture.map.discarding().setDebugOptions(.{ .tile_borders = true }, null);
+    try fixture.map.discarding().setDebugFlags(.{ .tile_borders = true }, null);
     // A later command on the same map completes after the discarded one.
     _ = try support.resolve(try fixture.map.requestRepaint(null));
     const snapshot = try fixture.map.getSnapshot(null);
-    try testing.expect(snapshot.debug_options.tile_borders);
+    try testing.expect(snapshot.debug_flags.tile_borders);
     try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8 }, null));
 }
 

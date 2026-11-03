@@ -51,18 +51,18 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
   mln_map_snapshot snapshot = read_snapshot(map);
   uint64_t previous = snapshot.generation;
 
-  const uint32_t every_debug_option =
+  const uint32_t every_debug_flag =
     MLN_MAP_DEBUG_TILE_BORDERS | MLN_MAP_DEBUG_PARSE_STATUS |
     MLN_MAP_DEBUG_TIMESTAMPS | MLN_MAP_DEBUG_COLLISION |
     MLN_MAP_DEBUG_OVERDRAW | MLN_MAP_DEBUG_STENCIL_CLIP |
     MLN_MAP_DEBUG_DEPTH_BUFFER;
   for (size_t pass = 0; pass < 2; pass += 1) {
-    const uint32_t debug = pass == 0 ? every_debug_option : 0;
+    const uint32_t debug = pass == 0 ? every_debug_flag : 0;
     COMMIT(
-      "debug options",
-      mln_map_set_debug_options(map, debug, &completion.descriptor, NULL)
+      "debug flags",
+      mln_map_set_debug_flags(map, debug, &completion.descriptor, NULL)
     );
-    TEST_ASSERT_EQUAL_UINT32(debug, snapshot.debug_options);
+    TEST_ASSERT_EQUAL_UINT32(debug, snapshot.debug_flags);
     const bool stats = pass == 0;
     COMMIT(
       "rendering stats view", mln_map_set_rendering_stats_view_enabled(
@@ -427,24 +427,22 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   MLN_TEST_INVALID(mln_map_set_viewport_options(map, NULL, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_tile_options(map, NULL, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_projection_mode(map, NULL, &discard, NULL));
-  MLN_TEST_INVALID(
-    mln_map_set_debug_options(MLN_HANDLE_NULL, 0, &discard, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_set_debug_flags(MLN_HANDLE_NULL, 0, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_rendering_stats_view_enabled(
     MLN_HANDLE_NULL, true, &discard, NULL
   ));
   MLN_TEST_INVALID(mln_map_dump_debug_logs(MLN_HANDLE_NULL, &discard, NULL));
-  MLN_TEST_INVALID(mln_map_set_debug_options(
+  MLN_TEST_INVALID(mln_map_set_debug_flags(
     map, UINT32_C(1) << 31, &discard, MLN_TEST_DIAGNOSTIC
   ));
   TEST_ASSERT_EQUAL_STRING(
-    "debug options contain unknown bits", mln_test_last_error()
+    "debug flags contain unknown bits", mln_test_last_error()
   );
 
   // A rejected command publishes nothing, so the snapshot keeps the defaults.
   MLN_TEST_OK(mln_test_map_fence(map));
   const mln_map_snapshot snapshot = read_snapshot(map);
-  TEST_ASSERT_EQUAL_UINT32(0, snapshot.debug_options);
+  TEST_ASSERT_EQUAL_UINT32(0, snapshot.debug_flags);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_NORTH_ORIENTATION_UP, snapshot.view.viewport.north_orientation
   );
@@ -561,7 +559,7 @@ static void submit_commands(void* argument) {
   for (size_t index = 0; index < commands_per_thread; index += 1) {
     mln_test_completion completion = mln_test_completion_default(0);
     mln_status status =
-      mln_map_set_debug_options(state->map, 0, &completion.descriptor, NULL);
+      mln_map_set_debug_flags(state->map, 0, &completion.descriptor, NULL);
     if (status == MLN_STATUS_OK) {
       status = mln_test_completion_finish(&completion);
       state->dispositions[index] = mln_test_completion_disposition(&completion);

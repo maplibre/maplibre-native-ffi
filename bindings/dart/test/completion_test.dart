@@ -18,10 +18,10 @@ void main() {
     () async {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
-      map.discarding.setDebugOptions(MapDebugFlag.tileBorders);
+      map.discarding.setDebugFlags(MapDebugFlag.tileBorders);
       // A later command on the same map completes after the discarded one.
       await within(map.requestRepaint(), 'a later command on the map');
-      expect(map.getSnapshot().debugOptions, MapDebugFlag.tileBorders);
+      expect(map.getSnapshot().debugFlags, MapDebugFlag.tileBorders);
       expect(
         () => map.discarding.resize(LogicalSize(width: 0, height: 8)),
         throwsA(

@@ -388,7 +388,7 @@ internal unsafe struct mln_map_options
 internal unsafe struct mln_map_snapshot
 {
     public uint size;
-    public uint debug_options;
+    public uint debug_flags;
     public ulong generation;
     public byte fully_loaded;
     public byte rendering_stats_view_enabled;

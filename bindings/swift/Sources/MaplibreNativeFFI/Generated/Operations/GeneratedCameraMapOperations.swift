@@ -245,16 +245,16 @@ public extension MapHandle {
 
   /// Draws debugging overlays, such as tile borders, on the map.
   ///
-  /// `options` replaces the overlays set before.
+  /// `flags` replaces the overlays set before.
   ///
-  /// See `mln_map_set_debug_options` in the
+  /// See `mln_map_set_debug_flags` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func setDebugOptions(_ bindingArg0: MapDebugFlag) async throws
+  func setDebugFlags(_ bindingArg0: MapDebugFlag) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_debug_options(
+      mln_map_set_debug_flags(
         raw,
         bindingArg0.rawValue,
         completion,
@@ -434,8 +434,8 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setDebugOptions(_ bindingArg0: MapDebugFlag) throws {
-    try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_debug_options(
+  func setDebugFlags(_ bindingArg0: MapDebugFlag) throws {
+    try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_debug_flags(
       raw,
       bindingArg0.rawValue,
       nil,

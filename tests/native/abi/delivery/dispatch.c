@@ -238,7 +238,7 @@ static void reenter(void* user_data, const mln_completion_result* result) {
   mln_test_thread_join(thread);
   const mln_completion later =
     dispatched_completion(state->queue, record_later, state, NULL);
-  state->submitted = mln_map_set_debug_options(state->map, 0, &later, NULL);
+  state->submitted = mln_map_set_debug_flags(state->map, 0, &later, NULL);
   // A later completion on the map follows the queued one.
   state->fenced = mln_test_map_fence(state->map);
 }
@@ -253,7 +253,7 @@ static void a_dispatch_inside_a_call_is_busy(void) {
   state.map = mln_test_create_map(runtime);
   const mln_completion first =
     dispatched_completion(queue.handle, reenter, &state, NULL);
-  MLN_TEST_OK(mln_map_set_debug_options(state.map, 0, &first, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(state.map, 0, &first, NULL));
   MLN_TEST_OK(mln_test_map_fence(state.map));
 
   MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
@@ -308,8 +308,8 @@ static void a_call_that_releases_the_queue_abandons_the_rest(void) {
   );
   const mln_completion second =
     dispatched_completion(queue.handle, record_second, &state, release_second);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &first, NULL));
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &second, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &first, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &second, NULL));
   MLN_TEST_OK(mln_test_map_fence(map));
 
   MLN_TEST_OK(mln_delivery_queue_dispatch(queue.handle, NULL));
@@ -362,7 +362,7 @@ static void a_call_may_dispose_its_owners(void) {
   );
   const mln_completion completion =
     dispatched_completion(queue.handle, dispose_owners, &owner, NULL);
-  MLN_TEST_OK(mln_map_set_debug_options(owner.map, 0, &completion, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(owner.map, 0, &completion, NULL));
 
   dispatch_until(queue.handle, &owner.log, 'r');
   MLN_TEST_OK(owner.map_disposed);

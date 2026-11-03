@@ -39,10 +39,10 @@ private struct ConversionFailure: Error {}
 @Test func discardedCommandsAreFencedAndSynchronousRejectionThrows(
 ) async throws {
   try await withMapFixture { fixture in
-    try fixture.map.discarding.setDebugOptions(.tileBorders)
+    try fixture.map.discarding.setDebugFlags(.tileBorders)
     // A later command on the same map completes after the discarded one.
     _ = try await fixture.map.requestRepaint()
-    #expect(try fixture.map.getSnapshot().debugOptions == .tileBorders)
+    #expect(try fixture.map.getSnapshot().debugFlags == .tileBorders)
     #expect(throws: MaplibreError.self) {
       try fixture.map.discarding.resize(
         logicalSize: LogicalSize(width: 0, height: 8)

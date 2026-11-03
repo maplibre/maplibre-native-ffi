@@ -815,7 +815,7 @@ typedef struct mln_map_tile_options {
 /** A map's state, as mln_map_get_snapshot() reads it. */
 typedef struct mln_map_snapshot {
   uint32_t size;
-  mln_map_debug_flags debug_options;
+  mln_map_debug_flags debug_flags;
   /** Grows with each change to the map's state. */
   uint64_t generation;
   /** Whether the style and every resource that the view needs have loaded. */

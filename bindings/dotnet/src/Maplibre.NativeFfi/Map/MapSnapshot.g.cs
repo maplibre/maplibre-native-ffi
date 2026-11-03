@@ -19,7 +19,7 @@ namespace Maplibre.NativeFfi;
 /// Counts the render updates that the map has made for its render session.
 /// </param>
 public readonly partial record struct MapSnapshot(
-    MapDebugFlag DebugOptions,
+    MapDebugFlag DebugFlags,
     ulong Generation,
     bool FullyLoaded,
     bool RenderingStatsViewEnabled,

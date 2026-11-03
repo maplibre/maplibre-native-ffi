@@ -549,7 +549,7 @@ final class mln_map_snapshot extends Struct {
   @Uint32()
   external int size;
   @Uint32()
-  external int debug_options;
+  external int debug_flags;
   @Uint64()
   external int generation;
   @Bool()
@@ -3510,9 +3510,9 @@ external int mln_map_set_custom_vector_source_tile_error(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_set_debug_options(
+external int mln_map_set_debug_flags(
   int map,
-  int options,
+  int flags,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

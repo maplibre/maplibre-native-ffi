@@ -20,11 +20,11 @@ extern "C" {
 /**
  * Draws debugging overlays, such as tile borders, on the map.
  *
- * `options` replaces the overlays set before.
+ * `flags` replaces the overlays set before.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_debug_options(
-  mln_map map, mln_map_debug_flags options, const mln_completion* completion,
+MLN_API mln_status mln_map_set_debug_flags(
+  mln_map map, mln_map_debug_flags flags, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /** Shows or hides an overlay of rendering statistics on the map. */
