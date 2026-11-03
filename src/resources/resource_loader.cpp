@@ -392,6 +392,103 @@ class AbiNetworkFileSource final : public mln::FileSource {
   std::shared_ptr<mln::FileSource> native_;
 };
 
+// MapLibre's style loader ignores a style response with no content (204) or
+// not modified (304), as one that revalidates a style an earlier response for
+// the request delivered. When no earlier response delivered one, the style load
+// would never end, so this adapter fails such a response instead. A 304 that
+// revalidates withheld cached bytes arrives with those bytes, as a response
+// with data. Every other response and resource kind passes through.
+class StyleResponseGuard final : public mln::FileSource {
+ public:
+  explicit StyleResponseGuard(std::unique_ptr<mln::FileSource> inner)
+      : inner_(std::move(inner)) {}
+
+  auto request(const mln::Resource& resource, Callback callback)
+    -> std::unique_ptr<mln::AsyncRequest> override {
+    if (resource.kind != mln::Resource::Kind::Style) {
+      return inner_->request(resource, std::move(callback));
+    }
+    // The request's callback is copied for each response and always runs on
+    // the requesting thread, so the flag is shared but needs no lock.
+    auto delivered = std::make_shared<bool>(false);
+    return inner_->request(
+      resource,
+      [callback = std::move(callback),
+       delivered](const mln::Response& response) -> void {
+        const auto empty = response.noContent || response.notModified;
+        if (response.error == nullptr && empty && !*delivered) {
+          auto failed = mln::Response{};
+          failed.error = std::make_unique<mln::Response::Error>(
+            mln::Response::Error::Reason::Other,
+            response.noContent
+              ? "the style request returned no content"
+              : "the style request returned not modified, but no earlier "
+                "response delivered the style"
+          );
+          callback(failed);
+          return;
+        }
+        if (response.error == nullptr && !empty) *delivered = true;
+        callback(response);
+      }
+    );
+  }
+
+  [[nodiscard]] auto canRequest(const mln::Resource& resource) const
+    -> bool override {
+    return inner_->canRequest(resource);
+  }
+
+  void forward(
+    const mln::Resource& resource, const mln::Response& response,
+    std::function<void()> callback
+  ) override {
+    inner_->forward(resource, response, std::move(callback));
+  }
+
+  [[nodiscard]] auto supportsCacheOnlyRequests() const -> bool override {
+    return inner_->supportsCacheOnlyRequests();
+  }
+
+  void pause() override { inner_->pause(); }
+
+  void resume() override { inner_->resume(); }
+
+  void setProperty(
+    const std::string& key, const mapbox::base::Value& value
+  ) override {
+    inner_->setProperty(key, value);
+  }
+
+  [[nodiscard]] auto getProperty(const std::string& key) const
+    -> mapbox::base::Value override {
+    return inner_->getProperty(key);
+  }
+
+  void setResourceTransform(mln::ResourceTransform transform) override {
+    inner_->setResourceTransform(std::move(transform));
+  }
+
+  void setResourceOptions(mln::ResourceOptions options) override {
+    inner_->setResourceOptions(std::move(options));
+  }
+
+  auto getResourceOptions() -> mln::ResourceOptions override {
+    return inner_->getResourceOptions();
+  }
+
+  void setClientOptions(mln::ClientOptions options) override {
+    inner_->setClientOptions(std::move(options));
+  }
+
+  auto getClientOptions() -> mln::ClientOptions override {
+    return inner_->getClientOptions();
+  }
+
+ private:
+  std::unique_ptr<mln::FileSource> inner_;
+};
+
 }  // namespace
 
 auto make_network_file_source(
@@ -434,8 +531,10 @@ auto make_main_resource_loader(
   const mln::ClientOptions& client_options
 ) noexcept -> std::unique_ptr<mln::FileSource> {
   try {
-    return std::make_unique<mln::MainResourceLoader>(
-      resource_options, client_options
+    return std::make_unique<StyleResponseGuard>(
+      std::make_unique<mln::MainResourceLoader>(
+        resource_options, client_options
+      )
     );
   } catch (const std::exception& exception) {
     set_thread_error(exception);

@@ -140,7 +140,7 @@ class AndroidHttpTransportTest {
       )
       .use { server ->
         withMap(provider = nativeHttp()) {
-          map.setStyleUrl(server.url("/held.json")).awaitWithin("the style command")
+          map.discarding.setStyleUrl(server.url("/held.json"))
           server.awaitRequest("/held.json")
           map.release().awaitWithin("the release of the map")
         }
@@ -232,7 +232,7 @@ class AndroidHttpTransportTest {
   /** Loads [url], which must fail, and returns the failure's message. */
   private suspend fun loadingFailure(url: String): String =
     withMap(provider = nativeHttp()) {
-      map.setStyleUrl(url).awaitWithin("the style command for $url")
+      map.discarding.setStyleUrl(url)
       runtimeFixture
         .awaitEvent("the loading failure for $url") {
           it.sourceType == RuntimeEventSourceType.MAP &&

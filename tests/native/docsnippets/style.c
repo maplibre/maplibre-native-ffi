@@ -23,17 +23,32 @@ static mln_premultiplied_rgba8_image draw_image(
   return image;
 }
 
+static void add_sources_and_layers(void) {}
+
+// #region load
+static void on_style_loaded(
+  void*, const mln_completion_result* result
+) {
+  if (result->status == MLN_STATUS_OK) {
+    add_sources_and_layers();
+  }
+}
+// #endregion load
+
 void mln_doc_style(const uint8_t* pixels);
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 void mln_doc_style(const uint8_t* pixels) {
   // #region load
+  const mln_completion loaded = {
+    .size = sizeof(mln_completion), .callback = on_style_loaded
+  };
   mln_map_set_style_url(
     map,
     mln_buffer_view_from_cstr(
       "https://demotiles.maplibre.org/style.json"
     ),
-    NULL, NULL
+    &loaded, NULL
   );
   // #endregion load
 

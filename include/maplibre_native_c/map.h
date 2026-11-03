@@ -1171,9 +1171,23 @@ mln_map_dispose(mln_map map, mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 /**
  * Loads the map's style from `url`.
  *
- * The style loads in the background, and MLN_RUNTIME_EVENT_MAP_STYLE_LOADED or
- * MLN_RUNTIME_EVENT_MAP_LOADING_FAILED reports how the load ends. Sources,
- * layers, and images added before the style loads are lost when it loads.
+ * The command completes once the style document has loaded and parsed. The
+ * style's sources, sprites, and glyphs then load in the background.
+ *
+ * The map's style is loaded from the time a style document parses until the
+ * next call to this function. It isn't loaded before the map's first style
+ * parses, while a style URL loads, or after a style URL fails to load. While
+ * the style isn't loaded, the commands that change it complete with
+ * MLN_STATUS_INVALID_STATE, because the next style to parse would replace
+ * their changes. To change a new map's style without a style document, first
+ * load an empty style, such as `{"version":8,"sources":{},"layers":[]}`.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when the style document fails to load or isn't a
+ *   valid style.
+ * - MLN_STATUS_CANCELLED when the map is released, or this function or
+ *   mln_map_set_style_json() loads another style, before the style document
+ *   parses.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_url(
@@ -1184,10 +1198,13 @@ MLN_API mln_status mln_map_set_style_url(
 /**
  * Loads the map's style from `json`.
  *
- * The style's sources, sprites, and glyphs load in the background.
+ * The command completes once the style has parsed, and the map's style is then
+ * loaded, as mln_map_set_style_url() describes. The style's sources, sprites,
+ * and glyphs load in the background.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when `json` isn't a valid style.
+ * - MLN_STATUS_NATIVE_ERROR when `json` isn't a valid style. The map keeps its
+ *   current style.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_json(

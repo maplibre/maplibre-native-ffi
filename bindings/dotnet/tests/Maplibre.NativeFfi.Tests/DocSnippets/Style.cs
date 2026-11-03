@@ -12,13 +12,13 @@ internal static class Style
     ) => new(1, 1, 4, [255, 0, 0, 255]);
 
     // pixels holds 16 x 16 premultiplied RGBA pixels.
-    internal static void Run(
+    internal static async Task Run(
         MapHandle map,
         ImmutableArray<byte> pixels
     )
     {
         // #region load
-        map.Discarding.SetStyleUrl(
+        await map.SetStyleUrlAsync(
             "https://demotiles.maplibre.org/style.json"
         );
         // #endregion load

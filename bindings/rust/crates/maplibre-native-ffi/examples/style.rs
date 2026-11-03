@@ -12,10 +12,10 @@ fn draw_image(_image_id: &str) -> PremultipliedRgba8Image<'static> {
 }
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
-fn style(map: &MapHandle, pixels: &[u8]) -> Result<()> {
+async fn style(map: &MapHandle, pixels: &[u8]) -> Result<()> {
     // #region load
-    map.discarding()
-        .set_style_url("https://demotiles.maplibre.org/style.json")?;
+    map.set_style_url("https://demotiles.maplibre.org/style.json")?
+        .await?;
     // #endregion load
 
     // #region add

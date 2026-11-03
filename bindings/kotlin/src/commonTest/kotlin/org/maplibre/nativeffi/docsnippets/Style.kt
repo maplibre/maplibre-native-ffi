@@ -18,11 +18,9 @@ private fun drawImage(imageId: String): PremultipliedRgba8Image =
   )
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
-private fun style(map: MapHandle, pixels: ByteArray) {
+private suspend fun style(map: MapHandle, pixels: ByteArray) {
   // #region load
-  map.discarding.setStyleUrl(
-    "https://demotiles.maplibre.org/style.json",
-  )
+  map.setStyleUrl("https://demotiles.maplibre.org/style.json").await()
   // #endregion load
 
   // #region add

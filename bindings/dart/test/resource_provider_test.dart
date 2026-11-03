@@ -18,7 +18,7 @@ void main() {
     );
     final map = await fixture.openMap();
 
-    await expectCommitted(map.setStyleUrl(styleUrl));
+    final loaded = map.setStyleUrl(styleUrl);
     final (request, handle) = await within(handed.future, 'the provider');
     expect(request.requestedUrl, styleUrl);
     expect(request.kind, ResourceKind.style);
@@ -42,7 +42,7 @@ void main() {
       ),
     );
     handle.complete(emptyStyleResponse);
-    await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded);
+    await expectCommitted(loaded);
 
     // The accepted answer consumed the handle, so closing it does nothing and
     // native refuses a second answer or any other call on it.
@@ -80,13 +80,18 @@ void main() {
       )!;
       final map = await fixture.openMap();
 
-      await expectCommitted(map.setStyleUrl(styleUrl));
       // The binding closes the handle the throwing callback abandoned, which
       // fails the request instead of leaving the style load waiting.
-      final failure = await fixture.awaitEventType(
-        RuntimeEventType.mapLoadingFailed,
+      await expectLater(
+        within(map.setStyleUrl(styleUrl), 'a command'),
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.diagnostic,
+            'diagnostic',
+            contains('released without a response'),
+          ),
+        ),
       );
-      expect(failure.message, contains('released without a response'));
       expect(zoneErrors, [isA<StateError>()]);
     },
   );
@@ -110,7 +115,7 @@ void main() {
       (error, _) => zoneErrors.add(error),
     )!;
     final map = await fixture.openMap();
-    await expectCommitted(map.setStyleUrl(styleUrl));
+    map.discarding.setStyleUrl(styleUrl);
     final handle = await within(handed.future, 'the provider');
 
     await within(map.close(), 'map close');

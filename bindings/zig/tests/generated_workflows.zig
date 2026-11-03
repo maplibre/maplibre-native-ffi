@@ -32,7 +32,7 @@ test "a provider can deinit its request inside its callback" {
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };
     try fixture.setProvider(.init(&probe, ProviderProbe.provide, null));
-    _ = try support.resolve(try fixture.map.setStyleUrl("binding-test://style", null));
+    try fixture.map.discarding().setStyleUrl("binding-test://style", null);
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
     try support.expectCommitted(try fixture.runtime.clearResourceProvider(null));

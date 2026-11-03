@@ -233,6 +233,8 @@ pub const Map = struct {
     ///
     /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn addCustomGeometrySource(self: Map, source_id: []const u8, options: CustomGeometrySourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_custom_geometry_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
     }
@@ -246,6 +248,8 @@ pub const Map = struct {
     ///
     /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn addCustomVectorSource(self: Map, source_id: []const u8, options: CustomVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_custom_vector_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
     }
@@ -262,6 +266,8 @@ pub const Map = struct {
     ///
     /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn addGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
@@ -277,6 +283,8 @@ pub const Map = struct {
     ///
     /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn addImageSourceImage(self: Map, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_image_source_image", .handle, self, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, image });
     }
@@ -297,6 +305,8 @@ pub const Map = struct {
     ///   no source with the ID that the layer uses.
     /// - `error.AlreadyExists` when the style already has a layer with the new
     ///   layer's ID.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn addStyleLayerJson(self: Map, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_style_layer_json", .handle, self, call.command, null, diagnostic, .{ layer_json, before_layer_id });
     }
@@ -313,6 +323,8 @@ pub const Map = struct {
     ///
     /// - `error.AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn addStyleSourceJson(self: Map, source_id: []const u8, source_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_style_source_json", .handle, self, call.command, null, diagnostic, .{ source_id, source_json });
     }
@@ -852,6 +864,8 @@ pub const Map = struct {
     ///
     /// - `error.NotFound` when the style has no layer named `layer_id` or
     ///   `before_layer_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn moveStyleLayer(self: Map, layer_id: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_move_style_layer", .handle, self, call.command, null, diagnostic, .{ layer_id, before_layer_id });
     }
@@ -885,6 +899,8 @@ pub const Map = struct {
     /// Errors:
     ///
     /// - `error.NotFound` when the style has no image named `image_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn removeStyleImage(self: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_remove_style_image", .handle, self, call.command, null, diagnostic, .{image_id});
     }
@@ -897,6 +913,8 @@ pub const Map = struct {
     /// Errors:
     ///
     /// - `error.NotFound` when the style has no layer named `layer_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn removeStyleLayer(self: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_remove_style_layer", .handle, self, call.command, null, diagnostic, .{layer_id});
     }
@@ -909,7 +927,8 @@ pub const Map = struct {
     /// Errors:
     ///
     /// - `error.NotFound` when the style has no source named `source_id`.
-    /// - `error.InvalidState` when a layer still uses the source.
+    /// - `error.InvalidState` when a layer still uses the source, or while the
+    ///   style isn't loaded, as `Map.setStyleUrl()` describes.
     pub fn removeStyleSource(self: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_remove_style_source", .handle, self, call.command, null, diagnostic, .{source_id});
     }
@@ -1084,6 +1103,8 @@ pub const Map = struct {
     /// - `error.NotFound` when the style has no source named `source_id`.
     /// - `error.InvalidArgument` when the source named `source_id` isn't a GeoJSON
     ///   source, or `data` was prepared with other options.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
@@ -1103,6 +1124,8 @@ pub const Map = struct {
     /// - `error.NotFound` when the style has no source named `source_id`.
     /// - `error.InvalidArgument` when the source named `source_id` isn't a GeoJSON
     ///   source.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setGeoJsonSourceSynchronousTiling(self: Map, source_id: []const u8, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_geo_json_source_synchronous_tiling", .handle, self, call.command, null, diagnostic, .{ source_id, enabled });
     }
@@ -1117,6 +1140,8 @@ pub const Map = struct {
     /// - `error.NotFound` when the style has no source named `source_id`.
     /// - `error.InvalidArgument` when the source named `source_id` isn't a GeoJSON
     ///   source.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setGeoJsonSourceUrl(self: Map, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_geo_json_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url });
     }
@@ -1129,9 +1154,8 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.InvalidState` until the map has parsed its style, which
-    ///   `RuntimeEventType.map_style_loaded` reports, and again while it loads a
-    ///   new style URL.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setGlobalStateProperty(self: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_global_state_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
     }
@@ -1148,6 +1172,8 @@ pub const Map = struct {
     /// - `error.NotFound` when the style has no source named `source_id`.
     /// - `error.InvalidArgument` when the source named `source_id` isn't an image
     ///   source.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setImageSourceCoordinates(self: Map, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_image_source_coordinates", .handle, self, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len });
     }
@@ -1162,6 +1188,8 @@ pub const Map = struct {
     /// - `error.NotFound` when the style has no source named `source_id`.
     /// - `error.InvalidArgument` when the source named `source_id` isn't an image
     ///   source.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setImageSourceImage(self: Map, source_id: []const u8, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_image_source_image", .handle, self, call.command, null, diagnostic, .{ source_id, image });
     }
@@ -1176,6 +1204,8 @@ pub const Map = struct {
     /// - `error.NotFound` when the style has no source named `source_id`.
     /// - `error.InvalidArgument` when the source named `source_id` isn't an image
     ///   source.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setImageSourceUrl(self: Map, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_image_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url });
     }
@@ -1203,20 +1233,28 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setStyleImage(self: Map, allocator: std.mem.Allocator, image_id: []const u8, image: PremultipliedRgba8Image, options: ?StyleImageOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_image", .handle, self, call.command, allocator, diagnostic, .{ image_id, image, options });
     }
 
     /// Loads the map's style from `json`.
     ///
-    /// The style's sources, sprites, and glyphs load in the background.
+    /// The command completes once the style has parsed, and the map's style is then
+    /// loaded, as `Map.setStyleUrl()` describes. The style's sources, sprites, and
+    /// glyphs load in the background.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     ///
     /// Errors:
     ///
-    /// - `error.NativeError` when `json` isn't a valid style.
+    /// - `error.NativeError` when `json` isn't a valid style. The map keeps its
+    ///   current style.
     pub fn setStyleJson(self: Map, json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_json", .handle, self, call.command, null, diagnostic, .{json});
     }
@@ -1234,6 +1272,8 @@ pub const Map = struct {
     /// Errors:
     ///
     /// - `error.NotFound` when the style has no layer named `layer_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setStyleLayerProperty(self: Map, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_layer_property", .handle, self, call.command, null, diagnostic, .{ layer_id, property_name, value });
     }
@@ -1243,6 +1283,11 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_style_light_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setStyleLightJson(self: Map, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_light_json", .handle, self, call.command, null, diagnostic, .{light_json});
     }
@@ -1251,6 +1296,11 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setStyleLightProperty(self: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_light_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
     }
@@ -1266,6 +1316,8 @@ pub const Map = struct {
     /// Errors:
     ///
     /// - `error.NotFound` when the style has no source named `source_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setStyleSourceVolatile(self: Map, source_id: []const u8, is_volatile: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_source_volatile", .handle, self, call.command, null, diagnostic, .{ source_id, is_volatile });
     }
@@ -1274,18 +1326,38 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
     pub fn setStyleTransitionOptions(self: Map, options: StyleTransitionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_transition_options", .handle, self, call.command, null, diagnostic, .{options});
     }
 
     /// Loads the map's style from `url`.
     ///
-    /// The style loads in the background, and `RuntimeEventType.map_style_loaded`
-    /// or `RuntimeEventType.map_loading_failed` reports how the load ends. Sources,
-    /// layers, and images added before the style loads are lost when it loads.
+    /// The command completes once the style document has loaded and parsed. The
+    /// style's sources, sprites, and glyphs then load in the background.
+    ///
+    /// The map's style is loaded from the time a style document parses until the
+    /// next call to this function. It isn't loaded before the map's first style
+    /// parses, while a style URL loads, or after a style URL fails to load. While
+    /// the style isn't loaded, the commands that change it complete with
+    /// `error.InvalidState`, because the next style to parse would replace their
+    /// changes. To change a new map's style without a style document, first load an
+    /// empty style, such as `{"version":8,"sources":{},"layers":[]}`.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.NativeError` when the style document fails to load or isn't a valid
+    ///   style.
+    /// - `error.Cancelled` when the map is released, or this function or
+    ///   `Map.setStyleJson()` loads another style, before the style document
+    ///   parses.
     pub fn setStyleUrl(self: Map, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_url", .handle, self, call.command, null, diagnostic, .{url});
     }

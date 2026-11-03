@@ -14,11 +14,9 @@ PremultipliedRgba8Image drawImage(String imageId) =>
     );
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
-void style(MapHandle map, Uint8List pixels) {
+Future<void> style(MapHandle map, Uint8List pixels) async {
   // #region load
-  map.discarding.setStyleUrl(
-    'https://demotiles.maplibre.org/style.json',
-  );
+  await map.setStyleUrl('https://demotiles.maplibre.org/style.json');
   // #endregion load
 
   // #region add

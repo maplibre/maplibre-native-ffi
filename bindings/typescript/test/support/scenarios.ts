@@ -43,7 +43,6 @@ export async function routeRequests(
   });
   const map = await fixture.openMap({ initialExtent: renderExtent });
   await bounded(map.setStyleUrl(`${scheme}://style.json`), "a command");
-  await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
   await bounded(
     map.addCustomGeometrySource("custom", {
       fetchTile: (_map, _sourceId, tile) =>
@@ -120,7 +119,8 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
   });
   liveWork.push(runtime, pending);
   await pendingReady;
-  await bounded(pending.setStyleUrl("exit://style.json"), "a command");
+  // The load waits for the held request, so its result is discarded.
+  pending.discarding.setStyleUrl("exit://style.json");
   // The provider callback holds nothing alive, so a bounded wait does.
   liveWork.push(await callbackArrival(held, "the held request"));
 

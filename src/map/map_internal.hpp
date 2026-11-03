@@ -71,6 +71,12 @@ struct MapObject {
   // otherwise releases it only fires when the mln::Map is destroyed — after
   // teardown already waits for submissions.
   std::function<void()> still_image_release_submission;
+  // Worker-owned. Set while a style URL load waits for its style to parse,
+  // with the completion of the command that started it, which is null when
+  // the caller passed none. The parse or a load failure completes it, and a
+  // newer style load or the map's release cancels it.
+  bool style_load_pending = false;
+  std::shared_ptr<Completion> style_load_completion;
   // Declared first so reverse-order destruction runs the release callbacks it
   // still owes after the mln::Map that could still reach a source is gone.
   std::shared_ptr<CallbackSourceRegistry> callback_sources;

@@ -65,7 +65,7 @@ static void set_image(
 
 static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   // Two rows of two pixels, each row padded to three pixels.
   const uint8_t padded[24] = {
     255, 0, 0,   255, 0,   255, 0,   255, 9, 9, 9, 9,
@@ -180,7 +180,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
 
 static void style_image_inputs_are_validated_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   const uint8_t pixel[4] = {0, 0, 0, 0};
   mln_premultiplied_rgba8_image image = {
     .size = sizeof(mln_premultiplied_rgba8_image)

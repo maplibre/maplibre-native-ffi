@@ -13,7 +13,6 @@ import {
   type ResourceRequestInfo,
   ResourceResponseStatus,
   type ResourceTransformRequestHandle,
-  RuntimeEventType,
   Status,
   UrlMatchFlag,
 } from "../src/index.ts";
@@ -84,7 +83,6 @@ test(
     // A request that no route matches passes through to the network.
     const passed = await fixture.openMap();
     await bounded(passed.setStyleUrl(`${origin.url}/style.json`), "a command");
-    await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, passed.id);
     assert.deepEqual(
       (await origin.requests()).map((request) => request.path),
       ["/style.json"],
@@ -93,7 +91,7 @@ test(
     // A claimed request arrives as a handle that answers it after the
     // provider callback returned.
     const map = await fixture.openMap();
-    await bounded(map.setStyleUrl(claimed), "a command");
+    const loaded = map.setStyleUrl(claimed);
     const handle = await callbackArrival(handed, "the provider");
     assert.deepEqual(requests, [claimed]);
     assert.equal(handle.isCancelled(), false);
@@ -110,7 +108,7 @@ test(
       isStatus(Status.invalidArgument),
     );
     handle.complete(styleResponse());
-    await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
+    await bounded(loaded, "the style load");
 
     // The accepted answer consumed the handle, so closing it does nothing.
     assert.equal(handle.isClosed, true);
@@ -132,10 +130,12 @@ test("a provider callback error is reported and fails the request", async () => 
   });
   const map = await fixture.openMap();
 
-  await bounded(map.setStyleUrl(url), "a command");
   // The binding closes the handle that the throwing callback abandoned, which
   // fails the request instead of leaving the style load waiting.
-  await fixture.awaitEventType(RuntimeEventType.mapLoadingFailed, map.id);
+  await assert.rejects(
+    bounded(map.setStyleUrl(url), "a command"),
+    isStatus(Status.nativeError),
+  );
   assert.equal(errors.length, 1);
   assert.match(errors[0]!, /provider failed/);
 });
@@ -158,10 +158,12 @@ test("a provider whose callback getter throws fails the request", async () => {
   const map = await fixture.openMap();
   armed = true;
 
-  await bounded(map.setStyleUrl(url), "a command");
   // The adapter adopts the handle before it reads the callback, so the getter
   // that throws still leaves the request to be released.
-  await fixture.awaitEventType(RuntimeEventType.mapLoadingFailed, map.id);
+  await assert.rejects(
+    bounded(map.setStyleUrl(url), "a command"),
+    isStatus(Status.nativeError),
+  );
   assert.equal(errors.length, 1);
   assert.match(errors[0]!, /getter failed/);
 });
@@ -195,13 +197,13 @@ test(
     );
 
     const map = await fixture.openMap();
-    await bounded(map.setStyleUrl(requested), "a command");
+    const loaded = map.setStyleUrl(requested);
     // The request waits for its URL until the host answers from the event
     // loop, after the transform callback returned.
     const request = await callbackArrival(transformed, "the transform");
     assert.deepEqual(urls, [requested]);
     request.complete(`${origin.url}/style.json`);
-    await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
+    await bounded(loaded, "the style load");
     assert.deepEqual(
       (await origin.requests()).map((entry) => entry.path),
       ["/style.json"],
@@ -235,7 +237,6 @@ test(
     // command and the event.
     const map = await fixture.openMap();
     await bounded(map.setStyleUrl(`${origin.url}/style.json`), "a command");
-    await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
     const requests = await origin.requests();
     assert.equal(requests.length, 1);
     assert.equal(requests[0]!.path, "/style.json");
@@ -252,7 +253,7 @@ test("a cancel callback runs once for a request that teardown discards", async (
   const { handed, provider } = handoff();
   const fixture = await openRuntime({ provider: provider(url) });
   const map = await fixture.openMap();
-  await bounded(map.setStyleUrl(url), "a command");
+  map.discarding.setStyleUrl(url);
   const [, handle] = await callbackArrival(handed, "the provider");
   teardown(() => handle.close());
   const cancels: boolean[] = [];

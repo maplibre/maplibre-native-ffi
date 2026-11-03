@@ -4053,6 +4053,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addCustomGeometrySource(
     String sourceId,
     CustomGeometrySourceOptions options,
@@ -4080,6 +4082,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addCustomVectorSource(
     String sourceId,
     CustomVectorSourceOptions options,
@@ -4110,6 +4114,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addGeoJsonSourceData(
     String sourceId,
     GeoJsonSourceDataHandle data,
@@ -4134,6 +4140,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addImageSourceImage(
     String sourceId,
     List<LatLng> coordinates,
@@ -4172,6 +4180,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///   no source with the ID that the layer uses.
   /// - `Status.alreadyExists` when the style already has a layer with the new
   ///   layer's ID.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addStyleLayerJson(
     Object? layerJson,
     String beforeLayerId,
@@ -4197,6 +4207,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addStyleSourceJson(
     String sourceId,
     Object? sourceJson,
@@ -5142,6 +5154,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.notFound` when the style has no layer named `layerId` or
   ///   `beforeLayerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> moveStyleLayer(
     String layerId,
     String beforeLayerId,
@@ -5190,6 +5204,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no image named `imageId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> removeStyleImage(String imageId) => _command(
     (arena, completion) => raw.mln_map_remove_style_image(
       _handle.raw,
@@ -5207,6 +5223,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no layer named `layerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> removeStyleLayer(String layerId) => _command(
     (arena, completion) => raw.mln_map_remove_style_layer(
       _handle.raw,
@@ -5224,7 +5242,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no source named `sourceId`.
-  /// - `Status.invalidState` when a layer still uses the source.
+  /// - `Status.invalidState` when a layer still uses the source, or while the
+  ///   style isn't loaded, as `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> removeStyleSource(String sourceId) => _command(
     (arena, completion) => raw.mln_map_remove_style_source(
       _handle.raw,
@@ -5490,6 +5509,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
   ///   GeoJSON source, or `data` was prepared with other options.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setGeoJsonSourceData(
     String sourceId,
     GeoJsonSourceDataHandle data,
@@ -5518,6 +5539,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
   ///   GeoJSON source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setGeoJsonSourceSynchronousTiling(
     String sourceId,
     bool enabled,
@@ -5541,6 +5564,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
   ///   GeoJSON source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setGeoJsonSourceUrl(String sourceId, String url) =>
       _command(
         (arena, completion) => raw.mln_map_set_geo_json_source_url(
@@ -5561,9 +5586,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidState` until the map has parsed its style, which
-  ///   `RuntimeEventType.mapStyleLoaded` reports, and again while it loads a
-  ///   new style URL.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setGlobalStateProperty(
     String propertyName,
     Object? value,
@@ -5589,6 +5613,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
   ///   source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setImageSourceCoordinates(
     String sourceId,
     List<LatLng> coordinates,
@@ -5619,6 +5645,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
   ///   source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setImageSourceImage(
     String sourceId,
     PremultipliedRgba8Image image,
@@ -5642,6 +5670,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
   ///   source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setImageSourceUrl(String sourceId, String url) =>
       _command(
         (arena, completion) => raw.mln_map_set_image_source_url(
@@ -5688,6 +5718,11 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setStyleImage(
     String imageId,
     PremultipliedRgba8Image image, {
@@ -5705,14 +5740,17 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Loads the map's style from `json`.
   ///
-  /// The style's sources, sprites, and glyphs load in the background.
+  /// The command completes once the style has parsed, and the map's style is
+  /// then loaded, as `MapHandle.setStyleUrl()` describes. The style's sources,
+  /// sprites, and glyphs load in the background.
   ///
   /// See `mln_map_set_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   ///
   /// Errors:
   ///
-  /// - `Status.nativeError` when `json` isn't a valid style.
+  /// - `Status.nativeError` when `json` isn't a valid style. The map keeps its
+  ///   current style.
   Future<CommandCompletion> setStyleJson(Object? json) => _command(
     (arena, completion) => raw.mln_map_set_style_json(
       _handle.raw,
@@ -5736,6 +5774,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no layer named `layerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setStyleLayerProperty(
     String layerId,
     String propertyName,
@@ -5756,6 +5796,11 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_style_light_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setStyleLightJson(Object? lightJson) => _command(
     (arena, completion) => raw.mln_map_set_style_light_json(
       _handle.raw,
@@ -5769,6 +5814,11 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_style_light_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setStyleLightProperty(
     String propertyName,
     Object? value,
@@ -5793,6 +5843,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setStyleSourceVolatile(
     String sourceId,
     bool isVolatile,
@@ -5810,6 +5862,11 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_style_transition_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setStyleTransitionOptions(
     StyleTransitionOptions options,
   ) => _command(
@@ -5823,12 +5880,27 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Loads the map's style from `url`.
   ///
-  /// The style loads in the background, and `RuntimeEventType.mapStyleLoaded`
-  /// or `RuntimeEventType.mapLoadingFailed` reports how the load ends. Sources,
-  /// layers, and images added before the style loads are lost when it loads.
+  /// The command completes once the style document has loaded and parsed. The
+  /// style's sources, sprites, and glyphs then load in the background.
+  ///
+  /// The map's style is loaded from the time a style document parses until the
+  /// next call to this function. It isn't loaded before the map's first style
+  /// parses, while a style URL loads, or after a style URL fails to load. While
+  /// the style isn't loaded, the commands that change it complete with
+  /// `Status.invalidState`, because the next style to parse would replace their
+  /// changes. To change a new map's style without a style document, first load
+  /// an empty style, such as `{"version":8,"sources":{},"layers":[]}`.
   ///
   /// See `mln_map_set_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.nativeError` when the style document fails to load or isn't a
+  ///   valid style.
+  /// - `Status.cancelled` when the map is released, or this function or
+  ///   `MapHandle.setStyleJson()` loads another style, before the style
+  ///   document parses.
   Future<CommandCompletion> setStyleUrl(String url) => _command(
     (arena, completion) => raw.mln_map_set_style_url(
       _handle.raw,

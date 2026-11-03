@@ -41,7 +41,8 @@ class ResourceCallbackTest {
   fun aCancelCallbackSurvivesACollectionAndRunsWhenNativeCancels() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
-      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+      // The load waits for the claimed request, so its result is discarded.
+      map.discarding.setStyleUrl(STYLE_URL)
       val request = claimed.awaitWithin("the provider to claim the request")
       try {
         val cancelled = CompletableDeferred<Unit>()
@@ -73,10 +74,11 @@ class ResourceCallbackTest {
     }
     try {
       withMap(provider = provider) {
-        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
         // The binding contains the exception and releases the request without a response, which
-        // MapLibre reports as the style's loading failure.
-        awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
+        // fails the style load.
+        assertFailsWithStatus(Status.NATIVE_ERROR) {
+          map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+        }
         loadStyle()
       }
     } finally {
@@ -92,7 +94,7 @@ class ResourceCallbackTest {
   fun aClaimedRequestCanBeAnsweredAfterTheProviderReturns() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
-      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+      val loaded = map.setStyleUrl(STYLE_URL)
       val request = claimed.awaitWithin("the provider to claim the request")
 
       // A response the C API cannot represent is refused and leaves the request answerable.
@@ -111,7 +113,7 @@ class ResourceCallbackTest {
         request.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
       assertFailsWithStatus(Status.INVALID_STATE) { request.passThrough() }
-      awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
+      loaded.awaitWithin("the style load")
     }
   }
 
@@ -129,7 +131,7 @@ class ResourceCallbackTest {
     // returned on MapLibre's: another thread on a threaded target, and a later task on the page.
     withMap(provider = denyingProvider(routes = NETWORK_URLS)) {
       runtime.setResourceTransform(transform).awaitWithin("the transform")
-      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+      map.discarding.setStyleUrl(STYLE_URL)
       val request = received.awaitWithin("the transform callback")
       request.complete(REWRITTEN_URL)
       // The accepted answer consumed the handle, so it reads as closed, and native refuses a
@@ -183,7 +185,7 @@ class ResourceCallbackTest {
       // A style outside the prefix matches only the tile route's URL, so it passes through to
       // native loading, which serves no custom scheme. The provider decides before the load
       // fails, so the failure shows that the provider never saw the request.
-      map.setStyleUrl(UNROUTED_STYLE_URL).awaitWithin("the unrouted style command")
+      map.discarding.setStyleUrl(UNROUTED_STYLE_URL)
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
       assertEquals(2, seen.load().size, "requests the provider saw: ${seen.load()}")
     }

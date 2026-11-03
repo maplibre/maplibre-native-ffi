@@ -15,7 +15,6 @@ import org.maplibre.nativeffi.ResourceRoute
 import org.maplibre.nativeffi.RuntimeEventSourceType
 import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.UrlMatchFlag
-import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -32,7 +31,7 @@ class AndroidTlsVerificationTest {
       val provider =
         denyingProvider(listOf(ResourceRoute(flags = UrlMatchFlag.GLOB, url = "http://**")))
       withMap(provider = provider) {
-        map.setStyleUrl("https://$HOST:${server.port}/style.json").awaitWithin("the style command")
+        map.discarding.setStyleUrl("https://$HOST:${server.port}/style.json")
         val failure =
           runtimeFixture.awaitEvent("the style failure") {
             it.sourceType == RuntimeEventSourceType.MAP &&

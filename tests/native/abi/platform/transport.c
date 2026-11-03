@@ -94,6 +94,46 @@ static void a_percent_encoded_file_url_loads_its_file(void) {
   remove_path(path);
 }
 
+// A file that is missing or that holds no valid style fails the style load
+// instead of leaving it waiting.
+static void a_missing_or_invalid_style_file_fails_the_load(void) {
+  char missing[1024];
+  mln_test_temp_path("missing style.json", missing, sizeof(missing));
+  char invalid[1024];
+  mln_test_temp_path("invalid style.json", invalid, sizeof(invalid));
+  FILE* file = open_for_writing(invalid);
+  TEST_ASSERT_NOT_NULL_MESSAGE(file, invalid);
+  static const char truncated_style[] = "{\"version\":8,";
+  TEST_ASSERT_EQUAL_size_t(
+    sizeof(truncated_style) - 1,
+    fwrite(truncated_style, 1, sizeof(truncated_style) - 1, file)
+  );
+  TEST_ASSERT_EQUAL_INT(0, fclose(file));
+  const char* const paths[] = {missing, invalid};
+
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  for (size_t index = 0; index < 2; index += 1) {
+    char url[4096];
+    file_url(paths[index], url, sizeof(url));
+    mln_test_completion load = mln_test_completion_default(0);
+    MLN_TEST_OK(mln_map_set_style_url(
+      map, mln_buffer_view_from_cstr(url), &load.descriptor, NULL
+    ));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&load), url
+    );
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+      MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&load),
+      url
+    );
+    mln_test_completion_destroy(&load);
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  remove_path(invalid);
+}
+
 static mln_map create_static_map(mln_runtime runtime) {
   mln_map_options options = mln_test_map_options();
   options.initial_extent =
@@ -372,6 +412,7 @@ static void an_unclassified_transport_error_fails_the_style(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_percent_encoded_file_url_loads_its_file);
+  RUN_TEST(a_missing_or_invalid_style_file_fails_the_load);
   RUN_TEST(a_local_pmtiles_archive_renders);
 #if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(the_http_transport_follows_each_status);

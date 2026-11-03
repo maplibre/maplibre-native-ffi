@@ -27,11 +27,20 @@ void main() {
     });
     final map = await fixture.openMap();
 
-    await expectCommitted(map.setStyleUrl(styleUrl));
+    final loaded = map.setStyleUrl(styleUrl);
     final request = await within(handed.future, 'the transform');
     request.complete('unsupported://rewritten-style.json');
     // Native loading cannot fetch the rewritten scheme.
-    await fixture.awaitEventType(RuntimeEventType.mapLoadingFailed);
+    await expectLater(
+      within(loaded, 'a command'),
+      throwsA(
+        isA<MaplibreException>().having(
+          (error) => error.status,
+          'status',
+          Status.nativeError,
+        ),
+      ),
+    );
     await fixture.runtime.clearResourceTransform();
   });
 }

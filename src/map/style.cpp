@@ -1946,12 +1946,9 @@ auto map_set_global_state_property(
   if (!native_value) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto& style = map_native(live).getStyle();
-  if (!style.isLoaded()) {
-    set_thread_error("style JSON has not loaded");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  style.setGlobalStateProperty(string_from_view(property_name), *native_value);
+  map_native(live).getStyle().setGlobalStateProperty(
+    string_from_view(property_name), *native_value
+  );
   return MLN_STATUS_OK;
 }
 

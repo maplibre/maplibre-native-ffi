@@ -3,6 +3,7 @@
 package docsnippets
 
 import (
+	"context"
 	"log"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
@@ -18,12 +19,15 @@ func drawImage(imageID string) maplibre.PremultipliedRgba8Image {
 }
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
-func style(m *maplibre.MapHandle, pixels []byte) error {
+func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	// #region load
-	err := m.Discarding().SetStyleUrl(
+	loaded, err := m.SetStyleUrl(
 		"https://demotiles.maplibre.org/style.json",
 	)
 	if err != nil {
+		return err
+	}
+	if _, err := loaded.Await(ctx); err != nil {
 		return err
 	}
 	// #endregion load
@@ -154,6 +158,6 @@ func styleEvents(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 
 // An example without an output comment compiles but never runs.
 func Example_style() {
-	_ = style(nil, nil)
+	_ = style(context.Background(), nil, nil)
 	_ = styleEvents(nil, nil)
 }
