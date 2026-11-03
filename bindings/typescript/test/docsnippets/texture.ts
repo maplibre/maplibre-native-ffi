@@ -35,7 +35,11 @@ export function drawFrame(): void {
   // Sample the texture, and wait for those reads to finish.
   frame.withVulkanTexture((texture) => drawMap(texture.imageView));
 
-  frame.release({ kind: GpuSyncKind.cpuComplete });
+  frame.release({
+    kind: GpuSyncKind.cpuComplete,
+    handle: 0n,
+    value: 0n,
+  });
   // #endregion acquire
 }
 

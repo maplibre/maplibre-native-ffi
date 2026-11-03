@@ -68,6 +68,7 @@ export async function offline(): Promise<void> {
         minZoom: 0,
         maxZoom: 6,
         pixelRatio: 1,
+        includeIdeographs: false,
       },
     },
     new TextEncoder().encode("Seattle"),

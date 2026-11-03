@@ -149,10 +149,10 @@ export const backend = buildBackend();
 const browser = backend === "webgl" || backend === "webgpu";
 
 export const renderSize = 32;
-export const renderLogicalSize: LogicalSize = {
+export const renderLogicalSize = {
   width: renderSize,
   height: renderSize,
-};
+} satisfies LogicalSize;
 export const renderExtent: LogicalExtent = {
   ...renderLogicalSize,
   scaleFactor: 1,

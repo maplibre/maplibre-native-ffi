@@ -150,7 +150,7 @@ test("a frame view expires with its scope and holds off release inside it", asyn
   const session = await frameSession(map);
   const frame = session.acquireFrame();
   assert.ok(frame, "the session exposed no frame");
-  const done = { kind: GpuSyncKind.cpuComplete };
+  const done = { kind: GpuSyncKind.cpuComplete, handle: 0n, value: 0n };
 
   // Reads a view's width, a plain value, and the texture object it lends.
   type Reader = { width(): number; texture(): unknown };
