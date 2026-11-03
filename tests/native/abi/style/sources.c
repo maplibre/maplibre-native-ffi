@@ -132,11 +132,10 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
     map, "unattributed",
     "{\"type\":\"vector\",\"tiles\":[\"fixture://a/{z}/{x}/{y}.mvt\"]}"
   );
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_url(
-    map, MLN_BUFFER_LITERAL("geojson"),
-    MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,
-    NULL
-  ));
+  add_source_json(
+    map, "geojson",
+    "{\"type\":\"geojson\",\"data\":\"fixture://first.geojson\"}"
+  );
   MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_url(
     map, MLN_BUFFER_LITERAL("geojson"),
     MLN_BUFFER_LITERAL("fixture://second.geojson"), &completion.descriptor, NULL
@@ -346,9 +345,11 @@ static void image_sources_take_corners_images_and_urls(void) {
   MLN_TEST_AWAIT_OK(mln_map_add_image_source_image(
     map, inline_image, corners, 4, &image, &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
-    map, remote_image, corners, 4, png, &completion.descriptor, NULL
-  ));
+  add_source_json(
+    map, "remote-image",
+    "{\"type\":\"image\",\"url\":\"fixture://image.png\","
+    "\"coordinates\":[[2,1],[3,1],[3,0],[2,0]]}"
+  );
   const source_copy probe = read_source(map, "inline-image");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, probe.info.type);
@@ -375,8 +376,8 @@ static void image_sources_take_corners_images_and_urls(void) {
     map, inline_image, moved, 3, &discard, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "must be 4", mln_map_add_image_source_url(
-                   map, MLN_BUFFER_LITERAL("one-corner"), moved, 1, png,
+    "must be 4", mln_map_add_image_source_image(
+                   map, MLN_BUFFER_LITERAL("one-corner"), moved, 1, &image,
                    &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
   );

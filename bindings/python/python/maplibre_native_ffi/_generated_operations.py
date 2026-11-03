@@ -374,21 +374,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.add_geo_json_source_data(source_id, data._native)
 
-    def add_geo_json_source_url(
-        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
-    ) -> Future[CommandCompletion]:
-        """Adds a GeoJSON source that loads its data from `url`.
-
-        See `mln_map_add_geo_json_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-
-        Errors:
-
-        - `Status.ALREADY_EXISTS` when the style already has a source named
-          `source_id`.
-        """
-        return self._native.add_geo_json_source_url(source_id, url, options)
-
     def add_image_source_image(
         self,
         source_id: str,
@@ -409,24 +394,6 @@ class _MapHandleOperations(GeneratedOperations):
           `source_id`.
         """
         return self._native.add_image_source_image(source_id, coordinates, image)
-
-    def add_image_source_url(
-        self, source_id: str, coordinates: Sequence[LatLng], url: str
-    ) -> Future[CommandCompletion]:
-        """Adds an image source that loads its image from `url`.
-
-        `coordinates` are the image's four corners, clockwise from the top
-        left.
-
-        See `mln_map_add_image_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-
-        Errors:
-
-        - `Status.ALREADY_EXISTS` when the style already has a source named
-          `source_id`.
-        """
-        return self._native.add_image_source_url(source_id, coordinates, url)
 
     def add_style_layer_json(
         self, layer_json: Any, before_layer_id: str
@@ -2988,16 +2955,6 @@ class MapHandleDiscarding:
         """
         return self._native._discard_add_geo_json_source_data(source_id, data._native)
 
-    def add_geo_json_source_url(
-        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
-    ) -> None:
-        """Adds a GeoJSON source that loads its data from `url`.
-
-        See `mln_map_add_geo_json_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_geo_json_source_url(source_id, url, options)
-
     def add_image_source_image(
         self,
         source_id: str,
@@ -3015,19 +2972,6 @@ class MapHandleDiscarding:
         return self._native._discard_add_image_source_image(
             source_id, coordinates, image
         )
-
-    def add_image_source_url(
-        self, source_id: str, coordinates: Sequence[LatLng], url: str
-    ) -> None:
-        """Adds an image source that loads its image from `url`.
-
-        `coordinates` are the image's four corners, clockwise from the top
-        left.
-
-        See `mln_map_add_image_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_add_image_source_url(source_id, coordinates, url)
 
     def add_style_layer_json(self, layer_json: Any, before_layer_id: str) -> None:
         """Adds a layer to the map's style.

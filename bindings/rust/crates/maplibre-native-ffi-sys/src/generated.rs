@@ -2062,29 +2062,12 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_geo_json_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        url: mln_buffer_view,
-        options: *const mln_geo_json_source_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_add_image_source_image(
         map: mln_map,
         source_id: mln_buffer_view,
         coordinates: *const mln_lat_lng,
         coordinate_count: usize,
         image: *const mln_premultiplied_rgba8_image,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_add_image_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        coordinates: *const mln_lat_lng,
-        coordinate_count: usize,
-        url: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

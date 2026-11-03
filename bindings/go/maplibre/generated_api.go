@@ -6251,19 +6251,6 @@ func (receiver *MapHandle) AddGeoJsonSourceData(sourceId string, data *GeoJsonSo
 	}, completionCommand)
 }
 
-// AddGeoJsonSourceUrl adds a GeoJSON source that loads its data from url.
-//
-// See mln_map_add_geo_json_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-//
-// Errors:
-//   - StatusAlreadyExists when the style already has a source named sourceId.
-func (receiver *MapHandle) AddGeoJsonSourceUrl(sourceId string, url string, options *GeoJsonSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geo_json_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), completion, diagnostic))
-	}, completionCommand)
-}
-
 // AddImageSourceImage adds an image source that shows image.
 //
 // coordinates are the image's four corners, clockwise from the top left.
@@ -6276,21 +6263,6 @@ func (receiver *MapHandle) AddGeoJsonSourceUrl(sourceId string, url string, opti
 func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// AddImageSourceUrl adds an image source that loads its image from url.
-//
-// coordinates are the image's four corners, clockwise from the top left.
-//
-// See mln_map_add_image_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-//
-// Errors:
-//   - StatusAlreadyExists when the style already has a source named sourceId.
-func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -8803,24 +8775,10 @@ func (view MapHandleDiscarding) AddGeoJsonSourceData(sourceId string, data *GeoJ
 	})
 }
 
-func (view MapHandleDiscarding) AddGeoJsonSourceUrl(sourceId string, url string, options *GeoJsonSourceOptions) error {
-	receiver := view.owner
-	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geo_json_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeoJsonSourceOptions), completion, diagnostic))
-	})
-}
-
 func (view MapHandleDiscarding) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) error {
-	receiver := view.owner
-	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
 	})
 }
 

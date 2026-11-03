@@ -122,34 +122,6 @@ internal constructor(
     }
 
   /**
-   * Adds a GeoJSON source that loads its data from `url`.
-   *
-   * See `mln_map_add_geo_json_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   */
-  public fun addGeoJsonSourceUrl(
-    sourceId: String,
-    url: String,
-    options: GeoJsonSourceOptions? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_add_geo_json_source_url(
-          handle,
-          view(sourceId),
-          view(url),
-          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
    * Adds an image source that shows `image`.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -174,37 +146,6 @@ internal constructor(
           array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           writePremultipliedRgba8Image(image),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Adds an image source that loads its image from `url`.
-   *
-   * `coordinates` are the image's four corners, clockwise from the top left.
-   *
-   * See `mln_map_add_image_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   */
-  public fun addImageSourceUrl(
-    sourceId: String,
-    coordinates: List<LatLng>,
-    url: String,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_add_image_source_url(
-          handle,
-          view(sourceId),
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          view(url),
           completion,
           diagnostic,
         ),
@@ -1947,25 +1888,6 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       )
     }
 
-  /** [MapHandle.addGeoJsonSourceUrl] without its completion. */
-  public fun addGeoJsonSourceUrl(
-    sourceId: String,
-    url: String,
-    options: GeoJsonSourceOptions? = null,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_add_geo_json_source_url(
-          handle,
-          view(sourceId),
-          view(url),
-          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
   /** [MapHandle.addImageSourceImage] without its completion. */
   public fun addImageSourceImage(
     sourceId: String,
@@ -1980,22 +1902,6 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
           array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
           coordinates.size.toLong(),
           writePremultipliedRgba8Image(image),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /** [MapHandle.addImageSourceUrl] without its completion. */
-  public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_add_image_source_url(
-          handle,
-          view(sourceId),
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          view(url),
           completion,
           diagnostic,
         ),

@@ -3409,20 +3409,6 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
           nativeDiagnostic,
         ),
       );
-  void addGeoJsonSourceUrl(
-    String sourceId,
-    String url, {
-    GeoJsonSourceOptions? options,
-  }) => _discard(
-    (arena, completion) => raw.mln_map_add_geo_json_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
   void addImageSourceImage(
     String sourceId,
     List<LatLng> coordinates,
@@ -3440,27 +3426,6 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativecoordinates,
       coordinates.length,
       _writePremultipliedRgba8Image(image, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-  void addImageSourceUrl(
-    String sourceId,
-    List<LatLng> coordinates,
-    String url,
-  ) => _discard((arena, completion) {
-    final nativecoordinates = arena<raw.mln_lat_lng>(
-      coordinates.isEmpty ? 1 : coordinates.length,
-    );
-    for (var index = 0; index < coordinates.length; index++) {
-      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
-    }
-    return raw.mln_map_add_image_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativecoordinates,
-      coordinates.length,
-      nativeStringView(url, arena).value,
       completion,
       nativeDiagnostic,
     );
@@ -4080,30 +4045,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Adds a GeoJSON source that loads its data from `url`.
-  ///
-  /// See `mln_map_add_geo_json_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.alreadyExists` when the style already has a source named
-  ///   `sourceId`.
-  Future<CommandCompletion> addGeoJsonSourceUrl(
-    String sourceId,
-    String url, {
-    GeoJsonSourceOptions? options,
-  }) => _command(
-    (arena, completion) => raw.mln_map_add_geo_json_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativeStringView(url, arena).value,
-      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Adds an image source that shows `image`.
   ///
   /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -4132,39 +4073,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       nativecoordinates,
       coordinates.length,
       _writePremultipliedRgba8Image(image, arena),
-      completion,
-      nativeDiagnostic,
-    );
-  });
-
-  /// Adds an image source that loads its image from `url`.
-  ///
-  /// `coordinates` are the image's four corners, clockwise from the top left.
-  ///
-  /// See `mln_map_add_image_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.alreadyExists` when the style already has a source named
-  ///   `sourceId`.
-  Future<CommandCompletion> addImageSourceUrl(
-    String sourceId,
-    List<LatLng> coordinates,
-    String url,
-  ) => _command((arena, completion) {
-    final nativecoordinates = arena<raw.mln_lat_lng>(
-      coordinates.isEmpty ? 1 : coordinates.length,
-    );
-    for (var index = 0; index < coordinates.length; index++) {
-      _writeLatLng(coordinates[index], arena, into: nativecoordinates + index);
-    }
-    return raw.mln_map_add_image_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      nativecoordinates,
-      coordinates.length,
-      nativeStringView(url, arena).value,
       completion,
       nativeDiagnostic,
     );

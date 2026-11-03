@@ -170,40 +170,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a GeoJSON source that loads its data from <c>url</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_add_geo_json_source_url</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.AlreadyExists</c> when the style already
-    /// has a source named <c>sourceId</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    public Task<CommandCompletion> AddGeoJsonSourceUrlAsync(
-        string sourceId,
-        string url,
-        GeoJsonSourceOptions? options = null
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeOptions = options is null
-            ? default(mln_geo_json_source_options)
-            : NativeGeoJsonSourceOptions(options, scope);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_add_geo_json_source_url(
-            Handle,
-            scope.Utf8(sourceId),
-            scope.Utf8(url),
-            options is null ? null : &nativeOptions,
-            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
     /// Adds an image source that shows <c>image</c>.
     /// </summary>
     /// <remarks>
@@ -235,43 +201,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             ),
             checked((nuint)coordinates.Length),
             &nativeImage,
-            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Adds an image source that loads its image from <c>url</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para><c>coordinates</c> are the image's four corners, clockwise from
-    /// the top left.</para>
-    /// <para>See <c>mln_map_add_image_source_url</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.AlreadyExists</c> when the style already
-    /// has a source named <c>sourceId</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    public Task<CommandCompletion> AddImageSourceUrlAsync(
-        string sourceId,
-        LatLng[] coordinates,
-        string url
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_add_image_source_url(
-            Handle,
-            scope.Utf8(sourceId),
-            scope.Array<mln_lat_lng, LatLng>(
-                coordinates,
-                static (item, scope) => NativeLatLng(item)
-            ),
-            checked((nuint)coordinates.Length),
-            scope.Utf8(url),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2706,30 +2635,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddGeoJsonSourceUrl(
-            string sourceId,
-            string url,
-            GeoJsonSourceOptions? options = null
-        )
-        {
-            var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner);
-            var nativeOptions = options is null
-                ? default(mln_geo_json_source_options)
-                : NativeGeoJsonSourceOptions(options, scope);
-            Check(
-                NativeMethods.mln_map_add_geo_json_source_url(
-                    receiverHandle,
-                    scope.Utf8(sourceId),
-                    scope.Utf8(url),
-                    options is null ? null : &nativeOptions,
-                    null,
-                    Diagnostic
-                )
-            );
-            scope.Accept();
-        }
-
         public void AddImageSourceImage(
             string sourceId,
             LatLng[] coordinates,
@@ -2749,27 +2654,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     ),
                     checked((nuint)coordinates.Length),
                     &nativeImage,
-                    null,
-                    Diagnostic
-                )
-            );
-            scope.Accept();
-        }
-
-        public void AddImageSourceUrl(string sourceId, LatLng[] coordinates, string url)
-        {
-            var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner);
-            Check(
-                NativeMethods.mln_map_add_image_source_url(
-                    receiverHandle,
-                    scope.Utf8(sourceId),
-                    scope.Array<mln_lat_lng, LatLng>(
-                        coordinates,
-                        static (item, scope) => NativeLatLng(item)
-                    ),
-                    checked((nuint)coordinates.Length),
-                    scope.Utf8(url),
                     null,
                     Diagnostic
                 )

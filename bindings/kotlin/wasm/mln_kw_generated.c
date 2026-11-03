@@ -232,18 +232,6 @@ int32_t mln_kw_mln_map_add_geo_json_source_data(
   );
 }
 
-int32_t mln_kw_mln_map_add_geo_json_source_url(
-  int64_t map, uintptr_t source_id, uintptr_t url, uintptr_t options,
-  uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_add_geo_json_source_url(
-    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    *(const mln_buffer_view*)(uintptr_t)url,
-    (const mln_geo_json_source_options*)options,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_add_image_source_image(
   int64_t map, uintptr_t source_id, uintptr_t coordinates,
   uint32_t coordinate_count, uintptr_t image, uintptr_t completion,
@@ -254,19 +242,6 @@ int32_t mln_kw_mln_map_add_image_source_image(
     (const mln_lat_lng*)coordinates, (size_t)coordinate_count,
     (const mln_premultiplied_rgba8_image*)image,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
-  );
-}
-
-int32_t mln_kw_mln_map_add_image_source_url(
-  int64_t map, uintptr_t source_id, uintptr_t coordinates,
-  uint32_t coordinate_count, uintptr_t url, uintptr_t completion,
-  uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_add_image_source_url(
-    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (const mln_lat_lng*)coordinates, (size_t)coordinate_count,
-    *(const mln_buffer_view*)(uintptr_t)url, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
   );
 }
 

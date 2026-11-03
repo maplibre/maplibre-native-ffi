@@ -335,53 +335,6 @@ static void geojson_pixel_options_respect_the_scaled_limits(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
 }
 
-static void geojson_sources_take_and_validate_their_options(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_style_serve(runtime, NULL, 0);
-  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
-  const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://points.geojson");
-
-  mln_geo_json_source_options options = {
-    .size = sizeof(mln_geo_json_source_options)
-  };
-  every_option(&options);
-  mln_geo_json_source_data data = prepare(POINT_COLLECTION("a"), &options);
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("prepared"), data, &completion.descriptor, NULL
-  ));
-  mln_geo_json_source_data_release(data);
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_url(
-    map, MLN_BUFFER_LITERAL("points"), url, &options, &completion.descriptor,
-    NULL
-  ));
-
-  options =
-    (mln_geo_json_source_options){.size = sizeof(mln_geo_json_source_options)};
-  inverted_zoom_range(&options);
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "min_zoom must be less than or equal to max_zoom",
-    mln_map_add_geo_json_source_url(
-      map, MLN_BUFFER_LITERAL("inverted"), url, &options,
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  options =
-    (mln_geo_json_source_options){.size = sizeof(mln_geo_json_source_options)};
-  cluster_properties_array(&options);
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT,
-    "cluster_properties must contain a JSON object",
-    mln_map_add_geo_json_source_url(
-      map, MLN_BUFFER_LITERAL("array-properties"), url, &options,
-      &completion.descriptor, NULL
-    )
-  );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // The submit-time lease keeps the prepared index alive, so each source keeps
 // its own reference after the host destroys the handle.
 static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
@@ -628,10 +581,12 @@ static void a_url_source_loads_through_the_resource_provider(void) {
   };
   mln_test_style_serve(runtime, routes, 2);
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_url(
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
     map, MLN_BUFFER_LITERAL("points"),
-    MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,
-    NULL
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"geojson\",\"data\":\"fixture://first.geojson\"}"
+    ),
+    &completion.descriptor, NULL
   ));
   draw_source(map, "points");
 
@@ -669,7 +624,6 @@ MLN_TEST_GROUP {
   RUN_TEST(geojson_data_preparation_validates_documents_and_options);
   RUN_TEST(geojson_max_zoom_respects_the_tiling_limit);
   RUN_TEST(geojson_pixel_options_respect_the_scaled_limits);
-  RUN_TEST(geojson_sources_take_and_validate_their_options);
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
   RUN_TEST(clustering_fields_decide_which_points_the_source_holds);

@@ -319,10 +319,6 @@ auto map_set_style_source_volatile(
 auto map_list_style_sources(
   MapObject& live, std::vector<StyleSourceRecord>& out_sources
 ) -> mln_status;
-auto map_add_geojson_source_url(
-  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geo_json_source_options* options
-) -> mln_status;
 auto map_add_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
@@ -378,10 +374,6 @@ auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
 auto map_get_style_image(
   MapObject& live, mln_buffer_view image_id, StyleImageRecord& out_image
 ) -> bool;
-auto map_add_image_source_url(
-  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  mln_buffer_view url
-) -> mln_status;
 auto map_add_image_source_image(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   mln::PremultipliedImage image

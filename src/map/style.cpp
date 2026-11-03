@@ -1194,30 +1194,6 @@ auto map_list_style_sources(
   return MLN_STATUS_OK;
 }
 
-auto map_add_geojson_source_url(
-  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geo_json_source_options* options
-) -> mln_status {
-  auto& style = map_native(live).getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  auto native_options =
-    to_native_geojson_source_options(effective_geojson_source_options(options));
-  if (!native_options) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto source =
-    std::make_unique<mln::style::GeoJSONSource>(id, std::move(*native_options));
-  source->setURL(string_from_view(url));
-  style.addSource(std::move(source));
-  return MLN_STATUS_OK;
-}
-
 auto map_add_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
@@ -1708,25 +1684,6 @@ auto style_image_info(const StyleImageRecord& record) noexcept
     .sdf = image.isSdf(),
     .keep_unused = record.keep_unused
   };
-}
-
-auto map_add_image_source_url(
-  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  mln_buffer_view url
-) -> mln_status {
-  auto& style = map_native(live).getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  auto source = std::make_unique<mln::style::ImageSource>(
-    id, to_native_image_source_coordinates(coordinates)
-  );
-  source->setURL(string_from_view(url));
-  style.addSource(std::move(source));
-  return MLN_STATUS_OK;
 }
 
 auto map_add_image_source_image(

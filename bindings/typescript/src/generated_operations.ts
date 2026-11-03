@@ -716,33 +716,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds a GeoJSON source that loads its data from `url`.
-   *
-   * See `mln_map_add_geo_json_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.alreadyExists` when the style already has a source named
-   *   `sourceId`.
-   */
-  addGeoJsonSourceUrl(
-    sourceId: string,
-    url: string,
-    options?: GeoJsonSourceOptions,
-  ): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_add_geo_json_source_url(
-        this.id,
-        sourceId,
-        url,
-        options,
-        completion,
-      ),
-    );
-  }
-
-  /**
    * Adds an image source that shows `image`.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -766,35 +739,6 @@ export class MapHandle extends Owner {
         sourceId,
         coordinates,
         image,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Adds an image source that loads its image from `url`.
-   *
-   * `coordinates` are the image's four corners, clockwise from the top left.
-   *
-   * See `mln_map_add_image_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.alreadyExists` when the style already has a source named
-   *   `sourceId`.
-   */
-  addImageSourceUrl(
-    sourceId: string,
-    coordinates: readonly LatLng[],
-    url: string,
-  ): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_add_image_source_url(
-        this.id,
-        sourceId,
-        coordinates,
-        url,
         completion,
       ),
     );
@@ -2704,26 +2648,6 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a GeoJSON source that loads its data from `url`.
-   *
-   * See `mln_map_add_geo_json_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  addGeoJsonSourceUrl(
-    sourceId: string,
-    url: string,
-    options?: GeoJsonSourceOptions,
-  ): void {
-    native.mln_map_add_geo_json_source_url(
-      this.#owner.id,
-      sourceId,
-      url,
-      options,
-      undefined,
-    );
-  }
-
-  /**
    * Adds an image source that shows `image`.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -2741,28 +2665,6 @@ export class MapHandleDiscarding {
       sourceId,
       coordinates,
       image,
-      undefined,
-    );
-  }
-
-  /**
-   * Adds an image source that loads its image from `url`.
-   *
-   * `coordinates` are the image's four corners, clockwise from the top left.
-   *
-   * See `mln_map_add_image_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  addImageSourceUrl(
-    sourceId: string,
-    coordinates: readonly LatLng[],
-    url: string,
-  ): void {
-    native.mln_map_add_image_source_url(
-      this.#owner.id,
-      sourceId,
-      coordinates,
-      url,
       undefined,
     );
   }

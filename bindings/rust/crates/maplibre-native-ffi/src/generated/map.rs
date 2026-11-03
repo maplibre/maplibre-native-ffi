@@ -95,37 +95,6 @@ impl MapHandle {
         })
     }
 
-    /// Adds a GeoJSON source that loads its data from `url`.
-    ///
-    /// See `mln_map_add_geo_json_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::AlreadyExists` when the style already has a source named
-    ///   `source_id`.
-    pub fn add_geo_json_source_url(
-        &self,
-        source_id: &str,
-        url: &str,
-        options: Option<&GeoJsonSourceOptions<'_>>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call();
-        let source_id = call.input(&source_id)?;
-        let url = call.input(&url)?;
-        let options = call.optional_reference(options.as_ref())?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geo_json_source_url(
-                map,
-                source_id,
-                url,
-                options,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Adds an image source that shows `image`.
     ///
     /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -155,41 +124,6 @@ impl MapHandle {
                 coordinates,
                 coordinate_count,
                 image,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Adds an image source that loads its image from `url`.
-    ///
-    /// `coordinates` are the image's four corners, clockwise from the top left.
-    ///
-    /// See `mln_map_add_image_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::AlreadyExists` when the style already has a source named
-    ///   `source_id`.
-    pub fn add_image_source_url(
-        &self,
-        source_id: &str,
-        coordinates: &[LatLng],
-        url: &str,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call();
-        let coordinate_count = convert::count(coordinates.len())?;
-        let source_id = call.input(&source_id)?;
-        let coordinates = call.array(coordinates)?;
-        let url = call.input(&url)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_image_source_url(
-                map,
-                source_id,
-                coordinates,
-                coordinate_count,
-                url,
                 completion,
                 out_diagnostic,
             )
@@ -2283,32 +2217,6 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds a GeoJSON source that loads its data from `url`.
-    ///
-    /// See `mln_map_add_geo_json_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_geo_json_source_url(
-        &self,
-        source_id: &str,
-        url: &str,
-        options: Option<&GeoJsonSourceOptions<'_>>,
-    ) -> Result<()> {
-        let mut call = self.0.inner.call();
-        let source_id = call.input(&source_id)?;
-        let url = call.input(&url)?;
-        let options = call.optional_reference(options.as_ref())?;
-        call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geo_json_source_url(
-                map,
-                source_id,
-                url,
-                options,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Adds an image source that shows `image`.
     ///
     /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -2333,36 +2241,6 @@ impl MapHandleDiscarding<'_> {
                 coordinates,
                 coordinate_count,
                 image,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Adds an image source that loads its image from `url`.
-    ///
-    /// `coordinates` are the image's four corners, clockwise from the top left.
-    ///
-    /// See `mln_map_add_image_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_image_source_url(
-        &self,
-        source_id: &str,
-        coordinates: &[LatLng],
-        url: &str,
-    ) -> Result<()> {
-        let mut call = self.0.inner.call();
-        let coordinate_count = convert::count(coordinates.len())?;
-        let source_id = call.input(&source_id)?;
-        let coordinates = call.array(coordinates)?;
-        let url = call.input(&url)?;
-        call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_image_source_url(
-                map,
-                source_id,
-                coordinates,
-                coordinate_count,
-                url,
                 completion,
                 out_diagnostic,
             )

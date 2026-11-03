@@ -546,20 +546,6 @@ MLN_API mln_status mln_map_list_style_sources(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a GeoJSON source that loads its data from `url`.
- *
- * Completes with:
- * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
- *   `source_id`.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_geo_json_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geo_json_source_options* options MLN_BINDING("nullable=true"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Prepares GeoJSON data for GeoJSON sources.
  *
  * `data` is a GeoJSON feature collection, feature, or geometry. Preparing it
@@ -828,23 +814,6 @@ MLN_BINDING("execution=query;result=mln_style_image_info;nullable=true")
 MLN_API mln_status mln_map_get_style_image(
   mln_map map, mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Adds an image source that loads its image from `url`.
- *
- * `coordinates` are the image's four corners, clockwise from the top left.
- *
- * Completes with:
- * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
- *   `source_id`.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_image_source_url(
-  mln_map map, mln_buffer_view source_id,
-  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
-  size_t coordinate_count, mln_buffer_view url,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

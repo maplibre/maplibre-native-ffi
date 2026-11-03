@@ -46,12 +46,6 @@ class _MapHandle:
     def _discard_add_geo_json_source_data(
         self, source_id: str, data: _GeoJsonSourceDataHandle
     ) -> None: ...
-    def add_geo_json_source_url(
-        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
-    ) -> Future[CommandCompletion]: ...
-    def _discard_add_geo_json_source_url(
-        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
-    ) -> None: ...
     def add_image_source_image(
         self,
         source_id: str,
@@ -63,12 +57,6 @@ class _MapHandle:
         source_id: str,
         coordinates: Sequence[LatLng],
         image: PremultipliedRgba8Image,
-    ) -> None: ...
-    def add_image_source_url(
-        self, source_id: str, coordinates: Sequence[LatLng], url: str
-    ) -> Future[CommandCompletion]: ...
-    def _discard_add_image_source_url(
-        self, source_id: str, coordinates: Sequence[LatLng], url: str
     ) -> None: ...
     def add_style_layer_json(
         self, layer_json: Any, before_layer_id: str
