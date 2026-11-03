@@ -635,6 +635,15 @@ class TransitionReplacementScope final {
   CameraTransitionReplacement previous_;
 };
 
+// Completes the style URL load that `live` waits for, if any, with `status`
+// and the snapshot `generation` that shows its result. Runs on the runtime
+// worker, inside the MapLibre callback that ended the load, so the completion
+// runs from a later task, unless posting the task fails.
+auto finish_pending_style_load(
+  MapObject& live, mln_status status, std::string_view message,
+  uint64_t generation
+) noexcept -> void;
+
 }  // namespace
 
 // Every callback tests the map's subscription mask before it builds anything,
@@ -735,29 +744,51 @@ class HeadlessObserver final : public mln::MapObserver {
     } catch (...) {
       event_state_->style_load_failure.clear();
     }
-    if (!selected(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
+    const auto map = event_state_->owner.lock();
+    const auto pending = map != nullptr && map->style_load_pending;
+    if (!pending && !selected(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
       return;
     }
-    queue_fresh(
-      MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, static_cast<uint32_t>(error),
-      message
-    );
+    const auto generation = event_state_->fresh_generation();
+    if (selected(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
+      queue_map_event(
+        *event_state_, generation, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
+        MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
+        static_cast<uint32_t>(error), message
+      );
+    }
+    if (pending) {
+      finish_pending_style_load(
+        *map, MLN_STATUS_NATIVE_ERROR, message, generation
+      );
+    }
   }
 
   // A style load can drop custom geometry sources that the previous style held.
   // The release callbacks this owes are map state, not an event, so the
   // reconciliation runs whatever the mask selects.
   void onDidFinishLoadingStyle() override {
-    // The style has dropped every runtime image by now. A load that fails
-    // never gets here, so the images it leaves stay kept.
-    if (const auto map = event_state_->owner.lock())
-      map->kept_style_images.clear();
-    // The event is queued before the reconciliation, and the registry is held
-    // by a local share across it, because reconcile() runs host release
-    // callbacks. Nothing may touch this observer or its members after host code
-    // runs: a callback that destroys its map destroys this observer with it.
-    if (selected(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)) {
-      queue_fresh(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
+    {
+      const auto map = event_state_->owner.lock();
+      // The style has dropped every runtime image by now. A load that fails
+      // never gets here, so the images it leaves stay kept.
+      if (map != nullptr) map->kept_style_images.clear();
+      const auto pending = map != nullptr && map->style_load_pending;
+      // The event is queued and the load completed before the
+      // reconciliation, and the registry is held by a local share across it,
+      // because reconcile() runs host release callbacks. Nothing may touch
+      // this observer or its members after host code runs: a callback that
+      // destroys its map destroys this observer with it.
+      if (pending || selected(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)) {
+        const auto generation = event_state_->fresh_generation();
+        if (selected(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)) {
+          queue_map_event(
+            *event_state_, generation, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED
+          );
+        }
+        if (pending)
+          finish_pending_style_load(*map, MLN_STATUS_OK, {}, generation);
+      }
     }
     const auto sources = callback_sources_;
     sources->reconcile();
@@ -2905,6 +2936,49 @@ class RuntimeMapRetainGuard final {
   mln_runtime runtime_ = MLN_HANDLE_NULL;
 };
 
+auto finish_pending_style_load(
+  MapObject& live, mln_status status, std::string_view message,
+  uint64_t generation
+) noexcept -> void {
+  if (!std::exchange(live.style_load_pending, false)) return;
+  const auto completion = std::exchange(live.style_load_completion, {});
+  const auto generations = CommandGenerations{
+    .snapshot = generation,
+    .render_update = live.frontend->pending_update_generation(),
+  };
+  auto diagnostic = std::string{};
+  try {
+    diagnostic = message;
+  } catch (...) {
+  }
+  try {
+    live.runtime_state->executor.invoke(
+      [completion, status, generations, diagnostic]() noexcept -> void {
+        complete_command(
+          completion, MLN_COMMAND_DISPOSITION_COMMITTED, status, generations,
+          diagnostic
+        );
+      }
+    );
+  } catch (...) {
+    complete_command(
+      completion, MLN_COMMAND_DISPOSITION_COMMITTED, status, generations,
+      std::move(diagnostic)
+    );
+  }
+}
+
+// Completes the style URL load that `live` waits for as cancelled, because a
+// newer style load or the map's release replaced it.
+auto cancel_pending_style_load(MapObject& live, const char* reason) noexcept
+  -> void {
+  if (!std::exchange(live.style_load_pending, false)) return;
+  complete_command(
+    std::exchange(live.style_load_completion, {}),
+    MLN_COMMAND_DISPOSITION_CANCELLED, MLN_STATUS_CANCELLED, {}, reason
+  );
+}
+
 // Runs on the runtime worker from MapLibre's still-image continuation and
 // resolves the handle that identifies the pending request.
 auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
@@ -3753,8 +3827,10 @@ auto finish_map_retirement(RetirementTask* task) noexcept -> void {
   static_cast<void>(handle_table<MapObject>().remove(map.self));
   map.callback_sources->detach();
   map.frontend->close_renderer_observer();
-  // A submission leased before close can start a transition after cancellation.
+  // A submission leased before close can start a transition or a style load
+  // after cancellation.
   close_camera_transitions(*map.event_state);
+  cancel_pending_style_load(map, "map was released");
   map.map.reset();
   map.callback_sources->release_all();
   if (auto completion = std::move(map.release_completion)) {
@@ -3776,6 +3852,7 @@ auto begin_map_retirement(RetirementTask* task) noexcept -> void {
     map.still_image_operation->complete(MLN_STATUS_CANCELLED, {}, {});
   }
   close_camera_transitions(*map.event_state);
+  cancel_pending_style_load(map, "map was released");
   if (auto release = std::exchange(map.still_image_release_submission, {}))
     release();
   task->run = finish_map_retirement;
@@ -4175,20 +4252,95 @@ auto map_dispose_render_target_session(
   if (run_now) on_close(handle);
 }
 
+namespace {
+
+// Runs a style load as one map transaction. A load whose style parsed, or
+// that failed, completes with the transaction. A style URL load that is still
+// fetching keeps its completion on the map until the parse or the failure
+// that ends the load, or until a newer load or the map's release cancels it.
+struct StyleLoadTask final : MapCommandTask {
+  StyleLoadFunction load;
+
+  explicit StyleLoadTask(StyleLoadFunction function)
+      : load(std::move(function)) {
+    command = true;
+    run = [](ExecutorTask* base) noexcept {
+      auto owner =
+        std::unique_ptr<StyleLoadTask>{static_cast<StyleLoadTask*>(base)};
+      run_runtime_command_task(*owner);
+    };
+    work = [](RuntimeCommandTask& base) {
+      static_cast<StyleLoadTask&>(base).execute();
+    };
+    clear_work = [](RuntimeCommandTask& base) noexcept {
+      auto& self = static_cast<StyleLoadTask&>(base);
+      self.load = nullptr;
+      self.map_lease.reset();
+      self.map.reset();
+    };
+  }
+
+  auto execute() -> void {
+    auto replaced_pending = false;
+    auto replaced = std::shared_ptr<Completion>{};
+    auto parse_pending = false;
+    auto outcome = run_map_transaction(map, [&](MapObject& live) -> mln_status {
+      // The new load replaces the pending one before it starts, so a parse
+      // or a failure during this transaction belongs to the new load.
+      replaced_pending = std::exchange(live.style_load_pending, false);
+      replaced = std::exchange(live.style_load_completion, {});
+      auto& events = *live.event_state;
+      events.style_load_failed = false;
+      events.style_load_failure.clear();
+      const auto status = load(live);
+      if (status != MLN_STATUS_OK) return status;
+      if (events.style_load_failed) {
+        set_thread_error(events.style_load_failure.c_str());
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      parse_pending = !live.map->getStyle().isLoaded();
+      return MLN_STATUS_OK;
+    });
+    if (replaced_pending) {
+      complete_command(
+        replaced, MLN_COMMAND_DISPOSITION_CANCELLED, MLN_STATUS_CANCELLED, {},
+        "a newer style load replaced this one"
+      );
+    }
+    if (outcome.status == MLN_STATUS_OK && parse_pending) {
+      map->style_load_pending = true;
+      map->style_load_completion = std::move(retained_completion);
+      completion = nullptr;
+      return;
+    }
+    complete_map_command(completion, std::move(outcome));
+  }
+};
+
+}  // namespace
+
+auto submit_map_style_load(
+  mln_map map, StyleLoadFunction load, const mln_completion* descriptor
+) -> mln_status {
+  auto task = std::make_unique<StyleLoadTask>(std::move(load));
+  const auto made =
+    make_command_completion(descriptor, task->retained_completion);
+  if (made != MLN_STATUS_OK) return made;
+  task->completion = task->retained_completion.get();
+  const auto prepared = prepare_map_command_task(map, *task, nullptr);
+  if (prepared != MLN_STATUS_OK) return prepared;
+  const auto runtime = task->map->runtime_state;
+  const auto status = submit_runtime_command_task(runtime, *task);
+  if (status == MLN_STATUS_OK) static_cast<void>(task.release());
+  return status;
+}
+
 auto map_set_style_url(MapObject& live, const char* url) -> mln_status {
   if (url == nullptr) {
     set_thread_error("url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // Parse failures reported on this stack use runtime-worker state, so no
-  // additional lock or queued diagnostic is needed.
-  live.event_state->style_load_failed = false;
-  live.event_state->style_load_failure.clear();
   live.map->getStyle().loadURL(url);
-  if (live.event_state->style_load_failed) {
-    set_thread_error(live.event_state->style_load_failure.c_str());
-    return MLN_STATUS_NATIVE_ERROR;
-  }
   return MLN_STATUS_OK;
 }
 
@@ -4197,8 +4349,6 @@ auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   try {
-    live.event_state->style_load_failed = false;
-    live.event_state->style_load_failure.clear();
     live.map->getStyle().loadJSON(
       std::string{reinterpret_cast<const char*>(json.data), json.size}
     );
@@ -4216,11 +4366,13 @@ auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status {
     }
     return MLN_STATUS_NATIVE_ERROR;
   }
-  if (live.event_state->style_load_failed) {
-    set_thread_error(live.event_state->style_load_failure.c_str());
-    return MLN_STATUS_NATIVE_ERROR;
-  }
   return MLN_STATUS_OK;
+}
+
+auto require_style_loaded(MapObject& live) -> mln_status {
+  if (live.map->getStyle().isLoaded()) return MLN_STATUS_OK;
+  set_thread_error("style is not loaded");
+  return MLN_STATUS_INVALID_STATE;
 }
 
 template <auto Function>

@@ -38,7 +38,7 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   void
 ) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   char id[] = "owned-source";
   char json[sizeof(MLN_TEST_EMPTY_GEOJSON_SOURCE)];
   memcpy(json, MLN_TEST_EMPTY_GEOJSON_SOURCE, sizeof(json));
@@ -95,7 +95,7 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
 
 static void missing_style_ids_report_not_found(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   const mln_buffer_view layer = MLN_BUFFER_LITERAL("absent-layer");
   const mln_buffer_view source = MLN_BUFFER_LITERAL("absent-source");
   const mln_buffer_view none = MLN_BUFFER_LITERAL("");
@@ -226,7 +226,7 @@ static void global_state_reads_back_defaults_and_set_properties(void) {
     &discard, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_STATE, "style JSON has not loaded",
+    MLN_STATUS_INVALID_STATE, "style is not loaded",
     mln_map_set_global_state_property(
       map, MLN_BUFFER_LITERAL("theme"), MLN_BUFFER_LITERAL("true"),
       &completion.descriptor, NULL
@@ -333,7 +333,7 @@ static void transition_options_report_the_fields_the_style_sets(void) {
 // Raw callers can hand the transition setter a struct no binding would build.
 static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
 
   mln_style_transition_options applied = {
     .size = sizeof(mln_style_transition_options)

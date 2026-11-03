@@ -17,12 +17,14 @@ layers, and images. Sources and layers use the JSON of the
 ## Load a style
 
 Set the style by URL with [](api:mln_map_set_style_url), or by JSON with
-[](api:mln_map_set_style_json).
+[](api:mln_map_set_style_json). Either one completes once the map has parsed the
+style, or fails when the style doesn't load.
 
 <Aside type="caution">
-  Loading a style removes the sources, layers, and images you added. Wait for
-  the style-loaded event before you add or change them. To receive events, see
-  [Events and logs](/maplibre-native-ffi/guides/events-and-logs/).
+  Loading a style replaces the sources, layers, and images you added. Wait for
+  the load to complete before you add or change them, because until it does,
+  those changes fail. A new map has no style, so load one first, even an empty
+  one.
 </Aside>
 
 <Snippet page="style" region="load" />

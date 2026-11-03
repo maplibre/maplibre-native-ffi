@@ -15,9 +15,9 @@ private func drawImage(_: String) -> PremultipliedRgba8Image {
 }
 
 /// pixels holds 16 x 16 premultiplied RGBA pixels.
-private func style(map: MapHandle, pixels: Data) throws {
+private func style(map: MapHandle, pixels: Data) async throws {
   // #region load
-  try map.discarding
+  try await map
     .setStyleUrl("https://demotiles.maplibre.org/style.json")
   // #endregion load
 

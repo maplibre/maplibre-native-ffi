@@ -23,6 +23,8 @@ impl MapHandle {
     ///
     /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
@@ -51,6 +53,8 @@ impl MapHandle {
     ///
     /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn add_custom_vector_source(
         &self,
         source_id: &str,
@@ -82,6 +86,8 @@ impl MapHandle {
     ///
     /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn add_geo_json_source_data(
         &self,
         source_id: &str,
@@ -106,6 +112,8 @@ impl MapHandle {
     ///
     /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn add_image_source_image(
         &self,
         source_id: &str,
@@ -146,6 +154,8 @@ impl MapHandle {
     ///   `before_layer_id`, or no source with the ID that the layer uses.
     /// - `Status::AlreadyExists` when the style already has a layer with the
     ///   new layer's ID.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn add_style_layer_json(
         &self,
         layer_json: &str,
@@ -177,6 +187,8 @@ impl MapHandle {
     ///
     /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn add_style_source_json(
         &self,
         source_id: &str,
@@ -1318,6 +1330,8 @@ impl MapHandle {
     ///
     /// - `Status::NotFound` when the style has no layer named `layer_id` or
     ///   `before_layer_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn move_style_layer(
         &self,
         layer_id: &str,
@@ -1378,6 +1392,8 @@ impl MapHandle {
     /// # Errors
     ///
     /// - `Status::NotFound` when the style has no image named `image_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn remove_style_image(&self, image_id: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let image_id = call.input(&image_id)?;
@@ -1394,6 +1410,8 @@ impl MapHandle {
     /// # Errors
     ///
     /// - `Status::NotFound` when the style has no layer named `layer_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn remove_style_layer(&self, layer_id: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let layer_id = call.input(&layer_id)?;
@@ -1410,7 +1428,8 @@ impl MapHandle {
     /// # Errors
     ///
     /// - `Status::NotFound` when the style has no source named `source_id`.
-    /// - `Status::InvalidState` when a layer still uses the source.
+    /// - `Status::InvalidState` when a layer still uses the source, or while
+    ///   the style isn't loaded, as `MapHandle::set_style_url()` describes.
     pub fn remove_style_source(&self, source_id: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let source_id = call.input(&source_id)?;
@@ -1705,6 +1724,8 @@ impl MapHandle {
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't a
     ///   GeoJSON source, or `data` was prepared with other options.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_geo_json_source_data(
         &self,
         source_id: &str,
@@ -1734,6 +1755,8 @@ impl MapHandle {
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't a
     ///   GeoJSON source.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_geo_json_source_synchronous_tiling(
         &self,
         source_id: &str,
@@ -1762,6 +1785,8 @@ impl MapHandle {
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't a
     ///   GeoJSON source.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_geo_json_source_url(
         &self,
         source_id: &str,
@@ -1784,9 +1809,8 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::InvalidState` until the map has parsed its style, which
-    ///   `RuntimeEventType::MapStyleLoaded` reports, and again while it loads a
-    ///   new style URL.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_global_state_property(
         &self,
         property_name: &str,
@@ -1818,6 +1842,8 @@ impl MapHandle {
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't an
     ///   image source.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_image_source_coordinates(
         &self,
         source_id: &str,
@@ -1849,6 +1875,8 @@ impl MapHandle {
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't an
     ///   image source.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_image_source_image(
         &self,
         source_id: &str,
@@ -1872,6 +1900,8 @@ impl MapHandle {
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't an
     ///   image source.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_image_source_url(
         &self,
         source_id: &str,
@@ -1922,6 +1952,11 @@ impl MapHandle {
     ///
     /// See `mln_map_set_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_style_image(
         &self,
         image_id: &str,
@@ -1939,14 +1974,17 @@ impl MapHandle {
 
     /// Loads the map's style from `json`.
     ///
-    /// The style's sources, sprites, and glyphs load in the background.
+    /// The command completes once the style has parsed, and the map's style is
+    /// then loaded, as `MapHandle::set_style_url()` describes. The style's
+    /// sources, sprites, and glyphs load in the background.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     ///
     /// # Errors
     ///
-    /// - `Status::NativeError` when `json` isn't a valid style.
+    /// - `Status::NativeError` when `json` isn't a valid style. The map keeps
+    ///   its current style.
     pub fn set_style_json(&self, json: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let json = call.input(&json)?;
@@ -1969,6 +2007,8 @@ impl MapHandle {
     /// # Errors
     ///
     /// - `Status::NotFound` when the style has no layer named `layer_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_style_layer_property(
         &self,
         layer_id: &str,
@@ -1996,6 +2036,11 @@ impl MapHandle {
     ///
     /// See `mln_map_set_style_light_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_style_light_json(
         &self,
         light_json: &str,
@@ -2011,6 +2056,11 @@ impl MapHandle {
     ///
     /// See `mln_map_set_style_light_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_style_light_property(
         &self,
         property_name: &str,
@@ -2041,6 +2091,8 @@ impl MapHandle {
     /// # Errors
     ///
     /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_style_source_volatile(
         &self,
         source_id: &str,
@@ -2063,6 +2115,11 @@ impl MapHandle {
     ///
     /// See `mln_map_set_style_transition_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
     pub fn set_style_transition_options(
         &self,
         options: &StyleTransitionOptions,
@@ -2076,13 +2133,28 @@ impl MapHandle {
 
     /// Loads the map's style from `url`.
     ///
-    /// The style loads in the background, and
-    /// `RuntimeEventType::MapStyleLoaded` or
-    /// `RuntimeEventType::MapLoadingFailed` reports how the load ends. Sources,
-    /// layers, and images added before the style loads are lost when it loads.
+    /// The command completes once the style document has loaded and parsed. The
+    /// style's sources, sprites, and glyphs then load in the background.
+    ///
+    /// The map's style is loaded from the time a style document parses until
+    /// the next call to this function. It isn't loaded before the map's first
+    /// style parses, while a style URL loads, or after a style URL fails to
+    /// load. While the style isn't loaded, the commands that change it complete
+    /// with `Status::InvalidState`, because the next style to parse would
+    /// replace their changes. To change a new map's style without a style
+    /// document, first load an empty style, such as
+    /// `{"version":8,"sources":{},"layers":[]}`.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NativeError` when the style document fails to load or isn't a
+    ///   valid style.
+    /// - `Status::Cancelled` when the map is released, or this function or
+    ///   `MapHandle::set_style_json()` loads another style, before the style
+    ///   document parses.
     pub fn set_style_url(&self, url: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let url = call.input(&url)?;
@@ -3009,7 +3081,9 @@ impl MapHandleDiscarding<'_> {
 
     /// Loads the map's style from `json`.
     ///
-    /// The style's sources, sprites, and glyphs load in the background.
+    /// The command completes once the style has parsed, and the map's style is
+    /// then loaded, as `MapHandle::set_style_url()` describes. The style's
+    /// sources, sprites, and glyphs load in the background.
     ///
     /// See `mln_map_set_style_json` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3120,10 +3194,17 @@ impl MapHandleDiscarding<'_> {
 
     /// Loads the map's style from `url`.
     ///
-    /// The style loads in the background, and
-    /// `RuntimeEventType::MapStyleLoaded` or
-    /// `RuntimeEventType::MapLoadingFailed` reports how the load ends. Sources,
-    /// layers, and images added before the style loads are lost when it loads.
+    /// The command completes once the style document has loaded and parsed. The
+    /// style's sources, sprites, and glyphs then load in the background.
+    ///
+    /// The map's style is loaded from the time a style document parses until
+    /// the next call to this function. It isn't loaded before the map's first
+    /// style parses, while a style URL loads, or after a style URL fails to
+    /// load. While the style isn't loaded, the commands that change it complete
+    /// with `Status::InvalidState`, because the next style to parse would
+    /// replace their changes. To change a new map's style without a style
+    /// document, first load an empty style, such as
+    /// `{"version":8,"sources":{},"layers":[]}`.
     ///
     /// See `mln_map_set_style_url` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

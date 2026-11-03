@@ -29,7 +29,7 @@ public sealed class ResourceProviderTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
-        await fixture.Map.SetStyleUrlAsync(StyleUrl);
+        var loaded = fixture.Map.SetStyleUrlAsync(StyleUrl);
         var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         // Native rejects a malformed etag while the request stays open for another answer.
@@ -45,7 +45,7 @@ public sealed class ResourceProviderTests
         );
         Assert.False(handle.IsClosed);
         handle.Complete(StyleResponse());
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+        await loaded.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         // The answer consumed the handle, so a second answer fails.
         Assert.True(handle.IsClosed);
@@ -101,8 +101,12 @@ public sealed class ResourceProviderTests
             }
         );
 
-        await fixture.Map.SetStyleUrlAsync("unrouted-test://maps/style.json");
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+        var failure = await Assert.ThrowsAsync<MaplibreException>(() =>
+            fixture
+                .Map.SetStyleUrlAsync("unrouted-test://maps/style.json")
+                .WaitAsync(TestWaits.Deadline, TestWaits.Token)
+        );
+        Assert.Equal(Status.NativeError, failure.Status);
         Assert.Empty(seen);
 
         await fixture.Map.SetStyleUrlAsync(routedStyle);
@@ -202,8 +206,10 @@ public sealed class ResourceProviderTests
             }
         );
 
-        await fixture.Map.SetStyleUrlAsync(StyleUrl);
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+        var failure = await Assert.ThrowsAsync<MaplibreException>(() =>
+            fixture.Map.SetStyleUrlAsync(StyleUrl).WaitAsync(TestWaits.Deadline, TestWaits.Token)
+        );
+        Assert.Equal(Status.NativeError, failure.Status);
 
         Assert.NotNull(escaped);
         Assert.Equal(0, calls);

@@ -13,9 +13,9 @@ def draw_image(image_id: str) -> mln.PremultipliedRgba8Image:
 # pixels holds 16 x 16 premultiplied RGBA pixels.
 def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #region load
-    map_handle.discarding.set_style_url(
+    map_handle.set_style_url(
         "https://demotiles.maplibre.org/style.json"
-    )
+    ).result()
     # #endregion load
 
     # #region add

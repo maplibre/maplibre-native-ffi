@@ -49,7 +49,7 @@ class ThreadedCallbackTest {
       // before it tries a port that nothing serves.
       runtime.setResourceProvider(passingThrough(HTTP_STYLE_URL)).awaitWithin("the provider")
       runtime.setHttpHeaderTransform(transform).awaitWithin("the header transform")
-      map.setStyleUrl(HTTP_STYLE_URL).awaitWithin("the style command")
+      map.discarding.setStyleUrl(HTTP_STYLE_URL)
       val (inside, fromAnotherThread) = outcome.awaitWithin("the header transform callback")
       assertEquals(null, inside, "setting a header inside the callback is allowed")
       assertIs<IllegalStateException>(fromAnotherThread, "the response from another thread")

@@ -23,7 +23,9 @@ await runtime.SetResourceProviderAsync(
 );
 var map = runtime.CreateMap(new MapOptions { InitialExtent = new LogicalExtent(64, 64, 1) });
 await map.Ready;
-await map.SetStyleUrlAsync("exit-probe://style.json");
+
+// The load waits for the held request, so its result is discarded.
+map.Discarding.SetStyleUrl("exit-probe://style.json");
 var request = await held.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
 Console.WriteLine($"Exiting with live handles {runtime.Id:x}, {map.Id:x}, and {request.Id:x}.");

@@ -355,6 +355,12 @@ mln_map mln_test_create_map(mln_runtime runtime) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
+mln_map mln_test_create_styled_map(mln_runtime runtime) {
+  const mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
+  return map;
+}
+
 void mln_test_destroy_runtime(mln_runtime runtime) {
   MLN_TEST_OK(mln_test_runtime_close(runtime));
   release_event_queue(runtime);

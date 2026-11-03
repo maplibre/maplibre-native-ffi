@@ -52,6 +52,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun addCustomGeometrySource(
     sourceId: String,
@@ -78,6 +79,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun addCustomVectorSource(
     sourceId: String,
@@ -107,6 +109,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun addGeoJsonSourceData(
     sourceId: String,
@@ -135,6 +138,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun addImageSourceImage(
     sourceId: String,
@@ -170,6 +174,7 @@ internal constructor(
    * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`, or no source with the
    *   ID that the layer uses.
    * - `Status.ALREADY_EXISTS` when the style already has a layer with the new layer's ID.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun addStyleLayerJson(
     layerJson: String,
@@ -198,6 +203,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun addStyleSourceJson(sourceId: String, sourceJson: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1042,6 +1048,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId` or `beforeLayerId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun moveStyleLayer(layerId: String, beforeLayerId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1094,6 +1101,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no image named `imageId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1109,6 +1117,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1124,7 +1133,8 @@ internal constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_STATE` when a layer still uses the source.
+   * - `Status.INVALID_STATE` when a layer still uses the source, or while the style isn't loaded,
+   *   as `MapHandle.setStyleUrl()` describes.
    */
   public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1401,6 +1411,7 @@ internal constructor(
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source, or `data`
    *   was prepared with other options.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setGeoJsonSourceData(
     sourceId: String,
@@ -1433,6 +1444,7 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setGeoJsonSourceSynchronousTiling(
     sourceId: String,
@@ -1460,6 +1472,7 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setGeoJsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1483,8 +1496,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` until the map has parsed its style, which
-   *   `RuntimeEventType.MAP_STYLE_LOADED` reports, and again while it loads a new style URL.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setGlobalStateProperty(
     propertyName: String,
@@ -1514,6 +1526,7 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setImageSourceCoordinates(
     sourceId: String,
@@ -1542,6 +1555,7 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setImageSourceImage(
     sourceId: String,
@@ -1569,6 +1583,7 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1614,6 +1629,10 @@ internal constructor(
    *
    * See `mln_map_set_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setStyleImage(
     imageId: String,
@@ -1636,14 +1655,16 @@ internal constructor(
   /**
    * Loads the map's style from `json`.
    *
-   * The style's sources, sprites, and glyphs load in the background.
+   * The command completes once the style has parsed, and the map's style is then loaded, as
+   * `MapHandle.setStyleUrl()` describes. The style's sources, sprites, and glyphs load in the
+   * background.
    *
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    *
    * Errors:
    *
-   * - `Status.NATIVE_ERROR` when `json` isn't a valid style.
+   * - `Status.NATIVE_ERROR` when `json` isn't a valid style. The map keeps its current style.
    */
   public fun setStyleJson(json: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1664,6 +1685,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setStyleLayerProperty(
     layerId: String,
@@ -1689,6 +1711,10 @@ internal constructor(
    *
    * See `mln_map_set_style_light_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setStyleLightJson(lightJson: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
@@ -1700,6 +1726,10 @@ internal constructor(
    *
    * See `mln_map_set_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setStyleLightProperty(
     propertyName: String,
@@ -1728,6 +1758,7 @@ internal constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setStyleSourceVolatile(
     sourceId: String,
@@ -1750,6 +1781,10 @@ internal constructor(
    *
    * See `mln_map_set_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
   public fun setStyleTransitionOptions(
     options: StyleTransitionOptions,
@@ -1768,12 +1803,24 @@ internal constructor(
   /**
    * Loads the map's style from `url`.
    *
-   * The style loads in the background, and `RuntimeEventType.MAP_STYLE_LOADED` or
-   * `RuntimeEventType.MAP_LOADING_FAILED` reports how the load ends. Sources, layers, and images
-   * added before the style loads are lost when it loads.
+   * The command completes once the style document has loaded and parsed. The style's sources,
+   * sprites, and glyphs then load in the background.
+   *
+   * The map's style is loaded from the time a style document parses until the next call to this
+   * function. It isn't loaded before the map's first style parses, while a style URL loads, or
+   * after a style URL fails to load. While the style isn't loaded, the commands that change it
+   * complete with `Status.INVALID_STATE`, because the next style to parse would replace their
+   * changes. To change a new map's style without a style document, first load an empty style, such
+   * as `{"version":8,"sources":{},"layers":[]}`.
    *
    * See `mln_map_set_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NATIVE_ERROR` when the style document fails to load or isn't a valid style.
+   * - `Status.CANCELLED` when the map is released, or this function or `MapHandle.setStyleJson()`
+   *   loads another style, before the style document parses.
    */
   public fun setStyleUrl(url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {

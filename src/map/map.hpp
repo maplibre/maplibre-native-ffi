@@ -300,8 +300,19 @@ auto map_get_feature_state_start(
 auto map_remove_feature_state(
   MapObject& live, const mln_feature_state_selector* selector
 ) -> mln_status;
+// Starts loading the map's style on the runtime worker. A failure that
+// MapLibre reports through its observer is read by submit_map_style_load().
+using StyleLoadFunction = std::function<mln_status(MapObject&)>;
+auto submit_map_style_load(
+  mln_map map, StyleLoadFunction load, const mln_completion* completion
+) -> mln_status;
 auto map_set_style_url(MapObject& live, const char* url) -> mln_status;
 auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status;
+// Fails with MLN_STATUS_INVALID_STATE while the map's style is not loaded:
+// before its first style parses, while a style URL loads, and after a style
+// URL fails to load. Style edits check it on the runtime worker, because the
+// parse that ends a load replaces the whole style.
+auto require_style_loaded(MapObject& live) -> mln_status;
 auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
   -> mln_status;
 auto map_style_url_start(mln_map map, const mln_completion* completion)

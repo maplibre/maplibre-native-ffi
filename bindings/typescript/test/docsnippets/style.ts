@@ -19,11 +19,12 @@ function drawImage(_imageId: string): PremultipliedRgba8Image {
 }
 
 // pixels holds 16 x 16 premultiplied RGBA pixels.
-export function style(map: MapHandle, pixels: Uint8Array): void {
+export async function style(
+  map: MapHandle,
+  pixels: Uint8Array,
+): Promise<void> {
   // #region load
-  map.discarding.setStyleUrl(
-    "https://demotiles.maplibre.org/style.json",
-  );
+  await map.setStyleUrl("https://demotiles.maplibre.org/style.json");
   // #endregion load
 
   // #region add

@@ -13,6 +13,8 @@ public extension MapHandle {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func addCustomGeometrySource(
     _ bindingArg0: String,
@@ -38,6 +40,8 @@ public extension MapHandle {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func addCustomVectorSource(
     _ bindingArg0: String,
@@ -66,6 +70,8 @@ public extension MapHandle {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func addGeoJsonSourceData(
     _ bindingArg0: String,
@@ -93,6 +99,8 @@ public extension MapHandle {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func addImageSourceImage(
     _ bindingArg0: String,
@@ -128,6 +136,8 @@ public extension MapHandle {
   ///   no source with the ID that the layer uses.
   /// - `Status.alreadyExists` when the style already has a layer with the new
   ///   layer's ID.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func addStyleLayerJson(
     _ bindingArg0: String,
@@ -156,6 +166,8 @@ public extension MapHandle {
   ///
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func addStyleSourceJson(
     _ bindingArg0: String,
@@ -504,6 +516,8 @@ public extension MapHandle {
   ///
   /// - `Status.notFound` when the style has no layer named `layerId` or
   ///   `beforeLayerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func moveStyleLayer(
     _ bindingArg0: String,
@@ -528,6 +542,8 @@ public extension MapHandle {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no image named `imageId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func removeStyleImage(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -550,6 +566,8 @@ public extension MapHandle {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no layer named `layerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func removeStyleLayer(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -572,7 +590,8 @@ public extension MapHandle {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no source named `sourceId`.
-  /// - `Status.invalidState` when a layer still uses the source.
+  /// - `Status.invalidState` when a layer still uses the source, or while the
+  ///   style isn't loaded, as `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func removeStyleSource(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -721,6 +740,8 @@ public extension MapHandle {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
   ///   GeoJSON source, or `data` was prepared with other options.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setGeoJsonSourceData(
     _ bindingArg0: String,
@@ -752,6 +773,8 @@ public extension MapHandle {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
   ///   GeoJSON source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setGeoJsonSourceSynchronousTiling(
     _ bindingArg0: String,
@@ -778,6 +801,8 @@ public extension MapHandle {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
   ///   GeoJSON source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setGeoJsonSourceUrl(
     _ bindingArg0: String,
@@ -803,9 +828,8 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.invalidState` until the map has parsed its style, which
-  ///   `RuntimeEventType.mapStyleLoaded` reports, and again while it loads a
-  ///   new style URL.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setGlobalStateProperty(
     _ bindingArg0: String,
@@ -834,6 +858,8 @@ public extension MapHandle {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
   ///   source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setImageSourceCoordinates(
     _ bindingArg0: String,
@@ -861,6 +887,8 @@ public extension MapHandle {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
   ///   source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setImageSourceImage(
     _ bindingArg0: String,
@@ -887,6 +915,8 @@ public extension MapHandle {
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't an image
   ///   source.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setImageSourceUrl(_ bindingArg0: String,
                          url bindingArg1: String) async throws
@@ -907,6 +937,11 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setStyleImage(
     _ bindingArg0: String,
@@ -939,6 +974,8 @@ public extension MapHandle {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no layer named `layerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setStyleLayerProperty(
     _ bindingArg0: String,
@@ -962,6 +999,11 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_style_light_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setStyleLightJson(_ bindingArg0: String) async throws
     -> CommandCompletion
@@ -980,6 +1022,11 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_style_light_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setStyleLightProperty(
     _ bindingArg0: String,
@@ -1007,6 +1054,8 @@ public extension MapHandle {
   /// Errors:
   ///
   /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setStyleSourceVolatile(
     _ bindingArg0: String,
@@ -1027,6 +1076,11 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_style_transition_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setStyleTransitionOptions(
     _ bindingArg0: StyleTransitionOptions

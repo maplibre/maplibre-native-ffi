@@ -58,7 +58,7 @@ test "an error returned by a resource provider is contained" {
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     loaded.deinit();
 
-    try support.expectCommitted(try fixture.map.setStyleUrl("custom://unanswered.json", null));
+    try fixture.map.discarding().setStyleUrl("custom://unanswered.json", null);
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
 }
@@ -84,7 +84,8 @@ const DeferringProvider = struct {
 
     fn take(self: *DeferringProvider, fixture: *support.Fixture) !maplibre.ResourceRequest {
         const index = self.taken.get();
-        try support.expectCommitted(try fixture.map.setStyleUrl(self.url, null));
+        // The load waits for the kept request, so its result is discarded.
+        try fixture.map.discarding().setStyleUrl(self.url, null);
         try self.taken.waitFor(index + 1);
         return self.handles[index];
     }
@@ -163,7 +164,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     var probe = HeaderProbe{};
     try support.expectCommitted(try fixture.runtime.setHttpHeaderTransform(testing.allocator, .init(&probe, HeaderProbe.transform, null), null));
 
-    try support.expectCommitted(try fixture.map.setStyleUrl("http://127.0.0.1:1/style.json", null));
+    try fixture.map.discarding().setStyleUrl("http://127.0.0.1:1/style.json", null);
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
@@ -206,7 +207,7 @@ test "a transform request is answered from another thread after its callback" {
     var probe = TransformProbe{};
     try support.expectCommitted(try fixture.runtime.setResourceTransform(.init(&probe, TransformProbe.transform, null), null));
 
-    try support.expectCommitted(try fixture.map.setStyleUrl("unsupported://original.json", null));
+    try fixture.map.discarding().setStyleUrl("unsupported://original.json", null);
     try probe.taken.waitFor(1);
     var request = probe.saved.?;
     var answered: ?anyerror = null;
@@ -281,7 +282,7 @@ test "a provider receives only the requests its routes match" {
     _ = scratch.reset(.free_all);
     try support.expectCommitted(registered);
 
-    try support.expectCommitted(try fixture.map.setStyleUrl("custom://outside.json", null));
+    try fixture.map.discarding().setStyleUrl("custom://outside.json", null);
     var failed = try fixture.waitForEvent(.map_loading_failed);
     defer failed.deinit();
     try testing.expect(std.mem.indexOf(u8, failed.value.message, "custom://outside.json") != null);

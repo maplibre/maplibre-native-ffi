@@ -97,7 +97,7 @@ static layer_probe take_layer_result(
 
 static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   TEST_ASSERT_FALSE(take_layer_result(runtime, map, "missing-layer").found);
 
   add_source(map, "info-source");
@@ -193,7 +193,7 @@ static mln_status read_layer_filter(
 
 static void layer_properties_and_filters_round_trip_through_json(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   add_source(map, "points");
   add_layer(
     map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
@@ -264,7 +264,7 @@ static mln_status read_layer_json(
 
 static void root_properties_match_serialization_and_null_resets_zoom(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   add_source(map, "points");
   add_layer(
     map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
@@ -305,7 +305,7 @@ static void root_properties_match_serialization_and_null_resets_zoom(void) {
 
 static void layer_json_serializes_the_current_layer(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   add_layer(
     map,
     "{\"id\":\"paper\",\"type\":\"background\",\"paint\":{"
@@ -352,7 +352,7 @@ static void move_layer(mln_map map, const char* layer, const char* before) {
 
 static void layers_list_in_style_order_after_moves(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   add_source(map, "points");
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
     map, MLN_BUFFER_LITERAL("tiles"),
@@ -400,7 +400,7 @@ static void layers_list_in_style_order_after_moves(void) {
 
 static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   add_source(map, "points");
   add_layer(
     map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
@@ -457,7 +457,7 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
 // draw one.
 static void a_layer_requires_a_source_that_supports_its_type(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   add_dem_source(map, "dem");
   add_source(map, "points");
 

@@ -20,10 +20,12 @@ fn drawImage(_: []const u8) maplibre.PremultipliedRgba8Image {
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 fn style(pixels: []const u8) !void {
     // #region load
-    try map.discarding().setStyleUrl(
+    var loaded = try map.setStyleUrl(
         "https://demotiles.maplibre.org/style.json",
         null,
     );
+    defer loaded.deinit();
+    _ = try loaded.wait(null);
     // #endregion load
 
     // #region add

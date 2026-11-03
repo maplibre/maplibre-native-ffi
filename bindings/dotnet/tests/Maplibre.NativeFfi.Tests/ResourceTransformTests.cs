@@ -146,7 +146,7 @@ public sealed class ResourceTransformTests
                 }
             )
         );
-        await fixture.Map.SetStyleUrlAsync(styleUrl);
+        var loaded = fixture.Map.SetStyleUrlAsync(styleUrl);
         var request = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         await Task.Run(() => request.Complete("unsupported://rewritten.json"), TestWaits.Token);
@@ -157,7 +157,10 @@ public sealed class ResourceTransformTests
         );
         Assert.Equal(Status.InvalidState, error.Status);
         // The online source cannot load the rewritten scheme.
-        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+        var failure = await Assert.ThrowsAsync<MaplibreException>(() =>
+            loaded.WaitAsync(TestWaits.Deadline, TestWaits.Token)
+        );
+        Assert.Equal(Status.NativeError, failure.Status);
         await fixture.Runtime.ClearResourceTransformAsync();
     }
 }

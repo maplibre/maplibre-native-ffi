@@ -65,7 +65,7 @@ struct GlobalStateTests {
         })
       )
       for url in [refused, broken] {
-        try await fixture.map.setStyleUrl(url)
+        try fixture.map.discarding.setStyleUrl(url)
         let failure = try await fixture
           .awaitEvent("the request to fail") { $0.type == .mapLoadingFailed }
         #expect(failure != nil)

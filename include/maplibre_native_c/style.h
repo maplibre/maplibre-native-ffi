@@ -26,9 +26,8 @@ extern "C" {
  * [expressions](https://maplibre.org/maplibre-style-spec/expressions/) read.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_STATE until the map has parsed its style, which
- *   MLN_RUNTIME_EVENT_MAP_STYLE_LOADED reports, and again while it loads a new
- *   style URL.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_global_state_property(
@@ -507,6 +506,8 @@ typedef struct mln_style_transition_options {
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_source_json(
@@ -520,7 +521,8 @@ MLN_API mln_status mln_map_add_style_source_json(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
- * - MLN_STATUS_INVALID_STATE when a layer still uses the source.
+ * - MLN_STATUS_INVALID_STATE when a layer still uses the source, or while the
+ *   style isn't loaded, as mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_source(
@@ -546,6 +548,8 @@ MLN_API mln_status mln_map_get_style_source(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_source_volatile(
@@ -596,6 +600,8 @@ MLN_API void mln_geo_json_source_data_release(
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geo_json_source_data(
@@ -610,6 +616,8 @@ MLN_API mln_status mln_map_add_geo_json_source_data(
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
  *   GeoJSON source.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_url(
@@ -628,6 +636,8 @@ MLN_API mln_status mln_map_set_geo_json_source_url(
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
  *   GeoJSON source, or `data` was prepared with other options.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_data(
@@ -647,6 +657,8 @@ MLN_API mln_status mln_map_set_geo_json_source_data(
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
  *   GeoJSON source.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
@@ -660,6 +672,8 @@ MLN_API mln_status mln_map_set_geo_json_source_synchronous_tiling(
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  *
  * Lifetimes:
  * When this function returns an error, the caller keeps `user_data` and the
@@ -740,6 +754,8 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  *
  * Lifetimes:
  * When this function returns an error, the caller keeps `user_data` and the
@@ -800,7 +816,13 @@ MLN_API mln_status mln_map_invalidate_custom_vector_source_tile(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Adds an image to the map's style, or replaces the image named `image_id`. */
+/**
+ * Adds an image to the map's style, or replaces the image named `image_id`.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
+ */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,
@@ -814,6 +836,8 @@ MLN_API mln_status mln_map_set_style_image(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no image named `image_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_image(
@@ -840,6 +864,8 @@ MLN_API mln_status mln_map_get_style_image(
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_image_source_image(
@@ -856,6 +882,8 @@ MLN_API mln_status mln_map_add_image_source_image(
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
  *   image source.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_url(
@@ -870,6 +898,8 @@ MLN_API mln_status mln_map_set_image_source_url(
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
  *   image source.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_image(
@@ -887,6 +917,8 @@ MLN_API mln_status mln_map_set_image_source_image(
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't an
  *   image source.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_coordinates(
@@ -922,6 +954,8 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
  *   or no source with the ID that the layer uses.
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a layer with the new
  *   layer's ID.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_layer_json(
@@ -935,6 +969,8 @@ MLN_API mln_status mln_map_add_style_layer_json(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_layer(
@@ -966,6 +1002,8 @@ MLN_API mln_status mln_map_list_style_layers(
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id` or
  *   `before_layer_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_move_style_layer(
@@ -991,6 +1029,10 @@ MLN_API mln_status mln_map_get_style_layer_json(
 /**
  * Replaces the [light](https://maplibre.org/maplibre-style-spec/light/) of the
  * map's style.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_light_json(
@@ -998,7 +1040,13 @@ MLN_API mln_status mln_map_set_style_light_json(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Sets a property of the light of the map's style. */
+/**
+ * Sets a property of the light of the map's style.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
+ */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_light_property(
   mln_map map, mln_buffer_view property_name,
@@ -1020,7 +1068,13 @@ MLN_API mln_status mln_map_get_style_light_property(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Sets the default transition of the map's style. */
+/**
+ * Sets the default transition of the map's style.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
+ */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options,
@@ -1043,6 +1097,8 @@ MLN_API mln_status mln_map_get_style_transition_options(
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_layer_property(

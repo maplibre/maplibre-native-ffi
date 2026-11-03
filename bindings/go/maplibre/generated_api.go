@@ -6290,6 +6290,8 @@ func LogicalExtentPhysicalSize(extent LogicalExtent) (width uint32, height uint3
 //
 // Errors:
 //   - StatusAlreadyExists when the style already has a source named sourceId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
@@ -6303,6 +6305,8 @@ func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options Cust
 //
 // Errors:
 //   - StatusAlreadyExists when the style already has a source named sourceId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) AddCustomVectorSource(sourceId string, options CustomVectorSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomVectorSourceOptions(options, arena), arena), completion, diagnostic))
@@ -6319,6 +6323,8 @@ func (receiver *MapHandle) AddCustomVectorSource(sourceId string, options Custom
 //
 // Errors:
 //   - StatusAlreadyExists when the style already has a source named sourceId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) AddGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
@@ -6334,6 +6340,8 @@ func (receiver *MapHandle) AddGeoJsonSourceData(sourceId string, data *GeoJsonSo
 //
 // Errors:
 //   - StatusAlreadyExists when the style already has a source named sourceId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
@@ -6354,6 +6362,8 @@ func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []La
 //     source with the ID that the layer uses.
 //   - StatusAlreadyExists when the style already has a layer with the new
 //     layer's ID.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) AddStyleLayerJson(layerJson string, beforeLayerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
@@ -6370,6 +6380,8 @@ func (receiver *MapHandle) AddStyleLayerJson(layerJson string, beforeLayerId str
 //
 // Errors:
 //   - StatusAlreadyExists when the style already has a source named sourceId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
@@ -6983,6 +6995,8 @@ func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error
 // Errors:
 //   - StatusNotFound when the style has no layer named layerId or
 //     beforeLayerId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(beforeLayerId, arena), completion, diagnostic))
@@ -7198,6 +7212,8 @@ func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*F
 //
 // Errors:
 //   - StatusNotFound when the style has no image named imageId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
@@ -7211,6 +7227,8 @@ func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandComp
 //
 // Errors:
 //   - StatusNotFound when the style has no layer named layerId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
@@ -7224,7 +7242,8 @@ func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandComp
 //
 // Errors:
 //   - StatusNotFound when the style has no source named sourceId.
-//   - StatusInvalidState when a layer still uses the source.
+//   - StatusInvalidState when a layer still uses the source, or while the style
+//     isn't loaded, as MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_remove_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
@@ -7425,6 +7444,8 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 //   - StatusNotFound when the style has no source named sourceId.
 //   - StatusInvalidArgument when the source named sourceId isn't a GeoJSON
 //     source, or data was prepared with other options.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetGeoJsonSourceData(sourceId string, data *GeoJsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geo_json_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
@@ -7446,6 +7467,8 @@ func (receiver *MapHandle) SetGeoJsonSourceData(sourceId string, data *GeoJsonSo
 //   - StatusNotFound when the style has no source named sourceId.
 //   - StatusInvalidArgument when the source named sourceId isn't a GeoJSON
 //     source.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetGeoJsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geo_json_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
@@ -7461,6 +7484,8 @@ func (receiver *MapHandle) SetGeoJsonSourceSynchronousTiling(sourceId string, en
 //   - StatusNotFound when the style has no source named sourceId.
 //   - StatusInvalidArgument when the source named sourceId isn't a GeoJSON
 //     source.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetGeoJsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_geo_json_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
@@ -7474,9 +7499,8 @@ func (receiver *MapHandle) SetGeoJsonSourceUrl(sourceId string, url string) (*Fu
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
-//   - StatusInvalidState until the map has parsed its style, which
-//     RuntimeEventTypeMapStyleLoaded reports, and again while it loads a new
-//     style URL.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
@@ -7494,6 +7518,8 @@ func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value str
 //   - StatusNotFound when the style has no source named sourceId.
 //   - StatusInvalidArgument when the source named sourceId isn't an image
 //     source.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinates []LatLng) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), completion, diagnostic))
@@ -7509,6 +7535,8 @@ func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinate
 //   - StatusNotFound when the style has no source named sourceId.
 //   - StatusInvalidArgument when the source named sourceId isn't an image
 //     source.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetImageSourceImage(sourceId string, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
@@ -7524,6 +7552,8 @@ func (receiver *MapHandle) SetImageSourceImage(sourceId string, image Premultipl
 //   - StatusNotFound when the style has no source named sourceId.
 //   - StatusInvalidArgument when the source named sourceId isn't an image
 //     source.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
@@ -7559,6 +7589,10 @@ func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[C
 //
 // See mln_map_set_style_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba8Image, options *StyleImageOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_image(C.mln_map(raw), bindingView(imageId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), bindingStoreOptional(options, arena, nativeStyleImageOptions), completion, diagnostic))
@@ -7567,13 +7601,16 @@ func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba
 
 // SetStyleJson loads the map's style from json.
 //
-// The style's sources, sprites, and glyphs load in the background.
+// The command completes once the style has parsed, and the map's style is then
+// loaded, as MapHandle.SetStyleUrl() describes. The style's sources, sprites,
+// and glyphs load in the background.
 //
 // See mln_map_set_style_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 //
 // Errors:
-//   - StatusNativeError when json isn't a valid style.
+//   - StatusNativeError when json isn't a valid style. The map keeps its
+//     current style.
 func (receiver *MapHandle) SetStyleJson(json string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
@@ -7592,6 +7629,8 @@ func (receiver *MapHandle) SetStyleJson(json string) (*Future[CommandCompletion]
 //
 // Errors:
 //   - StatusNotFound when the style has no layer named layerId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
@@ -7603,6 +7642,10 @@ func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName st
 //
 // See mln_map_set_style_light_json in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetStyleLightJson(lightJson string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
@@ -7613,6 +7656,10 @@ func (receiver *MapHandle) SetStyleLightJson(lightJson string) (*Future[CommandC
 //
 // See mln_map_set_style_light_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
@@ -7628,6 +7675,8 @@ func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value stri
 //
 // Errors:
 //   - StatusNotFound when the style has no source named sourceId.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bool) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_source_volatile(C.mln_map(raw), bindingView(sourceId, arena), C.bool(isVolatile), completion, diagnostic))
@@ -7638,6 +7687,10 @@ func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bo
 //
 // See mln_map_set_style_transition_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleUrl() describes.
 func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_transition_options(C.mln_map(raw), bindingStore(nativeStyleTransitionOptions(options, arena), arena), completion, diagnostic))
@@ -7646,12 +7699,26 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 
 // SetStyleUrl loads the map's style from url.
 //
-// The style loads in the background, and RuntimeEventTypeMapStyleLoaded or
-// RuntimeEventTypeMapLoadingFailed reports how the load ends. Sources, layers,
-// and images added before the style loads are lost when it loads.
+// The command completes once the style document has loaded and parsed. The
+// style's sources, sprites, and glyphs then load in the background.
+//
+// The map's style is loaded from the time a style document parses until the
+// next call to this function. It isn't loaded before the map's first style
+// parses, while a style URL loads, or after a style URL fails to load. While
+// the style isn't loaded, the commands that change it complete with
+// StatusInvalidState, because the next style to parse would replace their
+// changes. To change a new map's style without a style document, first load an
+// empty style, such as {"version":8,"sources":{},"layers":[]}.
 //
 // See mln_map_set_style_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+//
+// Errors:
+//   - StatusNativeError when the style document fails to load or isn't a valid
+//     style.
+//   - StatusCancelled when the map is released, or this function or
+//     MapHandle.SetStyleJson() loads another style, before the style document
+//     parses.
 func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_url(C.mln_map(raw), bindingView(url, arena), completion, diagnostic))

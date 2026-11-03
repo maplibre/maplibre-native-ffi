@@ -125,7 +125,7 @@ static void add_source_json(mln_map map, const char* id, const char* json) {
 
 static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
 
   add_source_json(
@@ -378,7 +378,7 @@ static bool source_is_volatile(mln_map map) {
 
 static void style_source_volatility_round_trips(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   const mln_buffer_view source_id = MLN_BUFFER_LITERAL("volatile-vector");
   add_source_json(
     map, "volatile-vector",
@@ -402,7 +402,7 @@ static void style_source_volatility_round_trips(void) {
 
 static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   const mln_buffer_view in_use = MLN_BUFFER_LITERAL("in-use");
   add_source_json(map, "in-use", MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
@@ -448,7 +448,7 @@ static const mln_lat_lng corners[4] = {{1, 2}, {1, 3}, {0, 3}, {0, 2}};
 
 static void image_sources_take_corners_images_and_urls(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
   const uint8_t pixels[16] = {
     255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,

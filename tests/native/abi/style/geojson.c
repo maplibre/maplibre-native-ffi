@@ -442,7 +442,7 @@ static void change_buffer(mln_geo_json_source_options* options) {
 // expressions, not as JSON text.
 static void prepared_data_must_match_the_source_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_styled_map(runtime);
   static const char points[] = POINT_COLLECTION("clustered");
   const mln_buffer_view id = MLN_BUFFER_LITERAL("clustered");
 

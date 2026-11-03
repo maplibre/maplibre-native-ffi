@@ -96,6 +96,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> AddCustomGeometrySourceAsync(
@@ -126,6 +129,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> AddCustomVectorSourceAsync(
@@ -158,6 +164,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> AddGeoJsonSourceDataAsync(
@@ -189,6 +198,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> AddImageSourceImageAsync(
@@ -232,6 +244,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// uses.</description></item>
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a layer with the new layer's ID.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> AddStyleLayerJsonAsync(string layerJson, string beforeLayerId)
@@ -261,6 +276,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> AddStyleSourceJsonAsync(string sourceId, string sourceJson)
@@ -1550,6 +1568,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.NotFound</c> when the style has no layer
     /// named <c>layerId</c> or <c>beforeLayerId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> MoveStyleLayerAsync(string layerId, string beforeLayerId)
@@ -1625,6 +1646,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.NotFound</c> when the style has no image
     /// named <c>imageId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> RemoveStyleImageAsync(string imageId)
@@ -1650,6 +1674,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.NotFound</c> when the style has no layer
     /// named <c>layerId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> RemoveStyleLayerAsync(string layerId)
@@ -1676,7 +1703,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <item><description><c>Status.NotFound</c> when the style has no source
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidState</c> when a layer still uses
-    /// the source.</description></item>
+    /// the source, or while the style isn't loaded, as
+    /// <c>MapHandle.SetStyleUrlAsync()</c> describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> RemoveStyleSourceAsync(string sourceId)
@@ -2042,6 +2070,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <item><description><c>Status.InvalidArgument</c> when the source named
     /// <c>sourceId</c> isn't a GeoJSON source, or <c>data</c> was prepared with
     /// other options.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetGeoJsonSourceDataAsync(
@@ -2079,6 +2110,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source named
     /// <c>sourceId</c> isn't a GeoJSON source.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetGeoJsonSourceSynchronousTilingAsync(
@@ -2110,6 +2144,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source named
     /// <c>sourceId</c> isn't a GeoJSON source.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetGeoJsonSourceUrlAsync(string sourceId, string url)
@@ -2136,9 +2173,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> until the map has parsed
-    /// its style, which <c>RuntimeEventType.MapStyleLoaded</c> reports, and
-    /// again while it loads a new style URL.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetGlobalStatePropertyAsync(string propertyName, string value)
@@ -2169,6 +2206,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source named
     /// <c>sourceId</c> isn't an image source.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetImageSourceCoordinatesAsync(
@@ -2204,6 +2244,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source named
     /// <c>sourceId</c> isn't an image source.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetImageSourceImageAsync(
@@ -2236,6 +2279,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source named
     /// <c>sourceId</c> isn't an image source.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetImageSourceUrlAsync(string sourceId, string url)
@@ -2301,8 +2347,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <c>imageId</c>.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_set_style_image</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// <para>See <c>mln_map_set_style_image</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleImageAsync(
         string imageId,
@@ -2331,14 +2383,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Loads the map's style from <c>json</c>.
     /// </summary>
     /// <remarks>
-    /// <para>The style's sources, sprites, and glyphs load in the
-    /// background.</para>
+    /// <para>The command completes once the style has parsed, and the map's
+    /// style is then loaded, as <c>MapHandle.SetStyleUrlAsync()</c> describes.
+    /// The style's sources, sprites, and glyphs load in the background.</para>
     /// <para>See <c>mln_map_set_style_json</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.NativeError</c> when <c>json</c> isn't a
-    /// valid style.</description></item>
+    /// valid style. The map keeps its current style.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleJsonAsync(string json)
@@ -2369,6 +2422,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.NotFound</c> when the style has no layer
     /// named <c>layerId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleLayerPropertyAsync(
@@ -2395,8 +2451,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// the map's style.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_set_style_light_json</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// <para>See <c>mln_map_set_style_light_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleLightJsonAsync(string lightJson)
     {
@@ -2415,8 +2477,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Sets a property of the light of the map's style.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_set_style_light_property</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// <para>See <c>mln_map_set_style_light_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleLightPropertyAsync(string propertyName, string value)
     {
@@ -2444,6 +2512,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <list type="bullet">
     /// <item><description><c>Status.NotFound</c> when the style has no source
     /// named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleSourceVolatileAsync(string sourceId, bool isVolatile)
@@ -2464,8 +2535,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Sets the default transition of the map's style.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_set_style_transition_options</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// <para>See <c>mln_map_set_style_transition_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleTransitionOptionsAsync(StyleTransitionOptions options)
     {
@@ -2485,13 +2562,27 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Loads the map's style from <c>url</c>.
     /// </summary>
     /// <remarks>
-    /// <para>The style loads in the background, and
-    /// <c>RuntimeEventType.MapStyleLoaded</c> or
-    /// <c>RuntimeEventType.MapLoadingFailed</c> reports how the load ends.
-    /// Sources, layers, and images added before the style loads are lost when
-    /// it loads.</para>
+    /// <para>The command completes once the style document has loaded and
+    /// parsed. The style's sources, sprites, and glyphs then load in the
+    /// background.</para>
+    /// <para>The map's style is loaded from the time a style document parses
+    /// until the next call to this function. It isn't loaded before the map's
+    /// first style parses, while a style URL loads, or after a style URL fails
+    /// to load. While the style isn't loaded, the commands that change it
+    /// complete with <c>Status.InvalidState</c>, because the next style to
+    /// parse would replace their changes. To change a new map's style without a
+    /// style document, first load an empty style, such as
+    /// <c>{"version":8,"sources":{},"layers":[]}</c>.</para>
     /// <para>See <c>mln_map_set_style_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.NativeError</c> when the style document
+    /// fails to load or isn't a valid style.</description></item>
+    /// <item><description><c>Status.Cancelled</c> when the map is released, or
+    /// this function or <c>MapHandle.SetStyleJsonAsync()</c> loads another
+    /// style, before the style document parses.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleUrlAsync(string url)
     {

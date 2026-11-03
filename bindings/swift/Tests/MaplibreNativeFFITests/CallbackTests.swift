@@ -65,7 +65,8 @@ func installProvider(
     ) { handle in
       taken.update { $0 = handle }
     }
-    try await fixture.map.setStyleUrl("custom://later.json")
+    // The load waits for the taken request, so its result is discarded.
+    try fixture.map.discarding.setStyleUrl("custom://later.json")
     await awaitCondition("the provider to take the request") {
       taken.value != nil
     }
@@ -113,7 +114,7 @@ func installProvider(
         escaped.update { $0 = response }
       })
     )
-    try await fixture.map.setStyleUrl(url)
+    try fixture.map.discarding.setStyleUrl(url)
     let failure = try await fixture
       .awaitEvent("the request to fail") {
         $0.type == .mapLoadingFailed
@@ -145,7 +146,7 @@ func installProvider(
         taken.update { $0 = request }
       })
     )
-    try await fixture.map.setStyleUrl(url)
+    try fixture.map.discarding.setStyleUrl(url)
     await awaitCondition("the transform to take the request") {
       taken.value != nil
     }
@@ -207,7 +208,7 @@ func installProvider(
     }
 
     // Outside the routes, native loading has no transport for the scheme.
-    try await fixture.map.setStyleUrl("custom://elsewhere/style.json")
+    try fixture.map.discarding.setStyleUrl("custom://elsewhere/style.json")
     #expect(try await fixture.awaitEvent("the unrouted style to fail") {
       $0.type == .mapLoadingFailed && $0.message.contains("elsewhere")
     } != nil)

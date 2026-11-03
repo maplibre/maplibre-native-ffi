@@ -86,6 +86,9 @@ mln_status mln_test_runtime_close(mln_runtime runtime);
 // pixel, the extent the cases assume unless they set their own.
 mln_map_options mln_test_map_options(void);
 mln_map mln_test_create_map(mln_runtime runtime);
+// mln_test_create_map() with mln_test_empty_style_json loaded, for a case
+// that edits the style, which a map accepts only once a style has loaded.
+mln_map mln_test_create_styled_map(mln_runtime runtime);
 mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options
 );
