@@ -290,7 +290,12 @@ class FailingFrameBackend final : public mln::core::TextureSessionBackend {
   }
   void quarantine() noexcept override { backend_->quarantine(); }
   auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status override {
-    if (failure_ == FrameFailure::Release) return MLN_STATUS_NATIVE_ERROR;
+    if (failure_ == FrameFailure::Release) {
+      mln::core::set_thread_error(
+        "waiting for the consumer synchronization failed"
+      );
+      return MLN_STATUS_NATIVE_ERROR;
+    }
     if (failure_ == FrameFailure::ReleaseTargetLost) {
       mln::core::set_thread_error("consumer synchronization lost its target");
       return MLN_STATUS_TARGET_LOST;
@@ -1639,19 +1644,18 @@ void fence_driver(const Fixture& fixture) {
   mln_test_completion_destroy(&fence);
 }
 
-// A release whose wait for the host's GPU fails quarantines its slot.
-// Quarantining the last usable one ends the demand that waits for a map
-// update, which no slot could ever render.
-void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
+// A release whose wait for the host's GPU fails fails the session through
+// its failure channel: a waiting demand ends FAILED, and the failure reports
+// the wait's error.
+void a_failed_release_wait_fails_the_session() {
   for (const auto failure :
        {FrameFailure::Release, FrameFailure::ReleaseTargetLost}) {
     auto fixture = Fixture{};
     create_fixture(fixture);
     render_until_idle(fixture);
     install_frame_failure(fixture, failure);
-    auto first = mln_test_render_and_acquire(&fixture.render, 171);
-    auto second = mln_test_render_and_acquire(&fixture.render, 172);
-    MLN_TEST_OK(request_waiting(fixture, 173));
+    auto frame = mln_test_render_and_acquire(&fixture.render, 171);
+    MLN_TEST_OK(request_waiting(fixture, 172));
     fence_driver(fixture);
     const auto fenced = mln_gpu_sync{
       .size = sizeof(mln_gpu_sync),
@@ -1659,30 +1663,28 @@ void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
       .handle = 1,
       .value = 0,
     };
-    MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
-    MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
+    MLN_TEST_OK(mln_acquired_frame_release(frame, &fenced, nullptr));
     const auto batch = wait_for_results(fixture);
     const auto ended = batch_result(batch, 0);
     mln_render_frame_batch_release(batch);
-    TEST_ASSERT_EQUAL_UINT64(173, ended.token);
-    TEST_ASSERT_EQUAL_UINT32(
-      failure == FrameFailure::Release ? MLN_RENDER_RESULT_TARGET_NOT_READY
-                                       : MLN_RENDER_RESULT_FAILED,
-      ended.disposition
-    );
+    TEST_ASSERT_EQUAL_UINT64(172, ended.token);
+    TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_FAILED, ended.disposition);
     auto saved = std::array<char, MLN_DIAGNOSTIC_MESSAGE_CAPACITY>{};
     MLN_TEST_STATUS(
-      failure == FrameFailure::Release ? MLN_STATUS_OK : MLN_STATUS_TARGET_LOST,
+      failure == FrameFailure::Release ? MLN_STATUS_NATIVE_ERROR
+                                       : MLN_STATUS_TARGET_LOST,
       mln_test_render_session_failure(
         fixture.render.session, saved.data(), saved.size()
       )
     );
-    if (failure == FrameFailure::ReleaseTargetLost)
-      TEST_ASSERT_EQUAL_STRING(
-        "consumer synchronization lost its target", saved.data()
-      );
-    // Detach keeps the quarantined ring, and a kept Vulkan ring is a child of
-    // the host's device.
+    TEST_ASSERT_EQUAL_STRING(
+      failure == FrameFailure::Release
+        ? "waiting for the consumer synchronization failed"
+        : "consumer synchronization lost its target",
+      saved.data()
+    );
+    // Detach keeps the quarantined slot's texture, and a kept Vulkan ring is a
+    // child of the host's device.
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
     mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
 #endif
@@ -1708,27 +1710,18 @@ void probe_results(void* context, const mln_completion_result*) {
   mln_test_pulse();
 }
 
-// Releases that quarantine the last slot leave a demand accepted after
+// Discards that quarantine the last slot leave a demand accepted after
 // maintenance to end in its own turn on the driver, after the maintenance.
-// The driver is held until the demand is accepted, since a ring the releases
-// already quarantined rejects the demand.
+// The driver is held until the discards, since a ring that is already
+// quarantined rejects the demand.
 void a_quarantined_ring_ends_a_demand_in_driver_order() {
   auto fixture = Fixture{};
   create_fixture(fixture);
   render_until_idle(fixture);
-  install_frame_failure(fixture, FrameFailure::Release);
   auto first = mln_test_render_and_acquire(&fixture.render, 181);
   auto second = mln_test_render_and_acquire(&fixture.render, 182);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
-  const auto fenced = mln_gpu_sync{
-    .size = sizeof(mln_gpu_sync),
-    .kind = MLN_GPU_SYNC_OPEN_GL_FENCE,
-    .handle = 1,
-    .value = 0,
-  };
-  MLN_TEST_OK(mln_acquired_frame_release(first, &fenced, nullptr));
-  MLN_TEST_OK(mln_acquired_frame_release(second, &fenced, nullptr));
   auto probe = MaintenanceProbe{.session = fixture.render.session};
   const auto maintenance = mln_completion{
     .size = sizeof(mln_completion),
@@ -1740,6 +1733,8 @@ void a_quarantined_ring_ends_a_demand_in_driver_order() {
     fixture.render.session, &maintenance, nullptr
   ));
   mln_test_render_request_forced(&fixture.render, 183);
+  MLN_TEST_OK(mln_acquired_frame_discard(first, nullptr));
+  MLN_TEST_OK(mln_acquired_frame_discard(second, nullptr));
   MLN_TEST_OK(blocker.finish(fixture.render));
   service_until(fixture, probe.done);
   TEST_ASSERT_FALSE(probe.results_queued);
@@ -1991,7 +1986,7 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_destroys_a_ring_whose_frame_release_is_still_queued);
   RUN_TEST(abandon_destroys_a_ring_released_with_a_gpu_wait_as_it_abandons);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
-  RUN_TEST(a_failed_release_of_the_last_slot_ends_a_waiting_demand);
+  RUN_TEST(a_failed_release_wait_fails_the_session);
   RUN_TEST(a_quarantined_ring_ends_a_demand_in_driver_order);
   RUN_TEST(a_waiting_demand_renders_an_update_that_lands_as_it_looks);
   RUN_TEST(a_barrier_ends_a_running_wait_without_ending_a_later_demand);

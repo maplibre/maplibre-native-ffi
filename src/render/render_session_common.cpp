@@ -3854,7 +3854,10 @@ auto acquired_frame_release(
     }
     if (status == MLN_STATUS_OK && backend != nullptr) {
       status = backend->release_consumer_sync(copied);
-      if (status == MLN_STATUS_TARGET_LOST)
+      // After a failed wait the host's GPU may still read the texture, so the
+      // slot is quarantined below, and the session fails rather than render
+      // on with fewer slots.
+      if (status != MLN_STATUS_OK)
         fail_session(consumed->session, status, thread_last_error_message());
     } else {
       // The release took the host's fd, which no backend waits on now.
@@ -3881,12 +3884,6 @@ auto acquired_frame_release(
         }
       }
       resume_parked_demand_locked(*consumed->session, wakes);
-    }
-    if (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST) {
-      mln::Log::Error(
-        mln::Event::Render,
-        "failed to retire an acquired frame; its texture slot is quarantined"
-      );
     }
   };
   auto release_immediately = false;

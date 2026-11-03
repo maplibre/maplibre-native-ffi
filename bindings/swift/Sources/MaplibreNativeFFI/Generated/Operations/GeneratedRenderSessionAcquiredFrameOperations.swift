@@ -74,6 +74,8 @@ public extension AcquiredFrameHandle {
   /// `consumerCompletion` says when your GPU work that reads the texture
   /// finishes. Pass `GpuSyncKind.cpuComplete` when that work has already
   /// finished. The session waits for that point before it renders into the
+  /// texture again. If that wait fails, such as for an OpenGL fence outside the
+  /// session's share group, the session fails and never renders into the
   /// texture again.
   ///
   /// See `mln_acquired_frame_release` in the

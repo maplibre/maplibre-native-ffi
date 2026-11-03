@@ -242,6 +242,8 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// <para><c>consumerCompletion</c> says when your GPU work that reads the
     /// texture finishes. Pass <c>GpuSyncKind.CpuComplete</c> when that work has
     /// already finished. The session waits for that point before it renders
+    /// into the texture again. If that wait fails, such as for an OpenGL fence
+    /// outside the session's share group, the session fails and never renders
     /// into the texture again.</para>
     /// <para>See <c>mln_acquired_frame_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
