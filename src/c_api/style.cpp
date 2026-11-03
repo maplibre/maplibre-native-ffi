@@ -41,24 +41,6 @@ struct OwnedView {
   }
 };
 
-struct OwnedGeoJSONOptions {
-  mln_geo_json_source_options value{};
-  OwnedView cluster_properties;
-
-  explicit OwnedGeoJSONOptions(const mln_geo_json_source_options* source)
-      : value(
-          source == nullptr ? mln::core::geojson_source_options_default()
-                            : *source
-        ),
-        cluster_properties(value.cluster_properties) {}
-
-  [[nodiscard]] auto options() const -> mln_geo_json_source_options {
-    auto copied = value;
-    copied.cluster_properties = cluster_properties.view();
-    return copied;
-  }
-};
-
 auto queue_tile_fetch(
   void* registration, mln_canonical_tile_id tile_id
 ) noexcept -> void {
@@ -350,38 +332,6 @@ auto mln_map_list_style_sources(
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
         return mln::core::map_list_style_sources(live, result.sources);
-      },
-      completion
-    );
-  });
-}
-
-auto mln_map_add_geo_json_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geo_json_source_options* options, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (
-      !valid_non_empty_view(source_id, "source_id") ||
-      !valid_non_empty_view(url, "url") ||
-      !mln::core::validate_c_string_view(url, "url") ||
-      mln::core::validate_geojson_source_options(options) != MLN_STATUS_OK
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{source_id};
-    auto owned_url = OwnedView{url};
-    auto owned_options = OwnedGeoJSONOptions{options};
-    return mln::core::submit_map_command(
-      map,
-      [id = std::move(id), url = std::move(owned_url),
-       options =
-         std::move(owned_options)](mln::core::MapObject& live) -> mln_status {
-        const auto source_options = options.options();
-        return mln::core::map_add_geojson_source_url(
-          live, id.view(), url.view(), &source_options
-        );
       },
       completion
     );
@@ -791,39 +741,6 @@ auto mln_map_get_style_image(
         result.found =
           mln::core::map_get_style_image(live, id.view(), result.image);
         return MLN_STATUS_OK;
-      },
-      completion
-    );
-  });
-}
-
-auto mln_map_add_image_source_url(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_buffer_view url,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (
-      !valid_non_empty_view(source_id, "source_id") ||
-      !valid_non_empty_view(url, "url") ||
-      !mln::core::validate_c_string_view(url, "url") ||
-      mln::core::validate_image_source_coordinates(
-        coordinates, coordinate_count
-      ) != MLN_STATUS_OK
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{source_id};
-    auto value = OwnedView{url};
-    auto points =
-      std::vector<mln_lat_lng>(coordinates, coordinates + coordinate_count);
-    return mln::core::submit_map_command(
-      map,
-      [id = std::move(id), value = std::move(value),
-       points = std::move(points)](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_add_image_source_url(
-          live, id.view(), points.data(), value.view()
-        );
       },
       completion
     );

@@ -94,31 +94,12 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_add_geo_json_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
     coordinates: Long,
     coordinateCount: Long,
     image: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_add_image_source_url(
-    map: Long,
-    sourceId: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    url: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

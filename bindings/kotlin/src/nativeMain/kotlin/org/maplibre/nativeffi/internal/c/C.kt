@@ -253,23 +253,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_geo_json_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geo_json_source_url(
-      map.toULong(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      options.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
@@ -285,25 +268,6 @@ internal actual object C {
       coordinates.toCPointer(),
       coordinateCount.convert(),
       image.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_add_image_source_url(
-    map: Long,
-    sourceId: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    url: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_image_source_url(
-      map.toULong(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      coordinates.toCPointer(),
-      coordinateCount.convert(),
-      url.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

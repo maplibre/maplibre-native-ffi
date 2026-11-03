@@ -82,33 +82,6 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a GeoJSON source that loads its data from `url`.
-  ///
-  /// See `mln_map_add_geo_json_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.alreadyExists` when the style already has a source named
-  ///   `sourceId`.
-  @discardableResult
-  func addGeoJsonSourceUrl(
-    _ bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: GeoJsonSourceOptions? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_add_geo_json_source_url(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Adds an image source that shows `image`.
   ///
   /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -133,36 +106,6 @@ public extension MapHandle {
         arena.array(bindingArg1.map { $0.nativeValue() }),
         NativeInputArena.count(bindingArg1.count),
         arena.store(bindingArg3.nativeValue(arena: arena)),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Adds an image source that loads its image from `url`.
-  ///
-  /// `coordinates` are the image's four corners, clockwise from the top left.
-  ///
-  /// See `mln_map_add_image_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.alreadyExists` when the style already has a source named
-  ///   `sourceId`.
-  @discardableResult
-  func addImageSourceUrl(
-    _ bindingArg0: String,
-    coordinates bindingArg1: [LatLng],
-    url bindingArg3: String
-  ) async throws -> CommandCompletion {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_add_image_source_url(
-        raw,
-        arena.view(bindingArg0),
-        arena.array(bindingArg1.map { $0.nativeValue() }),
-        NativeInputArena.count(bindingArg1.count),
-        arena.view(bindingArg3),
         completion,
         diagnostic
       )
@@ -1148,24 +1091,6 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func addGeoJsonSourceUrl(
-    _ bindingArg0: String,
-    url bindingArg1: String,
-    options bindingArg2: GeoJsonSourceOptions? = nil
-  ) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_add_geo_json_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-          nil,
-          diagnostic
-        )
-      }
-  }
-
   func addImageSourceImage(
     _ bindingArg0: String,
     coordinates bindingArg1: [LatLng],
@@ -1179,25 +1104,6 @@ public extension MapHandleDiscarding {
           arena.array(bindingArg1.map { $0.nativeValue() }),
           NativeInputArena.count(bindingArg1.count),
           arena.store(bindingArg3.nativeValue(arena: arena)),
-          nil,
-          diagnostic
-        )
-      }
-  }
-
-  func addImageSourceUrl(
-    _ bindingArg0: String,
-    coordinates bindingArg1: [LatLng],
-    url bindingArg3: String
-  ) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_add_image_source_url(
-          raw,
-          arena.view(bindingArg0),
-          arena.array(bindingArg1.map { $0.nativeValue() }),
-          NativeInputArena.count(bindingArg1.count),
-          arena.view(bindingArg3),
           nil,
           diagnostic
         )

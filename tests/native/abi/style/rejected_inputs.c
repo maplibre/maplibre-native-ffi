@@ -8,8 +8,6 @@
 #define EXPECT_EMPTY_REJECTED(name, expression) \
   MLN_TEST_EXPECT_COMMAND_REJECTED(name " must not be empty", expression)
 
-static const mln_lat_lng corners[4] = {{1, 1}, {1, 2}, {0, 2}, {0, 1}};
-
 // One shared check guards every input that must not be empty, so one ID and
 // one other view stand for them.
 static void empty_views_are_rejected_at_submission(void) {
@@ -87,7 +85,7 @@ static void style_commands_reject_invalid_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void source_commands_fail_on_a_taken_or_wrong_target(void) {
+static void source_commands_fail_on_the_wrong_source_type(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
@@ -113,18 +111,6 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_ALREADY_EXISTS, "source already exists",
-    mln_map_add_geo_json_source_url(
-      map, taken, geojson_url, NULL, &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_ALREADY_EXISTS, "source already exists",
-    mln_map_add_image_source_url(
-      map, taken, corners, 4, png, &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not an image source",
     mln_map_set_image_source_url(map, taken, png, &completion.descriptor, NULL)
   );
@@ -133,8 +119,13 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
   // sources alone. internal/geojson_tiling.cpp shows that the override
   // reaches the next frame.
   const mln_buffer_view image = MLN_BUFFER_LITERAL("image");
-  MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
-    map, image, corners, 4, png, &completion.descriptor, NULL
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, image,
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"image\",\"url\":\"fixture://image.png\","
+      "\"coordinates\":[[2,1],[3,1],[3,0],[2,0]]}"
+    ),
+    &completion.descriptor, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
@@ -163,5 +154,5 @@ static void source_commands_fail_on_a_taken_or_wrong_target(void) {
 MLN_TEST_GROUP {
   RUN_TEST(empty_views_are_rejected_at_submission);
   RUN_TEST(style_commands_reject_invalid_inputs);
-  RUN_TEST(source_commands_fail_on_a_taken_or_wrong_target);
+  RUN_TEST(source_commands_fail_on_the_wrong_source_type);
 }

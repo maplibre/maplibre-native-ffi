@@ -262,19 +262,6 @@ pub const Map = struct {
         return call.submit("mln_map_add_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
 
-    /// Adds a GeoJSON source that loads its data from `url`.
-    ///
-    /// See `mln_map_add_geo_json_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.AlreadyExists` when the style already has a source named
-    ///   `source_id`.
-    pub fn addGeoJsonSourceUrl(self: Map, source_id: []const u8, url: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_add_geo_json_source_url", .handle, self, call.command, null, diagnostic, .{ source_id, url, options });
-    }
-
     /// Adds an image source that shows `image`.
     ///
     /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -288,21 +275,6 @@ pub const Map = struct {
     ///   `source_id`.
     pub fn addImageSourceImage(self: Map, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_image_source_image", .handle, self, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, image });
-    }
-
-    /// Adds an image source that loads its image from `url`.
-    ///
-    /// `coordinates` are the image's four corners, clockwise from the top left.
-    ///
-    /// See `mln_map_add_image_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.AlreadyExists` when the style already has a source named
-    ///   `source_id`.
-    pub fn addImageSourceUrl(self: Map, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_add_image_source_url", .handle, self, call.command, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
     }
 
     /// Adds a layer to the map's style.
@@ -7997,19 +7969,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_add_geo_json_source_data", .handle, map, null, diagnostic, .{ source_id, data });
     }
 
-    pub fn addGeoJsonSourceUrl(self: MapDiscarding, source_id: []const u8, url: []const u8, options: ?GeoJsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_geo_json_source_url", .handle, map, null, diagnostic, .{ source_id, url, options });
-    }
-
     pub fn addImageSourceImage(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_add_image_source_image", .handle, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, image });
-    }
-
-    pub fn addImageSourceUrl(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_add_image_source_url", .handle, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, url });
     }
 
     pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

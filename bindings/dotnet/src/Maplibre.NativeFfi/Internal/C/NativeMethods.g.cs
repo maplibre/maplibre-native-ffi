@@ -160,33 +160,12 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_geo_json_source_url(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_buffer_view url,
-        mln_geo_json_source_options* options,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_add_image_source_image(
         MlnMap map,
         mln_buffer_view source_id,
         mln_lat_lng* coordinates,
         nuint coordinate_count,
         mln_premultiplied_rgba8_image* image,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_image_source_url(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_lat_lng* coordinates,
-        nuint coordinate_count,
-        mln_buffer_view url,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

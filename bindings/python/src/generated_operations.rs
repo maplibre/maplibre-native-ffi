@@ -3534,66 +3534,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn add_geo_json_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_geo_json_source_options(&options, storage)
-        })?;
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_geo_json_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, url, options=None))]
-    fn _discard_add_geo_json_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_geo_json_source_options(&options, storage)
-        })?;
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_geo_json_source_url(
-                    handle,
-                    source_id_value,
-                    url_value,
-                    generated_pointer(&options_value),
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
     #[pyo3(signature = (source_id, coordinates, image))]
     fn add_image_source_image(
         &self,
@@ -3648,66 +3588,6 @@ impl MapHandle {
                     coordinates_values.as_ptr(),
                     coordinates_values.len(),
                     &image_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, coordinates, url))]
-    fn add_image_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        coordinates: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let coordinates_values = generated_items(coordinates, |item| {
-            generated_input_mln_lat_lng(&item, storage)
-        })?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_add_image_source_url(
-                    handle,
-                    source_id_value,
-                    coordinates_values.as_ptr(),
-                    coordinates_values.len(),
-                    url_value,
-                    completion,
-                    diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (source_id, coordinates, url))]
-    fn _discard_add_image_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        coordinates: &Bound<'_, PyAny>,
-        url: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let coordinates_values = generated_items(coordinates, |item| {
-            generated_input_mln_lat_lng(&item, storage)
-        })?;
-        let url_value = storage.buffer(url.clone(), true)?;
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_add_image_source_url(
-                    handle,
-                    source_id_value,
-                    coordinates_values.as_ptr(),
-                    coordinates_values.len(),
-                    url_value,
                     completion,
                     diagnostic,
                 )

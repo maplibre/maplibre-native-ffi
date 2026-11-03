@@ -2611,25 +2611,6 @@ external int mln_map_add_geo_json_source_data(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_geo_json_source_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_geo_json_source_url(
-  int map,
-  mln_buffer_view source_id,
-  mln_buffer_view url,
-  Pointer<mln_geo_json_source_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     Pointer<mln_lat_lng>,
     Size,
     Pointer<mln_premultiplied_rgba8_image>,
@@ -2643,27 +2624,6 @@ external int mln_map_add_image_source_image(
   Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   Pointer<mln_premultiplied_rgba8_image> image,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_lat_lng>,
-    Size,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_add_image_source_url(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_lat_lng> coordinates,
-  int coordinate_count,
-  mln_buffer_view url,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

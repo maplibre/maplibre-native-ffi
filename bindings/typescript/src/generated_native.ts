@@ -139,25 +139,11 @@ export interface NativeOperations {
     data: bigint,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_add_geo_json_source_url(
-    map: bigint,
-    sourceId: string,
-    url: string,
-    options: GeoJsonSourceOptions | undefined,
-    completion: NativeCompletion | undefined,
-  ): void;
   mln_map_add_image_source_image(
     map: bigint,
     sourceId: string,
     coordinates: readonly LatLng[],
     image: PremultipliedRgba8Image,
-    completion: NativeCompletion | undefined,
-  ): void;
-  mln_map_add_image_source_url(
-    map: bigint,
-    sourceId: string,
-    coordinates: readonly LatLng[],
-    url: string,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_style_layer_json(

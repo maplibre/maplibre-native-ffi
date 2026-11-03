@@ -604,55 +604,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_add_geo_json_source_url(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_buffer_view arg_source_id = {0};
-  mln_buffer_view arg_url = {0};
-  mln_geo_json_source_options arg_options;
-  const void* present_options = NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
-    goto done;
-  if (!mln_ts_read_text_view(call, call->argv[2], &arg_url, "url")) goto done;
-  if (!mln_ts_is_absent(call, call->argv[3])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-    if (!mln_ts_write_geo_json_source_options(
-          call, call->argv[3], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  if (!mln_ts_read_completion(
-        call, call->argv[4], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_add_geo_json_source_url(
-    arg_map, arg_source_id, arg_url, present_options, present_completion,
-    &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_map_add_image_source_image(
   napi_env env, napi_callback_info info
 ) {
@@ -701,55 +652,6 @@ static napi_value mln_ts_export_mln_map_add_image_source_image(
   status = mln_map_add_image_source_image(
     arg_map, arg_source_id, arg_coordinates, (size_t)count_coordinates,
     &arg_image, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_add_image_source_url(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_buffer_view arg_source_id = {0};
-  size_t count_coordinates = 0;
-  mln_lat_lng* arg_coordinates = NULL;
-  mln_buffer_view arg_url = {0};
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
-    goto done;
-  {
-    mln_lat_lng* items = NULL;
-    size_t count = 0;
-    if (!mln_ts_write_list_lat_lng(
-          call, call->argv[2], UINT32_MAX, &items, &count, "coordinates"
-        ))
-      goto done;
-    arg_coordinates = items;
-    count_coordinates = (size_t)count;
-  }
-  if (!mln_ts_read_text_view(call, call->argv[3], &arg_url, "url")) goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_add_image_source_url(
-    arg_map, arg_source_id, arg_coordinates, (size_t)count_coordinates, arg_url,
-    present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -6930,11 +6832,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_add_custom_vector_source},
   {"mln_map_add_geo_json_source_data",
    mln_ts_export_mln_map_add_geo_json_source_data},
-  {"mln_map_add_geo_json_source_url",
-   mln_ts_export_mln_map_add_geo_json_source_url},
   {"mln_map_add_image_source_image",
    mln_ts_export_mln_map_add_image_source_image},
-  {"mln_map_add_image_source_url", mln_ts_export_mln_map_add_image_source_url},
   {"mln_map_add_style_layer_json", mln_ts_export_mln_map_add_style_layer_json},
   {"mln_map_add_style_source_json",
    mln_ts_export_mln_map_add_style_source_json},

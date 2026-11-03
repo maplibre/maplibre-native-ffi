@@ -128,17 +128,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_geo_json_source_url =
-    Ffm.downcall(
-      "mln_map_add_geo_json_source_url",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_add_image_source_image =
     Ffm.downcall(
       "mln_map_add_image_source_image",
@@ -148,18 +137,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_add_image_source_url =
-    Ffm.downcall(
-      "mln_map_add_image_source_url",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1459,23 +1436,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_geo_json_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_geo_json_source_url.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(url, mln_buffer_view),
-      options,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
@@ -1491,25 +1451,6 @@ internal actual object C {
       coordinates,
       coordinateCount,
       image,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_add_image_source_url(
-    map: Long,
-    sourceId: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    url: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_add_image_source_url.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      coordinates,
-      coordinateCount,
-      Ffm.value(url, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

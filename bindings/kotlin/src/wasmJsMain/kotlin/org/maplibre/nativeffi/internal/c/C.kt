@@ -183,23 +183,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_add_geo_json_source_url(
-    map: Long,
-    sourceId: Long,
-    url: Long,
-    options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_add_geo_json_source_url(
-      map,
-      word(sourceId),
-      word(url),
-      word(options),
-      word(completion),
-      word(outDiagnostic),
-    )
-
   actual fun mln_map_add_image_source_image(
     map: Long,
     sourceId: Long,
@@ -215,25 +198,6 @@ internal actual object C {
       word(coordinates),
       word(coordinateCount),
       word(image),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_add_image_source_url(
-    map: Long,
-    sourceId: Long,
-    coordinates: Long,
-    coordinateCount: Long,
-    url: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_add_image_source_url(
-      map,
-      word(sourceId),
-      word(coordinates),
-      word(coordinateCount),
-      word(url),
       word(completion),
       word(outDiagnostic),
     )
@@ -2069,18 +2033,6 @@ private fun mln_kw_mln_map_add_geo_json_source_data(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_data(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_add_geo_json_source_url(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_url(p0, p1, p2, p3, p4, p5)",
-  )
-
 private fun mln_kw_mln_map_add_image_source_image(
   p0: Long,
   p1: Int,
@@ -2092,19 +2044,6 @@ private fun mln_kw_mln_map_add_image_source_image(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_image_source_image(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_add_image_source_url(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_image_source_url(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_add_style_layer_json(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
