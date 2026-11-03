@@ -19,16 +19,20 @@ import (
 const backgroundStyle = `{"version":8,"sources":{},"layers":[` +
 	`{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}`
 
-// frameView is what every backend's owned-texture frame view reports, and
+// frameView is what every backend's texture frame view reports, and
 // readTexture reads the texture that one lends, which the view's scope guards.
 type frameView interface {
 	Width() uint32
 	Height() uint32
 }
 
+// renderFixture is a map with a session that renders into textures that the
+// test owns, or with an offscreen session.
 type renderFixture struct {
 	*fixture
+	// graphics and textures are nil for an offscreen session.
 	graphics *testsupport.Graphics
+	textures []*testsupport.Texture
 	extent   LogicalExtent
 	session  *RenderSessionHandle
 	attached *Future[struct{}]
@@ -38,7 +42,7 @@ type renderFixture struct {
 	closed             bool
 }
 
-// newRenderFixture starts attaching a session-owned 32x16 texture to a map,
+// newRenderFixture starts attaching a ring of two 32x16 textures to a map,
 // with the caller driver and a device or context from tests/graphics. The test
 // goroutine is the graphics thread. It stays locked to its OS thread through
 // the cleanups, which run on it last-first, so the session detaches there and
@@ -66,12 +70,39 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 		}
 	}
 
+	var textures []*testsupport.Texture
+	for range 2 {
+		texture, err := graphics.NewTexture(32, 16)
+		if err != nil {
+			t.Fatalf("Graphics.NewTexture: %v", err)
+		}
+		// The session retires and the map releases before this cleanup.
+		t.Cleanup(texture.Close)
+		textures = append(textures, texture)
+	}
+	r := newMapFixture(t)
+	r.graphics = graphics
+	r.textures = textures
+	return r
+}
+
+// newOffscreenFixture starts attaching an offscreen 32x16 session to a map,
+// with the core worker driver and a device that the session creates.
+func newOffscreenFixture(t *testing.T) *renderFixture {
+	t.Helper()
+	r := newMapFixture(t)
+	r.start(t, r.options())
+	return r
+}
+
+// newMapFixture is newOffscreenFixture without the session.
+func newMapFixture(t *testing.T) *renderFixture {
+	t.Helper()
 	extent := LogicalExtent{Width: 32, Height: 16, ScaleFactor: 1}
 	mapOptions := testMapOptions()
 	mapOptions.InitialExtent = extent
 	r := &renderFixture{
 		fixture:    newFixtureWith(t, mapOptions),
-		graphics:   graphics,
 		extent:     extent,
 		frames:     make(chan struct{}, 1),
 		driverWork: make(chan struct{}, 1),
@@ -81,24 +112,30 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 }
 
 func (r *renderFixture) options() RenderSessionAttachOptions {
+	driver := RenderDriverKindCallerGraphicsThread
+	if r.graphics == nil {
+		driver = RenderDriverKindCoreWorker
+	}
 	return RenderSessionAttachOptions{
-		Driver:                    RenderDriverKindCallerGraphicsThread,
-		RequestedTextureRingDepth: 2,
-		FrameWake:                 Wake{Callback: func() { notify(r.frames) }},
-		DriverWorkWake:            Wake{Callback: func() { notify(r.driverWork) }},
+		Driver:         driver,
+		FrameWake:      Wake{Callback: func() { notify(r.frames) }},
+		DriverWorkWake: Wake{Callback: func() { notify(r.driverWork) }},
 	}
 }
 
-func (r *renderFixture) attachTexture(options RenderSessionAttachOptions) (*RenderSessionHandle, *Future[struct{}], error) {
-	return attachOwnedTexture(r.m, r.graphics.Context, r.extent, options)
+func (r *renderFixture) attachSession(options RenderSessionAttachOptions) (*RenderSessionHandle, *Future[struct{}], error) {
+	if r.graphics == nil {
+		return r.m.AttachOffscreen(OffscreenDescriptor{Extent: r.extent}, options, nil)
+	}
+	return attachBorrowedTexture(r.m, r.graphics.Context, r.extent, r.textures, options)
 }
 
 func (r *renderFixture) start(t *testing.T, options RenderSessionAttachOptions) {
 	t.Helper()
 	var err error
-	r.session, r.attached, err = r.attachTexture(options)
+	r.session, r.attached, err = r.attachSession(options)
 	if err != nil {
-		t.Fatalf("owned texture attach: %v", err)
+		t.Fatalf("attach: %v", err)
 	}
 	t.Cleanup(func() { r.teardown(t) })
 }
@@ -123,14 +160,14 @@ func (r *renderFixture) teardown(t *testing.T) {
 	await(t, submitted(r.session.Close()))
 }
 
+// service services a caller-driven session until done closes. An offscreen
+// session's worker needs no service, so this only waits.
 func (r *renderFixture) service(t *testing.T, done <-chan struct{}, what string) {
 	t.Helper()
 	deadline := time.NewTimer(testTimeout())
 	defer deadline.Stop()
 	for {
-		if err := r.session.ServiceDriverWork(); err != nil {
-			t.Fatalf("ServiceDriverWork: %v", err)
-		}
+		r.serviceDriverWork(t)
 		select {
 		case <-done:
 			return
@@ -151,9 +188,7 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 			t.Fatalf("RequestFrame: %v", err)
 		}
 		for {
-			if err := r.session.ServiceDriverWork(); err != nil {
-				t.Fatalf("ServiceDriverWork: %v", err)
-			}
+			r.serviceDriverWork(t)
 			if disposition, done := r.result(t, r.token); done {
 				if disposition == RenderResultRendered {
 					return
@@ -167,6 +202,16 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 				t.Fatal("timed out waiting for a rendered frame")
 			}
 		}
+	}
+}
+
+func (r *renderFixture) serviceDriverWork(t *testing.T) {
+	t.Helper()
+	if r.graphics == nil {
+		return
+	}
+	if err := r.session.ServiceDriverWork(); err != nil {
+		t.Fatalf("ServiceDriverWork: %v", err)
 	}
 }
 
@@ -206,15 +251,17 @@ func TestCallerDriverIsServicedFromAGoroutine(t *testing.T) {
 }
 
 // Closing an attached session retires it without a detach. Once the close
-// completes, the map releases and the host destroys the graphics objects.
+// completes, the map takes another session.
 func TestCloseRetiresAnAttachedSession(t *testing.T) {
-	r := newRenderFixture(t)
+	r := newOffscreenFixture(t)
 	r.attach(t)
 	r.renderFrame(t)
 	r.closed = true
 	await(t, submitted(r.session.Close()))
-	await(t, submitted(r.m.Close()))
-	r.graphics.Close()
+	// Native refuses an attach while the map still has a session.
+	r.start(t, r.options())
+	r.closed = false
+	r.attach(t)
 }
 
 // Before any demand, no frame result is queued and no frame has rendered,
@@ -231,8 +278,8 @@ func TestDrainBeforeAnyDemandReturnsNoBatch(t *testing.T) {
 }
 
 // The binding reads a rendered frame back as premultiplied RGBA8 pixels.
-func TestOwnedTextureFrameReadsBackAsPixels(t *testing.T) {
-	r := newRenderFixture(t)
+func TestRenderedFrameReadsBackAsPixels(t *testing.T) {
+	r := newOffscreenFixture(t)
 	r.attach(t)
 	r.renderFrame(t)
 	readback, err := r.session.ReadTexture()

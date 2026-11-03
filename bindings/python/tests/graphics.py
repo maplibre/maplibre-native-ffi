@@ -1,4 +1,4 @@
-"""GPU contexts from tests/graphics, loaded with ctypes."""
+"""GPU contexts and textures from tests/graphics, loaded with ctypes."""
 
 from __future__ import annotations
 
@@ -33,6 +33,22 @@ class Context(ctypes.Structure):
         ("wgl_device_context", ctypes.c_void_p),
         ("wgl_context", ctypes.c_void_p),
         ("get_proc_address", ctypes.c_void_p),
+    )
+
+
+class TextureInfo(ctypes.Structure):
+    """mln_test_graphics_texture_info. Only the backend's own fields are set."""
+
+    _fields_ = (
+        ("vulkan_image", ctypes.c_uint64),
+        ("vulkan_image_view", ctypes.c_uint64),
+        ("metal_texture", ctypes.c_void_p),
+        ("width", ctypes.c_uint32),
+        ("height", ctypes.c_uint32),
+        ("format", ctypes.c_uint32),
+        ("vulkan_final_layout", ctypes.c_uint32),
+        ("opengl_texture", ctypes.c_uint32),
+        ("opengl_target", ctypes.c_uint32),
     )
 
 
@@ -76,6 +92,19 @@ def _library() -> ctypes.CDLL:
     library.mln_test_graphics_get_context.restype = ctypes.c_bool
     library.mln_test_graphics_make_current.argtypes = (ctypes.c_void_p,)
     library.mln_test_graphics_make_current.restype = ctypes.c_bool
+    library.mln_test_graphics_texture_create.argtypes = (
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+    )
+    library.mln_test_graphics_texture_create.restype = ctypes.c_void_p
+    library.mln_test_graphics_texture_destroy.argtypes = (ctypes.c_void_p,)
+    library.mln_test_graphics_texture_destroy.restype = None
+    library.mln_test_graphics_texture_get_info.argtypes = (
+        ctypes.c_void_p,
+        ctypes.POINTER(TextureInfo),
+    )
+    library.mln_test_graphics_texture_get_info.restype = ctypes.c_bool
     return library
 
 
@@ -112,4 +141,33 @@ class Graphics:
     def close(self) -> None:
         if self._handle is not None:
             _library().mln_test_graphics_destroy(self._handle)
+            self._handle = None
+
+
+class Texture:
+    """An RGBA texture that the host owns and a borrowed ring can name.
+
+    Create and close it on the thread that owns its graphics object. Close it
+    once every session that renders into it has retired, and before the
+    graphics object.
+    """
+
+    def __init__(self, graphics: Graphics, width: int, height: int) -> None:
+        library = _library()
+        handle = library.mln_test_graphics_texture_create(
+            graphics._handle, width, height
+        )
+        if not handle:
+            raise _failure("mln_test_graphics_texture_create")
+        info = TextureInfo()
+        if not library.mln_test_graphics_texture_get_info(handle, ctypes.byref(info)):
+            error = _failure("mln_test_graphics_texture_get_info")
+            library.mln_test_graphics_texture_destroy(handle)
+            raise error
+        self._handle: int | None = handle
+        self.info = info
+
+    def close(self) -> None:
+        if self._handle is not None:
+            _library().mln_test_graphics_texture_destroy(self._handle)
             self._handle = None

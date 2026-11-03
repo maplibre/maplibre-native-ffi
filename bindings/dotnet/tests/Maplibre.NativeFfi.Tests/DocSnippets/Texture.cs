@@ -55,15 +55,6 @@ internal static class Texture
     )
     {
         // #region attach-owned
-        var texture = new VulkanOwnedTextureDescriptor
-        {
-            // The texture's size in logical
-            // pixels, and its scale factor.
-            Extent = new LogicalExtent(800, 600, 2),
-            // Your VkInstance, VkPhysicalDevice,
-            // VkDevice, and graphics VkQueue.
-            Context = vulkan,
-        };
         var options = new RenderSessionAttachOptions
         {
             Driver = RenderDriverKind.CoreWorker,
@@ -72,13 +63,7 @@ internal static class Texture
             // submits to the graphics queue.
             QueueLock = new QueueLock(LockQueue, UnlockQueue),
         };
-
-        session = map.AttachVulkanOwnedTexture(texture, options);
-        await session.Ready;
         // #endregion attach-owned
-
-        DrawFrame();
-        await session.CloseAsync();
 
         // #region attach-borrowed
         var ring = new VulkanBorrowedTextureDescriptor
@@ -101,7 +86,6 @@ internal static class Texture
             FinalLayout = 5,
         };
 
-        // The same attach options as for an owned ring.
         session = map.AttachVulkanBorrowedTexture(ring, options);
         await session.Ready;
         // #endregion attach-borrowed

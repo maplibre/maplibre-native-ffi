@@ -1,4 +1,5 @@
-"""Owned-texture sessions on every backend this build carries.
+"""Offscreen sessions, and borrowed-texture sessions on every backend this
+build carries.
 
 GPU objects come from tests/graphics. A backend the build supports whose
 graphics object cannot be created fails its tests rather than skipping them.
@@ -32,6 +33,7 @@ from support import (
 )
 
 WIDTH, HEIGHT = 32, 16
+EXTENT = mln.LogicalExtent(WIDTH, HEIGHT, 1.0)
 
 
 def _backends() -> list[str]:
@@ -83,166 +85,17 @@ def _opengl_context(backend: str, context: graphics.Context) -> object:
     )
 
 
-class OwnedTexture:
-    """A map rendering into a session-owned texture ring.
-
-    A caller-driven session is serviced on a Python thread that blocks on the
-    session's driver-work wake, and every frame wait blocks on its frame wake.
-    An OpenGL context belongs to that thread for its whole life, as a host's
-    would: the thread creates it, makes it current, and destroys it.
-    ``frame_wake`` makes the frame wake from the function that notifies the
-    frame wait.
+class _Target:
+    """Frame demands on a map's render session, whose frame wake notifies
+    ``frames``.
     """
 
-    def __init__(
-        self,
-        harness: Harness,
-        backend: str,
-        driver: mln.RenderDriverKind,
-        frame_wake: Callable[[Callable[[], None]], mln.Wake | mln.NativeWake] = (
-            mln.Wake
-        ),
-        queue_lock: mln.QueueLock | mln.NativeQueueLock | None = None,
-    ) -> None:
-        opengl = backend in ("egl", "wgl")
-        assert driver == mln.RenderDriverKind.CALLER_GRAPHICS_THREAD or not opengl
-        self.harness = harness
-        self.backend = backend
+    def __init__(self) -> None:
         self.frames = Signal()
-        self._work = threading.Event()
-        self._ready = threading.Event()
-        self._stopped = threading.Event()
-        self._finish = threading.Event()
-        self._stopping = False
-        self._release = False
-        self._closed = False
         self._results: list[mln.RenderFrameResult] = []
         self._next_token = 1
-        self.serviced = 0
-        self.service_errors: list[BaseException] = []
-        self.graphics: graphics.Graphics | None = None
         self.map: mln.MapHandle | None = None
         self.session: mln.RenderSessionHandle | None = None
-        self._service: threading.Thread | None = None
-        try:
-            if driver == mln.RenderDriverKind.CALLER_GRAPHICS_THREAD:
-                # A daemon, so a driver call that never returns cannot keep
-                # the interpreter from exiting after the test fails.
-                self._service = threading.Thread(
-                    target=self._serve, args=(opengl,), name="graphics", daemon=True
-                )
-                self._service.start()
-                if not self._ready.wait(TIMEOUT):
-                    raise AssertionError("timed out creating the graphics object")
-                if self.service_errors:
-                    raise self.service_errors[0]
-            if not opengl:
-                self.graphics = graphics.Graphics(_GRAPHICS[backend])
-            self.map = harness.create_map(
-                map_mode=mln.MapMode.CONTINUOUS,
-                initial_extent=mln.LogicalExtent(WIDTH, HEIGHT, 1.0),
-            )
-            options = mln.RenderSessionAttachOptions(
-                driver=driver,
-                frame_wake=frame_wake(self.frames.notify),
-                driver_work_wake=mln.Wake(self._work.set),
-            )
-            if queue_lock is not None:
-                options = replace(options, queue_lock=queue_lock)
-            self.session, attached = self._attach(options)
-            # A wake that fired before the session was stored found nothing
-            # to service, so the graphics thread checks again.
-            self._work.set()
-            result(attached)
-        except BaseException:
-            # A session whose attach failed still detaches before it is
-            # destroyed, and close() leaves alive what it cannot detach.
-            with contextlib.suppress(Exception):
-                self.close()
-            raise
-
-    def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
-        assert self.graphics is not None and self.map is not None
-        extent = mln.LogicalExtent(WIDTH, HEIGHT, 1.0)
-        context = self.graphics.context
-        if self.backend == "metal":
-            return self.map.attach_metal_owned_texture(
-                mln.MetalOwnedTextureDescriptor(
-                    extent=extent,
-                    context=mln.MetalContextDescriptor(
-                        device=context.metal_device or 0
-                    ),
-                    # MTLPixelFormatBGRA8Unorm.
-                    pixel_format=80,
-                ),
-                options,
-            )
-        if self.backend == "vulkan":
-            return self.map.attach_vulkan_owned_texture(
-                mln.VulkanOwnedTextureDescriptor(
-                    extent=extent,
-                    context=mln.VulkanContextDescriptor(
-                        instance=context.vulkan_instance or 0,
-                        physical_device=context.vulkan_physical_device or 0,
-                        device=context.vulkan_device or 0,
-                        graphics_queue=context.vulkan_queue or 0,
-                        graphics_queue_family_index=context.vulkan_queue_family_index,
-                        get_instance_proc_addr=context.vulkan_get_instance_proc_addr
-                        or 0,
-                        get_device_proc_addr=context.vulkan_get_device_proc_addr or 0,
-                    ),
-                ),
-                options,
-            )
-        return self.map.attach_open_gl_owned_texture(
-            mln.OpenGlOwnedTextureDescriptor(
-                extent=extent, context=_opengl_context(self.backend, context)
-            ),
-            options,
-        )
-
-    def _serve(self, opengl: bool) -> None:
-        try:
-            if opengl:
-                self.graphics = graphics.Graphics(_GRAPHICS[self.backend])
-                self.graphics.make_current()
-        except BaseException as error:  # noqa: BLE001 - raised by __init__
-            self.service_errors.append(error)
-        finally:
-            self._ready.set()
-        try:
-            while not self.service_errors:
-                self._work.wait()
-                self._work.clear()
-                if self._stopping:
-                    break
-                if self.session is not None:
-                    self.session.service_driver_work()
-                    self.serviced += 1
-        except BaseException as error:  # noqa: BLE001 - reported by close()
-            self.service_errors.append(error)
-        finally:
-            while not self._stopping:
-                self._work.wait()
-                self._work.clear()
-            self._stopped.set()
-            # The context is current here, so it is destroyed here, once the
-            # session that shared it is gone.
-            self._finish.wait()
-            if opengl and self._release and self.graphics is not None:
-                self.graphics.close()
-
-    def with_texture[T](
-        self, frame: mln.AcquiredFrameHandle, callback: Callable[[object], T]
-    ) -> T:
-        if self.backend == "metal":
-            view = frame.metal_texture()
-        elif self.backend == "vulkan":
-            view = frame.vulkan_texture()
-        else:
-            view = frame.open_gl_texture()
-        with view as texture:
-            return callback(texture)
 
     def render(self, *, wait_for_update: bool = False) -> mln.RenderFrameResult:
         """Render one frame, whether or not the map has a newer update."""
@@ -268,6 +121,58 @@ class OwnedTexture:
 
         return self.frames.wait_until(check, f"frame {token}")
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        value: BaseException | None,
+        trace: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def close(self) -> None:
+        raise NotImplementedError
+
+
+class Offscreen(_Target):
+    """A map rendering offscreen on a device that its session creates.
+
+    ``frame_wake`` makes the frame wake from the function that notifies the
+    frame wait.
+    """
+
+    def __init__(
+        self,
+        harness: Harness,
+        frame_wake: Callable[[Callable[[], None]], mln.Wake | mln.NativeWake] = (
+            mln.Wake
+        ),
+    ) -> None:
+        super().__init__()
+        self.map = harness.create_map(
+            map_mode=mln.MapMode.CONTINUOUS, initial_extent=EXTENT
+        )
+        try:
+            self.session, attached = self._attach(
+                mln.RenderSessionAttachOptions(
+                    driver=mln.RenderDriverKind.CORE_WORKER,
+                    frame_wake=frame_wake(self.frames.notify),
+                )
+            )
+            result(attached)
+        except BaseException:
+            with contextlib.suppress(Exception):
+                self.close()
+            raise
+
+    def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
+        assert self.map is not None
+        return self.map.attach_offscreen(
+            mln.OffscreenDescriptor(extent=EXTENT), options
+        )
+
     def render_red(self) -> mln.TextureReadbackResult:
         assert self.map is not None and self.session is not None
         result(self.map.set_style_json(RED_STYLE))
@@ -282,6 +187,200 @@ class OwnedTexture:
                 return image
             if time.monotonic() > deadline:
                 raise AssertionError("timed out waiting for a red frame")
+
+    def close(self) -> None:
+        # A core-worker session detaches as it closes.
+        if self.session is not None:
+            result(self.session.close())
+            self.session = None
+        if self.map is not None:
+            close_if_live(self.map)
+
+
+class BorrowedTexture(_Target):
+    """A map rendering into a host texture.
+
+    A caller-driven session is serviced on a Python thread that blocks on the
+    session's driver-work wake, and every frame wait blocks on its frame wake.
+    An OpenGL context belongs to that thread for its whole life, as a host's
+    would: the thread creates it, makes it current, creates the textures, and
+    destroys them all.
+    """
+
+    def __init__(
+        self,
+        harness: Harness,
+        backend: str,
+        driver: mln.RenderDriverKind,
+        queue_lock: mln.QueueLock | mln.NativeQueueLock | None = None,
+    ) -> None:
+        opengl = backend in ("egl", "wgl")
+        assert driver == mln.RenderDriverKind.CALLER_GRAPHICS_THREAD or not opengl
+        super().__init__()
+        self.harness = harness
+        self.backend = backend
+        self._work = threading.Event()
+        self._ready = threading.Event()
+        self._stopped = threading.Event()
+        self._finish = threading.Event()
+        self._stopping = False
+        self._release = False
+        self._closed = False
+        self.serviced = 0
+        self.service_errors: list[BaseException] = []
+        self.graphics: graphics.Graphics | None = None
+        self.textures: list[graphics.Texture] = []
+        self._service: threading.Thread | None = None
+        try:
+            if driver == mln.RenderDriverKind.CALLER_GRAPHICS_THREAD:
+                # A daemon, so a driver call that never returns cannot keep
+                # the interpreter from exiting after the test fails.
+                self._service = threading.Thread(
+                    target=self._serve, args=(opengl,), name="graphics", daemon=True
+                )
+                self._service.start()
+                if not self._ready.wait(TIMEOUT):
+                    raise AssertionError("timed out creating the graphics object")
+                if self.service_errors:
+                    raise self.service_errors[0]
+            if not opengl:
+                self.graphics = graphics.Graphics(_GRAPHICS[backend])
+                self._create_textures()
+            self.map = harness.create_map(
+                map_mode=mln.MapMode.CONTINUOUS, initial_extent=EXTENT
+            )
+            options = mln.RenderSessionAttachOptions(
+                driver=driver,
+                frame_wake=mln.Wake(self.frames.notify),
+                driver_work_wake=mln.Wake(self._work.set),
+            )
+            if queue_lock is not None:
+                options = replace(options, queue_lock=queue_lock)
+            self.session, attached = self._attach(options)
+            # A wake that fired before the session was stored found nothing
+            # to service, so the graphics thread checks again.
+            self._work.set()
+            result(attached)
+        except BaseException:
+            # A session whose attach failed still detaches before it is
+            # destroyed, and close() leaves alive what it cannot detach.
+            with contextlib.suppress(Exception):
+                self.close()
+            raise
+
+    def _create_textures(self) -> None:
+        assert self.graphics is not None
+        self.textures.append(graphics.Texture(self.graphics, WIDTH, HEIGHT))
+
+    def _close_textures(self) -> None:
+        while self.textures:
+            self.textures.pop().close()
+
+    def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
+        assert self.graphics is not None and self.map is not None
+        context = self.graphics.context
+        infos = [texture.info for texture in self.textures]
+        # Every texture of the ring shares the first one's format and size.
+        width, height = infos[0].width, infos[0].height
+        if self.backend == "metal":
+            return self.map.attach_metal_borrowed_texture(
+                mln.MetalBorrowedTextureDescriptor(
+                    extent=EXTENT,
+                    physical_width=width,
+                    physical_height=height,
+                    textures=[
+                        mln.MetalBorrowedTexture(texture=info.metal_texture or 0)
+                        for info in infos
+                    ],
+                ),
+                options,
+            )
+        if self.backend == "vulkan":
+            return self.map.attach_vulkan_borrowed_texture(
+                mln.VulkanBorrowedTextureDescriptor(
+                    extent=EXTENT,
+                    physical_width=width,
+                    physical_height=height,
+                    context=mln.VulkanContextDescriptor(
+                        instance=context.vulkan_instance or 0,
+                        physical_device=context.vulkan_physical_device or 0,
+                        device=context.vulkan_device or 0,
+                        graphics_queue=context.vulkan_queue or 0,
+                        graphics_queue_family_index=context.vulkan_queue_family_index,
+                        get_instance_proc_addr=context.vulkan_get_instance_proc_addr
+                        or 0,
+                        get_device_proc_addr=context.vulkan_get_device_proc_addr or 0,
+                    ),
+                    textures=[
+                        mln.VulkanBorrowedTexture(
+                            image=info.vulkan_image, image_view=info.vulkan_image_view
+                        )
+                        for info in infos
+                    ],
+                    format=infos[0].format,
+                    final_layout=infos[0].vulkan_final_layout,
+                ),
+                options,
+            )
+        return self.map.attach_open_gl_borrowed_texture(
+            mln.OpenGlBorrowedTextureDescriptor(
+                extent=EXTENT,
+                physical_width=width,
+                physical_height=height,
+                context=_opengl_context(self.backend, context),
+                textures=[
+                    mln.OpenGlBorrowedTexture(texture=info.opengl_texture)
+                    for info in infos
+                ],
+                target=infos[0].opengl_target,
+            ),
+            options,
+        )
+
+    def _serve(self, opengl: bool) -> None:
+        try:
+            if opengl:
+                self.graphics = graphics.Graphics(_GRAPHICS[self.backend])
+                self.graphics.make_current()
+                self._create_textures()
+        except BaseException as error:  # noqa: BLE001 - raised by __init__
+            self.service_errors.append(error)
+        finally:
+            self._ready.set()
+        try:
+            while not self.service_errors:
+                self._work.wait()
+                self._work.clear()
+                if self._stopping:
+                    break
+                if self.session is not None:
+                    self.session.service_driver_work()
+                    self.serviced += 1
+        except BaseException as error:  # noqa: BLE001 - reported by close()
+            self.service_errors.append(error)
+        finally:
+            while not self._stopping:
+                self._work.wait()
+                self._work.clear()
+            self._stopped.set()
+            # The context is current here, so it and its textures are
+            # destroyed here, once the session that shared them is gone.
+            self._finish.wait()
+            if opengl and self._release and self.graphics is not None:
+                self._close_textures()
+                self.graphics.close()
+
+    def with_texture[T](
+        self, frame: mln.AcquiredFrameHandle, callback: Callable[[object], T]
+    ) -> T:
+        if self.backend == "metal":
+            view = frame.metal_texture()
+        elif self.backend == "vulkan":
+            view = frame.vulkan_texture()
+        else:
+            view = frame.open_gl_texture()
+        with view as texture:
+            return callback(texture)
 
     def stop_service(self) -> None:
         if self._service is not None:
@@ -309,6 +408,7 @@ class OwnedTexture:
             if self._service.is_alive():
                 raise AssertionError("the graphics thread did not exit")
         if release and self.graphics is not None:
+            self._close_textures()
             self.graphics.close()
 
     def close(self) -> None:
@@ -324,17 +424,6 @@ class OwnedTexture:
         self._teardown(release=True)
         assert not self.service_errors
 
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        kind: type[BaseException] | None,
-        value: BaseException | None,
-        trace: TracebackType | None,
-    ) -> None:
-        self.close()
-
 
 def _default_driver(backend: str) -> mln.RenderDriverKind:
     # OpenGL sessions render on the host's graphics thread.
@@ -347,11 +436,8 @@ def _texture_name(backend: str, view: object) -> int:
     return view.image if backend == "vulkan" else view.texture  # type: ignore[attr-defined]
 
 
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_an_owned_texture_renders_pixels_the_binding_reads_back(
-    harness: Harness, backend: str
-) -> None:
-    with OwnedTexture(harness, backend, _default_driver(backend)) as target:
+def test_a_session_renders_pixels_the_binding_reads_back(harness: Harness) -> None:
+    with Offscreen(harness) as target:
         image = target.render_red()
 
         assert (image.info.width, image.info.height) == (WIDTH, HEIGHT)
@@ -364,7 +450,7 @@ def test_an_owned_texture_renders_pixels_the_binding_reads_back(
 def test_a_drain_before_any_demand_returns_no_value(
     harness: Harness, backend: str
 ) -> None:
-    with OwnedTexture(harness, backend, _default_driver(backend)) as target:
+    with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
         # Native reports both calls as not ready, which reads as no results and
         # no frame.
         assert target.session.drain_frame_results() == ()
@@ -376,12 +462,12 @@ def test_a_caller_driven_session_is_serviced_from_a_python_thread(
     harness: Harness, backend: str
 ) -> None:
     driver = mln.RenderDriverKind.CALLER_GRAPHICS_THREAD
-    with OwnedTexture(harness, backend, driver) as target:
+    with BorrowedTexture(harness, backend, driver) as target:
         assert target.session.get_capabilities().driver == driver
         # The main thread blocks on frame wakes while the graphics thread
         # services the work, so neither holds the GIL across native calls.
-        assert target.render_red().data[:4] == RED_PIXEL
-    # A service call publishes its frame and readback before it returns, so
+        assert target.render().disposition == mln.RenderResult.RENDERED
+    # A service call publishes its frame before it returns, so
     # the count is read once closing has stopped the graphics thread.
     assert target.serviced > 0
 
@@ -390,8 +476,8 @@ def test_a_caller_driven_session_is_serviced_from_a_python_thread(
 def test_a_frame_view_holds_its_owners_until_its_scope_ends(
     harness: Harness, backend: str
 ) -> None:
-    with OwnedTexture(harness, backend, _default_driver(backend)) as target:
-        target.render_red()
+    with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
+        target.render()
         frame = target.session.acquire_frame()
 
         def inspect(view: object) -> int:
@@ -420,8 +506,8 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
 def test_a_borrow_on_another_thread_holds_off_close(
     harness: Harness, backend: str
 ) -> None:
-    with OwnedTexture(harness, backend, _default_driver(backend)) as target:
-        target.render_red()
+    with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
+        target.render()
         frame = target.session.acquire_frame()
         entered = threading.Event()
         release = threading.Event()
@@ -500,17 +586,17 @@ class _NativeCode:
         return self.registration
 
 
-@pytest.mark.parametrize("backend", BACKENDS)
 def test_a_native_wake_reaches_native_and_the_first_call_consumes_it(
-    harness: Harness, backend: str
+    harness: Harness,
 ) -> None:
     # An address must fit a pointer.
     with pytest.raises(OverflowError):
         mln.Wake.native(callback=-1)
     frames = _NativeCode(user_data=0x5EED)
-    driver = _default_driver(backend)
-    with OwnedTexture(harness, backend, driver, frame_wake=frames.wake) as target:
-        options = mln.RenderSessionAttachOptions(driver=driver)
+    with Offscreen(harness, frame_wake=frames.wake) as target:
+        options = mln.RenderSessionAttachOptions(
+            driver=mln.RenderDriverKind.CORE_WORKER
+        )
         target.render()
         # Native code calls the function pointer with the context unchanged.
         assert frames.called.wait(TIMEOUT)
@@ -548,21 +634,14 @@ def test_a_native_wake_reaches_native_and_the_first_call_consumes_it(
     assert frames.releases == [frames.user_data]
 
 
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_leaving_an_attached_sessions_scope_disposes_it(
-    harness: Harness, backend: str
-) -> None:
+def test_leaving_an_attached_sessions_scope_disposes_it(harness: Harness) -> None:
     frames = _NativeCode(user_data=0x5C0)
-    driver = _default_driver(backend)
-    with OwnedTexture(harness, backend, driver, frame_wake=frames.wake) as target:
+    with Offscreen(harness, frame_wake=frames.wake) as target:
         assert target.session is not None
         with target.session:
             target.render()
-            # Nothing services the session once its scope disposes it.
-            target.stop_service()
             target.session = None
-        # Native code releases the wakes once the session retires, after
-        # which the map releases and the host destroys the graphics objects.
+        # Native code releases the wakes once the session retires.
         assert frames.released.wait(TIMEOUT)
 
 
@@ -577,17 +656,17 @@ def test_a_native_queue_lock_reaches_native(harness: Harness, backend: str) -> N
     )
     driver = _default_driver(backend)
     if backend == "vulkan":
-        with OwnedTexture(harness, backend, driver, queue_lock=lock) as target:
-            # Rendering and reading back a styled frame submits to the queue,
-            # which native code does only while it holds the lock.
-            target.render_red()
+        with BorrowedTexture(harness, backend, driver, queue_lock=lock) as target:
+            # Rendering a frame submits to the queue, which native code does
+            # only while it holds the lock.
+            target.render()
         assert host.released.wait(TIMEOUT)
         assert host.calls
     else:
         # Only a Vulkan target takes a queue lock, so native code reports the
         # lock as unsupported, and the binding releases its context.
         with (
-            OwnedTexture(harness, backend, driver) as target,
+            BorrowedTexture(harness, backend, driver) as target,
             pytest.raises(
                 mln.MaplibreError,
                 check=lambda error: error.status == mln.Status.UNSUPPORTED,
@@ -605,21 +684,22 @@ import sys
 
 sys.path.insert(0, sys.argv[1])
 from support import Harness
-from test_render import OwnedTexture, _default_driver
+from test_render import BorrowedTexture, _default_driver
 
 backend = sys.argv[2]
-devices = []
+objects = []
 # Registered before the binding's exit hook, so it runs after that hook, as a
-# graphics driver's own exit teardown can. The device is destroyed while the
-# session is still open, which is safe only once its graphics calls ended.
-atexit.register(lambda: [device.close() for device in devices])
-target = OwnedTexture(Harness(), backend, _default_driver(backend))
-target.render_red()
+# graphics driver's own exit teardown can. The textures and device are
+# destroyed while the session is still open, which is safe only once its
+# graphics calls ended.
+atexit.register(lambda: [graphics.close() for graphics in objects])
+target = BorrowedTexture(Harness(), backend, _default_driver(backend))
+target.render()
 # An OpenGL context belongs to its graphics thread, which keeps it. The hook
 # keeps the session's Vulkan objects, which are children of the device, so a
 # Vulkan host keeps its device until the process exits.
 if target.graphics is not None and backend not in ("egl", "wgl", "vulkan"):
-    devices.append(target.graphics)
+    objects.extend([*target.textures, target.graphics])
 print("RENDERED", flush=True)
 """
 

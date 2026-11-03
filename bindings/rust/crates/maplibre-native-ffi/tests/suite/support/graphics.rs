@@ -1,4 +1,4 @@
-//! GPU contexts from tests/graphics, loaded over its C ABI.
+//! GPU contexts and textures from tests/graphics, loaded over its C ABI.
 //!
 //! The library installs beside the C API library, so it loads from the same
 //! search path the test process already has. See
@@ -7,6 +7,7 @@
 //! from the native install as `mln_render_backend`.
 
 use std::ffi::{CStr, c_char, c_void};
+use std::marker::PhantomData;
 use std::sync::OnceLock;
 
 use libloading::Library;
@@ -66,12 +67,29 @@ struct ContextInfo {
     get_proc_address: *mut c_void,
 }
 
+/// mln_test_graphics_texture_info, field for field.
+#[repr(C)]
+struct TextureInfo {
+    vulkan_image: u64,
+    vulkan_image_view: u64,
+    metal_texture: *mut c_void,
+    width: u32,
+    height: u32,
+    format: u32,
+    vulkan_final_layout: u32,
+    opengl_texture: u32,
+    opengl_target: u32,
+}
+
 struct Api {
     last_error: unsafe extern "C" fn() -> *const c_char,
     create: unsafe extern "C" fn(u32) -> *mut c_void,
     destroy: unsafe extern "C" fn(*mut c_void),
     get_context: unsafe extern "C" fn(*const c_void, *mut ContextInfo) -> bool,
     make_current: unsafe extern "C" fn(*mut c_void) -> bool,
+    texture_create: unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void,
+    texture_destroy: unsafe extern "C" fn(*mut c_void),
+    texture_get_info: unsafe extern "C" fn(*const c_void, *mut TextureInfo) -> bool,
 }
 
 fn api() -> &'static Api {
@@ -100,6 +118,11 @@ fn api() -> &'static Api {
                 destroy: *library.get(b"mln_test_graphics_destroy\0").unwrap(),
                 get_context: *library.get(b"mln_test_graphics_get_context\0").unwrap(),
                 make_current: *library.get(b"mln_test_graphics_make_current\0").unwrap(),
+                texture_create: *library.get(b"mln_test_graphics_texture_create\0").unwrap(),
+                texture_destroy: *library.get(b"mln_test_graphics_texture_destroy\0").unwrap(),
+                texture_get_info: *library
+                    .get(b"mln_test_graphics_texture_get_info\0")
+                    .unwrap(),
             }
         }
     })
@@ -149,9 +172,9 @@ impl Graphics {
         graphics
     }
 
-    /// The driver an owned-texture session on this context takes by default:
-    /// the calling thread when it shares a current context, and otherwise the
-    /// core's own worker.
+    /// The driver a borrowed-texture session on this context takes by
+    /// default: the calling thread when it shares a current context, and
+    /// otherwise the core's own worker.
     fn default_driver() -> RenderDriverKind {
         if USES_CURRENT_CONTEXT {
             RenderDriverKind::CallerGraphicsThread
@@ -160,35 +183,62 @@ impl Graphics {
         }
     }
 
-    pub fn attach_owned_texture(
+    /// Creates a width by height RGBA texture on this device or context.
+    pub fn texture(&self, width: u32, height: u32) -> Texture<'_> {
+        // SAFETY: raw is live and belongs to this thread.
+        let raw = unsafe { (api().texture_create)(self.raw, width, height) };
+        assert!(!raw.is_null(), "tests/graphics failed: {}", last_error());
+        let mut texture = Texture {
+            raw,
+            // SAFETY: the struct is plain data, and all zeroes is its empty
+            // value.
+            info: unsafe { std::mem::zeroed() },
+            graphics: PhantomData,
+        };
+        // SAFETY: raw is live and info is writable for the call.
+        assert!(
+            unsafe { (api().texture_get_info)(texture.raw, &mut texture.info) },
+            "tests/graphics failed: {}",
+            last_error()
+        );
+        texture
+    }
+
+    /// Attaches a session that renders into `ring`, one texture per slot, all
+    /// of this context's and the same size.
+    pub fn attach_borrowed_texture(
         &self,
         map: &MapHandle,
         extent: LogicalExtent,
+        ring: &[Texture<'_>],
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let context = &self.context;
-        // SAFETY: every handle comes from this live graphics object, which
-        // outlives the session.
+        let info = &ring.first().expect("a ring has a texture").info;
+        let (physical_width, physical_height) = (info.width, info.height);
+        // SAFETY: every handle comes from this live graphics object, and the
+        // textures outlive the session.
         unsafe {
             match BACKEND {
                 #[cfg(mln_render_backend = "metal")]
-                BACKEND_METAL => map.attach_metal_owned_texture(
-                    &MetalOwnedTextureDescriptor {
+                BACKEND_METAL => map.attach_metal_borrowed_texture(
+                    &MetalBorrowedTextureDescriptor::new(
                         extent,
-                        context: MetalContextDescriptor {
-                            device: context.metal_device,
-                        },
-                        // MTLPixelFormatBGRA8Unorm.
-                        pixel_format: 80,
-                        command_queue: std::ptr::null_mut(),
-                    },
+                        physical_width,
+                        physical_height,
+                        ring.iter()
+                            .map(|texture| MetalBorrowedTexture::new(texture.info.metal_texture))
+                            .collect(),
+                    ),
                     options,
                 ),
                 #[cfg(mln_render_backend = "vulkan")]
-                BACKEND_VULKAN => map.attach_vulkan_owned_texture(
-                    &VulkanOwnedTextureDescriptor {
+                BACKEND_VULKAN => map.attach_vulkan_borrowed_texture(
+                    &VulkanBorrowedTextureDescriptor::new(
                         extent,
-                        context: VulkanContextDescriptor {
+                        physical_width,
+                        physical_height,
+                        VulkanContextDescriptor {
                             instance: context.vulkan_instance,
                             physical_device: context.vulkan_physical_device,
                             device: context.vulkan_device,
@@ -197,46 +247,65 @@ impl Graphics {
                             get_instance_proc_addr: context.vulkan_get_instance_proc_addr,
                             get_device_proc_addr: context.vulkan_get_device_proc_addr,
                         },
-                    },
+                        ring.iter()
+                            .map(|texture| {
+                                VulkanBorrowedTexture::new(
+                                    texture.info.vulkan_image,
+                                    texture.info.vulkan_image_view,
+                                )
+                            })
+                            .collect(),
+                        info.format,
+                        info.vulkan_final_layout,
+                    ),
                     options,
                 ),
-                BACKEND_WGL => map.attach_open_gl_owned_texture(
-                    &OpenGlOwnedTextureDescriptor {
+                _ => map.attach_open_gl_borrowed_texture(
+                    &OpenGlBorrowedTextureDescriptor::new(
                         extent,
-                        context: OpenGlContextDescriptor {
+                        physical_width,
+                        physical_height,
+                        OpenGlContextDescriptor {
                             ownership: OpenGlContextOwnership::Shared,
-                            data: OpenGlContextDescriptorData::Wgl(WglContextDescriptor {
-                                device_context: context.wgl_device_context,
-                                share_context: context.wgl_context,
-                                get_proc_address: context.get_proc_address,
-                            }),
+                            data: if BACKEND == BACKEND_WGL {
+                                OpenGlContextDescriptorData::Wgl(WglContextDescriptor {
+                                    device_context: context.wgl_device_context,
+                                    share_context: context.wgl_context,
+                                    get_proc_address: context.get_proc_address,
+                                })
+                            } else {
+                                OpenGlContextDescriptorData::Egl(EglContextDescriptor {
+                                    share_context: context.egl_context,
+                                    ..EglContextDescriptor::new(
+                                        context.egl_display,
+                                        context.egl_config,
+                                    )
+                                })
+                            },
                         },
-                    },
-                    options,
-                ),
-                _ => map.attach_open_gl_owned_texture(
-                    &OpenGlOwnedTextureDescriptor {
-                        extent,
-                        context: OpenGlContextDescriptor {
-                            ownership: OpenGlContextOwnership::Shared,
-                            data: OpenGlContextDescriptorData::Egl(EglContextDescriptor {
-                                share_context: context.egl_context,
-                                ..EglContextDescriptor::new(context.egl_display, context.egl_config)
-                            }),
-                        },
-                    },
+                        ring.iter()
+                            .map(|texture| OpenGlBorrowedTexture::new(texture.info.opengl_texture))
+                            .collect(),
+                        info.opengl_target,
+                    ),
                     options,
                 ),
             }
         }
     }
 
-    /// Attaches an owned-texture session with this build's default driver
-    /// and waits until it is attached.
-    pub fn owned_texture_session(&self, map: &MapHandle, extent: LogicalExtent) -> Session {
+    /// Attaches a session that renders into `ring` with this build's default
+    /// driver, and waits until it is attached.
+    pub fn borrowed_texture_session(
+        &self,
+        map: &MapHandle,
+        extent: LogicalExtent,
+        ring: &[Texture<'_>],
+    ) -> Session {
         let (options, wakes) = Session::attach_options(Self::default_driver());
         Session::finish_attach(
-            self.attach_owned_texture(map, extent, &options).unwrap(),
+            self.attach_borrowed_texture(map, extent, ring, &options)
+                .unwrap(),
             wakes,
         )
     }
@@ -246,6 +315,22 @@ impl Drop for Graphics {
     fn drop(&mut self) {
         // SAFETY: raw is this value's and is destroyed once.
         unsafe { (api().destroy)(self.raw) };
+    }
+}
+
+/// A texture that the host owns, for a borrowed ring. Drop it only once every
+/// session that renders into it has retired.
+pub struct Texture<'graphics> {
+    raw: *mut c_void,
+    info: TextureInfo,
+    graphics: PhantomData<&'graphics Graphics>,
+}
+
+impl Drop for Texture<'_> {
+    fn drop(&mut self) {
+        // SAFETY: raw is this value's and is destroyed once, before the
+        // graphics object it borrows.
+        unsafe { (api().texture_destroy)(self.raw) };
     }
 }
 

@@ -4,9 +4,12 @@
 import { native } from "../../src/internal/addon.ts";
 import {
   importWebGpuDevice,
+  importWebGpuTexture,
+  importWebGpuTextureView,
   registerWebGlContext,
+  RegisteredWebGlContext,
+  webGpuTextureFormat,
   type ImportedWebGpuObject,
-  type RegisteredWebGlContext,
 } from "../../src/internal/web_graphics.ts";
 import type {
   Capabilities,
@@ -60,7 +63,17 @@ async function httpOrigin(
 interface TestExports {
   nativeProbe(listener: (event: string) => void): unknown;
   makeCurrent(context: number): boolean;
+  webGlTextureCreate(width: number, height: number): number;
+  webGlTextureDelete(texture: number): void;
 }
+
+interface GpuTexture {
+  createView(): object;
+  destroy(): void;
+}
+
+// GPUTextureUsage.RENDER_ATTACHMENT, TEXTURE_BINDING, and COPY_SRC.
+const textureUsage = 0x10 | 0x04 | 0x01;
 
 /** The test exports that test/browser/test_addon.c adds to the addon's. */
 function testExports(): TestExports {
@@ -74,7 +87,9 @@ const adapter = (await gpu?.requestAdapter()) as
   | { requestDevice(): Promise<object> }
   | null
   | undefined;
-const device: object | null = (await adapter?.requestDevice()) ?? null;
+const device = ((await adapter?.requestDevice()) ?? null) as {
+  createTexture(descriptor: object): GpuTexture;
+} | null;
 
 const graphics = new Map<
   bigint,
@@ -82,11 +97,15 @@ const graphics = new Map<
 >();
 let nextGraphics = 1n;
 
+/** The page's textures, by key, and how each one is destroyed. */
+const textures = new Map<bigint, () => void>();
+let nextTexture = 1n;
+
 /**
  * The page's graphics objects, in the shape of the desktop graphics addon: a
  * WebGL 2 context over an OffscreenCanvas of its own, or an import of the
- * run's WebGPU device. Sessions render into textures of their own, so the
- * canvas only carries the context.
+ * run's WebGPU device, and RGBA textures on either. Sessions render into
+ * textures, so the canvas only carries the context.
  */
 const testGraphics = {
   create(backend: number): object {
@@ -119,6 +138,56 @@ const testGraphics = {
   destroy(key: bigint): void {
     graphics.get(key)?.close();
     graphics.delete(key);
+  },
+  textureCreate(key: bigint, width: number, height: number): object {
+    const texture = nextTexture++;
+    const owner = graphics.get(key)!;
+    if (owner instanceof RegisteredWebGlContext) {
+      const context = owner.context;
+      const exports = testExports();
+      if (!exports.makeCurrent(context)) {
+        throw new Error("the WebGL context could not be made current");
+      }
+      const name = exports.webGlTextureCreate(width, height);
+      textures.set(texture, () => {
+        if (exports.makeCurrent(context)) {
+          exports.webGlTextureDelete(name);
+        }
+      });
+      // GL_RGBA8 and GL_TEXTURE_2D.
+      return {
+        texture,
+        width,
+        height,
+        format: 0x8058,
+        openGlTexture: name,
+        openGlTarget: 0x0de1,
+      };
+    }
+    const created = device!.createTexture({
+      size: { width, height },
+      format: "rgba8unorm",
+      usage: textureUsage,
+    });
+    const imported = importWebGpuTexture(created);
+    const view = importWebGpuTextureView(created.createView());
+    textures.set(texture, () => {
+      view.close();
+      imported.close();
+      created.destroy();
+    });
+    return {
+      texture,
+      width,
+      height,
+      format: webGpuTextureFormat("rgba8unorm"),
+      webGpuTexture: imported.pointer,
+      webGpuTextureView: view.pointer,
+    };
+  },
+  textureDestroy(texture: bigint): void {
+    textures.get(texture)?.();
+    textures.delete(texture);
   },
   nativeProbe(listener: (event: string) => void): unknown {
     return testExports().nativeProbe(listener);

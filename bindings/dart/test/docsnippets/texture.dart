@@ -38,17 +38,6 @@ Future<void> renderToTexture(
   List<int> newViews,
 ) async {
   // #region attach-owned
-  final texture = VulkanOwnedTextureDescriptor(
-    // The texture's size in logical pixels, and its scale factor.
-    extent: const LogicalExtent(
-      width: 800,
-      height: 600,
-      scaleFactor: 2,
-    ),
-    // Your VkInstance, VkPhysicalDevice,
-    // VkDevice, and graphics VkQueue.
-    context: vulkan,
-  );
   final options = RenderSessionAttachOptions(
     driver: RenderDriverKind.coreWorker,
     frameWake: const Wake(callback: onFrameWake),
@@ -56,14 +45,7 @@ Future<void> renderToTexture(
     // lock and unlock are native function pointers.
     queueLock: QueueLock.native(lock: lockQueue, unlock: unlockQueue),
   );
-
-  final owned = map.attachVulkanOwnedTexture(texture, options);
-  session = owned.session;
-  await owned.ready;
   // #endregion attach-owned
-
-  drawFrame();
-  await session.close();
 
   // #region attach-borrowed
   var ring = VulkanBorrowedTextureDescriptor(
@@ -85,17 +67,7 @@ Future<void> renderToTexture(
     finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
   );
 
-  // The same attach options as for an owned ring. A queue lock serves
-  // one attach, so pass a new one.
-  final borrowed = map.attachVulkanBorrowedTexture(
-    ring,
-    options.copyWith(
-      queueLock: QueueLock.native(
-        lock: lockQueue,
-        unlock: unlockQueue,
-      ),
-    ),
-  );
+  final borrowed = map.attachVulkanBorrowedTexture(ring, options);
   session = borrowed.session;
   await borrowed.ready;
   // #endregion attach-borrowed

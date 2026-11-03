@@ -50,15 +50,6 @@ def render_to_texture(
 ) -> None:
     global session
     # #region attach-owned
-    texture = mln.VulkanOwnedTextureDescriptor(
-        # The texture's size in logical pixels, and its scale factor.
-        extent=mln.LogicalExtent(
-            width=800, height=600, scale_factor=2.0
-        ),
-        # Your VkInstance, VkPhysicalDevice,
-        # VkDevice, and graphics VkQueue.
-        context=vulkan,
-    )
     options = mln.RenderSessionAttachOptions(
         driver=mln.RenderDriverKind.CORE_WORKER,
         frame_wake=mln.Wake(on_frame_wake),
@@ -68,15 +59,7 @@ def render_to_texture(
             lock=lock_queue, unlock=unlock_queue
         ),
     )
-
-    session, ready = map_handle.attach_vulkan_owned_texture(
-        texture, options
-    )
-    ready.result()
     # #endregion attach-owned
-
-    draw_frame()
-    session.close().result()
 
     # #region attach-borrowed
     ring = mln.VulkanBorrowedTextureDescriptor(
@@ -100,16 +83,8 @@ def render_to_texture(
         final_layout=5,  # VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-    # The same attach options as for an owned ring. A queue lock
-    # serves one attach, so pass a new one.
     session, ready = map_handle.attach_vulkan_borrowed_texture(
-        ring,
-        dataclasses.replace(
-            options,
-            queue_lock=mln.QueueLock.native(
-                lock=lock_queue, unlock=unlock_queue
-            ),
-        ),
+        ring, options
     )
     ready.result()
     # #endregion attach-borrowed

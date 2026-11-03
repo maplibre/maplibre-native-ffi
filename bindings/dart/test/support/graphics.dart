@@ -1,7 +1,7 @@
 /// GPU contexts from `mln_test_graphics`, the shared test library in
 /// `tests/graphics`, loaded from the install prefix the suite runs against.
 ///
-/// A test attaches an owned texture in such a context only for what an
+/// A test attaches a borrowed texture in such a context only for what an
 /// offscreen session lacks: acquired frames, and a Vulkan queue lock. Both exist
 /// only on Metal and Vulkan builds, so an OpenGL build opens no context here.
 library;
@@ -37,6 +37,36 @@ final class _Context extends Struct {
   external Pointer<Void> getProcAddress;
 }
 
+/// Mirrors `mln_test_graphics_texture_info`.
+final class _TextureInfo extends Struct {
+  @Uint64()
+  external int vulkanImage;
+  @Uint64()
+  external int vulkanImageView;
+  external Pointer<Void> metalTexture;
+  @Uint32()
+  external int width;
+  @Uint32()
+  external int height;
+  @Uint32()
+  external int format;
+  @Uint32()
+  external int vulkanFinalLayout;
+  @Uint32()
+  external int openGlTexture;
+  @Uint32()
+  external int openGlTarget;
+}
+
+/// The fields of a texture's info that a borrowed descriptor names.
+typedef _Texture = ({
+  NativePointer metalTexture,
+  int vulkanImage,
+  int vulkanImageView,
+  int format,
+  int vulkanFinalLayout,
+});
+
 final class _Library {
   _Library(DynamicLibrary library)
     : create = library
@@ -54,6 +84,21 @@ final class _Library {
             Bool Function(Pointer<Void>, Pointer<_Context>),
             bool Function(Pointer<Void>, Pointer<_Context>)
           >('mln_test_graphics_get_context'),
+      textureCreate = library
+          .lookupFunction<
+            Pointer<Void> Function(Pointer<Void>, Uint32, Uint32),
+            Pointer<Void> Function(Pointer<Void>, int, int)
+          >('mln_test_graphics_texture_create'),
+      textureDestroy = library
+          .lookupFunction<
+            Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)
+          >('mln_test_graphics_texture_destroy'),
+      textureGetInfo = library
+          .lookupFunction<
+            Bool Function(Pointer<Void>, Pointer<_TextureInfo>),
+            bool Function(Pointer<Void>, Pointer<_TextureInfo>)
+          >('mln_test_graphics_texture_get_info'),
       lastError = library
           .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
             'mln_test_graphics_last_error',
@@ -62,6 +107,9 @@ final class _Library {
   final Pointer<Void> Function(int) create;
   final void Function(Pointer<Void>) destroy;
   final bool Function(Pointer<Void>, Pointer<_Context>) getContext;
+  final Pointer<Void> Function(Pointer<Void>, int, int) textureCreate;
+  final void Function(Pointer<Void>) textureDestroy;
+  final bool Function(Pointer<Void>, Pointer<_TextureInfo>) textureGetInfo;
   final Pointer<Utf8> Function() lastError;
 }
 
@@ -128,33 +176,38 @@ final class TestGraphics {
 
   final Pointer<Void> _handle;
   final Pointer<_Context> _context;
+  final _textures = <Pointer<Void>>[];
   var _closed = false;
 
-  /// Attaches a session-owned texture on this device for a core worker.
-  NewRenderSession attachOwnedTexture(
+  /// Attaches a ring of one texture on this device for a core worker. [close]
+  /// destroys the texture, so the session must retire first.
+  NewRenderSession attachBorrowedTexture(
     MapHandle map,
     LogicalExtent extent,
     RenderSessionAttachOptions options,
   ) {
+    final width = (extent.width * extent.scaleFactor).round();
+    final height = (extent.height * extent.scaleFactor).round();
+    final texture = _createTexture(width, height);
     final context = _context.ref;
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
     switch (context.backend) {
       case _backendMetal:
-        return map.attachMetalOwnedTexture(
-          MetalOwnedTextureDescriptor(
+        return map.attachMetalBorrowedTexture(
+          MetalBorrowedTextureDescriptor(
             extent: extent,
-            context: MetalContextDescriptor(
-              device: pointer(context.metalDevice),
-            ),
-            // MTLPixelFormatBGRA8Unorm.
-            pixelFormat: 80,
+            physicalWidth: width,
+            physicalHeight: height,
+            textures: [MetalBorrowedTexture(texture: texture.metalTexture)],
           ),
           options,
         );
       case _backendVulkan:
-        return map.attachVulkanOwnedTexture(
-          VulkanOwnedTextureDescriptor(
+        return map.attachVulkanBorrowedTexture(
+          VulkanBorrowedTextureDescriptor(
             extent: extent,
+            physicalWidth: width,
+            physicalHeight: height,
             context: VulkanContextDescriptor(
               instance: pointer(context.vulkanInstance),
               physicalDevice: pointer(context.vulkanPhysicalDevice),
@@ -164,18 +217,55 @@ final class TestGraphics {
               getInstanceProcAddr: pointer(context.vulkanGetInstanceProcAddr),
               getDeviceProcAddr: pointer(context.vulkanGetDeviceProcAddr),
             ),
+            textures: [
+              VulkanBorrowedTexture(
+                image: texture.vulkanImage,
+                imageView: texture.vulkanImageView,
+              ),
+            ],
+            format: texture.format,
+            finalLayout: texture.vulkanFinalLayout,
           ),
           options,
         );
       default:
-        fail('no owned texture for backend ${context.backend}');
+        fail('no borrowed texture for backend ${context.backend}');
     }
   }
 
-  /// Destroys the context. A second close does nothing.
+  /// Creates a texture that [close] destroys, and returns its info.
+  _Texture _createTexture(int width, int height) {
+    final texture = _library.textureCreate(_handle, width, height);
+    if (texture == nullptr) {
+      fail(
+        'mln_test_graphics_texture_create: '
+        '${_library.lastError().toDartString()}',
+      );
+    }
+    _textures.add(texture);
+    return using((arena) {
+      final info = arena<_TextureInfo>();
+      if (!_library.textureGetInfo(texture, info)) {
+        fail(
+          'mln_test_graphics_texture_get_info: '
+          '${_library.lastError().toDartString()}',
+        );
+      }
+      return (
+        metalTexture: NativePointer(info.ref.metalTexture.address),
+        vulkanImage: info.ref.vulkanImage,
+        vulkanImageView: info.ref.vulkanImageView,
+        format: info.ref.format,
+        vulkanFinalLayout: info.ref.vulkanFinalLayout,
+      );
+    });
+  }
+
+  /// Destroys the textures and then the context. A second close does nothing.
   void close() {
     if (_closed) return;
     _closed = true;
+    _textures.forEach(_library.textureDestroy);
     _library.destroy(_handle);
     calloc.free(_context);
   }

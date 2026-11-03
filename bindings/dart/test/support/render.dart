@@ -1,6 +1,6 @@
 /// Render sessions on the build's backend, driven by their core worker
 /// and waited on through their frame wake. A session renders on a graphics
-/// device that native code creates, or on an owned texture in a context from
+/// device that native code creates, or on a borrowed texture in a context from
 /// `tests/graphics` when a test needs the frames that only such a session
 /// exposes.
 library;
@@ -69,12 +69,12 @@ final class WorkerSession {
   static Future<WorkerSession> attach(MapHandle map) =>
       _attach((options) => attachOffscreenSession(map, options));
 
-  /// Attaches an owned texture on [map] in a context from `tests/graphics`,
+  /// Attaches a borrowed texture on [map] in a context from `tests/graphics`,
   /// which exposes its frames on Metal and Vulkan.
-  static Future<WorkerSession> attachOwnedTexture(MapHandle map) {
+  static Future<WorkerSession> attachBorrowedTexture(MapHandle map) {
     final graphics = TestGraphics.open();
     return _attach(
-      (options) => graphics.attachOwnedTexture(map, _extent, options),
+      (options) => graphics.attachBorrowedTexture(map, _extent, options),
     );
   }
 

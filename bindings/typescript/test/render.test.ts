@@ -1,6 +1,6 @@
-// Owned-texture sessions on a core worker and on the JavaScript thread, the
-// scope of a borrowed frame view, a drain that finds nothing, and the native
-// registrations that a session's attach options take.
+// Offscreen sessions on a core worker, a borrowed texture serviced on the
+// JavaScript thread, the scope of a frame view, a drain that finds nothing,
+// and the native registrations that a session's attach options take.
 
 import assert from "node:assert/strict";
 
@@ -14,7 +14,7 @@ import {
 import { openRuntime } from "./support/fixture.ts";
 import {
   attachSession,
-  attachSessionOverOwnGraphics,
+  attachVulkanSession,
   backend,
   centerPixel,
   NativeProbe,
@@ -35,9 +35,9 @@ async function openRenderMap(style = backgroundStyle()): Promise<MapHandle> {
   return map;
 }
 
-test("an owned texture renders a frame that reads back as pixels", async () => {
+test("an offscreen session renders a frame that reads back as pixels", async () => {
   const map = await openRenderMap();
-  const worker = await TestSession.attach(map);
+  const worker = await TestSession.offscreen(map);
 
   const result = await worker.renderFrame();
   assert.ok(result.frameGeneration > 0n);
@@ -51,65 +51,56 @@ test("an owned texture renders a frame that reads back as pixels", async () => {
 });
 
 test(
-  "using disposes an attached session, and the map's release then lets the host destroy its graphics objects",
+  "using disposes an attached session, which then refuses calls, and the map releases",
   async () => {
     const map = await openRenderMap();
-    const { session, ready, destroyGraphics } =
-      attachSessionOverOwnGraphics(map);
+    const { session, ready } = attachSession(map, {});
     await bounded(ready, "the attachment");
     requestFrame(session, 1n);
     session[Symbol.dispose]();
     session[Symbol.dispose]();
     assert.throws(() => requestFrame(session, 2n), MaplibreError);
     await bounded(map.close(), "the map release");
-    destroyGraphics();
   },
   { needs: ["disposers"] },
 );
 
 test(
-  "await using waits until an attached session has retired, so the host may destroy its graphics objects",
+  "await using waits until an attached session has retired, so the map takes another",
   async () => {
     const map = await openRenderMap();
-    const { session, ready, destroyGraphics } =
-      attachSessionOverOwnGraphics(map);
+    const { session, ready } = attachSession(map, {});
     await bounded(ready, "the attachment");
     requestFrame(session, 1n);
     await bounded(session[Symbol.asyncDispose](), "the disposal");
     await session[Symbol.asyncDispose]();
-    destroyGraphics();
-    await bounded(map.close(), "the map release");
+    // Native code refuses an attach while the map still has a session.
+    const next = attachSession(map, {});
+    await bounded(next.ready, "the next attachment");
   },
   { needs: ["disposers"] },
 );
 
 test("a drain before any demand returns no results", async () => {
   const map = await openRenderMap();
-  const worker = await TestSession.attach(map);
+  const worker = await TestSession.offscreen(map);
   // Native reports the drain as not ready, which reads as no results.
   assert.deepEqual(worker.session.drainFrameResults(), []);
 });
 
 test("a caller-driven session is serviced from the event loop", async () => {
   const map = await openRenderMap();
-  const caller = await TestSession.attach(map, "caller");
+  const caller = await TestSession.borrowed(map, "caller");
 
-  await caller.renderFrame();
-  const image = await caller.settle(
-    caller.session.readTexture(),
-    "the readback",
-  );
-  assert.deepEqual(centerPixel(image), red);
+  // A borrowed texture has no readback, so the frame's result shows that the
+  // session rendered it.
+  const result = await caller.renderFrame();
+  assert.ok(result.frameGeneration > 0n);
 });
 
 /** A session whose rendered frames this binding can acquire and view. */
 async function frameSession(map: MapHandle) {
-  // An EGL core-worker session keeps its frames in its own context, so only a
-  // session that shares the host's context exposes them.
-  const attached = await TestSession.attach(
-    map,
-    backend === "egl" || backend === "wgl" ? "caller" : "worker",
-  );
+  const attached = await TestSession.borrowed(map);
   await attached.renderFrame();
   return attached.session;
 }
@@ -243,8 +234,8 @@ test("a native queue lock reaches a session whose target takes one", async () =>
     releaseUserData: probe.release,
   });
   if (backend !== "vulkan") {
-    // Only a Vulkan target takes a queue lock, and the binding releases the
-    // context of the attach that native code refuses.
+    // Only a Vulkan texture or surface takes a queue lock, and the binding
+    // releases the context of the attach that native code refuses.
     assert.throws(
       () => attachSession(map, { queueLock }),
       failsWith(Status.unsupported),
@@ -253,7 +244,7 @@ test("a native queue lock reaches a session whose target takes one", async () =>
     assert.deepEqual(probe.events, ["release"]);
     return;
   }
-  const { session, ready } = attachSession(map, { queueLock });
+  const { session, ready } = attachVulkanSession(map, { queueLock });
   await bounded(ready, "the attachment");
   requestFrame(session, 1n);
   await probe.arrival("unlock");

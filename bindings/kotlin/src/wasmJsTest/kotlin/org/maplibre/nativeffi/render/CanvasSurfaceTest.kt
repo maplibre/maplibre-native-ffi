@@ -36,7 +36,7 @@ class CanvasSurfaceTest {
   @Test
   fun aCanvasSurfaceRendersAFrame() = runSuspendTest {
     withMap(options = smallMapOptions(width = SIZE, height = SIZE)) {
-      testCanvas(TestCanvasKind.ELEMENT, SIZE, SIZE).use { canvas ->
+      testCanvas(SIZE, SIZE).use { canvas ->
         withCanvasSurface(canvas) {
           assertTrue(RenderSessionCapabilityFlag.PRESENTATION in session.getCapabilities().flags)
           setStyle(RED_BACKGROUND_STYLE)

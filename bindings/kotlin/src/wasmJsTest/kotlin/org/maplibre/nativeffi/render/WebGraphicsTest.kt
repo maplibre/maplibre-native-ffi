@@ -14,10 +14,11 @@ import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.NativePointer
+import org.maplibre.nativeffi.OpenGlBorrowedTexture
+import org.maplibre.nativeffi.OpenGlBorrowedTextureDescriptor
 import org.maplibre.nativeffi.OpenGlContextDescriptor
 import org.maplibre.nativeffi.OpenGlContextDescriptorData
 import org.maplibre.nativeffi.OpenGlContextOwnership
-import org.maplibre.nativeffi.OpenGlOwnedTextureDescriptor
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderResult
 import org.maplibre.nativeffi.WebGlContextDescriptor
@@ -34,9 +35,10 @@ import org.maplibre.nativeffi.withWebGpuTexture
 
 /**
  * Graphics objects that the page creates, imported through [WebGraphics], render a caller-driven
- * frame on the build's backend: a `GPUDevice` into a borrowed ring of the page's `GPUTexture` and
- * `GPUTextureView` on WebGPU, and an owned texture over a `WebGL2RenderingContext` on WebGL. Each
- * import closes after its session, and its handle then refuses use.
+ * frame into a borrowed ring of the page's texture on the build's backend: a `GPUDevice` with the
+ * page's `GPUTexture` and `GPUTextureView` on WebGPU, and a `WebGL2RenderingContext` with a texture
+ * that the page creates on it on WebGL. Each import closes after its session, and its handle then
+ * refuses use.
  */
 class WebGraphicsTest {
   @Test
@@ -106,32 +108,45 @@ class WebGraphicsTest {
     val pageContext =
       checkNotNull(pageWebGlContext(WIDTH)) { "creating the page's WebGL context failed" }
     val context = WebGraphics.registerWebGlContext(pageContext)
+    val pageTexture = webGlTexture(context.context, WIDTH, HEIGHT)
     val descriptor =
-      OpenGlOwnedTextureDescriptor(
+      OpenGlBorrowedTextureDescriptor(
         extent,
-        OpenGlContextDescriptor(
-          OpenGlContextOwnership.SHARED,
-          OpenGlContextDescriptorData.WebGl(
-            WebGlContextDescriptor(WebGlContextKind.EXISTING, context.context),
+        physicalWidth = WIDTH.toUInt(),
+        physicalHeight = HEIGHT.toUInt(),
+        context =
+          OpenGlContextDescriptor(
+            OpenGlContextOwnership.SHARED,
+            OpenGlContextDescriptorData.WebGl(
+              WebGlContextDescriptor(WebGlContextKind.EXISTING, context.context),
+            ),
           ),
-        ),
+        textures = listOf(OpenGlBorrowedTexture(pageTexture.openGlTexture)),
+        target = pageTexture.openGlTarget,
       )
-    withRenderSession(
-      RenderDriverKind.CALLER_GRAPHICS_THREAD,
-      attach = { options -> map.attachOpenGlOwnedTexture(descriptor, options) },
-    ) {
-      setStyle(RED_BACKGROUND_STYLE)
-      renderStill()
-      assertEquals(RenderResult.RENDERED, renderFrame().disposition)
+    // The texture goes once the session has retired, also when the attach or the test fails.
+    pageTexture.use {
+      withRenderSession(
+        RenderDriverKind.CALLER_GRAPHICS_THREAD,
+        attach = { options -> map.attachOpenGlBorrowedTexture(descriptor, options) },
+      ) {
+        setStyle(RED_BACKGROUND_STYLE)
+        renderStill()
+        // One more frame, left for the test to acquire.
+        assertEquals(RenderResult.RENDERED, renderFrame().disposition)
 
-      val readback = complete(session.readTexture())
-      val center = HEIGHT / 2 * readback.info.stride.toInt() + WIDTH / 2 * 4
-      assertEquals(
-        listOf(255, 0, 0, 255),
-        readback.data.copyOfRange(center, center + 4).map { it.toInt() and 0xff },
-      )
+        val frame = assertNotNull(session.acquireFrame())
+        // The frame names the page's own texture, which the page reads on its own context.
+        val name = frame.withOpenGlTexture { it.texture }
+        assertEquals(pageTexture.openGlTexture, name, "the frame names another texture")
+        assertEquals(
+          listOf(255, 0, 0, 255),
+          webGlTexturePixel(context.context, name, WIDTH / 2, HEIGHT / 2),
+        )
+        frame.release(null)
 
-      complete(session.detach())
+        complete(session.detach())
+      }
     }
 
     val handle = context.context
@@ -181,22 +196,6 @@ private fun readCenterPixel(
       });
     })()""",
   )
-
-/**
- * Creates a `GPUTexture` of [width] x [height] on [device] that a borrowed ring can render into and
- * the page can copy from.
- */
-private fun createRingTexture(device: JsAny, width: Int, height: Int): JsAny =
-  js(
-    """device.createTexture({
-      size: [width, height],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
-    })""",
-  )
-
-private fun createTextureView(texture: JsAny): JsAny = js("texture.createView()")
 
 private fun isSameObject(first: JsAny, second: JsAny): Boolean = js("first === second")
 

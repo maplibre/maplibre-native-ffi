@@ -5,25 +5,29 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// An owned-texture session on a context from tests/graphics, driven by the managed thread that
-/// owns the context.
+/// A render session for the render tests, driven by the managed thread that creates it.
 /// </summary>
 /// <remarks>
-/// Every backend attaches with the caller driver: an OpenGL session shares the fixture's context,
-/// which is current only on its graphics thread, and the other backends take the same path so one
-/// test covers them all. The session's frame and driver-work wakes release a semaphore, and the
-/// fixture blocks on it between services.
+/// A fixture with a backend renders into a ring of textures from tests/graphics with the caller
+/// driver: an OpenGL session shares the fixture's context, which is current only on its graphics
+/// thread, and the other backends take the same path so one test covers them all. An offscreen
+/// fixture renders on a device that the library creates, with the core worker driver. The
+/// session's wakes release a semaphore, and the fixture blocks on it between services.
 /// </remarks>
 internal sealed class RenderFixture : IDisposable
 {
     internal const uint Width = 32;
     internal const uint Height = 16;
 
+    // The number of textures in the ring of a fixture with a backend.
+    private const int RingDepth = 2;
+
     internal const string RedStyle = """
         {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ff0000"}}]}
         """;
 
     private readonly SemaphoreSlim wake = new(0);
+    private readonly List<TestGraphicsTexture> textures = [];
     private ulong token;
 
     internal static TheoryData<TestGraphicsBackend> Backends
@@ -48,16 +52,21 @@ internal sealed class RenderFixture : IDisposable
         }
     }
 
-    private RenderFixture(TestGraphicsBackend backend, Configure configure)
+    private RenderFixture(TestGraphicsBackend? backend, Configure configure)
     {
         Backend = backend;
-        Graphics = TestGraphics.Create(backend);
         try
         {
-            // An OpenGL host drives a shared-context session from the thread its context is
-            // current on, the way Rust and Kotlin attach on WGL and EGL.
-            if (backend is TestGraphicsBackend.Egl or TestGraphicsBackend.Wgl)
-                Graphics.MakeCurrent();
+            if (backend is { } graphics)
+            {
+                Graphics = TestGraphics.Create(graphics);
+                // An OpenGL host drives a shared-context session from the thread its context is
+                // current on, the way Rust and Kotlin attach on WGL and EGL.
+                if (graphics is TestGraphicsBackend.Egl or TestGraphicsBackend.Wgl)
+                    Graphics.MakeCurrent();
+                for (var index = 0; index < RingDepth; index++)
+                    textures.Add(Graphics.CreateTexture(Width, Height));
+            }
             Runtime = RuntimeHandle.Create(new RuntimeOptions());
             Runtime.Discarding.SetResourceProvider(NativeFixture.DenyingProvider);
             Map = Runtime.CreateMap(
@@ -71,13 +80,18 @@ internal sealed class RenderFixture : IDisposable
             Session = Attach(
                 configure(
                     Signal,
-                    new RenderSessionAttachOptions
-                    {
-                        Driver = RenderDriverKind.CallerGraphicsThread,
-                        RequestedTextureRingDepth = 2,
-                        FrameWake = new Wake(Signal),
-                        DriverWorkWake = new Wake(Signal),
-                    }
+                    backend is null
+                        ? new RenderSessionAttachOptions
+                        {
+                            Driver = RenderDriverKind.CoreWorker,
+                            FrameWake = new Wake(Signal),
+                        }
+                        : new RenderSessionAttachOptions
+                        {
+                            Driver = RenderDriverKind.CallerGraphicsThread,
+                            FrameWake = new Wake(Signal),
+                            DriverWorkWake = new Wake(Signal),
+                        }
                 )
             );
         }
@@ -88,9 +102,10 @@ internal sealed class RenderFixture : IDisposable
         }
     }
 
-    internal TestGraphicsBackend Backend { get; }
+    /// <summary>The backend of the fixture's textures, or null for an offscreen fixture.</summary>
+    internal TestGraphicsBackend? Backend { get; }
 
-    internal TestGraphics Graphics { get; }
+    internal TestGraphics? Graphics { get; }
 
     internal RuntimeHandle Runtime { get; } = null!;
 
@@ -115,6 +130,16 @@ internal sealed class RenderFixture : IDisposable
         TestGraphicsBackend backend,
         Configure configure,
         Action<RenderFixture> test
+    ) => RunOn(backend, configure, test);
+
+    /// <summary>Runs a test on an offscreen session.</summary>
+    internal static void RunOffscreen(Action<RenderFixture> test) =>
+        RunOn(null, static (_, options) => options, test);
+
+    private static void RunOn(
+        TestGraphicsBackend? backend,
+        Configure configure,
+        Action<RenderFixture> test
     )
     {
         ExceptionDispatchInfo? failure = null;
@@ -132,7 +157,7 @@ internal sealed class RenderFixture : IDisposable
         })
         {
             IsBackground = true,
-            Name = $"{backend} graphics thread",
+            Name = $"{backend?.ToString() ?? "Offscreen"} render thread",
         };
         thread.Start();
         thread.Join();
@@ -150,7 +175,7 @@ internal sealed class RenderFixture : IDisposable
         var elapsed = Stopwatch.StartNew();
         while (!operation.IsCompleted)
         {
-            Session.ServiceDriverWork();
+            ServiceDriverWork();
             if (!operation.IsCompleted)
                 TestWaits.Wait(wake, elapsed, what);
         }
@@ -173,7 +198,7 @@ internal sealed class RenderFixture : IDisposable
             RenderFrameResult? result = null;
             while (result is null)
             {
-                Session.ServiceDriverWork();
+                ServiceDriverWork();
                 result = DrainFrames().LastOrDefault(frame => frame.Token == demand);
                 if (result is null)
                     TestWaits.Wait(wake, elapsed, "a rendered frame");
@@ -208,8 +233,10 @@ internal sealed class RenderFixture : IDisposable
                 }
                 finally
                 {
-                    // Sessions retire before the context they borrowed goes away.
-                    Graphics.Dispose();
+                    // Sessions retire before the textures and context they borrowed go away.
+                    foreach (var texture in textures)
+                        texture.Dispose();
+                    Graphics?.Dispose();
                 }
             }
         }
@@ -217,23 +244,43 @@ internal sealed class RenderFixture : IDisposable
 
     private IReadOnlyList<RenderFrameResult> DrainFrames() => Session.DrainFrameResults();
 
+    // Only a caller-driven session has work for the fixture's thread.
+    private void ServiceDriverWork()
+    {
+        if (Backend is not null)
+            Session.ServiceDriverWork();
+    }
+
+    /// <summary>
+    /// Attaches a session to the fixture's map: on the fixture's textures, or offscreen.
+    /// </summary>
     internal RenderSessionHandle Attach(RenderSessionAttachOptions options)
     {
         var extent = new LogicalExtent(Width, Height, 1);
+        if (Graphics is null)
+            return Map.AttachOffscreen(new OffscreenDescriptor(extent), options);
         var context = Graphics.Context;
+        var infos = textures.Select(texture => texture.Info).ToArray();
+        // Every texture of the ring shares the first one's format and size.
+        var first = infos[0];
         return Backend switch
         {
             TestGraphicsBackend.Metal
                 when OperatingSystem.IsMacOS()
                     || OperatingSystem.IsIOS()
                     || OperatingSystem.IsTvOS()
-                    || OperatingSystem.IsMacCatalyst() => Map.AttachMetalOwnedTexture(
-                new MetalOwnedTextureDescriptor
+                    || OperatingSystem.IsMacCatalyst() => Map.AttachMetalBorrowedTexture(
+                new MetalBorrowedTextureDescriptor
                 {
                     Extent = extent,
-                    Context = new MetalContextDescriptor { Device = Borrow(context.MetalDevice) },
-                    // MTLPixelFormatBGRA8Unorm.
-                    PixelFormat = 80,
+                    PhysicalWidth = first.Width,
+                    PhysicalHeight = first.Height,
+                    Textures =
+                    [
+                        .. infos.Select(info => new MetalBorrowedTexture(
+                            Borrow(info.MetalTexture)
+                        )),
+                    ],
                 },
                 options
             ),
@@ -241,10 +288,12 @@ internal sealed class RenderFixture : IDisposable
                 when OperatingSystem.IsAndroid()
                     || OperatingSystem.IsLinux()
                     || OperatingSystem.IsMacOS()
-                    || OperatingSystem.IsWindows() => Map.AttachVulkanOwnedTexture(
-                new VulkanOwnedTextureDescriptor
+                    || OperatingSystem.IsWindows() => Map.AttachVulkanBorrowedTexture(
+                new VulkanBorrowedTextureDescriptor
                 {
                     Extent = extent,
+                    PhysicalWidth = first.Width,
+                    PhysicalHeight = first.Height,
                     Context = new VulkanContextDescriptor
                     {
                         Instance = Borrow(context.VulkanInstance),
@@ -255,13 +304,24 @@ internal sealed class RenderFixture : IDisposable
                         GetInstanceProcAddr = Borrow(context.VulkanGetInstanceProcAddr),
                         GetDeviceProcAddr = Borrow(context.VulkanGetDeviceProcAddr),
                     },
+                    Textures =
+                    [
+                        .. infos.Select(info => new VulkanBorrowedTexture(
+                            info.VulkanImage,
+                            info.VulkanImageView
+                        )),
+                    ],
+                    Format = first.Format,
+                    FinalLayout = first.VulkanFinalLayout,
                 },
                 options
             ),
-            TestGraphicsBackend.Egl => Map.AttachOpenGlOwnedTexture(
-                new OpenGlOwnedTextureDescriptor
+            TestGraphicsBackend.Egl => Map.AttachOpenGlBorrowedTexture(
+                new OpenGlBorrowedTextureDescriptor
                 {
                     Extent = extent,
+                    PhysicalWidth = first.Width,
+                    PhysicalHeight = first.Height,
                     Context = new OpenGlContextDescriptor(
                         OpenGlContextOwnership.Shared,
                         new OpenGlContextDescriptor.DataValue.Egl(
@@ -273,13 +333,20 @@ internal sealed class RenderFixture : IDisposable
                             }
                         )
                     ),
+                    Textures =
+                    [
+                        .. infos.Select(info => new OpenGlBorrowedTexture(info.OpenGlTexture)),
+                    ],
+                    Target = first.OpenGlTarget,
                 },
                 options
             ),
-            TestGraphicsBackend.Wgl => Map.AttachOpenGlOwnedTexture(
-                new OpenGlOwnedTextureDescriptor
+            TestGraphicsBackend.Wgl => Map.AttachOpenGlBorrowedTexture(
+                new OpenGlBorrowedTextureDescriptor
                 {
                     Extent = extent,
+                    PhysicalWidth = first.Width,
+                    PhysicalHeight = first.Height,
                     Context = new OpenGlContextDescriptor(
                         OpenGlContextOwnership.Shared,
                         new OpenGlContextDescriptor.DataValue.Wgl(
@@ -290,6 +357,11 @@ internal sealed class RenderFixture : IDisposable
                             }
                         )
                     ),
+                    Textures =
+                    [
+                        .. infos.Select(info => new OpenGlBorrowedTexture(info.OpenGlTexture)),
+                    ],
+                    Target = first.OpenGlTarget,
                 },
                 options
             ),

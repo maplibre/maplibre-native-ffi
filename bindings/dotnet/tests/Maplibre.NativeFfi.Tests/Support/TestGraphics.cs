@@ -59,6 +59,28 @@ internal sealed partial class TestGraphics : IDisposable
             );
     }
 
+    /// <summary>
+    /// Creates a texture that a borrowed texture descriptor can name. Dispose it before this
+    /// object.
+    /// </summary>
+    internal TestGraphicsTexture CreateTexture(uint width, uint height)
+    {
+        var texture = mln_test_graphics_texture_create(handle, width, height);
+        if (texture == 0)
+            throw new InvalidOperationException(
+                $"tests/graphics could not create a texture: {LastError()}"
+            );
+        if (!mln_test_graphics_texture_get_info(texture, out var info))
+        {
+            var error = LastError();
+            mln_test_graphics_texture_destroy(texture);
+            throw new InvalidOperationException(
+                $"tests/graphics could not describe a texture: {error}"
+            );
+        }
+        return new TestGraphicsTexture(texture, info);
+    }
+
     public void Dispose()
     {
         if (handle != 0)
@@ -90,6 +112,46 @@ internal sealed partial class TestGraphics : IDisposable
     [LibraryImport(Library)]
     [return: MarshalAs(UnmanagedType.U1)]
     private static partial bool mln_test_graphics_make_current(nint graphics);
+
+    [LibraryImport(Library)]
+    private static partial nint mln_test_graphics_texture_create(
+        nint graphics,
+        uint width,
+        uint height
+    );
+
+    [LibraryImport(Library)]
+    internal static partial void mln_test_graphics_texture_destroy(nint texture);
+
+    [LibraryImport(Library)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static partial bool mln_test_graphics_texture_get_info(
+        nint texture,
+        out TestGraphicsTextureInfo info
+    );
+}
+
+/// <summary>A texture from <see cref="TestGraphics.CreateTexture" />.</summary>
+internal sealed class TestGraphicsTexture : IDisposable
+{
+    private nint handle;
+
+    internal TestGraphicsTexture(nint handle, TestGraphicsTextureInfo info)
+    {
+        this.handle = handle;
+        Info = info;
+    }
+
+    internal TestGraphicsTextureInfo Info { get; }
+
+    public void Dispose()
+    {
+        if (handle != 0)
+        {
+            TestGraphics.mln_test_graphics_texture_destroy(handle);
+            handle = 0;
+        }
+    }
 }
 
 /// <summary>mln_test_graphics_context: only the fields of the context's backend are set.</summary>
@@ -111,4 +173,19 @@ internal struct TestGraphicsContext
     internal nint WglDeviceContext;
     internal nint WglContext;
     internal nint GetProcAddress;
+}
+
+/// <summary>mln_test_graphics_texture_info: only the fields of the texture's backend are set.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct TestGraphicsTextureInfo
+{
+    internal ulong VulkanImage;
+    internal ulong VulkanImageView;
+    internal nint MetalTexture;
+    internal uint Width;
+    internal uint Height;
+    internal uint Format;
+    internal uint VulkanFinalLayout;
+    internal uint OpenGlTexture;
+    internal uint OpenGlTarget;
 }

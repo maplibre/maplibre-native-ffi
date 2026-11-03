@@ -57,13 +57,6 @@ async fn render_to_texture(
     new_views: [u64; 2],
 ) -> Result<()> {
     // #region attach-owned
-    let texture = VulkanOwnedTextureDescriptor {
-        // The texture's size in logical pixels, and its scale factor.
-        extent: LogicalExtent::new(800, 600, 2.0),
-        // Your VkInstance, VkPhysicalDevice,
-        // VkDevice, and graphics VkQueue.
-        context: vulkan,
-    };
     let options = RenderSessionAttachOptions {
         frame_wake: Wake::new(on_frame_wake),
         // Only if your renderer also submits to the graphics queue.
@@ -73,16 +66,7 @@ async fn render_to_texture(
             RenderDriverKind::CoreWorker,
         )
     };
-
-    // SAFETY: the Vulkan objects outlive the session.
-    let (session, attached) = unsafe {
-        map.attach_vulkan_owned_texture(&texture, &options)?
-    };
-    attached.await?;
     // #endregion attach-owned
-
-    draw_frame(&session)?;
-    session.release().map_err(|(_, error)| error)?.await?;
 
     // #region attach-borrowed
     let ring = VulkanBorrowedTextureDescriptor {
@@ -101,8 +85,8 @@ async fn render_to_texture(
         owner: VulkanImageOwner::GraphicsQueue,
     };
 
-    // The same attach options as for an owned ring. SAFETY: the
-    // textures and the Vulkan objects outlive the session.
+    // SAFETY: the textures and the Vulkan objects outlive the
+    // session.
     let (session, attached) = unsafe {
         map.attach_vulkan_borrowed_texture(&ring, &options)?
     };

@@ -360,14 +360,15 @@ pub const Graphics = struct {
     }
 };
 
-pub const OwnedTextureFrame = if (build_options.supports_metal)
+/// The texture of an acquired frame on the build's backend.
+pub const FrameTexture = if (build_options.supports_metal)
     maplibre.MetalTextureFrame
 else if (build_options.supports_vulkan)
     maplibre.VulkanTextureFrame
 else
     maplibre.OpenGlTextureFrame;
 
-pub fn getOwnedTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime use: anytype) @TypeOf(getBackendTexture(frame, context, use, null)) {
+pub fn getFrameTexture(frame: maplibre.AcquiredFrame, context: anytype, comptime use: anytype) @TypeOf(getBackendTexture(frame, context, use, null)) {
     return getBackendTexture(frame, context, use, null);
 }
 
@@ -378,66 +379,134 @@ else if (build_options.supports_vulkan)
 else
     maplibre.AcquiredFrame.getOpenGlTexture;
 
-/// An owned-texture render session on a fixture's map, with the wakes that
-/// its waits block on. OpenGL sessions share the fixture context, which is
-/// current on the thread that attaches, so they take the caller driver.
-pub const OwnedTexture = struct {
+const BorrowedTexture = if (build_options.supports_metal)
+    maplibre.MetalBorrowedTexture
+else if (build_options.supports_vulkan)
+    maplibre.VulkanBorrowedTexture
+else
+    maplibre.OpenGlBorrowedTexture;
+
+/// A render session on a fixture's map, with the wakes that its waits block
+/// on. An offscreen session renders on a device of its own. A borrowed
+/// session renders into a ring of textures from tests/graphics.
+pub const TextureSession = struct {
     wakes: Signal = .{},
-    graphics: Graphics,
-    session: maplibre.RenderSession,
-    caller_driven: bool,
+    graphics: ?Graphics = null,
+    textures: [ring_depth]?*test_graphics.mln_test_graphics_texture = @splat(null),
+    session: maplibre.RenderSession = undefined,
+    caller_driven: bool = false,
     attached: bool = true,
     next_token: u64 = 1,
 
-    pub const default_driver: maplibre.RenderDriverKind = if (build_options.supports_opengl) .caller_graphics_thread else .core_worker;
+    /// Two textures, so a test can hold two acquired frames at once.
+    const ring_depth = 2;
 
-    pub fn attach(map: maplibre.Map, extent: maplibre.LogicalExtent, driver: maplibre.RenderDriverKind) !*OwnedTexture {
-        const self = try testing.allocator.create(OwnedTexture);
+    /// The driver of a borrowed session. OpenGL sessions share the fixture
+    /// context, which is current on the thread that attaches, so they take
+    /// the caller driver.
+    pub const borrowed_driver: maplibre.RenderDriverKind = if (build_options.supports_opengl) .caller_graphics_thread else .core_worker;
+
+    pub fn attachOffscreen(map: maplibre.Map, extent: maplibre.LogicalExtent) !*TextureSession {
+        const self = try testing.allocator.create(TextureSession);
         errdefer testing.allocator.destroy(self);
-        self.* = .{ .graphics = try Graphics.create(), .session = undefined, .caller_driven = driver == .caller_graphics_thread };
-        errdefer self.graphics.destroy();
-        if (build_options.supports_opengl and self.caller_driven) try self.graphics.makeCurrent();
-        const options: maplibre.RenderSessionAttachOptions = .{
-            .driver = driver,
-            .requested_texture_ring_depth = 2,
-            .frame_wake = self.wakes.wake(),
-            .driver_work_wake = self.wakes.wake(),
-        };
-        const attachment = if (build_options.supports_metal)
-            try map.attachMetalOwnedTexture(.{
-                .extent = extent,
-                .context = .{ .device = self.graphics.context.metal_device },
-                // MTLPixelFormatBGRA8Unorm.
-                .pixel_format = 80,
-            }, options, null)
-        else if (build_options.supports_vulkan)
-            try map.attachVulkanOwnedTexture(.{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
-        else
-            try map.attachOpenGlOwnedTexture(.{ .extent = extent, .context = self.graphics.openGlContext() }, options, null);
+        self.* = .{};
+        const attachment = try map.attachOffscreen(.{ .extent = extent }, self.attachOptions(.core_worker), null, null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);
         return self;
     }
 
+    pub fn attachBorrowed(map: maplibre.Map, extent: maplibre.LogicalExtent, driver: maplibre.RenderDriverKind) !*TextureSession {
+        const self = try testing.allocator.create(TextureSession);
+        errdefer testing.allocator.destroy(self);
+        self.* = .{ .graphics = try Graphics.create(), .caller_driven = driver == .caller_graphics_thread };
+        errdefer self.destroyGraphics();
+        const graphics = &self.graphics.?;
+        if (build_options.supports_opengl) try graphics.makeCurrent();
+        const width: u32 = @intFromFloat(@round(@as(f64, @floatFromInt(extent.width)) * extent.scale_factor));
+        const height: u32 = @intFromFloat(@round(@as(f64, @floatFromInt(extent.height)) * extent.scale_factor));
+        var entries: [ring_depth]BorrowedTexture = undefined;
+        var info: test_graphics.mln_test_graphics_texture_info = undefined;
+        for (&self.textures, &entries) |*texture, *entry| {
+            texture.* = test_graphics.mln_test_graphics_texture_create(graphics.handle, width, height) orelse return Graphics.graphicsError();
+            if (!test_graphics.mln_test_graphics_texture_get_info(texture.*.?, &info)) return Graphics.graphicsError();
+            entry.* = if (build_options.supports_metal)
+                .{ .texture = info.metal_texture }
+            else if (build_options.supports_vulkan)
+                .{ .image = info.vulkan_image, .image_view = info.vulkan_image_view }
+            else
+                .{ .texture = info.opengl_texture };
+        }
+        const options = self.attachOptions(driver);
+        const attachment = if (build_options.supports_metal)
+            try map.attachMetalBorrowedTexture(testing.allocator, .{
+                .extent = extent,
+                .physical_width = info.width,
+                .physical_height = info.height,
+                .textures = &entries,
+            }, options, null)
+        else if (build_options.supports_vulkan)
+            try map.attachVulkanBorrowedTexture(testing.allocator, .{
+                .extent = extent,
+                .physical_width = info.width,
+                .physical_height = info.height,
+                .context = graphics.vulkanContext(),
+                .textures = &entries,
+                .format = info.format,
+                .final_layout = info.vulkan_final_layout,
+            }, options, null)
+        else
+            try map.attachOpenGlBorrowedTexture(testing.allocator, .{
+                .extent = extent,
+                .physical_width = info.width,
+                .physical_height = info.height,
+                .context = graphics.openGlContext(),
+                .textures = &entries,
+                .target = info.opengl_target,
+            }, options, null);
+        self.session = attachment.session;
+        errdefer self.release();
+        try self.resolve(attachment.ready);
+        return self;
+    }
+
+    fn attachOptions(self: *TextureSession, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
+        return .{
+            .driver = driver,
+            .frame_wake = self.wakes.wake(),
+            .driver_work_wake = self.wakes.wake(),
+        };
+    }
+
     /// Detaches and releases the session unless the test already did, then
-    /// destroys the graphics context. A failed detach logs an error, which
-    /// fails the test, and the release abandons the session instead.
-    pub fn close(self: *OwnedTexture) void {
+    /// destroys the textures and graphics context. A failed detach logs an
+    /// error, which fails the test, and the release abandons the session
+    /// instead.
+    pub fn close(self: *TextureSession) void {
         if (!self.session.isClosed()) {
             if (self.attached) self.detach() catch |err| {
                 std.log.err("render session detach failed: {s}", .{@errorName(err)});
             };
             self.release();
         }
-        self.graphics.destroy();
+        self.destroyGraphics();
         testing.allocator.destroy(self);
+    }
+
+    fn destroyGraphics(self: *TextureSession) void {
+        for (&self.textures) |*texture| {
+            test_graphics.mln_test_graphics_texture_destroy(texture.*);
+            texture.* = null;
+        }
+        if (self.graphics) |*graphics| graphics.destroy();
+        self.graphics = null;
     }
 
     /// Releases the session and waits until it retires, after which the host
     /// may destroy its graphics objects. A failure logs an error, which fails
     /// the test.
-    fn release(self: *OwnedTexture) void {
+    fn release(self: *TextureSession) void {
         var retired = self.session.release(null) catch |err| {
             std.log.err("render session release failed: {s}", .{@errorName(err)});
             return;
@@ -448,17 +517,17 @@ pub const OwnedTexture = struct {
         };
     }
 
-    pub fn detach(self: *OwnedTexture) !void {
+    pub fn detach(self: *TextureSession) !void {
         try self.resolve(try self.session.detach(null));
         self.attached = false;
     }
 
     /// Waits for a session future, servicing a caller driver's work between
     /// checks.
-    pub fn resolve(self: *OwnedTexture, future_value: anytype) !@TypeOf(future_value).Value {
+    pub fn resolve(self: *TextureSession, future_value: anytype) !@TypeOf(future_value).Value {
         var future = future_value;
         defer future.deinit();
-        const Context = struct { owner: *OwnedTexture, future: *@TypeOf(future) };
+        const Context = struct { owner: *TextureSession, future: *@TypeOf(future) };
         try self.wakes.waitUntil(Context{ .owner = self, .future = &future }, struct {
             fn ready(context: Context) anyerror!bool {
                 try context.owner.service();
@@ -468,17 +537,17 @@ pub const OwnedTexture = struct {
         return future.wait(null);
     }
 
-    fn service(self: *OwnedTexture) !void {
+    fn service(self: *TextureSession) !void {
         if (self.caller_driven) _ = try self.session.serviceDriverWork(null);
     }
 
     /// Requests one forced frame, which renders whether or not the map
     /// changed, and returns its result, blocking on the session's frame wake.
-    pub fn renderFrame(self: *OwnedTexture) !maplibre.RenderFrameResult {
+    pub fn renderFrame(self: *TextureSession) !maplibre.RenderFrameResult {
         const token = self.next_token;
         self.next_token += 1;
         try self.session.requestFrame(.{ .flags = .{ .force = true }, .token = token }, null);
-        const Context = struct { owner: *OwnedTexture, token: u64, result: ?maplibre.RenderFrameResult = null };
+        const Context = struct { owner: *TextureSession, token: u64, result: ?maplibre.RenderFrameResult = null };
         var context = Context{ .owner = self, .token = token };
         try self.wakes.waitUntil(&context, struct {
             fn ready(ctx: *Context) anyerror!bool {
@@ -496,7 +565,7 @@ pub const OwnedTexture = struct {
 
     /// Renders until a frame reports `.rendered`, passing over the pending
     /// dispositions that precede a map's first update.
-    pub fn renderUntilRendered(self: *OwnedTexture) !maplibre.RenderFrameResult {
+    pub fn renderUntilRendered(self: *TextureSession) !maplibre.RenderFrameResult {
         const deadline = Deadline.start();
         while (!deadline.expired()) {
             const result = try self.renderFrame();

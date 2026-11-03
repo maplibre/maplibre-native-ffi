@@ -104,8 +104,68 @@ func (g *Graphics) MakeCurrent() error {
 	return nil
 }
 
-// Close destroys the device or context. Detach every session that borrows it
-// first. A second call does nothing.
+// TextureInfo holds the handles that a borrowed texture descriptor takes. Only
+// the fields of the texture's backend are set.
+type TextureInfo struct {
+	VulkanImage       uint64
+	VulkanImageView   uint64
+	MetalTexture      uintptr
+	Width             uint32
+	Height            uint32
+	Format            uint32
+	VulkanFinalLayout uint32
+	OpenGlTexture     uint32
+	OpenGlTarget      uint32
+}
+
+// Texture is a color texture that stands in for one the host owns.
+type Texture struct {
+	handle *C.mln_test_graphics_texture
+	Info   TextureInfo
+}
+
+// NewTexture creates a width x height RGBA texture on the device or context.
+// An EGL or WGL context must be current on the calling OS thread.
+func (g *Graphics) NewTexture(width, height uint32) (*Texture, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	handle := C.mln_test_graphics_texture_create(g.handle, C.uint32_t(width), C.uint32_t(height))
+	if handle == nil {
+		return nil, lastError()
+	}
+	var info C.mln_test_graphics_texture_info
+	if !C.mln_test_graphics_texture_get_info(handle, &info) {
+		err := lastError()
+		C.mln_test_graphics_texture_destroy(handle)
+		return nil, err
+	}
+	return &Texture{
+		handle: handle,
+		Info: TextureInfo{
+			VulkanImage:       uint64(info.vulkan_image),
+			VulkanImageView:   uint64(info.vulkan_image_view),
+			MetalTexture:      uintptr(unsafe.Pointer(info.metal_texture)),
+			Width:             uint32(info.width),
+			Height:            uint32(info.height),
+			Format:            uint32(info.format),
+			VulkanFinalLayout: uint32(info.vulkan_final_layout),
+			OpenGlTexture:     uint32(info.opengl_texture),
+			OpenGlTarget:      uint32(info.opengl_target),
+		},
+	}, nil
+}
+
+// Close destroys the texture. Wait for every session that renders into it to
+// retire first. A second call does nothing.
+func (t *Texture) Close() {
+	if t.handle != nil {
+		C.mln_test_graphics_texture_destroy(t.handle)
+		t.handle = nil
+	}
+}
+
+// Close destroys the device or context. Detach every session that borrows it,
+// and close its textures, first. A second call does nothing.
 func (g *Graphics) Close() {
 	if g.handle != nil {
 		C.mln_test_graphics_destroy(g.handle)

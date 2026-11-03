@@ -55,7 +55,7 @@ export async function routeRequests(
     map.addStyleLayerJson({ id: "fill", type: "fill", source: "custom" }, ""),
     "a command",
   );
-  const worker = await TestSession.attach(map);
+  const worker = await TestSession.offscreen(map);
   for (let frame = 0; frame < 32 && tiles.length === 0; frame++) {
     await worker.renderFrame();
   }
@@ -131,7 +131,7 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
     map.addCustomGeometrySource("custom", { fetchTile() {} }),
     "a command",
   );
-  const worker = await TestSession.attach(map);
+  const worker = await TestSession.offscreen(map);
   liveWork.push(map, worker);
   await worker.renderFrame();
   for (let token = 100n; token < 104n; token++) {

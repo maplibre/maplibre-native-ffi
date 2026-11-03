@@ -164,38 +164,51 @@ internal class RenderSessionFixture(
 }
 
 /**
- * Runs [block] against a map with an attached owned-texture session of [width] x [height] on the
- * build's backend, and abandons and closes the session afterwards. The caller drives the session on
- * [TestGraphics.thread] unless [driver] names a core worker. The map's runtime is created from
- * [runtimeOptions], and [onFrameWake] runs on each frame wake.
+ * Runs [block] against a map with an attached session that renders into a borrowed ring of
+ * [ringDepth] textures of [width] x [height] on the build's backend, and abandons and closes the
+ * session afterwards, then destroys the textures. The caller drives the session on
+ * [TestGraphics.thread]. The map's runtime is created from [runtimeOptions], and [onFrameWake] runs
+ * on each frame wake.
  */
-internal suspend fun <T> withOwnedTexture(
+internal suspend fun <T> withBorrowedTexture(
   width: Int = 32,
   height: Int = 16,
   mapMode: MapMode = MapMode.STATIC,
-  driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-  textureRingDepth: UInt = 1u,
+  ringDepth: Int = 1,
   provider: ResourceProvider = denyingProvider(),
   runtimeOptions: RuntimeOptions = RuntimeOptions(),
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,
 ): T =
   withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
-    val canvas = TestGraphics.ownedTextureCanvas(width, height, driver)
-    try {
+    withTestTextures(width, height, ringDepth) { textures ->
       withRenderSession(
-        driver,
-        attach = { options ->
-          TestGraphics.attachOwnedTexture(map, width, height, options, canvas)
-        },
-        textureRingDepth = textureRingDepth,
+        RenderDriverKind.CALLER_GRAPHICS_THREAD,
+        attach = { options -> TestGraphics.attachBorrowedTexture(map, textures, options) },
         onFrameWake = onFrameWake,
         block = block,
       )
-    } finally {
-      canvas?.close()
     }
   }
+
+/**
+ * Runs [block] with [count] textures of [width] x [height] from [TestGraphics.createTextures], and
+ * destroys them afterwards. Every session that renders into them must have retired by then, as
+ * [withRenderSession] leaves its session.
+ */
+internal suspend fun <T> withTestTextures(
+  width: Int,
+  height: Int,
+  count: Int,
+  block: suspend (List<TestTexture>) -> T,
+): T {
+  val textures = TestGraphics.createTextures(width, height, count)
+  try {
+    return block(textures)
+  } finally {
+    TestGraphics.destroyTextures(textures)
+  }
+}
 
 /**
  * Runs [block] against a map with an attached offscreen session of [width] x [height] that a core
@@ -206,15 +219,12 @@ internal suspend fun <T> withOffscreenSession(
   width: Int = 32,
   height: Int = 16,
   mapMode: MapMode = MapMode.STATIC,
+  provider: ResourceProvider = denyingProvider(),
   runtimeOptions: RuntimeOptions = RuntimeOptions(),
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,
 ): T =
-  withMap(
-    mapMode,
-    options = smallMapOptions(mapMode, width, height),
-    runtimeOptions = runtimeOptions,
-  ) {
+  withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
     withRenderSession(
       RenderDriverKind.CORE_WORKER,
       attach = { options -> attachOffscreenSession(map, width, height, options) },
@@ -242,7 +252,6 @@ internal fun attachOffscreenSession(
 internal suspend fun <T> MapFixture.withRenderSession(
   driver: RenderDriverKind,
   attach: suspend (RenderSessionAttachOptions) -> NewRenderSession,
-  textureRingDepth: UInt = 1u,
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,
 ): T {
@@ -250,7 +259,6 @@ internal suspend fun <T> MapFixture.withRenderSession(
   val options =
     RenderSessionAttachOptions(
       driver = driver,
-      requestedTextureRingDepth = textureRingDepth,
       frameWake =
         Wake {
           wakes.trySend(Unit)

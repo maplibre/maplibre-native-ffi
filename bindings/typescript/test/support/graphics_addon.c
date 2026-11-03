@@ -5,6 +5,8 @@
 //   create(backend) -> { graphics, backend, eglDisplay, ..., vulkanQueue }
 //   makeCurrent(graphics) -> boolean
 //   destroy(graphics)
+//   textureCreate(graphics, width, height) -> { texture, vulkanImage, ... }
+//   textureDestroy(texture)
 //   nativeProbe(listener) -> { wake, lock, unlock, release, userData }
 //   turn(callback)
 //
@@ -33,10 +35,9 @@ static void set(
   napi_set_named_property(env, object, key, v);
 }
 
-static mln_test_graphics* argument(napi_env env, napi_callback_info info) {
-  size_t argc = 1;
-  napi_value argv[1] = {NULL};
-  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+static void* pointer_argument(
+  napi_env env, size_t argc, const napi_value* argv, const char* what
+) {
   uint64_t value = 0;
   bool lossless = false;
   if (
@@ -44,10 +45,19 @@ static mln_test_graphics* argument(napi_env env, napi_callback_info info) {
     napi_get_value_bigint_uint64(env, argv[0], &value, &lossless) != napi_ok ||
     value == 0
   ) {
-    napi_throw_type_error(env, NULL, "expected a graphics object address");
+    napi_throw_type_error(env, NULL, what);
     return NULL;
   }
-  return (mln_test_graphics*)(uintptr_t)value;
+  return (void*)(uintptr_t)value;
+}
+
+static mln_test_graphics* argument(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1] = {NULL};
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  return pointer_argument(
+    env, argc, argv, "expected a graphics object address"
+  );
 }
 
 static napi_value create(napi_env env, napi_callback_info info) {
@@ -115,6 +125,80 @@ static napi_value destroy(napi_env env, napi_callback_info info) {
   mln_test_graphics* graphics = argument(env, info);
   if (graphics != NULL) {
     mln_test_graphics_destroy(graphics);
+  }
+  return NULL;
+}
+
+static napi_value uint32_value(napi_env env, uint32_t value) {
+  napi_value result = NULL;
+  napi_create_double(env, value, &result);
+  return result;
+}
+
+static napi_value texture_create(napi_env env, napi_callback_info info) {
+  size_t argc = 3;
+  napi_value argv[3] = {NULL};
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  mln_test_graphics* graphics =
+    pointer_argument(env, argc, argv, "expected a graphics object address");
+  if (graphics == NULL) {
+    return NULL;
+  }
+  double width = 0;
+  double height = 0;
+  if (
+    argc < 3 || napi_get_value_double(env, argv[1], &width) != napi_ok ||
+    napi_get_value_double(env, argv[2], &height) != napi_ok
+  ) {
+    napi_throw_type_error(env, NULL, "expected a width and a height");
+    return NULL;
+  }
+  mln_test_graphics_texture* texture = mln_test_graphics_texture_create(
+    graphics, (uint32_t)width, (uint32_t)height
+  );
+  mln_test_graphics_texture_info texture_info = {0};
+  if (
+    texture == NULL ||
+    !mln_test_graphics_texture_get_info(texture, &texture_info)
+  ) {
+    napi_throw_error(env, NULL, mln_test_graphics_last_error());
+    mln_test_graphics_texture_destroy(texture);
+    return NULL;
+  }
+  napi_value object = NULL;
+  napi_create_object(env, &object);
+  set(env, object, "texture", address(env, texture));
+  napi_value image = NULL;
+  napi_create_bigint_uint64(env, texture_info.vulkan_image, &image);
+  set(env, object, "vulkanImage", image);
+  napi_value view = NULL;
+  napi_create_bigint_uint64(env, texture_info.vulkan_image_view, &view);
+  set(env, object, "vulkanImageView", view);
+  set(env, object, "metalTexture", address(env, texture_info.metal_texture));
+  set(env, object, "width", uint32_value(env, texture_info.width));
+  set(env, object, "height", uint32_value(env, texture_info.height));
+  set(env, object, "format", uint32_value(env, texture_info.format));
+  set(
+    env, object, "vulkanFinalLayout",
+    uint32_value(env, texture_info.vulkan_final_layout)
+  );
+  set(
+    env, object, "openGlTexture", uint32_value(env, texture_info.opengl_texture)
+  );
+  set(
+    env, object, "openGlTarget", uint32_value(env, texture_info.opengl_target)
+  );
+  return object;
+}
+
+static napi_value texture_destroy(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1] = {NULL};
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  mln_test_graphics_texture* texture =
+    pointer_argument(env, argc, argv, "expected a texture address");
+  if (texture != NULL) {
+    mln_test_graphics_texture_destroy(texture);
   }
   return NULL;
 }
@@ -188,8 +272,12 @@ napi_register_module_v1(napi_env env, napi_value exports) {
     const char* name;
     napi_callback function;
   } entries[] = {
-    {"create", create},   {"makeCurrent", make_current},
-    {"destroy", destroy}, {"nativeProbe", mln_ts_test_native_probe},
+    {"create", create},
+    {"makeCurrent", make_current},
+    {"destroy", destroy},
+    {"textureCreate", texture_create},
+    {"textureDestroy", texture_destroy},
+    {"nativeProbe", mln_ts_test_native_probe},
 #ifdef __OHOS__
     {"turn", turn},
 #endif

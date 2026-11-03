@@ -7,32 +7,28 @@ public sealed class RenderTests
 {
     public static TheoryData<TestGraphicsBackend> Backends => RenderFixture.Backends;
 
-    [Theory]
-    [MemberData(nameof(Backends))]
-    public void AnOwnedTextureSessionRendersPixelsTheBindingReadsBack(TestGraphicsBackend backend)
+    [Fact]
+    public void AnOffscreenSessionRendersPixelsTheBindingReadsBack()
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
+        RenderFixture.RunOffscreen(fixture =>
+        {
+            fixture.Await(fixture.Session.Ready, "the session to be ready");
+            fixture.RenderFrame();
+
+            var image = fixture.Await(fixture.Session.ReadTextureAsync(), "the readback");
+
+            Assert.Equal(RenderFixture.Width, image.Info.Width);
+            Assert.Equal(RenderFixture.Height, image.Info.Height);
+            var pixels = image.Data;
+            for (var y = 0; y < image.Info.Height; y++)
             {
-                fixture.Await(fixture.Session.Ready, "the session to be ready");
-                fixture.RenderFrame();
-
-                var image = fixture.Await(fixture.Session.ReadTextureAsync(), "the readback");
-
-                Assert.Equal(RenderFixture.Width, image.Info.Width);
-                Assert.Equal(RenderFixture.Height, image.Info.Height);
-                var pixels = image.Data;
-                for (var y = 0; y < image.Info.Height; y++)
+                for (var x = 0; x < image.Info.Width; x++)
                 {
-                    for (var x = 0; x < image.Info.Width; x++)
-                    {
-                        var offset = checked((int)(y * image.Info.Stride + x * 4));
-                        Assert.Equal([255, 0, 0, 255], pixels[offset..(offset + 4)]);
-                    }
+                    var offset = checked((int)(y * image.Info.Stride + x * 4));
+                    Assert.Equal([255, 0, 0, 255], pixels[offset..(offset + 4)]);
                 }
             }
-        );
+        });
     }
 
     [Theory]
@@ -80,41 +76,33 @@ public sealed class RenderTests
         );
     }
 
-    [Theory]
-    [MemberData(nameof(Backends))]
-    public void AScopeDisposesAnAttachedSessionSoItsMapReleasesBeforeTheGraphicsGo(
-        TestGraphicsBackend backend
-    )
+    [Fact]
+    public void AScopeDisposesAnAttachedSessionSoItsMapCanRelease()
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
-            {
-                using (var session = fixture.Session)
-                    fixture.Await(session.Ready, "the session to be ready");
+        RenderFixture.RunOffscreen(fixture =>
+        {
+            using (var session = fixture.Session)
+                fixture.Await(session.Ready, "the session to be ready");
 
-                // A disposal reports no retirement, so the map's release waits for it.
-                RenderFixture.Complete(fixture.Map.CloseAsync());
-                fixture.Graphics.Dispose();
-            }
-        );
+            // A disposal reports no retirement, so the map's release waits for it.
+            RenderFixture.Complete(fixture.Map.CloseAsync());
+        });
     }
 
-    [Theory]
-    [MemberData(nameof(Backends))]
-    public void AnAsyncScopeAwaitsTheRetirementOfAnAttachedSession(TestGraphicsBackend backend)
+    [Fact]
+    public void AnAsyncScopeAwaitsTheRetirementOfAnAttachedSession()
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
-            {
-                fixture.Await(fixture.Session.Ready, "the session to be ready");
+        RenderFixture.RunOffscreen(fixture =>
+        {
+            fixture.Await(fixture.Session.Ready, "the session to be ready");
 
-                RenderFixture.Complete(DisposeInScope(fixture.Session));
-                // The session has retired, so its graphics objects may go before its map does.
-                fixture.Graphics.Dispose();
-            }
-        );
+            RenderFixture.Complete(DisposeInScope(fixture.Session));
+            // The session has retired, so the map takes another.
+            using var next = fixture.Attach(
+                new RenderSessionAttachOptions { Driver = RenderDriverKind.CoreWorker }
+            );
+            fixture.Await(next.Ready, "the next session to be ready");
+        });
 
         static async Task DisposeInScope(RenderSessionHandle session)
         {

@@ -41,36 +41,75 @@ final class TestGraphics: @unchecked Sendable {
 
   deinit { mln_test_graphics_destroy(graphics) }
 
+  /// Whether the backend is EGL or WGL, whose sessions need a thread with the
+  /// context current.
+  var usesCurrentContext: Bool {
+    backend == MLN_TEST_GRAPHICS_BACKEND_EGL ||
+      backend == MLN_TEST_GRAPHICS_BACKEND_WGL
+  }
+
   /// Makes an EGL or WGL context current on the calling thread, which then
   /// drives a shared session. Metal and Vulkan have no current context.
   func makeCurrentIfNeeded() throws {
-    guard backend == MLN_TEST_GRAPHICS_BACKEND_EGL ||
-      backend == MLN_TEST_GRAPHICS_BACKEND_WGL else { return }
+    guard usesCurrentContext else { return }
     guard mln_test_graphics_make_current(graphics) else {
       throw FixtureError(String(cString: mln_test_graphics_last_error()))
     }
   }
 
-  /// Attaches a session-owned texture target. A core-worker EGL session owns
-  /// a context on the fixture's display, because a worker cannot share the
-  /// host's; a caller-driven one joins the fixture context's share group.
-  func attachOwnedTexture(
+  /// Creates `count` textures of `width` x `height` for a borrowed ring. Call
+  /// it before an EGL or WGL context is current on another thread.
+  func createTextures(
+    count: Int,
+    width: UInt32 = 32,
+    height: UInt32 = 32
+  ) throws -> [TestTexture] {
+    var textures: [TestTexture] = []
+    do {
+      for _ in 0 ..< count {
+        guard let texture = mln_test_graphics_texture_create(
+          graphics,
+          width,
+          height
+        ) else {
+          throw FixtureError(String(cString: mln_test_graphics_last_error()))
+        }
+        try textures.append(TestTexture(graphics: self, texture: texture))
+      }
+    } catch {
+      textures.forEach { $0.destroy() }
+      throw error
+    }
+    return textures
+  }
+
+  /// Attaches a session that renders into `textures`, a borrowed ring. An
+  /// OpenGL session shares the fixture's context, so it needs a caller-driven
+  /// session on a thread with that context current.
+  func attachBorrowedTexture(
     map: MapHandle,
-    options: RenderSessionAttachOptions,
-    extent: LogicalExtent = LogicalExtent(
-      width: 32,
-      height: 32,
+    textures: [TestTexture],
+    options: RenderSessionAttachOptions
+  ) throws -> NewRenderSession {
+    guard let info = textures.last?.info else {
+      throw FixtureError("a borrowed ring needs a texture")
+    }
+    let extent = LogicalExtent(
+      width: info.width,
+      height: info.height,
       scaleFactor: 1
     )
-  ) throws -> NewRenderSession {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
       #if canImport(Metal)
-        return try map.attachMetalOwnedTexture(
-          descriptor: MetalOwnedTextureDescriptor(
+        return try map.attachMetalBorrowedTexture(
+          descriptor: MetalBorrowedTextureDescriptor(
             extent: extent,
-            context: MetalContextDescriptor(device: metalDevice),
-            pixelFormat: .bgra8Unorm
+            physicalWidth: info.width,
+            physicalHeight: info.height,
+            textures: textures.map {
+              MetalBorrowedTexture(texture: pointer($0.info.metal_texture))
+            }
           ),
           options: options
         )
@@ -79,9 +118,11 @@ final class TestGraphics: @unchecked Sendable {
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-        return try map.attachVulkanOwnedTexture(
-          descriptor: VulkanOwnedTextureDescriptor(
+        return try map.attachVulkanBorrowedTexture(
+          descriptor: VulkanBorrowedTextureDescriptor(
             extent: extent,
+            physicalWidth: info.width,
+            physicalHeight: info.height,
             context: VulkanContextDescriptor(
               instance: pointer(context.vulkan_instance),
               physicalDevice: pointer(context.vulkan_physical_device),
@@ -91,7 +132,15 @@ final class TestGraphics: @unchecked Sendable {
               getInstanceProcAddr: pointer(context
                 .vulkan_get_instance_proc_addr),
               getDeviceProcAddr: pointer(context.vulkan_get_device_proc_addr)
-            )
+            ),
+            textures: textures.map {
+              VulkanBorrowedTexture(
+                image: $0.info.vulkan_image,
+                imageView: $0.info.vulkan_image_view
+              )
+            },
+            format: info.format,
+            finalLayout: info.vulkan_final_layout
           ),
           options: options
         )
@@ -101,34 +150,44 @@ final class TestGraphics: @unchecked Sendable {
         )
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
-      let dedicated = options.driver == .coreWorker
-      return try map.attachOpenGlOwnedTexture(
-        descriptor: OpenGlOwnedTextureDescriptor(
+      return try map.attachOpenGlBorrowedTexture(
+        descriptor: OpenGlBorrowedTextureDescriptor(
           extent: extent,
+          physicalWidth: info.width,
+          physicalHeight: info.height,
           context: OpenGlContextDescriptor(
-            ownership: dedicated ? .dedicated : .shared,
+            ownership: .shared,
             data: .wgl(WglContextDescriptor(
               deviceContext: pointer(context.wgl_device_context),
-              shareContext: dedicated ? .null : pointer(context.wgl_context)
+              shareContext: pointer(context.wgl_context)
             ))
-          )
+          ),
+          textures: textures.map {
+            OpenGlBorrowedTexture(texture: $0.info.opengl_texture)
+          },
+          target: info.opengl_target
         ),
         options: options
       )
     default:
-      let dedicated = options.driver == .coreWorker
-      return try map.attachOpenGlOwnedTexture(
-        descriptor: OpenGlOwnedTextureDescriptor(
+      return try map.attachOpenGlBorrowedTexture(
+        descriptor: OpenGlBorrowedTextureDescriptor(
           extent: extent,
+          physicalWidth: info.width,
+          physicalHeight: info.height,
           context: OpenGlContextDescriptor(
-            ownership: dedicated ? .dedicated : .shared,
+            ownership: .shared,
             data: .egl(EglContextDescriptor(
               display: pointer(context.egl_display),
               config: pointer(context.egl_config),
-              shareContext: dedicated ? .null : pointer(context.egl_context),
+              shareContext: pointer(context.egl_context),
               clientApi: .gles
             ))
-          )
+          ),
+          textures: textures.map {
+            OpenGlBorrowedTexture(texture: $0.info.opengl_texture)
+          },
+          target: info.opengl_target
         ),
         options: options
       )
@@ -137,7 +196,7 @@ final class TestGraphics: @unchecked Sendable {
 
   func withTextureView<Result>(
     of frame: AcquiredFrameHandle,
-    _ body: (any OwnedTextureFrameView) throws -> Result
+    _ body: (any TextureFrameView) throws -> Result
   ) throws -> Result {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
@@ -172,8 +231,8 @@ final class TestGraphics: @unchecked Sendable {
   }
 }
 
-/// The part every backend's owned-texture frame view shares.
-protocol OwnedTextureFrameView: AnyObject {
+/// The part every backend's texture frame view shares.
+protocol TextureFrameView: AnyObject {
   var width: UInt32 { get }
   var height: UInt32 { get }
   /// Reads the texture object that the frame lends, which the view's scope
@@ -181,21 +240,48 @@ protocol OwnedTextureFrameView: AnyObject {
   func readTexture() throws
 }
 
-extension MetalTextureFrameView: OwnedTextureFrameView {
+extension MetalTextureFrameView: TextureFrameView {
   func readTexture() throws {
     _ = try texture
   }
 }
 
-extension VulkanTextureFrameView: OwnedTextureFrameView {
+extension VulkanTextureFrameView: TextureFrameView {
   func readTexture() throws {
     _ = try image
   }
 }
 
-extension OpenGlTextureFrameView: OwnedTextureFrameView {
+extension OpenGlTextureFrameView: TextureFrameView {
   func readTexture() throws {
     _ = try texture
+  }
+}
+
+/// A texture from tests/graphics that a borrowed ring names. Destroy it once
+/// the session that renders into it has retired. It keeps its graphics
+/// object alive.
+final class TestTexture: @unchecked Sendable {
+  let info: mln_test_graphics_texture_info
+  private let graphics: TestGraphics
+  private var texture: OpaquePointer?
+
+  fileprivate init(graphics: TestGraphics, texture: OpaquePointer) throws {
+    var info = mln_test_graphics_texture_info()
+    guard mln_test_graphics_texture_get_info(texture, &info) else {
+      mln_test_graphics_texture_destroy(texture)
+      throw FixtureError(String(cString: mln_test_graphics_last_error()))
+    }
+    self.info = info
+    self.graphics = graphics
+    self.texture = texture
+  }
+
+  /// Destroys the texture. An EGL or WGL texture needs its context current on
+  /// the calling thread or on none. A second call does nothing.
+  func destroy() {
+    mln_test_graphics_texture_destroy(texture)
+    texture = nil
   }
 }
 
@@ -273,12 +359,19 @@ final class RenderThread: @unchecked Sendable {
     }
   }
 
-  /// Runs `body` on this thread and returns its result.
+  /// Runs `body` on this thread and returns its result. Throws once the
+  /// thread has stopped.
   func perform<Value: Sendable>(
     _ body: @escaping @Sendable () throws -> Value
   ) async throws -> Value {
     try await withCheckedThrowingContinuation { continuation in
       condition.withLock {
+        guard !stopping else {
+          continuation.resume(
+            throwing: FixtureError("the render thread has stopped")
+          )
+          return
+        }
         tasks.append { continuation.resume(with: Result { try body() }) }
         condition.signal()
       }

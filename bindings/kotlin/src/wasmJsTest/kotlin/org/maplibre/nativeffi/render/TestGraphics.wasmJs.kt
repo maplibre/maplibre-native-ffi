@@ -3,24 +3,24 @@ package org.maplibre.nativeffi.render
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.maplibre.nativeffi.AcquiredFrameHandle
-import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.NewRenderSession
 import org.maplibre.nativeffi.RenderSessionAttachOptions
-import org.maplibre.nativeffi.attachWebGpuOwnedTexture
+import org.maplibre.nativeffi.attachWebGpuBorrowedTexture
 import org.maplibre.nativeffi.withWebGpuTexture
 
 // The page is the only thread that runs Kotlin, so it drives graphics too.
 internal actual val testGraphicsThread: CoroutineDispatcher = Dispatchers.Default
 
-internal actual fun TestGraphics.attachBackendOwnedTexture(
+internal actual fun TestGraphics.attachBackendBorrowedTexture(
   map: MapHandle,
-  extent: LogicalExtent,
+  textures: List<TestTexture>,
   context: TestGraphicsContext,
   options: RenderSessionAttachOptions,
 ): NewRenderSession =
   when (backend) {
-    TestBackend.WEBGPU -> map.attachWebGpuOwnedTexture(webGpuOwnedTexture(extent, context), options)
+    TestBackend.WEBGPU ->
+      map.attachWebGpuBorrowedTexture(webGpuBorrowedTexture(textures, context), options)
     else -> error("this target declares no attach for $backend")
   }
 
