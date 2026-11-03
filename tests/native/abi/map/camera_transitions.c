@@ -1080,6 +1080,93 @@ static void a_rejected_command_runs_no_handler(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static const mln_lat_lng_bounds fit_region = {
+  .southwest = {.latitude = 35.0, .longitude = -125.0},
+  .northeast = {.latitude = 39.0, .longitude = -115.0},
+};
+
+static void a_rendered_fit_ease_ends_where_the_query_fits(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  mln_test_drain_all(runtime);
+
+  mln_test_completion query =
+    mln_test_completion_default(sizeof(mln_camera_options));
+  MLN_TEST_OK(mln_map_camera_for_lat_lng_bounds(
+    map, fit_region, NULL, &query.descriptor, NULL
+  ));
+  mln_camera_options fit = {.size = sizeof(mln_camera_options)};
+  MLN_TEST_OK(mln_test_completion_finish_value(&query, &fit, sizeof(fit)));
+
+  mln_test_transition_end probe;
+  mln_test_transition_end_init(&probe);
+  mln_camera_fit_update update = {.size = sizeof(mln_camera_fit_update)};
+  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  update.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  update.animation.duration_ms = 20.0;
+  update.animation.end_handler = mln_test_transition_end_handler(&probe);
+  MLN_TEST_AWAIT_OK(mln_map_fit_camera_to_lat_lng_bounds(
+    map, fit_region, &update, &completion.descriptor, NULL
+  ));
+
+  render_until_ended(&fixture, &probe);
+  assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "fit ease");
+  const mln_camera camera = query_camera(map);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, fit.center.latitude, camera.center.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, fit.center.longitude, camera.center.longitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, fit.zoom, camera.zoom);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A fit jump ends as soon as the camera moves, and a fit that fails ends as
+// cancelled without moving the camera.
+static void a_fit_command_ends_its_handler_when_it_runs(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  mln_test_transition_end jumped;
+  mln_test_transition_end_init(&jumped);
+  mln_camera_fit_update update = {.size = sizeof(mln_camera_fit_update)};
+  update.animation.end_handler = mln_test_transition_end_handler(&jumped);
+  MLN_TEST_AWAIT_OK(mln_map_fit_camera_to_lat_lng_bounds(
+    map, fit_region, &update, &completion.descriptor, NULL
+  ));
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&jumped.calls));
+  assert_ended(&jumped, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "fit jump");
+  const mln_camera fitted = query_camera(map);
+
+  mln_test_transition_end failed;
+  mln_test_transition_end_init(&failed);
+  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  update.fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
+  update.fit.padding = (mln_edge_insets){.top = 64.0};
+  update.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  update.animation.duration_ms = 60000.0;
+  update.animation.end_handler = mln_test_transition_end_handler(&failed);
+  mln_test_completion command = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_fit_camera_to_lat_lng_bounds(
+    map, fit_region, &update, &command.descriptor, NULL
+  ));
+  MLN_TEST_INVALID(mln_test_completion_finish(&command));
+  mln_test_completion_destroy(&command);
+  assert_ended(&failed, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "fit failure");
+  const mln_camera after = query_camera(map);
+  TEST_ASSERT_EQUAL_DOUBLE(fitted.zoom, after.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(fitted.center.latitude, after.center.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(fitted.center.longitude, after.center.longitude);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_rendered_ease_completes_at_its_target);
   RUN_TEST(an_unobserved_animation_publishes_its_final_snapshot);
@@ -1097,4 +1184,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_map_close_ends_running_transitions);
   RUN_TEST(a_handler_may_submit_a_command);
   RUN_TEST(a_rejected_command_runs_no_handler);
+  RUN_TEST(a_rendered_fit_ease_ends_where_the_query_fits);
+  RUN_TEST(a_fit_command_ends_its_handler_when_it_runs);
 }

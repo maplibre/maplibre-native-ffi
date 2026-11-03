@@ -6,6 +6,7 @@ import org.maplibre.nativeffi.AnimationOptions
 import org.maplibre.nativeffi.BoundOptions
 import org.maplibre.nativeffi.Camera
 import org.maplibre.nativeffi.CameraDelta
+import org.maplibre.nativeffi.CameraFitUpdate
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraTransitionHandler
 import org.maplibre.nativeffi.CameraTransitionOutcome
@@ -115,12 +116,10 @@ private suspend fun camera(map: MapHandle) {
       southwest = LatLng(latitude = 45.8, longitude = 5.9),
       northeast = LatLng(latitude = 47.8, longitude = 10.5),
     )
-  val fitted = map.cameraForLatLngBounds(bounds).await()
-
-  map.discarding.updateCamera(
-    CameraUpdate(
+  map.discarding.fitCameraToLatLngBounds(
+    bounds,
+    CameraFitUpdate(
       mode = CameraUpdateMode.EASE,
-      camera = fitted,
       animation = AnimationOptions(durationMs = 500.0),
     ),
   )

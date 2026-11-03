@@ -263,6 +263,31 @@ internal expect object C {
 
   fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int
 
+  fun mln_map_fit_camera_to_geometry(
+    map: Long,
+    geometry: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_fit_camera_to_lat_lng_bounds(
+    map: Long,
+    bounds: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_fit_camera_to_lat_lngs(
+    map: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_get_feature_state(

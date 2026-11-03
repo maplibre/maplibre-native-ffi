@@ -200,6 +200,15 @@ final class mln_camera_fit_options extends Struct {
   external double pitch;
 }
 
+final class mln_camera_fit_update extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int mode;
+  external mln_camera_fit_options fit;
+  external mln_animation_options animation;
+}
+
 final class mln_camera_options extends Struct {
   @Uint32()
   external int size;
@@ -2918,6 +2927,59 @@ external int mln_map_dump_debug_logs(
 >()
 external int mln_map_end_command_group(
   int map,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    Pointer<mln_camera_fit_update>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_fit_camera_to_geometry(
+  int map,
+  mln_buffer_view geometry,
+  Pointer<mln_camera_fit_update> update,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_lat_lng_bounds,
+    Pointer<mln_camera_fit_update>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_fit_camera_to_lat_lng_bounds(
+  int map,
+  mln_lat_lng_bounds bounds,
+  Pointer<mln_camera_fit_update> update,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_lat_lng>,
+    Size,
+    Pointer<mln_camera_fit_update>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_fit_camera_to_lat_lngs(
+  int map,
+  Pointer<mln_lat_lng> coordinates,
+  int coordinate_count,
+  Pointer<mln_camera_fit_update> update,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 static atomic_bool finished;
-static mln_camera_options fitted;
 
 static void on_done(
   void* user_data, const mln_completion_result* result
@@ -48,19 +47,6 @@ static void on_fly_end(
   fly_ended(end->outcome == MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
 }
 // #endregion animate
-
-// #region fit
-static void on_fit(
-  void* user_data, const mln_completion_result* result
-) {
-  if (result->status == MLN_STATUS_OK) {
-    // The result is valid only during this callback.
-    const mln_camera_options* camera = result->value;
-    fitted = *camera;
-  }
-  on_done(user_data, result);
-}
-// #endregion fit
 
 // #region gesture
 static void begin_gesture(mln_map map) {
@@ -157,24 +143,14 @@ void mln_doc_camera(mln_map map) {
     .southwest = {.latitude = 45.8, .longitude = 5.9},
     .northeast = {.latitude = 47.8, .longitude = 10.5},
   };
-  const mln_completion fit = {
-    .size = sizeof(mln_completion), .callback = on_fit
-  };
-  // NULL fit options use the defaults.
-  mln_map_camera_for_lat_lng_bounds(map, bounds, NULL, &fit, NULL);
-  // #endregion fit
-  wait_for_done();
-
-  // #region fit
-  const mln_camera_update ease = {
-    .size = sizeof(mln_camera_update),
+  const mln_camera_fit_update fit = {
+    .size = sizeof(mln_camera_fit_update),
     .mode = MLN_CAMERA_UPDATE_MODE_EASE,
-    .camera = fitted,
     .animation = {
       .fields = MLN_ANIMATION_OPTION_DURATION, .duration_ms = 500
     },
   };
-  mln_map_update_camera(map, &ease, NULL, NULL);
+  mln_map_fit_camera_to_lat_lng_bounds(map, bounds, &fit, NULL, NULL);
   // #endregion fit
 
   // #region limit

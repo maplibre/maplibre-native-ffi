@@ -100,6 +100,14 @@ internal unsafe struct mln_camera_fit_options
     public double pitch;
 }
 
+internal unsafe struct mln_camera_fit_update
+{
+    public uint size;
+    public mln_camera_update_mode mode;
+    public mln_camera_fit_options fit;
+    public mln_animation_options animation;
+}
+
 internal unsafe struct mln_camera_options
 {
     public uint size;

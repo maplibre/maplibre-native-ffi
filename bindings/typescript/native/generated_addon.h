@@ -357,6 +357,10 @@ bool mln_ts_write_camera_fit_options(
   mln_ts_call* call, napi_value value, mln_camera_fit_options* out,
   const char* path
 );
+bool mln_ts_write_camera_fit_update(
+  mln_ts_call* call, napi_value value, mln_camera_fit_update* out,
+  const char* path
+);
 bool mln_ts_write_camera_options(
   mln_ts_call* call, napi_value value, mln_camera_options* out, const char* path
 );

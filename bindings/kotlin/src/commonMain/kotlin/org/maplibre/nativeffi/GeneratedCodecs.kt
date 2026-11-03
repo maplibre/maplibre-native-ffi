@@ -443,6 +443,16 @@ internal fun NativeArena.putLatLngBounds(target: Long, value: LatLngBounds) {
 internal fun NativeArena.writeLatLngBounds(value: LatLngBounds): Long =
   allocate(32, w(8, 8, 4)).also { putLatLngBounds(it, value) }
 
+internal fun NativeCall.putCameraFitUpdate(target: Long, value: CameraFitUpdate) {
+  writeU32(target, w(160, 168, 152).toUInt())
+  writeU32(target + 4, value.mode.rawValue)
+  putCameraFitOptions(target + 8, value.fit)
+  putAnimationOptions(target + 64, value.animation)
+}
+
+internal fun NativeCall.writeCameraFitUpdate(value: CameraFitUpdate): Long =
+  allocate(w(160, 168, 152), w(8, 8, 4)).also { putCameraFitUpdate(it, value) }
+
 internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureStateSelector) {
   writeU32(target, w(40, 72).toUInt())
   var fields = 0u

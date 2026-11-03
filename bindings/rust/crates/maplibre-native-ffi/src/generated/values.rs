@@ -342,6 +342,31 @@ impl ToNative<sys::mln_camera_fit_options> for CameraFitOptions {
     }
 }
 
+/// A camera change that fits an area, for
+/// `MapHandle::fit_camera_to_lat_lng_bounds()` and the other fit commands.
+///
+/// A jump uses only the end handler of `animation`, and the handler runs as
+/// soon as the camera moves.
+///
+/// See `mln_camera_fit_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Default)]
+pub struct CameraFitUpdate {
+    pub mode: CameraUpdateMode,
+    pub fit: CameraFitOptions,
+    pub animation: AnimationOptions,
+}
+impl ToNative<sys::mln_camera_fit_update> for CameraFitUpdate {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera_fit_update> {
+        let mut raw: sys::mln_camera_fit_update = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_camera_fit_update>() as _;
+        raw.mode = to_native(&self.mode, arena)?;
+        raw.fit = to_native(&self.fit, arena)?;
+        raw.animation = to_native(&self.animation, arena)?;
+        Ok(raw)
+    }
+}
+
 /// A camera, with only the members that `fields` selects.
 ///
 /// See `mln_camera_options` in the
@@ -551,7 +576,8 @@ pub enum CameraTransitionOutcome: u32 {
     /// `MapHandle::cancel_camera_transitions_with_id()`, a gesture's
     /// `GesturePhase::Begin` or `GesturePhase::Cancel`,
     /// `MapHandle::set_free_camera_options()`, or a resize that moves the
-    /// camera back inside its bounds stopped the change.
+    /// camera back inside its bounds stopped the change, or the command failed
+    /// before it moved the camera.
     Cancelled = 1,
     /// The map closed before the change ended.
     Closed = 2,
@@ -598,7 +624,7 @@ impl ToNative<sys::mln_camera_update> for CameraUpdate {
 }
 
 native_enum! {
-/// How `MapHandle::update_camera()` moves the camera.
+/// How a camera command moves the camera.
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

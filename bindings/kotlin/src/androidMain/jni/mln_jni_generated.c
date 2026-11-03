@@ -544,6 +544,43 @@ static jint mln_map_end_command_group_jni(
   );
 }
 
+static jint mln_map_fit_camera_to_geometry_jni(
+  JNIEnv* env, jclass type, jlong map, jlong geometry, jlong update,
+  jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_fit_camera_to_geometry(
+    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, geometry),
+    MLN_JNI_POINTER(const mln_camera_fit_update*, update),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_fit_camera_to_lat_lng_bounds_jni(
+  JNIEnv* env, jclass type, jlong map, jlong bounds, jlong update,
+  jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_fit_camera_to_lat_lng_bounds(
+    (mln_map)map, MLN_JNI_RECORD(mln_lat_lng_bounds, bounds),
+    MLN_JNI_POINTER(const mln_camera_fit_update*, update),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_fit_camera_to_lat_lngs_jni(
+  JNIEnv* env, jclass type, jlong map, jlong coordinates,
+  jlong coordinate_count, jlong update, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_fit_camera_to_lat_lngs(
+    (mln_map)map, MLN_JNI_POINTER(const mln_lat_lng*, coordinates),
+    (size_t)coordinate_count,
+    MLN_JNI_POINTER(const mln_camera_fit_update*, update),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_get_camera_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
@@ -2199,6 +2236,12 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_dispose", "(JJ)I", (void*)mln_map_dispose_jni},
   {"mln_map_dump_debug_logs", "(JJJ)I", (void*)mln_map_dump_debug_logs_jni},
   {"mln_map_end_command_group", "(JJJ)I", (void*)mln_map_end_command_group_jni},
+  {"mln_map_fit_camera_to_geometry", "(JJJJJ)I",
+   (void*)mln_map_fit_camera_to_geometry_jni},
+  {"mln_map_fit_camera_to_lat_lng_bounds", "(JJJJJ)I",
+   (void*)mln_map_fit_camera_to_lat_lng_bounds_jni},
+  {"mln_map_fit_camera_to_lat_lngs", "(JJJJJJ)I",
+   (void*)mln_map_fit_camera_to_lat_lngs_jni},
   {"mln_map_get_camera", "(JJJ)I", (void*)mln_map_get_camera_jni},
   {"mln_map_get_feature_state", "(JJJJ)I",
    (void*)mln_map_get_feature_state_jni},
@@ -2552,6 +2595,12 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_map_dispose", "(JJ)I", (void*)mln_map_dispose_jni},
   {"mln_map_dump_debug_logs", "(JJJ)I", (void*)mln_map_dump_debug_logs_jni},
   {"mln_map_end_command_group", "(JJJ)I", (void*)mln_map_end_command_group_jni},
+  {"mln_map_fit_camera_to_geometry", "(JJJJJ)I",
+   (void*)mln_map_fit_camera_to_geometry_jni},
+  {"mln_map_fit_camera_to_lat_lng_bounds", "(JJJJJ)I",
+   (void*)mln_map_fit_camera_to_lat_lng_bounds_jni},
+  {"mln_map_fit_camera_to_lat_lngs", "(JJJJJJ)I",
+   (void*)mln_map_fit_camera_to_lat_lngs_jni},
   {"mln_map_get_camera", "(JJJ)I", (void*)mln_map_get_camera_jni},
   {"mln_map_get_feature_state", "(JJJJ)I",
    (void*)mln_map_get_feature_state_jni},

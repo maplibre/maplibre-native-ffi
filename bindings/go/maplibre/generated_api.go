@@ -93,7 +93,8 @@ const (
 	// MapHandle.CancelCameraTransitions(),
 	// MapHandle.CancelCameraTransitionsWithId(), a gesture's GesturePhaseBegin or
 	// GesturePhaseCancel, MapHandle.SetFreeCameraOptions(), or a resize that moves
-	// the camera back inside its bounds stopped the change.
+	// the camera back inside its bounds stopped the change, or the command failed
+	// before it moved the camera.
 	CameraTransitionOutcomeCancelled CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED)
 	// The map closed before the change ended.
 	CameraTransitionOutcomeClosed CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CLOSED)
@@ -121,8 +122,8 @@ func (value CameraTransitionOutcome) String() string {
 	return fmt.Sprintf("CameraTransitionOutcome(%d)", value)
 }
 
-// CameraUpdateMode corresponds to mln_camera_update_mode. How
-// MapHandle.UpdateCamera() moves the camera.
+// CameraUpdateMode corresponds to mln_camera_update_mode. How a camera command
+// moves the camera.
 //
 // See mln_camera_update_mode in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2043,6 +2044,30 @@ func nativeCameraFitOptions(input CameraFitOptions, arena *bindingArena) C.mln_c
 	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_PADDING, &raw.padding, input.Padding, arena, nativeEdgeInsets)
 	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
+	return raw
+}
+
+// CameraFitUpdate corresponds to mln_camera_fit_update. A camera change that
+// fits an area, for MapHandle.FitCameraToLatLngBounds() and the other fit
+// commands.
+//
+// A jump uses only the end handler of animation, and the handler runs as soon
+// as the camera moves.
+//
+// See mln_camera_fit_update in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraFitUpdate struct {
+	Mode      CameraUpdateMode
+	Fit       CameraFitOptions
+	Animation AnimationOptions
+}
+
+func nativeCameraFitUpdate(input CameraFitUpdate, arena *bindingArena) C.mln_camera_fit_update {
+	raw := C.mln_camera_fit_update{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.mode = C.mln_camera_update_mode(input.Mode)
+	raw.fit = nativeCameraFitOptions(input.Fit, arena)
+	raw.animation = nativeAnimationOptions(input.Animation, arena)
 	return raw
 }
 
@@ -6429,6 +6454,11 @@ func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], erro
 //
 // See mln_map_camera_for_geometry in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the padding in fitOptions leaves no room for
+//     the area: its left and right add up to at least the map's width, or its
+//     top and bottom to at least the map's height.
 func (receiver *MapHandle) CameraForGeometry(geometry string, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
@@ -6442,6 +6472,11 @@ func (receiver *MapHandle) CameraForGeometry(geometry string, fitOptions *Camera
 //
 // See mln_map_camera_for_lat_lng_bounds in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the padding in fitOptions leaves no room for
+//     the area: its left and right add up to at least the map's width, or its
+//     top and bottom to at least the map's height.
 func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
@@ -6455,6 +6490,11 @@ func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions
 //
 // See mln_map_camera_for_lat_lngs in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the padding in fitOptions leaves no room for
+//     the area: its left and right add up to at least the map's width, or its
+//     top and bottom to at least the map's height.
 func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
@@ -6505,6 +6545,70 @@ func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
 func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
+}
+
+// FitCameraToGeometry moves the camera to fit a GeoJSON geometry in the map's
+// view, at once or with an animation.
+//
+// geometry is a GeoJSON geometry object with at least one coordinate, not a
+// feature. The map computes the camera when it runs the command, from the
+// camera and size that earlier commands leave, as MapHandle.CameraForGeometry()
+// would then. The function finishes when the map applies the change, before an
+// animation ends.
+//
+// See mln_map_fit_camera_to_geometry in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the padding in update leaves no room for the
+//     area: its left and right add up to at least the map's width, or its top
+//     and bottom to at least the map's height. The camera doesn't move.
+func (receiver *MapHandle) FitCameraToGeometry(geometry string, update CameraFitUpdate) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_fit_camera_to_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// FitCameraToLatLngBounds moves the camera to fit bounds in the map's view, at
+// once or with an animation.
+//
+// The map computes the camera when it runs the command, from the camera and
+// size that earlier commands leave, as MapHandle.CameraForLatLngBounds() would
+// then. The function finishes when the map applies the change, before an
+// animation ends.
+//
+// See mln_map_fit_camera_to_lat_lng_bounds in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the padding in update leaves no room for the
+//     area: its left and right add up to at least the map's width, or its top
+//     and bottom to at least the map's height. The camera doesn't move.
+func (receiver *MapHandle) FitCameraToLatLngBounds(bounds LatLngBounds, update CameraFitUpdate) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_fit_camera_to_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// FitCameraToLatLngs moves the camera to fit coordinates in the map's view, at
+// once or with an animation.
+//
+// coordinates must not be empty. The map computes the camera when it runs the
+// command, from the camera and size that earlier commands leave, as
+// MapHandle.CameraForLatLngs() would then. The function finishes when the map
+// applies the change, before an animation ends.
+//
+// See mln_map_fit_camera_to_lat_lngs in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the padding in update leaves no room for the
+//     area: its left and right add up to at least the map's width, or its top
+//     and bottom to at least the map's height. The camera doesn't move.
+func (receiver *MapHandle) FitCameraToLatLngs(coordinates []LatLng, update CameraFitUpdate) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_fit_camera_to_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -8701,6 +8805,27 @@ func (view MapHandleDiscarding) EndCommandGroup() error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) FitCameraToGeometry(geometry string, update CameraFitUpdate) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_fit_camera_to_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) FitCameraToLatLngBounds(bounds LatLngBounds, update CameraFitUpdate) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_fit_camera_to_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) FitCameraToLatLngs(coordinates []LatLng, update CameraFitUpdate) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_fit_camera_to_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
 	})
 }
 

@@ -81,13 +81,13 @@ private func camera(_ map: MapHandle) async throws {
     southwest: LatLng(latitude: 45.8, longitude: 5.9),
     northeast: LatLng(latitude: 47.8, longitude: 10.5)
   )
-  let fitted = try await map.cameraForLatLngBounds(bounds)
-
-  try map.discarding.updateCamera(CameraUpdate(
-    mode: .ease,
-    camera: fitted,
-    animation: AnimationOptions(durationMs: 500)
-  ))
+  try map.discarding.fitCameraToLatLngBounds(
+    bounds,
+    update: CameraFitUpdate(
+      mode: .ease,
+      animation: AnimationOptions(durationMs: 500)
+    )
+  )
   // #endregion fit
 
   // #region limit

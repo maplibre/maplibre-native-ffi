@@ -23,6 +23,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/CameraBounds.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraDelta.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraFitOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraFitUpdate.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraQueryResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionEnd.g.cs linguist-generated=true

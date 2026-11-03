@@ -100,14 +100,12 @@ def camera(map_handle: mln.MapHandle) -> None:
         southwest=mln.LatLng(latitude=45.8, longitude=5.9),
         northeast=mln.LatLng(latitude=47.8, longitude=10.5),
     )
-    fitted = map_handle.camera_for_lat_lng_bounds(bounds).result()
-
-    map_handle.discarding.update_camera(
-        mln.CameraUpdate(
+    map_handle.discarding.fit_camera_to_lat_lng_bounds(
+        bounds,
+        mln.CameraFitUpdate(
             mode=mln.CameraUpdateMode.EASE,
-            camera=fitted,
             animation=mln.AnimationOptions(duration_ms=500),
-        )
+        ),
     )
     # #endregion fit
 

@@ -1626,6 +1626,151 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_map_fit_camera_to_geometry(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_buffer_view arg_geometry = {0};
+  mln_camera_fit_update arg_update;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_json_view(call, call->argv[1], &arg_geometry, "geometry"))
+    goto done;
+  memset(&arg_update, 0, sizeof arg_update);
+  arg_update.size = sizeof arg_update;
+  arg_update.fit.size = sizeof arg_update.fit;
+  if (!mln_ts_read_record(call, call->argv[2], "update")) goto done;
+  if (!mln_ts_write_camera_fit_update(
+        call, call->argv[2], &arg_update, "update"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_fit_camera_to_geometry(
+    arg_map, arg_geometry, &arg_update, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_fit_camera_to_lat_lng_bounds(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_lat_lng_bounds arg_bounds;
+  mln_camera_fit_update arg_update;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  memset(&arg_bounds, 0, sizeof arg_bounds);
+  if (!mln_ts_is_absent(call, call->argv[1])) {
+    if (!mln_ts_read_record(call, call->argv[1], "bounds")) goto done;
+    if (!mln_ts_write_lat_lng_bounds(
+          call, call->argv[1], &arg_bounds, "bounds"
+        ))
+      goto done;
+  }
+  memset(&arg_update, 0, sizeof arg_update);
+  arg_update.size = sizeof arg_update;
+  arg_update.fit.size = sizeof arg_update.fit;
+  if (!mln_ts_read_record(call, call->argv[2], "update")) goto done;
+  if (!mln_ts_write_camera_fit_update(
+        call, call->argv[2], &arg_update, "update"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_fit_camera_to_lat_lng_bounds(
+    arg_map, arg_bounds, &arg_update, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_fit_camera_to_lat_lngs(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  size_t count_coordinates = 0;
+  mln_lat_lng* arg_coordinates = NULL;
+  mln_camera_fit_update arg_update;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  {
+    mln_lat_lng* items = NULL;
+    size_t count = 0;
+    if (!mln_ts_write_list_lat_lng(
+          call, call->argv[1], UINT32_MAX, &items, &count, "coordinates"
+        ))
+      goto done;
+    arg_coordinates = items;
+    count_coordinates = (size_t)count;
+  }
+  memset(&arg_update, 0, sizeof arg_update);
+  arg_update.size = sizeof arg_update;
+  arg_update.fit.size = sizeof arg_update.fit;
+  if (!mln_ts_read_record(call, call->argv[2], "update")) goto done;
+  if (!mln_ts_write_camera_fit_update(
+        call, call->argv[2], &arg_update, "update"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_fit_camera_to_lat_lngs(
+    arg_map, arg_coordinates, (size_t)count_coordinates, &arg_update,
+    present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_map_get_camera(
   napi_env env, napi_callback_info info
 ) {
@@ -6749,6 +6894,12 @@ static const mln_ts_export exports[] = {
   {"mln_map_dispose", mln_ts_export_mln_map_dispose},
   {"mln_map_dump_debug_logs", mln_ts_export_mln_map_dump_debug_logs},
   {"mln_map_end_command_group", mln_ts_export_mln_map_end_command_group},
+  {"mln_map_fit_camera_to_geometry",
+   mln_ts_export_mln_map_fit_camera_to_geometry},
+  {"mln_map_fit_camera_to_lat_lng_bounds",
+   mln_ts_export_mln_map_fit_camera_to_lat_lng_bounds},
+  {"mln_map_fit_camera_to_lat_lngs",
+   mln_ts_export_mln_map_fit_camera_to_lat_lngs},
   {"mln_map_get_camera", mln_ts_export_mln_map_get_camera},
   {"mln_map_get_feature_state", mln_ts_export_mln_map_get_feature_state},
   {"mln_map_get_global_state", mln_ts_export_mln_map_get_global_state},

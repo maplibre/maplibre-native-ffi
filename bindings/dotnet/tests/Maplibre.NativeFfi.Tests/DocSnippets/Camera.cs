@@ -109,13 +109,11 @@ internal static class Camera
             new LatLng(45.8, 5.9),
             new LatLng(47.8, 10.5)
         );
-        var fitted = await map.CameraForLatLngBoundsAsync(bounds);
-
-        map.Discarding.UpdateCamera(
-            new CameraUpdate
+        map.Discarding.FitCameraToLatLngBounds(
+            bounds,
+            new CameraFitUpdate
             {
                 Mode = CameraUpdateMode.Ease,
-                Camera = fitted,
                 Animation = new AnimationOptions { DurationMs = 500 },
             }
         );

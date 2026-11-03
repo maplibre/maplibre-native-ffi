@@ -364,7 +364,8 @@ typedef enum mln_camera_transition_outcome : uint32_t {
    * mln_map_cancel_camera_transitions_with_id(), a gesture's
    * MLN_GESTURE_PHASE_BEGIN or MLN_GESTURE_PHASE_CANCEL,
    * mln_map_set_free_camera_options(), or a resize that moves the camera back
-   * inside its bounds stopped the change.
+   * inside its bounds stopped the change, or the command failed before it
+   * moved the camera.
    */
   MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
   /** The map closed before the change ended. */
@@ -440,7 +441,7 @@ typedef struct mln_animation_options {
   mln_camera_transition_handler end_handler;
 } mln_animation_options;
 
-/** How mln_map_update_camera() moves the camera. */
+/** How a camera command moves the camera. */
 typedef enum mln_camera_update_mode : uint32_t {
   /** Moves the camera at once. */
   MLN_CAMERA_UPDATE_MODE_JUMP = 0,
@@ -541,6 +542,20 @@ typedef struct mln_camera_fit_options {
   /** The tilt toward the horizon, in degrees. */
   double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PITCH");
 } mln_camera_fit_options;
+
+/**
+ * A camera change that fits an area, for mln_map_fit_camera_to_lat_lng_bounds()
+ * and the other fit commands.
+ *
+ * A jump uses only the end handler of `animation`, and the handler runs as
+ * soon as the camera moves.
+ */
+typedef struct mln_camera_fit_update {
+  uint32_t size;
+  mln_camera_update_mode mode;
+  mln_camera_fit_options fit;
+  mln_animation_options animation;
+} mln_camera_fit_update;
 
 /** A vector in three dimensions. */
 typedef struct mln_vec3 {

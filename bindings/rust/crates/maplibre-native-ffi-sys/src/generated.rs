@@ -553,6 +553,14 @@ pub struct mln_camera_fit_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_camera_fit_update {
+    pub size: u32,
+    pub mode: mln_camera_update_mode,
+    pub fit: mln_camera_fit_options,
+    pub animation: mln_animation_options,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_camera_options {
     pub size: u32,
     pub fields: mln_camera_option_fields,
@@ -2202,6 +2210,28 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_end_command_group(
         map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_fit_camera_to_geometry(
+        map: mln_map,
+        geometry: mln_buffer_view,
+        update: *const mln_camera_fit_update,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_fit_camera_to_lat_lng_bounds(
+        map: mln_map,
+        bounds: mln_lat_lng_bounds,
+        update: *const mln_camera_fit_update,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_fit_camera_to_lat_lngs(
+        map: mln_map,
+        coordinates: *const mln_lat_lng,
+        coordinate_count: usize,
+        update: *const mln_camera_fit_update,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

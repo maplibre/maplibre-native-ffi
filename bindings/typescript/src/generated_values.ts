@@ -244,6 +244,22 @@ export interface CameraFitOptions {
 }
 
 /**
+ * A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()`
+ * and the other fit commands.
+ *
+ * A jump uses only the end handler of `animation`, and the handler runs as soon
+ * as the camera moves.
+ *
+ * See `mln_camera_fit_update` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface CameraFitUpdate {
+  mode?: CameraUpdateMode;
+  fit?: CameraFitOptions;
+  animation?: AnimationOptions;
+}
+
+/**
  * A camera, with only the members that `fields` selects.
  *
  * See `mln_camera_options` in the
@@ -342,7 +358,8 @@ export const CameraTransitionOutcome = {
    * `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
    * `GesturePhase.begin` or `GesturePhase.cancel`,
    * `MapHandle.setFreeCameraOptions()`, or a resize that moves the camera back
-   * inside its bounds stopped the change.
+   * inside its bounds stopped the change, or the command failed before it moved
+   * the camera.
    */
   cancelled: 1,
   /**
@@ -382,7 +399,7 @@ export interface CameraUpdate {
 }
 
 /**
- * How `MapHandle.updateCamera()` moves the camera.
+ * How a camera command moves the camera.
  *
  * See `mln_camera_update_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

@@ -683,6 +683,12 @@ impl MapHandle {
     ///
     /// See `mln_map_camera_for_geometry` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the padding in `fit_options` leaves no
+    ///   room for the area: its left and right add up to at least the map's
+    ///   width, or its top and bottom to at least the map's height.
     pub fn camera_for_geometry(
         &self,
         geometry: &str,
@@ -712,6 +718,12 @@ impl MapHandle {
     ///
     /// See `mln_map_camera_for_lat_lng_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the padding in `fit_options` leaves no
+    ///   room for the area: its left and right add up to at least the map's
+    ///   width, or its top and bottom to at least the map's height.
     pub fn camera_for_lat_lng_bounds(
         &self,
         bounds: LatLngBounds,
@@ -742,6 +754,12 @@ impl MapHandle {
     ///
     /// See `mln_map_camera_for_lat_lngs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the padding in `fit_options` leaves no
+    ///   room for the area: its left and right add up to at least the map's
+    ///   width, or its top and bottom to at least the map's height.
     pub fn camera_for_lat_lngs(
         &self,
         coordinates: &[LatLng],
@@ -836,6 +854,111 @@ impl MapHandle {
         let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_end_command_group(map, completion, out_diagnostic)
+        })
+    }
+
+    /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+    /// with an animation.
+    ///
+    /// `geometry` is a GeoJSON geometry object with at least one coordinate,
+    /// not a feature. The map computes the camera when it runs the command,
+    /// from the camera and size that earlier commands leave, as
+    /// `MapHandle::camera_for_geometry()` would then. The function finishes
+    /// when the map applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_geometry` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the padding in `update` leaves no room
+    ///   for the area: its left and right add up to at least the map's width,
+    ///   or its top and bottom to at least the map's height. The camera doesn't
+    ///   move.
+    pub fn fit_camera_to_geometry(
+        &self,
+        geometry: &str,
+        update: &CameraFitUpdate,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let geometry = call.input(&geometry)?;
+        let update = call.reference(&update)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_fit_camera_to_geometry(map, geometry, update, completion, out_diagnostic)
+        })
+    }
+
+    /// Moves the camera to fit `bounds` in the map's view, at once or with an
+    /// animation.
+    ///
+    /// The map computes the camera when it runs the command, from the camera
+    /// and size that earlier commands leave, as
+    /// `MapHandle::camera_for_lat_lng_bounds()` would then. The function
+    /// finishes when the map applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_lat_lng_bounds` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the padding in `update` leaves no room
+    ///   for the area: its left and right add up to at least the map's width,
+    ///   or its top and bottom to at least the map's height. The camera doesn't
+    ///   move.
+    pub fn fit_camera_to_lat_lng_bounds(
+        &self,
+        bounds: LatLngBounds,
+        update: &CameraFitUpdate,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let bounds = call.input(&bounds)?;
+        let update = call.reference(&update)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_fit_camera_to_lat_lng_bounds(
+                map,
+                bounds,
+                update,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Moves the camera to fit `coordinates` in the map's view, at once or with
+    /// an animation.
+    ///
+    /// `coordinates` must not be empty. The map computes the camera when it
+    /// runs the command, from the camera and size that earlier commands leave,
+    /// as `MapHandle::camera_for_lat_lngs()` would then. The function finishes
+    /// when the map applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_lat_lngs` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the padding in `update` leaves no room
+    ///   for the area: its left and right add up to at least the map's width,
+    ///   or its top and bottom to at least the map's height. The camera doesn't
+    ///   move.
+    pub fn fit_camera_to_lat_lngs(
+        &self,
+        coordinates: &[LatLng],
+        update: &CameraFitUpdate,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let coordinate_count = convert::count(coordinates.len())?;
+        let coordinates = call.array(coordinates)?;
+        let update = call.reference(&update)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_fit_camera_to_lat_lngs(
+                map,
+                coordinates,
+                coordinate_count,
+                update,
+                completion,
+                out_diagnostic,
+            )
         })
     }
 
@@ -2378,6 +2501,86 @@ impl MapHandleDiscarding<'_> {
         let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_end_command_group(map, completion, out_diagnostic)
+        })
+    }
+
+    /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+    /// with an animation.
+    ///
+    /// `geometry` is a GeoJSON geometry object with at least one coordinate,
+    /// not a feature. The map computes the camera when it runs the command,
+    /// from the camera and size that earlier commands leave, as
+    /// `MapHandle::camera_for_geometry()` would then. The function finishes
+    /// when the map applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_geometry` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn fit_camera_to_geometry(&self, geometry: &str, update: &CameraFitUpdate) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let geometry = call.input(&geometry)?;
+        let update = call.reference(&update)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_fit_camera_to_geometry(map, geometry, update, completion, out_diagnostic)
+        })
+    }
+
+    /// Moves the camera to fit `bounds` in the map's view, at once or with an
+    /// animation.
+    ///
+    /// The map computes the camera when it runs the command, from the camera
+    /// and size that earlier commands leave, as
+    /// `MapHandle::camera_for_lat_lng_bounds()` would then. The function
+    /// finishes when the map applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_lat_lng_bounds` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn fit_camera_to_lat_lng_bounds(
+        &self,
+        bounds: LatLngBounds,
+        update: &CameraFitUpdate,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let bounds = call.input(&bounds)?;
+        let update = call.reference(&update)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_fit_camera_to_lat_lng_bounds(
+                map,
+                bounds,
+                update,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Moves the camera to fit `coordinates` in the map's view, at once or with
+    /// an animation.
+    ///
+    /// `coordinates` must not be empty. The map computes the camera when it
+    /// runs the command, from the camera and size that earlier commands leave,
+    /// as `MapHandle::camera_for_lat_lngs()` would then. The function finishes
+    /// when the map applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_lat_lngs` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn fit_camera_to_lat_lngs(
+        &self,
+        coordinates: &[LatLng],
+        update: &CameraFitUpdate,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let coordinate_count = convert::count(coordinates.len())?;
+        let coordinates = call.array(coordinates)?;
+        let update = call.reference(&update)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_fit_camera_to_lat_lngs(
+                map,
+                coordinates,
+                coordinate_count,
+                update,
+                completion,
+                out_diagnostic,
+            )
         })
     }
 

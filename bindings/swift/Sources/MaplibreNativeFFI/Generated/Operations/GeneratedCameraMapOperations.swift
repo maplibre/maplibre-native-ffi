@@ -37,6 +37,12 @@ public extension MapHandle {
   ///
   /// See `mln_map_camera_for_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+  ///   for the area: its left and right add up to at least the map's width, or
+  ///   its top and bottom to at least the map's height.
   func cameraForGeometry(
     _ bindingArg0: String,
     fitOptions bindingArg1: CameraFitOptions? = nil
@@ -61,6 +67,12 @@ public extension MapHandle {
   ///
   /// See `mln_map_camera_for_lat_lng_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+  ///   for the area: its left and right add up to at least the map's width, or
+  ///   its top and bottom to at least the map's height.
   func cameraForLatLngBounds(
     _ bindingArg0: LatLngBounds,
     fitOptions bindingArg1: CameraFitOptions? = nil
@@ -86,6 +98,12 @@ public extension MapHandle {
   ///
   /// See `mln_map_camera_for_lat_lngs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+  ///   for the area: its left and right add up to at least the map's width, or
+  ///   its top and bottom to at least the map's height.
   func cameraForLatLngs(
     coordinates bindingArg0: [LatLng],
     fitOptions bindingArg2: CameraFitOptions? = nil
@@ -155,6 +173,104 @@ public extension MapHandle {
     try await nativeCommand { raw, _, completion, diagnostic in
       mln_map_dump_debug_logs(
         raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+  /// with an animation.
+  ///
+  /// `geometry` is a GeoJSON geometry object with at least one coordinate, not
+  /// a feature. The map computes the camera when it runs the command, from the
+  /// camera and size that earlier commands leave, as
+  /// `MapHandle.cameraForGeometry()` would then. The function finishes when the
+  /// map applies the change, before an animation ends.
+  ///
+  /// See `mln_map_fit_camera_to_geometry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `update` leaves no room for
+  ///   the area: its left and right add up to at least the map's width, or its
+  ///   top and bottom to at least the map's height. The camera doesn't move.
+  @discardableResult
+  func fitCameraToGeometry(
+    _ bindingArg0: String,
+    update bindingArg1: CameraFitUpdate
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      try mln_map_fit_camera_to_geometry(
+        raw,
+        arena.view(bindingArg0),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Moves the camera to fit `bounds` in the map's view, at once or with an
+  /// animation.
+  ///
+  /// The map computes the camera when it runs the command, from the camera and
+  /// size that earlier commands leave, as `MapHandle.cameraForLatLngBounds()`
+  /// would then. The function finishes when the map applies the change, before
+  /// an animation ends.
+  ///
+  /// See `mln_map_fit_camera_to_lat_lng_bounds` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `update` leaves no room for
+  ///   the area: its left and right add up to at least the map's width, or its
+  ///   top and bottom to at least the map's height. The camera doesn't move.
+  @discardableResult
+  func fitCameraToLatLngBounds(
+    _ bindingArg0: LatLngBounds,
+    update bindingArg1: CameraFitUpdate
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      try mln_map_fit_camera_to_lat_lng_bounds(
+        raw,
+        bindingArg0.nativeValue(),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Moves the camera to fit `coordinates` in the map's view, at once or with
+  /// an animation.
+  ///
+  /// `coordinates` must not be empty. The map computes the camera when it runs
+  /// the command, from the camera and size that earlier commands leave, as
+  /// `MapHandle.cameraForLatLngs()` would then. The function finishes when the
+  /// map applies the change, before an animation ends.
+  ///
+  /// See `mln_map_fit_camera_to_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the padding in `update` leaves no room for
+  ///   the area: its left and right add up to at least the map's width, or its
+  ///   top and bottom to at least the map's height. The camera doesn't move.
+  @discardableResult
+  func fitCameraToLatLngs(
+    coordinates bindingArg0: [LatLng],
+    update bindingArg2: CameraFitUpdate
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      try mln_map_fit_camera_to_lat_lngs(
+        raw,
+        arena.array(bindingArg0.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg0.count),
+        arena.store(bindingArg2.nativeValue(arena: arena)),
         completion,
         diagnostic
       )
@@ -408,6 +524,55 @@ public extension MapHandleDiscarding {
       nil,
       diagnostic
     ) }
+  }
+
+  func fitCameraToGeometry(
+    _ bindingArg0: String,
+    update bindingArg1: CameraFitUpdate
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_map_fit_camera_to_geometry(
+          raw,
+          arena.view(bindingArg0),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func fitCameraToLatLngBounds(
+    _ bindingArg0: LatLngBounds,
+    update bindingArg1: CameraFitUpdate
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_map_fit_camera_to_lat_lng_bounds(
+          raw,
+          bindingArg0.nativeValue(),
+          arena.store(bindingArg1.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func fitCameraToLatLngs(
+    coordinates bindingArg0: [LatLng],
+    update bindingArg2: CameraFitUpdate
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        try mln_map_fit_camera_to_lat_lngs(
+          raw,
+          arena.array(bindingArg0.map { $0.nativeValue() }),
+          NativeInputArena.count(bindingArg0.count),
+          arena.store(bindingArg2.nativeValue(arena: arena)),
+          nil,
+          diagnostic
+        )
+      }
   }
 
   func setBounds(options bindingArg0: BoundOptions) throws {

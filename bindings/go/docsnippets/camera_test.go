@@ -110,20 +110,9 @@ func camera(ctx context.Context, m *maplibre.MapHandle) error {
 		Southwest: maplibre.LatLng{Latitude: 45.8, Longitude: 5.9},
 		Northeast: maplibre.LatLng{Latitude: 47.8, Longitude: 10.5},
 	}
-	// nil fit options use the defaults.
-	fit, err := m.CameraForLatLngBounds(bounds, nil)
-	if err != nil {
-		return err
-	}
-	fitted, err := fit.Await(ctx)
-	if err != nil {
-		return err
-	}
-
 	easeDuration := 500.0
-	err = m.Discarding().UpdateCamera(maplibre.CameraUpdate{
+	err = m.Discarding().FitCameraToLatLngBounds(bounds, maplibre.CameraFitUpdate{
 		Mode:      maplibre.CameraUpdateModeEase,
-		Camera:    fitted,
 		Animation: maplibre.AnimationOptions{DurationMs: &easeDuration},
 	})
 	if err != nil {

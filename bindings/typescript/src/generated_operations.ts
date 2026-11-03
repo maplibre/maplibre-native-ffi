@@ -5,6 +5,7 @@ import type {
   BoundOptions,
   CameraDelta,
   CameraFitOptions,
+  CameraFitUpdate,
   CameraOptions,
   CameraQueryResult,
   CameraTransitionHandler,
@@ -1209,6 +1210,12 @@ export class MapHandle extends Owner {
    *
    * See `mln_map_camera_for_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+   *   for the area: its left and right add up to at least the map's width, or
+   *   its top and bottom to at least the map's height.
    */
   cameraForGeometry(
     geometry: unknown,
@@ -1232,6 +1239,12 @@ export class MapHandle extends Owner {
    *
    * See `mln_map_camera_for_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+   *   for the area: its left and right add up to at least the map's width, or
+   *   its top and bottom to at least the map's height.
    */
   cameraForLatLngBounds(
     bounds: LatLngBounds = {},
@@ -1256,6 +1269,12 @@ export class MapHandle extends Owner {
    *
    * See `mln_map_camera_for_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
+   *   for the area: its left and right add up to at least the map's width, or
+   *   its top and bottom to at least the map's height.
    */
   cameraForLatLngs(
     coordinates: readonly LatLng[],
@@ -1357,6 +1376,112 @@ export class MapHandle extends Owner {
   endCommandGroup(): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_end_command_group(this.id, completion),
+    );
+  }
+
+  /**
+   * Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+   * with an animation.
+   *
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+   * feature. The map computes the camera when it runs the command, from the
+   * camera and size that earlier commands leave, as
+   * `MapHandle.cameraForGeometry()` would then. The function finishes when the
+   * map applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_geometry` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the padding in `update` leaves no room for
+   *   the area: its left and right add up to at least the map's width, or its
+   *   top and bottom to at least the map's height. The camera doesn't move.
+   */
+  fitCameraToGeometry(
+    geometry: unknown,
+    update: CameraFitUpdate = {},
+  ): Promise<CommandCompletion> {
+    return withRegistrations((registrations) =>
+      command((completion) => {
+        native.mln_map_fit_camera_to_geometry(
+          this.id,
+          geometry,
+          update,
+          completion,
+        );
+        registrations.commit(rootsOf(this));
+      }),
+    );
+  }
+
+  /**
+   * Moves the camera to fit `bounds` in the map's view, at once or with an
+   * animation.
+   *
+   * The map computes the camera when it runs the command, from the camera and
+   * size that earlier commands leave, as `MapHandle.cameraForLatLngBounds()`
+   * would then. The function finishes when the map applies the change, before
+   * an animation ends.
+   *
+   * See `mln_map_fit_camera_to_lat_lng_bounds` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the padding in `update` leaves no room for
+   *   the area: its left and right add up to at least the map's width, or its
+   *   top and bottom to at least the map's height. The camera doesn't move.
+   */
+  fitCameraToLatLngBounds(
+    bounds: LatLngBounds = {},
+    update: CameraFitUpdate = {},
+  ): Promise<CommandCompletion> {
+    return withRegistrations((registrations) =>
+      command((completion) => {
+        native.mln_map_fit_camera_to_lat_lng_bounds(
+          this.id,
+          bounds,
+          update,
+          completion,
+        );
+        registrations.commit(rootsOf(this));
+      }),
+    );
+  }
+
+  /**
+   * Moves the camera to fit `coordinates` in the map's view, at once or with an
+   * animation.
+   *
+   * `coordinates` must not be empty. The map computes the camera when it runs
+   * the command, from the camera and size that earlier commands leave, as
+   * `MapHandle.cameraForLatLngs()` would then. The function finishes when the
+   * map applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the padding in `update` leaves no room for
+   *   the area: its left and right add up to at least the map's width, or its
+   *   top and bottom to at least the map's height. The camera doesn't move.
+   */
+  fitCameraToLatLngs(
+    coordinates: readonly LatLng[],
+    update: CameraFitUpdate = {},
+  ): Promise<CommandCompletion> {
+    return withRegistrations((registrations) =>
+      command((completion) => {
+        native.mln_map_fit_camera_to_lat_lngs(
+          this.id,
+          coordinates,
+          update,
+          completion,
+        );
+        registrations.commit(rootsOf(this));
+      }),
     );
   }
 
@@ -2730,6 +2855,85 @@ export class MapHandleDiscarding {
    */
   endCommandGroup(): void {
     native.mln_map_end_command_group(this.#owner.id, undefined);
+  }
+
+  /**
+   * Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+   * with an animation.
+   *
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+   * feature. The map computes the camera when it runs the command, from the
+   * camera and size that earlier commands leave, as
+   * `MapHandle.cameraForGeometry()` would then. The function finishes when the
+   * map applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_geometry` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  fitCameraToGeometry(geometry: unknown, update: CameraFitUpdate = {}): void {
+    withRegistrations((registrations) => {
+      native.mln_map_fit_camera_to_geometry(
+        this.#owner.id,
+        geometry,
+        update,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+
+  /**
+   * Moves the camera to fit `bounds` in the map's view, at once or with an
+   * animation.
+   *
+   * The map computes the camera when it runs the command, from the camera and
+   * size that earlier commands leave, as `MapHandle.cameraForLatLngBounds()`
+   * would then. The function finishes when the map applies the change, before
+   * an animation ends.
+   *
+   * See `mln_map_fit_camera_to_lat_lng_bounds` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  fitCameraToLatLngBounds(
+    bounds: LatLngBounds = {},
+    update: CameraFitUpdate = {},
+  ): void {
+    withRegistrations((registrations) => {
+      native.mln_map_fit_camera_to_lat_lng_bounds(
+        this.#owner.id,
+        bounds,
+        update,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+
+  /**
+   * Moves the camera to fit `coordinates` in the map's view, at once or with an
+   * animation.
+   *
+   * `coordinates` must not be empty. The map computes the camera when it runs
+   * the command, from the camera and size that earlier commands leave, as
+   * `MapHandle.cameraForLatLngs()` would then. The function finishes when the
+   * map applies the change, before an animation ends.
+   *
+   * See `mln_map_fit_camera_to_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  fitCameraToLatLngs(
+    coordinates: readonly LatLng[],
+    update: CameraFitUpdate = {},
+  ): void {
+    withRegistrations((registrations) => {
+      native.mln_map_fit_camera_to_lat_lngs(
+        this.#owner.id,
+        coordinates,
+        update,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
   }
 
   /**

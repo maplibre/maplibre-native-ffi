@@ -1639,16 +1639,10 @@ auto validate_animation_options(const mln_animation_options* animation)
   return MLN_STATUS_OK;
 }
 
-auto validate_camera_fit_options(const mln_camera_fit_options* options)
+// Validates the members of fit options, whose size its container versions
+// when it is embedded.
+auto validate_camera_fit_fields(const mln_camera_fit_options* options)
   -> mln_status {
-  if (options == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (options->size < sizeof(mln_camera_fit_options)) {
-    mln::core::set_thread_error("mln_camera_fit_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_CAMERA_FIT_OPTION_PADDING) |
     MLN_CAMERA_FIT_OPTION_BEARING | MLN_CAMERA_FIT_OPTION_PITCH;
@@ -1674,6 +1668,33 @@ auto validate_camera_fit_options(const mln_camera_fit_options* options)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
+}
+
+auto validate_camera_fit_options(const mln_camera_fit_options* options)
+  -> mln_status {
+  if (options == nullptr) {
+    return MLN_STATUS_OK;
+  }
+  if (options->size < sizeof(mln_camera_fit_options)) {
+    mln::core::set_thread_error("mln_camera_fit_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return validate_camera_fit_fields(options);
+}
+
+auto validate_camera_fit_update(const mln_camera_fit_update* update)
+  -> mln_status {
+  if (update == nullptr || update->size < sizeof(mln_camera_fit_update)) {
+    mln::core::set_thread_error("camera fit update must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (update->mode > MLN_CAMERA_UPDATE_MODE_FLY) {
+    mln::core::set_thread_error("camera fit update mode is invalid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto fit_status = validate_camera_fit_fields(&update->fit);
+  if (fit_status != MLN_STATUS_OK) return fit_status;
+  return validate_animation_options(&update->animation);
 }
 
 auto validate_bound_options(const mln_bound_options* options) -> mln_status {
@@ -2391,6 +2412,46 @@ auto camera_fit_pitch(const mln_camera_fit_options* options)
     return std::nullopt;
   }
   return options->pitch;
+}
+
+// An area that a camera fit frames.
+using CameraFitArea = std::variant<
+  mln::LatLngBounds, std::vector<mln::LatLng>, mln::Geometry<double>>;
+
+// Computes the camera that fits `area` in the map's view. MapLibre logs an
+// error and keeps the zoom when the padding leaves no room for the area, so
+// the fit rejects that padding first.
+auto camera_for_area(
+  const mln::Map& map, const CameraFitArea& area,
+  const mln_camera_fit_options* options, mln::CameraOptions& out_camera
+) -> mln_status {
+  const auto padding = camera_fit_padding(options);
+  const auto size = map.getTransformState().getSize();
+  if (
+    padding.left() + padding.right() >= size.width ||
+    padding.top() + padding.bottom() >= size.height
+  ) {
+    mln::core::set_thread_error(
+      "camera fit padding must be less than the map's width and height"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto bearing = camera_fit_bearing(options);
+  const auto pitch = camera_fit_pitch(options);
+  out_camera = std::visit(
+    [&](const auto& value) -> mln::CameraOptions {
+      using Area = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<Area, mln::LatLngBounds>) {
+        return map.cameraForLatLngBounds(value, padding, bearing, pitch);
+      } else if constexpr (std::is_same_v<Area, std::vector<mln::LatLng>>) {
+        return map.cameraForLatLngs(value, padding, bearing, pitch);
+      } else {
+        return map.cameraForGeometry(value, padding, bearing, pitch);
+      }
+    },
+    area
+  );
+  return MLN_STATUS_OK;
 }
 
 auto to_native_debug_flags(uint32_t flags) -> mln::MapDebugOptions {
@@ -4330,6 +4391,8 @@ auto map_set_event_mask(
 
 namespace {
 
+// Submits a camera command. A mutation that returns a status fails the command
+// with it.
 template <typename Mutation>
 auto submit_camera_command(
   mln_map map, Mutation mutation, const mln_completion* completion
@@ -4338,8 +4401,14 @@ auto submit_camera_command(
     map,
     [mutation = std::move(mutation)](MapObject& live) mutable -> mln_status {
       live.snapshot_camera_dirty = true;
-      mutation(live);
-      return MLN_STATUS_OK;
+      if constexpr (
+        std::is_void_v<std::invoke_result_t<Mutation&, MapObject&>>
+      ) {
+        mutation(live);
+        return MLN_STATUS_OK;
+      } else {
+        return mutation(live);
+      }
     },
     completion
   );
@@ -4368,6 +4437,43 @@ auto apply_gesture_phase_after(MapObject& live, mln_gesture_phase phase)
   if (phase == MLN_GESTURE_PHASE_END || phase == MLN_GESTURE_PHASE_CANCEL) {
     live.map->setGestureInProgress(false);
   }
+}
+
+// Moves the camera for a camera command, to the camera that `target` resolves
+// on the worker. The command's animation is built before `target` runs, so a
+// target that fails ends the command as cancelled.
+template <typename Target>
+auto move_camera(
+  MapObject& live, mln_camera_update_mode mode,
+  const mln_animation_options& options, mln_gesture_phase gesture_phase,
+  const std::shared_ptr<CameraTransitionEnd>& end, Target&& target
+) -> mln_status {
+  const auto animation = to_native_animation(live.event_state, options, end);
+  auto camera = mln::CameraOptions{};
+  const auto status = std::invoke(std::forward<Target>(target), camera);
+  if (status != MLN_STATUS_OK) return status;
+  apply_gesture_phase_before(live, gesture_phase);
+  {
+    const auto replacing = TransitionReplacementScope{*live.event_state, end};
+    switch (mode) {
+      case MLN_CAMERA_UPDATE_MODE_JUMP:
+        // MapLibre gives a jump no animation options, so the jump ends its
+        // command here, as soon as it applies.
+        live.map->jumpTo(camera);
+        if (animation.transitionFinishFn) animation.transitionFinishFn();
+        break;
+      case MLN_CAMERA_UPDATE_MODE_EASE:
+        live.map->easeTo(camera, animation);
+        break;
+      case MLN_CAMERA_UPDATE_MODE_FLY:
+        live.map->flyTo(camera, animation);
+        break;
+      default:
+        break;
+    }
+  }
+  apply_gesture_phase_after(live, gesture_phase);
+  return MLN_STATUS_OK;
 }
 
 }  // namespace
@@ -4399,33 +4505,14 @@ auto map_update_camera(
     copied.animation, [&](const auto& end) -> mln_status {
       return submit_camera_command(
         map,
-        [copied, end](MapObject& live) -> void {
-          const auto animation =
-            to_native_animation(live.event_state, copied.animation, end);
-          apply_gesture_phase_before(live, copied.gesture_phase);
-          {
-            const auto replacing =
-              TransitionReplacementScope{*live.event_state, end};
-            switch (copied.mode) {
-              case MLN_CAMERA_UPDATE_MODE_JUMP:
-                // MapLibre gives a jump no animation options, so the jump ends
-                // its command here, as soon as it applies.
-                live.map->jumpTo(to_native_camera(copied.camera));
-                if (animation.transitionFinishFn) {
-                  animation.transitionFinishFn();
-                }
-                break;
-              case MLN_CAMERA_UPDATE_MODE_EASE:
-                live.map->easeTo(to_native_camera(copied.camera), animation);
-                break;
-              case MLN_CAMERA_UPDATE_MODE_FLY:
-                live.map->flyTo(to_native_camera(copied.camera), animation);
-                break;
-              default:
-                break;
+        [copied, end](MapObject& live) -> mln_status {
+          return move_camera(
+            live, copied.mode, copied.animation, copied.gesture_phase, end,
+            [&copied](mln::CameraOptions& camera) -> mln_status {
+              camera = to_native_camera(copied.camera);
+              return MLN_STATUS_OK;
             }
-          }
-          apply_gesture_phase_after(live, copied.gesture_phase);
+          );
         },
         completion
       );
@@ -5055,6 +5142,21 @@ auto validate_camera_output(mln_camera_options* out_camera) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+namespace {
+
+auto fit_camera_output(
+  const MapObject& live, const CameraFitArea& area,
+  const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
+) -> mln_status {
+  auto camera = mln::CameraOptions{};
+  const auto status = camera_for_area(*live.map, area, fit_options, camera);
+  if (status != MLN_STATUS_OK) return status;
+  *out_camera = from_native_camera(camera);
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
 auto map_camera_for_lat_lng_bounds(
   MapObject& live, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
@@ -5072,11 +5174,9 @@ auto map_camera_for_lat_lng_bounds(
     return output_status;
   }
 
-  *out_camera = from_native_camera(live.map->cameraForLatLngBounds(
-    to_native_lat_lng_bounds(bounds), camera_fit_padding(fit_options),
-    camera_fit_bearing(fit_options), camera_fit_pitch(fit_options)
-  ));
-  return MLN_STATUS_OK;
+  return fit_camera_output(
+    live, to_native_lat_lng_bounds(bounds), fit_options, out_camera
+  );
 }
 
 auto map_camera_for_lat_lngs(
@@ -5097,12 +5197,10 @@ auto map_camera_for_lat_lngs(
     return output_status;
   }
 
-  *out_camera = from_native_camera(live.map->cameraForLatLngs(
-    to_native_lat_lngs(coordinates, coordinate_count),
-    camera_fit_padding(fit_options), camera_fit_bearing(fit_options),
-    camera_fit_pitch(fit_options)
-  ));
-  return MLN_STATUS_OK;
+  return fit_camera_output(
+    live, to_native_lat_lngs(coordinates, coordinate_count), fit_options,
+    out_camera
+  );
 }
 
 auto map_camera_for_geometry(
@@ -5126,11 +5224,9 @@ auto map_camera_for_geometry(
     return output_status;
   }
 
-  *out_camera = from_native_camera(live.map->cameraForGeometry(
-    *native_geometry, camera_fit_padding(fit_options),
-    camera_fit_bearing(fit_options), camera_fit_pitch(fit_options)
-  ));
-  return MLN_STATUS_OK;
+  return fit_camera_output(
+    live, std::move(*native_geometry), fit_options, out_camera
+  );
 }
 
 auto map_lat_lng_bounds_for_camera(
@@ -5241,6 +5337,74 @@ auto map_camera_for_geometry_start(
     },
     completion
   );
+}
+
+namespace {
+
+auto submit_camera_fit(
+  mln_map map, CameraFitArea area, const mln_camera_fit_update& update,
+  const mln_completion* completion
+) -> mln_status {
+  return submit_with_transition_end(
+    update.animation, [&](const auto& end) -> mln_status {
+      return submit_camera_command(
+        map,
+        [area = std::move(area), update, end](MapObject& live) -> mln_status {
+          return move_camera(
+            live, update.mode, update.animation, MLN_GESTURE_PHASE_NONE, end,
+            [&](mln::CameraOptions& camera) -> mln_status {
+              return camera_for_area(*live.map, area, &update.fit, camera);
+            }
+          );
+        },
+        completion
+      );
+    }
+  );
+}
+
+}  // namespace
+
+auto map_fit_camera_to_lat_lng_bounds(
+  mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_update* update,
+  const mln_completion* completion
+) -> mln_status {
+  const auto bounds_status = validate_lat_lng_bounds(bounds);
+  if (bounds_status != MLN_STATUS_OK) return bounds_status;
+  const auto update_status = validate_camera_fit_update(update);
+  if (update_status != MLN_STATUS_OK) return update_status;
+  return submit_camera_fit(
+    map, to_native_lat_lng_bounds(bounds), *update, completion
+  );
+}
+
+auto map_fit_camera_to_lat_lngs(
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  const mln_camera_fit_update* update, const mln_completion* completion
+) -> mln_status {
+  const auto coordinates_status =
+    validate_lat_lng_array(coordinates, coordinate_count, false);
+  if (coordinates_status != MLN_STATUS_OK) return coordinates_status;
+  const auto update_status = validate_camera_fit_update(update);
+  if (update_status != MLN_STATUS_OK) return update_status;
+  return submit_camera_fit(
+    map, to_native_lat_lngs(coordinates, coordinate_count), *update, completion
+  );
+}
+
+auto map_fit_camera_to_geometry(
+  mln_map map, mln_buffer_view geometry, const mln_camera_fit_update* update,
+  const mln_completion* completion
+) -> mln_status {
+  auto parsed = to_native_geometry(geometry);
+  if (!parsed) return MLN_STATUS_INVALID_ARGUMENT;
+  if (geometry_lat_lngs(*parsed).empty()) {
+    set_thread_error("geometry must contain at least one coordinate");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto update_status = validate_camera_fit_update(update);
+  if (update_status != MLN_STATUS_OK) return update_status;
+  return submit_camera_fit(map, std::move(*parsed), *update, completion);
 }
 
 auto map_lat_lng_bounds_for_camera_start(

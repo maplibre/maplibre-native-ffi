@@ -364,6 +364,34 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_fit_camera_to_geometry(
+    map: Long,
+    geometry: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_fit_camera_to_lat_lng_bounds(
+    map: Long,
+    bounds: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_fit_camera_to_lat_lngs(
+    map: Long,
+    coordinates: Long,
+    coordinateCount: Long,
+    update: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int
 
   @JvmStatic

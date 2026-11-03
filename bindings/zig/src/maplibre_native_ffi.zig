@@ -490,6 +490,12 @@ pub const Map = struct {
     ///
     /// See `mln_map_camera_for_geometry` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the padding in `fit_options` leaves no room
+    ///   for the area: its left and right add up to at least the map's width, or
+    ///   its top and bottom to at least the map's height.
     pub fn cameraForGeometry(self: Map, geometry: []const u8, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
         return call.submit("mln_map_camera_for_geometry", .handle, self, call.value(CameraOptions, c.mln_camera_options), null, diagnostic, .{ geometry, fit_options });
     }
@@ -501,6 +507,12 @@ pub const Map = struct {
     ///
     /// See `mln_map_camera_for_lat_lng_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the padding in `fit_options` leaves no room
+    ///   for the area: its left and right add up to at least the map's width, or
+    ///   its top and bottom to at least the map's height.
     pub fn cameraForLatLngBounds(self: Map, bounds: LatLngBounds, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
         return call.submit("mln_map_camera_for_lat_lng_bounds", .handle, self, call.value(CameraOptions, c.mln_camera_options), null, diagnostic, .{ bounds, fit_options });
     }
@@ -513,6 +525,12 @@ pub const Map = struct {
     ///
     /// See `mln_map_camera_for_lat_lngs` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the padding in `fit_options` leaves no room
+    ///   for the area: its left and right add up to at least the map's width, or
+    ///   its top and bottom to at least the map's height.
     pub fn cameraForLatLngs(self: Map, allocator: std.mem.Allocator, coordinates: []const LatLng, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
         return call.submit("mln_map_camera_for_lat_lngs", .handle, self, call.value(CameraOptions, c.mln_camera_options), allocator, diagnostic, .{ coordinates, coordinates.len, fit_options });
     }
@@ -566,6 +584,67 @@ pub const Map = struct {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn endCommandGroup(self: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_end_command_group", .handle, self, call.command, null, diagnostic, .{});
+    }
+
+    /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+    /// with an animation.
+    ///
+    /// `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+    /// feature. The map computes the camera when it runs the command, from the
+    /// camera and size that earlier commands leave, as `Map.cameraForGeometry()`
+    /// would then. The function finishes when the map applies the change, before an
+    /// animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_geometry` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the padding in `update` leaves no room for
+    ///   the area: its left and right add up to at least the map's width, or its
+    ///   top and bottom to at least the map's height. The camera doesn't move.
+    pub fn fitCameraToGeometry(self: Map, geometry: []const u8, update: CameraFitUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_fit_camera_to_geometry", .handle, self, call.command, null, diagnostic, .{ geometry, update });
+    }
+
+    /// Moves the camera to fit `bounds` in the map's view, at once or with an
+    /// animation.
+    ///
+    /// The map computes the camera when it runs the command, from the camera and
+    /// size that earlier commands leave, as `Map.cameraForLatLngBounds()` would
+    /// then. The function finishes when the map applies the change, before an
+    /// animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_lat_lng_bounds` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the padding in `update` leaves no room for
+    ///   the area: its left and right add up to at least the map's width, or its
+    ///   top and bottom to at least the map's height. The camera doesn't move.
+    pub fn fitCameraToLatLngBounds(self: Map, bounds: LatLngBounds, update: CameraFitUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_fit_camera_to_lat_lng_bounds", .handle, self, call.command, null, diagnostic, .{ bounds, update });
+    }
+
+    /// Moves the camera to fit `coordinates` in the map's view, at once or with an
+    /// animation.
+    ///
+    /// `coordinates` must not be empty. The map computes the camera when it runs
+    /// the command, from the camera and size that earlier commands leave, as
+    /// `Map.cameraForLatLngs()` would then. The function finishes when the map
+    /// applies the change, before an animation ends.
+    ///
+    /// See `mln_map_fit_camera_to_lat_lngs` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the padding in `update` leaves no room for
+    ///   the area: its left and right add up to at least the map's width, or its
+    ///   top and bottom to at least the map's height. The camera doesn't move.
+    pub fn fitCameraToLatLngs(self: Map, allocator: std.mem.Allocator, coordinates: []const LatLng, update: CameraFitUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_fit_camera_to_lat_lngs", .handle, self, call.command, allocator, diagnostic, .{ coordinates, coordinates.len, update });
     }
 
     /// Reads the map's camera.
@@ -2673,6 +2752,36 @@ pub const CameraFitOptions = struct {
     }
 };
 
+/// A camera change that fits an area, for `Map.fitCameraToLatLngBounds()` and
+/// the other fit commands.
+///
+/// A jump uses only the end handler of `animation`, and the handler runs as
+/// soon as the camera moves.
+///
+/// See `mln_camera_fit_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraFitUpdate = struct {
+    mode: CameraUpdateMode = .jump,
+    fit: CameraFitOptions = .{},
+    animation: AnimationOptions = .{},
+    pub fn toNative(self: CameraFitUpdate, roots: *callbacks.Roots) status.Error!c.mln_camera_fit_update {
+        var raw = std.mem.zeroes(c.mln_camera_fit_update);
+        raw.size = @sizeOf(c.mln_camera_fit_update);
+        raw.mode = self.mode.toNative();
+        raw.fit = self.fit.toNative();
+        raw.animation = try self.animation.toNative(roots);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_camera_fit_update) status.Error!CameraFitUpdate {
+        return .{
+            .mode = CameraUpdateMode.fromNative(raw.mode),
+            .fit = CameraFitOptions.fromNative(raw.fit),
+            .animation = try AnimationOptions.fromNative(allocator, raw.animation),
+        };
+    }
+};
+
 /// A camera, with only the members that `fields` selects.
 ///
 /// See `mln_camera_options` in the
@@ -2832,7 +2941,8 @@ pub const CameraTransitionOutcome = enum(u32) {
     /// `Map.cancelCameraTransitions()`, `Map.cancelCameraTransitionsWithId()`,
     /// a gesture's `GesturePhase.begin` or `GesturePhase.cancel`,
     /// `Map.setFreeCameraOptions()`, or a resize that moves the camera back
-    /// inside its bounds stopped the change.
+    /// inside its bounds stopped the change, or the command failed before it
+    /// moved the camera.
     cancelled = 1,
     /// The map closed before the change ended.
     closed = 2,
@@ -2881,7 +2991,7 @@ pub const CameraUpdate = struct {
     }
 };
 
-/// How `Map.updateCamera()` moves the camera.
+/// How a camera command moves the camera.
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -7872,6 +7982,21 @@ pub const MapDiscarding = struct {
     pub fn endCommandGroup(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_end_command_group", .handle, map, null, diagnostic, .{});
+    }
+
+    pub fn fitCameraToGeometry(self: MapDiscarding, geometry: []const u8, update: CameraFitUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_fit_camera_to_geometry", .handle, map, null, diagnostic, .{ geometry, update });
+    }
+
+    pub fn fitCameraToLatLngBounds(self: MapDiscarding, bounds: LatLngBounds, update: CameraFitUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_fit_camera_to_lat_lng_bounds", .handle, map, null, diagnostic, .{ bounds, update });
+    }
+
+    pub fn fitCameraToLatLngs(self: MapDiscarding, allocator: std.mem.Allocator, coordinates: []const LatLng, update: CameraFitUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_fit_camera_to_lat_lngs", .handle, map, allocator, diagnostic, .{ coordinates, coordinates.len, update });
     }
 
     pub fn invalidateCustomGeometrySourceRegion(self: MapDiscarding, source_id: []const u8, bounds: LatLngBounds, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

@@ -257,7 +257,7 @@ class CameraTransitionOutcome(UnknownIntEnum):
 
 
 class CameraUpdateMode(UnknownIntEnum):
-    """How `MapHandle.update_camera()` moves the camera.
+    """How a camera command moves the camera.
 
     See `mln_camera_update_mode` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1224,6 +1224,33 @@ class CameraFitOptions:
             padding=_maybe(EdgeInsets._from_native, raw["padding"]),
             bearing=raw["bearing"],
             pitch=raw["pitch"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CameraFitUpdate:
+    """A camera change that fits an area, for
+    `MapHandle.fit_camera_to_lat_lng_bounds()` and the other fit commands.
+
+    A jump uses only the end handler of `animation`, and the handler runs as
+    soon as the camera moves.
+
+    See `mln_camera_fit_update` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    mode: CameraUpdateMode = CameraUpdateMode.JUMP
+
+    fit: CameraFitOptions = field(default_factory=lambda: CameraFitOptions())
+
+    animation: AnimationOptions = field(default_factory=lambda: AnimationOptions())
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            mode=CameraUpdateMode(raw["mode"]),
+            fit=CameraFitOptions._from_native(raw["fit"]),
+            animation=AnimationOptions._from_native(raw["animation"]),
         )
 
 

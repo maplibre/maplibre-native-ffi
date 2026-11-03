@@ -400,6 +400,47 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()`
+/// and the other fit commands.
+///
+/// A jump uses only the end handler of `animation`, and the handler runs as
+/// soon as the camera moves.
+///
+/// See `mln_camera_fit_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraFitUpdate: Sendable {
+  public var mode: CameraUpdateMode
+  public var fit: CameraFitOptions
+  public var animation: AnimationOptions
+  public init(
+    mode: CameraUpdateMode = .init(rawValue: 0),
+    fit: CameraFitOptions = .init(),
+    animation: AnimationOptions = .init()
+  ) {
+    self.mode = mode
+    self.fit = fit
+    self.animation = animation
+  }
+
+  init(
+    raw: mln_camera_fit_update,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    mode = CameraUpdateMode(rawValue: raw.mode.rawValue)
+    fit = CameraFitOptions(raw: raw.fit)
+    animation = try AnimationOptions(raw: raw.animation)
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_camera_fit_update {
+    var raw = mln_camera_fit_update()
+    raw.size = UInt32(MemoryLayout<mln_camera_fit_update>.size)
+    raw.mode = mln_camera_update_mode(rawValue: mode.rawValue)
+    raw.fit = fit.nativeValue()
+    raw.animation = try animation.nativeValue(arena: arena)
+    return raw
+  }
+}
+
 /// A camera, with only the members that `fields` selects.
 ///
 /// See `mln_camera_options` in the
@@ -618,7 +659,8 @@ public struct CameraTransitionOutcome: RawRepresentable,
   /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
   /// `GesturePhase.begin` or `GesturePhase.cancel`,
   /// `MapHandle.setFreeCameraOptions()`, or a resize that moves the camera back
-  /// inside its bounds stopped the change.
+  /// inside its bounds stopped the change, or the command failed before it
+  /// moved the camera.
   public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
   /// The map closed before the change ended.
   public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
@@ -686,7 +728,7 @@ public struct CameraUpdate: Sendable {
   }
 }
 
-/// How `MapHandle.updateCamera()` moves the camera.
+/// How a camera command moves the camera.
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

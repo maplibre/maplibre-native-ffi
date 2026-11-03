@@ -130,6 +130,11 @@ MLN_API mln_status mln_map_get_camera(
  *
  * The camera keeps the map's bearing and pitch unless `fit_options` sets them,
  * and its zoom stays within the map's zoom limits.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the padding in `fit_options` leaves no
+ *   room for the area: its left and right add up to at least the map's width,
+ *   or its top and bottom to at least the map's height.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
@@ -144,6 +149,11 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
  * `coordinates` must not be empty. The camera keeps the map's bearing and pitch
  * unless `fit_options` sets them, and its zoom stays within the map's zoom
  * limits.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the padding in `fit_options` leaves no
+ *   room for the area: its left and right add up to at least the map's width,
+ *   or its top and bottom to at least the map's height.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lngs(
@@ -160,12 +170,81 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
  * feature. The camera keeps the map's bearing and pitch unless `fit_options`
  * sets them, and its zoom stays within the map's zoom limits.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the padding in `fit_options` leaves no
+ *   room for the area: its left and right add up to at least the map's width,
+ *   or its top and bottom to at least the map's height.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_geometry(
   mln_map map, mln_buffer_view geometry MLN_BINDING("encoding=json"),
   const mln_camera_fit_options* fit_options MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Moves the camera to fit `bounds` in the map's view, at once or with an
+ * animation.
+ *
+ * The map computes the camera when it runs the command, from the camera and
+ * size that earlier commands leave, as mln_map_camera_for_lat_lng_bounds()
+ * would then. The function finishes when the map applies the change, before an
+ * animation ends.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the padding in `update` leaves no room for
+ *   the area: its left and right add up to at least the map's width, or its
+ *   top and bottom to at least the map's height. The camera doesn't move.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_fit_camera_to_lat_lng_bounds(
+  mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_update* update,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Moves the camera to fit `coordinates` in the map's view, at once or with an
+ * animation.
+ *
+ * `coordinates` must not be empty. The map computes the camera when it runs the
+ * command, from the camera and size that earlier commands leave, as
+ * mln_map_camera_for_lat_lngs() would then. The function finishes when the map
+ * applies the change, before an animation ends.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the padding in `update` leaves no room for
+ *   the area: its left and right add up to at least the map's width, or its
+ *   top and bottom to at least the map's height. The camera doesn't move.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_fit_camera_to_lat_lngs(
+  mln_map map,
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count, const mln_camera_fit_update* update,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Moves the camera to fit a GeoJSON geometry in the map's view, at once or with
+ * an animation.
+ *
+ * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+ * feature. The map computes the camera when it runs the command, from the
+ * camera and size that earlier commands leave, as mln_map_camera_for_geometry()
+ * would then. The function finishes when the map applies the change, before an
+ * animation ends.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the padding in `update` leaves no room for
+ *   the area: its left and right add up to at least the map's width, or its
+ *   top and bottom to at least the map's height. The camera doesn't move.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_fit_camera_to_geometry(
+  mln_map map, mln_buffer_view geometry MLN_BINDING("encoding=json"),
+  const mln_camera_fit_update* update, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
