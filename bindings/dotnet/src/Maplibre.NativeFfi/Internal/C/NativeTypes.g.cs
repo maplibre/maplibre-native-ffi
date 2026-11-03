@@ -779,8 +779,8 @@ internal unsafe struct mln_rendered_query_geometry_data
 
 internal unsafe struct mln_rendering_stats
 {
-    public double encoding_time;
-    public double rendering_time;
+    public double encoding_time_ms;
+    public double rendering_time_ms;
     public long frame_count;
     public long draw_call_count;
     public long total_draw_call_count;

@@ -137,6 +137,8 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     sizeof(viewport.frustum_offset)
   );
 
+  // The engine's default is 60 degrees, which it keeps in radians.
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 60.0, snapshot.tile.lod_pitch_threshold);
   mln_map_tile_options tile = {.size = sizeof(mln_map_tile_options)};
   tile.fields =
     MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA |
@@ -146,7 +148,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
   tile.prefetch_zoom_delta = 3;
   tile.lod_min_radius = 2.5;
   tile.lod_scale = 1.5;
-  tile.lod_pitch_threshold = 0.75;
+  tile.lod_pitch_threshold = 45.0;
   tile.lod_zoom_shift = -1.25;
   tile.lod_mode = MLN_TILE_LOD_MODE_DISTANCE;
   for (size_t pass = 0; pass < 2; pass += 1) {
@@ -159,9 +161,7 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
     );
     TEST_ASSERT_EQUAL_DOUBLE(tile.lod_min_radius, snapshot.tile.lod_min_radius);
     TEST_ASSERT_EQUAL_DOUBLE(tile.lod_scale, snapshot.tile.lod_scale);
-    TEST_ASSERT_EQUAL_DOUBLE(
-      tile.lod_pitch_threshold, snapshot.tile.lod_pitch_threshold
-    );
+    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 45.0, snapshot.tile.lod_pitch_threshold);
     TEST_ASSERT_EQUAL_DOUBLE(tile.lod_zoom_shift, snapshot.tile.lod_zoom_shift);
     TEST_ASSERT_EQUAL_UINT32(tile.lod_mode, snapshot.tile.lod_mode);
     tile.fields = MLN_MAP_TILE_OPTION_LOD_MODE;
@@ -505,6 +505,46 @@ static void map_extent_snapshot_tracks_resize_and_keeps_scale_factor(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// The snapshot reports the LOD pitch threshold in degrees, converted from the
+// engine's radians. Sending that value back must not count as a change.
+static void reapplying_the_reported_lod_pitch_threshold_changes_nothing(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_tile_options tile = {
+    .size = sizeof(mln_map_tile_options),
+    .fields = MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD,
+    .lod_pitch_threshold = 75.0,
+  };
+
+  mln_map_snapshot snapshot = read_snapshot(map);
+  uint64_t render_update = snapshot.latest_render_update_generation;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_tile_options(map, &tile, &completion.descriptor, NULL)
+  );
+  MLN_TEST_OK(mln_test_map_fence(map));
+  snapshot = read_snapshot(map);
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    render_update, snapshot.latest_render_update_generation
+  );
+
+  render_update = snapshot.latest_render_update_generation;
+  tile.lod_pitch_threshold = snapshot.tile.lod_pitch_threshold;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_tile_options(map, &tile, &completion.descriptor, NULL)
+  );
+  MLN_TEST_OK(mln_test_map_fence(map));
+  snapshot = read_snapshot(map);
+  TEST_ASSERT_EQUAL_UINT64(
+    render_update, snapshot.latest_render_update_generation
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(
+    tile.lod_pitch_threshold, snapshot.tile.lod_pitch_threshold
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void resizes_apply_in_order_and_the_last_sets_the_extent(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -634,6 +674,7 @@ MLN_TEST_GROUP {
   RUN_TEST(every_option_command_round_trips_through_the_snapshot);
   RUN_TEST(option_descriptors_reject_what_they_cannot_express);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_keeps_scale_factor);
+  RUN_TEST(reapplying_the_reported_lod_pitch_threshold_changes_nothing);
   RUN_TEST(resizes_apply_in_order_and_the_last_sets_the_extent);
   RUN_TEST(generations_increase_across_submitting_threads);
 }

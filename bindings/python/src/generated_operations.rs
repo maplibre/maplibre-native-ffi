@@ -854,8 +854,14 @@ fn generated_copy_mln_rendering_stats(
     value: &sys::mln_rendering_stats,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("encoding_time", generated_value(py, value.encoding_time)?)?;
-    dict.set_item("rendering_time", generated_value(py, value.rendering_time)?)?;
+    dict.set_item(
+        "encoding_time_ms",
+        generated_value(py, value.encoding_time_ms)?,
+    )?;
+    dict.set_item(
+        "rendering_time_ms",
+        generated_value(py, value.rendering_time_ms)?,
+    )?;
     dict.set_item("frame_count", generated_value(py, value.frame_count)?)?;
     dict.set_item(
         "draw_call_count",

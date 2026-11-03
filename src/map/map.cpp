@@ -299,8 +299,9 @@ auto to_c_render_mode(mln::MapObserver::RenderMode mode) -> mln_render_mode {
 auto to_c_rendering_stats(const mln::gfx::RenderingStats& stats)
   -> mln_rendering_stats {
   return mln_rendering_stats{
-    .encoding_time = stats.encodingTime,
-    .rendering_time = stats.renderingTime,
+    // The engine measures these in seconds.
+    .encoding_time_ms = stats.encodingTime * 1000.0,
+    .rendering_time_ms = stats.renderingTime * 1000.0,
     .frame_count = stats.numFrames,
     .draw_call_count = stats.numDrawCalls,
     .total_draw_call_count = stats.totalDrawCalls
@@ -2941,7 +2942,9 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
        .prefetch_zoom_delta = live.map->getPrefetchZoomDelta(),
        .lod_min_radius = live.map->getTileLodMinRadius(),
        .lod_scale = live.map->getTileLodScale(),
-       .lod_pitch_threshold = live.map->getTileLodPitchThreshold(),
+       // The engine takes the threshold in radians.
+       .lod_pitch_threshold =
+         mln::util::rad2deg(live.map->getTileLodPitchThreshold()),
        .lod_zoom_shift = live.map->getTileLodZoomShift(),
        .lod_mode = from_native_tile_lod_mode(live.map->getTileLodMode())},
     .bounds = from_native_bound_options(live.map->getBounds()),
@@ -4739,8 +4742,17 @@ auto map_set_tile_options(MapObject& live, const mln_map_tile_options* options)
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0U) {
     live.map->setTileLodScale(options->lod_scale);
   }
-  if ((options->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U) {
-    live.map->setTileLodPitchThreshold(options->lod_pitch_threshold);
+  // Degrees don't round-trip through radians exactly, so the snapshot's value
+  // converts back to a slightly different angle. Keep the engine's value when
+  // a caller sends back what the snapshot reported, or the engine would redraw.
+  if (
+    (options->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U &&
+    options->lod_pitch_threshold !=
+      mln::util::rad2deg(live.map->getTileLodPitchThreshold())
+  ) {
+    live.map->setTileLodPitchThreshold(
+      mln::util::deg2rad(options->lod_pitch_threshold)
+    );
   }
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0U) {
     live.map->setTileLodZoomShift(options->lod_zoom_shift);

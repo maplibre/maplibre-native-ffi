@@ -67,7 +67,7 @@ import Testing
   frame.payload.render_frame.mode = MLN_RENDER_MODE_FULL
   frame.payload.render_frame.needs_repaint = true
   frame.payload.render_frame.stats.frame_count = 21
-  frame.payload.render_frame.stats.encoding_time = 0.5
+  frame.payload.render_frame.stats.encoding_time_ms = 0.5
 
   let events = try withSynthesizedEventBatch(
     events: [frame]
@@ -84,5 +84,5 @@ import Testing
   #expect(decodedFrame.needsRepaint)
   #expect(!decodedFrame.placementChanged)
   #expect(decodedFrame.stats.frameCount == 21)
-  #expect(decodedFrame.stats.encodingTime == 0.5)
+  #expect(decodedFrame.stats.encodingTimeMs == 0.5)
 }

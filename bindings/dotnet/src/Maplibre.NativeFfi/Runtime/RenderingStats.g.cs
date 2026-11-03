@@ -9,11 +9,11 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_rendering_stats</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="EncodingTime">
-/// The time that the frame took to encode, in seconds.
+/// <param name="EncodingTimeMs">
+/// The time that the frame took to encode, in milliseconds.
 /// </param>
-/// <param name="RenderingTime">
-/// The time that the frame took to render, in seconds.
+/// <param name="RenderingTimeMs">
+/// The time that the frame took to render, in milliseconds.
 /// </param>
 /// <param name="FrameCount">
 /// The frames rendered so far.
@@ -25,8 +25,8 @@ namespace Maplibre.NativeFfi;
 /// The draw calls in every frame so far.
 /// </param>
 public readonly partial record struct RenderingStats(
-    double EncodingTime,
-    double RenderingTime,
+    double EncodingTimeMs,
+    double RenderingTimeMs,
     long FrameCount,
     long DrawCallCount,
     long TotalDrawCallCount

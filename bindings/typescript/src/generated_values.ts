@@ -79,7 +79,13 @@ export interface BoundOptions {
   bounds?: LatLngBounds;
   minZoom?: number;
   maxZoom?: number;
+  /**
+   * The lowest pitch, in degrees.
+   */
   minPitch?: number;
+  /**
+   * The highest pitch, in degrees.
+   */
   maxPitch?: number;
   /**
    * Removes the area that limits the camera's center.
@@ -90,19 +96,35 @@ export interface BoundOptions {
 /**
  * A map's whole camera.
  *
- * Its members mean the same as those of `CameraOptions`.
- *
  * See `mln_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface Camera {
   center?: LatLng;
+  /**
+   * The altitude of the center, in meters above sea level.
+   */
   centerAltitude?: number;
+  /**
+   * Insets from the map's edges. The camera centers within the rest.
+   */
   padding?: EdgeInsets;
   zoom?: number;
+  /**
+   * The rotation from north, in degrees.
+   */
   bearing?: number;
+  /**
+   * The tilt toward the horizon, in degrees. 0 looks straight down.
+   */
   pitch?: number;
+  /**
+   * The roll, in degrees.
+   */
   roll?: number;
+  /**
+   * The vertical field of view, in degrees.
+   */
   fieldOfView?: number;
 }
 
@@ -165,7 +187,13 @@ export interface CameraFitOptions {
    * Space to leave between the area and each edge of the map.
    */
   padding?: EdgeInsets;
+  /**
+   * The rotation from north, in degrees.
+   */
   bearing?: number;
+  /**
+   * The tilt toward the horizon, in degrees.
+   */
   pitch?: number;
 }
 
@@ -979,7 +1007,7 @@ export interface MapTileOptions {
    */
   lodScale?: number;
   /**
-   * The pitch, in radians, above which the map lowers the detail.
+   * The pitch, in degrees, above which the map lowers the detail.
    */
   lodPitchThreshold?: number;
   /**
@@ -1998,13 +2026,13 @@ export type RenderedQueryGeometry =
  */
 export interface RenderingStats {
   /**
-   * The time that the frame took to encode, in seconds.
+   * The time that the frame took to encode, in milliseconds.
    */
-  readonly encodingTime: number;
+  readonly encodingTimeMs: number;
   /**
-   * The time that the frame took to render, in seconds.
+   * The time that the frame took to render, in milliseconds.
    */
-  readonly renderingTime: number;
+  readonly renderingTimeMs: number;
   /**
    * The frames rendered so far.
    */

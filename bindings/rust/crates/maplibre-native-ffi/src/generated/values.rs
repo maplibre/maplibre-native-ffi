@@ -81,7 +81,9 @@ pub struct BoundOptions {
     pub bounds: Option<LatLngBounds>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
+    /// The lowest pitch, in degrees.
     pub min_pitch: Option<f64>,
+    /// The highest pitch, in degrees.
     pub max_pitch: Option<f64>,
 }
 impl ToNative<sys::mln_bound_options> for BoundOptions {
@@ -134,19 +136,23 @@ impl FromNative<sys::mln_bound_options> for BoundOptions {
 
 /// A map's whole camera.
 ///
-/// Its members mean the same as those of `CameraOptions`.
-///
 /// See `mln_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Camera {
     pub center: LatLng,
+    /// The altitude of the center, in meters above sea level.
     pub center_altitude: f64,
+    /// Insets from the map's edges. The camera centers within the rest.
     pub padding: EdgeInsets,
     pub zoom: f64,
+    /// The rotation from north, in degrees.
     pub bearing: f64,
+    /// The tilt toward the horizon, in degrees. 0 looks straight down.
     pub pitch: f64,
+    /// The roll, in degrees.
     pub roll: f64,
+    /// The vertical field of view, in degrees.
     pub field_of_view: f64,
 }
 impl Camera {
@@ -277,7 +283,9 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
 pub struct CameraFitOptions {
     /// Space to leave between the area and each edge of the map.
     pub padding: Option<EdgeInsets>,
+    /// The rotation from north, in degrees.
     pub bearing: Option<f64>,
+    /// The tilt toward the horizon, in degrees.
     pub pitch: Option<f64>,
 }
 impl ToNative<sys::mln_camera_fit_options> for CameraFitOptions {
@@ -1891,7 +1899,7 @@ pub struct MapTileOptions {
     pub lod_min_radius: Option<f64>,
     /// Scales the distance to the view point. Above 1 lowers the detail.
     pub lod_scale: Option<f64>,
-    /// The pitch, in radians, above which the map lowers the detail.
+    /// The pitch, in degrees, above which the map lowers the detail.
     pub lod_pitch_threshold: Option<f64>,
     /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
     pub lod_zoom_shift: Option<f64>,
@@ -3561,10 +3569,10 @@ impl ToNative<sys::mln_rendered_query_geometry> for RenderedQueryGeometry {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderingStats {
-    /// The time that the frame took to encode, in seconds.
-    pub encoding_time: f64,
-    /// The time that the frame took to render, in seconds.
-    pub rendering_time: f64,
+    /// The time that the frame took to encode, in milliseconds.
+    pub encoding_time_ms: f64,
+    /// The time that the frame took to render, in milliseconds.
+    pub rendering_time_ms: f64,
     /// The frames rendered so far.
     pub frame_count: i64,
     /// The draw calls in the frame.
@@ -3575,8 +3583,8 @@ pub struct RenderingStats {
 impl FromNative<sys::mln_rendering_stats> for RenderingStats {
     unsafe fn from_native(raw: sys::mln_rendering_stats) -> Result<Self> {
         Ok(Self {
-            encoding_time: raw.encoding_time,
-            rendering_time: raw.rendering_time,
+            encoding_time_ms: raw.encoding_time_ms,
+            rendering_time_ms: raw.rendering_time_ms,
             frame_count: raw.frame_count,
             draw_call_count: raw.draw_call_count,
             total_draw_call_count: raw.total_draw_call_count,

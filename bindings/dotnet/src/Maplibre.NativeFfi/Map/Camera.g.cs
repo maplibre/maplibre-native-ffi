@@ -6,10 +6,27 @@ namespace Maplibre.NativeFfi;
 /// A map's whole camera.
 /// </summary>
 /// <remarks>
-/// <para>Its members mean the same as those of <c>CameraOptions</c>.</para>
-/// <para>See <c>mln_camera</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+/// See <c>mln_camera</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="CenterAltitude">
+/// The altitude of the center, in meters above sea level.
+/// </param>
+/// <param name="Padding">
+/// Insets from the map's edges. The camera centers within the rest.
+/// </param>
+/// <param name="Bearing">
+/// The rotation from north, in degrees.
+/// </param>
+/// <param name="Pitch">
+/// The tilt toward the horizon, in degrees. 0 looks straight down.
+/// </param>
+/// <param name="Roll">
+/// The roll, in degrees.
+/// </param>
+/// <param name="FieldOfView">
+/// The vertical field of view, in degrees.
+/// </param>
 public readonly partial record struct Camera(
     LatLng Center,
     double CenterAltitude,

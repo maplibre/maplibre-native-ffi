@@ -372,10 +372,10 @@ public struct RenderMode: RawRepresentable, CustomStringConvertible,
 /// See `mln_rendering_stats` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RenderingStats: Equatable, Hashable, Sendable {
-  /// The time that the frame took to encode, in seconds.
-  public var encodingTime: Double
-  /// The time that the frame took to render, in seconds.
-  public var renderingTime: Double
+  /// The time that the frame took to encode, in milliseconds.
+  public var encodingTimeMs: Double
+  /// The time that the frame took to render, in milliseconds.
+  public var renderingTimeMs: Double
   /// The frames rendered so far.
   public var frameCount: Int64
   /// The draw calls in the frame.
@@ -383,22 +383,22 @@ public struct RenderingStats: Equatable, Hashable, Sendable {
   /// The draw calls in every frame so far.
   public var totalDrawCallCount: Int64
   public init(
-    encodingTime: Double = 0,
-    renderingTime: Double = 0,
+    encodingTimeMs: Double = 0,
+    renderingTimeMs: Double = 0,
     frameCount: Int64 = 0,
     drawCallCount: Int64 = 0,
     totalDrawCallCount: Int64 = 0
   ) {
-    self.encodingTime = encodingTime
-    self.renderingTime = renderingTime
+    self.encodingTimeMs = encodingTimeMs
+    self.renderingTimeMs = renderingTimeMs
     self.frameCount = frameCount
     self.drawCallCount = drawCallCount
     self.totalDrawCallCount = totalDrawCallCount
   }
 
   init(raw: mln_rendering_stats) {
-    encodingTime = raw.encoding_time
-    renderingTime = raw.rendering_time
+    encodingTimeMs = raw.encoding_time_ms
+    renderingTimeMs = raw.rendering_time_ms
     frameCount = raw.frame_count
     drawCallCount = raw.draw_call_count
     totalDrawCallCount = raw.total_draw_call_count

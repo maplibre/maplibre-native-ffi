@@ -46,8 +46,12 @@ function runs. The generator uses them to write safe wrappers in each binding.
 - Name a bitmask enum `mln_<x>_flag`, and the type that holds a set of its bits
   `mln_<x>_flags`.
 - Prefer the MapLibre style spec's terms over engine terms.
-- When a plain number's type doesn't show its unit, end its name with the unit:
-  `duration_ms`, `expires_unix_ms`.
+- Camera terms from the style spec keep their spec names and units: `bearing`,
+  `pitch`, `roll`, and `field_of_view` are in degrees, and `center_altitude` is
+  in meters. Their comments state the unit.
+- A `_size` is a count of bytes, and a `_count` is a count of items.
+- When another plain number's type doesn't show its unit, end its name with the
+  unit: `duration_ms`, `expires_unix_ms`.
 
 ### General API design
 

@@ -280,19 +280,21 @@ typedef struct mln_camera_options {
   double field_of_view MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_FOV");
 } mln_camera_options;
 
-/**
- * A map's whole camera.
- *
- * Its members mean the same as those of mln_camera_options.
- */
+/** A map's whole camera. */
 typedef struct mln_camera {
   mln_lat_lng center;
+  /** The altitude of the center, in meters above sea level. */
   double center_altitude;
+  /** Insets from the map's edges. The camera centers within the rest. */
   mln_edge_insets padding;
   double zoom;
+  /** The rotation from north, in degrees. */
   double bearing;
+  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
   double pitch;
+  /** The roll, in degrees. */
   double roll;
+  /** The vertical field of view, in degrees. */
   double field_of_view;
 } mln_camera;
 
@@ -461,7 +463,9 @@ typedef struct mln_camera_fit_options {
   /** Space to leave between the area and each edge of the map. */
   mln_edge_insets padding
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PADDING");
+  /** The rotation from north, in degrees. */
   double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_BEARING");
+  /** The tilt toward the horizon, in degrees. */
   double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PITCH");
 } mln_camera_fit_options;
 
@@ -545,7 +549,9 @@ typedef struct mln_bound_options {
     MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_BOUNDS");
   double min_zoom MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MIN_ZOOM");
   double max_zoom MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MAX_ZOOM");
+  /** The lowest pitch, in degrees. */
   double min_pitch MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MIN_PITCH");
+  /** The highest pitch, in degrees. */
   double max_pitch MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MAX_PITCH");
 } mln_bound_options;
 
@@ -801,7 +807,7 @@ typedef struct mln_map_tile_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS");
   /** Scales the distance to the view point. Above 1 lowers the detail. */
   double lod_scale MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_SCALE");
-  /** The pitch, in radians, above which the map lowers the detail. */
+  /** The pitch, in degrees, above which the map lowers the detail. */
   double lod_pitch_threshold
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD");
   /** Zoom levels to add for picking the detail. Below 0 loads fewer tiles. */

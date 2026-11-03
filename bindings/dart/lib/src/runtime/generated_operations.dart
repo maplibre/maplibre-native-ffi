@@ -2258,8 +2258,8 @@ OfflineRegionStatus _readOfflineRegionStatus(
 
 RenderingStats _readRenderingStats(raw.mln_rendering_stats source) =>
     RenderingStats(
-      encodingTime: source.encoding_time,
-      renderingTime: source.rendering_time,
+      encodingTimeMs: source.encoding_time_ms,
+      renderingTimeMs: source.rendering_time_ms,
       frameCount: source.frame_count,
       drawCallCount: source.draw_call_count,
       totalDrawCallCount: source.total_draw_call_count,

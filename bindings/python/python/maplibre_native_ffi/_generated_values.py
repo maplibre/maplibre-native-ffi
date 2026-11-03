@@ -1030,8 +1030,10 @@ class BoundOptions:
     max_zoom: float | None = None
 
     min_pitch: float | None = None
+    """The lowest pitch, in degrees."""
 
     max_pitch: float | None = None
+    """The highest pitch, in degrees."""
 
     unbounded: bool = False
 
@@ -1051,8 +1053,6 @@ class BoundOptions:
 class Camera:
     """A map's whole camera.
 
-    Its members mean the same as those of `CameraOptions`.
-
     See `mln_camera` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
@@ -1060,18 +1060,24 @@ class Camera:
     center: LatLng = field(default_factory=lambda: LatLng())
 
     center_altitude: float = 0.0
+    """The altitude of the center, in meters above sea level."""
 
     padding: EdgeInsets = field(default_factory=lambda: EdgeInsets())
+    """Insets from the map's edges. The camera centers within the rest."""
 
     zoom: float = 0.0
 
     bearing: float = 0.0
+    """The rotation from north, in degrees."""
 
     pitch: float = 0.0
+    """The tilt toward the horizon, in degrees. 0 looks straight down."""
 
     roll: float = 0.0
+    """The roll, in degrees."""
 
     field_of_view: float = 0.0
+    """The vertical field of view, in degrees."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1142,8 +1148,10 @@ class CameraFitOptions:
     """Space to leave between the area and each edge of the map."""
 
     bearing: float | None = None
+    """The rotation from north, in degrees."""
 
     pitch: float | None = None
+    """The tilt toward the horizon, in degrees."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -1907,7 +1915,7 @@ class MapTileOptions:
     """Scales the distance to the view point. Above 1 lowers the detail."""
 
     lod_pitch_threshold: float | None = None
-    """The pitch, in radians, above which the map lowers the detail."""
+    """The pitch, in degrees, above which the map lowers the detail."""
 
     lod_zoom_shift: float | None = None
     """Zoom levels to add for picking the detail. Below 0 loads fewer tiles."""
@@ -3066,11 +3074,11 @@ class RenderingStats:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    encoding_time: float
-    """The time that the frame took to encode, in seconds."""
+    encoding_time_ms: float
+    """The time that the frame took to encode, in milliseconds."""
 
-    rendering_time: float
-    """The time that the frame took to render, in seconds."""
+    rendering_time_ms: float
+    """The time that the frame took to render, in milliseconds."""
 
     frame_count: int
     """The frames rendered so far."""
@@ -3084,8 +3092,8 @@ class RenderingStats:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            encoding_time=raw["encoding_time"],
-            rendering_time=raw["rendering_time"],
+            encoding_time_ms=raw["encoding_time_ms"],
+            rendering_time_ms=raw["rendering_time_ms"],
             frame_count=raw["frame_count"],
             draw_call_count=raw["draw_call_count"],
             total_draw_call_count=raw["total_draw_call_count"],

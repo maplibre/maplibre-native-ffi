@@ -2481,7 +2481,9 @@ pub const BoundOptions = struct {
     bounds: ?LatLngBounds = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
+    /// The lowest pitch, in degrees.
     min_pitch: ?f64 = null,
+    /// The highest pitch, in degrees.
     max_pitch: ?f64 = null,
     pub fn toNative(self: BoundOptions) c.mln_bound_options {
         var raw = std.mem.zeroes(c.mln_bound_options);
@@ -2509,18 +2511,22 @@ pub const BoundOptions = struct {
 
 /// A map's whole camera.
 ///
-/// Its members mean the same as those of `CameraOptions`.
-///
 /// See `mln_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const Camera = struct {
     center: LatLng = .{},
+    /// The altitude of the center, in meters above sea level.
     center_altitude: f64 = 0,
+    /// Insets from the map's edges. The camera centers within the rest.
     padding: EdgeInsets = .{},
     zoom: f64 = 0,
+    /// The rotation from north, in degrees.
     bearing: f64 = 0,
+    /// The tilt toward the horizon, in degrees. 0 looks straight down.
     pitch: f64 = 0,
+    /// The roll, in degrees.
     roll: f64 = 0,
+    /// The vertical field of view, in degrees.
     field_of_view: f64 = 0,
     pub fn toNative(self: Camera) c.mln_camera {
         var raw = std.mem.zeroes(c.mln_camera);
@@ -2613,7 +2619,9 @@ pub const CameraDelta = struct {
 pub const CameraFitOptions = struct {
     /// Space to leave between the area and each edge of the map.
     padding: ?EdgeInsets = null,
+    /// The rotation from north, in degrees.
     bearing: ?f64 = null,
+    /// The tilt toward the horizon, in degrees.
     pitch: ?f64 = null,
     pub fn toNative(self: CameraFitOptions) c.mln_camera_fit_options {
         var raw = std.mem.zeroes(c.mln_camera_fit_options);
@@ -3932,7 +3940,7 @@ pub const MapTileOptions = struct {
     lod_min_radius: ?f64 = null,
     /// Scales the distance to the view point. Above 1 lowers the detail.
     lod_scale: ?f64 = null,
-    /// The pitch, in radians, above which the map lowers the detail.
+    /// The pitch, in degrees, above which the map lowers the detail.
     lod_pitch_threshold: ?f64 = null,
     /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
     lod_zoom_shift: ?f64 = null,
@@ -5371,10 +5379,10 @@ pub const RenderedQueryGeometry = union(enum) {
 /// See `mln_rendering_stats` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RenderingStats = struct {
-    /// The time that the frame took to encode, in seconds.
-    encoding_time: f64 = 0,
-    /// The time that the frame took to render, in seconds.
-    rendering_time: f64 = 0,
+    /// The time that the frame took to encode, in milliseconds.
+    encoding_time_ms: f64 = 0,
+    /// The time that the frame took to render, in milliseconds.
+    rendering_time_ms: f64 = 0,
     /// The frames rendered so far.
     frame_count: i64 = 0,
     /// The draw calls in the frame.
@@ -5383,8 +5391,8 @@ pub const RenderingStats = struct {
     total_draw_call_count: i64 = 0,
     pub fn fromNative(raw: c.mln_rendering_stats) RenderingStats {
         return .{
-            .encoding_time = raw.encoding_time,
-            .rendering_time = raw.rendering_time,
+            .encoding_time_ms = raw.encoding_time_ms,
+            .rendering_time_ms = raw.rendering_time_ms,
             .frame_count = raw.frame_count,
             .draw_call_count = raw.draw_call_count,
             .total_draw_call_count = raw.total_draw_call_count,

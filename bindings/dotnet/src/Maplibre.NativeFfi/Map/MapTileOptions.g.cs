@@ -31,7 +31,7 @@ public sealed record MapTileOptions
     public double? LodScale { get; init; }
 
     /// <summary>
-    /// The pitch, in radians, above which the map lowers the detail.
+    /// The pitch, in degrees, above which the map lowers the detail.
     /// </summary>
     public double? LodPitchThreshold { get; init; }
 

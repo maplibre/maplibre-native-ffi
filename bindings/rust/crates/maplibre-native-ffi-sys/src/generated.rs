@@ -1204,8 +1204,8 @@ pub union mln_rendered_query_geometry_data {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_rendering_stats {
-    pub encoding_time: f64,
-    pub rendering_time: f64,
+    pub encoding_time_ms: f64,
+    pub rendering_time_ms: f64,
     pub frame_count: i64,
     pub draw_call_count: i64,
     pub total_draw_call_count: i64,

@@ -1855,19 +1855,23 @@ public data class EdgeInsets(
 /**
  * A map's whole camera.
  *
- * Its members mean the same as those of `CameraOptions`.
- *
  * See `mln_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class Camera(
   public val center: LatLng = LatLng(),
+  /** The altitude of the center, in meters above sea level. */
   public val centerAltitude: Double = 0.0,
+  /** Insets from the map's edges. The camera centers within the rest. */
   public val padding: EdgeInsets = EdgeInsets(),
   public val zoom: Double = 0.0,
+  /** The rotation from north, in degrees. */
   public val bearing: Double = 0.0,
+  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
   public val pitch: Double = 0.0,
+  /** The roll, in degrees. */
   public val roll: Double = 0.0,
+  /** The vertical field of view, in degrees. */
   public val fieldOfView: Double = 0.0,
 )
 
@@ -2685,7 +2689,9 @@ public data class WebGpuSurfaceDescriptor(
 public data class CameraFitOptions(
   /** Space to leave between the area and each edge of the map. */
   public val padding: EdgeInsets? = null,
+  /** The rotation from north, in degrees. */
   public val bearing: Double? = null,
+  /** The tilt toward the horizon, in degrees. */
   public val pitch: Double? = null,
 )
 
@@ -2780,7 +2786,7 @@ public data class MapTileOptions(
   public val lodMinRadius: Double? = null,
   /** Scales the distance to the view point. Above 1 lowers the detail. */
   public val lodScale: Double? = null,
-  /** The pitch, in radians, above which the map lowers the detail. */
+  /** The pitch, in degrees, above which the map lowers the detail. */
   public val lodPitchThreshold: Double? = null,
   /** Zoom levels to add for picking the detail. Below 0 loads fewer tiles. */
   public val lodZoomShift: Double? = null,
@@ -2799,7 +2805,9 @@ public data class BoundOptions(
   public val bounds: LatLngBounds? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
+  /** The lowest pitch, in degrees. */
   public val minPitch: Double? = null,
+  /** The highest pitch, in degrees. */
   public val maxPitch: Double? = null,
   /** Removes the area that limits the camera's center. */
   public val unbounded: Boolean = false,
@@ -3586,10 +3594,10 @@ public data class OfflineRegionStatus(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RenderingStats(
-  /** The time that the frame took to encode, in seconds. */
-  public val encodingTime: Double,
-  /** The time that the frame took to render, in seconds. */
-  public val renderingTime: Double,
+  /** The time that the frame took to encode, in milliseconds. */
+  public val encodingTimeMs: Double,
+  /** The time that the frame took to render, in milliseconds. */
+  public val renderingTimeMs: Double,
   /** The frames rendered so far. */
   public val frameCount: Long,
   /** The draw calls in the frame. */

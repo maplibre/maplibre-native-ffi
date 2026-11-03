@@ -1020,9 +1020,9 @@ final class mln_rendered_query_geometry_data extends Union {
 
 final class mln_rendering_stats extends Struct {
   @Double()
-  external double encoding_time;
+  external double encoding_time_ms;
   @Double()
-  external double rendering_time;
+  external double rendering_time_ms;
   @Int64()
   external int frame_count;
   @Int64()
