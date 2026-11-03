@@ -28,21 +28,21 @@ link = "https://peps.python.org/pep-0783/#the-pyemscripten-platform"
 bindings = ["zig"]
 platforms = ["emscripten"]
 status = "blocked"
-reason = "Zig 0.17.0 has no `std.heap.page_allocator` for multithreaded WebAssembly, and every safe build reaches it through the panic handler. Each thread that `std.Thread` spawns also panics, because Emscripten lacks `sigaltstack`. A program can override both from its root module, but every consumer would have to."
+reason = "Zig 0.17.1 has no `std.heap.page_allocator` for multithreaded WebAssembly, and every safe build reaches it through the panic handler. Each thread that `std.Thread` spawns also panics, because Emscripten lacks `sigaltstack`. A program can override both from its root module, but every consumer would have to."
 link = "https://github.com/ziglang/zig/issues/22807"
 
 [[entry]]
 bindings = ["zig"]
 platforms = ["ios", "tvos", "visionos"]
 status = "blocked"
-reason = "Zig 0.17.0 references process spawning, which these targets lack. Zig's master branch has the fix."
-link = "https://codeberg.org/ziglang/zig/pulls/37063"
+reason = "Zig 0.17.1 compiles these targets but cannot link them: the SDK's `libSystem` stub is tagged `arm64e-ios`, which Zig does not accept for `arm64-ios`, so even a hello world leaves every libc symbol undefined. Simulator targets link."
+link = "https://codeberg.org/ziglang/zig/issues/37298"
 
 [[entry]]
 bindings = ["zig"]
 platforms = ["ohos"]
 status = "blocked"
-reason = "Zig 0.17.0's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on OpenHarmony, but `std.c` defines no layout for the `ohos` ABI."
+reason = "Zig 0.17.1's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on OpenHarmony, but `std.c` defines no layout for the `ohos` ABI."
 link = "https://codeberg.org/ziglang/zig/issues/31427"
 
 [[entry]]
@@ -342,7 +342,7 @@ bindings = ["zig"]
 platforms = ["windows", "windows-mingw"]
 archs = ["arm64"]
 status = "blocked"
-reason = "Zig 0.17.0's native ARM64 compiler fails to load build.zig, and its x64 compiler hangs under emulation."
+reason = "Zig's native ARM64 compiler fails to load build.zig, and its x64 compiler hangs under emulation."
 
 [[entry]]
 bindings = ["python"]

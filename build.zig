@@ -242,8 +242,8 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         translator.defineCMacro("__ANDROID_MIN_SDK_VERSION__", b.fmt("{d}", .{options.target.result.os.version_range.linux.android}));
     }
     if (options.target.result.cpu.arch == .loongarch64) {
-        // Zig 0.17.0's C translator predefines no LoongArch macros, and glibc's
-        // headers reject a LoongArch target without its register width.
+        // Zig's C translator predefines no LoongArch macros, and glibc's headers
+        // reject a LoongArch target without its register width.
         translator.defineCMacro("__loongarch_grlen", "64");
     }
     for (options.c_macros) |c_macro| {

@@ -126,11 +126,11 @@ sccache = "0.19.0"
 
 # The native CMake build compiles the Linux and FreeBSD targets with `zig cc`,
 # so Zig joins the native toolchain there. See cmake/toolchains/zig.cmake. The
-# Zig binding and the docs use this same install. Zig 0.17.0 is
-# unusable on Windows ARM64: the native aarch64 build exits non-zero with no
-# diagnostic while loading build.zig, and the x64 build under emulation hangs
-# until the job timeout.
-"core:zig" = { version = "0.17.0", os = ["linux", "macos", "windows/x64"] }
+# Zig binding and the docs use this same install. Zig is unusable on Windows
+# ARM64: the native aarch64 build exits non-zero with no diagnostic while
+# loading build.zig, and the x64 build under emulation hangs until the job
+# timeout.
+"core:zig" = { version = "0.17.1", os = ["linux", "macos", "windows/x64"] }
 
 # The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
 # of the environment, so each is opt-in through a configuration environment of its
