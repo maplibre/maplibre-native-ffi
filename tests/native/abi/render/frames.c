@@ -63,7 +63,7 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   MLN_TEST_OK(mln_test_render_session_failure(fixture.session, NULL, 0));
 
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
-  mln_test_render_request_forced(&fixture, 260);
+  mln_test_render_demand_forced(&fixture, 260);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   mln_texture_image_info info = {0};
   uint8_t pixel[4] = {0};
@@ -547,7 +547,7 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   // Holding the frame in the one usable slot leaves the next demand nowhere
   // to render, even though the quarantined slot holds no frame.
   mln_acquired_frame held = mln_test_render_and_acquire(&fixture, 3);
-  mln_test_render_request_forced(&fixture, 4);
+  mln_test_render_demand_forced(&fixture, 4);
   expect_parked_demand(&fixture);
   mln_test_render_release_frame(&held);
   const mln_render_frame_batch batch =
@@ -567,8 +567,8 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   const mln_acquired_frame first = mln_test_render_and_acquire(&fixture, 1);
   const mln_acquired_frame second = mln_test_render_and_acquire(&fixture, 2);
   // Forced demands remain independent, so both park.
-  mln_test_render_request_forced(&fixture, 3);
-  mln_test_render_request_forced(&fixture, 4);
+  mln_test_render_demand_forced(&fixture, 3);
+  mln_test_render_demand_forced(&fixture, 4);
   expect_parked_demand(&fixture);
 
   MLN_TEST_OK(mln_acquired_frame_discard(first, NULL));
@@ -584,7 +584,7 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
 
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.token = 5;
-  MLN_TEST_INVALID_STATE(mln_render_session_request_frame(
+  MLN_TEST_INVALID_STATE(mln_render_session_demand_frame(
     fixture.session, &demand, MLN_TEST_DIAGNOSTIC
   ));
   TEST_ASSERT_NOT_NULL_MESSAGE(
@@ -596,7 +596,7 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
 static void render_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
@@ -682,7 +682,7 @@ static void physical_sizes_round_up_and_reject_overflow(void) {
 static mln_render_frame_result render_one(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);

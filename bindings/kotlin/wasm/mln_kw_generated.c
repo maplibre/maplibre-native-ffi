@@ -1264,6 +1264,15 @@ int32_t mln_kw_mln_render_session_clear_data(
   );
 }
 
+int32_t mln_kw_mln_render_session_demand_frame(
+  int64_t session, uintptr_t demand, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_demand_frame(
+    (mln_render_session)session, (const mln_frame_demand*)demand,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_render_session_detach(
   int64_t session, uintptr_t completion, uintptr_t out_diagnostic
 ) {
@@ -1390,15 +1399,6 @@ int32_t mln_kw_mln_render_session_release_target(
 ) {
   return (int32_t)mln_render_session_release_target(
     (mln_render_session)session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
-int32_t mln_kw_mln_render_session_request_frame(
-  int64_t session, uintptr_t demand, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_render_session_request_frame(
-    (mln_render_session)session, (const mln_frame_demand*)demand,
     (mln_diagnostic*)out_diagnostic
   );
 }

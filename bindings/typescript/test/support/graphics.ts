@@ -362,8 +362,8 @@ function releaseSession(session: RenderSessionHandle): void {
  * Demands a frame with the default flags, which render only when the map has
  * an update newer than the session's last frame.
  */
-export function requestFrame(session: RenderSessionHandle, token: bigint) {
-  session.requestFrame({ token });
+export function demandFrame(session: RenderSessionHandle, token: bigint) {
+  session.demandFrame({ token });
 }
 
 function takeResult(
@@ -486,7 +486,7 @@ export class TestSession {
   async renderFrame(): Promise<RenderFrameResult> {
     for (let attempt = 0; attempt < frameAttempts; attempt++) {
       const token = ++this.#token;
-      this.session.requestFrame({
+      this.session.demandFrame({
         token,
         flags: FrameDemandFlag.waitForUpdate,
       });

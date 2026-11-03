@@ -26,9 +26,9 @@ let session: RenderSessionHandle;
 // Set while the window has no surface, and when it closes.
 let paused = false;
 
-function requestFrame(): void {
-  session.requestFrame({
-    flags: FrameDemandFlag.present | FrameDemandFlag.waitForUpdate,
+function demandFrame(): void {
+  session.demandFrame({
+    flags: FrameDemandFlag.waitForUpdate,
   });
 }
 
@@ -44,7 +44,7 @@ function drainFrameResults(): void {
   ) {
     replaceSession(); // Close the session and attach a new one.
   } else if (!paused) {
-    atNextRefresh(requestFrame);
+    atNextRefresh(demandFrame);
   }
 }
 // #endregion frame-loop
@@ -90,7 +90,7 @@ export async function surfaceRestored(
     surface: newSurface,
   });
   paused = false;
-  requestFrame();
+  demandFrame();
   // #endregion lost-surface
 }
 
@@ -116,7 +116,7 @@ export async function renderToWindow(
   await attachment.ready;
   // #endregion attach
 
-  requestFrame();
+  demandFrame();
   onWindowResized(1024, 768);
 
   // #region service

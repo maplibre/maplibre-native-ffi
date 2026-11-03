@@ -607,6 +607,10 @@ export interface NativeOperations {
     session: bigint,
     completion: NativeCompletion,
   ): void;
+  mln_render_session_demand_frame(
+    session: bigint,
+    demand: FrameDemand | undefined,
+  ): void;
   mln_render_session_detach(
     session: bigint,
     completion: NativeCompletion,
@@ -660,10 +664,6 @@ export interface NativeOperations {
   mln_render_session_release_target(
     session: bigint,
     completion: NativeCompletion,
-  ): void;
-  mln_render_session_request_frame(
-    session: bigint,
-    demand: FrameDemand | undefined,
   ): void;
   mln_render_session_resize(
     session: bigint,

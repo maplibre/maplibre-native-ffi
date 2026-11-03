@@ -2,11 +2,14 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a frame request behaves.
+/// How a frame demand behaves.
 /// </summary>
 /// <remarks>
-/// See <c>mln_frame_demand_flag</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+/// <para>Without flags, a demand draws a frame when the map changed since the
+/// last one, and otherwise finishes with <c>RenderResult.NoUpdate</c>. A
+/// session with a surface target shows each frame that it draws.</para>
+/// <para>See <c>mln_frame_demand_flag</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
 /// </remarks>
 [Flags]
 public enum FrameDemandFlag : uint
@@ -16,11 +19,6 @@ public enum FrameDemandFlag : uint
     /// combined with <c>FrameDemandFlag.WaitForUpdate</c>.
     /// </summary>
     Force = 1,
-
-    /// <summary>
-    /// Shows the frame on a surface target.
-    /// </summary>
-    Present = 2,
 
     /// <summary>
     /// When the map has nothing new to draw, waits for its next update instead

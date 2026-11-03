@@ -6698,6 +6698,19 @@ impl RenderSessionHandle {
             )
         }
     }
+    #[pyo3(signature = (demand))]
+    fn demand_frame(&self, py: Python<'_>, demand: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let demand_value = generated_input_mln_frame_demand(&demand.clone(), storage)?;
+        let handle = self.input();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_render_session_demand_frame(handle, &demand_value, diagnostic)
+            })
+        }?;
+        Ok(py.None())
+    }
     #[pyo3(signature = ())]
     fn detach(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -7009,19 +7022,6 @@ impl RenderSessionHandle {
                 convert,
             )
         }
-    }
-    #[pyo3(signature = (demand))]
-    fn request_frame(&self, py: Python<'_>, demand: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let demand_value = generated_input_mln_frame_demand(&demand.clone(), storage)?;
-        let handle = self.input();
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_render_session_request_frame(handle, &demand_value, diagnostic)
-            })
-        }?;
-        Ok(py.None())
     }
     #[pyo3(signature = (extent))]
     fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {

@@ -32,7 +32,7 @@ static void prepare(mln_map map) {
 static mln_render_frame_result render_frame(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
@@ -50,9 +50,7 @@ static mln_render_frame_result render_update(
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = token;
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
@@ -307,7 +305,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   );
 
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture.session, &demand, NULL));
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result unchanged =

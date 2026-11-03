@@ -95,7 +95,7 @@ static void render_style(
 static void render_again(
   const mln_test_render_fixture* fixture, uint64_t token, uint8_t* pixels
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);

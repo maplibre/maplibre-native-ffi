@@ -39,11 +39,10 @@ private lateinit var session: RenderSessionHandle
 // Set while the window has no surface, and when it closes.
 private var paused = false
 
-private fun requestFrame() {
-  session.requestFrame(
+private fun demandFrame() {
+  session.demandFrame(
     FrameDemand(
-      flags =
-        FrameDemandFlag.PRESENT or FrameDemandFlag.WAIT_FOR_UPDATE,
+      flags = FrameDemandFlag.WAIT_FOR_UPDATE,
     ),
   )
 }
@@ -55,7 +54,7 @@ private fun drainFrameResults() {
   if (results.any { it.disposition == RenderResult.FAILED }) {
     replaceSession() // Close the session and attach a new one.
   } else if (!paused) {
-    runAtNextRefresh(::requestFrame)
+    runAtNextRefresh(::demandFrame)
   }
 }
 
@@ -119,7 +118,7 @@ private suspend fun surfaceRestored(
     )
     .await()
   paused = false
-  requestFrame()
+  demandFrame()
   // #endregion lost-surface
 }
 
@@ -154,7 +153,7 @@ private suspend fun renderToWindow(
   attachment.ready.await()
   // #endregion attach
 
-  requestFrame()
+  demandFrame()
   onWindowResized(1024u, 768u)
 
   // #region service

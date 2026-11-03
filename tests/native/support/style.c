@@ -73,7 +73,7 @@ uint32_t mln_test_style_render_frame(const mln_test_render_fixture* fixture) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = MLN_FRAME_DEMAND_FORCE;
   demand.token = wait.token;
-  MLN_TEST_OK(mln_render_session_request_frame(
+  MLN_TEST_OK(mln_render_session_demand_frame(
     fixture->session, &demand, MLN_TEST_DIAGNOSTIC
   ));
   MLN_TEST_OK_MESSAGE(

@@ -40,9 +40,9 @@ var session: maplibre.RenderSession = undefined;
 // Set while the window has no surface, and when it closes.
 var paused = false;
 
-fn requestFrame() !void {
-    try session.requestFrame(.{
-        .flags = .{ .present = true, .wait_for_update = true },
+fn demandFrame() !void {
+    try session.demandFrame(.{
+        .flags = .{ .wait_for_update = true },
     }, null);
 }
 
@@ -57,7 +57,7 @@ fn drainFrameResults() !void {
             return replaceSession();
         }
     }
-    if (!paused) runAtNextRefresh(requestFrame);
+    if (!paused) runAtNextRefresh(demandFrame);
 }
 // #endregion frame-loop
 
@@ -115,7 +115,7 @@ fn surfaceRestored(vulkan: maplibre.VulkanContextDescriptor, new_surface: u64) !
     try replaced.wait(null);
 
     paused = false;
-    try requestFrame();
+    try demandFrame();
     // #endregion lost-surface
 }
 
@@ -142,7 +142,7 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
     try attached.ready.wait(null);
     // #endregion attach
 
-    try requestFrame();
+    try demandFrame();
     try onWindowResized(1024, 768);
 
     // #region service

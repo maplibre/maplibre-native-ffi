@@ -1483,7 +1483,7 @@ pub const RenderSession = struct {
     ///
     /// Use it when the target's graphics objects are going away and a detach can't
     /// finish first. Pending work completes with `error.TargetLost`, and pending
-    /// frame requests finish with `RenderResult.target_not_ready`. Once the call
+    /// frame demands finish with `RenderResult.target_not_ready`. Once the call
     /// returns, the library no longer uses your graphics objects, and you can
     /// attach another session to the map. Dispose the session afterward.
     ///
@@ -1508,14 +1508,18 @@ pub const RenderSession = struct {
     ///
     /// - `error.Unsupported` when the session lacks
     ///   `RenderSessionCapabilityFlag.frame_acquisition`.
-    /// - `error.InvalidState` when the session has failed.
+    /// - `RenderSessionSnapshot.failure_status`, `error.TargetLost` or
+    ///   `error.NativeError`, when the session has failed. The diagnostic carries
+    ///   the failure's message.
+    /// - `error.InvalidState` when you detached, abandoned, or disposed the
+    ///   session.
     pub fn acquireFrame(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!?AcquiredFrame {
         return call.invokeNullable("mln_render_session_acquire_frame", .handle, self, null, diagnostic, .{call.adopt(AcquiredFrame)});
     }
 
-    /// Ends the session's pending frame requests and waits for its earlier work.
+    /// Ends the session's pending frame demands and waits for its earlier work.
     ///
-    /// Frame requests that haven't started, including those that wait for a map
+    /// Frame demands that haven't started, including those that wait for a map
     /// update, finish with `RenderResult.no_update`.
     ///
     /// See `mln_render_session_barrier` in the
@@ -1542,9 +1546,31 @@ pub const RenderSession = struct {
         return call.submit("mln_render_session_clear_data", .handle, self, call.unit, null, diagnostic, .{});
     }
 
+    /// Asks the session to render a frame.
+    ///
+    /// You can call it once the attach call returns. While the attach runs, the
+    /// demand waits for it to complete. Every demand finishes with one frame result
+    /// that carries its token, and `RenderSession.drainFrameResults()` takes it. A
+    /// demand without `FrameDemandFlag.force` replaces each pending demand with the
+    /// same flags.
+    ///
+    /// See `mln_render_session_demand_frame` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `RenderSessionSnapshot.failure_status`, `error.TargetLost` or
+    ///   `error.NativeError`, when the session has failed. The diagnostic carries
+    ///   the failure's message.
+    /// - `error.InvalidState` when you detached, abandoned, or disposed the
+    ///   session, or discarded a frame from every texture of its ring.
+    pub fn demandFrame(self: RenderSession, demand: FrameDemand, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        return call.invoke("mln_render_session_demand_frame", .handle, self, null, diagnostic, .{demand});
+    }
+
     /// Detaches the session from its map and frees its graphics objects.
     ///
-    /// Release every acquired frame first. Pending frame requests finish with
+    /// Release every acquired frame first. Pending frame demands finish with
     /// `RenderResult.target_not_ready`. Once the detach completes, the library no
     /// longer uses your graphics objects, and you can attach another session to the
     /// map. Dispose the session afterward.
@@ -1715,7 +1741,7 @@ pub const RenderSession = struct {
     ///
     /// Use it when the platform takes a surface away, such as when your app goes to
     /// the background. Release every acquired frame first. Until you give the
-    /// session a new target, frame requests finish with
+    /// session a new target, frame demands finish with
     /// `RenderResult.target_not_ready`. Once the release completes, you can destroy
     /// the old target.
     ///
@@ -1730,23 +1756,6 @@ pub const RenderSession = struct {
     ///   runs.
     pub fn releaseTarget(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
         return call.submit("mln_render_session_release_target", .handle, self, call.unit, null, diagnostic, .{});
-    }
-
-    /// Asks the session to render a frame.
-    ///
-    /// Call it once the attach completes. Every request finishes with one frame
-    /// result that carries its token, and `RenderSession.drainFrameResults()` takes
-    /// it. A request without `FrameDemandFlag.force` replaces each pending request
-    /// with the same flags.
-    ///
-    /// See `mln_render_session_request_frame` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidState` when the session has failed.
-    pub fn requestFrame(self: RenderSession, demand: FrameDemand, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_render_session_request_frame", .handle, self, null, diagnostic, .{demand});
     }
 
     /// Resizes the session's target and its map.
@@ -1773,7 +1782,7 @@ pub const RenderSession = struct {
     /// Use it with `RenderDriverKind.caller_graphics_thread`, and call it from the
     /// same thread every time. Call it each time
     /// `RenderSessionAttachOptions.driver_work_wake` is called, even while you
-    /// request no frames, and until a detach completes. It returns once no work is
+    /// demand no frames, and until a detach completes. It returns once no work is
     /// ready.
     ///
     /// See `mln_render_session_service_driver_work` in the
@@ -3141,13 +3150,13 @@ pub const FeatureStateSelector = struct {
     }
 };
 
-/// A request for one frame.
+/// A demand for one frame.
 ///
 /// See `mln_frame_demand` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const FrameDemand = struct {
     flags: FrameDemandFlag = .{},
-    /// A value of your choice that the request's frame result carries.
+    /// A value of your choice that the demand's frame result carries.
     token: u64 = 0,
     pub fn toNative(self: FrameDemand) c.mln_frame_demand {
         var raw = std.mem.zeroes(c.mln_frame_demand);
@@ -3164,7 +3173,11 @@ pub const FrameDemand = struct {
     }
 };
 
-/// How a frame request behaves.
+/// How a frame demand behaves.
+///
+/// Without flags, a demand draws a frame when the map changed since the last
+/// one, and otherwise finishes with `RenderResult.no_update`. A session with a
+/// surface target shows each frame that it draws.
 ///
 /// See `mln_frame_demand_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3172,13 +3185,11 @@ pub const FrameDemandFlag = struct {
     /// Draws a frame even when nothing changed since the last one. It can't be
     /// combined with `FrameDemandFlag.wait_for_update`.
     force: bool = false,
-    /// Shows the frame on a surface target.
-    present: bool = false,
     /// When the map has nothing new to draw, waits for its next update instead
     /// of finishing with `RenderResult.no_update`.
     wait_for_update: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4 };
+    pub const native_bits = [_]u32{ 1, 4 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4859,7 +4870,7 @@ pub const RenderDriverKind = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// How one frame request finished.
+/// How one frame demand finished.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4903,7 +4914,7 @@ pub const RenderMode = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// How a frame request finished.
+/// How a frame demand finished.
 ///
 /// See `mln_render_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4912,9 +4923,9 @@ pub const RenderResult = enum(u32) {
     /// The map had nothing new to draw.
     no_update = 1,
     /// The target couldn't take a frame, such as while a window is hidden or
-    /// after `RenderSession.releaseTarget()`. Request a frame again later.
+    /// after `RenderSession.releaseTarget()`. Demand a frame again later.
     target_not_ready = 2,
-    /// A later request with the same flags replaced this one.
+    /// A later demand with the same flags replaced this one.
     superseded = 3,
     /// The session failed, and `RenderSession.getFailure()` reports why. Once
     /// `RenderSession.release()` completes, you can attach a new session.

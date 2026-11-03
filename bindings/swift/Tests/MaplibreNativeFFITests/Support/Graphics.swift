@@ -308,7 +308,7 @@ extension RenderSessionHandle {
   ) async throws -> RenderFrameResult? {
     var token: UInt64 = 1
     var rendered: RenderFrameResult?
-    try requestFrame(demand: FrameDemand(flags: [.force], token: token))
+    try demandFrame(FrameDemand(flags: [.force], token: token))
     try await awaitCondition(
       "a rendered frame",
       sourceLocation: sourceLocation
@@ -316,7 +316,7 @@ extension RenderSessionHandle {
       for result in try drainFrameResults() where result.token == token {
         guard result.disposition == .rendered else {
           token += 1
-          try requestFrame(demand: FrameDemand(flags: [.force], token: token))
+          try demandFrame(FrameDemand(flags: [.force], token: token))
           return false
         }
         rendered = result

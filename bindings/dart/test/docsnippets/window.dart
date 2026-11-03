@@ -20,11 +20,9 @@ late RenderSessionHandle session;
 // Set while the window has no surface, and when it closes.
 var paused = false;
 
-void requestFrame() {
-  session.requestFrame(
-    FrameDemand(
-      flags: FrameDemandFlag.present | FrameDemandFlag.waitForUpdate,
-    ),
+void demandFrame() {
+  session.demandFrame(
+    FrameDemand(flags: FrameDemandFlag.waitForUpdate),
   );
 }
 
@@ -38,7 +36,7 @@ void drainFrameResults() {
   )) {
     replaceSession(); // Close the session and attach a new one.
   } else if (!paused) {
-    atNextRefresh(requestFrame);
+    atNextRefresh(demandFrame);
   }
 }
 // #endregion frame-loop
@@ -84,7 +82,7 @@ Future<void> surfaceRestored(
     ),
   );
   paused = false;
-  requestFrame();
+  demandFrame();
   // #endregion lost-surface
 }
 
@@ -118,7 +116,7 @@ Future<void> renderToWindow(
   await attachment.ready;
   // #endregion attach
 
-  requestFrame();
+  demandFrame();
   onWindowResized(1024, 768);
 
   // #region service

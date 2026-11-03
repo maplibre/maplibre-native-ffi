@@ -97,7 +97,7 @@ final class WorkerSession {
   Future<RenderFrameResult> renderFrame() async {
     for (var attempt = 0; attempt < _frameAttempts; attempt++) {
       final token = _nextToken++;
-      _requestFrame(session, token);
+      _demandFrame(session, token);
       var result = _takeResult(session, token);
       while (result == null) {
         await _frames.wait('frame $token');
@@ -115,8 +115,8 @@ Future<void> releaseSession(RenderSessionHandle session) =>
     closeIfLive(session.close);
 
 /// Demands a forced frame, which renders whether or not the map changed.
-void _requestFrame(RenderSessionHandle session, int token) {
-  session.requestFrame(FrameDemand(flags: FrameDemandFlag.force, token: token));
+void _demandFrame(RenderSessionHandle session, int token) {
+  session.demandFrame(FrameDemand(flags: FrameDemandFlag.force, token: token));
 }
 
 /// Drains the session's frame results and returns the one for [token], or

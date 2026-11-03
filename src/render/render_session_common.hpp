@@ -1263,7 +1263,7 @@ auto render_session_get_failure(
   mln_render_session session, char* out_message, std::size_t message_capacity,
   std::size_t* out_message_length
 ) -> mln_status;
-auto render_session_request_frame(
+auto render_session_demand_frame(
   mln_render_session session, const mln_frame_demand* demand
 ) -> mln_status;
 auto render_session_service_driver_work(mln_render_session session)

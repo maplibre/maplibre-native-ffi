@@ -29,10 +29,9 @@ var session *maplibre.RenderSessionHandle
 // Set while the window has no surface, and when it closes.
 var paused bool
 
-func requestFrame() error {
-	return session.RequestFrame(maplibre.FrameDemand{
-		Flags: maplibre.FrameDemandFlagPresent |
-			maplibre.FrameDemandFlagWaitForUpdate,
+func demandFrame() error {
+	return session.DemandFrame(maplibre.FrameDemand{
+		Flags: maplibre.FrameDemandFlagWaitForUpdate,
 	})
 }
 
@@ -51,7 +50,7 @@ func drainFrameResults() error {
 		}
 	}
 	if !paused {
-		runAtNextRefresh(requestFrame)
+		runAtNextRefresh(demandFrame)
 	}
 	return nil
 }
@@ -122,7 +121,7 @@ func surfaceRestored(ctx context.Context, vulkan maplibre.VulkanContextDescripto
 		return err
 	}
 	paused = false
-	return requestFrame()
+	return demandFrame()
 	// #endregion lost-surface
 }
 
@@ -154,7 +153,7 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	}
 	// #endregion attach
 
-	if err := requestFrame(); err != nil {
+	if err := demandFrame(); err != nil {
 		return err
 	}
 	if err := onWindowResized(1024, 768); err != nil {

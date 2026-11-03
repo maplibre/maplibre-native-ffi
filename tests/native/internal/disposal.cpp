@@ -426,7 +426,7 @@ void disposal_detaches_an_attached_core_worker_session() {
   auto released = std::atomic_bool{false};
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   const auto core_worker = fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER;
   auto blocker = DriverBlocker{};
@@ -528,7 +528,7 @@ void finalization_abandons_an_attached_session() {
   auto released = std::atomic_bool{false};
   auto fixture = mln_test_render_fixture{};
   attach_observed(map, fixture, released);
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   auto* const token = mln_binding_owner_token_create(fixture.session);
   TEST_ASSERT_NOT_NULL(token);

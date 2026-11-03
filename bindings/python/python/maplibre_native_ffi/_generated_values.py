@@ -275,14 +275,17 @@ class ConstrainMode(UnknownIntEnum):
 
 
 class FrameDemandFlag(IntFlag):
-    """How a frame request behaves.
+    """How a frame demand behaves.
+
+    Without flags, a demand draws a frame when the map changed since the last
+    one, and otherwise finishes with `RenderResult.NO_UPDATE`. A session with
+    a surface target shows each frame that it draws.
 
     See `mln_frame_demand_flag` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     """
 
     FORCE = 1
-    PRESENT = 2
     WAIT_FOR_UPDATE = 4
 
 
@@ -537,7 +540,7 @@ class RenderMode(UnknownIntEnum):
 
 
 class RenderResult(UnknownIntEnum):
-    """How a frame request finished.
+    """How a frame demand finished.
 
     See `mln_render_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1473,7 +1476,7 @@ class FeatureStateSelector:
 
 @dataclass(frozen=True, slots=True)
 class FrameDemand:
-    """A request for one frame.
+    """A demand for one frame.
 
     See `mln_frame_demand` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1482,7 +1485,7 @@ class FrameDemand:
     flags: FrameDemandFlag = field(default_factory=lambda: FrameDemandFlag(0))
 
     token: int = 0
-    """A value of your choice that the request's frame result carries."""
+    """A value of your choice that the demand's frame result carries."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2652,7 +2655,7 @@ class RenderAbandonResult:
 
 @dataclass(frozen=True, slots=True)
 class RenderFrameResult:
-    """How one frame request finished.
+    """How one frame demand finished.
 
     See `mln_render_frame_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

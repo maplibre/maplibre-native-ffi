@@ -105,7 +105,7 @@ class _Target:
         session = self.session
         token = self._next_token
         self._next_token += 1
-        session.request_frame(
+        session.demand_frame(
             mln.FrameDemand(
                 flags=mln.FrameDemandFlag.WAIT_FOR_UPDATE
                 if wait_for_update

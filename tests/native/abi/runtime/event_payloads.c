@@ -614,9 +614,7 @@ static void render_one_frame(
   const mln_test_render_fixture* fixture, mln_runtime runtime, event_log* log
 ) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  MLN_TEST_OK(
-    mln_render_session_request_frame(fixture->session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture->session, &demand, NULL));
   const mln_render_frame_batch frames =
     mln_test_render_wait_for_results(fixture);
   mln_render_frame_batch_release(frames);

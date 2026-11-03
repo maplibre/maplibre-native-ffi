@@ -123,7 +123,11 @@ final class ConstrainMode extends _Enum {
   };
 }
 
-/// How a frame request behaves.
+/// How a frame demand behaves.
+///
+/// Without flags, a demand draws a frame when the map changed since the last
+/// one, and otherwise finishes with `RenderResult.noUpdate`. A session with a
+/// surface target shows each frame that it draws.
 ///
 /// See `mln_frame_demand_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -133,9 +137,6 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   /// Draws a frame even when nothing changed since the last one. It can't be
   /// combined with `FrameDemandFlag.waitForUpdate`.
   static const force = FrameDemandFlag.fromRawValue(1);
-
-  /// Shows the frame on a surface target.
-  static const present = FrameDemandFlag.fromRawValue(2);
 
   /// When the map has nothing new to draw, waits for its next update instead of
   /// finishing with `RenderResult.noUpdate`.
@@ -149,7 +150,6 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   String toString() => _describe('FrameDemandFlag', const {
     0: 'none',
     1: 'force',
-    2: 'present',
     4: 'waitForUpdate',
   });
 }
@@ -605,7 +605,7 @@ final class RenderMode extends _Enum {
   };
 }
 
-/// How a frame request finished.
+/// How a frame demand finished.
 ///
 /// See `mln_render_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -617,10 +617,10 @@ final class RenderResult extends _Enum {
   static const noUpdate = RenderResult.fromRawValue(1);
 
   /// The target couldn't take a frame, such as while a window is hidden or
-  /// after `RenderSessionHandle.releaseTarget()`. Request a frame again later.
+  /// after `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
   static const targetNotReady = RenderResult.fromRawValue(2);
 
-  /// A later request with the same flags replaced this one.
+  /// A later demand with the same flags replaced this one.
   static const superseded = RenderResult.fromRawValue(3);
 
   /// The session failed, and `RenderSessionHandle.getFailure()` reports why.
@@ -1786,7 +1786,7 @@ final class MapView extends _Value {
   ]);
 }
 
-/// How one frame request finished.
+/// How one frame demand finished.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4238,6 +4238,27 @@ final class RenderAbandonResult extends _Value {
   ]);
 }
 
+/// A demand for one frame.
+///
+/// See `mln_frame_demand` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class FrameDemand extends _Value {
+  const FrameDemand({this.flags = FrameDemandFlag.none, this.token = 0});
+  final FrameDemandFlag flags;
+
+  /// A value of your choice that the demand's frame result carries.
+  final int token;
+
+  /// A copy of this value with the given members replaced.
+  FrameDemand copyWith({FrameDemandFlag? flags, int? token}) =>
+      FrameDemand(flags: flags ?? this.flags, token: token ?? this.token);
+
+  @override
+  List<Object?> get _members => [flags, token];
+  @override
+  String toString() => _describe('FrameDemand', const ['flags', 'token']);
+}
+
 /// What an attached render session supports.
 ///
 /// See `mln_render_session_capabilities` in the
@@ -4591,27 +4612,6 @@ final class TextureReadbackResult extends _Value {
   @override
   String toString() =>
       _describe('TextureReadbackResult', const ['data', 'info']);
-}
-
-/// A request for one frame.
-///
-/// See `mln_frame_demand` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-final class FrameDemand extends _Value {
-  const FrameDemand({this.flags = FrameDemandFlag.none, this.token = 0});
-  final FrameDemandFlag flags;
-
-  /// A value of your choice that the request's frame result carries.
-  final int token;
-
-  /// A copy of this value with the given members replaced.
-  FrameDemand copyWith({FrameDemandFlag? flags, int? token}) =>
-      FrameDemand(flags: flags ?? this.flags, token: token ?? this.token);
-
-  @override
-  List<Object?> get _members => [flags, token];
-  @override
-  String toString() => _describe('FrameDemand', const ['flags', 'token']);
 }
 
 /// The answer to a resource request.

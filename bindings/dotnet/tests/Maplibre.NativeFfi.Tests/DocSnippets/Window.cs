@@ -31,14 +31,9 @@ internal static class Window
     // Set while the window has no surface, and when it closes.
     private static bool paused;
 
-    private static void RequestFrame() =>
-        session.RequestFrame(
-            new FrameDemand
-            {
-                Flags =
-                    FrameDemandFlag.Present
-                    | FrameDemandFlag.WaitForUpdate,
-            }
+    private static void DemandFrame() =>
+        session.DemandFrame(
+            new FrameDemand { Flags = FrameDemandFlag.WaitForUpdate }
         );
 
     private static void DrainFrameResults()
@@ -55,7 +50,7 @@ internal static class Window
             // Close the session and attach a new one.
             ReplaceSession();
         else if (!paused)
-            RunAtNextRefresh(RequestFrame);
+            RunAtNextRefresh(DemandFrame);
     }
 
     // #endregion frame-loop
@@ -112,7 +107,7 @@ internal static class Window
             }
         );
         paused = false;
-        RequestFrame();
+        DemandFrame();
         // #endregion lost-surface
     }
 
@@ -144,7 +139,7 @@ internal static class Window
         await session.Ready;
         // #endregion attach
 
-        RequestFrame();
+        DemandFrame();
         OnWindowResized(1024, 768);
 
         // #region service

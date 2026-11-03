@@ -56,20 +56,39 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  options.driver_work_wake = mln_test_pulse_wake();
   mln_render_session session = MLN_HANDLE_NULL;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_attach_vulkan_borrowed_texture(
-      map, &descriptor, &options, &session, &completion.descriptor, NULL
-    )
+  mln_test_completion attach = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_attach_vulkan_borrowed_texture(
+    map, &descriptor, &options, &session, &attach.descriptor, NULL
+  ));
+  // The caller driver attaches only when serviced, so this demand waits behind
+  // the attach and ends with it.
+  const mln_frame_demand demand = {
+    .size = sizeof(mln_frame_demand),
+    .flags = MLN_FRAME_DEMAND_FORCE,
+    .token = 1,
+  };
+  MLN_TEST_OK(mln_render_session_demand_frame(session, &demand, NULL));
+  MLN_TEST_OK(mln_render_session_service_driver_work(session, NULL));
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&attach)
   );
+  mln_test_completion_destroy(&attach);
 
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
   MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_FAILED, snapshot.state);
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_test_drain_frame_results(session, &batch, NULL));
+  TEST_ASSERT_EQUAL_size_t(1, mln_test_render_batch_view(batch).result_count);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(1, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_FAILED, result.disposition);
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
@@ -245,7 +264,7 @@ VULKAN_OBSERVER(second_observer)
 static void render_one_frame(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);

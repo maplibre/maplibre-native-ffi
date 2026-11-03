@@ -184,8 +184,8 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 	defer deadline.Stop()
 	for {
 		r.token++
-		if err := r.session.RequestFrame(FrameDemand{Flags: FrameDemandFlagForce, Token: r.token}); err != nil {
-			t.Fatalf("RequestFrame: %v", err)
+		if err := r.session.DemandFrame(FrameDemand{Flags: FrameDemandFlagForce, Token: r.token}); err != nil {
+			t.Fatalf("DemandFrame: %v", err)
 		}
 		for {
 			r.serviceDriverWork(t)

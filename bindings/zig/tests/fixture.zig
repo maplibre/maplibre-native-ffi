@@ -546,7 +546,7 @@ pub const TextureSession = struct {
     pub fn renderFrame(self: *TextureSession) !maplibre.RenderFrameResult {
         const token = self.next_token;
         self.next_token += 1;
-        try self.session.requestFrame(.{ .flags = .{ .force = true }, .token = token }, null);
+        try self.session.demandFrame(.{ .flags = .{ .force = true }, .token = token }, null);
         const Context = struct { owner: *TextureSession, token: u64, result: ?maplibre.RenderFrameResult = null };
         var context = Context{ .owner = self, .token = token };
         try self.wakes.waitUntil(&context, struct {

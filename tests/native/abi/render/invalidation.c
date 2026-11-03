@@ -249,7 +249,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
     mln_map_begin_command_group(map, &completion.descriptor, NULL)
   );
   set_property(map, "background-color", "\"#0000ff\"");
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture);
   mln_render_frame_batch_release(batch);
   expect_center_pixel(&fixture, red, "inside the group");
@@ -292,7 +292,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
     mln_map_begin_command_group(map, &completion.descriptor, NULL)
   );
   set_selected(map, "{\"selected\":true}");
-  mln_test_render_request_forced(&fixture, 9001);
+  mln_test_render_demand_forced(&fixture, 9001);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(&fixture);
   const mln_render_frame_result held = mln_test_render_batch_result(batch, 0);
@@ -515,7 +515,7 @@ static bool frame_matches(void* context) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   demand.flags = seek->flags;
   MLN_TEST_OK(
-    mln_render_session_request_frame(seek->fixture->session, &demand, NULL)
+    mln_render_session_demand_frame(seek->fixture->session, &demand, NULL)
   );
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(seek->fixture);
@@ -606,7 +606,7 @@ static const mln_test_provided_resource held_tile[] = {
 static mln_render_frame_result render_forced(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
-  mln_test_render_request_forced(fixture, token);
+  mln_test_render_demand_forced(fixture, token);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
@@ -637,7 +637,7 @@ static void frame_results_report_whether_the_map_was_fully_loaded(void) {
   while (mln_test_provider_requests(provider, held_tile_url) == 0) {
     mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
     MLN_TEST_OK(
-      mln_render_session_request_frame(fixture.session, &demand, NULL)
+      mln_render_session_demand_frame(fixture.session, &demand, NULL)
     );
     mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
     TEST_ASSERT_FALSE_MESSAGE(
@@ -708,7 +708,7 @@ static void a_drawn_frame_reports_its_statistics(void) {
   mln_test_render_until_idle(runtime, map, &fixture);
   // The settled map draws its circle in this frame, whatever the frames before
   // it reported.
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
 
   drawn_frame_wait wait = {.map = map};

@@ -147,7 +147,7 @@ class Host {
     auto demand = mln_frame_demand{};
     demand.size = sizeof(mln_frame_demand);
     demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
-    check(mln_render_session_request_frame(session_, &demand, nullptr));
+    check(mln_render_session_demand_frame(session_, &demand, nullptr));
   }
   void service() {
     check(mln_render_session_service_driver_work(session_, nullptr));

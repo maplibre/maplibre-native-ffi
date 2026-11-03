@@ -1688,6 +1688,18 @@ RenderAbandonResult _readRenderAbandonResult(
   quarantinedResourceCount: source.quarantined_resource_count,
 );
 
+Pointer<raw.mln_frame_demand> _writeFrameDemand(
+  FrameDemand value,
+  Allocator arena, {
+  Pointer<raw.mln_frame_demand>? into,
+}) {
+  final result = into ?? arena<raw.mln_frame_demand>();
+  result.ref.size = sizeOf<raw.mln_frame_demand>();
+  result.ref.flags = value.flags.rawValue;
+  result.ref.token = value.token;
+  return result;
+}
+
 List<RenderFrameResult> _readRenderFrameBatchView(
   raw.mln_render_frame_batch_view source,
 ) => (() {
@@ -1860,18 +1872,6 @@ TextureReadbackResult _readTextureReadbackResult(
   data: _copyBufferView(source.data),
   info: _readTextureImageInfo(source.info),
 );
-
-Pointer<raw.mln_frame_demand> _writeFrameDemand(
-  FrameDemand value,
-  Allocator arena, {
-  Pointer<raw.mln_frame_demand>? into,
-}) {
-  final result = into ?? arena<raw.mln_frame_demand>();
-  result.ref.size = sizeOf<raw.mln_frame_demand>();
-  result.ref.flags = value.flags.rawValue;
-  result.ref.token = value.token;
-  return result;
-}
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
   ResourceResponse value,
@@ -5957,7 +5957,7 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Use it when the target's graphics objects are going away and a detach
   /// can't finish first. Pending work completes with `Status.targetLost`, and
-  /// pending frame requests finish with `RenderResult.targetNotReady`. Once the
+  /// pending frame demands finish with `RenderResult.targetNotReady`. Once the
   /// call returns, the library no longer uses your graphics objects, and you
   /// can attach another session to the map. Dispose the session afterward.
   ///
@@ -5987,7 +5987,11 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// - `Status.unsupported` when the session lacks
   ///   `RenderSessionCapabilityFlag.frameAcquisition`.
-  /// - `Status.invalidState` when the session has failed.
+  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
+  ///   `Status.nativeError`, when the session has failed. The diagnostic
+  ///   carries the failure's message.
+  /// - `Status.invalidState` when you detached, abandoned, or disposed the
+  ///   session.
   AcquiredFrameHandle? acquireFrame() => withNativeArena((arena) {
     final outFrame = arena<Uint64>();
     _check(
@@ -6009,9 +6013,9 @@ final class RenderSessionHandle implements Finalizable {
     );
   });
 
-  /// Ends the session's pending frame requests and waits for its earlier work.
+  /// Ends the session's pending frame demands and waits for its earlier work.
   ///
-  /// Frame requests that haven't started, including those that wait for a map
+  /// Frame demands that haven't started, including those that wait for a map
   /// update, finish with `RenderResult.noUpdate`.
   ///
   /// See `mln_render_session_barrier` in the
@@ -6047,9 +6051,37 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
+  /// Asks the session to render a frame.
+  ///
+  /// You can call it once the attach call returns. While the attach runs, the
+  /// demand waits for it to complete. Every demand finishes with one frame
+  /// result that carries its token, and
+  /// `RenderSessionHandle.drainFrameResults()` takes it. A demand without
+  /// `FrameDemandFlag.force` replaces each pending demand with the same flags.
+  ///
+  /// See `mln_render_session_demand_frame` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
+  ///   `Status.nativeError`, when the session has failed. The diagnostic
+  ///   carries the failure's message.
+  /// - `Status.invalidState` when you detached, abandoned, or disposed the
+  ///   session, or discarded a frame from every texture of its ring.
+  void demandFrame(FrameDemand demand) => withNativeArena((arena) {
+    _check(
+      raw.mln_render_session_demand_frame(
+        _handle.raw,
+        _writeFrameDemand(demand, arena),
+        nativeDiagnostic,
+      ),
+    );
+  });
+
   /// Detaches the session from its map and frees its graphics objects.
   ///
-  /// Release every acquired frame first. Pending frame requests finish with
+  /// Release every acquired frame first. Pending frame demands finish with
   /// `RenderResult.targetNotReady`. Once the detach completes, the library no
   /// longer uses your graphics objects, and you can attach another session to
   /// the map. Dispose the session afterward.
@@ -6331,7 +6363,7 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Use it when the platform takes a surface away, such as when your app goes
   /// to the background. Release every acquired frame first. Until you give the
-  /// session a new target, frame requests finish with
+  /// session a new target, frame demands finish with
   /// `RenderResult.targetNotReady`. Once the release completes, you can destroy
   /// the old target.
   ///
@@ -6351,29 +6383,6 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
-
-  /// Asks the session to render a frame.
-  ///
-  /// Call it once the attach completes. Every request finishes with one frame
-  /// result that carries its token, and
-  /// `RenderSessionHandle.drainFrameResults()` takes it. A request without
-  /// `FrameDemandFlag.force` replaces each pending request with the same flags.
-  ///
-  /// See `mln_render_session_request_frame` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` when the session has failed.
-  void requestFrame(FrameDemand demand) => withNativeArena((arena) {
-    _check(
-      raw.mln_render_session_request_frame(
-        _handle.raw,
-        _writeFrameDemand(demand, arena),
-        nativeDiagnostic,
-      ),
-    );
-  });
 
   /// Resizes the session's target and its map.
   ///
@@ -6404,8 +6413,8 @@ final class RenderSessionHandle implements Finalizable {
   /// Use it with `RenderDriverKind.callerGraphicsThread`, and call it from the
   /// same thread every time. Call it each time
   /// `RenderSessionAttachOptions.driverWorkWake` is called, even while you
-  /// request no frames, and until a detach completes. It returns once no work
-  /// is ready.
+  /// demand no frames, and until a detach completes. It returns once no work is
+  /// ready.
   ///
   /// An isolate cannot service a caller-graphics-thread driver, because Dart
   /// can resume it on another native thread after any `await`. Host native code

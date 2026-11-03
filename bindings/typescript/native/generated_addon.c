@@ -4497,6 +4497,35 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_render_session_demand_frame(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_frame_demand arg_demand;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  memset(&arg_demand, 0, sizeof arg_demand);
+  arg_demand.size = sizeof arg_demand;
+  if (!mln_ts_read_record(call, call->argv[1], "demand")) goto done;
+  if (!mln_ts_write_frame_demand(call, call->argv[1], &arg_demand, "demand"))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_render_session_demand_frame(arg_session, &arg_demand, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_render_session_detach(
   napi_env env, napi_callback_info info
 ) {
@@ -4963,35 +4992,6 @@ static napi_value mln_ts_export_mln_render_session_release_target(
     arg_session, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_request_frame(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_frame_demand arg_demand;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_demand, 0, sizeof arg_demand);
-  arg_demand.size = sizeof arg_demand;
-  if (!mln_ts_read_record(call, call->argv[1], "demand")) goto done;
-  if (!mln_ts_write_frame_demand(call, call->argv[1], &arg_demand, "demand"))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status =
-    mln_render_session_request_frame(arg_session, &arg_demand, &diagnostic);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6913,6 +6913,8 @@ static const mln_ts_export exports[] = {
   {"mln_render_session_barrier", mln_ts_export_mln_render_session_barrier},
   {"mln_render_session_clear_data",
    mln_ts_export_mln_render_session_clear_data},
+  {"mln_render_session_demand_frame",
+   mln_ts_export_mln_render_session_demand_frame},
   {"mln_render_session_detach", mln_ts_export_mln_render_session_detach},
   {"mln_render_session_dispose", mln_ts_export_mln_render_session_dispose},
   {"mln_render_session_drain_frame_results",
@@ -6937,8 +6939,6 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_render_session_reduce_memory_use},
   {"mln_render_session_release_target",
    mln_ts_export_mln_render_session_release_target},
-  {"mln_render_session_request_frame",
-   mln_ts_export_mln_render_session_request_frame},
   {"mln_render_session_resize", mln_ts_export_mln_render_session_resize},
   {"mln_render_session_service_driver_work",
    mln_ts_export_mln_render_session_service_driver_work},

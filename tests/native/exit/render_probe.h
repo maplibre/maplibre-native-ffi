@@ -117,16 +117,16 @@ typedef struct probe_session {
 #endif
 } probe_session;
 
-static inline void probe_request_frame(mln_render_session session) {
+static inline void probe_demand_frame(mln_render_session session) {
   probe_require(
-    mln_render_session_request_frame(
+    mln_render_session_demand_frame(
       session,
       &(mln_frame_demand){
         .size = sizeof(mln_frame_demand), .flags = MLN_FRAME_DEMAND_FORCE
       },
       NULL
     ),
-    "requesting a frame"
+    "demanding a frame"
   );
 }
 
@@ -266,7 +266,7 @@ static inline void probe_attach_rendering(
   // A frame can come before the style loads, so ask until one renders it.
   uint64_t seen = 0;
   do {
-    probe_request_frame(probe->session);
+    probe_demand_frame(probe->session);
     seen = probe_signal_wait(&probe->frames, seen);
   } while (!probe_drain_rendered(probe->session));
 }
@@ -299,8 +299,8 @@ static inline int probe_exit_after_abandoning(
     MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
   );
   for (int frame = 0; frame < 64; frame += 1) {
-    probe_request_frame(core_worker.session);
-    probe_request_frame(caller_driven.session);
+    probe_demand_frame(core_worker.session);
+    probe_demand_frame(caller_driven.session);
   }
   // The core worker is mid-frame here; abandon waits out its call.
   probe_abandon(core_worker.session);

@@ -435,40 +435,26 @@ auto make_string_vector(std::span<const mln_buffer_view> strings)
   return result;
 }
 
-// Restores the previous setting rather than clearing it, so an inner warmup
-// render nests inside a demand that already asked for no presentation.
-class DiscardedPresent {
- public:
-  explicit DiscardedPresent(bool discard)
-      : previous_(mln::core::discard_renderable_present) {
-    mln::core::discard_renderable_present =
-      mln::core::discard_renderable_present || discard;
-  }
-  DiscardedPresent(const DiscardedPresent&) = delete;
-  auto operator=(const DiscardedPresent&) -> DiscardedPresent& = delete;
-  DiscardedPresent(DiscardedPresent&&) = delete;
-  auto operator=(DiscardedPresent&&) -> DiscardedPresent& = delete;
-  ~DiscardedPresent() { mln::core::discard_renderable_present = previous_; }
-
- private:
-  bool previous_;
-};
-
+// A warmup render that the host never sees: the backend skips its present,
+// and the frame observer reports nothing.
 class UnpresentedRender {
  public:
   explicit UnpresentedRender(mln::core::SessionFrameObserver& observer)
-      : observer_(observer), present_(true) {
+      : observer_(observer) {
+    mln::core::discard_renderable_present = true;
     observer_.suppress_frame_callbacks(true);
   }
   UnpresentedRender(const UnpresentedRender&) = delete;
   auto operator=(const UnpresentedRender&) -> UnpresentedRender& = delete;
   UnpresentedRender(UnpresentedRender&&) = delete;
   auto operator=(UnpresentedRender&&) -> UnpresentedRender& = delete;
-  ~UnpresentedRender() { observer_.suppress_frame_callbacks(false); }
+  ~UnpresentedRender() {
+    observer_.suppress_frame_callbacks(false);
+    mln::core::discard_renderable_present = false;
+  }
 
  private:
   mln::core::SessionFrameObserver& observer_;
-  DiscardedPresent present_;
 };
 
 void reset_pushed_feature_state(mln_render_session_object& session) {
@@ -1155,7 +1141,7 @@ auto arm_still_image_demand_locked(
     session.demands.push_back(
       std::make_shared<const mln_frame_demand>(mln_frame_demand{
         .size = sizeof(mln_frame_demand),
-        .flags = MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
+        .flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
         .token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE,
       })
     );
@@ -3156,25 +3142,16 @@ auto run_frame_demand(
     auto scope = std::optional<mln::gfx::BackendScope>{};
     if (auto* backend = renderer_backend(session.get()); backend != nullptr)
       scope.emplace(*backend);
-    {
-      // A demand without MLN_FRAME_DEMAND_PRESENT still draws; the target keeps
-      // whatever it presented last. Only a presenting target can honor this.
-      const auto presents = (session->capabilities.flags &
-                             MLN_RENDER_SESSION_CAPABILITY_PRESENTATION) != 0;
-      const DiscardedPresent unpresented{
-        presents && (demand->flags & MLN_FRAME_DEMAND_PRESENT) == 0
-      };
-      const auto status = render_session_render_update_on_driver(
-        *session, &disposition, &mode, &needs_repaint, &rendered_map_generation,
-        &view
-      );
-      if (status != MLN_STATUS_OK) {
-        scope.reset();
-        disposition = finish_failed_attempt(session, status);
-      } else if (disposition == MLN_RENDER_RESULT_TARGET_NOT_READY) {
-        scope.reset();
-        static_cast<void>(finish_unready_attempt(session));
-      }
+    const auto status = render_session_render_update_on_driver(
+      *session, &disposition, &mode, &needs_repaint, &rendered_map_generation,
+      &view
+    );
+    if (status != MLN_STATUS_OK) {
+      scope.reset();
+      disposition = finish_failed_attempt(session, status);
+    } else if (disposition == MLN_RENDER_RESULT_TARGET_NOT_READY) {
+      scope.reset();
+      static_cast<void>(finish_unready_attempt(session));
     }
     result.disposition = disposition;
     result.map_update_generation = rendered_map_generation;
@@ -3338,7 +3315,23 @@ auto render_session_get_failure(
   return MLN_STATUS_OK;
 }
 
-auto render_session_request_frame(
+namespace {
+// The status that a call that needs a usable session reports for one in
+// `session.state`: the saved failure for a failed session, and
+// MLN_STATUS_INVALID_STATE for one that the host detached, abandoned, or
+// disposed.
+auto unusable_session_status_locked(const mln_render_session_object& session)
+  -> mln_status {
+  if (session.state == MLN_RENDER_SESSION_STATE_FAILED) {
+    set_thread_error(session.failure.message);
+    return session.failure_status;
+  }
+  set_thread_error("render session is not attached");
+  return MLN_STATUS_INVALID_STATE;
+}
+}  // namespace
+
+auto render_session_demand_frame(
   mln_render_session session, const mln_frame_demand* demand
 ) -> mln_status {
   if (demand == nullptr || demand->size < sizeof(*demand)) {
@@ -3347,7 +3340,6 @@ auto render_session_request_frame(
   }
   constexpr auto known_flags =
     static_cast<uint32_t>(MLN_FRAME_DEMAND_FORCE) |
-    static_cast<uint32_t>(MLN_FRAME_DEMAND_PRESENT) |
     static_cast<uint32_t>(MLN_FRAME_DEMAND_WAIT_FOR_UPDATE);
   if ((demand->flags & ~known_flags) != 0) {
     set_thread_error("frame demand carries unknown policy flags");
@@ -3368,10 +3360,13 @@ auto render_session_request_frame(
   if (live == nullptr) return recorded_handle_fault_status();
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{live->control_mutex};
-  if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
-    set_thread_error("render session is not attached");
-    return MLN_STATUS_INVALID_STATE;
-  }
+  // A demand accepted while the session attaches runs once the attach work
+  // ahead of it completes, and ends with the session if the attach fails.
+  if (
+    live->state != MLN_RENDER_SESSION_STATE_ATTACHING &&
+    live->state != MLN_RENDER_SESSION_STATE_ATTACHED
+  )
+    return unusable_session_status_locked(*live);
   if (every_slot_quarantined_locked(*live)) {
     set_thread_error("every texture slot of the render session is quarantined");
     return MLN_STATUS_INVALID_STATE;
@@ -3598,10 +3593,12 @@ auto render_session_acquire_frame(
   auto frame = std::shared_ptr<mln_acquired_frame_object>{};
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
-      set_thread_error("render session is not attached");
-      return MLN_STATUS_INVALID_STATE;
-    }
+    // An attaching session has rendered no frame yet, so it has none ready.
+    if (
+      live->state != MLN_RENDER_SESSION_STATE_ATTACHING &&
+      live->state != MLN_RENDER_SESSION_STATE_ATTACHED
+    )
+      return unusable_session_status_locked(*live);
     if (
       (live->capabilities.flags &
        MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION) == 0
@@ -4510,7 +4507,7 @@ auto abandon_render_session(
     } else {
       finish_demands_locked(*live, MLN_RENDER_RESULT_TARGET_NOT_READY, wakes);
     }
-    // Another thread, such as a request_frame that superseded a demand, can
+    // Another thread, such as a demand_frame that superseded a demand, can
     // have set the frame wake pending and released the lock without invoking
     // the wake yet. Closing the wake below makes that late notify do nothing,
     // so abandon invokes the frame wake for any queued result itself, whatever

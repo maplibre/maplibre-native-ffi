@@ -49,7 +49,7 @@ void read_center_pixel(
 
 // Renders one forced frame, which renders the session's latest update again.
 void render_forced_frame(const mln_test_render_fixture& fixture) {
-  mln_test_render_request_forced(&fixture, 1);
+  mln_test_render_demand_forced(&fixture, 1);
   const auto batch = mln_test_render_wait_for_results(&fixture);
   const auto result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);

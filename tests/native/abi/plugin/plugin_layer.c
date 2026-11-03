@@ -60,7 +60,7 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
     demand.flags = MLN_FRAME_DEMAND_FORCE;
     MLN_TEST_OK(
-      mln_render_session_request_frame(fixture.session, &demand, NULL)
+      mln_render_session_demand_frame(fixture.session, &demand, NULL)
     );
     const mln_render_frame_batch batch =
       mln_test_render_wait_for_results(&fixture);

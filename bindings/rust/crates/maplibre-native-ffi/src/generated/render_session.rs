@@ -18,7 +18,7 @@ impl RenderSessionHandle {
     ///
     /// Use it when the target's graphics objects are going away and a detach
     /// can't finish first. Pending work completes with `Status::TargetLost`,
-    /// and pending frame requests finish with `RenderResult::TargetNotReady`.
+    /// and pending frame demands finish with `RenderResult::TargetNotReady`.
     /// Once the call returns, the library no longer uses your graphics objects,
     /// and you can attach another session to the map. Dispose the session
     /// afterward.
@@ -50,7 +50,11 @@ impl RenderSessionHandle {
     ///
     /// - `Status::Unsupported` when the session lacks
     ///   `RenderSessionCapabilityFlag::FRAME_ACQUISITION`.
-    /// - `Status::InvalidState` when the session has failed.
+    /// - `RenderSessionSnapshot::failure_status`, `Status::TargetLost` or
+    ///   `Status::NativeError`, when the session has failed. The diagnostic
+    ///   carries the failure's message.
+    /// - `Status::InvalidState` when you detached, abandoned, or disposed the
+    ///   session.
     pub fn acquire_frame(&self) -> Result<Option<AcquiredFrameHandle>> {
         let mut call = self.inner.call();
         let mut out_frame = sys::mln_acquired_frame(0);
@@ -63,10 +67,9 @@ impl RenderSessionHandle {
         Ok(Some(AcquiredFrameHandle::adopt(out_frame)?))
     }
 
-    /// Ends the session's pending frame requests and waits for its earlier
-    /// work.
+    /// Ends the session's pending frame demands and waits for its earlier work.
     ///
-    /// Frame requests that haven't started, including those that wait for a map
+    /// Frame demands that haven't started, including those that wait for a map
     /// update, finish with `RenderResult::NoUpdate`.
     ///
     /// See `mln_render_session_barrier` in the
@@ -106,9 +109,37 @@ impl RenderSessionHandle {
         )
     }
 
+    /// Asks the session to render a frame.
+    ///
+    /// You can call it once the attach call returns. While the attach runs, the
+    /// demand waits for it to complete. Every demand finishes with one frame
+    /// result that carries its token, and
+    /// `RenderSessionHandle::drain_frame_results()` takes it. A demand without
+    /// `FrameDemandFlag::FORCE` replaces each pending demand with the same
+    /// flags.
+    ///
+    /// See `mln_render_session_demand_frame` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `RenderSessionSnapshot::failure_status`, `Status::TargetLost` or
+    ///   `Status::NativeError`, when the session has failed. The diagnostic
+    ///   carries the failure's message.
+    /// - `Status::InvalidState` when you detached, abandoned, or disposed the
+    ///   session, or discarded a frame from every texture of its ring.
+    pub fn demand_frame(&self, demand: &FrameDemand) -> Result<()> {
+        let mut call = self.inner.call();
+        let demand = call.reference(&demand)?;
+        call.status(|session, out_diagnostic| unsafe {
+            sys::mln_render_session_demand_frame(session, demand, out_diagnostic)
+        })?;
+        Ok(())
+    }
+
     /// Detaches the session from its map and frees its graphics objects.
     ///
-    /// Release every acquired frame first. Pending frame requests finish with
+    /// Release every acquired frame first. Pending frame demands finish with
     /// `RenderResult::TargetNotReady`. Once the detach completes, the library
     /// no longer uses your graphics objects, and you can attach another session
     /// to the map. Dispose the session afterward.
@@ -431,7 +462,7 @@ impl RenderSessionHandle {
     ///
     /// Use it when the platform takes a surface away, such as when your app
     /// goes to the background. Release every acquired frame first. Until you
-    /// give the session a new target, frame requests finish with
+    /// give the session a new target, frame demands finish with
     /// `RenderResult::TargetNotReady`. Once the release completes, you can
     /// destroy the old target.
     ///
@@ -452,29 +483,6 @@ impl RenderSessionHandle {
             },
             completion::unit,
         )
-    }
-
-    /// Asks the session to render a frame.
-    ///
-    /// Call it once the attach completes. Every request finishes with one frame
-    /// result that carries its token, and
-    /// `RenderSessionHandle::drain_frame_results()` takes it. A request without
-    /// `FrameDemandFlag::FORCE` replaces each pending request with the same
-    /// flags.
-    ///
-    /// See `mln_render_session_request_frame` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::InvalidState` when the session has failed.
-    pub fn request_frame(&self, demand: &FrameDemand) -> Result<()> {
-        let mut call = self.inner.call();
-        let demand = call.reference(&demand)?;
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_request_frame(session, demand, out_diagnostic)
-        })?;
-        Ok(())
     }
 
     /// Resizes the session's target and its map.
@@ -505,7 +513,7 @@ impl RenderSessionHandle {
     /// Use it with `RenderDriverKind::CallerGraphicsThread`, and call it from
     /// the same thread every time. Call it each time
     /// `RenderSessionAttachOptions::driver_work_wake` is called, even while you
-    /// request no frames, and until a detach completes. It returns once no work
+    /// demand no frames, and until a detach completes. It returns once no work
     /// is ready.
     ///
     /// See `mln_render_session_service_driver_work` in the

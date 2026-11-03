@@ -53,10 +53,10 @@ static bool repaint_waits_for_a_demand(void* context) {
 
 static void request_next(replacement_wait* wait) {
   mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE | MLN_FRAME_DEMAND_PRESENT;
+  demand.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
   demand.token = ++wait->token;
   MLN_TEST_OK(
-    mln_render_session_request_frame(wait->fixture->session, &demand, NULL)
+    mln_render_session_demand_frame(wait->fixture->session, &demand, NULL)
   );
   wait->pending = true;
 }

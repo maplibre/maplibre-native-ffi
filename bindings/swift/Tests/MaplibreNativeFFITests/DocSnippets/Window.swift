@@ -33,10 +33,8 @@
   /// Set while the window has no surface, and when it closes.
   @MainActor private var paused = false
 
-  @MainActor private func requestFrame() throws {
-    try session.requestFrame(
-      demand: FrameDemand(flags: [.present, .waitForUpdate])
-    )
+  @MainActor private func demandFrame() throws {
+    try session.demandFrame(FrameDemand(flags: [.waitForUpdate]))
   }
 
   @MainActor private func drainFrameResults() throws {
@@ -48,7 +46,7 @@
     if results.contains(where: { $0.disposition == .failed }) {
       replaceSession() // Close the session and attach a new one.
     } else if !paused {
-      atNextRefresh(requestFrame)
+      atNextRefresh(demandFrame)
     }
   }
 
@@ -121,7 +119,7 @@
       )
     )
     paused = false
-    try requestFrame()
+    try demandFrame()
     // #endregion lost-surface
   }
 
@@ -154,7 +152,7 @@
     try await attached.ready.value
     // #endregion attach
 
-    try requestFrame()
+    try demandFrame()
     try onWindowResized(width: 1024, height: 768)
 
     // #region service

@@ -529,7 +529,7 @@ impl Session {
     pub fn render_frame(&self) -> RenderFrameResult {
         let token = next_token();
         self.handle
-            .request_frame(&FrameDemand {
+            .demand_frame(&FrameDemand {
                 token,
                 ..Default::default()
             })

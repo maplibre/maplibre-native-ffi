@@ -46,13 +46,12 @@ static mln_render_session session = MLN_HANDLE_NULL;
 // Set while the window has no surface, and when it closes.
 static bool paused = false;
 
-static void request_frame(void) {
+static void demand_frame(void) {
   const mln_frame_demand demand = {
     .size = sizeof(mln_frame_demand),
-    .flags =
-      MLN_FRAME_DEMAND_PRESENT | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
+    .flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
   };
-  mln_render_session_request_frame(session, &demand, NULL);
+  mln_render_session_demand_frame(session, &demand, NULL);
 }
 
 static void drain_frame_results(void) {
@@ -82,7 +81,7 @@ static void drain_frame_results(void) {
   if (failed) {
     replace_session();  // Dispose the session and attach a new one.
   } else if (!paused) {
-    run_at_next_refresh(request_frame);
+    run_at_next_refresh(demand_frame);
   }
 }
 // #endregion frame-loop
@@ -152,7 +151,7 @@ void mln_doc_window_surface_restored(
   wait_for_done();
   // #region lost-surface
   paused = false;
-  request_frame();
+  demand_frame();
   // #endregion lost-surface
 }
 
@@ -188,7 +187,7 @@ void mln_doc_window(
   // #endregion attach
   wait_for_done();
 
-  request_frame();
+  demand_frame();
   on_window_resized(1024, 768);
 
   // #region service

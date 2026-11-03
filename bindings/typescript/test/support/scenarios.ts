@@ -11,7 +11,7 @@ import {
   UrlMatchFlag,
 } from "../../src/index.ts";
 import { openRuntime, styleResponse, styleRoute } from "./fixture.ts";
-import { renderExtent, requestFrame, TestSession } from "./graphics.ts";
+import { renderExtent, demandFrame, TestSession } from "./graphics.ts";
 import { bounded, callbackArrival } from "./harness.ts";
 import { backgroundStyle, emptyStyle } from "./styles.ts";
 
@@ -135,7 +135,7 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
   liveWork.push(map, worker);
   await worker.renderFrame();
   for (let token = 100n; token < 104n; token++) {
-    requestFrame(worker.session, token);
+    demandFrame(worker.session, token);
   }
   return worker.session;
 }
