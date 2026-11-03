@@ -29,21 +29,27 @@ native_install="$(cd "$binding/../.." && pwd)/build/$preset/install"
 rm -rf "$work"
 mkdir -p "$work/ets" "$work/libs/$abi" "$work/ohpm"
 cp "$binding/test/arkts/TestAbility.ts" "$work/ets/TestAbility.ts"
-# The application carries the OHPM package as an application that installs it
-# does: the addon, C library, and C++ runtime from the package's libs, beside
-# the application's own libraries.
+case "$preset" in
+  *-egl) backend=opengl ;;
+  *-vulkan) backend=vulkan ;;
+  *) echo "error: no OHPM backend for $preset" >&2; exit 2 ;;
+esac
 "$binding/scripts/pack-ohpm.sh" "$work/ohpm" "$preset"
-# A native module in the application links the package's C library and
-# headers, as one that installs the package from oh_modules would.
-"$binding/scripts/verify-ohpm.sh" "$work"/ohpm/*.har
-tar -xzf "$work"/ohpm/*.har -C "$work/ohpm"
-cp -R "$work/ohpm/package/libs/." "$work/libs/"
+facade_har="$work/ohpm/native-ffi-0.0.0.har"
+backend_har="$work/ohpm/native-ffi-$backend-0.0.0.har"
+# The backend supplies the C headers and libraries; the facade supplies the
+# ArkTS entry that the consumer loads in its own realm.
+"$binding/scripts/verify-ohpm.sh" "$backend_har"
+mkdir -p "$work/ohpm/facade" "$work/ohpm/backend"
+tar -xzf "$facade_har" -C "$work/ohpm/facade"
+tar -xzf "$backend_har" -C "$work/ohpm/backend"
+cp -R "$work/ohpm/backend/package/libs/." "$work/libs/"
 # One bundle with three entries: the hypium runner, a spawned realm, and a
 # spawned realm that loads the package's ArkTS entry.
 (
   cd "$binding/test/arkts"
   MAPLIBRE_NATIVE_FFI_ARKTS_BUNDLE="$work/ets" \
-    MAPLIBRE_NATIVE_FFI_ARKTS_PACKAGE="$work/ohpm/package" \
+    MAPLIBRE_NATIVE_FFI_ARKTS_PACKAGE="$work/ohpm/facade/package" \
     pnpm exec vp pack >/dev/null
 )
 # hypium, which .config/mise.ohos.toml pins, is plain JavaScript with relative
@@ -64,7 +70,7 @@ if [[ "$preset" == ohos-x64-vulkan ]]; then
   cp "$("$binding/../../tools/devices/ohos-vulkan-driver")" "$work/libs/$abi/libvulkan.so"
 fi
 # The application requires the API floor that the package declares.
-api=$(jq -er .compatibleSdkVersion "$work/ohpm/package/oh-package.json5")
+api=$(jq -er .compatibleSdkVersion "$work/ohpm/facade/package/oh-package.json5")
 "$binding/scripts/build-hap.sh" "$work" "$bundle" "$abi" "$api"
 
 connect_key=$("$binding/../../tools/devices/ohos-key")

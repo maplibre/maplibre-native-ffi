@@ -292,7 +292,7 @@ jobs:
     # with its passphrase.
     environment:
       name: ohpm
-      url: https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl
+      url: https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi
     permissions:
       contents: read
     env:

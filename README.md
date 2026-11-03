@@ -34,7 +34,7 @@
 [![Rust](https://img.shields.io/badge/Rust-crates.io-000000?logo=rust&logoColor=white)](https://crates.io/crates/maplibre-native-ffi)
 [![Swift](https://img.shields.io/badge/Swift-Swift%20Package%20Index-F05138?logo=swift&logoColor=white)](https://swiftpackageindex.com/maplibre/maplibre-native-ffi-distribution)
 [![TypeScript](https://img.shields.io/badge/TypeScript-npm-3178C6?logo=typescript&logoColor=white)](https://www.npmjs.com/package/@maplibre/native-ffi)
-[![ArkTS](https://img.shields.io/badge/ArkTS-OHPM-0A59F7?logo=harmonyos&logoColor=white)](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi-opengl)
+[![ArkTS](https://img.shields.io/badge/ArkTS-OHPM-0A59F7?logo=harmonyos&logoColor=white)](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi)
 [![Zig](https://img.shields.io/badge/Zig-GitHub%20Releases-F7A41D?logo=zig&logoColor=white)](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
 
 MapLibre Native FFI is the

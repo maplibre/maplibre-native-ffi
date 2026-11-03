@@ -1,19 +1,24 @@
 # MapLibre Native FFI for ArkTS
 
-`@maplibre/native-ffi-opengl` and `@maplibre/native-ffi-vulkan` are the
-low-level ArkTS binding for the C API of
-[MapLibre Native FFI](https://maplibre.org/maplibre-native-ffi/) on OpenHarmony,
-with the OpenGL and the Vulkan backend. The C API embeds the
+`@maplibre/native-ffi` is the low-level ArkTS binding for the C API of
+[MapLibre Native FFI](https://maplibre.org/maplibre-native-ffi/) on OpenHarmony.
+The C API embeds the
 [MapLibre Native](https://github.com/maplibre/maplibre-native) map renderer.
 
-Install one of them:
+Install the binding and one backend:
 
 ```bash
-ohpm install @maplibre/native-ffi-opengl
+ohpm install @maplibre/native-ffi @maplibre/native-ffi-opengl
 ```
 
-```bash
-ohpm install @maplibre/native-ffi-vulkan
+For Vulkan, replace `@maplibre/native-ffi-opengl` with
+`@maplibre/native-ffi-vulkan`. Keep both packages on the same version. Code
+imports from the binding whatever the backend:
+
+```ts
+import { RuntimeHandle } from "@maplibre/native-ffi";
+
+const runtime = await RuntimeHandle.create();
 ```
 
 An application's native module can use the same C library as the ArkTS binding.
