@@ -18,23 +18,23 @@ func withAPIKey(url string) string {
 
 func findTile(url string) []byte { return nil }
 
-func geojsonForTile(tile maplibre.CanonicalTileId) string {
+func geojsonForTile(tile maplibre.CanonicalTileID) string {
 	return `{"type": "FeatureCollection", "features": []}`
 }
 
 func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	// #region headers
-	headers := maplibre.HttpHeaderTransform{
-		Rules: []maplibre.HttpHeaderRule{{
-			Flags: maplibre.UrlMatchFlagGlob,
-			Url:   "https://tiles.example.com/**",
-			Headers: []maplibre.HttpHeader{{
+	headers := maplibre.HTTPHeaderTransform{
+		Rules: []maplibre.HTTPHeaderRule{{
+			Flags: maplibre.URLMatchFlagGlob,
+			URL:   "https://tiles.example.com/**",
+			Headers: []maplibre.HTTPHeader{{
 				Name:  "Authorization",
 				Value: "Bearer my-token",
 			}},
 		}},
 	}
-	err := runtime.Discarding().SetHttpHeaderTransform(headers)
+	err := runtime.Discarding().SetHTTPHeaderTransform(headers)
 	if err != nil {
 		return err
 	}
@@ -43,9 +43,9 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	// #region query-rules
 	keys := maplibre.ResourceTransform{
 		Rules: []maplibre.ResourceTransformRule{{
-			Flags: maplibre.UrlMatchFlagGlob,
-			Url:   "https://tiles.example.com/**",
-			Parameters: []maplibre.UrlQueryParameter{{
+			Flags: maplibre.URLMatchFlagGlob,
+			URL:   "https://tiles.example.com/**",
+			Parameters: []maplibre.URLQueryParameter{{
 				Name:  "key",
 				Value: "my-api-key",
 			}},
@@ -81,8 +81,8 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	provider := maplibre.ResourceProvider{
 		Routes: []maplibre.ResourceRoute{{
 			Kinds: maplibre.ResourceKindFlagTile,
-			Flags: maplibre.UrlMatchFlagGlob,
-			Url:   "app://tiles/**",
+			Flags: maplibre.URLMatchFlagGlob,
+			URL:   "app://tiles/**",
 		}},
 		Callback: func(
 			request maplibre.ResourceRequestInfo,
@@ -91,7 +91,7 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 			response := maplibre.ResourceResponse{
 				Status: maplibre.ResourceResponseStatusNoContent,
 			}
-			if tile := findTile(request.RequestedUrl); tile != nil {
+			if tile := findTile(request.RequestedURL); tile != nil {
 				response = maplibre.ResourceResponse{
 					Status: maplibre.ResourceResponseStatusOk,
 					Bytes:  tile,
@@ -112,10 +112,10 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	// #region custom-source
 	source := maplibre.CustomGeometrySourceOptions{
 		FetchTile: func(
-			m *maplibre.MapHandle, sourceId string, tile maplibre.CanonicalTileId,
+			m *maplibre.MapHandle, sourceID string, tile maplibre.CanonicalTileID,
 		) {
 			err := m.Discarding().SetCustomGeometrySourceTileData(
-				sourceId, tile, geojsonForTile(tile),
+				sourceID, tile, geojsonForTile(tile),
 			)
 			if err != nil {
 				log.Print(err)

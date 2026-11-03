@@ -72,7 +72,7 @@ func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
 // the generation it published.
 func TestFailedCommandReturnsItsError(t *testing.T) {
 	f := newFixture(t)
-	committed := await(t, submitted(f.m.SetStyleJson(emptyStyle)))
+	committed := await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
 	failure := awaitFailure(t, submitted(f.m.RemoveStyleSource("missing")))
 	if !errors.Is(failure, StatusNotFound) || failure.Diagnostic == "" {
 		t.Fatalf("RemoveStyleSource(missing) = %v, want NOT_FOUND with a diagnostic", failure)

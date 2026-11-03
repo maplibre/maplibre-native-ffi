@@ -105,7 +105,7 @@ func TestABorrowedHandleRefusesRelease(t *testing.T) {
 	if _, err := m.Close(); !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("Close = %v, want StatusInvalidState", err)
 	}
-	if m.IsClosed() || m.Id() != 7 {
+	if m.IsClosed() || m.ID() != 7 {
 		t.Fatalf("the borrowed handle is %v", m)
 	}
 }

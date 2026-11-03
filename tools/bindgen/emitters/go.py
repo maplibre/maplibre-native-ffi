@@ -66,8 +66,41 @@ def native_identifier(value: str) -> str:
     return "_" + value if value in GO_KEYWORDS else value
 
 
+# The words of C names that Go spells as initialisms, as Go Code Review
+# Comments and staticcheck's ST1003 require. Matching whole words of the C name
+# leaves words such as identity, idle, glyph, and global alone.
+INITIALISMS = {
+    "api": "API",
+    "cpu": "CPU",
+    "egl": "EGL",
+    "gl": "GL",
+    "gles": "GLES",
+    "gpu": "GPU",
+    "http": "HTTP",
+    "id": "ID",
+    "ids": "IDs",
+    "json": "JSON",
+    "url": "URL",
+    "urls": "URLs",
+    "wgl": "WGL",
+}
+
+
+def _word(value: str) -> str:
+    return INITIALISMS.get(value) or value[:1].upper() + value[1:]
+
+
 def name(value: str) -> str:
-    return "".join(word[:1].upper() + word[1:] for word in value.split("_"))
+    """The exported Go name of a snake_case C name: each word capitalized, and
+    each initialism in capitals."""
+    return "".join(_word(word) for word in value.split("_"))
+
+
+def camel(value: str) -> str:
+    """The unexported Go name of a snake_case C name: the first word as written,
+    then the rest as in `name`."""
+    first, *rest = value.split("_")
+    return first + name("_".join(rest)) if rest else first
 
 
 def doc(
@@ -184,16 +217,16 @@ def public_dispose(handle) -> bool:
 
 def owner_members(owner: str, event_source: bool) -> str:
     id_doc = (
-        "// Id returns the native handle value, which runtime events report as their\n"
+        "// ID returns the native handle value, which runtime events report as their\n"
         "// source. It stays readable after the handle closes, so events drained later\n"
         "// still match this handle.\n"
         if event_source
-        else "// Id returns the native handle value. It stays readable after the handle\n"
+        else "// ID returns the native handle value. It stays readable after the handle\n"
         "// closes.\n"
     )
     return (
         id_doc
-        + f"func (handle *{owner}) Id() uint64 {{ return handle.owner().id() }}\n"
+        + f"func (handle *{owner}) ID() uint64 {{ return handle.owner().id() }}\n"
         "// IsClosed reports whether the binding has accepted a release, dispose, or\n"
         "// discard of the handle. A nil handle is closed.\n"
         f"func (handle *{owner}) IsClosed() bool {{ return handle.owner().isClosed() }}\n"

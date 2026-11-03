@@ -22,9 +22,9 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 			withRenderFrame(RuntimeEventRenderFrame{Mode: RenderModeFull, NeedsRepaint: true}),
 		newRuntimeEventForTest(RuntimeEventTypeMapTileAction, RuntimeEventSourceTypeMap, 1).
 			withTileAction(RuntimeEventTileAction{
-				SourceId:  "roads",
+				SourceID:  "roads",
 				Operation: TileOperationLoadFromCache,
-				TileId:    TileId{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
+				TileID:    TileID{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
 			}),
 		newRuntimeEventForTest(RuntimeEventType(0x7fff_0001), RuntimeEventSourceType(0x7fff_0002), 0x7fff_0004).
 			withGeneration(0x1_0000_0003).
@@ -38,7 +38,7 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 		t.Fatalf("render frame payload = %+v", decoded[0].Payload)
 	}
 	tile, ok := decoded[1].Payload.(RuntimeEventPayloadTileActionVariant)
-	if !ok || tile.Value.SourceId != "roads" || tile.Value.Operation != TileOperationLoadFromCache || tile.Value.TileId.Wrap != -1 || tile.Value.TileId.CanonicalX != 7 {
+	if !ok || tile.Value.SourceID != "roads" || tile.Value.Operation != TileOperationLoadFromCache || tile.Value.TileID.Wrap != -1 || tile.Value.TileID.CanonicalX != 7 {
 		t.Fatalf("tile action payload = %+v", decoded[1].Payload)
 	}
 	unknown := decoded[2]

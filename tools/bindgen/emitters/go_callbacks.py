@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from .. import async_hosts
 from ..model import Unsupported
-from .go import GO_KEYWORDS, native_identifier
+from .go import GO_KEYWORDS, camel, native_identifier
 from .go_values import name, public
 
 
@@ -37,8 +37,7 @@ def validate(values, plan):
 
 def parameter_name(native):
     """A callback argument's name in a func type: its C name in camel case."""
-    first, *rest = native.split("_")
-    label = first + "".join(name(part) for part in rest)
+    label = camel(native)
     while label in GO_KEYWORDS:
         label += "_"
     return label
@@ -188,8 +187,7 @@ def accepts_native(values, plan):
 
 
 def parameter(member):
-    word = name(member)
-    return native_identifier(word[:1].lower() + word[1:])
+    return native_identifier(camel(member))
 
 
 def native_constructor(values, plan):

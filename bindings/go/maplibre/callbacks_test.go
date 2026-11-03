@@ -67,18 +67,16 @@ func isLoadingFailure(url string) func(RuntimeEvent) bool {
 func TestCameraEndHandlerSurvivesACollectionUntilItRuns(t *testing.T) {
 	f := newFixture(t)
 	ends := make(chan CameraTransitionEnd, 2)
-	zoom := 4.0
-	duration := 60000.0
 	identity := uint64(1<<64 - 1)
 	update := CameraUpdate{}
 	update.Mode = CameraUpdateModeEase
-	update.Camera.Zoom = &zoom
-	update.Animation.DurationMs = &duration
-	update.Animation.TransitionId = &identity
+	update.Camera.Zoom = new(4.0)
+	update.Animation.DurationMs = new(60000.0)
+	update.Animation.TransitionID = &identity
 	update.Animation.EndHandler = CameraTransitionHandler{Callback: func(end CameraTransitionEnd) { ends <- end }}
 	await(t, submitted(f.m.UpdateCamera(update)))
 	stdruntime.GC()
-	await(t, submitted(f.m.CancelCameraTransitionsWithId(identity)))
+	await(t, submitted(f.m.CancelCameraTransitionsWithID(identity)))
 	end := receive(t, ends, "the end handler")
 	if end.Outcome != CameraTransitionOutcomeCancelled || end.Generation == 0 {
 		t.Fatalf("end = %+v, want a cancellation with a generation", end)
@@ -100,7 +98,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 		offer(panicked, struct{}{})
 		panic("transform failed")
 	}})))
-	if _, err := f.m.SetStyleUrl(base + "/original.json"); err != nil {
+	if _, err := f.m.SetStyleURL(base + "/original.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the transform's loading failure", isLoadingFailure("without an answer"))
@@ -113,7 +111,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequestInfo, *ResourceRequestHandle) {
 		panic("provider failed")
 	}})))
-	if _, err := f.m.SetStyleUrl("custom://unserved.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://unserved.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the provider's loading failure", func(event RuntimeEvent) bool {
@@ -256,7 +254,7 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		offer(requests, request)
 	}})))
-	if _, err := f.m.SetStyleUrl("custom://deferred.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://deferred.json"); err != nil {
 		t.Fatal(err)
 	}
 	request := receive(t, requests, "the provider's request")
@@ -279,7 +277,7 @@ func TestARefusedAnswerClosesItsRequest(t *testing.T) {
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		offer(requests, request)
 	}})))
-	if _, err := f.m.SetStyleUrl("custom://refused.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://refused.json"); err != nil {
 		t.Fatal(err)
 	}
 	request := receive(t, requests, "the provider's request")
@@ -299,13 +297,13 @@ func TestARefusedAnswerClosesItsRequest(t *testing.T) {
 func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	f := newFixture(t)
 	requests := make(chan string, 4)
-	routes := []ResourceRoute{{Kinds: ResourceKindFlagStyle, Flags: UrlMatchFlagGlob, Url: "custom://routed/**"}}
+	routes := []ResourceRoute{{Kinds: ResourceKindFlagStyle, Flags: URLMatchFlagGlob, URL: "custom://routed/**"}}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
-		offer(requests, request.RequestedUrl)
+		offer(requests, request.RequestedURL)
 		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)})
 	}})))
 
-	if _, err := f.m.SetStyleUrl("custom://routed/style.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://routed/style.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the routed style load", isStyleLoaded)
@@ -314,7 +312,7 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	}
 
 	// No route claims this style, so native loading fails it for its scheme.
-	if _, err := f.m.SetStyleUrl("custom://unrouted/style.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://unrouted/style.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the unrouted style's loading failure", isLoadingFailure("custom://unrouted/style.json"))
@@ -333,8 +331,8 @@ func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 	}
 	f := newFixture(t)
 	failures := newFailureLog()
-	responses := make(chan *HttpHeaderTransformResponseScope, 1)
-	await(t, submitted(f.runtime.SetHttpHeaderTransform(HttpHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HttpHeaderTransformResponseScope) error {
+	responses := make(chan *HTTPHeaderTransformResponseScope, 1)
+	await(t, submitted(f.runtime.SetHTTPHeaderTransform(HTTPHeaderTransform{Callback: func(_ ResourceKind, _ string, response *HTTPHeaderTransformResponseScope) error {
 		foreign := make(chan error, 1)
 		go func() { foreign <- response.SetHeader("X-Test", "1") }()
 		if err := <-foreign; !errors.Is(err, StatusInvalidState) {
@@ -344,7 +342,7 @@ func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
 		return nil
 	}})))
 	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
-	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
+	if _, err := f.m.SetStyleURL(base + "/style.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
@@ -368,7 +366,7 @@ func TestTransformRequestAnsweredAfterItsCallback(t *testing.T) {
 		}
 		_ = request.Close()
 	}})))
-	if _, err := f.m.SetStyleUrl(base + "/original.json"); err != nil {
+	if _, err := f.m.SetStyleURL(base + "/original.json"); err != nil {
 		t.Fatal(err)
 	}
 	request := receive(t, requests, "the transform's request")
@@ -396,7 +394,7 @@ func TestCancelCallbackSurvivesACollectionUntilItRuns(t *testing.T) {
 		offer(requests, request)
 	}})))
 
-	if _, err := f.m.SetStyleUrl("custom://held.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://held.json"); err != nil {
 		t.Fatal(err)
 	}
 	held := receive(t, requests, "the held request")
