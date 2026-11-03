@@ -41,17 +41,26 @@ auto mln_resource_request_complete(
   mln_resource_request handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::complete_resource_request(handle, response);
-  });
+  const auto status =
+    mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+      return mln::core::complete_resource_request(handle, response);
+    });
+  // A failed answer ends a live handle as its release does. The release does
+  // nothing for a handle that the answer already ended or that never lived.
+  if (status != MLN_STATUS_OK) mln::core::release_resource_request(handle);
+  return status;
 }
 
 auto mln_resource_request_pass_through(
   mln_resource_request handle, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::pass_through_resource_request(handle);
-  });
+  const auto status =
+    mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+      return mln::core::pass_through_resource_request(handle);
+    });
+  // As in mln_resource_request_complete().
+  if (status != MLN_STATUS_OK) mln::core::release_resource_request(handle);
+  return status;
 }
 
 auto mln_resource_request_is_cancelled(
@@ -102,18 +111,30 @@ auto mln_resource_transform_request_complete(
   mln_resource_transform_request request, mln_buffer_view url,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::complete_resource_transform_request(request, url);
-  });
+  const auto status =
+    mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+      return mln::core::complete_resource_transform_request(request, url);
+    });
+  // As in mln_resource_request_complete().
+  if (status != MLN_STATUS_OK) {
+    mln::core::release_resource_transform_request(request);
+  }
+  return status;
 }
 
 auto mln_resource_transform_request_fail(
   mln_resource_transform_request request,
   const mln_resource_transform_error* error, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::fail_resource_transform_request(request, error);
-  });
+  const auto status =
+    mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+      return mln::core::fail_resource_transform_request(request, error);
+    });
+  // As in mln_resource_request_complete().
+  if (status != MLN_STATUS_OK) {
+    mln::core::release_resource_transform_request(request);
+  }
+  return status;
 }
 
 auto mln_resource_transform_request_release(

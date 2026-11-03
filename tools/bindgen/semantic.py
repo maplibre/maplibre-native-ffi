@@ -422,7 +422,8 @@ class AbsencePlan:
 # - "discard": the cleanup of a dropped owner, which no scope runs.
 # - "release": a release or dispose that consumes its receiver and returns.
 # - "release_async": a release that consumes its receiver and completes later.
-# - "answer": an immediate call that consumes its receiver but is no release.
+# - "answer": an immediate call that ends its receiver whatever it returns,
+#   but is no release.
 # - "thread_start": an immediate call that waits for a native thread to start.
 # - "attach": a completion that readies the owner the call creates at once.
 # - "command": a completion that reports a disposition.
@@ -534,9 +535,11 @@ class OperationPlan:
 
     @property
     def answers(self) -> bool:
-        """Whether the call answers its receiver once and consumes it, as a
-        resource request's completion does. It keeps its own name, and a
-        repeated one reaches native."""
+        """Whether the call answers its receiver once and ends it whatever
+        the call returns, as a resource request's completion does. A binding
+        ends its owner on every outcome and, after a failure, releases the
+        handle, in case the failure came before native code. It keeps its own
+        name, and a repeated one reaches native."""
         return self.shape == "answer"
 
     @property
@@ -1442,7 +1445,8 @@ class Binder:
                 ),
             )
         # A release consumes its handle; another call that answers its handle
-        # once declares consumes=, as a resource request's completion does.
+        # once declares consumes=always, as a resource request's completion
+        # does, and ends the handle whatever it returns.
         consumes = metadata.get("consumes")
         release = discard = False
         for handle in self.handles.values():
@@ -1460,6 +1464,23 @@ class Binder:
             raise ModelError(
                 [f"{context}: consumption requires a managed handle receiver"]
             )
+        if consumes and not release:
+            # An answer ends its handle before it returns, so it runs
+            # immediately. A binding releases the handle after a failed answer,
+            # in case the failure came before native code, so the release must
+            # accept a handle that the answer ended.
+            receiver_type = function.parameters[0].type
+            handle = self.handles[type_name(receiver_type.pointee or receiver_type)]
+            if (
+                completion
+                or metadata["execution"] != "immediate"
+                or self.api.functions_by_name[handle.release].return_type.kind != "void"
+            ):
+                raise ModelError(
+                    [
+                        f"{context}: an answer requires an immediate call on a handle whose release returns nothing"
+                    ]
+                )
         scoped_receiver = next(
             (
                 parameter.name

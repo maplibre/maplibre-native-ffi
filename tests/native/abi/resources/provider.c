@@ -259,6 +259,64 @@ static void releasing_a_claimed_request_without_a_response_fails_it(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static const mln_resource_response invalid_etag_response = {
+  .size = sizeof(mln_resource_response),
+  .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+  .etag = MLN_BUFFER_LITERAL("before\0after"),
+};
+
+// Answers its request inline with a response that native refuses.
+static void refuse_inline(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  (void)request;
+  atomic_int* status = user_data;
+  atomic_store(
+    status, mln_resource_request_complete(handle, &invalid_etag_response, NULL)
+  );
+}
+
+// An answer that native refuses ends the request as a release does, inside
+// the provider callback or after it returns.
+static void a_refused_answer_fails_its_request(void) {
+  static atomic_int inline_status;
+  for (int inline_answer = 0; inline_answer < 2; ++inline_answer) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = MLN_HANDLE_NULL;
+    if (inline_answer) {
+      atomic_store(&inline_status, MLN_STATUS_OK);
+      const mln_resource_provider provider = {
+        .size = sizeof(mln_resource_provider),
+        .callback = refuse_inline,
+        .user_data = &inline_status,
+      };
+      MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+      map = mln_test_create_map(runtime);
+      MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://refused.json"));
+    } else {
+      dropped_request_probe probe = {0};
+      map = start_claimed_request(runtime, &probe);
+      const mln_resource_request handle = atomic_load(&probe.handle);
+      MLN_TEST_INVALID(
+        mln_resource_request_complete(handle, &invalid_etag_response, NULL)
+      );
+      bool cancelled = false;
+      MLN_TEST_INVALID_STATE(
+        mln_resource_request_is_cancelled(handle, &cancelled, NULL)
+      );
+    }
+    char message[512];
+    TEST_ASSERT_TRUE(
+      mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+    );
+    TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
+    if (inline_answer) MLN_TEST_INVALID(atomic_load(&inline_status));
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
+}
+
 static atomic_int completed_handle_reuse = MLN_STATUS_OK;
 
 // Completes its request inline, then tries to answer it again through the
@@ -272,7 +330,6 @@ static void complete_inline(
   const mln_resource_response response =
     mln_test_text_response(inline_style_json);
   if (mln_resource_request_complete(handle, &response, NULL) != MLN_STATUS_OK) {
-    mln_resource_request_release(handle);
     return;
   }
   atomic_store(
@@ -533,12 +590,6 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   bool cancelled = false;
   MLN_TEST_OK(mln_resource_request_is_cancelled(handle, &cancelled, NULL));
   TEST_ASSERT_TRUE(cancelled);
-  const mln_resource_response response =
-    mln_test_text_response(inline_style_json);
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_resource_request_complete(handle, &response, NULL)
-  );
 
   cancelled = false;
   const mln_resource_request_cancel_handler unreleased =
@@ -551,10 +602,15 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
 
-  mln_resource_request_release(handle);
-  MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
-    handle, &unreleased, &cancelled, NULL
-  ));
+  // An answer to a cancelled request fails and still ends the handle.
+  const mln_resource_response response =
+    mln_test_text_response(inline_style_json);
+  MLN_TEST_INVALID_STATE(
+    mln_resource_request_complete(handle, &response, NULL)
+  );
+  MLN_TEST_INVALID_STATE(
+    mln_resource_request_is_cancelled(handle, &cancelled, NULL)
+  );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
@@ -926,14 +982,6 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   const mln_test_provider_request* revalidation =
     mln_test_provider_request_at(provider, cached_style_url, 1);
   expect_revalidation_of_cached_style(revalidation, false);
-  const mln_resource_response invalid_etag = {
-    .size = sizeof(mln_resource_response),
-    .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
-    .etag = MLN_BUFFER_LITERAL("before\0after"),
-  };
-  MLN_TEST_INVALID(
-    mln_resource_request_complete(revalidation->handle, &invalid_etag, NULL)
-  );
   const mln_resource_response not_modified = {
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
@@ -954,9 +1002,7 @@ static void hand_back_inline(
 ) {
   (void)request;
   atomic_int* status = user_data;
-  const mln_status passed = mln_resource_request_pass_through(handle, NULL);
-  atomic_store(status, passed);
-  if (passed != MLN_STATUS_OK) mln_resource_request_release(handle);
+  atomic_store(status, mln_resource_request_pass_through(handle, NULL));
 }
 
 static void a_callback_request_can_pass_through_inline_or_later(void) {
@@ -1021,6 +1067,7 @@ MLN_TEST_GROUP {
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
+  RUN_TEST(a_refused_answer_fails_its_request);
   RUN_TEST(a_request_completed_inside_its_callback_consumes_its_handle);
   RUN_TEST(a_released_request_does_not_hold_its_runtime_open);
   RUN_TEST(a_held_request_does_not_hold_its_runtime_open);

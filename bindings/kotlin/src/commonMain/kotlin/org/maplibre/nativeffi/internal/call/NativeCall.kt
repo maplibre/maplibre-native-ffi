@@ -311,12 +311,13 @@ internal fun nativeClose(owner: Any, state: HandleState, body: NativeCall.() -> 
 }
 
 /**
- * Runs a call that answers [state]'s handle, which native consumes when it accepts the call. A
- * consumed handle reaches native, which reports it, where a repeated [nativeClose] does nothing.
+ * Runs a call that answers [state]'s handle, which ends it whatever the call returns. A repeated
+ * answer reaches native, which reports the handle stale, where a repeated [nativeClose] does
+ * nothing.
  */
 internal fun nativeAnswer(owner: Any, state: HandleState, body: NativeCall.() -> Unit) {
   try {
-    state.release { NativeCall(state.handle).use { it.body() } }
+    state.answer { NativeCall(state.handle).use { it.body() } }
   } finally {
     bindingKeepAlive(owner)
   }

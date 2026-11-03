@@ -33,6 +33,9 @@ internal constructor(
   /**
    * Answers a resource request.
    *
+   * A failed answer fails the request with `ResourceErrorReason.OTHER`, as
+   * `ResourceRequestHandle.close()` does.
+   *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    *
@@ -60,6 +63,9 @@ internal constructor(
 
   /**
    * Hands a resource request back to the library to load as usual.
+   *
+   * A failed call fails the request with `ResourceErrorReason.OTHER`, as
+   * `ResourceRequestHandle.close()` does.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

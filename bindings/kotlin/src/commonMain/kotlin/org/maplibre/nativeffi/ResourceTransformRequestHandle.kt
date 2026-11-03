@@ -34,7 +34,8 @@ internal constructor(
   /**
    * Answers a resource transform request with the URL to load instead.
    *
-   * `url` must not be empty.
+   * `url` must not be empty. A failed answer fails the request with `ResourceErrorReason.OTHER`, as
+   * `ResourceTransformRequestHandle.close()` does.
    *
    * See `mln_resource_transform_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -48,7 +49,9 @@ internal constructor(
    * Fails a resource transform request without sending it.
    *
    * The library retries a request that failed for a reason it retries, such as
-   * `ResourceErrorReason.CONNECTION`, and the retry calls the transform again.
+   * `ResourceErrorReason.CONNECTION`, and the retry calls the transform again. When this call
+   * fails, the request fails with `ResourceErrorReason.OTHER`, as
+   * `ResourceTransformRequestHandle.close()` does.
    *
    * See `mln_resource_transform_request_fail` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

@@ -4557,6 +4557,9 @@ export class ResourceRequestHandle extends Owner {
   /**
    * Answers a resource request.
    *
+   * A failed answer fails the request with `ResourceErrorReason.other`, as
+   * `ResourceRequestHandle.close()` does.
+   *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    *
@@ -4582,6 +4585,9 @@ export class ResourceRequestHandle extends Owner {
 
   /**
    * Hands a resource request back to the library to load as usual.
+   *
+   * A failed call fails the request with `ResourceErrorReason.other`, as
+   * `ResourceRequestHandle.close()` does.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4663,7 +4669,9 @@ export class ResourceTransformRequestHandle extends Owner {
   /**
    * Answers a resource transform request with the URL to load instead.
    *
-   * `url` must not be empty.
+   * `url` must not be empty. A failed answer fails the request with
+   * `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.close()`
+   * does.
    *
    * See `mln_resource_transform_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4679,6 +4687,8 @@ export class ResourceTransformRequestHandle extends Owner {
    *
    * The library retries a request that failed for a reason it retries, such as
    * `ResourceErrorReason.connection`, and the retry calls the transform again.
+   * When this call fails, the request fails with `ResourceErrorReason.other`,
+   * as `ResourceTransformRequestHandle.close()` does.
    *
    * See `mln_resource_transform_request_fail` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

@@ -75,6 +75,12 @@ bool mln_ts_read_owner(mln_ts_call* call, napi_value value);
  * export, so no realm teardown can finalize the consumed handle.
  */
 void mln_ts_consume(mln_ts_call* call);
+/**
+ * Ends the call's owner token and disposes its handle, unless the call
+ * consumed it. An answer runs this as it returns, so that one that failed
+ * before reaching native code still ends its handle.
+ */
+void mln_ts_dispose_unconsumed(mln_ts_call* call);
 /** Throws a MaplibreError for a failed status and returns false. */
 bool mln_ts_check(
   mln_ts_call* call, mln_status status, const mln_diagnostic* diagnostic
@@ -263,5 +269,7 @@ mln_ts_realm* mln_ts_realm_of(napi_env env);
 void mln_ts_throw_status(napi_env env, mln_status status, const char* message);
 /** Ends an owner's token, as mln_ts_consume does. */
 void mln_ts_owner_consume(mln_ts_owner* owner);
+/** Ends an owner's token and disposes its handle, unless a call consumed it. */
+void mln_ts_owner_dispose(mln_ts_owner* owner);
 
 #endif

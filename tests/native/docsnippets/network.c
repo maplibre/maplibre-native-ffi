@@ -43,13 +43,9 @@ static void add_api_key(
   (void)kind;
   char buffer[4096];
   mln_buffer_view new_url = with_api_key(url, buffer, sizeof(buffer));
-  if (
-    mln_resource_transform_request_complete(request, new_url, NULL) !=
-    MLN_STATUS_OK
-  ) {
-    // Releasing the request without an answer fails it.
-    mln_resource_transform_request_release(request);
-  }
+  // The answer ends the request whatever it returns. A failed one
+  // fails it.
+  mln_resource_transform_request_complete(request, new_url, NULL);
 }
 // #endregion rewrite
 
@@ -72,12 +68,7 @@ static void serve_tile(
     response.status = MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT;
   }
 
-  if (
-    mln_resource_request_complete(handle, &response, NULL) !=
-    MLN_STATUS_OK
-  ) {
-    mln_resource_request_release(handle);
-  }
+  mln_resource_request_complete(handle, &response, NULL);
 }
 // #endregion provider
 

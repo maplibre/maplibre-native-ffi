@@ -99,7 +99,7 @@ from ._generated_values import (
     VulkanTextureFrame,
     _maybe,
 )
-from ._operation import GeneratedOperations, _adopt_value, _view
+from ._operation import GeneratedOperations, _adopt_value, _answer, _view
 
 if TYPE_CHECKING:
     from ._generated_owners import (
@@ -2332,6 +2332,9 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     def complete(self, response: ResourceResponse) -> None:
         """Answers a resource request.
 
+        A failed answer fails the request with `ResourceErrorReason.OTHER`,
+        as `ResourceRequestHandle.close()` does.
+
         See `mln_resource_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 
@@ -2339,7 +2342,7 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
 
         - `Status.INVALID_STATE` when the library cancelled the request.
         """
-        return self._native.complete(response)
+        return _answer(self, lambda: self._native.complete(response))
 
     def is_cancelled(self) -> bool:
         """Reads whether the library cancelled a resource request.
@@ -2352,6 +2355,9 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     def pass_through(self) -> None:
         """Hands a resource request back to the library to load as usual.
 
+        A failed call fails the request with `ResourceErrorReason.OTHER`, as
+        `ResourceRequestHandle.close()` does.
+
         See `mln_resource_request_pass_through` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 
@@ -2359,7 +2365,7 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
 
         - `Status.INVALID_STATE` when the library cancelled the request.
         """
-        return self._native.pass_through()
+        return _answer(self, lambda: self._native.pass_through())
 
     def close(self) -> None:
         """Releases a resource request.
@@ -2388,24 +2394,28 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
     def complete(self, url: str) -> None:
         """Answers a resource transform request with the URL to load instead.
 
-        `url` must not be empty.
+        `url` must not be empty. A failed answer fails the request with
+        `ResourceErrorReason.OTHER`, as
+        `ResourceTransformRequestHandle.close()` does.
 
         See `mln_resource_transform_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.complete(url)
+        return _answer(self, lambda: self._native.complete(url))
 
     def fail(self, error: ResourceTransformError) -> None:
         """Fails a resource transform request without sending it.
 
         The library retries a request that failed for a reason it retries,
         such as `ResourceErrorReason.CONNECTION`, and the retry calls the
-        transform again.
+        transform again. When this call fails, the request fails with
+        `ResourceErrorReason.OTHER`, as
+        `ResourceTransformRequestHandle.close()` does.
 
         See `mln_resource_transform_request_fail` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.fail(error)
+        return _answer(self, lambda: self._native.fail(error))
 
     def close(self) -> None:
         """Releases a resource transform request.

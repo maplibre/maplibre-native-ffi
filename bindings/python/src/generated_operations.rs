@@ -7465,12 +7465,13 @@ impl ResourceRequestHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe {
+        let result = unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_request_complete(handle, &response_value, diagnostic)
             })
-        }?;
+        };
         reservation.commit();
+        result?;
         Ok(py.None())
     }
     #[pyo3(signature = ())]
@@ -7492,10 +7493,11 @@ impl ResourceRequestHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe {
+        let result = unsafe {
             call.status(|diagnostic| sys::mln_resource_request_pass_through(handle, diagnostic))
-        }?;
+        };
         reservation.commit();
+        result?;
         Ok(py.None())
     }
     #[pyo3(signature = ())]
@@ -7563,12 +7565,13 @@ impl ResourceTransformRequestHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe {
+        let result = unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_transform_request_complete(handle, url_value, diagnostic)
             })
-        }?;
+        };
         reservation.commit();
+        result?;
         Ok(py.None())
     }
     #[pyo3(signature = (error))]
@@ -7580,12 +7583,13 @@ impl ResourceTransformRequestHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe {
+        let result = unsafe {
             call.status(|diagnostic| {
                 sys::mln_resource_transform_request_fail(handle, &error_value, diagnostic)
             })
-        }?;
+        };
         reservation.commit();
+        result?;
         Ok(py.None())
     }
     #[pyo3(signature = ())]

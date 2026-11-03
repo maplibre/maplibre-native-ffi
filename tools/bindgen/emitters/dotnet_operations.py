@@ -324,8 +324,12 @@ def operation(plan: OperationPlan, bound: BoundApi, discard: bool) -> Operation:
         native = type_name(parameter.type.pointee or parameter.type)
         owners.setdefault(native, owner_name(native))
     function = plan.function
-    if plan.consumes == "always" and (
-        plan.completion or function.return_type.kind != "void"
+    # An answer ends its receiver on every outcome, through its own
+    # adapter; any other call that always consumes is a void release.
+    if (
+        plan.consumes == "always"
+        and not plan.answers
+        and (plan.completion or function.return_type.kind != "void")
     ):
         raise Unsupported("unconditional consumption requires a void immediate release")
     if reason := operation_contract(plan):
@@ -409,7 +413,9 @@ def release_async(op: Operation) -> tuple[str, str, set[str]]:
 def released(op: Operation) -> tuple[str, str, set[str]]:
     """A release with inputs, or an answer that consumes its receiver, runs
     through the owner's state, which marks the handle closed once native
-    accepts it. An answer keeps its name, and a repeated one reaches native."""
+    accepts it. An answer keeps its name, and a repeated one reaches native.
+    It ends the handle whatever it returns: a conversion that fails before
+    native ends it as a release does."""
     plan, values = op.plan, op.values
     declarations, arguments = [], ["live"]
     # The release runs synchronously, so its scope outlives the call. The
@@ -440,15 +446,24 @@ def released(op: Operation) -> tuple[str, str, set[str]]:
             body.append(f"var {local} = {values.encode(value, name)};")
         arguments.append(local)
     call = native_call(plan.function, ", ".join(arguments), "diagnostic")
+    if plan.answers:
+        lines = [
+            "try",
+            "{",
+            *("    " + line for line in body),
+            f"    state.Answer((live, diagnostic) => {call});",
+            "}",
+            "catch",
+            "{",
+            "    state.EndAnswer();",
+            "    throw;",
+            "}",
+        ]
+    else:
+        lines = [*body, f"state.Release((live, diagnostic) => {call});"]
     return (
         op.owner_class,
-        method(
-            f"public void {op.declared}({', '.join(declarations)})",
-            [
-                *body,
-                f"state.Release((live, diagnostic) => {call}{', idempotent: false' if plan.answers else ''});",
-            ],
-        ),
+        method(f"public void {op.declared}({', '.join(declarations)})", lines),
         set(values.plans),
     )
 

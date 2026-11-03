@@ -646,15 +646,12 @@ auto complete_resource_request(
       if (!native_response.etag) native_response.etag = live->prior_etag;
       native_response.notModified = false;
     }
+    // A post that throws leaves the request open, so the release that follows
+    // the failed answer still fails it.
+    live->actor.invoke(
+      &mln::FileSourceRequest::setResponse, std::move(native_response)
+    );
     live->completed = true;
-    try {
-      live->actor.invoke(
-        &mln::FileSourceRequest::setResponse, std::move(native_response)
-      );
-    } catch (...) {
-      set_thread_error("resource request can no longer accept a response");
-      return MLN_STATUS_INVALID_STATE;
-    }
   }
   // An answered request consumes its handle. It is not cancelled, so no
   // cancel callback runs that the retirement would wait for.

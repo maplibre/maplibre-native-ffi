@@ -128,8 +128,6 @@ static void complete_request(
   const mln_resource_response response = style_response();
   if (mln_resource_request_complete(handle, &response, NULL) == MLN_STATUS_OK) {
     atomic_fetch_add(&wake->completed, 1);
-  } else {
-    mln_resource_request_release(handle);
   }
 }
 
@@ -209,8 +207,11 @@ static void a_request_cancelled_before_dispatch_reports_it(void) {
     mln_resource_request_set_cancel_callback(handle, &handler, &cancelled, NULL)
   );
   TEST_ASSERT_TRUE(cancelled);
+  // Passing a cancelled request through fails and still ends the handle.
   MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, NULL));
-  mln_resource_request_release(handle);
+  MLN_TEST_INVALID_STATE(
+    mln_resource_request_is_cancelled(handle, &cancelled, NULL)
+  );
 
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
   mln_test_destroy_map(map);

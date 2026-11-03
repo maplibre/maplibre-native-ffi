@@ -1,14 +1,29 @@
 // Resource registrations and requests when allocations fail: a rejected
 // registration leaves ownership with the host, and a request still reaches a
 // terminal response, its cancel, and its release in order.
-#include <optional>
 
+// The library builds as C++20, where mln::expected is expected-lite's own
+// type rather than std::expected, so this file selects the same type to share
+// a resource transform's result with the library.
+#define nsel_CONFIG_SELECT_EXPECTED nsel_EXPECTED_NONSTD
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include <mln/storage/resource_transform.hpp>
 #include <mln/storage/response.hpp>
 #include <mln/util/run_loop.hpp>
 
 #include "internal/support/allocation_faults.hpp"
 #include "internal/support/resources.hpp"
 #include "resources/custom_resource_provider.hpp"
+#include "resources/resource_transform.hpp"
 #include "runtime/runtime.hpp"
 #include "support/resources.h"
 #include "support/test_support.h"
@@ -278,18 +293,24 @@ void a_queued_cancel_precedes_its_release_when_allocations_fail() {
   mln_delivery_queue_release(queue);
 }
 
-void pass_through_retry_starts_native_after_scheduling_failure() {
+// Under allocation failure, a pass-through either starts native loading or
+// fails the request as a release does. Either way it ends the handle.
+void pass_through_starts_native_or_fails_under_allocation_failure() {
   for (auto budget = std::size_t{0}; budget < 8; ++budget) {
     auto loop = mln::util::RunLoop{};
     auto handle = mln_resource_request{MLN_HANDLE_NULL};
     auto starts = unsigned{0};
+    auto failures = unsigned{0};
     auto request = mln::core::request_custom_resource(
       mln::Resource::style("custom://pass-through-allocation"),
       "custom://pass-through-allocation",
       [](
         void* data, const mln_resource_request_info*, mln_resource_request value
       ) -> void { *static_cast<mln_resource_request*>(data) = value; },
-      &handle, [](const mln::Response&) {},
+      &handle,
+      [&](const mln::Response& response) {
+        if (response.error) ++failures;
+      },
       [&](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
         ++starts;
         return nullptr;
@@ -300,16 +321,155 @@ void pass_through_retry_starts_native_after_scheduling_failure() {
       const auto faults = mln::native_tests::AllocationFaults{budget};
       status = mln_resource_request_pass_through(handle, nullptr);
     }
-    if (status == MLN_STATUS_NATIVE_ERROR)
-      status = mln_resource_request_pass_through(handle, nullptr);
+    MLN_TEST_INVALID_STATE(mln_resource_request_pass_through(handle, nullptr));
     loop.invoke([&] { loop.stop(); });
     loop.run();
-    mln_resource_request_release(handle);
     request.reset();
-    MLN_TEST_OK(status);
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(
-      1, starts, "pass-through retry left native loading unscheduled"
+    if (status == MLN_STATUS_OK) {
+      TEST_ASSERT_EQUAL_UINT_MESSAGE(
+        1, starts, "the pass-through left native loading unscheduled"
+      );
+      TEST_ASSERT_EQUAL_UINT(0, failures);
+    } else {
+      MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
+      TEST_ASSERT_EQUAL_UINT(0, starts);
+      TEST_ASSERT_EQUAL_UINT(1, failures);
+    }
+  }
+}
+
+// Under allocation failure, including a failed post of the response to the
+// requester, a completion either delivers its response or fails the request as
+// a release does. Either way the request gets one response, and the handle
+// ends.
+void completion_responds_or_fails_under_allocation_failure() {
+  static constexpr auto body = std::string_view{"a body that allocates"};
+  auto completed = false;
+  for (auto budget = std::size_t{0}; !completed; ++budget) {
+    TEST_ASSERT_LESS_THAN_size_t_MESSAGE(
+      64, budget, "the completion never succeeded"
     );
+    auto loop = mln::util::RunLoop{};
+    auto handle = mln_resource_request{MLN_HANDLE_NULL};
+    auto responses = std::vector<mln::Response>{};
+    responses.reserve(2);
+    auto request = mln::core::request_custom_resource(
+      mln::Resource::style("custom://completion-allocation"),
+      "custom://completion-allocation",
+      [](
+        void* data, const mln_resource_request_info*, mln_resource_request value
+      ) -> void { *static_cast<mln_resource_request*>(data) = value; },
+      &handle,
+      [&](const mln::Response& response) { responses.push_back(response); },
+      [](mln::FileSource::Callback) -> std::unique_ptr<mln::AsyncRequest> {
+        return nullptr;
+      }
+    );
+    const auto response = mln_resource_response{
+      .size = sizeof(mln_resource_response),
+      .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+      .bytes = reinterpret_cast<const std::uint8_t*>(body.data()),
+      .byte_count = body.size(),
+    };
+    auto status = MLN_STATUS_OK;
+    {
+      const auto faults = mln::native_tests::AllocationFaults{budget};
+      status = mln_resource_request_complete(handle, &response, nullptr);
+    }
+    MLN_TEST_INVALID_STATE(
+      mln_resource_request_complete(handle, &response, nullptr)
+    );
+    loop.invoke([&] { loop.stop(); });
+    loop.run();
+    request.reset();
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(
+      1, responses.size(), "the completion left its request without a response"
+    );
+    const auto& delivered = responses.front();
+    if (status == MLN_STATUS_OK) {
+      completed = true;
+      TEST_ASSERT_NULL(delivered.error.get());
+      TEST_ASSERT_NOT_NULL(delivered.data.get());
+      TEST_ASSERT_EQUAL_STRING(
+        std::string{body}.c_str(), delivered.data->c_str()
+      );
+    } else {
+      MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
+      TEST_ASSERT_NOT_NULL(delivered.error.get());
+      TEST_ASSERT_TRUE(
+        delivered.error->reason == mln::Response::Error::Reason::Other
+      );
+    }
+  }
+}
+
+// MapLibre's finished callback posts the transform's answer to the waiting
+// request, which allocates, as this callback does. Under allocation failure,
+// including a failed post, a transform answer either posts its result or fails
+// the request as a release does. Either way the request gets one result, and
+// the handle ends.
+void transform_answers_post_or_fail_under_allocation_failure() {
+  using Result = mln::ResourceTransform::Result;
+  static constexpr auto url = std::string_view{"custom://transform-allocation"};
+  for (const auto fail : {false, true}) {
+    auto answered = false;
+    for (auto budget = std::size_t{0}; !answered; ++budget) {
+      TEST_ASSERT_LESS_THAN_size_t_MESSAGE(
+        64, budget, "the transform answer never succeeded"
+      );
+      auto request = mln_resource_transform_request{MLN_HANDLE_NULL};
+      auto results = std::vector<std::unique_ptr<Result>>{};
+      results.reserve(2);
+      mln::core::request_resource_transform(
+        [](
+          void* data, mln_resource_kind, mln_buffer_view,
+          mln_resource_transform_request value
+        ) { *static_cast<mln_resource_transform_request*>(data) = value; },
+        &request, MLN_RESOURCE_KIND_STYLE, std::string{url},
+        [&results](Result result) {
+          results.push_back(std::make_unique<Result>(std::move(result)));
+        }
+      );
+      TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, request);
+      const auto error = mln_resource_transform_error{
+        .size = sizeof(mln_resource_transform_error),
+        .reason = MLN_RESOURCE_ERROR_REASON_SERVER,
+      };
+      const auto view = mln_buffer_view{.data = url.data(), .size = url.size()};
+      auto status = MLN_STATUS_OK;
+      {
+        const auto faults = mln::native_tests::AllocationFaults{budget};
+        status =
+          fail
+            ? mln_resource_transform_request_fail(request, &error, nullptr)
+            : mln_resource_transform_request_complete(request, view, nullptr);
+      }
+      MLN_TEST_INVALID_STATE(
+        mln_resource_transform_request_complete(request, view, nullptr)
+      );
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(
+        1, results.size(), "the answer left its request without a result"
+      );
+      const auto& result = *results.front();
+      if (status == MLN_STATUS_OK) {
+        answered = true;
+        if (fail) {
+          TEST_ASSERT_FALSE(result.has_value());
+          TEST_ASSERT_TRUE(
+            result.error().reason == mln::Response::Error::Reason::Server
+          );
+        } else {
+          TEST_ASSERT_TRUE(result.has_value());
+          TEST_ASSERT_EQUAL_STRING(std::string{url}.c_str(), result->c_str());
+        }
+      } else {
+        MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
+        TEST_ASSERT_FALSE(result.has_value());
+        TEST_ASSERT_TRUE(
+          result.error().reason == mln::Response::Error::Reason::Other
+        );
+      }
+    }
   }
 }
 
@@ -352,7 +512,9 @@ void reserved_decisions_are_cancelled_with_the_native_request() {
 MLN_TEST_GROUP {
   RUN_TEST(reserved_decisions_are_cancelled_with_the_native_request);
   RUN_TEST(a_failed_provider_copy_delivers_with_persistent_allocation_failure);
-  RUN_TEST(pass_through_retry_starts_native_after_scheduling_failure);
+  RUN_TEST(pass_through_starts_native_or_fails_under_allocation_failure);
+  RUN_TEST(completion_responds_or_fails_under_allocation_failure);
+  RUN_TEST(transform_answers_post_or_fail_under_allocation_failure);
   RUN_TEST(a_queued_cancel_precedes_its_release_when_allocations_fail);
   RUN_TEST(rejected_provider_registration_queues_no_release);
   RUN_TEST(rejected_callback_registrations_never_release_caller_data);

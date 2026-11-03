@@ -86,6 +86,36 @@ func installProvider(
   }
 }
 
+/// A refused answer still closes the request's handle, and the request fails
+/// as a close fails it.
+@Test func aRefusedAnswerClosesItsRequest() async throws {
+  try await withMapFixture { fixture in
+    let taken = LockedBox<ResourceRequestHandle?>(nil)
+    try await installProvider(
+      on: fixture.runtime,
+      for: "custom://refused.json"
+    ) { handle in
+      taken.update { $0 = handle }
+    }
+    try fixture.map.discarding.setStyleUrl("custom://refused.json")
+    await awaitCondition("the provider to take the request") {
+      taken.value != nil
+    }
+    let request = try #require(taken.value)
+
+    await expectMaplibreError(.invalidArgument) {
+      try request.complete(response: ResourceResponse(
+        status: .ok,
+        etag: "bad\u{0}tag"
+      ))
+    }
+    #expect(request.isClosed)
+    #expect(try await fixture.awaitEvent("the refused style's failure") {
+      $0.type == .mapLoadingFailed
+    } != nil)
+  }
+}
+
 /// A header transform's response object works only on the callback's thread
 /// and only until the callback returns.
 @Test func aHeaderResponseExpiresWithItsCallback() async throws {

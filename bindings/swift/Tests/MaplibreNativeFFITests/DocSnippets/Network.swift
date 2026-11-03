@@ -34,12 +34,10 @@ private func network(runtime: RuntimeHandle, map: MapHandle) throws {
 
   // #region rewrite
   let transform = ResourceTransform { _, url, request in
-    do {
-      try request.complete(url: withApiKey(url))
-    } catch {
-      // Releasing the request without an answer fails it.
-      request.close()
-    }
+    // The answer ends the request whatever it returns. A failed one
+    // fails
+    // the request.
+    try? request.complete(url: withApiKey(url))
   }
 
   try runtime.discarding.setResourceTransform(transform)
@@ -53,11 +51,7 @@ private func network(runtime: RuntimeHandle, map: MapHandle) throws {
       } else {
         ResourceResponse(status: .noContent)
       }
-      do {
-        try handle.complete(response: response)
-      } catch {
-        handle.close()
-      }
+      try? handle.complete(response: response)
     },
     routes: [ResourceRoute(
       kinds: .tile,

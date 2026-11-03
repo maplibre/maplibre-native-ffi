@@ -126,6 +126,12 @@ void mln_ts_consume(mln_ts_call* call) {
   }
 }
 
+void mln_ts_dispose_unconsumed(mln_ts_call* call) {
+  if (call->owner != NULL) {
+    mln_ts_owner_dispose(call->owner);
+  }
+}
+
 bool mln_ts_check(
   mln_ts_call* call, mln_status status, const mln_diagnostic* diagnostic
 ) {

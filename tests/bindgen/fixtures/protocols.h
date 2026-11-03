@@ -573,6 +573,7 @@ mln_status mln_map_set_query_handler(
   mln_map map, const mln_query_handler* handler,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
+BIND("consumes=always")
 mln_status mln_query_answer(
   mln_query query, mln_buffer_view text, mln_diagnostic* out_diagnostic
 );

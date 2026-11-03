@@ -6,8 +6,12 @@ from ..names import camel
 
 def consumed(plan, owner, values):
     function = plan.function
-    if plan.consumes == "always" and (
-        plan.completion or function.return_type.kind != "void"
+    # An answer ends its receiver on every outcome, through its own
+    # adapter; any other call that always consumes is a void release.
+    if (
+        plan.consumes == "always"
+        and not plan.answers
+        and (plan.completion or function.return_type.kind != "void")
     ):
         raise Unsupported(
             f"Swift: {function.name}: unconditional consumption requires a void immediate release"
@@ -33,16 +37,16 @@ def consumed(plan, owner, values):
             local = identifier(camel(parameter.name))
             declarations.append(f"{local}: {values.public(parameter.value)}")
             args.append(encode(values, parameter.value, local))
-        # A release with inputs is idempotent. An answer that consumes its
-        # receiver keeps its name, and a repeated one reaches native.
+        # A release with inputs is idempotent. An answer keeps its name, ends
+        # its receiver whatever it returns, and a repeated one reaches native.
         name = "release" if plan.release else identifier(method_name(plan))
-        idempotent = "" if plan.release else "idempotent: false"
+        close = "answer" if plan.answers else "closeOnce"
         return (
             f"""public extension {owner} {{
 {doc(values.bound, function.name, "  ")}  func {name}({", ".join(declarations)}) throws {{
     let arena = NativeInputArena()
     defer {{ withExtendedLifetime(arena) {{}} }}
-    try handle.closeOnce({idempotent}) {{ live in
+    try handle.{close} {{ live in
       {"var" if "&raw" in args else "let"} raw = live.raw
       {checked(native_call(function, *args))}
     }}

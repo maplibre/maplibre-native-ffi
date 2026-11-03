@@ -27,7 +27,11 @@ def render_export(entry: Lowered) -> str:
     count = len(entry.native_parameters)
     lines.append(f"  if (!mln_ts_begin(call, env, info, {count})) return NULL;")
     lines += [f"  {line}" for line in entry.c_body]
-    if any("goto done" in line for line in entry.c_body):
+    if entry.plan.answers:
+        # An answer ends its handle whatever happens, including a conversion
+        # that fails before native code sees it.
+        lines += ["done:", "  mln_ts_dispose_unconsumed(call);"]
+    elif any("goto done" in line for line in entry.c_body):
         lines.append("done:")
     lines += ["  return mln_ts_end(call);", "}"]
     helpers = entry.c_helpers + "\n" if entry.c_helpers else ""

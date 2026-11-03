@@ -98,10 +98,27 @@ fn completeOnThread(handle: *maplibre.ResourceRequest, result: *?anyerror) void 
     result.* = null;
 }
 
-// A provider can keep its request and answer it later from any thread. The
-// binding validates the response's strings first, a refused completion leaves
-// the handle open, and an accepted one closes it. Native refuses a second
-// completion, through the closed handle or a copy made before it closed.
+// A refused answer still closes the handle, and its request fails as a
+// release fails it.
+test "a refused answer closes its request handle and fails the request" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+    var provider = DeferringProvider{ .url = "custom://refused.json" };
+    try provider.install(fixture);
+    var handle = try provider.take(fixture);
+    defer handle.release();
+
+    var diagnostic: maplibre.Diagnostic = .{};
+    try testing.expectError(error.InvalidArgument, handle.complete(.{ .etag = "bad\x00tag" }, &diagnostic));
+    try testing.expect(diagnostic.status != null);
+    try testing.expect(handle.isClosed());
+    var failed = try fixture.waitForEvent(.map_loading_failed);
+    failed.deinit();
+}
+
+// A provider can keep its request and answer it later from any thread. An
+// accepted answer closes the handle. Native refuses a second completion,
+// through the closed handle or a copy made before it closed.
 test "a kept request handle answers its request later from another thread" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -110,11 +127,6 @@ test "a kept request handle answers its request later from another thread" {
     var handle = try provider.take(fixture);
     defer handle.release();
     try testing.expect(!try handle.isCancelled(null));
-
-    var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, handle.complete(.{ .etag = "bad\x00tag" }, &diagnostic));
-    try testing.expect(diagnostic.status != null);
-    try testing.expect(!handle.isClosed());
 
     var copy = handle;
     var thread_result: ?anyerror = error.NotRun;

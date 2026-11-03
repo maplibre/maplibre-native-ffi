@@ -115,7 +115,11 @@ def operation(
     passes no completion. With `retiring`, the method belongs to the value
     that a release leaves, which names the handle without owning it."""
     function = plan.function
-    if plan.consumes == "always" and function.return_type.kind != "void":
+    if (
+        plan.consumes == "always"
+        and function.return_type.kind != "void"
+        and not plan.answers
+    ):
         raise Unsupported(
             "status-returning unconditional consumption requires a commit-on-error adapter"
         )
@@ -687,11 +691,12 @@ def method_code(
                 public = f"({public}, {retired})"
                 ending[-1] += f".map(|value| (value, {retired}({body.target})))"
         # The call takes the owner, and a refusal hands it back with the
-        # error, so no value outlives its handle.
+        # error, so no value outlives its handle. An answer ends the owner
+        # whatever it returns.
         body.signature[0] = "self"
         lines = [
             *prelude,
-            f"self.consume(|{body.target}| {{",
+            f"self.{'consume_always' if plan.answers else 'consume'}(|{body.target}| {{",
             f"    let {mutable}{call} = Call::new({body.target});",
             *("    " + line for line in [*setup, *ending]),
             "})",
@@ -708,7 +713,7 @@ def method_code(
         lines += [*prelude, *setup, *ending]
     returns = (
         f" -> std::result::Result<{public}, (Self, Error)>"
-        if consuming
+        if consuming and not plan.answers
         else f" -> Result<{public}>"
     )
     # A call with no status and an infallible conversion returns its value.

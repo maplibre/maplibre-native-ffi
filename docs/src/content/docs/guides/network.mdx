@@ -40,7 +40,9 @@ The callback answers each request with its new URL through
 
 To stop a request instead, such as when the callback can't get a credential,
 fail it with [](api:mln_resource_transform_request_fail). A request that the
-callback releases without an answer also fails.
+callback releases without an answer also fails, and so does one whose answer
+fails, such as an empty URL. An answer ends the request whatever it returns, so
+the callback doesn't release it afterwards.
 
 ## Serve resources
 

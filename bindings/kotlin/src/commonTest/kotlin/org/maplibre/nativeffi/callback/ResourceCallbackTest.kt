@@ -96,13 +96,6 @@ class ResourceCallbackTest {
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
       val loaded = map.setStyleUrl(STYLE_URL)
       val request = claimed.awaitWithin("the provider to claim the request")
-
-      // A response the C API cannot represent is refused and leaves the request answerable.
-      assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-        request.complete(
-          ResourceResponse(ResourceResponseStatus.ERROR, errorMessage = "bad\u0000message"),
-        )
-      }
       request.complete(
         ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray()),
       )
@@ -114,6 +107,24 @@ class ResourceCallbackTest {
       }
       assertFailsWithStatus(Status.INVALID_STATE) { request.passThrough() }
       loaded.awaitWithin("the style load")
+    }
+  }
+
+  @Test
+  fun aRefusedAnswerClosesItsRequestAndFailsIt() = runSuspendTest {
+    val claimed = CompletableDeferred<ResourceRequestHandle>()
+    withMap(provider = claimingProvider(STYLE_URL, claimed)) {
+      map.discarding.setStyleUrl(STYLE_URL)
+      val request = claimed.awaitWithin("the provider to claim the request")
+      // A response the C API cannot represent is refused, and the refused answer still ends the
+      // request.
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) {
+        request.complete(
+          ResourceResponse(ResourceResponseStatus.ERROR, errorMessage = "bad\u0000message"),
+        )
+      }
+      assertTrue(request.isClosed)
+      awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
     }
   }
 

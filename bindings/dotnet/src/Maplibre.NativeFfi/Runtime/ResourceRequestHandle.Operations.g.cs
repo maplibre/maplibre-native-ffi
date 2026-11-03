@@ -63,6 +63,9 @@ public sealed unsafe partial class ResourceRequestHandle
     /// Answers a resource request.
     /// </summary>
     /// <remarks>
+    /// <para>A failed answer fails the request with
+    /// <c>ResourceErrorReason.Other</c>, as
+    /// <c>ResourceRequestHandle.Dispose()</c> does.</para>
     /// <para>See <c>mln_resource_request_complete</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -73,13 +76,20 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void Complete(ResourceResponse response)
     {
-        using var scope = new NativeCallScope();
-        var nativeResponse = scope.Value(NativeResourceResponse(response, scope));
-        state.Release(
-            (live, diagnostic) =>
-                NativeMethods.mln_resource_request_complete(live, nativeResponse, diagnostic),
-            idempotent: false
-        );
+        try
+        {
+            using var scope = new NativeCallScope();
+            var nativeResponse = scope.Value(NativeResourceResponse(response, scope));
+            state.Answer(
+                (live, diagnostic) =>
+                    NativeMethods.mln_resource_request_complete(live, nativeResponse, diagnostic)
+            );
+        }
+        catch
+        {
+            state.EndAnswer();
+            throw;
+        }
     }
 
     /// <summary>
@@ -101,6 +111,9 @@ public sealed unsafe partial class ResourceRequestHandle
     /// Hands a resource request back to the library to load as usual.
     /// </summary>
     /// <remarks>
+    /// <para>A failed call fails the request with
+    /// <c>ResourceErrorReason.Other</c>, as
+    /// <c>ResourceRequestHandle.Dispose()</c> does.</para>
     /// <para>See <c>mln_resource_request_pass_through</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -111,11 +124,19 @@ public sealed unsafe partial class ResourceRequestHandle
     /// </remarks>
     public void PassThrough()
     {
-        using var scope = new NativeCallScope();
-        state.Release(
-            (live, diagnostic) => NativeMethods.mln_resource_request_pass_through(live, diagnostic),
-            idempotent: false
-        );
+        try
+        {
+            using var scope = new NativeCallScope();
+            state.Answer(
+                (live, diagnostic) =>
+                    NativeMethods.mln_resource_request_pass_through(live, diagnostic)
+            );
+        }
+        catch
+        {
+            state.EndAnswer();
+            throw;
+        }
     }
 
     /// <summary>

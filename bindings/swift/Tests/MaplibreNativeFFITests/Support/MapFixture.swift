@@ -23,8 +23,9 @@ func denyingProvider(routes: [String: Data] = [:]) -> ResourceProvider {
         errorReason: .notFound,
         errorMessage: "the test fixture serves no \(url)"
       )
-    // A request that native cancelled first refuses the answer.
-    do { try handle.complete(response: response) } catch { handle.close() }
+    // A request that native cancelled first refuses the answer, which still
+    // ends it.
+    try? handle.complete(response: response)
   }
 }
 

@@ -79,17 +79,29 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   void close(int Function(H) destroy) {
     _checkReleasable();
     if (_closed) return;
-    answer(destroy);
-  }
-
-  /// Runs [answer], which native consumes the handle with when it accepts the
-  /// call. A repeated answer still reaches native, which reports the handle
-  /// stale, where a second [close] does nothing.
-  void answer(int Function(H) answer) {
-    _checkReleasable();
-    checkNativeCall(answer(_handle));
+    checkNativeCall(destroy(_handle));
     _closed = true;
     _detachOwnerFinalizer();
+  }
+
+  /// Runs [answer], which ends the handle whatever it returns. A repeated
+  /// answer still reaches native, which reports the handle stale, where a
+  /// second [close] does nothing.
+  void answer(int Function(H) answer) {
+    _checkReleasable();
+    final int status;
+    try {
+      status = answer(_handle);
+    } catch (_) {
+      // The answer failed before native saw it, so the handle is still live.
+      _closed = true;
+      _disposeNow();
+      rethrow;
+    }
+    // Native ends a live handle on every outcome.
+    _closed = true;
+    _detachOwnerFinalizer();
+    checkNativeCall(status);
   }
 
   /// Submits a release and detaches cleanup once native accepts it.
@@ -129,6 +141,19 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
       _destroyOwnerToken(token);
       rethrow;
     }
+  }
+
+  /// Disposes the handle through its finalizer token now, and detaches the
+  /// finalizer.
+  void _disposeNow() {
+    final token = _ownerToken;
+    if (token == null) {
+      return;
+    }
+    _ownerFinalizer.detach(_finalizerDetachToken);
+    _leakReporter.detach(_finalizerDetachToken);
+    _ownerToken = null;
+    raw.mln_binding_owner_finalize(token);
   }
 
   void _detachOwnerFinalizer() {

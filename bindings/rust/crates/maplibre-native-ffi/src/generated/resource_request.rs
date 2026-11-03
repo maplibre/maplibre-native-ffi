@@ -16,17 +16,17 @@ native_owner! {
 impl ResourceRequestHandle {
     /// Answers a resource request.
     ///
+    /// A failed answer fails the request with `ResourceErrorReason::Other`, as
+    /// `ResourceRequestHandle::release()` does.
+    ///
     /// See `mln_resource_request_complete` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     ///
     /// # Errors
     ///
     /// - `Status::InvalidState` when the library cancelled the request.
-    pub fn complete(
-        self,
-        response: &ResourceResponse<'_>,
-    ) -> std::result::Result<(), (Self, Error)> {
-        self.consume(|handle| {
+    pub fn complete(self, response: &ResourceResponse<'_>) -> Result<()> {
+        self.consume_always(|handle| {
             let mut call = Call::new(handle);
             let response = call.reference(&response)?;
             call.status(|handle, out_diagnostic| unsafe {
@@ -50,14 +50,17 @@ impl ResourceRequestHandle {
 
     /// Hands a resource request back to the library to load as usual.
     ///
+    /// A failed call fails the request with `ResourceErrorReason::Other`, as
+    /// `ResourceRequestHandle::release()` does.
+    ///
     /// See `mln_resource_request_pass_through` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     ///
     /// # Errors
     ///
     /// - `Status::InvalidState` when the library cancelled the request.
-    pub fn pass_through(self) -> std::result::Result<(), (Self, Error)> {
-        self.consume(|handle| {
+    pub fn pass_through(self) -> Result<()> {
+        self.consume_always(|handle| {
             let mut call = Call::new(handle);
             call.status(|handle, out_diagnostic| unsafe {
                 sys::mln_resource_request_pass_through(handle, out_diagnostic)

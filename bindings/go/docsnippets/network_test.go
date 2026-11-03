@@ -47,9 +47,10 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 			url string,
 			request *maplibre.ResourceTransformRequestHandle,
 		) {
+			// The answer ends the request whatever it returns. A failed
+			// one fails the request.
 			if err := request.Complete(withAPIKey(url)); err != nil {
-				// Closing the request without an answer fails it.
-				request.Close()
+				log.Print(err)
 			}
 		},
 	}
@@ -81,7 +82,7 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 			}
 
 			if err := handle.Complete(response); err != nil {
-				handle.Close()
+				log.Print(err)
 			}
 		},
 	}

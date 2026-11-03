@@ -8332,6 +8332,9 @@ func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(replacement VulkanSu
 
 // Complete answers a resource request.
 //
+// A failed answer fails the request with ResourceErrorReasonOther, as
+// ResourceRequestHandle.Close() does.
+//
 // See mln_resource_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 //
@@ -8357,6 +8360,9 @@ func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 }
 
 // PassThrough hands a resource request back to the library to load as usual.
+//
+// A failed call fails the request with ResourceErrorReasonOther, as
+// ResourceRequestHandle.Close() does.
 //
 // See mln_resource_request_pass_through in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8404,7 +8410,8 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 
 // Complete answers a resource transform request with the URL to load instead.
 //
-// url must not be empty.
+// url must not be empty. A failed answer fails the request with
+// ResourceErrorReasonOther, as ResourceTransformRequestHandle.Close() does.
 //
 // See mln_resource_transform_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8417,7 +8424,9 @@ func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
 // Fail fails a resource transform request without sending it.
 //
 // The library retries a request that failed for a reason it retries, such as
-// ResourceErrorReasonConnection, and the retry calls the transform again.
+// ResourceErrorReasonConnection, and the retry calls the transform again. When
+// this call fails, the request fails with ResourceErrorReasonOther, as
+// ResourceTransformRequestHandle.Close() does.
 //
 // See mln_resource_transform_request_fail in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html

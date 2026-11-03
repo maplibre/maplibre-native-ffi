@@ -116,8 +116,8 @@ mln_resource_response mln_test_error_response(
   uint32_t reason, const char* message
 );
 
-// Answers a provider request, which consumes its handle, or releases the
-// handle when the answer fails, as for a cancelled request. A case that checks
+// Answers a provider request and ignores whether the answer fails, as for a
+// cancelled request. Either way the answer ends the handle. A case that checks
 // the answer itself calls the C API directly.
 void mln_test_request_answer(
   mln_resource_request handle, const mln_resource_response* response

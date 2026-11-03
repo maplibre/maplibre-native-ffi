@@ -284,6 +284,44 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 for fragment in fragments:
                     self.assertIn(fragment, source)
 
+    def test_an_answer_ends_its_owner_whatever_it_returns(self):
+        api = parse(groups=("owned_argument",))
+        validate(api)
+        # Native ends a live handle on every outcome. Each binding ends its
+        # owner after the call too, and releases a handle that a failure
+        # before the call left live: through the owner's state, its finalizer
+        # token, or a release that does nothing for a handle the answer ended.
+        expected = {
+            dart: ("void answer(String text) => _state.answer(",),
+            dotnet: (
+                "state.Answer((live, diagnostic) => NativeMethods.mln_query_answer(live, nativeText, diagnostic));",
+                "catch\n        {\n            state.EndAnswer();\n            throw;",
+            ),
+            go: ("return bindingDo(bindingAnswering(receiver.owner()), ",),
+            kotlin: (
+                "public fun answer(text: String): Unit = nativeAnswer(this, binding) {",
+            ),
+            python: (
+                "reservation.commit();\n        result?;",
+                "return _answer(self, lambda: self._native.answer(text))",
+            ),
+            rust: (
+                "pub fn answer(self, text: &str) -> Result<()> {\n        self.consume_always(|query| {",
+            ),
+            swift: ("try handle.answer { live in",),
+            typescript: (
+                "status = mln_query_answer(arg_query, arg_text, &diagnostic);\n  mln_ts_consume(call);",
+                "done:\n  mln_ts_dispose_unconsumed(call);",
+                "answerSync(this, (handle, token) => native.mln_query_answer(handle, token, text));",
+            ),
+            zig: ('errdefer self.deinit();\n    try call.invoke("mln_query_answer"',),
+        }
+        for emitter, fragments in expected.items():
+            with self.subTest(emitter=emitter.__name__):
+                source = self.rendered(emitter, api)
+                for fragment in fragments:
+                    self.assertIn(fragment, source)
+
     def test_a_complete_record_converts_to_its_option_bag(self):
         # The record's members come in another order than the bag's, and the
         # bag has a member, `anchor`, that the record lacks.

@@ -154,10 +154,9 @@ export function closeSync(
 }
 
 /**
- * Answers the handle through a synchronous call, which native code consumes
- * the handle with when it accepts the call. A repeated answer still reaches
- * native code, which reports the handle stale, where a second close does
- * nothing.
+ * Answers the handle through a synchronous call, which ends the handle
+ * whatever it returns. A repeated answer still reaches native code, which
+ * reports the handle stale, where a second close does nothing.
  */
 export function answerSync(
   owner: Owner,
@@ -165,8 +164,11 @@ export function answerSync(
 ) {
   const state = stateOf(owner);
   checkReleasable(state);
-  answer(state.handle, state.token);
-  released(state);
+  try {
+    answer(state.handle, state.token);
+  } finally {
+    released(state);
+  }
 }
 
 /**
