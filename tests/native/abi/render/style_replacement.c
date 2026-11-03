@@ -13,6 +13,7 @@ typedef struct replacement_wait {
   const mln_test_render_fixture* fixture;
   uint64_t token;
   uint64_t generation;
+  uint64_t render_update_generation;
   uint64_t retained_frame;
   unsigned int observed_frame_wakes;
   bool host_requested;
@@ -59,10 +60,6 @@ static bool note_settlement(const mln_runtime_event* event, void* context) {
     MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, event->type
   );
   if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) wait->idle = true;
-  if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
-    wait->full = event->payload.render_frame.mode == MLN_RENDER_MODE_FULL &&
-                 !event->payload.render_frame.needs_repaint;
-  }
   return false;
 }
 
@@ -78,6 +75,11 @@ static void drain_requested_frame(replacement_wait* wait) {
     mln_render_frame_batch_release(batch);
     TEST_ASSERT_EQUAL_UINT64(wait->token, result.token);
     TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+    // Runtime render events can arrive after a newer style has been applied.
+    // The demanded frame identifies the update it actually rendered.
+    wait->full =
+      result.map_update_generation >= wait->render_update_generation &&
+      result.mode == MLN_RENDER_MODE_FULL && !result.needs_repaint;
     wait->pending = false;
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     MLN_TEST_OK(
@@ -178,6 +180,8 @@ static void waiting_demands_settle_replaced_styles_with_revalidated_tiles(
     ));
     MLN_TEST_OK(mln_test_completion_finish(&completion));
     wait.generation = mln_test_completion_generation(&completion);
+    wait.render_update_generation =
+      mln_test_completion_render_update_generation(&completion);
     mln_test_completion_destroy(&completion);
     wait.idle = false;
     wait.full = false;
