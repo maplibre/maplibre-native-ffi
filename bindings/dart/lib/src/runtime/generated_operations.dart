@@ -25,9 +25,6 @@ OpenGlTextureFrame _readOpenGlTextureFrame(
   slot: source.slot,
   texture: source.texture,
   target: source.target,
-  internalFormat: source.internal_format,
-  format: source.format,
-  type: source.type,
 );
 
 Pointer<raw.mln_gpu_sync> _writeGpuSync(
@@ -828,11 +825,6 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   final result = into ?? arena<raw.mln_render_session_attach_options>();
   result.ref.size = sizeOf<raw.mln_render_session_attach_options>();
   result.ref.driver = value.driver.rawValue;
-  result.ref.requested_texture_ring_depth = _nativeInteger(
-    value.requestedTextureRingDepth,
-    0,
-    4294967295,
-  );
   result.ref.producer_sync_kinds = value.producerSyncKinds.rawValue;
   result.ref.frame_wake = registrations
       .add(_prepareWake(value.frameWake, registrations.roots))
@@ -855,23 +847,6 @@ Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
 }) {
   final result = into ?? arena<raw.mln_metal_context_descriptor>();
   result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
-  return result;
-}
-
-Pointer<raw.mln_metal_owned_texture_descriptor>
-_writeMetalOwnedTextureDescriptor(
-  MetalOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_owned_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_metal_owned_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
-  result.ref.pixel_format = value.pixelFormat;
-  result.ref.command_queue = Pointer<Void>.fromAddress(
-    value.commandQueue.address,
-  ).cast();
   return result;
 }
 
@@ -1017,19 +992,6 @@ _writeOpenGlBorrowedTextureDescriptor(
   return result;
 }
 
-Pointer<raw.mln_open_gl_owned_texture_descriptor>
-_writeOpenGlOwnedTextureDescriptor(
-  OpenGlOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_open_gl_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_open_gl_owned_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_open_gl_owned_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeOpenGlContextDescriptor(value.context, arena).ref;
-  return result;
-}
-
 Pointer<raw.mln_open_gl_surface_descriptor> _writeOpenGlSurfaceDescriptor(
   OpenGlSurfaceDescriptor value,
   Allocator arena, {
@@ -1118,19 +1080,6 @@ _writeVulkanBorrowedTextureDescriptor(
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
   result.ref.owner = value.owner.rawValue;
-  return result;
-}
-
-Pointer<raw.mln_vulkan_owned_texture_descriptor>
-_writeVulkanOwnedTextureDescriptor(
-  VulkanOwnedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_vulkan_owned_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_vulkan_owned_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_vulkan_owned_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
   return result;
 }
 
@@ -4098,47 +4047,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   }
 
-  /// Creates a session that renders the map into a ring of new Metal textures.
-  ///
-  /// See `mln_map_attach_metal_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-  ///   `RenderBackendFlag.metal`, or when the target supports none of the
-  ///   `producer_sync_kinds` in `options`.
-  NewRenderSession attachMetalOwnedTexture(
-    MetalOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_metal_owned_texture(
-          _handle.raw,
-          _writeMetalOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
   /// Creates a session that renders the map to a Metal layer.
   ///
   /// See `mln_map_attach_metal_surface` in the
@@ -4273,54 +4181,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   }
 
-  /// Creates a session that renders the map into a ring of new OpenGL textures.
-  ///
-  /// With `OpenGlContextOwnership.shared`, the session needs
-  /// `RenderDriverKind.callerGraphicsThread`, and the textures are in your
-  /// context's share group. With `OpenGlContextOwnership.dedicated`, the
-  /// session needs `RenderDriverKind.coreWorker` and renders in a context of
-  /// its own. You can't acquire its frames, but
-  /// `RenderSessionHandle.readTexture()` reads them.
-  ///
-  /// See `mln_map_attach_open_gl_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
-  ///   the context's platform, or when the target supports none of the
-  ///   `producer_sync_kinds` in `options`.
-  NewRenderSession attachOpenGlOwnedTexture(
-    OpenGlOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_open_gl_owned_texture(
-          _handle.raw,
-          _writeOpenGlOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
   /// Creates a session that renders the map to an OpenGL surface.
   ///
   /// The session needs `RenderDriverKind.coreWorker` for a transferred WebGL
@@ -4384,47 +4244,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         () => raw.mln_map_attach_vulkan_borrowed_texture(
           _handle.raw,
           _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
-  /// Creates a session that renders the map into a ring of new Vulkan images.
-  ///
-  /// See `mln_map_attach_vulkan_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-  ///   `RenderBackendFlag.vulkan`, or when the target supports none of the
-  ///   `producer_sync_kinds` in `options`.
-  NewRenderSession attachVulkanOwnedTexture(
-    VulkanOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_vulkan_owned_texture(
-          _handle.raw,
-          _writeVulkanOwnedTextureDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
           completion,
@@ -6508,8 +6327,7 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the session renders into a ring that it
-  ///   created.
+  /// - `Status.unsupported` when the session renders offscreen.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
@@ -7677,9 +7495,6 @@ final class ScopedOpenGlTextureFrame {
   int get slot => _value.slot;
   int get texture => _scope.active(_value).texture;
   int get target => _value.target;
-  int get internalFormat => _value.internalFormat;
-  int get format => _value.format;
-  int get type => _value.type;
 }
 
 /// A `GpuSync` whose native objects are readable only while the

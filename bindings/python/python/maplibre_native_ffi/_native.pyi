@@ -89,11 +89,6 @@ class _MapHandle:
         descriptor: MetalBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> dict[str, Any]: ...
-    def attach_metal_owned_texture(
-        self,
-        descriptor: MetalOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> dict[str, Any]: ...
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> dict[str, Any]: ...
@@ -108,22 +103,12 @@ class _MapHandle:
         descriptor: OpenGlBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> dict[str, Any]: ...
-    def attach_open_gl_owned_texture(
-        self,
-        descriptor: OpenGlOwnedTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> dict[str, Any]: ...
     def attach_open_gl_surface(
         self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
     ) -> dict[str, Any]: ...
     def attach_vulkan_borrowed_texture(
         self,
         descriptor: VulkanBorrowedTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> dict[str, Any]: ...
-    def attach_vulkan_owned_texture(
-        self,
-        descriptor: VulkanOwnedTextureDescriptor,
         options: RenderSessionAttachOptions,
     ) -> dict[str, Any]: ...
     def attach_vulkan_surface(

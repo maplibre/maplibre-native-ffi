@@ -72,7 +72,6 @@ Future<void> abandonSession() async {
     OffscreenDescriptor(extent: extent),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
-      requestedTextureRingDepth: 1,
       frameWake: Wake(
         callback: () {
           if (!frames.isCompleted) frames.complete();

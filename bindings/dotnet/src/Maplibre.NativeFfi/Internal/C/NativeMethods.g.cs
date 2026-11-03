@@ -220,16 +220,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_metal_owned_texture(
-        MlnMap map,
-        mln_metal_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_attach_metal_surface(
         MlnMap map,
         mln_metal_surface_descriptor* descriptor,
@@ -261,16 +251,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_open_gl_owned_texture(
-        MlnMap map,
-        mln_open_gl_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_attach_open_gl_surface(
         MlnMap map,
         mln_open_gl_surface_descriptor* descriptor,
@@ -284,16 +264,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_attach_vulkan_borrowed_texture(
         MlnMap map,
         mln_vulkan_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_vulkan_owned_texture(
-        MlnMap map,
-        mln_vulkan_owned_texture_descriptor* descriptor,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,

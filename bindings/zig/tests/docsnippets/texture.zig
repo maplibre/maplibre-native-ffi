@@ -49,14 +49,14 @@ fn renderToTexture(
     new_images: [2]u64,
     new_views: [2]u64,
 ) !void {
-    // #region attach-owned
+    // #region attach-options
     const options = maplibre.RenderSessionAttachOptions{
         .driver = .core_worker,
         .frame_wake = .{ .callback = onFrameWake },
         // Only if your renderer also submits to the graphics queue.
         .queue_lock = .{ .lock = lockQueue, .unlock = unlockQueue },
     };
-    // #endregion attach-owned
+    // #endregion attach-options
 
     // #region attach-borrowed
     // Your VkImage and VkImageView for each texture of the ring.

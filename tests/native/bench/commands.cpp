@@ -184,9 +184,27 @@ class Host {
     if (!graphics) std::abort();
     auto context = mln_test_graphics_context{};
     if (!mln_test_graphics_get_context(graphics, &context)) std::abort();
-    auto target = mln_vulkan_owned_texture_descriptor{};
-    target.size = sizeof(mln_vulkan_owned_texture_descriptor);
+    // A ring of two textures, so a frame can render while the last one is
+    // still acquired.
+    auto textures = std::array<mln_test_graphics_texture*, 2>{};
+    auto entries = std::array<mln_vulkan_borrowed_texture, 2>{};
+    auto info = mln_test_graphics_texture_info{};
+    for (size_t index = 0; index < textures.size(); ++index) {
+      textures[index] = mln_test_graphics_texture_create(graphics, 64, 64);
+      if (
+        !textures[index] ||
+        !mln_test_graphics_texture_get_info(textures[index], &info)
+      )
+        std::abort();
+      entries[index] = {
+        .image = info.vulkan_image, .image_view = info.vulkan_image_view
+      };
+    }
+    auto target = mln_vulkan_borrowed_texture_descriptor{};
+    target.size = sizeof(mln_vulkan_borrowed_texture_descriptor);
     target.extent = {.width = 64, .height = 64, .scale_factor = 1};
+    target.physical_width = info.width;
+    target.physical_height = info.height;
     target.context = {
       .instance = context.vulkan_instance,
       .physical_device = context.vulkan_physical_device,
@@ -196,13 +214,17 @@ class Host {
       .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
       .get_device_proc_addr = context.vulkan_get_device_proc_addr
     };
+    target.textures = entries.data();
+    target.texture_count = entries.size();
+    target.format = info.format;
+    target.final_layout = info.vulkan_final_layout;
     auto options = mln_render_session_attach_options{};
     options.size = sizeof(mln_render_session_attach_options);
     options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
     options.driver_work_wake = {.callback = wake, .user_data = this};
     options.frame_wake = {.callback = wake, .user_data = this};
     auto attached = Done{};
-    check(mln_map_attach_vulkan_owned_texture(
+    check(mln_map_attach_vulkan_borrowed_texture(
       map_, &target, &options, &session_, &attached.descriptor, nullptr
     ));
     for (;;) {
@@ -243,6 +265,7 @@ class Host {
       check(mln_render_session_service_driver_work(session_, nullptr));
     }
     check(mln_render_session_dispose(session_, nullptr, nullptr));
+    for (auto* texture : textures) mln_test_graphics_texture_destroy(texture);
     mln_test_graphics_destroy(graphics);
   }
   mln_map map_;

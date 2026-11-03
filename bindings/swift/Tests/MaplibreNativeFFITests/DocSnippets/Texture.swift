@@ -42,14 +42,14 @@
     newImages: [UInt64],
     newViews: [UInt64]
   ) async throws {
-    // #region attach-owned
+    // #region attach-options
     let options = RenderSessionAttachOptions(
       driver: .coreWorker,
       frameWake: Wake(callback: onFrameWake),
       // Only if your renderer also submits to the graphics queue.
       queueLock: QueueLock(lock: lockQueue, unlock: unlockQueue)
     )
-    // #endregion attach-owned
+    // #endregion attach-options
 
     // #region attach-borrowed
     var ring = VulkanBorrowedTextureDescriptor(

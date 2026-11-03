@@ -47,7 +47,7 @@ export async function renderToTexture(
   newImages: Pair,
   newViews: Pair,
 ): Promise<void> {
-  // #region attach-owned
+  // #region attach-options
   const options: RenderSessionAttachOptions = {
     driver: RenderDriverKind.coreWorker,
     frameWake: onFrameWake,
@@ -58,7 +58,7 @@ export async function renderToTexture(
       unlock: unlockQueue,
     }),
   };
-  // #endregion attach-owned
+  // #endregion attach-options
 
   // #region attach-borrowed
   let ring: VulkanBorrowedTextureDescriptor = {

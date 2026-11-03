@@ -16,8 +16,6 @@ static const mln_vulkan_non_dispatchable_handle high_view_handle =
 
 MLN_TEST_DESCRIPTOR_EDITS(vulkan_surface, mln_vulkan_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(vulkan_surface)
-MLN_TEST_DESCRIPTOR_EDITS(vulkan_owned, mln_vulkan_owned_texture_descriptor)
-MLN_TEST_OVERFLOW_EDIT(vulkan_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
   vulkan_borrowed, mln_vulkan_borrowed_texture_descriptor
 )
@@ -27,8 +25,9 @@ static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_surface.surface =
     MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
 }
-static void owned_without_device(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_owned.context.device = NULL;
+static void borrowed_without_device(void* call) {
+  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.context.device =
+    NULL;
 }
 static void borrowed_without_image(void* call) {
   mln_test_target_call* edited = call;
@@ -68,9 +67,6 @@ static void borrowed_with_unknown_owner(void* call) {
 }
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_vulkan_surface)
-MLN_TEST_ATTACH_SUBMITTER(
-  submit_owned_attach, mln_map_attach_vulkan_owned_texture
-)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_vulkan_borrowed_texture
 )
@@ -148,32 +144,14 @@ static void vulkan_attach_rejects_malformed_calls(void) {
     sizeof(surface_rows) / sizeof(surface_rows[0])
   );
 
-  call.descriptor.vulkan_owned = (mln_vulkan_owned_texture_descriptor){
-    .size = sizeof(mln_vulkan_owned_texture_descriptor)
-  };
-  call.descriptor.vulkan_owned.extent = mln_test_target_extent();
-  call.descriptor.vulkan_owned.context = fake_context();
-  static const mln_test_validation_case owned_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(vulkan_owned),
-    MLN_TEST_OVERFLOW_CASE(vulkan_owned),
-    {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT,
-     "must not be null"},
-#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
-  };
-  mln_test_run_attach_table(
-    submit_owned_attach, &call, owned_rows,
-    sizeof(owned_rows) / sizeof(owned_rows[0])
-  );
-
   call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
   describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed),
     MLN_TEST_BORROWED_CASES(vulkan_borrowed),
+    {"null device", borrowed_without_device, MLN_STATUS_INVALID_ARGUMENT,
+     "must not be null"},
     {"null image", borrowed_without_image, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null image view", borrowed_without_image_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},

@@ -54,7 +54,7 @@ internal static class Texture
         ulong[] newViews
     )
     {
-        // #region attach-owned
+        // #region attach-options
         var options = new RenderSessionAttachOptions
         {
             Driver = RenderDriverKind.CoreWorker,
@@ -63,7 +63,7 @@ internal static class Texture
             // submits to the graphics queue.
             QueueLock = new QueueLock(LockQueue, UnlockQueue),
         };
-        // #endregion attach-owned
+        // #endregion attach-options
 
         // #region attach-borrowed
         var ring = new VulkanBorrowedTextureDescriptor

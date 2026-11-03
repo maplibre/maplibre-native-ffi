@@ -28,7 +28,6 @@ import type {
   MapView,
   MapViewportOptions,
   MetalBorrowedTextureDescriptor,
-  MetalOwnedTextureDescriptor,
   MetalSurfaceDescriptor,
   MetalTextureFrame,
   NetworkStatus,
@@ -38,7 +37,6 @@ import type {
   OffscreenDeviceOptions,
   OpenGlBorrowedTextureDescriptor,
   OpenGlContextProviderFlag,
-  OpenGlOwnedTextureDescriptor,
   OpenGlSurfaceDescriptor,
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
@@ -68,11 +66,9 @@ import type {
   StyleTransitionOptions,
   StyleVectorTileEncoding,
   VulkanBorrowedTextureDescriptor,
-  VulkanOwnedTextureDescriptor,
   VulkanSurfaceDescriptor,
   VulkanTextureFrame,
   WebGpuBorrowedTextureDescriptor,
-  WebGpuOwnedTextureDescriptor,
   WebGpuSurfaceDescriptor,
   WebGpuTextureFrame,
 } from "./generated_values.ts";
@@ -171,12 +167,6 @@ export interface NativeOperations {
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;
-  mln_map_attach_metal_owned_texture(
-    map: bigint,
-    descriptor: MetalOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
   mln_map_attach_metal_surface(
     map: bigint,
     descriptor: MetalSurfaceDescriptor,
@@ -196,12 +186,6 @@ export interface NativeOperations {
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;
-  mln_map_attach_open_gl_owned_texture(
-    map: bigint,
-    descriptor: OpenGlOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
   mln_map_attach_open_gl_surface(
     map: bigint,
     descriptor: OpenGlSurfaceDescriptor,
@@ -214,12 +198,6 @@ export interface NativeOperations {
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;
-  mln_map_attach_vulkan_owned_texture(
-    map: bigint,
-    descriptor: VulkanOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
   mln_map_attach_vulkan_surface(
     map: bigint,
     descriptor: VulkanSurfaceDescriptor,
@@ -229,12 +207,6 @@ export interface NativeOperations {
   mln_map_attach_web_gpu_borrowed_texture(
     map: bigint,
     descriptor: WebGpuBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_web_gpu_owned_texture(
-    map: bigint,
-    descriptor: WebGpuOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;

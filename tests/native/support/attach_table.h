@@ -35,16 +35,12 @@ typedef struct mln_test_target_call {
   bool null_completion;
   union {
     mln_metal_surface_descriptor metal_surface;
-    mln_metal_owned_texture_descriptor metal_owned;
     mln_metal_borrowed_texture_descriptor metal_borrowed;
     mln_vulkan_surface_descriptor vulkan_surface;
-    mln_vulkan_owned_texture_descriptor vulkan_owned;
     mln_vulkan_borrowed_texture_descriptor vulkan_borrowed;
     mln_open_gl_surface_descriptor opengl_surface;
-    mln_open_gl_owned_texture_descriptor opengl_owned;
     mln_open_gl_borrowed_texture_descriptor opengl_borrowed;
     mln_web_gpu_surface_descriptor webgpu_surface;
-    mln_web_gpu_owned_texture_descriptor webgpu_owned;
     mln_web_gpu_borrowed_texture_descriptor webgpu_borrowed;
   } descriptor;
   // Storage for a borrowed descriptor's textures array. A row works on a copy

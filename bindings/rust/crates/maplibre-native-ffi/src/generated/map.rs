@@ -329,51 +329,6 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Creates a session that renders the map into a ring of new Metal
-    /// textures.
-    ///
-    /// See `mln_map_attach_metal_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
-    ///   `RenderBackendFlag::METAL`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "tvos",
-        target_os = "visionos"
-    ))]
-    pub unsafe fn attach_metal_owned_texture(
-        &self,
-        descriptor: &MetalOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_metal_owned_texture(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session)?, future))
-    }
-
     /// Creates a session that renders the map to a Metal layer.
     ///
     /// See `mln_map_attach_metal_surface` in the
@@ -503,52 +458,6 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Creates a session that renders the map into a ring of new OpenGL
-    /// textures.
-    ///
-    /// With `OpenGlContextOwnership::Shared`, the session needs
-    /// `RenderDriverKind::CallerGraphicsThread`, and the textures are in your
-    /// context's share group. With `OpenGlContextOwnership::Dedicated`, the
-    /// session needs `RenderDriverKind::CoreWorker` and renders in a context of
-    /// its own. You can't acquire its frames, but
-    /// `RenderSessionHandle::read_texture()` reads them.
-    ///
-    /// See `mln_map_attach_open_gl_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when `open_gl_supported_context_provider_mask()`
-    ///   lacks the context's platform, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn attach_open_gl_owned_texture(
-        &self,
-        descriptor: &OpenGlOwnedTextureDescriptor<'_>,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_open_gl_owned_texture(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session)?, future))
-    }
-
     /// Creates a session that renders the map to an OpenGL surface.
     ///
     /// The session needs `RenderDriverKind::CoreWorker` for a transferred WebGL
@@ -636,51 +545,6 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
-    /// Creates a session that renders the map into a ring of new Vulkan images.
-    ///
-    /// See `mln_map_attach_vulkan_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
-    ///   `RenderBackendFlag::VULKAN`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(any(
-        target_os = "android",
-        target_os = "freebsd",
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "windows"
-    ))]
-    pub unsafe fn attach_vulkan_owned_texture(
-        &self,
-        descriptor: &VulkanOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_vulkan_owned_texture(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session)?, future))
-    }
-
     /// Creates a session that renders the map to a Vulkan surface.
     ///
     /// See `mln_map_attach_vulkan_surface` in the
@@ -754,48 +618,6 @@ impl MapHandle {
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_attach_web_gpu_borrowed_texture(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session)?, future))
-    }
-
-    /// Creates a session that renders the map into a ring of new WebGPU
-    /// textures.
-    ///
-    /// The session needs `RenderDriverKind::CallerGraphicsThread`.
-    ///
-    /// See `mln_map_attach_web_gpu_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
-    ///   `RenderBackendFlag::WEB_GPU`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    #[cfg(target_os = "emscripten")]
-    pub unsafe fn attach_web_gpu_owned_texture(
-        &self,
-        descriptor: &WebGpuOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_attach_web_gpu_owned_texture(
                     map,
                     descriptor,
                     options,

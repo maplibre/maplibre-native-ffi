@@ -155,8 +155,8 @@ static bool thread_context(mln_web_gpu_context_descriptor* out_context) {
   return true;
 }
 
-// The textures of a borrowed ring fixture, in slot order. An owned-texture
-// fixture has no state of its own: the device belongs to the thread.
+// The textures of a borrowed ring fixture, in slot order. The device belongs
+// to the thread.
 typedef struct webgpu_ring {
   WGPUTexture textures[MLN_TEXTURE_RING_MAX_DEPTH];
   WGPUTextureView views[MLN_TEXTURE_RING_MAX_DEPTH];
@@ -180,29 +180,6 @@ uint32_t mln_test_backend_driver(void) {
   return MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
 }
 
-bool mln_test_backend_attach_owned(
-  mln_map map, const mln_render_session_attach_options* options,
-  void** out_state, mln_render_session* out_session,
-  const mln_completion* completion, mln_status* out_status
-) {
-  mln_web_gpu_context_descriptor context = {0};
-  if (!thread_context(&context)) {
-    return false;
-  }
-  *out_state = NULL;
-  mln_web_gpu_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_web_gpu_owned_texture_descriptor)
-  };
-  descriptor.extent.width = 64;
-  descriptor.extent.height = 64;
-  descriptor.extent.scale_factor = 1.0;
-  descriptor.context = context;
-  *out_status = mln_map_attach_web_gpu_owned_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-  return true;
-}
-
 void mln_test_backend_destroy(void* state) { destroy_backend_state(state); }
 
 // The side, in pixels, of every texture of a borrowed ring fixture. One row of
@@ -214,7 +191,7 @@ bool mln_test_backend_attach_borrowed(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  const size_t depth = mln_test_render_ring_depth(options);
+  const size_t depth = mln_test_render_ring_depth();
   mln_web_gpu_context_descriptor context = {0};
   if (!thread_context(&context)) {
     return false;
@@ -267,10 +244,8 @@ bool mln_test_backend_attach_borrowed(
   descriptor.texture_count = ring->texture_count;
   descriptor.format = WGPUTextureFormat_RGBA8Unorm;
   *out_state = ring;
-  mln_render_session_attach_options attach = *options;
-  attach.requested_texture_ring_depth = 0;
   *out_status = mln_map_attach_web_gpu_borrowed_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
 }
@@ -283,163 +258,6 @@ void* mln_test_webgpu_ring_texture(
     return NULL;
   }
   return ring->textures[index];
-}
-
-static void on_main_thread_device_lost(
-  const WGPUDevice* device, WGPUDeviceLostReason reason, WGPUStringView message,
-  void* user_data, void* unused
-) {
-  (void)device;
-  (void)reason;
-  (void)message;
-  (void)unused;
-  mln_test_flag_set(&((mln_test_webgpu_main_thread_device*)user_data)->lost);
-}
-
-static void on_main_thread_device(
-  WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message,
-  void* user_data, void* unused
-) {
-  (void)message;
-  (void)unused;
-  mln_test_webgpu_main_thread_device* owner = user_data;
-  if (status == WGPURequestDeviceStatus_Success) {
-    owner->context.device = device;
-  }
-  mln_test_flag_set(&owner->created);
-}
-
-static void on_main_thread_adapter(
-  WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message,
-  void* user_data, void* unused
-) {
-  (void)message;
-  (void)unused;
-  mln_test_webgpu_main_thread_device* owner = user_data;
-  if (status != WGPURequestAdapterStatus_Success) {
-    mln_test_flag_set(&owner->created);
-    return;
-  }
-  const WGPUDeviceDescriptor descriptor = {
-    .deviceLostCallbackInfo = {
-      .mode = WGPUCallbackMode_AllowSpontaneous,
-      .callback = on_main_thread_device_lost,
-      .userdata1 = owner,
-    },
-  };
-  const WGPURequestDeviceCallbackInfo device_info = {
-    .mode = WGPUCallbackMode_AllowSpontaneous,
-    .callback = on_main_thread_device,
-    .userdata1 = owner,
-  };
-  wgpuAdapterRequestDevice(adapter, &descriptor, device_info);
-  wgpuAdapterRelease(adapter);
-}
-
-// Runs on the main thread, which must not block, so every step answers through
-// a spontaneous callback that its event loop runs once this call returns.
-static void request_main_thread_device(void* context) {
-  mln_test_webgpu_main_thread_device* owner = context;
-  owner->context.instance = wgpuCreateInstance(NULL);
-  if (owner->context.instance == NULL) {
-    mln_test_flag_set(&owner->created);
-    return;
-  }
-  const WGPURequestAdapterOptions options = {0};
-  const WGPURequestAdapterCallbackInfo adapter_info = {
-    .mode = WGPUCallbackMode_AllowSpontaneous,
-    .callback = on_main_thread_adapter,
-    .userdata1 = owner,
-  };
-  wgpuInstanceRequestAdapter(owner->context.instance, &options, adapter_info);
-}
-
-static void destroy_main_thread_device(void* context) {
-  mln_test_webgpu_main_thread_device* owner = context;
-  if (owner->context.device != NULL) {
-    wgpuDeviceDestroy(owner->context.device);
-    wgpuDeviceRelease(owner->context.device);
-  }
-  if (owner->context.instance != NULL) {
-    wgpuInstanceRelease(owner->context.instance);
-  }
-}
-
-static bool run_on_main_thread(void (*function)(void*), void* context) {
-  return emscripten_proxy_sync(
-           emscripten_proxy_get_system_queue(),
-           emscripten_main_runtime_thread_id(), function, context
-         ) == 1;
-}
-
-bool mln_test_webgpu_main_thread_device_create(
-  mln_test_webgpu_main_thread_device* device
-) {
-  *device = (mln_test_webgpu_main_thread_device){0};
-  if (
-    !run_on_main_thread(request_main_thread_device, device) ||
-    !mln_test_wait_for_flag(&device->created)
-  ) {
-    fprintf(stderr, "the main thread answered no WebGPU device request\n");
-    return false;
-  }
-  if (device->context.device == NULL) {
-    fprintf(stderr, "the main thread got no WebGPU device\n");
-    (void)run_on_main_thread(destroy_main_thread_device, device);
-    *device = (mln_test_webgpu_main_thread_device){0};
-    return false;
-  }
-  return true;
-}
-
-void mln_test_webgpu_main_thread_device_destroy(
-  mln_test_webgpu_main_thread_device* device
-) {
-  if (device->context.device == NULL) {
-    return;
-  }
-  TEST_ASSERT_TRUE(run_on_main_thread(destroy_main_thread_device, device));
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_wait_for_flag(&device->lost),
-    "the main thread never reported its WebGPU device lost"
-  );
-  *device = (mln_test_webgpu_main_thread_device){0};
-}
-
-static MLN_TEST_THREAD_LOCAL const mln_web_gpu_context_descriptor*
-  attach_context;
-
-// Attach validation makes no WebGPU call, so the attach can run here. The
-// fixture services on the main thread, where the backend initializes.
-static bool attach_main_thread_texture(
-  mln_map map, const mln_render_session_attach_options* options,
-  void** out_state, mln_render_session* out_session,
-  const mln_completion* completion, mln_status* out_status
-) {
-  *out_state = NULL;
-  mln_web_gpu_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_web_gpu_owned_texture_descriptor)
-  };
-  descriptor.extent.width = 64;
-  descriptor.extent.height = 64;
-  descriptor.extent.scale_factor = 1.0;
-  descriptor.context = *attach_context;
-  *out_status = mln_map_attach_web_gpu_owned_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-  return true;
-}
-
-bool mln_test_webgpu_main_thread_fixture_create(
-  mln_map map, const mln_test_webgpu_main_thread_device* device,
-  mln_test_render_fixture* fixture
-) {
-  attach_context = &device->context;
-  const bool attached = mln_test_render_fixture_create_serviced_on_main_thread(
-    map, fixture, attach_main_thread_texture
-  );
-  attach_context = NULL;
-  return attached;
 }
 
 static void on_buffer_mapped(

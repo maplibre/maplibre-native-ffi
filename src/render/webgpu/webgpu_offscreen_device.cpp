@@ -120,14 +120,10 @@ class WebGPUOffscreenDevice final : public OffscreenDevice {
   auto create_texture_backend(
     mln::Size size, std::unique_ptr<TextureSessionBackend>& out_backend
   ) -> mln_status override {
-    const auto descriptor = mln_web_gpu_owned_texture_descriptor{
-      .size = sizeof(mln_web_gpu_owned_texture_descriptor),
-      .extent = {},
-      .context = {.instance = instance_, .device = device_, .queue = nullptr},
+    const auto context = mln_web_gpu_context_descriptor{
+      .instance = instance_, .device = device_, .queue = nullptr
     };
-    return create_webgpu_owned_texture_backend(
-      descriptor, size, 1, out_backend
-    );
+    return create_webgpu_offscreen_texture_backend(context, size, out_backend);
   }
 
  private:

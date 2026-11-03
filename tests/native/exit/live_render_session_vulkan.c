@@ -61,13 +61,20 @@ static void session_releases_queue_lock(void* user_data) {
 
 static mln_status attach(
   mln_map map, const mln_test_graphics_context* context,
+  const mln_test_graphics_texture_info* texture,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  mln_vulkan_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_owned_texture_descriptor)
+  const mln_vulkan_borrowed_texture entry = {
+    .image = texture->vulkan_image,
+    .image_view = texture->vulkan_image_view,
+  };
+  mln_vulkan_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
   };
   descriptor.extent = probe_extent;
+  descriptor.physical_width = texture->width;
+  descriptor.physical_height = texture->height;
   descriptor.context.instance = context->vulkan_instance;
   descriptor.context.physical_device = context->vulkan_physical_device;
   descriptor.context.device = context->vulkan_device;
@@ -78,6 +85,10 @@ static mln_status attach(
     context->vulkan_get_instance_proc_addr;
   descriptor.context.get_device_proc_addr =
     context->vulkan_get_device_proc_addr;
+  descriptor.textures = &entry;
+  descriptor.texture_count = 1;
+  descriptor.format = texture->format;
+  descriptor.final_layout = texture->vulkan_final_layout;
   mln_render_session_attach_options locked = *options;
   locked.queue_lock = (mln_queue_lock){
     .lock = session_locks_queue,
@@ -85,7 +96,7 @@ static mln_status attach(
     .user_data = &queue_lock,
     .release_user_data = session_releases_queue_lock,
   };
-  return mln_map_attach_vulkan_owned_texture(
+  return mln_map_attach_vulkan_borrowed_texture(
     map, &descriptor, &locked, out_session, completion, NULL
   );
 }

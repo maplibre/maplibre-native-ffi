@@ -493,10 +493,6 @@ bool mln_ts_write_metal_context_descriptor(
   mln_ts_call* call, napi_value value, mln_metal_context_descriptor* out,
   const char* path
 );
-bool mln_ts_write_metal_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_metal_owned_texture_descriptor* out,
-  const char* path
-);
 bool mln_ts_write_metal_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_metal_surface_descriptor* out,
   const char* path
@@ -532,10 +528,6 @@ bool mln_ts_write_open_gl_borrowed_texture_descriptor(
 bool mln_ts_write_open_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_open_gl_context_descriptor* out,
   const char* path
-);
-bool mln_ts_write_open_gl_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_open_gl_owned_texture_descriptor* out, const char* path
 );
 bool mln_ts_write_open_gl_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_open_gl_surface_descriptor* out,
@@ -635,10 +627,6 @@ bool mln_ts_write_vulkan_context_descriptor(
   mln_ts_call* call, napi_value value, mln_vulkan_context_descriptor* out,
   const char* path
 );
-bool mln_ts_write_vulkan_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value, mln_vulkan_owned_texture_descriptor* out,
-  const char* path
-);
 bool mln_ts_write_vulkan_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_vulkan_surface_descriptor* out,
   const char* path
@@ -658,10 +646,6 @@ bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
 bool mln_ts_write_web_gpu_context_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gpu_context_descriptor* out,
   const char* path
-);
-bool mln_ts_write_web_gpu_owned_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_web_gpu_owned_texture_descriptor* out, const char* path
 );
 bool mln_ts_write_web_gpu_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gpu_surface_descriptor* out,

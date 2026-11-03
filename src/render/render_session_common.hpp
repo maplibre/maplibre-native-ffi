@@ -55,7 +55,7 @@ namespace mln::core {
 struct MapObject;
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
-enum class TextureSessionMode : uint8_t { Owned, Borrowed };
+enum class TextureSessionMode : uint8_t { Offscreen, Borrowed };
 
 enum class RenderSessionMaintenance : uint8_t {
   ReduceMemoryUse,
@@ -509,14 +509,13 @@ struct RenderTextureSlot {
   bool rendering = false;
   // Set by a frame disposed without consumer synchronization, or by a release
   // whose wait failed. The host's GPU may still read the slot's texture, so the
-  // ring never renders into it again, and detach never destroys a texture that
-  // the session owns. A borrowed ring's replacement gives the slot a new
-  // texture, which lifts this.
+  // ring never renders into it again. A replacement of the ring gives the slot
+  // a new texture, which lifts this.
   bool quarantined = false;
 };
 
-// The renderable resources a texture backend cycles through, one per slot. A
-// session-owned ring allocates each slot's texture in its resource; a borrowed
+// The renderable resources a texture backend cycles through, one per slot. An
+// offscreen session allocates its slot's texture in its resource; a borrowed
 // ring builds each slot's resource over the caller's texture at the slot's
 // index. The selected slot's resource lives in the backend's own `resource`
 // member, which mbgl reads every frame; this parks the others and drops any
@@ -753,7 +752,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
 struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
-  TextureSessionMode mode = TextureSessionMode::Owned;
+  TextureSessionMode mode = TextureSessionMode::Offscreen;
   std::vector<RenderTextureSlot> slots;
   // Borrowed-ring replacements accepted but not yet run. Acquisition waits for
   // them, because every frame published before one runs names a texture that
@@ -1020,16 +1019,6 @@ auto validate_live_attached_render_session(
 inline auto physical_dimension(uint32_t logical, double scale_factor)
   -> uint32_t {
   return static_cast<uint32_t>(std::ceil(logical * scale_factor));
-}
-
-inline auto validate_metal_context(
-  const mln_metal_context_descriptor& context, bool require_device
-) -> mln_status {
-  if (require_device && context.device == nullptr) {
-    set_thread_error("Metal device must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
 }
 
 inline auto validate_vulkan_context(
@@ -1322,22 +1311,6 @@ auto lease_valid_acquired_frame(
   mln_acquired_frame frame,
   std::shared_ptr<mln_acquired_frame_object>& out_frame
 ) -> mln_status;
-
-// Slot count a session-owned texture ring is granted, between one and
-// max_texture_ring_depth. A zero request takes two slots, so the host can
-// retain one frame while the session renders its replacement. Attachment
-// rejects null options, but some backends size their ring before they reach
-// that check, so null options take one slot.
-inline auto attach_ring_depth(const mln_render_session_attach_options* options)
-  -> uint32_t {
-  constexpr auto default_depth = uint32_t{2};
-  if (options == nullptr) return 1U;
-  const auto requested = options->requested_texture_ring_depth;
-  return std::clamp(
-    requested == 0 ? default_depth : requested, 1U,
-    static_cast<uint32_t>(max_texture_ring_depth)
-  );
-}
 
 inline auto require_render_driver(
   const mln_render_session_attach_options* options,

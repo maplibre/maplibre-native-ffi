@@ -14,8 +14,6 @@ enum { some_texture_format = 18 };
 MLN_TEST_DESCRIPTOR_EDITS(webgpu_surface, mln_web_gpu_surface_descriptor)
 MLN_TEST_EXTENT_RULE_EDITS(webgpu_surface)
 MLN_TEST_OVERFLOW_EDIT(webgpu_surface)
-MLN_TEST_DESCRIPTOR_EDITS(webgpu_owned, mln_web_gpu_owned_texture_descriptor)
-MLN_TEST_OVERFLOW_EDIT(webgpu_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
   webgpu_borrowed, mln_web_gpu_borrowed_texture_descriptor
 )
@@ -27,9 +25,6 @@ static void surface_without_surface(void* call) {
 }
 static void surface_without_format(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_surface.format = 0;
-}
-static void owned_without_device(void* call) {
-  ((mln_test_target_call*)call)->descriptor.webgpu_owned.context.device = NULL;
 }
 static void borrowed_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_borrowed.context.device =
@@ -48,9 +43,6 @@ static void borrowed_without_physical_width(void* call) {
 }
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_web_gpu_surface)
-MLN_TEST_ATTACH_SUBMITTER(
-  submit_owned_attach, mln_map_attach_web_gpu_owned_texture
-)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_web_gpu_borrowed_texture
 )
@@ -120,25 +112,6 @@ static void webgpu_attach_rejects_malformed_calls(void) {
   mln_test_run_attach_table(
     submit_surface_attach, &call, surface_rows,
     sizeof(surface_rows) / sizeof(surface_rows[0])
-  );
-
-  call.descriptor.webgpu_owned = (mln_web_gpu_owned_texture_descriptor){
-    .size = sizeof(mln_web_gpu_owned_texture_descriptor)
-  };
-  call.descriptor.webgpu_owned.extent = mln_test_target_extent();
-  call.descriptor.webgpu_owned.context.device = MLN_TEST_FAKE_HANDLE;
-  static const mln_test_validation_case owned_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(webgpu_owned),
-    MLN_TEST_OVERFLOW_CASE(webgpu_owned),
-    {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
-  };
-  mln_test_run_attach_table(
-    submit_owned_attach, &call, owned_rows,
-    sizeof(owned_rows) / sizeof(owned_rows[0])
   );
 
   describe_borrowed(&call);

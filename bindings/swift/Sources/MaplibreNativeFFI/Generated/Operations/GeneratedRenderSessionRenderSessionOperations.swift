@@ -288,8 +288,7 @@ public extension RenderSessionHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the session renders into a ring that it
-  ///   created.
+  /// - `Status.unsupported` when the session renders offscreen.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.

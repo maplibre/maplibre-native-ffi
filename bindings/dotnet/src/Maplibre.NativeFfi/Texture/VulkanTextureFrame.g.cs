@@ -10,8 +10,7 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Slot">
-/// The image's index in the ring. For a borrowed ring, it indexes the
-/// descriptor's <c>textures</c>.
+/// The image's index in the descriptor's <c>textures</c>.
 /// </param>
 /// <param name="Image">
 /// The VkImage.

@@ -60,34 +60,6 @@ func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTe
 	return result.session, result.ready, err
 }
 
-// AttachMetalOwnedTexture creates a session that renders the map into a ring of
-// new Metal textures.
-//
-// See mln_map_attach_metal_owned_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagMetal, or when the target supports none of the
-//     producer_sync_kinds in options.
-func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_metal_owned_texture(C.mln_map(raw), bindingStore(nativeMetalOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
 // AttachMetalSurface creates a session that renders the map to a Metal layer.
 //
 // See mln_map_attach_metal_surface in the C API reference:

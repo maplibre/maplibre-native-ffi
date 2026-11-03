@@ -75,33 +75,6 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   detach(runtime, map, &fixture);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-static void an_owned_metal_ring_renders_in_its_pixel_format(void) {
-  // MTLPixelFormatRGBA8Unorm and MTLPixelFormatBGRA8Unorm.
-  const uint64_t formats[] = {70, 80};
-  for (size_t index = 0; index < 2; index += 1) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
-    mln_test_render_fixture fixture = {0};
-    TEST_ASSERT_TRUE(mln_test_render_fixture_create_metal_owned_texture(
-      map, &fixture, formats[index]
-    ));
-    mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 270);
-    mln_metal_texture_frame texture = {.size = sizeof(texture)};
-    MLN_TEST_OK(mln_acquired_frame_get_metal_texture(frame, &texture, NULL));
-    TEST_ASSERT_EQUAL_UINT64(formats[index], texture.pixel_format);
-    mln_texture_image_info info = {0};
-    uint8_t pixel[4] = {0};
-    MLN_TEST_OK(mln_test_render_read_back(&fixture, &info, pixel, 4));
-    const uint8_t red[4] = {255, 0, 0, 255};
-    TEST_ASSERT_EQUAL_HEX8_ARRAY(red, pixel, 4);
-    mln_test_render_release_frame(&frame);
-    detach(runtime, map, &fixture);
-  }
-}
-#endif
-
 enum frame_backend { METAL, VULKAN, OPENGL, WEBGPU };
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
@@ -221,8 +194,6 @@ static uint64_t expect_preset_texture(
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->texture);
   // GL_TEXTURE_2D.
   TEST_ASSERT_EQUAL_HEX32(0x0DE1, frame->target);
-  // The host knows a borrowed ring's format, so the frame reports none.
-  TEST_ASSERT_EQUAL_UINT32(0, frame->internal_format);
 #else
   const mln_web_gpu_texture_frame* frame = &record->webgpu;
   TEST_ASSERT_NOT_NULL(frame->texture);
@@ -620,19 +591,27 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   detach_keeping_the_ring(runtime, map, &fixture);
 }
 
-// Holding the first frame while the second renders is what puts a texture in
-// the second slot of the two-deep ring. Only a session that owns its ring
-// resizes it and reads it back.
-static void a_resize_retires_every_old_size_slot(void) {
+static void render_forced(
+  const mln_test_render_fixture* fixture, uint64_t token
+) {
+  mln_test_render_request_forced(fixture, token);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(fixture);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  TEST_ASSERT_EQUAL_UINT64(token, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  mln_render_frame_batch_release(batch);
+}
+
+// Only an offscreen session resizes its texture; a borrowed ring takes new
+// textures instead.
+static void a_resize_renders_and_reads_back_at_the_new_size(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create_owned(map, &fixture));
-  mln_acquired_frame held = mln_test_render_and_acquire(&fixture, 301);
-  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 302);
-  mln_test_render_release_frame(&frame);
-  mln_test_render_release_frame(&held);
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  render_forced(&fixture, 301);
 
   const mln_logical_extent resized = {
     .width = 48,
@@ -645,10 +624,7 @@ static void a_resize_retires_every_old_size_slot(void) {
       fixture.session, resized, &completion.descriptor, NULL
     )
   );
-  for (uint64_t token = 303; token <= 304; token += 1) {
-    frame = mln_test_render_and_acquire(&fixture, token);
-    mln_test_render_release_frame(&frame);
-  }
+  render_forced(&fixture, 302);
   mln_texture_image_info info = {0};
   MLN_TEST_OK(mln_test_render_read_back(&fixture, &info, NULL, 0));
   TEST_ASSERT_EQUAL_UINT32(48, info.width);
@@ -798,9 +774,6 @@ static void a_camera_transition_publishes_an_update_after_every_frame(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(texture_readback_copies_the_latest_rendered_frame);
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  RUN_TEST(an_owned_metal_ring_renders_in_its_pixel_format);
-#endif
   RUN_TEST(only_the_sessions_backend_describes_its_frame_texture);
   RUN_TEST(accessors_and_release_reject_a_broken_frame_or_record);
   RUN_TEST(an_acquired_frame_still_releases_after_abandon);
@@ -808,7 +781,7 @@ MLN_TEST_GROUP {
   RUN_TEST(borrowed_views_hold_a_frame_until_every_view_ends);
   RUN_TEST(disposing_a_frame_quarantines_only_its_slot);
   RUN_TEST(a_fully_quarantined_ring_takes_no_more_demands);
-  RUN_TEST(a_resize_retires_every_old_size_slot);
+  RUN_TEST(a_resize_renders_and_reads_back_at_the_new_size);
   RUN_TEST(physical_sizes_round_up_and_reject_overflow);
   RUN_TEST(a_camera_transition_publishes_an_update_after_every_frame);
 }

@@ -83,7 +83,7 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void record_command_buffer_result(const MTL::CommandBuffer& buffer);
   void commit(NS::SharedPtr<MTL::CommandBuffer> buffer);
 
-  // The caller's texture for each slot, or empty for a session-owned ring.
+  // The caller's texture for each slot, or empty for an offscreen session.
   std::vector<MTL::Texture*> borrowed_textures_;
   // Recorded when this session took borrowed_textures_, which it does not
   // retain and the host may already have released.

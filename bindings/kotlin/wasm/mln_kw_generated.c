@@ -302,18 +302,6 @@ int32_t mln_kw_mln_map_attach_metal_borrowed_texture(
   );
 }
 
-int32_t mln_kw_mln_map_attach_metal_owned_texture(
-  int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
-  uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_attach_metal_owned_texture(
-    (mln_map)map, (const mln_metal_owned_texture_descriptor*)descriptor,
-    (const mln_render_session_attach_options*)options,
-    (mln_render_session*)out_session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_attach_metal_surface(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
@@ -350,18 +338,6 @@ int32_t mln_kw_mln_map_attach_open_gl_borrowed_texture(
   );
 }
 
-int32_t mln_kw_mln_map_attach_open_gl_owned_texture(
-  int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
-  uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_attach_open_gl_owned_texture(
-    (mln_map)map, (const mln_open_gl_owned_texture_descriptor*)descriptor,
-    (const mln_render_session_attach_options*)options,
-    (mln_render_session*)out_session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_attach_open_gl_surface(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
@@ -386,18 +362,6 @@ int32_t mln_kw_mln_map_attach_vulkan_borrowed_texture(
   );
 }
 
-int32_t mln_kw_mln_map_attach_vulkan_owned_texture(
-  int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
-  uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_attach_vulkan_owned_texture(
-    (mln_map)map, (const mln_vulkan_owned_texture_descriptor*)descriptor,
-    (const mln_render_session_attach_options*)options,
-    (mln_render_session*)out_session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_attach_vulkan_surface(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
@@ -416,18 +380,6 @@ int32_t mln_kw_mln_map_attach_web_gpu_borrowed_texture(
 ) {
   return (int32_t)mln_map_attach_web_gpu_borrowed_texture(
     (mln_map)map, (const mln_web_gpu_borrowed_texture_descriptor*)descriptor,
-    (const mln_render_session_attach_options*)options,
-    (mln_render_session*)out_session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
-  );
-}
-
-int32_t mln_kw_mln_map_attach_web_gpu_owned_texture(
-  int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
-  uintptr_t completion, uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_attach_web_gpu_owned_texture(
-    (mln_map)map, (const mln_web_gpu_owned_texture_descriptor*)descriptor,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic

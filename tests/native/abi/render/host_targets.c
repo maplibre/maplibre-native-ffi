@@ -245,7 +245,7 @@ static void queue_ordered_frames_share_the_hosts_queue(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, true,
+      map, &fixture,
       MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER
     ),
     mln_test_graphics_last_error()
@@ -307,33 +307,41 @@ static void queue_ordered_frames_share_the_hosts_queue(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void a_queue_ordered_ring_resizes_after_the_hosts_reads(void) {
+// A queue-ordered release leaves the host's read of the frame on the shared
+// queue, so a replacement of the ring waits for it before the session lets go
+// of the old texture.
+static void a_queue_ordered_ring_takes_new_textures_after_the_hosts_reads(
+  void
+) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, false, MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER
+      map, &fixture, MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER
     ),
     mln_test_graphics_last_error()
   );
   const mln_gpu_sync consumer = {
     .size = sizeof(mln_gpu_sync), .kind = MLN_GPU_SYNC_QUEUE_ORDER
   };
-  const mln_logical_extent smaller = {
-    .width = MLN_TEST_HOST_TARGET_SIZE / 2,
-    .height = MLN_TEST_HOST_TARGET_SIZE / 2,
-    .scale_factor = 1.0,
-  };
+  mln_test_graphics_texture* smaller = NULL;
   for (uint64_t index = 0; index < 2; index += 1) {
     if (index == 1) {
+      smaller = mln_test_render_fixture_new_sized_texture(
+        &fixture, MLN_TEST_HOST_TARGET_SIZE / 2, MLN_TEST_HOST_TARGET_SIZE / 2
+      );
+      TEST_ASSERT_NOT_NULL_MESSAGE(smaller, mln_test_graphics_last_error());
       MLN_TEST_RENDER_AWAIT(
         MLN_STATUS_OK, &fixture,
-        mln_render_session_resize(
-          fixture.session, smaller, &completion.descriptor, NULL
+        mln_test_render_fixture_set_textures(
+          &fixture, mln_test_render_fixture_graphics(&fixture), &smaller, 1,
+          &completion.descriptor
         )
       );
+      // A later query completes after the resize that the replacement made.
+      MLN_TEST_OK(mln_test_map_fence(map));
     }
     TEST_ASSERT_EQUAL_UINT32(
       MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, index + 1, 0)
@@ -342,9 +350,15 @@ static void a_queue_ordered_ring_resizes_after_the_hosts_reads(void) {
     MLN_TEST_OK(
       mln_render_session_acquire_frame(fixture.session, &frame, NULL)
     );
+    if (smaller != NULL) {
+      uint32_t slot = UINT32_MAX;
+      TEST_ASSERT_EQUAL_UINT64(
+        mln_test_texture_handle(smaller),
+        mln_test_frame_texture_handle(frame, &slot)
+      );
+    }
     MLN_TEST_OK(mln_acquired_frame_release(frame, &consumer, NULL));
   }
-  MLN_TEST_STATUS(MLN_STATUS_OK, read_back(&fixture));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -367,7 +381,7 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, true,
+      map, &fixture,
       MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
         MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
     ),
@@ -395,7 +409,7 @@ static void vulkan_timelines_order_frame_reads_and_slot_reuse(void) {
     mln_test_render_fixture_destroy(&fixture);
     mln_test_render_fixture fallback = {0};
     TEST_ASSERT_FALSE(mln_test_render_fixture_create_synced(
-      map, &fallback, true, MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
+      map, &fallback, MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE
     ));
     mln_test_destroy_map(map);
     mln_test_destroy_runtime(runtime);
@@ -542,7 +556,7 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, true,
+      map, &fixture,
       MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_SYNC_FD
     ),
     mln_test_graphics_last_error()
@@ -563,7 +577,7 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
     mln_test_render_fixture_destroy(&fixture);
     mln_test_render_fixture fallback = {0};
     TEST_ASSERT_FALSE(mln_test_render_fixture_create_synced(
-      map, &fallback, true, MLN_GPU_SYNC_KIND_FLAG_SYNC_FD
+      map, &fallback, MLN_GPU_SYNC_KIND_FLAG_SYNC_FD
     ));
     mln_test_destroy_map(map);
     mln_test_destroy_runtime(runtime);
@@ -636,7 +650,7 @@ static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, true,
+      map, &fixture,
       MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE
     ),
     mln_test_graphics_last_error()
@@ -660,7 +674,7 @@ static void d3d12_fences_order_frame_reads_and_slot_reuse(void) {
     mln_test_render_fixture_destroy(&fixture);
     mln_test_render_fixture fallback = {0};
     TEST_ASSERT_FALSE(mln_test_render_fixture_create_synced(
-      map, &fallback, true, MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE
+      map, &fallback, MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE
     ));
     mln_test_destroy_map(map);
     mln_test_destroy_runtime(runtime);
@@ -777,7 +791,7 @@ static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, true,
+      map, &fixture,
       MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
         MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT
     ),
@@ -866,16 +880,14 @@ static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
 #endif
 
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
-static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
-  bool borrowed
-) {
+static void borrowed_opengl_frames_support_gpu_fences(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_synced(
-      map, &fixture, borrowed, MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE
+      map, &fixture, MLN_GPU_SYNC_KIND_FLAG_OPEN_GL_FENCE
     ),
     mln_test_graphics_last_error()
   );
@@ -907,14 +919,10 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   TEST_ASSERT_NOT_EQUAL_UINT64(
     0, mln_test_frame_texture_handle(first, &first_slot)
   );
-  if (borrowed) {
-    expect_texture_color(
-      mln_test_render_fixture_texture(&fixture, first_slot), red,
-      "the fence-protected first texture"
-    );
-  } else {
-    MLN_TEST_STATUS(MLN_STATUS_OK, read_back(&fixture));
-  }
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, first_slot), red,
+    "the fence-protected first texture"
+  );
 
   // An invalid fence keeps the frame handle available for a valid release.
   mln_gpu_sync consumer = {
@@ -950,14 +958,10 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
     0, mln_test_frame_texture_handle(second, &second_slot)
   );
   TEST_ASSERT_EQUAL_UINT32(first_slot, second_slot);
-  if (borrowed) {
-    expect_texture_color(
-      mln_test_render_fixture_texture(&fixture, second_slot), blue,
-      "the reused texture after the consumer fence"
-    );
-  } else {
-    MLN_TEST_STATUS(MLN_STATUS_OK, read_back(&fixture));
-  }
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, second_slot), blue,
+    "the reused texture after the consumer fence"
+  );
   finish();
   mln_test_render_release_frame(&second);
   MLN_TEST_RENDER_AWAIT(
@@ -968,14 +972,6 @@ static void shared_opengl_fences_order_frame_reads_and_slot_reuse(
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-}
-
-static void borrowed_opengl_frames_support_gpu_fences(void) {
-  shared_opengl_fences_order_frame_reads_and_slot_reuse(true);
-}
-
-static void owned_opengl_frames_support_gpu_fences(void) {
-  shared_opengl_fences_order_frame_reads_and_slot_reuse(false);
 }
 #endif
 
@@ -1074,7 +1070,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_borrowed_ring_hands_each_frame_to_the_host);
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
   RUN_TEST(queue_ordered_frames_share_the_hosts_queue);
-  RUN_TEST(a_queue_ordered_ring_resizes_after_the_hosts_reads);
+  RUN_TEST(a_queue_ordered_ring_takes_new_textures_after_the_hosts_reads);
 #endif
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   RUN_TEST(vulkan_timelines_order_frame_reads_and_slot_reuse);
@@ -1092,7 +1088,6 @@ MLN_TEST_GROUP {
 #endif
 #if defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
-  RUN_TEST(owned_opengl_frames_support_gpu_fences);
 #endif
   RUN_TEST(a_surface_presents_frames_and_takes_a_resize);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)

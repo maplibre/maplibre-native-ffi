@@ -1,5 +1,5 @@
-// The render-session exit program, shared by the backends that render a
-// session-owned texture. Each backend's file defines the attach and calls
+// The render-session exit program, shared by the backends that render into a
+// borrowed texture. Each backend's file defines the attach and calls
 // probe_exit_after_abandoning() from main.
 //
 // A render session borrows the host's graphics device, and a graphics driver
@@ -14,17 +14,20 @@
 #include "mln_test_graphics.h"
 #include "probe.h"
 
-// Starts attaching a session-owned texture on `map` for the graphics context,
-// with the driver that options->driver names.
+// Starts attaching a session on `map` that renders into `texture`, which the
+// graphics context created, with the driver that options->driver names.
 typedef mln_status (*probe_attach_fn)(
   mln_map map, const mln_test_graphics_context* context,
+  const mln_test_graphics_texture_info* texture,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 );
 
+enum { probe_texture_size = 256 };
+
 static const mln_logical_extent probe_extent = {
-  .width = 256,
-  .height = 256,
+  .width = probe_texture_size,
+  .height = probe_texture_size,
   .scale_factor = 1.0,
 };
 
@@ -223,6 +226,18 @@ static inline void probe_attach_rendering(
     );
     exit(1);
   }
+  // The texture stays live through the exit, as the rest of the host does.
+  mln_test_graphics_texture* texture = mln_test_graphics_texture_create(
+    probe->graphics, probe_texture_size, probe_texture_size
+  );
+  mln_test_graphics_texture_info texture_info = {0};
+  if (
+    texture == NULL ||
+    !mln_test_graphics_texture_get_info(texture, &texture_info)
+  ) {
+    (void)fprintf(stderr, "no texture: %s\n", mln_test_graphics_last_error());
+    exit(1);
+  }
   probe_signal_init(&probe->frames);
   probe_signal_init(&probe->driver_work);
   mln_render_session_attach_options options = {
@@ -238,7 +253,9 @@ static inline void probe_attach_rendering(
   const mln_completion completion = probe_latch_completion(&latch);
   probe->session = MLN_HANDLE_NULL;
   probe_require(
-    attach(map, &context, &options, &probe->session, &completion),
+    attach(
+      map, &context, &texture_info, &options, &probe->session, &completion
+    ),
     "attaching the render session"
   );
   if (driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {

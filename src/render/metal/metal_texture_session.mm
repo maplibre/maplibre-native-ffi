@@ -24,9 +24,6 @@
 
 namespace {
 
-static_assert(mln::core::metal_rgba8_unorm == MTL::PixelFormatRGBA8Unorm);
-static_assert(mln::core::metal_bgra8_unorm == MTL::PixelFormatBGRA8Unorm);
-
 auto metal_textures(std::span<const mln_metal_borrowed_texture> entries)
   -> std::vector<MTL::Texture*> {
   auto textures = std::vector<MTL::Texture*>{};
@@ -268,86 +265,10 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_METAL;
 }
 
-auto create_metal_owned_texture_backend(
-  MTL::Device* device, mln::Size size, std::size_t ring_depth
-) -> std::unique_ptr<TextureSessionBackend> {
+auto create_metal_offscreen_texture_backend(MTL::Device* device, mln::Size size)
+  -> std::unique_ptr<TextureSessionBackend> {
   return std::make_unique<MetalTextureSessionBackend>(
-    device, nullptr, size, ring_depth, MTL::PixelFormatRGBA8Unorm
-  );
-}
-
-auto metal_owned_texture_attach_start(
-  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status {
-  MapObject* live_map = nullptr;
-  const auto map_status = validate_map_live(map, live_map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_metal_owned_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  // The retain below sends a message to the descriptor's device, so this
-  // session validates the request before start_attach_render_session does.
-  const auto request_status =
-    validate_render_session_attach_request(options, out_session, completion);
-  if (request_status != MLN_STATUS_OK) {
-    return request_status;
-  }
-
-  auto session = std::make_shared<mln_render_session_object>();
-  session->map = map;
-  set_session_extent(*session, descriptor->extent);
-  session->texture.mode = TextureSessionMode::Owned;
-  auto device =
-    NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
-  auto queue = NS::SharedPtr<MTL::CommandQueue>{};
-  const auto queue_status =
-    retain_host_queue(descriptor->command_queue, device.get(), queue);
-  if (queue_status != MLN_STATUS_OK) return queue_status;
-  if (queue) session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
-  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
-  const auto ring_depth = attach_ring_depth(options);
-  const auto pixel_format =
-    static_cast<MTL::PixelFormat>(descriptor->pixel_format);
-  session->initialize_backend =
-    [device = std::move(device), queue, ring_depth,
-     pixel_format](mln_render_session_object& target) mutable {
-      auto backend = std::make_unique<MetalTextureSessionBackend>(
-        device.get(), queue.get(),
-        mln::Size{target.physical_width, target.physical_height}, ring_depth,
-        pixel_format
-      );
-      backend->set_producer_sync_kind(target.producer_sync_kind);
-      target.texture.backend = std::move(backend);
-      return MLN_STATUS_OK;
-    };
-  const auto capabilities = mln_render_session_capabilities{
-    .size = sizeof(mln_render_session_capabilities),
-    .driver = {},
-    .texture_ring_depth = ring_depth,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_READBACK,
-    .producer_sync_kind = {},
-    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
-                           MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT |
-                           (queue ? MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER : 0U),
-  };
-  return start_attach_render_session(
-    std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, completion,
-    valueless_completion<&mln_map_attach_metal_owned_texture>()
+    device, nullptr, size, 1, MTL::PixelFormatRGBA8Unorm
   );
 }
 

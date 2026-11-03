@@ -53,7 +53,7 @@ private suspend fun renderToTexture(
   newImages: List<ULong>,
   newViews: List<ULong>,
 ) {
-  // #region attach-owned
+  // #region attach-options
   val options =
     RenderSessionAttachOptions(
       driver = RenderDriverKind.CORE_WORKER,
@@ -65,7 +65,7 @@ private suspend fun renderToTexture(
           unlock = { queueMutex.unlock() },
         ),
     )
-  // #endregion attach-owned
+  // #endregion attach-options
 
   // #region attach-borrowed
   var ring =

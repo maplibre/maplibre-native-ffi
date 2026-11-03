@@ -163,8 +163,8 @@ static void expect_texture_color(
   );
 }
 
-// The center pixel of a session-owned texture's latest frame holds `color`.
-static void expect_owned_color(
+// The center pixel of an offscreen session's latest frame holds `color`.
+static void expect_offscreen_color(
   const mln_test_render_fixture* fixture, const uint8_t color[4],
   const char* what
 ) {
@@ -191,7 +191,7 @@ typedef struct retarget_map {
   mln_test_render_fixture fixture;
 } retarget_map;
 
-enum target_kind { TARGET_OWNED, TARGET_BORROWED, TARGET_SURFACE };
+enum target_kind { TARGET_OFFSCREEN, TARGET_BORROWED, TARGET_SURFACE };
 
 static void open_map(enum target_kind kind, retarget_map* out) {
   out->runtime = mln_test_create_runtime();
@@ -199,8 +199,9 @@ static void open_map(enum target_kind kind, retarget_map* out) {
   mln_test_load_style_and_wait(out->map, mln_test_red_background_style_json);
   bool attached = false;
   switch (kind) {
-    case TARGET_OWNED:
-      attached = mln_test_render_fixture_create_owned(out->map, &out->fixture);
+    case TARGET_OFFSCREEN:
+      attached =
+        mln_test_render_fixture_create_offscreen(out->map, &out->fixture);
       break;
     case TARGET_BORROWED:
       attached = mln_test_render_fixture_create_borrowed_ring(
@@ -574,9 +575,6 @@ typedef struct refusal_row {
 } refusal_row;
 
 static const refusal_row refusal_rows[] = {
-  {"a session-owned texture takes no borrowed texture", TARGET_OWNED,
-   TARGET_BORROWED, ORIGIN_SESSION, MLN_STATUS_UNSUPPORTED, MLN_STATUS_OK,
-   "session-owned texture"},
   {"a borrowed texture takes no surface", TARGET_BORROWED, TARGET_SURFACE,
    ORIGIN_SESSION, MLN_STATUS_UNSUPPORTED, MLN_STATUS_OK, "native surface"},
   {"a surface takes no texture", TARGET_SURFACE, TARGET_BORROWED,
@@ -701,8 +699,6 @@ static void expect_old_target_rendering(
   );
   if (row->session == TARGET_BORROWED) {
     expect_texture_color(fixture, NULL, blue, row->label);
-  } else if (row->session == TARGET_OWNED) {
-    expect_owned_color(fixture, blue, row->label);
   }
 }
 
@@ -976,23 +972,65 @@ static void a_release_finishes_a_waiting_demand(void) {
   close_map(&map);
 }
 
-static void releases_that_a_ring_refuses(void) {
-  retarget_map owned = {0};
-  open_map(TARGET_OWNED, &owned);
+// A set_target checks the session before it reads the descriptor, so an
+// offscreen session refuses even a null one.
+static mln_status set_borrowed_target(
+  mln_render_session session, const mln_completion* completion
+) {
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  return mln_render_session_set_metal_borrowed_texture_target(
+    session, NULL, completion, MLN_TEST_DIAGNOSTIC
+  );
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  return mln_render_session_set_vulkan_borrowed_texture_target(
+    session, NULL, completion, MLN_TEST_DIAGNOSTIC
+  );
+#else
+  return mln_render_session_set_open_gl_borrowed_texture_target(
+    session, NULL, completion, MLN_TEST_DIAGNOSTIC
+  );
+#endif
+}
+
+// An offscreen session renders into a texture of its own, so it takes no
+// target and releases none, and keeps rendering into its own.
+static void an_offscreen_session_refuses_targets(void) {
+  retarget_map offscreen = {0};
+  open_map(TARGET_OFFSCREEN, &offscreen);
+  const mln_test_render_fixture* fixture = &offscreen.fixture;
   mln_test_completion refused = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_UNSUPPORTED,
-    mln_render_session_release_target(
-      owned.fixture.session, &refused.descriptor, MLN_TEST_DIAGNOSTIC
-    )
+    set_borrowed_target(fixture->session, &refused.descriptor)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
-    strstr(mln_test_last_error(), "session-owned"), mln_test_last_error()
+    strstr(mln_test_last_error(), "offscreen session"), mln_test_last_error()
   );
   mln_test_completion_reject(&refused);
   mln_test_completion_destroy(&refused);
-  close_map(&owned);
 
+  refused = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_render_session_release_target(
+      fixture->session, &refused.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "offscreen session"), mln_test_last_error()
+  );
+  mln_test_completion_reject(&refused);
+  mln_test_completion_destroy(&refused);
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
+  );
+  expect_offscreen_color(fixture, red, "the offscreen session's own texture");
+  close_map(&offscreen);
+}
+
+static void releases_that_a_ring_refuses(void) {
+  mln_test_completion refused = mln_test_completion_default(0);
   retarget_map map = {0};
   open_borrowed_ring(&map, MLN_TEST_PRESET_DRIVER);
   const mln_test_render_fixture* fixture = &map.fixture;
@@ -1001,7 +1039,6 @@ static void releases_that_a_ring_refuses(void) {
   );
   mln_acquired_frame held = MLN_HANDLE_NULL;
   MLN_TEST_OK(acquire(fixture, &held));
-  refused = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE,
     mln_render_session_release_target(
@@ -1036,6 +1073,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_released_surface_can_be_destroyed_before_the_next);
   RUN_TEST(a_released_target_keeps_the_renderer);
   RUN_TEST(a_release_finishes_a_waiting_demand);
+  RUN_TEST(an_offscreen_session_refuses_targets);
   RUN_TEST(releases_that_a_ring_refuses);
 #endif
 }

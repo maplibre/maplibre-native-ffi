@@ -1424,8 +1424,7 @@ final class MetalTextureFrame extends _Value {
   final double scaleFactor;
   final int frameId;
 
-  /// The texture's index in the ring. For a borrowed ring, it indexes the
-  /// descriptor's `textures`.
+  /// The texture's index in the descriptor's `textures`.
   final int slot;
 
   /// The MTLTexture.
@@ -1477,9 +1476,6 @@ final class OpenGlTextureFrame extends _Value {
     this.slot = 0,
     this.texture = 0,
     this.target = 0,
-    this.internalFormat = 0,
-    this.format = 0,
-    this.type = 0,
   });
   final int generation;
   final int width;
@@ -1487,20 +1483,10 @@ final class OpenGlTextureFrame extends _Value {
   final double scaleFactor;
   final int frameId;
 
-  /// The texture's index in the ring. For a borrowed ring, it indexes the
-  /// descriptor's `textures`.
+  /// The texture's index in the descriptor's `textures`.
   final int slot;
   final int texture;
   final int target;
-
-  /// The texture's internal format, or 0 for a borrowed ring.
-  final int internalFormat;
-
-  /// The texture's pixel format, or 0 for a borrowed ring.
-  final int format;
-
-  /// The texture's pixel type, or 0 for a borrowed ring.
-  final int type;
 
   @override
   List<Object?> get _members => [
@@ -1512,9 +1498,6 @@ final class OpenGlTextureFrame extends _Value {
     slot,
     texture,
     target,
-    internalFormat,
-    format,
-    type,
   ];
   @override
   String toString() => _describe('OpenGlTextureFrame', const [
@@ -1526,9 +1509,6 @@ final class OpenGlTextureFrame extends _Value {
     'slot',
     'texture',
     'target',
-    'internalFormat',
-    'format',
-    'type',
   ]);
 }
 
@@ -1904,8 +1884,7 @@ final class VulkanTextureFrame extends _Value {
   final double scaleFactor;
   final int frameId;
 
-  /// The image's index in the ring. For a borrowed ring, it indexes the
-  /// descriptor's `textures`.
+  /// The image's index in the descriptor's `textures`.
   final int slot;
 
   /// The VkImage.
@@ -2621,17 +2600,12 @@ final class QueueLock {
 final class RenderSessionAttachOptions extends _Value {
   const RenderSessionAttachOptions({
     required this.driver,
-    this.requestedTextureRingDepth = 0,
     this.producerSyncKinds = GpuSyncKindFlag.none,
     this.frameWake = const Wake(),
     this.driverWorkWake = const Wake(),
     this.queueLock,
   });
   final RenderDriverKind driver;
-
-  /// How many textures a ring that the session creates has, up to 8. Zero picks
-  /// a default.
-  final int requestedTextureRingDepth;
 
   /// The kinds of `GpuSync` that you can wait on before you read an acquired
   /// frame. The session uses one of them that its target supports. Zero lets
@@ -2654,15 +2628,12 @@ final class RenderSessionAttachOptions extends _Value {
   /// A copy of this value with the given members replaced.
   RenderSessionAttachOptions copyWith({
     RenderDriverKind? driver,
-    int? requestedTextureRingDepth,
     GpuSyncKindFlag? producerSyncKinds,
     Wake? frameWake,
     Wake? driverWorkWake,
     QueueLock? queueLock,
   }) => RenderSessionAttachOptions(
     driver: driver ?? this.driver,
-    requestedTextureRingDepth:
-        requestedTextureRingDepth ?? this.requestedTextureRingDepth,
     producerSyncKinds: producerSyncKinds ?? this.producerSyncKinds,
     frameWake: frameWake ?? this.frameWake,
     driverWorkWake: driverWorkWake ?? this.driverWorkWake,
@@ -2672,7 +2643,6 @@ final class RenderSessionAttachOptions extends _Value {
   @override
   List<Object?> get _members => [
     driver,
-    requestedTextureRingDepth,
     producerSyncKinds,
     frameWake,
     driverWorkWake,
@@ -2681,7 +2651,6 @@ final class RenderSessionAttachOptions extends _Value {
   @override
   String toString() => _describe('RenderSessionAttachOptions', const [
     'driver',
-    'requestedTextureRingDepth',
     'producerSyncKinds',
     'frameWake',
     'driverWorkWake',
@@ -2707,55 +2676,6 @@ final class MetalContextDescriptor extends _Value {
   List<Object?> get _members => [device];
   @override
   String toString() => _describe('MetalContextDescriptor', const ['device']);
-}
-
-/// A ring of Metal textures that the session creates, for
-/// `MapHandle.attachMetalOwnedTexture()`.
-///
-/// See `mln_metal_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalOwnedTextureDescriptor extends _Value {
-  const MetalOwnedTextureDescriptor({
-    required this.extent,
-    this.context = const MetalContextDescriptor(),
-    required this.pixelFormat,
-    this.commandQueue = NativePointer.nullPointer,
-  });
-  final LogicalExtent extent;
-
-  /// Names the MTLDevice that creates the textures.
-  final MetalContextDescriptor context;
-
-  /// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-  /// MTLPixelFormatBGRA8Unorm.
-  final int pixelFormat;
-
-  /// Your MTLCommandQueue on the same device, or null for a queue of the
-  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
-  final NativePointer commandQueue;
-
-  /// A copy of this value with the given members replaced.
-  MetalOwnedTextureDescriptor copyWith({
-    LogicalExtent? extent,
-    MetalContextDescriptor? context,
-    int? pixelFormat,
-    NativePointer? commandQueue,
-  }) => MetalOwnedTextureDescriptor(
-    extent: extent ?? this.extent,
-    context: context ?? this.context,
-    pixelFormat: pixelFormat ?? this.pixelFormat,
-    commandQueue: commandQueue ?? this.commandQueue,
-  );
-
-  @override
-  List<Object?> get _members => [extent, context, pixelFormat, commandQueue];
-  @override
-  String toString() => _describe('MetalOwnedTextureDescriptor', const [
-    'extent',
-    'context',
-    'pixelFormat',
-    'commandQueue',
-  ]);
 }
 
 /// A Metal layer to render to, for `MapHandle.attachMetalSurface()` and
@@ -3085,35 +3005,6 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
   ]);
 }
 
-/// A ring of OpenGL textures that the session creates, for
-/// `MapHandle.attachOpenGlOwnedTexture()`.
-///
-/// See `mln_open_gl_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenGlOwnedTextureDescriptor extends _Value {
-  const OpenGlOwnedTextureDescriptor({
-    required this.extent,
-    required this.context,
-  });
-  final LogicalExtent extent;
-  final OpenGlContextDescriptor context;
-
-  /// A copy of this value with the given members replaced.
-  OpenGlOwnedTextureDescriptor copyWith({
-    LogicalExtent? extent,
-    OpenGlContextDescriptor? context,
-  }) => OpenGlOwnedTextureDescriptor(
-    extent: extent ?? this.extent,
-    context: context ?? this.context,
-  );
-
-  @override
-  List<Object?> get _members => [extent, context];
-  @override
-  String toString() =>
-      _describe('OpenGlOwnedTextureDescriptor', const ['extent', 'context']);
-}
-
 /// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
 /// `RenderSessionHandle.setOpenGlSurfaceTarget()`.
 ///
@@ -3159,9 +3050,7 @@ final class OpenGlSurfaceDescriptor extends _Value {
 /// The Vulkan device and queue that a render session uses.
 ///
 /// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns. If you discarded a frame of a ring
-/// that the session creates, or abandon the session while you hold a frame,
-/// keep them alive until the process exits instead.
+/// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -3346,38 +3235,6 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     'finalLayout',
     'owner',
   ]);
-}
-
-/// A ring of Vulkan images that the session creates, for
-/// `MapHandle.attachVulkanOwnedTexture()`.
-///
-/// Each frame leaves its image in the layout that `VulkanTextureFrame.layout`
-/// reports, owned by the queue family of `graphics_queue_family_index`.
-///
-/// See `mln_vulkan_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class VulkanOwnedTextureDescriptor extends _Value {
-  const VulkanOwnedTextureDescriptor({
-    required this.extent,
-    required this.context,
-  });
-  final LogicalExtent extent;
-  final VulkanContextDescriptor context;
-
-  /// A copy of this value with the given members replaced.
-  VulkanOwnedTextureDescriptor copyWith({
-    LogicalExtent? extent,
-    VulkanContextDescriptor? context,
-  }) => VulkanOwnedTextureDescriptor(
-    extent: extent ?? this.extent,
-    context: context ?? this.context,
-  );
-
-  @override
-  List<Object?> get _members => [extent, context];
-  @override
-  String toString() =>
-      _describe('VulkanOwnedTextureDescriptor', const ['extent', 'context']);
 }
 
 /// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()` and

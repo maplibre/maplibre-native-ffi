@@ -29,23 +29,12 @@ typedef bool (*mln_test_backend_attach_fn)(
   const mln_completion* completion, mln_status* out_status
 );
 
-// How many textures a ring has when `options` requests its depth: as many as
-// for a ring that the session would own.
-size_t mln_test_render_ring_depth(
-  const mln_render_session_attach_options* options
-);
+// How many textures the borrowed ring that the fixture attaches has.
+size_t mln_test_render_ring_depth(void);
 
 // Creates a borrowed ring of 64x64 textures on the host device, as many as
-// mln_test_render_ring_depth() gives for `options`, and attaches it with the
-// requested depth cleared.
+// mln_test_render_ring_depth() gives, and attaches it.
 bool mln_test_backend_attach_borrowed(
-  mln_map map, const mln_render_session_attach_options* options,
-  void** out_state, mln_render_session* out_session,
-  const mln_completion* completion, mln_status* out_status
-);
-
-// Attaches a 64x64 owned texture target on the host device.
-bool mln_test_backend_attach_owned(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
@@ -59,15 +48,6 @@ bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
 );
-
-#if defined(__EMSCRIPTEN__)
-// The browser main thread services this session from its first service on,
-// so its backend initializes there.
-bool mln_test_render_fixture_create_serviced_on_main_thread(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach
-);
-#endif
 
 // Shared with the backends that attach fixtures of their own.
 void mln_test_render_count_wake(void* user_data);

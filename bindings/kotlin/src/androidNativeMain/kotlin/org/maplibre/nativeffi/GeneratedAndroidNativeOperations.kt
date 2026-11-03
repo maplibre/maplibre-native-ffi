@@ -65,41 +65,6 @@ public fun MapHandle.attachVulkanBorrowedTexture(
   }
 
 /**
- * Creates a session that renders the map into a ring of new Vulkan images.
- *
- * See `mln_map_attach_vulkan_owned_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.VULKAN`, or
- *   when the target supports none of the `producer_sync_kinds` in `options`.
- */
-public fun MapHandle.attachVulkanOwnedTexture(
-  descriptor: VulkanOwnedTextureDescriptor,
-  options: RenderSessionAttachOptions,
-): NewRenderSession =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_vulkan_owned_texture(
-          handle,
-          writeVulkanOwnedTextureDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachVulkanOwnedTexture) },
-      { it.bindingCallbacks },
-      { it.dispose() },
-      ::NewRenderSession,
-    )
-  }
-
-/**
  * Creates a session that renders the map to a Vulkan surface.
  *
  * See `mln_map_attach_vulkan_surface` in the

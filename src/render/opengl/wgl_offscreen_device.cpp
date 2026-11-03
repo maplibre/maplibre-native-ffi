@@ -119,13 +119,12 @@ class WglOffscreenDevice final : public OffscreenDevice {
     if (window_status != MLN_STATUS_OK) {
       return window_status;
     }
-    auto descriptor = mln_open_gl_owned_texture_descriptor{};
-    descriptor.size = sizeof(descriptor);
-    descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
-    descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
-    descriptor.context.data.wgl.device_context = window->device_context();
+    auto descriptor = mln_open_gl_context_descriptor{};
+    descriptor.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
+    descriptor.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
+    descriptor.data.wgl.device_context = window->device_context();
     const auto status =
-      create_opengl_owned_texture_backend(descriptor, size, 1, out_backend);
+      create_opengl_offscreen_texture_backend(descriptor, size, out_backend);
     if (out_backend != nullptr) {
       out_backend->retain(std::move(window));
     }

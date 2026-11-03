@@ -39,16 +39,6 @@
 
 namespace {
 
-auto owned_descriptor_from_borrowed(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor
-) -> mln_vulkan_owned_texture_descriptor {
-  return mln_vulkan_owned_texture_descriptor{
-    .size = sizeof(mln_vulkan_owned_texture_descriptor),
-    .extent = descriptor.extent,
-    .context = descriptor.context,
-  };
-}
-
 // A failed wait, such as a lost device, leaves the frame's GPU work
 // unfinished, so the render or readback fails instead of publishing that frame
 // as complete.
@@ -373,14 +363,14 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 };
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-  std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
+  const mln_vulkan_context_descriptor& context, mln::Size size,
+  std::shared_ptr<const QueueLock> queue_lock
 )
     : VulkanQueueAccess(std::move(queue_lock)),
       mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
-      descriptor_(descriptor),
-      slot_count_(ring_depth) {
+      context_(context),
+      slot_count_(1) {
   slot_fds_.fill(-1);
   initSharedDevice();
 }
@@ -392,7 +382,7 @@ VulkanTextureBackend::VulkanTextureBackend(
     : VulkanQueueAccess(std::move(queue_lock)),
       mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
-      descriptor_(owned_descriptor_from_borrowed(target.descriptor)),
+      context_(target.descriptor.context),
       borrowed_descriptor_(target.descriptor),
       borrowed_images_(target.textures),
       uses_borrowed_texture_(true),
@@ -421,11 +411,11 @@ VulkanTextureBackend::~VulkanTextureBackend() {
 }
 
 void VulkanTextureBackend::initSharedDevice() {
-  dispatcher = vulkan_dispatch_loader(descriptor_.context);
+  dispatcher = vulkan_dispatch_loader(context_);
 
   initFrameCapture();
   initInstance();
-  vulkan_init_instance_dispatch(dispatcher, descriptor_.context);
+  vulkan_init_instance_dispatch(dispatcher, context_);
   initDebug();
   initSurface();
   initDevice();
@@ -1011,7 +1001,7 @@ auto VulkanTextureBackend::select_slot(std::size_t slot) -> bool {
 void VulkanTextureBackend::initInstance() {
   usingSharedContext = true;
   instance = vk::UniqueInstance(
-    static_cast<VkInstance>(descriptor_.context.instance),
+    static_cast<VkInstance>(context_.instance),
     mln::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
   );
 }
@@ -1023,7 +1013,7 @@ void VulkanTextureBackend::initSurface() {}
 void VulkanTextureBackend::initDevice() {
   const auto physical_devices = instance->enumeratePhysicalDevices(dispatcher);
   auto* const requested_physical_device =
-    static_cast<VkPhysicalDevice>(descriptor_.context.physical_device);
+    static_cast<VkPhysicalDevice>(context_.physical_device);
   auto found_physical_device = false;
   for (const auto& candidate : physical_devices) {
     if (static_cast<VkPhysicalDevice>(candidate) == requested_physical_device) {
@@ -1038,14 +1028,14 @@ void VulkanTextureBackend::initDevice() {
     );
   }
   device = vk::UniqueDevice(
-    static_cast<VkDevice>(descriptor_.context.device),
+    static_cast<VkDevice>(context_.device),
     mln::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
   );
-  vulkan_init_device_dispatch(dispatcher, device.get(), descriptor_.context);
+  vulkan_init_device_dispatch(dispatcher, device.get(), context_);
   graphicsQueueIndex =
-    static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
+    static_cast<int32_t>(context_.graphics_queue_family_index);
   presentQueueIndex = -1;
-  graphicsQueue = static_cast<VkQueue>(descriptor_.context.graphics_queue);
+  graphicsQueue = static_cast<VkQueue>(context_.graphics_queue);
   install_queue_access(
     dispatcher, device.get(), static_cast<VkQueue>(graphicsQueue)
   );

@@ -27,7 +27,7 @@ class MetalOffscreenDevice final : public OffscreenDevice {
   auto create_texture_backend(
     mln::Size size, std::unique_ptr<TextureSessionBackend>& out_backend
   ) -> mln_status override {
-    out_backend = create_metal_owned_texture_backend(device_.get(), size, 1);
+    out_backend = create_metal_offscreen_texture_backend(device_.get(), size);
     return MLN_STATUS_OK;
   }
 

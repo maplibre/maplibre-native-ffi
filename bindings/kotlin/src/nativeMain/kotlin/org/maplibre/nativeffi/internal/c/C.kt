@@ -355,23 +355,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_metal_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_metal_owned_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_attach_metal_surface(
     map: Long,
     descriptor: Long,
@@ -425,23 +408,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_open_gl_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_open_gl_owned_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
@@ -476,23 +442,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_vulkan_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_vulkan_owned_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_attach_vulkan_surface(
     map: Long,
     descriptor: Long,
@@ -519,23 +468,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_borrowed_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_web_gpu_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_owned_texture(
       map.toULong(),
       descriptor.toCPointer(),
       options.toCPointer(),

@@ -30,7 +30,6 @@ import type {
   MapView,
   MapViewportOptions,
   MetalBorrowedTextureDescriptor,
-  MetalOwnedTextureDescriptor,
   MetalSurfaceDescriptor,
   MetalTextureFrame,
   NetworkStatus,
@@ -42,7 +41,6 @@ import type {
   OffscreenDeviceOptions,
   OpenGlBorrowedTextureDescriptor,
   OpenGlContextProviderFlag,
-  OpenGlOwnedTextureDescriptor,
   OpenGlSurfaceDescriptor,
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
@@ -78,11 +76,9 @@ import type {
   StyleVectorTileEncoding,
   TextureReadbackResult,
   VulkanBorrowedTextureDescriptor,
-  VulkanOwnedTextureDescriptor,
   VulkanSurfaceDescriptor,
   VulkanTextureFrame,
   WebGpuBorrowedTextureDescriptor,
-  WebGpuOwnedTextureDescriptor,
   WebGpuSurfaceDescriptor,
   WebGpuTextureFrame,
 } from "./generated_values.ts";
@@ -874,43 +870,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Creates a session that renders the map into a ring of new Metal textures.
-   *
-   * See `mln_map_attach_metal_owned_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.metal`, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_metal_owned_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
    * Creates a session that renders the map to a Metal layer.
    *
    * See `mln_map_attach_metal_surface` in the
@@ -1031,50 +990,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Creates a session that renders the map into a ring of new OpenGL textures.
-   *
-   * With `OpenGlContextOwnership.shared`, the session needs
-   * `RenderDriverKind.callerGraphicsThread`, and the textures are in your
-   * context's share group. With `OpenGlContextOwnership.dedicated`, the session
-   * needs `RenderDriverKind.coreWorker` and renders in a context of its own.
-   * You can't acquire its frames, but `RenderSessionHandle.readTexture()` reads
-   * them.
-   *
-   * See `mln_map_attach_open_gl_owned_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
-   *   the context's platform, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachOpenGlOwnedTexture(
-    descriptor: OpenGlOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_open_gl_owned_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
    * Creates a session that renders the map to an OpenGL surface.
    *
    * The session needs `RenderDriverKind.coreWorker` for a transferred WebGL
@@ -1151,43 +1066,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Creates a session that renders the map into a ring of new Vulkan images.
-   *
-   * See `mln_map_attach_vulkan_owned_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.vulkan`, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_vulkan_owned_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
    * Creates a session that renders the map to a Vulkan surface.
    *
    * See `mln_map_attach_vulkan_surface` in the
@@ -1245,45 +1123,6 @@ export class MapHandle extends Owner {
       const [session, ready] = attach(
         (completion) =>
           native.mln_map_attach_web_gpu_borrowed_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle) =>
-          adopt(
-            handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
-          ),
-      );
-      return { session, ready };
-    });
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of new WebGPU textures.
-   *
-   * The session needs `RenderDriverKind.callerGraphicsThread`.
-   *
-   * See `mln_map_attach_web_gpu_owned_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.webGpu`, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachWebGpuOwnedTexture(
-    descriptor: WebGpuOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
-        (completion) =>
-          native.mln_map_attach_web_gpu_owned_texture(
             this.id,
             descriptor,
             options,
@@ -4129,8 +3968,7 @@ export class RenderSessionHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.unsupported` when the session renders into a ring that it
-   *   created.
+   * - `Status.unsupported` when the session renders offscreen.
    * - `Status.unsupported` when the target is a WebGL canvas.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
@@ -5519,18 +5357,6 @@ export class ScopedOpenGlTextureFrame {
 
   get target(): OpenGlTextureFrame["target"] {
     return this.#value.target;
-  }
-
-  get internalFormat(): OpenGlTextureFrame["internalFormat"] {
-    return this.#value.internalFormat;
-  }
-
-  get format(): OpenGlTextureFrame["format"] {
-    return this.#value.format;
-  }
-
-  get type(): OpenGlTextureFrame["type"] {
-    return this.#value.type;
   }
 }
 

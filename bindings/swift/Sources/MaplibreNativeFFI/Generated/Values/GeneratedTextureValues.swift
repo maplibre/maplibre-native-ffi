@@ -96,54 +96,6 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// A ring of Metal textures that the session creates, for
-/// `MapHandle.attachMetalOwnedTexture()`.
-///
-/// See `mln_metal_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
-  /// Names the MTLDevice that creates the textures.
-  public var context: MetalContextDescriptor
-  /// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-  /// MTLPixelFormatBGRA8Unorm.
-  public var pixelFormat: UInt64
-  /// Your MTLCommandQueue on the same device, or null for a queue of the
-  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
-  public var commandQueue: NativePointer
-  public init(
-    extent: LogicalExtent,
-    context: MetalContextDescriptor = .init(),
-    pixelFormat: UInt64,
-    commandQueue: NativePointer = .null
-  ) {
-    self.extent = extent
-    self.context = context
-    self.pixelFormat = pixelFormat
-    self.commandQueue = commandQueue
-  }
-
-  init(raw: mln_metal_owned_texture_descriptor) {
-    extent = LogicalExtent(raw: raw.extent)
-    context = MetalContextDescriptor(raw: raw.context)
-    pixelFormat = raw.pixel_format
-    commandQueue = NativePointer(bitPattern: unsafeBitCast(
-      raw.command_queue,
-      to: UInt.self
-    ))
-  }
-
-  func nativeValue() -> mln_metal_owned_texture_descriptor {
-    var raw = mln_metal_owned_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_descriptor>.size)
-    raw.extent = extent.nativeValue()
-    raw.context = context.nativeValue()
-    raw.pixel_format = pixelFormat
-    raw.command_queue = commandQueue.unsafeMutableRawPointer
-    return raw
-  }
-}
-
 /// The Metal texture of an acquired frame.
 ///
 /// See `mln_metal_texture_frame` in the
@@ -154,8 +106,7 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   public var scaleFactor: Double
   public var frameId: UInt64
-  /// The texture's index in the ring. For a borrowed ring, it indexes the
-  /// descriptor's `textures`.
+  /// The texture's index in the descriptor's `textures`.
   public var slot: UInt32
   /// The MTLTexture.
   public var texture: NativePointer
@@ -295,38 +246,6 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// A ring of OpenGL textures that the session creates, for
-/// `MapHandle.attachOpenGlOwnedTexture()`.
-///
-/// See `mln_open_gl_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenGlOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
-  public var context: OpenGlContextDescriptor
-  public init(extent: LogicalExtent, context: OpenGlContextDescriptor) {
-    self.extent = extent
-    self.context = context
-  }
-
-  init(
-    raw: mln_open_gl_owned_texture_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    extent = LogicalExtent(raw: raw.extent)
-    context = try OpenGlContextDescriptor(raw: raw.context)
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_open_gl_owned_texture_descriptor
-  {
-    var raw = mln_open_gl_owned_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_open_gl_owned_texture_descriptor>.size)
-    raw.extent = extent.nativeValue()
-    raw.context = try context.nativeValue(arena: arena)
-    return raw
-  }
-}
-
 /// The OpenGL texture of an acquired frame.
 ///
 /// See `mln_open_gl_texture_frame` in the
@@ -337,17 +256,10 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   public var scaleFactor: Double
   public var frameId: UInt64
-  /// The texture's index in the ring. For a borrowed ring, it indexes the
-  /// descriptor's `textures`.
+  /// The texture's index in the descriptor's `textures`.
   public var slot: UInt32
   public var texture: UInt32
   public var target: UInt32
-  /// The texture's internal format, or 0 for a borrowed ring.
-  public var internalFormat: UInt32
-  /// The texture's pixel format, or 0 for a borrowed ring.
-  public var format: UInt32
-  /// The texture's pixel type, or 0 for a borrowed ring.
-  public var type: UInt32
   public init(
     generation: UInt64 = 0,
     width: UInt32 = 0,
@@ -356,10 +268,7 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
     frameId: UInt64 = 0,
     slot: UInt32 = 0,
     texture: UInt32 = 0,
-    target: UInt32 = 0,
-    internalFormat: UInt32 = 0,
-    format: UInt32 = 0,
-    type: UInt32 = 0
+    target: UInt32 = 0
   ) {
     self.generation = generation
     self.width = width
@@ -369,9 +278,6 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
     self.slot = slot
     self.texture = texture
     self.target = target
-    self.internalFormat = internalFormat
-    self.format = format
-    self.type = type
   }
 
   init(raw: mln_open_gl_texture_frame) {
@@ -383,9 +289,6 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
     slot = raw.slot
     texture = raw.texture
     target = raw.target
-    internalFormat = raw.internal_format
-    format = raw.format
-    type = raw.type
   }
 }
 
@@ -580,36 +483,6 @@ public struct VulkanImageOwner: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// A ring of Vulkan images that the session creates, for
-/// `MapHandle.attachVulkanOwnedTexture()`.
-///
-/// Each frame leaves its image in the layout that `VulkanTextureFrame.layout`
-/// reports, owned by the queue family of `graphics_queue_family_index`.
-///
-/// See `mln_vulkan_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var extent: LogicalExtent
-  public var context: VulkanContextDescriptor
-  public init(extent: LogicalExtent, context: VulkanContextDescriptor) {
-    self.extent = extent
-    self.context = context
-  }
-
-  init(raw: mln_vulkan_owned_texture_descriptor) {
-    extent = LogicalExtent(raw: raw.extent)
-    context = VulkanContextDescriptor(raw: raw.context)
-  }
-
-  func nativeValue() -> mln_vulkan_owned_texture_descriptor {
-    var raw = mln_vulkan_owned_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_descriptor>.size)
-    raw.extent = extent.nativeValue()
-    raw.context = context.nativeValue()
-    return raw
-  }
-}
-
 /// The Vulkan image of an acquired frame.
 ///
 /// See `mln_vulkan_texture_frame` in the
@@ -620,8 +493,7 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   public var height: UInt32
   public var scaleFactor: Double
   public var frameId: UInt64
-  /// The image's index in the ring. For a borrowed ring, it indexes the
-  /// descriptor's `textures`.
+  /// The image's index in the descriptor's `textures`.
   public var slot: UInt32
   /// The VkImage.
   public var image: UInt64

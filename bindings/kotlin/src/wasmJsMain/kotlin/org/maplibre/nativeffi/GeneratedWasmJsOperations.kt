@@ -67,43 +67,6 @@ public fun MapHandle.attachWebGpuBorrowedTexture(
   }
 
 /**
- * Creates a session that renders the map into a ring of new WebGPU textures.
- *
- * The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.
- *
- * See `mln_map_attach_web_gpu_owned_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.WEB_GPU`, or
- *   when the target supports none of the `producer_sync_kinds` in `options`.
- */
-public fun MapHandle.attachWebGpuOwnedTexture(
-  descriptor: WebGpuOwnedTextureDescriptor,
-  options: RenderSessionAttachOptions,
-): NewRenderSession =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_web_gpu_owned_texture(
-          handle,
-          writeWebGpuOwnedTextureDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachWebGpuOwnedTexture) },
-      { it.bindingCallbacks },
-      { it.dispose() },
-      ::NewRenderSession,
-    )
-  }
-
-/**
  * Creates a session that renders the map to a WebGPU surface.
  *
  * The session needs `RenderDriverKind.CALLER_GRAPHICS_THREAD`.

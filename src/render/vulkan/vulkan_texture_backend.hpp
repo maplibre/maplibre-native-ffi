@@ -35,9 +35,10 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   class VulkanTextureRenderableResource;
 
  public:
+  // An offscreen session's backend, which renders into one image it creates.
   VulkanTextureBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
+    const mln_vulkan_context_descriptor& context, mln::Size size,
+    std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(
     const VulkanBorrowedTarget& target, mln::Size size,
@@ -66,7 +67,7 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   [[nodiscard]] auto frame_layout() const -> VkImageLayout;
   [[nodiscard]] auto context_descriptor() const
     -> const mln_vulkan_context_descriptor& {
-    return descriptor_.context;
+    return context_;
   }
   auto readStillImage() -> mln::PremultipliedImage override;
   auto getRendererBackend() -> mln::gfx::RendererBackend* override;
@@ -109,11 +110,11 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
 
  private:
   void initSharedDevice();
-  mln_vulkan_owned_texture_descriptor descriptor_;
+  mln_vulkan_context_descriptor context_;
   // The borrowed format, final layout, and owner. Its textures array is null;
   // the images are in borrowed_images_.
   mln_vulkan_borrowed_texture_descriptor borrowed_descriptor_{};
-  // The caller's image for each slot, or empty for a session-owned ring.
+  // The caller's image for each slot, or empty for an offscreen session.
   std::vector<mln_vulkan_borrowed_texture> borrowed_images_;
   bool uses_borrowed_texture_ = false;
   mln_gpu_sync_kind producer_sync_kind_ = MLN_GPU_SYNC_CPU_COMPLETE;

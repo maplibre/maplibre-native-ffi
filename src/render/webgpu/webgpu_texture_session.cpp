@@ -34,7 +34,7 @@
 
 namespace {
 
-constexpr auto webgpu_owned_color_format = WGPUTextureFormat_RGBA8Unorm;
+constexpr auto webgpu_offscreen_color_format = WGPUTextureFormat_RGBA8Unorm;
 
 // WebGPU pads every row of a texture-to-buffer copy to this many bytes, so a
 // readback stages the padded rows and unpacks them.
@@ -131,17 +131,18 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     WebGPUTextureBackend& backend;
   };
 
+  // An offscreen session's backend, which renders into one texture it
+  // creates.
   WebGPUTextureBackend(
-    const mln_web_gpu_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth
+    const mln_web_gpu_context_descriptor& context, mln::Size size
   )
       : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::gfx::HeadlessBackend(size),
         owns_color_texture_(true),
-        color_format_(webgpu_owned_color_format),
-        slots_(ring_depth) {
+        color_format_(webgpu_offscreen_color_format),
+        slots_(1) {
     try {
-      initializeContext(descriptor.context);
+      initializeContext(context);
       setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
       setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
       ensureColorTexture();
@@ -183,7 +184,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   mln::PremultipliedImage readStillImage() override { return {}; }
 
   // Copies the rendered texture into a mappable buffer and starts mapping it,
-  // then returns before the map finishes. Only a session-owned texture reaches
+  // then returns before the map finishes. Only an offscreen session reaches
   // here; a caller's texture need not carry CopySrc usage.
   //
   // The map finishes once the device's thread yields to its event loop, and
@@ -1168,10 +1169,9 @@ class WebGPUTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   WebGPUTextureSessionBackend(
-    const mln_web_gpu_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth
+    const mln_web_gpu_context_descriptor& context, mln::Size size
   )
-      : backend_(descriptor, size, ring_depth) {}
+      : backend_(context, size) {}
 
   WebGPUTextureSessionBackend(
     const WebGPUBorrowedTarget& target, mln::Size size
@@ -1274,79 +1274,12 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
 #endif
 }
 
-auto create_webgpu_owned_texture_backend(
-  const mln_web_gpu_owned_texture_descriptor& descriptor, mln::Size size,
-  std::size_t ring_depth, std::unique_ptr<TextureSessionBackend>& out_backend
+auto create_webgpu_offscreen_texture_backend(
+  const mln_web_gpu_context_descriptor& context, mln::Size size,
+  std::unique_ptr<TextureSessionBackend>& out_backend
 ) -> mln_status {
-  out_backend =
-    std::make_unique<WebGPUTextureSessionBackend>(descriptor, size, ring_depth);
+  out_backend = std::make_unique<WebGPUTextureSessionBackend>(context, size);
   return MLN_STATUS_OK;
-}
-
-auto webgpu_owned_texture_attach_start(
-  mln_map map, const mln_web_gpu_owned_texture_descriptor* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status {
-#if !defined(MLN_RENDER_BACKEND_WEBGPU)
-  set_thread_error("WebGPU texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-#else
-  MapObject* live_map = nullptr;
-  const auto map_status = validate_map_live(map, live_map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_webgpu_owned_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto driver_status = require_render_driver(
-    options, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
-    "WebGPU targets require the caller graphics thread driver"
-  );
-  if (driver_status != MLN_STATUS_OK) {
-    return driver_status;
-  }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  auto session = std::make_shared<mln_render_session_object>();
-  session->map = map;
-  set_session_extent(*session, descriptor->extent);
-  session->texture.mode = TextureSessionMode::Owned;
-  session->producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER;
-  const auto copied = *descriptor;
-  const auto ring_depth = attach_ring_depth(options);
-  session->initialize_backend =
-    [copied, ring_depth](mln_render_session_object& target) {
-      target.texture.backend = std::make_unique<WebGPUTextureSessionBackend>(
-        copied, mln::Size{target.physical_width, target.physical_height},
-        ring_depth
-      );
-      return MLN_STATUS_OK;
-    };
-  const auto capabilities = mln_render_session_capabilities{
-    .size = sizeof(mln_render_session_capabilities),
-    .driver = {},
-    .texture_ring_depth = ring_depth,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_READBACK,
-    .producer_sync_kind = {},
-    .consumer_sync_kinds =
-      MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE | MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER,
-  };
-  return start_attach_render_session(
-    std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, completion,
-    valueless_completion<&mln_map_attach_web_gpu_owned_texture>()
-  );
-#endif
 }
 
 auto webgpu_borrowed_texture_attach_start(

@@ -148,15 +148,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_attach_metal_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_attach_metal_surface(
     map: Long,
     descriptor: Long,
@@ -185,15 +176,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_attach_open_gl_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_attach_open_gl_surface(
     map: Long,
     descriptor: Long,
@@ -212,15 +194,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_attach_vulkan_owned_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_attach_vulkan_surface(
     map: Long,
     descriptor: Long,
@@ -231,15 +204,6 @@ internal expect object C {
   ): Int
 
   fun mln_map_attach_web_gpu_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_web_gpu_owned_texture(
     map: Long,
     descriptor: Long,
     options: Long,

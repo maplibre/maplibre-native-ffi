@@ -7,17 +7,21 @@
 
 static mln_status attach(
   mln_map map, const mln_test_graphics_context* context,
+  const mln_test_graphics_texture_info* texture,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  mln_metal_owned_texture_descriptor descriptor = {
-    .size = sizeof(mln_metal_owned_texture_descriptor)
+  (void)context;
+  const mln_metal_borrowed_texture entry = {.texture = texture->metal_texture};
+  mln_metal_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_metal_borrowed_texture_descriptor)
   };
   descriptor.extent = probe_extent;
-  descriptor.context.device = context->metal_device;
-  // MTLPixelFormatRGBA8Unorm.
-  descriptor.pixel_format = 70;
-  return mln_map_attach_metal_owned_texture(
+  descriptor.physical_width = texture->width;
+  descriptor.physical_height = texture->height;
+  descriptor.textures = &entry;
+  descriptor.texture_count = 1;
+  return mln_map_attach_metal_borrowed_texture(
     map, &descriptor, options, out_session, completion, NULL
   );
 }

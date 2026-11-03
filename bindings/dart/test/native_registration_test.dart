@@ -53,7 +53,6 @@ RenderSessionAttachOptions _options({
   QueueLock? queueLock,
 }) => RenderSessionAttachOptions(
   driver: RenderDriverKind.coreWorker,
-  requestedTextureRingDepth: 1,
   frameWake: frameWake,
   queueLock: queueLock,
 );

@@ -63,7 +63,6 @@ static void a_queued_frame_wake_runs_once_in_dispatch(void) {
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = count_call,
     .user_data = &wake,
@@ -129,7 +128,6 @@ static void releasing_the_queue_reports_an_abandoned_wake(void) {
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
-  options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
     .callback = count_call,
     .user_data = &wake,

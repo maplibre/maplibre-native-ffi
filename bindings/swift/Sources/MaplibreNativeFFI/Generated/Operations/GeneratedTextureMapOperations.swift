@@ -36,38 +36,6 @@ public extension MapHandle {
     }
   #endif
 
-  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
-    /// Creates a session that renders the map into a ring of new Metal
-    /// textures.
-    ///
-    /// See `mln_map_attach_metal_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.metal`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    func attachMetalOwnedTexture(
-      descriptor bindingArg0: MetalOwnedTextureDescriptor,
-      options bindingArg1: RenderSessionAttachOptions
-    ) throws -> NewRenderSession {
-      var value0: mln_render_session = 0
-      return try nativeAttach(as: NewRenderSession
-        .init)
-      { raw, arena, completion, diagnostic in
-        try mln_map_attach_metal_owned_texture(
-          raw,
-          arena.store(bindingArg0.nativeValue()),
-          arena.store(bindingArg1.nativeValue(arena: arena)),
-          &value0,
-          completion,
-          diagnostic
-        )
-      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-    }
-  #endif
-
   /// Creates a session that renders the map into a ring of your OpenGL
   /// textures.
   ///
@@ -90,42 +58,6 @@ public extension MapHandle {
       .init)
     { raw, arena, completion, diagnostic in
       try mln_map_attach_open_gl_borrowed_texture(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        &value0,
-        completion,
-        diagnostic
-      )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-  }
-
-  /// Creates a session that renders the map into a ring of new OpenGL textures.
-  ///
-  /// With `OpenGlContextOwnership.shared`, the session needs
-  /// `RenderDriverKind.callerGraphicsThread`, and the textures are in your
-  /// context's share group. With `OpenGlContextOwnership.dedicated`, the
-  /// session needs `RenderDriverKind.coreWorker` and renders in a context of
-  /// its own. You can't acquire its frames, but
-  /// `RenderSessionHandle.readTexture()` reads them.
-  ///
-  /// See `mln_map_attach_open_gl_owned_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
-  ///   the context's platform, or when the target supports none of the
-  ///   `producer_sync_kinds` in `options`.
-  func attachOpenGlOwnedTexture(
-    descriptor bindingArg0: OpenGlOwnedTextureDescriptor,
-    options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
-    var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
-      try mln_map_attach_open_gl_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -159,37 +91,6 @@ public extension MapHandle {
         try mln_map_attach_vulkan_borrowed_texture(
           raw,
           arena.store(bindingArg0.nativeValue(arena: arena)),
-          arena.store(bindingArg1.nativeValue(arena: arena)),
-          &value0,
-          completion,
-          diagnostic
-        )
-      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
-    }
-  #endif
-
-  #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-    /// Creates a session that renders the map into a ring of new Vulkan images.
-    ///
-    /// See `mln_map_attach_vulkan_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.vulkan`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    func attachVulkanOwnedTexture(
-      descriptor bindingArg0: VulkanOwnedTextureDescriptor,
-      options bindingArg1: RenderSessionAttachOptions
-    ) throws -> NewRenderSession {
-      var value0: mln_render_session = 0
-      return try nativeAttach(as: NewRenderSession
-        .init)
-      { raw, arena, completion, diagnostic in
-        try mln_map_attach_vulkan_owned_texture(
-          raw,
-          arena.store(bindingArg0.nativeValue()),
           arena.store(bindingArg1.nativeValue(arena: arena)),
           &value0,
           completion,

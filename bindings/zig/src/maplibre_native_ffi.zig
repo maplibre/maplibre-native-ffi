@@ -367,23 +367,6 @@ pub const Map = struct {
         }
     }.function else {};
 
-    /// Creates a session that renders the map into a ring of new Metal textures.
-    ///
-    /// See `mln_map_attach_metal_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.metal`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    pub const attachMetalOwnedTexture = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_metal_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
     /// Creates a session that renders the map to a Metal layer.
     ///
     /// See `mln_map_attach_metal_surface` in the
@@ -438,27 +421,6 @@ pub const Map = struct {
         return .{ .session = started.outputs, .ready = started.ready };
     }
 
-    /// Creates a session that renders the map into a ring of new OpenGL textures.
-    ///
-    /// With `OpenGlContextOwnership.shared`, the session needs
-    /// `RenderDriverKind.caller_graphics_thread`, and the textures are in your
-    /// context's share group. With `OpenGlContextOwnership.dedicated`, the session
-    /// needs `RenderDriverKind.core_worker` and renders in a context of its own.
-    /// You can't acquire its frames, but `RenderSession.readTexture()` reads them.
-    ///
-    /// See `mln_map_attach_open_gl_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `openGlSupportedContextProviderMask()` lacks the
-    ///   context's platform, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    pub fn attachOpenGlOwnedTexture(self: Map, descriptor: OpenGlOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_open_gl_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-        return .{ .session = started.outputs, .ready = started.ready };
-    }
-
     /// Creates a session that renders the map to an OpenGL surface.
     ///
     /// The session needs `RenderDriverKind.core_worker` for a transferred WebGL
@@ -489,23 +451,6 @@ pub const Map = struct {
     pub const attachVulkanBorrowedTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: Map, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_vulkan_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map into a ring of new Vulkan images.
-    ///
-    /// See `mln_map_attach_vulkan_owned_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.vulkan`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    pub const attachVulkanOwnedTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_vulkan_owned_texture", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
         }
     }.function else {};
@@ -1772,7 +1717,7 @@ pub const RenderSession = struct {
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` when the session renders into a ring that it created.
+    /// - `error.Unsupported` when the session renders offscreen.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -4114,41 +4059,6 @@ pub const MetalContextDescriptor = struct {
     }
 };
 
-/// A ring of Metal textures that the session creates, for
-/// `Map.attachMetalOwnedTexture()`.
-///
-/// See `mln_metal_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const MetalOwnedTextureDescriptor = struct {
-    extent: LogicalExtent,
-    /// Names the MTLDevice that creates the textures.
-    context: MetalContextDescriptor = .{},
-    /// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-    /// MTLPixelFormatBGRA8Unorm.
-    pixel_format: u64,
-    /// Your MTLCommandQueue on the same device, or null for a queue of the
-    /// session's own. With your queue, frames can use
-    /// `GpuSyncKind.queue_order`.
-    command_queue: ?*anyopaque = null,
-    pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_metal_owned_texture_descriptor);
-        raw.size = @sizeOf(c.mln_metal_owned_texture_descriptor);
-        raw.extent = self.extent.toNative();
-        raw.context = self.context.toNative();
-        raw.pixel_format = self.pixel_format;
-        raw.command_queue = self.command_queue;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
-        return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
-            .context = MetalContextDescriptor.fromNative(raw.context),
-            .pixel_format = raw.pixel_format,
-            .command_queue = raw.command_queue,
-        };
-    }
-};
-
 /// A Metal layer to render to, for `Map.attachMetalSurface()` and
 /// `RenderSession.setMetalSurfaceTarget()`.
 ///
@@ -4191,8 +4101,7 @@ pub const MetalTextureFrame = struct {
     height: u32 = 0,
     scale_factor: f64 = 0,
     frame_id: u64 = 0,
-    /// The texture's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The texture's index in the descriptor's `textures`.
     slot: u32 = 0,
     /// The MTLTexture.
     texture: ?*anyopaque = null,
@@ -4641,30 +4550,6 @@ pub const OpenGlContextProviderFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// A ring of OpenGL textures that the session creates, for
-/// `Map.attachOpenGlOwnedTexture()`.
-///
-/// See `mln_open_gl_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const OpenGlOwnedTextureDescriptor = struct {
-    extent: LogicalExtent,
-    context: OpenGlContextDescriptor,
-    pub fn toNative(self: OpenGlOwnedTextureDescriptor) status.Error!c.mln_open_gl_owned_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_open_gl_owned_texture_descriptor);
-        raw.size = @sizeOf(c.mln_open_gl_owned_texture_descriptor);
-        raw.extent = self.extent.toNative();
-        raw.context = try self.context.toNative();
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_owned_texture_descriptor) status.Error!OpenGlOwnedTextureDescriptor {
-        return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
-            .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
-        };
-    }
-};
-
 /// An OpenGL surface to present to, for `Map.attachOpenGlSurface()` and
 /// `RenderSession.setOpenGlSurfaceTarget()`.
 ///
@@ -4707,17 +4592,10 @@ pub const OpenGlTextureFrame = struct {
     height: u32 = 0,
     scale_factor: f64 = 0,
     frame_id: u64 = 0,
-    /// The texture's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The texture's index in the descriptor's `textures`.
     slot: u32 = 0,
     texture: u32 = 0,
     target: u32 = 0,
-    /// The texture's internal format, or 0 for a borrowed ring.
-    internal_format: u32 = 0,
-    /// The texture's pixel format, or 0 for a borrowed ring.
-    format: u32 = 0,
-    /// The texture's pixel type, or 0 for a borrowed ring.
-    type: u32 = 0,
     pub fn fromNative(raw: c.mln_open_gl_texture_frame) OpenGlTextureFrame {
         return .{
             .generation = raw.generation,
@@ -4728,9 +4606,6 @@ pub const OpenGlTextureFrame = struct {
             .slot = raw.slot,
             .texture = raw.texture,
             .target = raw.target,
-            .internal_format = raw.internal_format,
-            .format = raw.format,
-            .type = raw.type,
         };
     }
 };
@@ -5056,9 +4931,6 @@ pub const RenderResult = enum(u32) {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderSessionAttachOptions = struct {
     driver: RenderDriverKind,
-    /// How many textures a ring that the session creates has, up to 8. Zero
-    /// picks a default.
-    requested_texture_ring_depth: u32 = 0,
     /// The kinds of `GpuSync` that you can wait on before you read an acquired
     /// frame. The session uses one of them that its target supports. Zero lets
     /// the session pick a kind that names no object to wait on.
@@ -5078,7 +4950,6 @@ pub const RenderSessionAttachOptions = struct {
         var raw = std.mem.zeroes(c.mln_render_session_attach_options);
         raw.size = @sizeOf(c.mln_render_session_attach_options);
         raw.driver = self.driver.toNative();
-        raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
         raw.producer_sync_kinds = self.producer_sync_kinds.toNative();
         raw.frame_wake = try self.frame_wake.toNative(roots);
         raw.driver_work_wake = try self.driver_work_wake.toNative(roots);
@@ -5090,7 +4961,6 @@ pub const RenderSessionAttachOptions = struct {
         _ = allocator;
         return .{
             .driver = RenderDriverKind.fromNative(raw.driver),
-            .requested_texture_ring_depth = raw.requested_texture_ring_depth,
             .producer_sync_kinds = GpuSyncKindFlag.fromNative(raw.producer_sync_kinds),
             .frame_wake = .{},
             .driver_work_wake = .{},
@@ -7067,9 +6937,7 @@ pub const VulkanBorrowedTextureDescriptor = struct {
 /// The Vulkan device and queue that a render session uses.
 ///
 /// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns. If you discarded a frame of a ring
-/// that the session creates, or abandon the session while you hold a frame,
-/// keep them alive until the process exits instead.
+/// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -7131,32 +6999,6 @@ pub const VulkanImageOwner = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// A ring of Vulkan images that the session creates, for
-/// `Map.attachVulkanOwnedTexture()`.
-///
-/// Each frame leaves its image in the layout that `VulkanTextureFrame.layout`
-/// reports, owned by the queue family of `graphics_queue_family_index`.
-///
-/// See `mln_vulkan_owned_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const VulkanOwnedTextureDescriptor = struct {
-    extent: LogicalExtent,
-    context: VulkanContextDescriptor,
-    pub fn toNative(self: VulkanOwnedTextureDescriptor) c.mln_vulkan_owned_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_vulkan_owned_texture_descriptor);
-        raw.size = @sizeOf(c.mln_vulkan_owned_texture_descriptor);
-        raw.extent = self.extent.toNative();
-        raw.context = self.context.toNative();
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_vulkan_owned_texture_descriptor) VulkanOwnedTextureDescriptor {
-        return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
-            .context = VulkanContextDescriptor.fromNative(raw.context),
-        };
-    }
-};
-
 /// A Vulkan surface to present to, for `Map.attachVulkanSurface()` and
 /// `RenderSession.setVulkanSurfaceTarget()`.
 ///
@@ -7200,8 +7042,7 @@ pub const VulkanTextureFrame = struct {
     height: u32 = 0,
     scale_factor: f64 = 0,
     frame_id: u64 = 0,
-    /// The image's index in the ring. For a borrowed ring, it indexes the
-    /// descriptor's `textures`.
+    /// The image's index in the descriptor's `textures`.
     slot: u32 = 0,
     /// The VkImage.
     image: u64 = 0,

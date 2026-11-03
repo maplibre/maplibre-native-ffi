@@ -37,7 +37,7 @@ Future<void> renderToTexture(
   List<int> newImages,
   List<int> newViews,
 ) async {
-  // #region attach-owned
+  // #region attach-options
   final options = RenderSessionAttachOptions(
     driver: RenderDriverKind.coreWorker,
     frameWake: const Wake(callback: onFrameWake),
@@ -45,7 +45,7 @@ Future<void> renderToTexture(
     // lock and unlock are native function pointers.
     queueLock: QueueLock.native(lock: lockQueue, unlock: unlockQueue),
   );
-  // #endregion attach-owned
+  // #endregion attach-options
 
   // #region attach-borrowed
   var ring = VulkanBorrowedTextureDescriptor(

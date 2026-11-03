@@ -85,18 +85,6 @@ public final class OpenGlTextureFrameView {
   public var target: UInt32 {
     snapshot.target
   }
-
-  public var internalFormat: UInt32 {
-    snapshot.internalFormat
-  }
-
-  public var format: UInt32 {
-    snapshot.format
-  }
-
-  public var type: UInt32 {
-    snapshot.type
-  }
 }
 
 public final class GpuSyncView {

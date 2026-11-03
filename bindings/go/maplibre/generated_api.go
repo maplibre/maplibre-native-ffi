@@ -2960,34 +2960,6 @@ func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingAr
 	return raw
 }
 
-// MetalOwnedTextureDescriptor corresponds to
-// mln_metal_owned_texture_descriptor. A ring of Metal textures that the session
-// creates, for MapHandle.AttachMetalOwnedTexture().
-//
-// See mln_metal_owned_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type MetalOwnedTextureDescriptor struct {
-	Extent LogicalExtent
-	// Names the MTLDevice that creates the textures.
-	Context MetalContextDescriptor
-	// The textures' MTLPixelFormat: MTLPixelFormatRGBA8Unorm or
-	// MTLPixelFormatBGRA8Unorm.
-	PixelFormat uint64
-	// Your MTLCommandQueue on the same device, or null for a queue of the session's
-	// own. With your queue, frames can use GpuSyncKindQueueOrder.
-	CommandQueue uintptr
-}
-
-func nativeMetalOwnedTextureDescriptor(input MetalOwnedTextureDescriptor, arena *bindingArena) C.mln_metal_owned_texture_descriptor {
-	raw := C.mln_metal_owned_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeMetalContextDescriptor(input.Context, arena)
-	raw.pixel_format = C.uint64_t(input.PixelFormat)
-	raw.command_queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.CommandQueue)))
-	return raw
-}
-
 // MetalSurfaceDescriptor corresponds to mln_metal_surface_descriptor. A Metal
 // layer to render to, for MapHandle.AttachMetalSurface() and
 // RenderSessionHandle.SetMetalSurfaceTarget().
@@ -3026,8 +2998,7 @@ type MetalTextureFrame struct {
 	Height      uint32
 	ScaleFactor float64
 	FrameId     uint64
-	// The texture's index in the ring. For a borrowed ring, it indexes the
-	// descriptor's textures.
+	// The texture's index in the descriptor's textures.
 	Slot uint32
 	// The MTLTexture.
 	Texture uintptr
@@ -3353,25 +3324,6 @@ func nativeOpenGlContextDescriptor(input OpenGlContextDescriptor, arena *binding
 	return raw
 }
 
-// OpenGlOwnedTextureDescriptor corresponds to
-// mln_open_gl_owned_texture_descriptor. A ring of OpenGL textures that the
-// session creates, for MapHandle.AttachOpenGlOwnedTexture().
-//
-// See mln_open_gl_owned_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenGlOwnedTextureDescriptor struct {
-	Extent  LogicalExtent
-	Context OpenGlContextDescriptor
-}
-
-func nativeOpenGlOwnedTextureDescriptor(input OpenGlOwnedTextureDescriptor, arena *bindingArena) C.mln_open_gl_owned_texture_descriptor {
-	raw := C.mln_open_gl_owned_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeOpenGlContextDescriptor(input.Context, arena)
-	return raw
-}
-
 // OpenGlSurfaceDescriptor corresponds to mln_open_gl_surface_descriptor. An
 // OpenGL surface to present to, for MapHandle.AttachOpenGlSurface() and
 // RenderSessionHandle.SetOpenGlSurfaceTarget().
@@ -3409,17 +3361,10 @@ type OpenGlTextureFrame struct {
 	Height      uint32
 	ScaleFactor float64
 	FrameId     uint64
-	// The texture's index in the ring. For a borrowed ring, it indexes the
-	// descriptor's textures.
+	// The texture's index in the descriptor's textures.
 	Slot    uint32
 	Texture uint32
 	Target  uint32
-	// The texture's internal format, or 0 for a borrowed ring.
-	InternalFormat uint32
-	// The texture's pixel format, or 0 for a borrowed ring.
-	Format uint32
-	// The texture's pixel type, or 0 for a borrowed ring.
-	Type uint32
 }
 
 func copyOpenGlTextureFrame(raw C.mln_open_gl_texture_frame) OpenGlTextureFrame {
@@ -3432,9 +3377,6 @@ func copyOpenGlTextureFrame(raw C.mln_open_gl_texture_frame) OpenGlTextureFrame 
 	result.Slot = uint32(raw.slot)
 	result.Texture = uint32(raw.texture)
 	result.Target = uint32(raw.target)
-	result.InternalFormat = uint32(raw.internal_format)
-	result.Format = uint32(raw.format)
-	result.Type = uint32(raw._type)
 	return result
 }
 
@@ -3655,9 +3597,6 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type RenderSessionAttachOptions struct {
 	Driver RenderDriverKind
-	// How many textures a ring that the session creates has, up to 8. Zero picks a
-	// default.
-	RequestedTextureRingDepth uint32
 	// The kinds of GpuSync that you can wait on before you read an acquired frame.
 	// The session uses one of them that its target supports. Zero lets the session
 	// pick a kind that names no object to wait on.
@@ -3678,7 +3617,6 @@ func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *b
 	raw := C.mln_render_session_attach_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.driver = C.mln_render_driver_kind(input.Driver)
-	raw.requested_texture_ring_depth = C.uint32_t(input.RequestedTextureRingDepth)
 	raw.producer_sync_kinds = C.mln_gpu_sync_kind_flags(input.ProducerSyncKinds)
 	raw.frame_wake = nativeWake(input.FrameWake, arena)
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
@@ -4950,9 +4888,7 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 // Vulkan device and queue that a render session uses.
 //
 // Keep these objects alive until a detach or disposal of the session completes,
-// or an abandon of it returns. If you discarded a frame of a ring that the
-// session creates, or abandon the session while you hold a frame, keep them
-// alive until the process exits instead.
+// or an abandon of it returns.
 //
 // See mln_vulkan_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
@@ -4982,28 +4918,6 @@ func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *binding
 	raw.graphics_queue_family_index = C.uint32_t(input.GraphicsQueueFamilyIndex)
 	raw.get_instance_proc_addr = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetInstanceProcAddr)))
 	raw.get_device_proc_addr = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetDeviceProcAddr)))
-	return raw
-}
-
-// VulkanOwnedTextureDescriptor corresponds to
-// mln_vulkan_owned_texture_descriptor. A ring of Vulkan images that the session
-// creates, for MapHandle.AttachVulkanOwnedTexture().
-//
-// Each frame leaves its image in the layout that VulkanTextureFrame.Layout
-// reports, owned by the queue family of graphics_queue_family_index.
-//
-// See mln_vulkan_owned_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type VulkanOwnedTextureDescriptor struct {
-	Extent  LogicalExtent
-	Context VulkanContextDescriptor
-}
-
-func nativeVulkanOwnedTextureDescriptor(input VulkanOwnedTextureDescriptor, arena *bindingArena) C.mln_vulkan_owned_texture_descriptor {
-	raw := C.mln_vulkan_owned_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeLogicalExtent(input.Extent, arena)
-	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
 	return raw
 }
 
@@ -5046,8 +4960,7 @@ type VulkanTextureFrame struct {
 	Height      uint32
 	ScaleFactor float64
 	FrameId     uint64
-	// The image's index in the ring. For a borrowed ring, it indexes the
-	// descriptor's textures.
+	// The image's index in the descriptor's textures.
 	Slot uint32
 	// The VkImage.
 	Image uint64
@@ -5228,12 +5141,6 @@ func (view OpenGlTextureFrameView) Texture() (uint32, error) {
 }
 
 func (view OpenGlTextureFrameView) Target() uint32 { return view.value.Target }
-
-func (view OpenGlTextureFrameView) InternalFormat() uint32 { return view.value.InternalFormat }
-
-func (view OpenGlTextureFrameView) Format() uint32 { return view.value.Format }
-
-func (view OpenGlTextureFrameView) Type() uint32 { return view.value.Type }
 
 type GpuSyncView struct {
 	value GpuSync
@@ -6083,40 +5990,6 @@ func (receiver *MapHandle) AttachOpenGlBorrowedTexture(descriptor OpenGlBorrowed
 	return result.session, result.ready, err
 }
 
-// AttachOpenGlOwnedTexture creates a session that renders the map into a ring
-// of new OpenGL textures.
-//
-// With OpenGlContextOwnershipShared, the session needs
-// RenderDriverKindCallerGraphicsThread, and the textures are in your context's
-// share group. With OpenGlContextOwnershipDedicated, the session needs
-// RenderDriverKindCoreWorker and renders in a context of its own. You can't
-// acquire its frames, but RenderSessionHandle.ReadTexture() reads them.
-//
-// See mln_map_attach_open_gl_owned_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when OpenGlSupportedContextProviderMask() lacks the
-//     context's platform, or when the target supports none of the
-//     producer_sync_kinds in options.
-func (receiver *MapHandle) AttachOpenGlOwnedTexture(descriptor OpenGlOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_open_gl_owned_texture(C.mln_map(raw), bindingStore(nativeOpenGlOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
 // AttachOpenGlSurface creates a session that renders the map to an OpenGL
 // surface.
 //
@@ -6161,34 +6034,6 @@ func (receiver *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowed
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_attach_vulkan_borrowed_texture(C.mln_map(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachVulkanOwnedTexture creates a session that renders the map into a ring
-// of new Vulkan images.
-//
-// See mln_map_attach_vulkan_owned_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagVulkan, or when the target supports none of the
-//     producer_sync_kinds in options.
-func (receiver *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_vulkan_owned_texture(C.mln_map(raw), bindingStore(nativeVulkanOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -7708,7 +7553,7 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the session renders into a ring that it created.
+//   - StatusUnsupported when the session renders offscreen.
 //   - StatusUnsupported when the target is a WebGL canvas.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.

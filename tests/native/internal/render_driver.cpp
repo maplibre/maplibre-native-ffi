@@ -52,24 +52,14 @@ void create_fixture(Fixture& fixture) {
   );
 }
 
-// create_fixture() for a case that resizes the session, which only a session
-// that owns its texture does.
+// create_fixture() for a case that resizes the session, which only an
+// offscreen session does.
 void create_offscreen_fixture(Fixture& fixture) {
   fixture.runtime = mln_test_create_runtime();
   fixture.map = mln_test_create_map(fixture.runtime);
   mln_test_render_prepare_map(fixture.map);
   TEST_ASSERT_TRUE(
     mln_test_render_fixture_create_offscreen(fixture.map, &fixture.render)
-  );
-}
-
-// create_fixture() for a case about a ring that the session owns.
-void create_owned_fixture(Fixture& fixture) {
-  fixture.runtime = mln_test_create_runtime();
-  fixture.map = mln_test_create_map(fixture.runtime);
-  mln_test_render_prepare_map(fixture.map);
-  TEST_ASSERT_TRUE(
-    mln_test_render_fixture_create_owned(fixture.map, &fixture.render)
   );
 }
 
@@ -1417,16 +1407,15 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   destroy_fixture(fixture);
 }
 
-// A frame release that the host made before abandon lets go of its slot even
-// while the driver has yet to run it, because CPU_COMPLETE attests that the
-// host's GPU read is done. Abandon runs the queued release before it decides
-// what to keep, so it destroys a Vulkan or Metal ring with the rest. Holding
-// the driver keeps the release queued until the abandon, which no public
-// fence reaches. Only a ring that the session owns is the session's to keep.
+// A frame release that the host made before abandon is still queued for the
+// driver when abandon runs it. A borrowed ring's textures belong to the host,
+// so abandon destroys a Vulkan or Metal backend with the rest. Holding the
+// driver keeps the release queued until the abandon, which no public fence
+// reaches.
 void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
-  create_owned_fixture(fixture);
+  create_fixture(fixture);
   auto frame = mln_test_render_and_acquire(&fixture.render, 141);
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
@@ -1483,15 +1472,15 @@ void release_with_a_gpu_wait(
   if (racing.release_status == MLN_STATUS_OK) racing.frame = MLN_HANDLE_NULL;
 }
 
-// A frame release can reach a session after abandon took its backend and
-// before abandon decides what to keep. Native never runs the GPU wait that
-// such a release hands over, so the host's GPU may still read the slot, and
-// abandon keeps the ring that the session owns. The blocked driver keeps the
-// operation queued until abandon discards it, which no public fence reaches.
-void abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons() {
+// A frame release can reach a session after abandon took its backend. Native
+// never runs the GPU wait that such a release hands over, but the host's GPU
+// reads a borrowed texture that the host owns, so abandon still destroys a
+// Vulkan or Metal backend. The blocked driver keeps the operation queued until
+// abandon discards it, which no public fence reaches.
+void abandon_destroys_a_ring_released_with_a_gpu_wait_as_it_abandons() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
-  create_owned_fixture(fixture);
+  create_fixture(fixture);
   {
     // The session accepts the fence that the racing release hands over.
     const auto live = mln::core::lease_render_session(fixture.render.session);
@@ -1527,22 +1516,22 @@ void abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons() {
   MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, racing.completion_status);
   MLN_TEST_OK(racing.release_status);
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, racing.frame);
+  // OpenGL and WebGPU keep the renderer and the backend, which only their
+  // graphics thread may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_CLEAN, result.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(0, result.quarantined_resource_count);
+#else
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
   );
-  // OpenGL and WebGPU keep the renderer too, which only their graphics thread
-  // may destroy.
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
-  TEST_ASSERT_EQUAL_UINT32(1, result.quarantined_resource_count);
-#else
   TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
 #endif
   TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
   mln_test_completion_destroy(&blocker.completion);
   blocker.submitted = false;
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
-#endif
   destroy_fixture(fixture);
 }
 
@@ -1980,7 +1969,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);
   RUN_TEST(abandon_destroys_a_ring_whose_frame_release_is_still_queued);
-  RUN_TEST(abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons);
+  RUN_TEST(abandon_destroys_a_ring_released_with_a_gpu_wait_as_it_abandons);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
   RUN_TEST(a_failed_release_of_the_last_slot_ends_a_waiting_demand);
   RUN_TEST(a_quarantined_ring_ends_a_demand_in_driver_order);

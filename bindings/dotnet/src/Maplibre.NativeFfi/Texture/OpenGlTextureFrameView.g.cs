@@ -21,7 +21,4 @@ public sealed class OpenGlTextureFrameView
     public uint Slot => value.Slot;
     public uint Texture => scope.Active(value).Texture;
     public uint Target => value.Target;
-    public uint InternalFormat => value.InternalFormat;
-    public uint Format => value.Format;
-    public uint Type => value.Type;
 }

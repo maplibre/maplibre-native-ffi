@@ -448,15 +448,6 @@ internal unsafe struct mln_metal_context_descriptor
     public void* device;
 }
 
-internal unsafe struct mln_metal_owned_texture_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_metal_context_descriptor context;
-    public ulong pixel_format;
-    public void* command_queue;
-}
-
 internal unsafe struct mln_metal_surface_descriptor
 {
     public uint size;
@@ -589,13 +580,6 @@ internal unsafe struct mln_open_gl_context_descriptor_data
     public mln_web_gl_context_descriptor web_gl;
 }
 
-internal unsafe struct mln_open_gl_owned_texture_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_open_gl_context_descriptor context;
-}
-
 internal unsafe struct mln_open_gl_surface_descriptor
 {
     public uint size;
@@ -615,9 +599,6 @@ internal unsafe struct mln_open_gl_texture_frame
     public uint slot;
     public uint texture;
     public uint target;
-    public uint internal_format;
-    public uint format;
-    public uint type;
 }
 
 internal unsafe struct mln_premultiplied_rgba8_image
@@ -694,7 +675,6 @@ internal unsafe struct mln_render_session_attach_options
 {
     public uint size;
     public mln_render_driver_kind driver;
-    public uint requested_texture_ring_depth;
     public uint producer_sync_kinds;
     public mln_wake frame_wake;
     public mln_wake driver_work_wake;
@@ -1181,13 +1161,6 @@ internal unsafe struct mln_vulkan_context_descriptor
     public void* get_device_proc_addr;
 }
 
-internal unsafe struct mln_vulkan_owned_texture_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_vulkan_context_descriptor context;
-}
-
 internal unsafe struct mln_vulkan_surface_descriptor
 {
     public uint size;
@@ -1250,13 +1223,6 @@ internal unsafe struct mln_web_gpu_context_descriptor
     public void* instance;
     public void* device;
     public void* queue;
-}
-
-internal unsafe struct mln_web_gpu_owned_texture_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_web_gpu_context_descriptor context;
 }
 
 internal unsafe struct mln_web_gpu_surface_descriptor

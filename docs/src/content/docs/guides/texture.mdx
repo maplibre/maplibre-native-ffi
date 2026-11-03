@@ -1,9 +1,9 @@
 ---
 title: Render to a texture
 description: Share rendered frames with your renderer.
-# Scope: owned and borrowed textures, and acquiring frames. Reading pixels back
-# belongs in Render images. Running driver work on your graphics thread belongs
-# in Render to a window.
+# Scope: rings of your textures, acquiring frames, and replacing the ring.
+# Reading pixels back belongs in Render images. Running driver work on your
+# graphics thread belongs in Render to a window.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -15,14 +15,15 @@ renderer to draw, such as a UI framework, a game engine, or a compositor. It
 builds on the frame loop from
 [Render to a window](/maplibre-native-ffi/guides/window/#render-frames).
 
+To read a map's pixels on the CPU instead, render offscreen, as in
+[Render images](/maplibre-native-ffi/guides/images/).
+
 ## Attach a texture ring
 
-The session renders into a ring of textures, so your renderer can draw one frame
-while the session renders the next.
-
-Usually, you let the session create the ring on your GPU device. If your
-framework hands you textures to render into, attach those as a borrowed ring
-instead.
+The session renders into a ring of textures that you create on your GPU device,
+so your renderer can draw one frame while the session renders the next. Create
+two textures at the map's size in device pixels, which is its logical size times
+its scale factor.
 
 <Aside type="note">
   The snippets below use Vulkan. For another backend, use that backend's calls
@@ -30,17 +31,18 @@ instead.
   other steps are the same.
 </Aside>
 
-Pass your graphics context, such as your device and queue. On Vulkan, if your
-renderer submits to the same queue, also pass a lock, and hold it around your
-own submissions.
+On Vulkan, if your renderer submits to the same queue as the session, pass a
+lock in the attach options, and hold it around your own submissions.
 
-As with a window, use your graphics thread as the driver if the texture uses
-your OpenGL context, and the library thread otherwise. See
+As with a window, use your graphics thread as the driver for OpenGL and WebGPU
+textures, and the library thread otherwise. See
 [Service driver work](/maplibre-native-ffi/guides/window/#service-driver-work).
 
-<Snippet page="texture" region="attach-owned" />
+<Snippet page="texture" region="attach-options" />
 
-For a borrowed ring, pass your textures and their size in device pixels.
+Then attach your textures, with your graphics context, such as your device and
+queue, and the textures' size in device pixels. Keep the textures alive until
+you replace them, or until the session detaches.
 
 <Snippet page="texture" region="attach-borrowed" />
 
@@ -50,21 +52,24 @@ Run the window's frame loop, but without [](api:MLN_FRAME_DEMAND_PRESENT), since
 your renderer shows the frames instead.
 
 When a frame renders, acquire it with [](api:mln_render_session_acquire_frame)
-and get its texture for your backend.
+and get its texture for your backend. The frame's slot is the index of its
+texture in your ring.
 
 When your reads finish, release the frame with
 [](api:mln_acquired_frame_release), so the session can render into that texture
-again. To sync on the GPU, see [](api:mln_gpu_sync_kind). Keep at most one frame
-acquired, or the next frame waits for a free texture, and release every acquired
-frame before you close the session.
+again. If your reads may still run on the GPU, pass a sync point of a kind that
+[](api:mln_render_session_capabilities) lists in its consumer sync kinds, and
+the session waits for it on the GPU. Keep at most one frame acquired, or the
+next frame waits for a free texture, and release every acquired frame before you
+close the session.
 
 <Snippet page="texture" region="acquire" />
 
 ## Resize the textures
 
-First, release every acquired frame. Then resize an owned ring with
-[](api:mln_render_session_resize), as for a window. For a borrowed ring, create
-textures at the new size and set them as the session's target, then destroy the
-old textures.
+The session renders at the size of your textures, so to resize, give it new
+ones. First, release every acquired frame. Then create textures at the new size,
+and set them as the session's target, with as many textures as before. Once the
+replacement completes, destroy the old textures.
 
 <Snippet page="texture" region="resize-borrowed" />

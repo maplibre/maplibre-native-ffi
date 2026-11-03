@@ -699,12 +699,6 @@ fn generated_copy_mln_open_gl_texture_frame(
     dict.set_item("slot", generated_value(py, value.slot)?)?;
     dict.set_item("texture", generated_value(py, value.texture)?)?;
     dict.set_item("target", generated_value(py, value.target)?)?;
-    dict.set_item(
-        "internal_format",
-        generated_value(py, value.internal_format)?,
-    )?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    dict.set_item("type", generated_value(py, value.type_)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2283,20 +2277,6 @@ fn generated_input_mln_metal_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_metal_owned_texture_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_metal_owned_texture_descriptor> {
-    let mut raw: sys::mln_metal_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    raw.context =
-        generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.pixel_format = value.getattr("pixel_format")?.extract::<u64>()?;
-    raw.command_queue = value.getattr("command_queue")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
 fn generated_input_mln_metal_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2462,18 +2442,6 @@ fn generated_input_mln_open_gl_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_open_gl_owned_texture_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_open_gl_owned_texture_descriptor> {
-    let mut raw: sys::mln_open_gl_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_open_gl_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    raw.context =
-        generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
-    Ok(raw)
-}
-
 fn generated_input_mln_open_gl_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2575,9 +2543,6 @@ fn generated_input_mln_render_session_attach_options<'py>(
     raw.driver = value
         .getattr("driver")?
         .extract::<sys::mln_render_driver_kind>()?;
-    raw.requested_texture_ring_depth = value
-        .getattr("requested_texture_ring_depth")?
-        .extract::<u32>()?;
     raw.producer_sync_kinds = value
         .getattr("producer_sync_kinds")?
         .extract::<sys::mln_gpu_sync_kind_flags>()?;
@@ -3080,18 +3045,6 @@ fn generated_input_mln_vulkan_context_descriptor<'py>(
         .getattr("get_instance_proc_addr")?
         .extract::<usize>()? as _;
     raw.get_device_proc_addr = value.getattr("get_device_proc_addr")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_vulkan_owned_texture_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_vulkan_owned_texture_descriptor> {
-    let mut raw: sys::mln_vulkan_owned_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    raw.context =
-        generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
 }
 
@@ -3905,48 +3858,6 @@ impl MapHandle {
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options))]
-    fn attach_metal_owned_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_metal_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_metal_owned_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
     fn attach_metal_surface(
         &self,
         py: Python<'_>,
@@ -4076,48 +3987,6 @@ impl MapHandle {
         Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, options))]
-    fn attach_open_gl_owned_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_open_gl_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_open_gl_owned_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
     fn attach_open_gl_surface(
         &self,
         py: Python<'_>,
@@ -4179,48 +4048,6 @@ impl MapHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_map_attach_vulkan_borrowed_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_vulkan_owned_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_vulkan_owned_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_vulkan_owned_texture(
                         handle,
                         &descriptor_value,
                         &options_value,

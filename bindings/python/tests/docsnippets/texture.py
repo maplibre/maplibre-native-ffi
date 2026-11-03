@@ -49,7 +49,7 @@ def render_to_texture(
     new_views: tuple[int, int],
 ) -> None:
     global session
-    # #region attach-owned
+    # #region attach-options
     options = mln.RenderSessionAttachOptions(
         driver=mln.RenderDriverKind.CORE_WORKER,
         frame_wake=mln.Wake(on_frame_wake),
@@ -59,7 +59,7 @@ def render_to_texture(
             lock=lock_queue, unlock=unlock_queue
         ),
     )
-    # #endregion attach-owned
+    # #endregion attach-options
 
     # #region attach-borrowed
     ring = mln.VulkanBorrowedTextureDescriptor(
