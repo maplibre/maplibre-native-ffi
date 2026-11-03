@@ -1074,7 +1074,7 @@ internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
   allocate(w(24, 40), w(8, 8, 4)).also { putResourceTransform(it, value) }
 
 internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpressionInputs) {
-  writeU32(target, w(80, 112, 76).toUInt())
+  writeU32(target, w(72, 104, 68).toUInt())
   var fields = 0u
   value.zoom?.let {
     fields = fields or 1u
@@ -1084,30 +1084,26 @@ internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpr
     fields = fields or 2u
     writeF64(target + 16, it)
   }
-  value.elevation?.let {
-    fields = fields or 4u
-    writeF64(target + 24, it)
-  }
-  putView(target + 32, value.feature)
-  putView(target + w(40, 48), value.featureState)
-  putView(target + w(48, 64), value.globalState)
+  putView(target + 24, value.feature)
+  putView(target + w(32, 40), value.featureState)
+  putView(target + w(40, 56), value.globalState)
   value.canonicalTileId?.let {
     fields = fields or 8u
-    putCanonicalTileId(target + w(56, 80), it)
+    putCanonicalTileId(target + w(48, 72), it)
   }
   writeAddress(
-    target + w(68, 96),
+    target + w(60, 88),
     array(value.availableImages, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item
       ->
       putView(at, item)
     },
   )
-  writeSize(target + w(72, 104), value.availableImages.size.toULong())
+  writeSize(target + w(64, 96), value.availableImages.size.toULong())
   writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeStyleExpressionInputs(value: StyleExpressionInputs): Long =
-  allocate(w(80, 112, 76), w(8, 8, 4)).also { putStyleExpressionInputs(it, value) }
+  allocate(w(72, 104, 68), w(8, 8, 4)).also { putStyleExpressionInputs(it, value) }
 
 internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
   writeU32(target, w(28, 48).toUInt())

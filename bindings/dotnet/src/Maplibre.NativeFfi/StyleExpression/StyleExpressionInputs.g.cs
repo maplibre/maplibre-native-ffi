@@ -14,15 +14,10 @@ public sealed record StyleExpressionInputs
     public double? Zoom { get; init; }
 
     /// <summary>
-    /// The value that <c>heatmap-density</c> and <c>line-progress</c> read.
+    /// The value of <c>heatmap-density</c>, <c>line-progress</c>, and
+    /// <c>elevation</c>.
     /// </summary>
     public double? ColorRampParameter { get; init; }
-
-    /// <summary>
-    /// The value that <c>elevation</c> reads when <c>color_ramp_parameter</c>
-    /// isn't set.
-    /// </summary>
-    public double? Elevation { get; init; }
 
     /// <summary>
     /// The feature to evaluate against, as a GeoJSON feature, or empty for

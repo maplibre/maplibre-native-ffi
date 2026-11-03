@@ -6385,7 +6385,6 @@ final class StyleExpressionInputs extends _Value {
   StyleExpressionInputs({
     this.zoom,
     this.colorRampParameter,
-    this.elevation,
     this.feature,
     this.featureState,
     this.globalState,
@@ -6394,11 +6393,8 @@ final class StyleExpressionInputs extends _Value {
   }) : availableImages = List.unmodifiable(availableImages);
   final double? zoom;
 
-  /// The value that `heatmap-density` and `line-progress` read.
+  /// The value of `heatmap-density`, `line-progress`, and `elevation`.
   final double? colorRampParameter;
-
-  /// The value that `elevation` reads when `color_ramp_parameter` isn't set.
-  final double? elevation;
 
   /// The feature to evaluate against, as a GeoJSON feature, or empty for none.
   final Object? feature;
@@ -6420,7 +6416,6 @@ final class StyleExpressionInputs extends _Value {
   StyleExpressionInputs copyWith({
     double? zoom,
     double? colorRampParameter,
-    double? elevation,
     Object? feature = _unchanged,
     Object? featureState = _unchanged,
     Object? globalState = _unchanged,
@@ -6429,7 +6424,6 @@ final class StyleExpressionInputs extends _Value {
   }) => StyleExpressionInputs(
     zoom: zoom ?? this.zoom,
     colorRampParameter: colorRampParameter ?? this.colorRampParameter,
-    elevation: elevation ?? this.elevation,
     feature: identical(feature, _unchanged) ? this.feature : feature,
     featureState: identical(featureState, _unchanged)
         ? this.featureState
@@ -6445,7 +6439,6 @@ final class StyleExpressionInputs extends _Value {
   List<Object?> get _members => [
     zoom,
     colorRampParameter,
-    elevation,
     feature,
     featureState,
     globalState,
@@ -6456,7 +6449,6 @@ final class StyleExpressionInputs extends _Value {
   String toString() => _describe('StyleExpressionInputs', const [
     'zoom',
     'colorRampParameter',
-    'elevation',
     'feature',
     'featureState',
     'globalState',

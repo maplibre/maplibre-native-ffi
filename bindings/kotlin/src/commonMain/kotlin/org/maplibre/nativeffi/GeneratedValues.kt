@@ -4074,10 +4074,8 @@ public data class ResourceRoute(
  */
 public data class StyleExpressionInputs(
   public val zoom: Double? = null,
-  /** The value that `heatmap-density` and `line-progress` read. */
+  /** The value of `heatmap-density`, `line-progress`, and `elevation`. */
   public val colorRampParameter: Double? = null,
-  /** The value that `elevation` reads when `color_ramp_parameter` isn't set. */
-  public val elevation: Double? = null,
   /** The feature to evaluate against, as a GeoJSON feature, or empty for none. */
   public val feature: String = "",
   /** The feature's state, as a JSON object, or empty for none. */

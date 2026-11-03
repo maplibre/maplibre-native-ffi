@@ -4725,10 +4725,8 @@ func copyStyleExpressionInfo(raw C.mln_style_expression_info) StyleExpressionInf
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
 type StyleExpressionInputs struct {
 	Zoom *float64
-	// The value that heatmap-density and line-progress read.
+	// The value of heatmap-density, line-progress, and elevation.
 	ColorRampParameter *float64
-	// The value that elevation reads when color_ramp_parameter isn't set.
-	Elevation *float64
 	// The feature to evaluate against, as a GeoJSON feature, or empty for none.
 	Feature string
 	// The feature's state, as a JSON object, or empty for none.
@@ -4748,7 +4746,6 @@ func nativeStyleExpressionInputs(input StyleExpressionInputs, arena *bindingAren
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, input.Zoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, input.ColorRampParameter, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, input.Elevation, arena, bindingNumber[float64, C.double])
 	raw.feature = C.mln_buffer_view{data: arena.bytes([]byte(input.Feature)), size: C.size_t(len(input.Feature))}
 	raw.feature_state = C.mln_buffer_view{data: arena.bytes([]byte(input.FeatureState)), size: C.size_t(len(input.FeatureState))}
 	raw.global_state = C.mln_buffer_view{data: arena.bytes([]byte(input.GlobalState)), size: C.size_t(len(input.GlobalState))}

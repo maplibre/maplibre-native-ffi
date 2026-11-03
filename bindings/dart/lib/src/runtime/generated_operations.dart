@@ -2738,10 +2738,6 @@ Pointer<raw.mln_style_expression_inputs> _writeStyleExpressionInputs(
     result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
     result.ref.color_ramp_parameter = value.colorRampParameter!;
   }
-  if (value.elevation != null) {
-    result.ref.fields |= raw.MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
-    result.ref.elevation = value.elevation!;
-  }
   result.ref.feature = _nativeJsonView(value.feature, arena, member: true);
   result.ref.feature_state = _nativeJsonView(
     value.featureState,

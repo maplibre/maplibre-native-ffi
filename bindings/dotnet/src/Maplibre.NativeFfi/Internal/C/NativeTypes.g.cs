@@ -1091,7 +1091,6 @@ internal unsafe struct mln_style_expression_inputs
     public mln_style_expression_input_field fields;
     public double zoom;
     public double color_ramp_parameter;
-    public double elevation;
     public mln_buffer_view feature;
     public mln_buffer_view feature_state;
     public mln_buffer_view global_state;
@@ -1960,7 +1959,6 @@ internal enum mln_style_expression_input_field : uint
 {
     MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1,
     MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 2,
-    MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 4,
     MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 8,
 }
 

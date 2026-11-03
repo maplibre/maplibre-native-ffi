@@ -4838,10 +4838,8 @@ impl FromNative<sys::mln_style_expression_info> for StyleExpressionInfo {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleExpressionInputs<'a> {
     pub zoom: Option<f64>,
-    /// The value that `heatmap-density` and `line-progress` read.
+    /// The value of `heatmap-density`, `line-progress`, and `elevation`.
     pub color_ramp_parameter: Option<f64>,
-    /// The value that `elevation` reads when `color_ramp_parameter` isn't set.
-    pub elevation: Option<f64>,
     /// The feature to evaluate against, as a GeoJSON feature, or empty for
     /// none.
     pub feature: &'a str,
@@ -4868,10 +4866,6 @@ impl<'a> ToNative<sys::mln_style_expression_inputs> for StyleExpressionInputs<'a
         if let Some(item) = &self.color_ramp_parameter {
             raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
             raw.color_ramp_parameter = *item;
-        }
-        if let Some(item) = &self.elevation {
-            raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
-            raw.elevation = *item;
         }
         raw.feature = to_native(&self.feature, arena)?;
         raw.feature_state = to_native(&self.feature_state, arena)?;

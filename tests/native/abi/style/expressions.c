@@ -106,12 +106,7 @@ static void each_input_reaches_the_expression_that_reads_it(void) {
   inputs.color_ramp_parameter = 0.25;
   expect_evaluates("[\"heatmap-density\"]", &inputs, "0.25");
   expect_evaluates("[\"line-progress\"]", &inputs, "0.25");
-
-  inputs =
-    (mln_style_expression_inputs){.size = sizeof(mln_style_expression_inputs)};
-  inputs.fields = MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
-  inputs.elevation = 120.0;
-  expect_evaluates("[\"elevation\"]", &inputs, "120.0");
+  expect_evaluates("[\"elevation\"]", &inputs, "0.25");
 
   inputs = feature_inputs(
     "{\"type\":\"Feature\",\"id\":7,\"geometry\":{\"type\":\"Point\","
@@ -404,7 +399,6 @@ static void evaluation_rejects_invalid_inputs(void) {
   const uint32_t numbers[] = {
     MLN_STYLE_EXPRESSION_INPUT_ZOOM,
     MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER,
-    MLN_STYLE_EXPRESSION_INPUT_ELEVATION,
   };
   for (size_t index = 0; index < sizeof(numbers) / sizeof(numbers[0]);
        ++index) {
@@ -414,7 +408,6 @@ static void evaluation_rejects_invalid_inputs(void) {
     inputs.fields = numbers[index];
     inputs.zoom = NAN;
     inputs.color_ramp_parameter = INFINITY;
-    inputs.elevation = -INFINITY;
     MLN_TEST_INVALID(evaluate_status(expression, &inputs));
     TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "must be finite"));
   }

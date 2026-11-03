@@ -75,7 +75,6 @@ typedef enum MLN_BINDING(
 ) mln_style_expression_input_field : uint32_t {
   MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1U << 0U,
   MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 1U << 1U,
-  MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 1U << 2U,
   MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 1U << 3U,
 } mln_style_expression_input_field;
 
@@ -87,13 +86,10 @@ typedef struct mln_style_expression_inputs {
   uint32_t size;
   mln_style_expression_input_fields fields;
   double zoom MLN_BINDING("mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_ZOOM");
-  /** The value that `heatmap-density` and `line-progress` read. */
+  /** The value of `heatmap-density`, `line-progress`, and `elevation`. */
   double color_ramp_parameter MLN_BINDING(
     "mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER"
   );
-  /** The value that `elevation` reads when `color_ramp_parameter` isn't set. */
-  double elevation
-    MLN_BINDING("mask=fields;bit=MLN_STYLE_EXPRESSION_INPUT_ELEVATION");
   /**
    * The feature to evaluate against, as a GeoJSON feature, or empty for none.
    */

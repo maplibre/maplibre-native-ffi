@@ -1370,8 +1370,6 @@ final class mln_style_expression_inputs extends Struct {
   external double zoom;
   @Double()
   external double color_ramp_parameter;
-  @Double()
-  external double elevation;
   external mln_buffer_view feature;
   external mln_buffer_view feature_state;
   external mln_buffer_view global_state;
@@ -2188,7 +2186,6 @@ const MLN_STATUS_ALREADY_EXISTS = -11;
 // mln_style_expression_input_field
 const MLN_STYLE_EXPRESSION_INPUT_ZOOM = 1;
 const MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER = 2;
-const MLN_STYLE_EXPRESSION_INPUT_ELEVATION = 4;
 const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID = 8;
 
 // mln_style_expression_option_field

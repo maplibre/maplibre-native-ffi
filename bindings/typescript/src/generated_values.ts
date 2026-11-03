@@ -2985,13 +2985,9 @@ export interface StyleExpressionInfo {
 export interface StyleExpressionInputs {
   zoom?: number;
   /**
-   * The value that `heatmap-density` and `line-progress` read.
+   * The value of `heatmap-density`, `line-progress`, and `elevation`.
    */
   colorRampParameter?: number;
-  /**
-   * The value that `elevation` reads when `color_ramp_parameter` isn't set.
-   */
-  elevation?: number;
   /**
    * The feature to evaluate against, as a GeoJSON feature, or empty for none.
    */

@@ -3974,10 +3974,7 @@ class StyleExpressionInputs:
     zoom: float | None = None
 
     color_ramp_parameter: float | None = None
-    """The value that `heatmap-density` and `line-progress` read."""
-
-    elevation: float | None = None
-    """The value that `elevation` reads when `color_ramp_parameter` isn't set."""
+    """The value of `heatmap-density`, `line-progress`, and `elevation`."""
 
     feature: Any = None
     """The feature to evaluate against, as a GeoJSON feature, or empty for none."""
@@ -4006,7 +4003,6 @@ class StyleExpressionInputs:
         return cls(
             zoom=raw["zoom"],
             color_ramp_parameter=raw["color_ramp_parameter"],
-            elevation=raw["elevation"],
             feature=raw["feature"],
             feature_state=raw["feature_state"],
             global_state=raw["global_state"],

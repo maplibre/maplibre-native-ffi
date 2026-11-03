@@ -2070,11 +2070,6 @@ internal static unsafe class GeneratedValues
             ref native.color_ramp_parameter,
             MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
         );
-        native.fields |= Put(
-            value.Elevation,
-            ref native.elevation,
-            MLN_STYLE_EXPRESSION_INPUT_ELEVATION
-        );
         native.feature = scope.Utf8(value.Feature);
         native.feature_state = scope.Utf8(value.FeatureState);
         native.global_state = scope.Utf8(value.GlobalState);
