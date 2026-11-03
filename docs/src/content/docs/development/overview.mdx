@@ -135,7 +135,7 @@ every unit after merge. To run a unit that a pull request skipped, start a
 manual run and list it by its name under `ci.units`:
 
 ```bash
-gh workflow run CI --ref <branch> -f 'units=["mingw"]'
+gh workflow run CI --ref <branch> -f 'units=["mingw-arm64"]'
 ```
 
 To debug on a CI runner, use a

@@ -149,8 +149,9 @@ labels:
 # rule runs it regardless of the plan when a changed file matches, with globs as
 # in GitHub Actions path filters. A rule names only files that no other unit's
 # jobs read: Jev judges a shared file from its diff, so one file never forces
-# several units. The submodule pin is the exception, since its diff names only a
-# commit.
+# several units. A file that every architecture of a platform reads goes on the
+# unit that carries the platform's coverage, not on its architecture units. The
+# submodule pin is the exception, since its diff names only a commit.
 ci:
   workflow: .github/workflows/ci-coverage.yml
   threshold: 0.6
@@ -161,20 +162,22 @@ ci:
     platform-independent changes however large. Another unit matters only when a
     change reaches what it alone builds or runs: platform source directories and
     source sets such as `androidMain`, Objective-C++, platform conditionals,
-    `cmake/platform/`, render backends, SDK setup, or packaging. A test change
-    matters only to units that run that suite. `tools/ci/` plans each unit's
-    jobs from the presets' vendor blocks and runs each target job's suites, so
-    changing a unit's vendor block, jobs, or suites puts it at risk. Windows
-    runs shared scripts differently, with Git Bash and MSVC, and a tool
-    configured for only some operating systems puts those at risk. A public
-    header change that adds a macro, an inline function, or a construct new to
-    the headers puts MSVC (Windows x64) and Apple Clang and the Swift importer
-    (macOS) at risk, since the C tests and several bindings compile the headers
-    there. A header change that only edits declarations or docs does not.
-    Release workflows don't run on pull requests. Hygiene always runs
-    formatting, lint, generated-code checks, and the tests for `ci/`. Main runs
-    every unit after merge, so a pull request needs only the coverage a reviewer
-    would expect.
+    `cmake/platform/`, render backends, SDK setup, or packaging. A unit for one
+    architecture of a platform, such as `linux-arm64` or `android-x86`, matters
+    only when a change reaches what differs by architecture there; the
+    platform's own unit covers the rest. A test change matters only to units
+    that run that suite. `tools/ci/` plans each unit's jobs from the presets'
+    vendor blocks and runs each target job's suites, so changing a unit's vendor
+    block, jobs, or suites puts it at risk. Windows runs shared scripts
+    differently, with Git Bash and MSVC, and a tool configured for only some
+    operating systems puts those at risk. A public header change that adds a
+    macro, an inline function, or a construct new to the headers puts MSVC
+    (Windows x64) and Apple Clang and the Swift importer (macOS) at risk, since
+    the C tests and several bindings compile the headers there. A header change
+    that only edits declarations or docs does not. Release workflows don't run
+    on pull requests. Hygiene always runs formatting, lint, generated-code
+    checks, and the tests for `ci/`. Main runs every unit after merge, so a pull
+    request needs only the coverage a reviewer would expect.
   units:
     docs:
       covers: >-
@@ -228,10 +231,24 @@ ci:
           then: apply
     linux-musl:
       covers: >-
-        Linux musl on x64 and ARM64. Builds the native library, checks its musl
-        ABI, and runs the binding tests in Alpine. Catches libc assumptions and
-        musl packaging problems. Platform-independent code that Linux x64 tests
+        Linux musl on x64. Builds the native library, checks its musl ABI, and
+        runs the binding tests in Alpine. Catches libc assumptions and musl
+        packaging problems. Platform-independent code that Linux x64 tests
         doesn't need it.
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
+    linux-musl-arm64:
+      covers: >-
+        Linux musl ARM64 with OpenGL (EGL) and Vulkan, running Linux musl x64's
+        suites on ARM runners about twice as slow as x64. Catches only what
+        depends on both musl and ARM64: architecture conditionals in code or
+        build logic for musl, a tool or dependency fetched per architecture for
+        musl, such as an aarch64 musl Rust target or dynamic loader, and the ARM
+        runner setup. musl changes that Linux musl x64 already builds and tests,
+        and ARM64 changes that Linux ARM64 already covers, don't need it.
       rules:
         - if:
             files:
@@ -288,15 +305,28 @@ ci:
           then: apply
     macos:
       covers: >-
-        macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE), and macOS
-        x64 with Metal under Rosetta. Runs the C tests and the desktop binding
-        suites, including Swift, and on x64 the C, Rust, Zig, and Go suites.
-        Catches Apple Clang, Apple SDK, Metal, and macOS packaging problems.
+        macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE). Runs the
+        C tests and the desktop binding suites, including Swift. Catches Apple
+        Clang, Apple SDK, Metal, and macOS packaging problems.
         Platform-independent code that Linux x64 tests doesn't need it.
       rules:
         - if:
             files:
               - bindings/kotlin/src/macosTest/**
+              - third_party/maplibre-native
+          then: apply
+    macos-x64:
+      covers: >-
+        macOS x64 with Metal, built for x86_64 and running macOS ARM64's suites
+        under Rosetta on the same ARM runners. Catches only what differs by CPU
+        architecture on macOS: architecture conditionals in code or build logic,
+        a tool or dependency fetched per architecture, and the Rosetta setup and
+        the build logic that runs x64 tests under it. macOS platform, renderer,
+        and binding changes that macOS ARM64 already builds and tests don't need
+        it.
+      rules:
+        - if:
+            files:
               - third_party/maplibre-native
           then: apply
     ios:
@@ -365,6 +395,21 @@ ci:
               - .config/mise.msys2.*
               - third_party/maplibre-native
           then: apply
+    mingw-arm64:
+      covers: >-
+        Windows ARM64 with OpenGL (WGL) and Vulkan, built with Clang in MSYS2's
+        CLANGARM64 environment and running MinGW x64's suites, except Zig, on
+        GitHub-hosted ARM runners whose setup alone takes about 16 minutes.
+        Catches only what differs by CPU architecture on MinGW: architecture
+        conditionals in code or build logic, a tool or dependency fetched per
+        architecture, such as the CLANGARM64 packages, and the ARM runner setup.
+        MinGW, Windows platform, renderer, and binding changes that MinGW x64
+        already builds and tests don't need it.
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
     windows-arm64:
       covers: >-
         Windows ARM64 with OpenGL (WGL) and Vulkan, running Windows x64's suites
@@ -380,12 +425,10 @@ ci:
           then: apply
     android:
       covers: >-
-        Android on ARM, ARM64, and x64 with OpenGL ES and Vulkan, built with the
-        NDK. The x64 jobs run the C, Kotlin, Go, Rust, Swift, Zig, and Python
-        tests in the emulator; the ARM jobs only build. Also builds Dart and
-        verifies multi-ABI packaging. Catches NDK, Android API, JNI, emulator,
-        and AAR problems. Platform-independent code that Linux x64 tests doesn't
-        need it.
+        Android on x64 with OpenGL ES and Vulkan, built with the NDK. Runs the C
+        tests and every binding's suite in the emulator. Catches NDK, Android
+        API, JNI, emulator, and AAR problems. Platform-independent code that
+        Linux x64 tests doesn't need it.
       rules:
         - if:
             files:
@@ -394,19 +437,77 @@ ci:
               - .config/mise.android.*
               - bindings/kotlin/src/android*/**
               - .mise/tasks/kotlin/check-android-api-floor
-              - .mise/tasks/kotlin/verify-android-multi-abi
               - tools/devices/android-serial
               - tools/env/swift-android-env.sh
               - third_party/maplibre-native
           then: apply
+    android-arm64:
+      covers: >-
+        Android ARM64 with OpenGL ES and Vulkan, built with the NDK on an x64
+        runner. Builds the native library, the bindings that Android x64 tests,
+        and the Python runtime, but runs nothing. Catches only what differs by
+        CPU architecture on Android: architecture conditionals in code or build
+        logic, and a tool or dependency fetched per ABI. Android platform,
+        renderer, and binding changes that Android x64 already builds and tests
+        don't need it.
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
+    android-arm:
+      covers: >-
+        Android ARMv7, a 32-bit ABI, with OpenGL ES and Vulkan, built with the
+        NDK on an x64 runner. Builds the native library and the bindings that
+        Android x64 tests, except Python, but runs nothing. Catches only what
+        differs by CPU architecture on Android: architecture conditionals in
+        code or build logic, a tool or dependency fetched per ABI, and ABI or
+        pointer-size assumptions that a 32-bit build rejects. Android platform,
+        renderer, and binding changes that Android x64 already builds and tests
+        don't need it.
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
+    android-x86:
+      covers: >-
+        Android x86, a 32-bit ABI, with OpenGL ES and Vulkan, built with the
+        NDK. The OpenGL ES job runs the C, C#, Go, Kotlin, Rust, TypeScript, and
+        Zig tests in an API 30 x86 emulator, and the Vulkan job only builds.
+        Dart, Python, and Swift have no Android x86 target. Catches only what
+        differs by CPU architecture on Android: architecture conditionals in
+        code or build logic, a tool or dependency fetched per ABI, the x86
+        emulator image, and 32-bit ABI or pointer-size problems at run time,
+        such as x86 aligning 64-bit fields to four bytes. Android platform,
+        renderer, and binding changes that Android x64 already builds and tests
+        don't need it.
+      rules:
+        - if:
+            files:
+              - third_party/maplibre-native
+          then: apply
+    android-multi-abi:
+      covers: >-
+        Builds the Kotlin Android runtime AARs for OpenGL ES and Vulkan with
+        every Android ABI's native library, from the native packages of every
+        Android target, so it runs those targets. Only changes to how the AAR
+        gathers ABIs need it: the verification task, and the Kotlin Android
+        build's ABI selection and native library packaging. Ordinary Kotlin or
+        Android changes and one ABI's native packaging don't.
+      rules:
+        - if:
+            files:
+              - .mise/tasks/kotlin/verify-android-multi-abi
+          then: apply
     ohos:
       covers: >-
-        OpenHarmony on ARM64 and x64 with OpenGL ES and Vulkan. The x64 jobs run
-        the C, Rust, Go, and TypeScript (ArkTS) tests in the Oniro emulator; the
-        ARM64 jobs only build. Catches OpenHarmony SDK and platform problems.
-        Platform-independent code that Linux x64 tests doesn't need it. Nor does
-        a C API change that only regenerates the TypeScript binding; a change to
-        its handwritten runtime, native addon, or ArkTS harness does.
+        OpenHarmony on x64 with OpenGL ES and Vulkan. Runs the C, Rust, Go, and
+        TypeScript (ArkTS) tests in the Oniro emulator. Catches OpenHarmony SDK
+        and platform problems. Platform-independent code that Linux x64 tests
+        doesn't need it. Nor does a C API change that only regenerates the
+        TypeScript binding; a change to its handwritten runtime, native addon,
+        or ArkTS harness does.
       rules:
         - if:
             files:
@@ -421,6 +522,20 @@ ci:
               - bindings/typescript/test/arkts/**
               - bindings/typescript/test/ohpm/**
               - tools/devices/ohos-key
+              - third_party/maplibre-native
+          then: apply
+    ohos-arm64:
+      covers: >-
+        OpenHarmony ARM64 with OpenGL ES and Vulkan, built with the OpenHarmony
+        SDK on an x64 runner. Builds the native library and the Go, Rust, and
+        TypeScript (ArkTS) bindings, but runs nothing. Catches only what differs
+        by CPU architecture on OpenHarmony: architecture conditionals in code or
+        build logic, and a tool or dependency fetched per architecture.
+        OpenHarmony platform, renderer, and binding changes that OpenHarmony x64
+        already builds and tests don't need it.
+      rules:
+        - if:
+            files:
               - third_party/maplibre-native
           then: apply
     web:

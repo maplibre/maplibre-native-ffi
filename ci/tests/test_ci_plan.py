@@ -163,15 +163,29 @@ class PresetTest(unittest.TestCase):
         cls.targets = {target.preset: target for target in plan.targets(cls.presets)}
 
     def test_musl_overrides_the_unit_and_inherits_the_gnu_runner(self):
-        for architecture in ("x64", "arm64"):
+        for architecture, unit in (
+            ("x64", "linux-musl"),
+            ("arm64", "linux-musl-arm64"),
+        ):
             with self.subTest(architecture=architecture):
                 musl = self.targets[f"linux-musl-{architecture}-egl"]
                 gnu = self.targets[f"linux-gnu-{architecture}-egl"]
                 self.assertEqual(
                     (musl.platform, musl.unit, musl.runner),
-                    ("linux-musl", "linux-musl", gnu.runner),
+                    ("linux-musl", unit, gnu.runner),
                 )
                 self.assertEqual(gnu.unit, f"linux-{architecture}")
+
+    def test_a_target_unit_runs_one_architecture(self):
+        # A unit that pulled in another architecture's targets would run its
+        # slow jobs for changes that only the unit's own architecture needs.
+        for unit in sorted({target.unit for target in self.targets.values()}):
+            with self.subTest(unit=unit):
+                matrix = plan.plan(self.presets, False, [unit])["matrix"]
+                architectures = {
+                    self.targets[row["preset"]].architecture for row in matrix
+                }
+                self.assertEqual(len(architectures), 1, architectures)
 
     def test_each_row_names_its_sdk_software_driver_and_zig_packages(self):
         # Targets that run the Zig binding cache its packages; the rest skip them.

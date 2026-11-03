@@ -82,7 +82,7 @@
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-musl",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-musl"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "linux-musl" } }
+      "vendor": { "maplibre-native-ffi": { "unit": "linux-musl-arm64" } }
     },
     {
       "name": "_linux-riscv64",
@@ -224,7 +224,8 @@
         "MLN_FFI_TARGET_PLATFORM": "macos-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-macos",
         "MLN_FFI_RUST_TARGET": "x86_64-apple-darwin"
-      }
+      },
+      "vendor": { "maplibre-native-ffi": { "unit": "macos-x64" } }
     },
     {
       "name": "_ios-arm64",
@@ -298,10 +299,7 @@
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
       },
       "vendor": {
-        "maplibre-native-ffi": {
-          "unit": "android",
-          "runner": "blacksmith-4vcpu-ubuntu-2404"
-        }
+        "maplibre-native-ffi": { "runner": "blacksmith-4vcpu-ubuntu-2404" }
       }
     },
     {
@@ -313,7 +311,8 @@
         "MLN_FFI_TARGET_PLATFORM": "android-arm",
         "MLN_FFI_ZIG_TARGET": "arm-linux-android",
         "MLN_FFI_RUST_TARGET": "armv7-linux-androideabi"
-      }
+      },
+      "vendor": { "maplibre-native-ffi": { "unit": "android-arm" } }
     },
     {
       "name": "_android-arm64",
@@ -324,7 +323,8 @@
         "MLN_FFI_TARGET_PLATFORM": "android-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-android",
         "MLN_FFI_RUST_TARGET": "aarch64-linux-android"
-      }
+      },
+      "vendor": { "maplibre-native-ffi": { "unit": "android-arm64" } }
     },
     {
       "name": "_android-x86",
@@ -335,7 +335,8 @@
         "MLN_FFI_TARGET_PLATFORM": "android-x86",
         "MLN_FFI_ZIG_TARGET": "x86-linux-android",
         "MLN_FFI_RUST_TARGET": "i686-linux-android"
-      }
+      },
+      "vendor": { "maplibre-native-ffi": { "unit": "android-x86" } }
     },
     {
       "name": "_android-x64",
@@ -349,6 +350,7 @@
       },
       "vendor": {
         "maplibre-native-ffi": {
+          "unit": "android",
           "device": {
             "name": "Android emulator",
             "command": "tools/devices/android-serial x86_64"
@@ -399,7 +401,7 @@
       },
       "vendor": {
         "maplibre-native-ffi": {
-          "unit": "ohos",
+          "unit": "ohos-arm64",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
           "miseEnv": "ohos"
         }
@@ -511,6 +513,7 @@
       },
       "vendor": {
         "maplibre-native-ffi": {
+          "unit": "mingw-arm64",
           "runner": "windows-11-arm"
         }
       }
