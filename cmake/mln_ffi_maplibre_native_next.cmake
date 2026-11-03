@@ -1,29 +1,19 @@
-# The C API on maplibre-native-next, a port of MapLibre Native's core to Rust:
-# https://github.com/louwers/maplibre-native-next. Its //ffi package implements
-# this repository's C API, against a copy of include/, as a static library that
-# Bazel builds. MLN_FFI_IMPLEMENTATION=maplibre-native-next selects it in place
-# of src/ on the C++ core, so the ABI suite and the exit programs run against it
+# The C API on maplibre-native-next, a port of MapLibre Native's core to Rust
+# that is published as the maplibre-native-next crate:
+# https://github.com/louwers/maplibre-native-next. The src/next crate implements
+# this repository's C API (include/) on it, and Cargo builds it as a static
+# library. MLN_FFI_IMPLEMENTATION=maplibre-native-next selects it in place of
+# src/ on the C++ core, so the ABI suite and the exit programs run against it
 # unchanged.
 #
 # The port renders through wgpu, which uses Vulkan on Linux, so the build takes
 # Linux and the vulkan backend for now. It installs nothing yet.
 
-# Finds the checkout and the headers that still come from MapLibre Native: the
-# plugin header that include/maplibre_native_c/plugin.h includes, and the Vulkan
-# headers of the test harness. Nothing else in third_party/maplibre-native is
-# compiled.
-function(mln_ffi_locate_maplibre_native_next)
-  set(MLN_FFI_NEXT_SOURCE_DIR
-      "${PROJECT_SOURCE_DIR}/third_party/maplibre-native-next"
-      CACHE PATH "maplibre-native-next checkout to build the C API from")
-  if(NOT EXISTS "${MLN_FFI_NEXT_SOURCE_DIR}/ffi/BUILD.bazel")
-    message(
-      FATAL_ERROR
-        "${MLN_FFI_NEXT_SOURCE_DIR} has no ffi/BUILD.bazel. Check out the "
-        "submodule with `git submodule update --init --checkout "
-        "third_party/maplibre-native-next`, or point MLN_FFI_NEXT_SOURCE_DIR "
-        "at a maplibre-native-next checkout.")
-  endif()
+# Checks the configuration and finds the headers that still come from MapLibre
+# Native: the plugin header that include/maplibre_native_c/plugin.h includes,
+# and the Vulkan headers of the test harness. Nothing else in
+# third_party/maplibre-native is compiled.
+function(mln_ffi_check_maplibre_native_next)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux"
      OR NOT MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
     message(
@@ -42,35 +32,51 @@ function(mln_ffi_locate_maplibre_native_next)
   set(MLN_FFI_SOURCE_DIR "${MLN_FFI_SOURCE_DIR}" PARENT_SCOPE)
 endfunction()
 
-# Adds `target` as the static library that Bazel builds, with the public
-# headers of this repository and the platform libraries that the C build links.
+# Adds `target` as the static library that Cargo builds from src/next, with the
+# public headers of this repository and the platform libraries that the C build
+# links.
 function(mln_ffi_add_maplibre_native_next_library target)
-  find_program(
-    MLN_FFI_NEXT_BAZEL
-    NAMES bazelisk bazel
-    REQUIRED
-    DOC "Bazel or Bazelisk to build maplibre-native-next with")
-  set(default_flags)
-  if(CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
-    set(default_flags --compilation_mode=opt)
+  find_program(CARGO_EXECUTABLE cargo REQUIRED)
+  if(NOT MLN_FFI_RUST_TARGET)
+    message(
+      FATAL_ERROR
+        "maplibre-native-next builds need MLN_FFI_RUST_TARGET, which the "
+        "preset sets")
   endif()
-  set(MLN_FFI_NEXT_BAZEL_FLAGS "${default_flags}"
-      CACHE STRING "Bazel flags for the maplibre-native-next build")
+  set(MLN_FFI_NEXT_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/target"
+      CACHE PATH "Cargo target directory for the maplibre-native-next build")
+  # For a maplibre-native-next that isn't published yet, such as a checkout's
+  # release crate: a file with [patch.crates-io] entries for it.
+  set(MLN_FFI_NEXT_CARGO_CONFIG ""
+      CACHE FILEPATH
+            "Extra Cargo configuration for the maplibre-native-next build")
+
+  set(cargo_args build --lib --target "${MLN_FFI_RUST_TARGET}")
+  if(CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
+    list(APPEND cargo_args --release)
+    set(profile release)
+  else()
+    set(profile debug)
+  endif()
+  if(MLN_FFI_NEXT_CARGO_CONFIG)
+    list(APPEND cargo_args --config "${MLN_FFI_NEXT_CARGO_CONFIG}")
+  else()
+    list(APPEND cargo_args --locked)
+  endif()
 
   set(library
-      "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-next/libmaplibre-native-c.a")
+      "${MLN_FFI_NEXT_CARGO_TARGET_DIR}/${MLN_FFI_RUST_TARGET}/${profile}/libmaplibre_native_c.a"
+  )
+  # Cargo decides what to rebuild, so this runs on every build, and the library
+  # changes only when its inputs do.
   add_custom_target(
-    ${target}_bazel
-    COMMAND
-      "${CMAKE_COMMAND}"
-      "-DBAZEL=${MLN_FFI_NEXT_BAZEL}"
-      "-DBAZEL_FLAGS=${MLN_FFI_NEXT_BAZEL_FLAGS}"
-      "-DSOURCE_DIR=${MLN_FFI_NEXT_SOURCE_DIR}"
-      "-DOUTPUT=${library}"
-      -P
-      "${PROJECT_SOURCE_DIR}/cmake/mln_ffi_maplibre_native_next_build.cmake"
+    ${target}_cargo
+    COMMAND "${CMAKE_COMMAND}" -E env
+            "CARGO_TARGET_DIR=${MLN_FFI_NEXT_CARGO_TARGET_DIR}"
+            "${CARGO_EXECUTABLE}" ${cargo_args}
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/next"
     BYPRODUCTS "${library}"
-    COMMENT "Building maplibre-native-next's C API with Bazel"
+    COMMENT "Building the C API on maplibre-native-next with Cargo"
     USES_TERMINAL
     VERBATIM)
 
@@ -83,7 +89,7 @@ function(mln_ffi_add_maplibre_native_next_library target)
   # The Rust standard library and the port's compression need these: threads,
   # libdl, libm and zlib.
   target_link_libraries(${target} INTERFACE MLN_FFI::PlatformDependencies)
-  add_dependencies(${target} ${target}_bazel)
+  add_dependencies(${target} ${target}_cargo)
 
   # The test harness drives Vulkan itself, as it does for the C++ build.
   add_library(mln_ffi_render_dependencies INTERFACE)
@@ -95,4 +101,30 @@ function(mln_ffi_add_maplibre_native_next_library target)
       MLN_FFI_INCLUDE_DIRS "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/include"
   )
   mln_ffi_configure_vulkan_test_loader(mln_ffi_render_dependencies)
+endfunction()
+
+# The crate's own test, which the ABI suite can't replace: its Rust mirrors of
+# the header's types against the C compiler's layouts.
+function(mln_ffi_add_maplibre_native_next_tests out_tests)
+  find_package(Threads REQUIRED)
+  add_executable(mln_next_c_api_test
+                 "${PROJECT_SOURCE_DIR}/src/next/tests/c_api_test.c")
+  set_target_properties(mln_next_c_api_test PROPERTIES C_STANDARD 23
+                                                       C_STANDARD_REQUIRED YES)
+  target_link_libraries(mln_next_c_api_test PRIVATE maplibre_native_c
+                                                    Threads::Threads)
+  add_test(NAME next/c_api COMMAND mln_next_c_api_test)
+  mln_native_bound_test(next/c_api mln_next_c_api_test 120)
+  # wgpu opens the Vulkan loader by name. The ABI suite's harness opens it by
+  # path first, but this test has no harness.
+  get_target_property(runtime_dirs mln_ffi_render_dependencies
+                      MLN_FFI_RUNTIME_DIRS)
+  foreach(runtime_dir IN LISTS runtime_dirs)
+    set_property(
+      TEST next/c_api
+      APPEND
+      PROPERTY ENVIRONMENT_MODIFICATION
+               "LD_LIBRARY_PATH=path_list_prepend:${runtime_dir}")
+  endforeach()
+  set(${out_tests} next/c_api PARENT_SCOPE)
 endfunction()

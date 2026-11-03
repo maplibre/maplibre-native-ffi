@@ -718,6 +718,10 @@ function(mln_ffi_add_native_tests)
     mln_native_add_exit_tests(exit_tests)
     list(APPEND registered_tests ${exit_tests})
   endif()
+  if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+    mln_ffi_add_maplibre_native_next_tests(next_tests)
+    list(APPEND registered_tests ${next_tests})
+  endif()
   foreach(test_name IN LISTS registered_tests)
     set_property(
       TEST ${test_name}

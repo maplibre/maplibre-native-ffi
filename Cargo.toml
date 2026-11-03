@@ -6,6 +6,8 @@ members = [
   "bindings/rust/crates/maplibre-native-ffi-sys",
   "src/platform/rust",
 ]
+# Builds on its own, only for MLN_FFI_IMPLEMENTATION=maplibre-native-next.
+exclude = ["src/next"]
 
 # The release workflow stamps the release version into the published crates,
 # here and in their requirements on each other, which ship in lockstep.

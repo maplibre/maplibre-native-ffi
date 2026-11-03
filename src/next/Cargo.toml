@@ -1,0 +1,20 @@
+# The C API on maplibre-native-next, a port of MapLibre Native's core to Rust.
+# cmake/mln_ffi_maplibre_native_next.cmake builds it as the maplibre_native_c
+# static library when MLN_FFI_IMPLEMENTATION is maplibre-native-next.
+[package]
+name = "maplibre-native-ffi-next"
+version = "0.0.0"
+edition = "2024"
+license = "BSD-2-Clause"
+publish = false
+
+[lib]
+name = "maplibre_native_c"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[dependencies]
+maplibre-native-next = "0.0.1"
+
+# A workspace of its own: the repository's workspace builds without the port.
+[workspace]
