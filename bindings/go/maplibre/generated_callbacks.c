@@ -2,15 +2,15 @@
 #include "generated_callbacks.h"
 extern void mlnGoCallbackRelease(void*);
 void binding_release(void* p) { mlnGoCallbackRelease(p); }
-extern bool mlnGo_mln_log_handler_callback(
+extern void mlnGo_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 );
-bool binding_mln_log_handler_callback(
+void binding_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
-  return mlnGo_mln_log_handler_callback(
+  mlnGo_mln_log_handler_callback(
     (void*)user_data, severity, event, code, message
   );
 }

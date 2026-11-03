@@ -450,12 +450,11 @@ final raw.mln_log_callback _deliverLogCallback = isolateCallable(
         );
       }
     });
-    return false;
-  }, exceptionalReturn: false),
+  }),
 );
 
 _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
-  LogCallback value,
+  LogHandler value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -463,8 +462,9 @@ _NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
   try {
     final result = arena<raw.mln_log_handler>();
     result.ref.size = sizeOf<raw.mln_log_handler>();
+    result.ref.platform_severities = value.platformSeverities.rawValue;
     final registered = registration = roots.registerQueued({
-      #mln_log_callback: value,
+      #mln_log_callback: value.callback,
     });
     result.ref.callback = _deliverLogCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
@@ -3042,7 +3042,7 @@ void setLogAsyncSeverityMask(LogSeverityFlag mask) {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void setLogCallback(LogCallback handler) {
+void setLogCallback(LogHandler handler) {
   ensureAbiVersion();
   final registrations = _NativeRegistrations(_globalCallbackRoots);
   _check(

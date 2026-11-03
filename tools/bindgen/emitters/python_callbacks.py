@@ -96,8 +96,8 @@ def validate(values, plan):
             if parameter.direction != "in":
                 values.fail(plan, "a dispatched callback has no output")
             values.supported(parameter.value)
-        if callback.result.native != "void" and not callback.queue_result:
-            values.fail(plan, "a dispatched callback's result needs a queue result")
+        if callback.result.native != "void":
+            values.fail(plan, "a dispatched callback returns nothing")
 
 
 def native_input_lines(plan):
@@ -227,22 +227,12 @@ def sources(values, plan):
         )
         if len(parameters) == 1:
             copied += ","
-        # Native answers a dispatched call itself and ignores what it returns,
-        # so the callback returns nothing and its call returns that answer.
-        answer = "()" if callback.result.native == "void" else result_literal(callback)
-        body = (
-            f"let _result = callback.bind(py).call1(({copied}))?;\n        Ok({answer})"
-        )
-        returns = (
-            ""
-            if callback.result.native == "void"
-            else f" -> {ffi_type(callback.result)}"
-        )
-        rust.append(f"""unsafe extern "C" fn generated_callback_{plan.native}_{name}({native_parameters}){returns} {{
+        body = f"let _result = callback.bind(py).call1(({copied}))?;\n        Ok(())"
+        rust.append(f"""unsafe extern "C" fn generated_callback_{plan.native}_{name}({native_parameters}) {{
     {adoption_flags}
-    let outcome = generated_invoke(|| {{ {unadopted}{"" if unadopted and answer == "()" else answer} }}, |py| {{
+    let outcome = generated_invoke(|| {{ {unadopted or "()"} }}, |py| {{
         {scope}
-        let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok({answer}); }};
+        let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok(()); }};
         {body}
     }});
     outcome
@@ -368,9 +358,3 @@ def protocol_sources(values):
             + f"\n    def __call__(self{parameters}, /) -> None: ...\n"
         )
     return "\n\n".join(classes)
-
-
-def result_literal(callback):
-    """The answer that native gives a dispatched call, as Rust spells it."""
-    answer = callback.queue_result
-    return "sys::" + answer if answer.startswith("MLN_") else answer

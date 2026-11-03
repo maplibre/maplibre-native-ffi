@@ -2830,12 +2830,20 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 // See mln_log_handler in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 type LogHandler struct {
-	Callback func(severity LogSeverity, event LogEvent, code int64, message string) bool
+	// The severities that also go to the platform's log, as they do without a
+	// callback. 0 sends none.
+	//
+	// A record that the handler's delivery queue can't accept is dropped. These
+	// severities alone decide whether a record also goes to the platform's log,
+	// whether or not the queue accepts it.
+	PlatformSeverities LogSeverityFlag
+	Callback           func(severity LogSeverity, event LogEvent, code int64, message string)
 }
 
 func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
 	raw := C.mln_log_handler{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.platform_severities = C.mln_log_severity_flags(input.PlatformSeverities)
 	if input.Callback != nil {
 		raw.user_data = arena.register(input)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -9318,19 +9326,17 @@ func (view RuntimeHandleDiscarding) SetResourceTransform(transform ResourceTrans
 }
 
 //export mlnGo_mln_log_handler_callback
-func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.mln_log_severity, native_event C.mln_log_event, native_code C.int64_t, native_message C.mln_buffer_view) (result C.bool) {
-	result = false
+func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.mln_log_severity, native_event C.mln_log_event, native_code C.int64_t, native_message C.mln_buffer_view) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_log_callback", failure)
-			result = false
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[LogHandler](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.bool(callbacks.Callback(LogSeverity(native_severity), LogEvent(native_event), int64(native_code), bindingString(native_message.data, uint64(native_message.size))))
+	callbacks.Callback(LogSeverity(native_severity), LogEvent(native_event), int64(native_code), bindingString(native_message.data, uint64(native_message.size)))
 	return
 }
 

@@ -913,8 +913,7 @@ class NativeShims:
         A trampoline copies each argument into its own zeroed 8-byte slot, a
         record as its address, with the builtin memcpy, since the glue includes
         no libc header, and hands the slots to the page, which reads
-        them in `DispatchedUpcalls`. The queue answers native in place of the
-        callback, so a trampoline returns the callback's queue result.
+        them in `DispatchedUpcalls`.
         """
         functions = []
         for number, site in enumerate(self.dispatched):
@@ -930,19 +929,11 @@ class NativeShims:
                 copies.append(
                     f"  __builtin_memcpy(&arguments[{slot}], &{source}, sizeof {source});"
                 )
-            result = self.classify(site.result)
-            answer = ""
-            if result is not None:
-                answer = (
-                    f"  return {self.bound.callbacks[site.callback].queue_result};\n"
-                )
             functions.append(
-                f"static {site.result.spelling if result is not None else 'void'} "
-                f"mln_kw_upcall_{site.name}({', '.join(parameters) or 'void'}) {{\n"
+                f"static void mln_kw_upcall_{site.name}({', '.join(parameters) or 'void'}) {{\n"
                 f"  uint64_t arguments[{max(len(site.parameters), 1)}] = {{0}};\n"
                 + "".join(f"{copy}\n" for copy in copies)
                 + f"  mln_kw_js_upcall({number}, arguments);\n"
-                + answer
                 + "}"
             )
         table = "".join(

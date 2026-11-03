@@ -420,10 +420,11 @@ internal unsafe struct mln_log_handler
         mln_log_event,
         long,
         mln_buffer_view,
-        byte> callback;
+        void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
+    public uint platform_severities;
 }
 
 internal unsafe struct mln_logical_extent

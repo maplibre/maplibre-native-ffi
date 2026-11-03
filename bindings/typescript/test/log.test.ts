@@ -24,10 +24,12 @@ function isDumpRule(message: string): boolean {
 
 function collectDumpRules(): [LogSeverity, LogEvent][] {
   const rules: [LogSeverity, LogEvent][] = [];
-  setLogCallback((severity, event, _code, message) => {
-    if (isDumpRule(message)) {
-      rules.push([severity, event]);
-    }
+  setLogCallback({
+    callback: (severity, event, _code, message) => {
+      if (isDumpRule(message)) {
+        rules.push([severity, event]);
+      }
+    },
   });
   return rules;
 }
@@ -76,10 +78,12 @@ test("a replaced or cleared log callback receives no more records", async () => 
 test("a log record reaches the event loop after its native call returns", async () => {
   const map = await openLoggingMap();
   const order: string[] = [];
-  setLogCallback((_severity, _event, _code, message) => {
-    if (isDumpRule(message)) {
-      order.push("record");
-    }
+  setLogCallback({
+    callback: (_severity, _event, _code, message) => {
+      if (isDumpRule(message)) {
+        order.push("record");
+      }
+    },
   });
   const dumped = map.dumpDebugLogs();
   order.push("returned");

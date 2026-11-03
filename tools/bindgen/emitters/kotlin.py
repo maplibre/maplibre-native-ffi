@@ -549,10 +549,11 @@ def lower(api: Api | BoundApi) -> Lowered:
             + "\n\n"
             + "\n".join(extensions)
         )
-        upcalls = kotlin_callbacks.SPLIT_UPCALLS[lowering][0]
-        outputs[f"{directory}/internal/c/{upcalls}.kt"] = (
-            kotlin_callbacks.split_upcalls(values, lowering)
-        )
+        if any(s.split == lowering for s in kotlin_callbacks.sites(values).values()):
+            upcalls = kotlin_callbacks.SPLIT_UPCALLS[lowering][0]
+            outputs[f"{directory}/internal/c/{upcalls}.kt"] = (
+                kotlin_callbacks.split_upcalls(values, lowering)
+            )
     outputs.update(
         kotlin_owners.generate_owners(
             bound,

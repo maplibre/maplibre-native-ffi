@@ -213,7 +213,7 @@ typedef struct lent_logs {
   atomic_int unterminated;
 } lent_logs;
 
-static bool read_lent_log(
+static void read_lent_log(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
@@ -225,7 +225,6 @@ static bool read_lent_log(
   if (!mln_test_lent_text_is_terminated(message)) {
     atomic_fetch_add(&lent->unterminated, 1);
   }
-  return true;
 }
 
 static void log_callback_body(void) {

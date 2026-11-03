@@ -20,25 +20,6 @@ internal actual object UpcallStubs {
     Upcalls.releaseRoot(userData.toLong())
   }
     .toLong()
-  actual val logHandlerCallback: Long =
-    staticCFunction {
-      userData: COpaquePointer?,
-      severity: UInt,
-      event: UInt,
-      code: Long,
-      message: CValue<mln_buffer_view> ->
-      message.useContents {
-        val messageAddress = ptr.toLong()
-        ThreadedUpcalls.logHandlerCallback(
-          userData.toLong(),
-          severity.toInt(),
-          event.toInt(),
-          code,
-          messageAddress,
-        )
-      }
-    }
-    .toLong()
   actual val httpHeaderTransformCallback: Long =
     staticCFunction {
       userData: COpaquePointer?,
@@ -52,6 +33,25 @@ internal actual object UpcallStubs {
           kind.toInt(),
           urlAddress,
           outResponse.toLong(),
+        )
+      }
+    }
+    .toLong()
+  actual val logHandlerCallback: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      severity: UInt,
+      event: UInt,
+      code: Long,
+      message: CValue<mln_buffer_view> ->
+      message.useContents {
+        val messageAddress = ptr.toLong()
+        Upcalls.logHandlerCallback(
+          userData.toLong(),
+          severity.toInt(),
+          event.toInt(),
+          code,
+          messageAddress,
         )
       }
     }

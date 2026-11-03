@@ -5719,8 +5719,10 @@ defineCallbacks([
   },
   // mln_log_callback
   (target, args) => {
-    const callback = target as LogHandler;
-    const [severity, event, code, message] = args as Parameters<LogHandler>;
+    const callback = (target as LogHandler).callback;
+    const [severity, event, code, message] = args as Parameters<
+      NonNullable<LogHandler["callback"]>
+    >;
     callback(severity, event, code, message);
   },
   // mln_resource_provider_callback

@@ -162,7 +162,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "failure",
         "borrowed_owner",
         "abandon",
-        "queue_result",
         "synchronous",
         "native_object",
         "options",
@@ -1211,7 +1210,16 @@ def validate(api: Api) -> None:
                 )
         elif "failure" in typedef.metadata:
             errors.append(f"{context}: failure requires a callback")
-        errors.extend(queue_result_errors(typedef, queued, enum_constants, context))
+        if (
+            typedef.name in queued
+            and signature is not None
+            and signature.kind == "function"
+            and signature.result is not None
+            and signature.result.kind != "void"
+        ):
+            # Native code returns before a queued call runs, so nothing could
+            # receive its result.
+            errors.append(f"{context}: a queued callback returns void")
         if "synchronous" in typedef.metadata and (
             signature is None or signature.kind != "function"
         ):
@@ -1637,33 +1645,3 @@ def delivery_queue_errors(api: Api, typedef, record, context: str) -> list[str]:
                 f"{context}: {field.name}: kind=delivery_queue requires {DELIVERY_QUEUE}"
             )
     return errors
-
-
-def queue_result_errors(typedef, queued, enum_constants, context: str) -> list[str]:
-    """Check the result that native answers for a queued call.
-
-    Native code answers each queued call without its callback. A queued
-    callback with a result names the answer in `queue_result=`, which a host
-    that serves the queue form through a callback returns.
-    """
-    metadata = typedef.metadata
-    signature = typedef.type.pointee
-    returns = (
-        signature is not None
-        and signature.kind == "function"
-        and signature.result is not None
-        and signature.result.kind != "void"
-        and not is_status(signature.result)
-    )
-    needed = returns and typedef.name in queued
-    if "queue_result" not in metadata:
-        return (
-            [f"{context}: a queued callback with a result declares its queue_result"]
-            if needed
-            else []
-        )
-    if not needed:
-        return [f"{context}: queue_result requires a queued callback with a result"]
-    return callback_result_errors(
-        typedef, metadata["queue_result"], "queue_result", enum_constants, context
-    )

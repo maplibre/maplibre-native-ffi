@@ -133,7 +133,7 @@ typedef struct finalization_failure_probe {
   char message[256];
 } finalization_failure_probe;
 
-static bool record_finalization_failure(
+static void record_finalization_failure(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
@@ -147,7 +147,6 @@ static bool record_finalization_failure(
     snprintf(probe->message, sizeof(probe->message), "%s", text);
     atomic_fetch_add(&probe->errors, 1);
   }
-  return true;
 }
 
 static void a_failed_finalization_logs_one_error(void) {

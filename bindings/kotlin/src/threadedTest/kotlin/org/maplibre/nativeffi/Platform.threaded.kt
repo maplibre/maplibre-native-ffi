@@ -19,12 +19,3 @@ internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): Te
   runBlocking {
     withTimeout(TEST_TIMEOUT) { block() }
   }
-
-internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
-  setLogCallback(
-    LogHandler { _, event, _, _ ->
-      callback(event)
-      true
-    },
-  )
-}

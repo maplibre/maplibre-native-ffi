@@ -110,18 +110,6 @@ class ZigEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", source)
 
-    def test_a_callback_names_its_arguments_and_returns_a_bool_result(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        self.assertIn(
-            '@"callback": *const fn (context: ?*anyopaque, severity: LogSeverity, '
-            "event: LogEvent, code: i64, message: []const u8) anyerror!bool,",
-            source,
-        )
-        # The log callback's failure is false, which an error answers.
-        self.assertIn(
-            'callbacks.reportError("mln_log_callback", err); return false; }', source
-        )
-
     def test_a_status_callback_answers_a_named_status_and_reports_other_errors(self):
         source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
         self.assertIn(

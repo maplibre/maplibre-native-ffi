@@ -445,7 +445,7 @@ void mln_ts_dispatch_custom_source_fetch_tile_callback(
   (void)received;
 }
 
-bool mln_ts_dispatch_log_callback(
+void mln_ts_dispatch_log_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
@@ -463,7 +463,6 @@ bool mln_ts_dispatch_log_callback(
     );
   }
   (void)received;
-  return true;
 }
 
 void mln_ts_dispatch_resource_provider_callback(
@@ -4370,6 +4369,33 @@ bool mln_ts_write_list_web_gpu_borrowed_texture(
       return false;
   }
   *out = items;
+  return true;
+}
+
+bool mln_ts_write_log_handler(
+  mln_ts_call* call, napi_value value, mln_log_handler* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "callback", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "callback");
+  if (!mln_ts_read_function(call, member, child)) return false;
+  if (!mln_ts_read_registration(
+        call, value, &(*out).user_data, &(*out).release_user_data, &(*out).queue
+      ))
+    return false;
+  (*out).callback = mln_ts_dispatch_log_callback;
+  if (!mln_ts_member(call, value, "platformSeverities", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "platformSeverities");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->platform_severities = (mln_log_severity_flags)number;
+    }
+  }
   return true;
 }
 

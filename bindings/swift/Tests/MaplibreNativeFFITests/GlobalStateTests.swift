@@ -2,31 +2,9 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Tests that change the process log callback or report observer run in order.
+/// Tests that change the process report observer run in order.
 @Suite(.serialized)
 struct GlobalStateTests {
-  /// A callback's thrown error is reported, native receives the callback's
-  /// fallback, and the runtime keeps working.
-  @Test func aCallbackThatThrowsIsContainedAndReported() async throws {
-    let capture = ReportCapture()
-    defer { capture.finish() }
-    defer { try? clearLogCallback() }
-    try setLogCallback(handler: LogHandler { _, _, _, _ in
-      throw CallbackFailure()
-    })
-    let report =
-      "mln_log_callback failed: CallbackFailure()"
-    try await withMapFixture { fixture in
-      // MapLibre logs the parse failure of a malformed document.
-      _ = try? await fixture.map
-        .setStyleJson(#"{"version":8,"#)
-      await awaitCondition("the thrown error's report") {
-        capture.text.contains(report)
-      }
-      try await fixture.map.setStyleJson(emptyStyle)
-    }
-  }
-
   /// A header transform that throws a `MaplibreError` with a failure status
   /// fails on purpose, so nothing is reported. Any other thrown error is a bug,
   /// which is reported to standard error.
@@ -77,8 +55,6 @@ struct GlobalStateTests {
     #expect(!capture.text.contains("the transform refused"))
   }
 }
-
-private struct CallbackFailure: Error {}
 
 /// Records the runtime's reports until ``finish()``; they still reach standard
 /// error. Redirecting file descriptor 2 instead races the suite's other

@@ -24,7 +24,7 @@ static void restoring_log_state(void (*body)(void)) {
   static void name(void) { restoring_log_state(name##_body); } \
   static void name##_body(void)
 
-static bool ignore_log_record(
+static void ignore_log_record(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message
 ) {
@@ -33,7 +33,6 @@ static bool ignore_log_record(
   (void)event;
   (void)code;
   (void)message;
-  return false;
 }
 
 static void count_log_callback_release(void* user_data) { ++*(int*)user_data; }
@@ -88,6 +87,20 @@ LOG_STATE_CASE(a_rejected_handler_keeps_the_installed_one) {
   const mln_log_handler without_callback =
     log_handler(NULL, &rejected_releases, count_log_callback_release);
   MLN_TEST_INVALID(mln_log_set_callback(&without_callback, NULL));
+  // Bit 0 names no severity: the flag bits start at the INFO severity value.
+  static const mln_log_severity_flags unknown_platform_severities[] = {
+    UINT32_C(1),
+    UINT32_C(1) << 4U,
+  };
+  for (size_t index = 0; index < sizeof(unknown_platform_severities) /
+                                   sizeof(*unknown_platform_severities);
+       index += 1) {
+    mln_log_handler unknown = log_handler(
+      ignore_log_record, &rejected_releases, count_log_callback_release
+    );
+    unknown.platform_severities = unknown_platform_severities[index];
+    MLN_TEST_INVALID(mln_log_set_callback(&unknown, NULL));
+  }
   TEST_ASSERT_EQUAL_INT(0, installed_releases);
   TEST_ASSERT_EQUAL_INT(0, rejected_releases);
 
@@ -127,7 +140,7 @@ typedef struct discarded_failure_probe {
   char message[256];
 } discarded_failure_probe;
 
-static bool record_discarded_failure(
+static void record_discarded_failure(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message_view
 ) {
@@ -140,7 +153,6 @@ static bool record_discarded_failure(
     snprintf(probe->message, sizeof(probe->message), "%s", message);
     atomic_fetch_add(&probe->warnings, 1);
   }
-  return true;
 }
 
 LOG_STATE_CASE(a_failed_discarded_command_logs_one_warning) {
@@ -175,7 +187,7 @@ typedef struct reentry_probe {
   char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } reentry_probe;
 
-static bool clear_from_log_callback(
+static void clear_from_log_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message_view
 ) {
@@ -192,7 +204,6 @@ static bool clear_from_log_callback(
     );
     atomic_store(&probe->callback_status, status);
   }
-  return true;
 }
 
 static void clear_from_log_release(void* user_data) {
@@ -274,15 +285,14 @@ static bool is_dump_record(const char* message) {
          strncmp(message, dump_style_url, sizeof(dump_style_url) - 1) == 0;
 }
 
-// Consumes every other record, so the verdict can only matter per record.
-static bool record_dump(
+static void record_dump(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message_view
 ) {
   const char* message = message_view.data;
   dump_probe* probe = user_data;
   if (message == NULL || !is_dump_record(message)) {
-    return false;
+    return;
   }
   const int index = atomic_fetch_add(&probe->count, 1);
   if (index >= DUMP_RECORD_COUNT) {
@@ -300,7 +310,6 @@ static bool record_dump(
     record->message[length] = '\0';
   }
   mln_test_pulse();
-  return (uint32_t)(index % 2);
 }
 
 static void record_dump_completion(

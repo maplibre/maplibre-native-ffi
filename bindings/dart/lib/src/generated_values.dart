@@ -2251,6 +2251,29 @@ typedef LogCallback =
       String message,
     );
 
+/// A log callback, for `setLogCallback()`.
+///
+/// The callback runs asynchronously in the isolate and zone that registered it,
+/// after native queues the call.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+final class LogHandler {
+  const LogHandler({
+    required this.callback,
+    this.platformSeverities = LogSeverityFlag.none,
+  });
+  final LogCallback callback;
+
+  /// The severities that also go to the platform's log, as they do without a
+  /// callback. 0 sends none.
+  ///
+  /// A record that the handler's delivery queue can't accept is dropped. These
+  /// severities alone decide whether a record also goes to the platform's log,
+  /// whether or not the queue accepts it.
+  final LogSeverityFlag platformSeverities;
+}
+
 /// Asks for the data of a tile in a custom source.
 ///
 /// `map` and `sourceId` name the source that asks. Return quickly. Once the

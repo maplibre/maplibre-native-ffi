@@ -1943,6 +1943,16 @@ class LogHandler:
     """
 
     callback: LogCallback
+    platform_severities: LogSeverityFlag = field(
+        default_factory=lambda: LogSeverityFlag(0)
+    )
+    """The severities that also go to the platform's log, as they do without a
+    callback. 0 sends none.
+
+    A record that the handler's delivery queue can't accept is dropped. These
+    severities alone decide whether a record also goes to the platform's log,
+    whether or not the queue accepts it.
+    """
 
     def _invoke_callback(self, severity, event, code, message):
         callback = self.callback

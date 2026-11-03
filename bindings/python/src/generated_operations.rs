@@ -424,12 +424,12 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     event: sys::mln_log_event,
     code: i64,
     message: sys::mln_buffer_view,
-) -> bool {
+) {
     let outcome = generated_invoke(
-        || true,
+        || (),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(true);
+                return Ok(());
             };
             let _result = callback.bind(py).call1((
                 generated_value(py, severity)?,
@@ -437,7 +437,7 @@ unsafe extern "C" fn generated_callback_mln_log_handler_callback(
                 generated_value(py, code)?,
                 generated_text(py, message)?,
             ))?;
-            Ok(true)
+            Ok(())
         },
     );
     outcome
@@ -2128,6 +2128,9 @@ fn generated_input_mln_log_handler<'py>(
 ) -> PyResult<sys::mln_log_handler> {
     let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
+    raw.platform_severities = value
+        .getattr("platform_severities")?
+        .extract::<sys::mln_log_severity_flags>()?;
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =

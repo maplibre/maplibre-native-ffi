@@ -1904,7 +1904,7 @@ static void mln_kw_upcall_releaseRoot(void* userData) {
   mln_kw_js_upcall(2, arguments);
 }
 
-static bool mln_kw_upcall_queuedLogHandlerCallback(
+static void mln_kw_upcall_logHandlerCallback(
   void* userData, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
@@ -1916,7 +1916,6 @@ static bool mln_kw_upcall_queuedLogHandlerCallback(
   const mln_buffer_view* message_address = &message;
   __builtin_memcpy(&arguments[4], &message_address, sizeof message_address);
   mln_kw_js_upcall(3, arguments);
-  return true;
 }
 
 static void mln_kw_upcall_customGeometrySourceOptionsFetchTile(
@@ -2038,7 +2037,7 @@ uintptr_t mln_kw_upcall_function(uint32_t site) {
     (void (*)(void))mln_kw_upcall_completion,
     (void (*)(void))mln_kw_upcall_completionRelease,
     (void (*)(void))mln_kw_upcall_releaseRoot,
-    (void (*)(void))mln_kw_upcall_queuedLogHandlerCallback,
+    (void (*)(void))mln_kw_upcall_logHandlerCallback,
     (void (*)(void))mln_kw_upcall_customGeometrySourceOptionsFetchTile,
     (void (*)(void))mln_kw_upcall_customGeometrySourceOptionsCancelTile,
     (void (*)(void))mln_kw_upcall_customVectorSourceOptionsFetchTile,

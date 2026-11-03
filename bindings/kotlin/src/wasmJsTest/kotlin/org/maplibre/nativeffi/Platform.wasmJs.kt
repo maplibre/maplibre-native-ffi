@@ -49,11 +49,6 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
   return { restoreReportError(previous) }
 }
 
-// Native consumes each record and queues it, and the page runs the callback as it dispatches.
-internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
-  setLogCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
-}
-
 private fun replaceReportError(sink: (JsReference<Throwable>) -> Boolean): JsAny =
   js(
     """{

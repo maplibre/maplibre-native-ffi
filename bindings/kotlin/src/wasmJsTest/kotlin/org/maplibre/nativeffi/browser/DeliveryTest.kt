@@ -5,8 +5,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.LogHandler
 import org.maplibre.nativeffi.LogSeverity
-import org.maplibre.nativeffi.QueuedLogHandler
 import org.maplibre.nativeffi.TestSupport
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.clearLogCallback
@@ -25,7 +25,7 @@ class DeliveryTest {
     val second = CompletableDeferred<Unit>()
     try {
       setLogCallback(
-        QueuedLogHandler { severity, _, _, message ->
+        LogHandler { severity, _, _, message ->
           if (severity == LogSeverity.ERROR && FAILURE in message) {
             calls += 1
             if (calls == 2) second.complete(Unit)
@@ -48,7 +48,7 @@ class DeliveryTest {
     val logged = CompletableDeferred<Unit>()
     try {
       setLogCallback(
-        QueuedLogHandler { _, _, _, message ->
+        LogHandler { _, _, _, message ->
           if (FAILURE in message) {
             during = true
             logged.complete(Unit)

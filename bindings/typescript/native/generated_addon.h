@@ -104,7 +104,7 @@ void mln_ts_dispatch_custom_source_fetch_tile_callback(
   void* user_data, mln_map map, mln_buffer_view source_id,
   mln_canonical_tile_id tile_id
 );
-bool mln_ts_dispatch_log_callback(
+void mln_ts_dispatch_log_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 );
@@ -478,6 +478,9 @@ bool mln_ts_write_list_vulkan_borrowed_texture(
 bool mln_ts_write_list_web_gpu_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
   mln_web_gpu_borrowed_texture** out, size_t* out_count, const char* path
+);
+bool mln_ts_write_log_handler(
+  mln_ts_call* call, napi_value value, mln_log_handler* out, const char* path
 );
 bool mln_ts_write_logical_extent(
   mln_ts_call* call, napi_value value, mln_logical_extent* out, const char* path

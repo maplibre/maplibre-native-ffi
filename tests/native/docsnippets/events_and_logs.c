@@ -72,7 +72,7 @@ void mln_doc_events_handler(mln_runtime runtime) {
 }
 
 // #region logs
-static bool on_log(
+static void on_log(
   void* user_data, mln_log_severity severity, mln_log_event event,
   int64_t code, mln_buffer_view message
 ) {
@@ -81,9 +81,6 @@ static bool on_log(
   (void)code;
   // The message is valid only during this callback.
   write_log(severity, message);
-  // Consume the record. Return false to
-  // let the platform logger print it too.
-  return true;
 }
 // #endregion logs
 

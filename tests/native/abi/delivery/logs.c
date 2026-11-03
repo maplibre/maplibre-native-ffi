@@ -61,12 +61,12 @@ typedef struct seen_calls {
 
 static seen_calls seen;
 
-static bool record_log(
+static void record_log(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
   if (!mln_test_lent_text_is_terminated(message)) seen.unterminated = true;
-  if (!is_dump_record(message.data) || seen.count == max_seen) return false;
+  if (!is_dump_record(message.data) || seen.count == max_seen) return;
   const size_t slot = seen.count++;
   seen.kinds[slot] = 'l';
   seen.user_data[slot] = user_data;
@@ -74,7 +74,6 @@ static bool record_log(
   seen.events[slot] = event;
   seen.codes[slot] = code;
   strncpy(seen.messages[slot], message.data, sizeof(seen.messages[slot]) - 1);
-  return false;
 }
 
 static void record_log_release(void* user_data) {
@@ -200,8 +199,8 @@ typedef struct dispatched_log {
 static MLN_TEST_THREAD_LOCAL bool dispatching_logs;
 
 // Calls a status-returning function, which a log callback on a native thread
-// may not, and asks for the platform logger, which a queued handler ignores.
-static bool record_dispatched_log(
+// may not.
+static void record_dispatched_log(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 ) {
@@ -211,9 +210,9 @@ static bool record_dispatched_log(
   dispatched_log* log = user_data;
   if (!dispatching_logs) {
     atomic_fetch_add(&log->off_thread, 1);
-    return false;
+    return;
   }
-  if (!is_dump_record(message.data)) return false;
+  if (!is_dump_record(message.data)) return;
   log->records += 1;
   if (
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_FLAG_ERROR, NULL) !=
@@ -221,7 +220,6 @@ static bool record_dispatched_log(
   ) {
     log->refused_calls += 1;
   }
-  return false;
 }
 
 static void release_dispatched_log(void* user_data) {

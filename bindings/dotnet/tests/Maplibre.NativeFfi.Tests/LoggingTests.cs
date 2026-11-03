@@ -17,17 +17,17 @@ public sealed class LoggingTests
             throw new FormatException("Host callback failed.");
         };
         using var scope = new NativeCallScope();
-        var handler = GeneratedValues.NativeLogHandler(new LogHandler(callback), scope);
+        var handler = GeneratedValues.NativeLogHandler(
+            new LogHandler { Callback = callback },
+            scope
+        );
 
-        Assert.Equal(
-            0,
-            handler.callback(
-                handler.user_data,
-                (mln_log_severity)999,
-                (mln_log_event)998,
-                42,
-                scope.Utf8("é")
-            )
+        handler.callback(
+            handler.user_data,
+            (mln_log_severity)999,
+            (mln_log_event)998,
+            42,
+            scope.Utf8("é")
         );
         Assert.Equal((999u, 998u, 42L, "é"), copied);
     }

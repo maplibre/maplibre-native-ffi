@@ -267,7 +267,6 @@
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/DispatchedUpcalls.kt",
     "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt",
-    "bindings/kotlin/src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt",
     "bindings/kotlin/wasm/mln_kw_exports.txt",
     "bindings/kotlin/wasm/mln_kw_generated.c",
     "bindings/python/python/maplibre_native_ffi/_generated_operations.py",

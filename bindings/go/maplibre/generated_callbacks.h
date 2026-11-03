@@ -4,7 +4,7 @@
 #include "binding_callback.h"
 #include "maplibre_native_c.h"
 void binding_release(void*);
-bool binding_mln_log_handler_callback(
+void binding_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 );

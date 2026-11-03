@@ -65,7 +65,7 @@ typedef mln_http_header_transform_callbackFunction =
     );
 typedef mln_log_callback = Pointer<NativeFunction<mln_log_callbackFunction>>;
 typedef mln_log_callbackFunction =
-    Bool Function(
+    Void Function(
       Pointer<Void> user_data,
       Uint32 severity,
       Uint32 event,
@@ -563,6 +563,8 @@ final class mln_log_handler extends Struct {
   external mln_user_data_release release_user_data;
   @Uint64()
   external int queue;
+  @Uint32()
+  external int platform_severities;
 }
 
 final class mln_logical_extent extends Struct {

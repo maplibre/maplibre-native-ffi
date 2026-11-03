@@ -88,6 +88,18 @@ internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters
 internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long =
   allocate(16, w(8, 8, 4)).also { putProjectedMeters(it, value) }
 
+internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
+  writeU32(target, w(32, 48, 28).toUInt())
+  writeU32(target + w(24, 40), value.platformSeverities.rawValue)
+  writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.logHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+  writeI64(target + w(16, 32), HostDelivery.queue)
+}
+
+internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
+  allocate(w(32, 48, 28), w(8, 8, 4)).also { putLogHandler(it, value) }
+
 internal fun NativeArena.putLogicalExtent(target: Long, value: LogicalExtent) {
   writeU32(target, value.width)
   writeU32(target + 4, value.height)

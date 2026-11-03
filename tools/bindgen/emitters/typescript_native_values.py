@@ -404,6 +404,10 @@ class NativeValues:
         self.callbacks.add(callback.native)
         context = callback.context
         assert context is not None
+        if callback.result.native != "void":
+            raise Unsupported(
+                f"{callback.native}: a dispatched callback returns nothing"
+            )
         returns = callback.result.ctype.spelling
         parameters = ", ".join(
             f"{p.value.ctype.spelling} {p.name}" for p in callback.parameters
@@ -450,12 +454,6 @@ class NativeValues:
             lines.append("  }")
         else:
             lines.append("  (void)received;")
-        if callback.result.native != "void":
-            # Native code answers a dispatched call itself and ignores what
-            # the trampoline returns.
-            if not callback.queue_result:
-                raise Unsupported(f"{callback.native}: a result needs a queue result")
-            lines.append(f"  return {callback.queue_result};")
         self.functions[name] = (prototype, "\n".join(lines))
         return name
 

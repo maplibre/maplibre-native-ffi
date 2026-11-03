@@ -63,15 +63,11 @@ internal static class EventsAndLogs
         // #region logs
         // Runs on a library thread, and can't call the library.
         MaplibreNative.SetLogCallback(
-            new LogHandler(
-                (severity, _, _, message) =>
-                {
-                    WriteLog(severity, message);
-                    // Consume the record. Return false to let the
-                    // platform logger print it too.
-                    return true;
-                }
-            )
+            new LogHandler
+            {
+                Callback = (severity, _, _, message) =>
+                    WriteLog(severity, message),
+            }
         );
         // #endregion logs
     }

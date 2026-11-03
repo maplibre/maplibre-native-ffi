@@ -9,17 +9,6 @@ internal actual object UpcallStubs {
   actual val completionRelease: Long =
     Ffm.upcall(Upcalls::class.java, "completionRelease", null, JAVA_LONG)
   actual val releaseRoot: Long = Ffm.upcall(Upcalls::class.java, "releaseRoot", null, JAVA_LONG)
-  actual val logHandlerCallback: Long =
-    Ffm.upcall(
-      ThreadedUpcalls::class.java,
-      "logHandlerCallback",
-      JAVA_BOOLEAN,
-      JAVA_LONG,
-      JAVA_INT,
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-    )
   actual val httpHeaderTransformCallback: Long =
     Ffm.upcall(
       ThreadedUpcalls::class.java,
@@ -29,6 +18,17 @@ internal actual object UpcallStubs {
       JAVA_INT,
       mln_buffer_view,
       JAVA_LONG,
+    )
+  actual val logHandlerCallback: Long =
+    Ffm.upcall(
+      Upcalls::class.java,
+      "logHandlerCallback",
+      null,
+      JAVA_LONG,
+      JAVA_INT,
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
     )
   actual val customGeometrySourceOptionsFetchTile: Long =
     Ffm.upcall(

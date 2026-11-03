@@ -115,16 +115,6 @@ class GoEmitterTests(unittest.TestCase):
         )
         self.assertNotIn("EventBatchView", source)
 
-    def test_a_func_names_its_arguments_and_returns_a_bool_result(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn(
-            "Callback func(severity LogSeverity, event LogEvent, code int64, "
-            "message string) bool",
-            source,
-        )
-        # The log callback's failure is false, which a panic answers too.
-        self.assertIn("(result C.bool) { result = false; ", source)
-
     def test_an_absent_json_result_is_an_empty_string(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(

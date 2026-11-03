@@ -182,8 +182,9 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
         synchronous = parse_sources(
             {
                 "api.h": text.replace(
-                    ' BIND("failure=0;queue_result=1")',
-                    ' BIND("failure=0")',
+                    "typedef void (*mln_notice_callback)(void* context, int code, const char* text);",
+                    "typedef unsigned (*mln_notice_callback)("
+                    'void* context, int code, const char* text) BIND("failure=0");',
                 ).replace(
                     '  mln_delivery_queue queue BIND("kind=delivery_queue");\n} mln_notice_handler',
                     "} mln_notice_handler",

@@ -14,7 +14,7 @@ internal object DispatchedUpcalls {
       1 -> Upcalls.completionRelease(readAddress(arguments))
       2 -> Upcalls.releaseRoot(readAddress(arguments))
       3 ->
-        WasmUpcalls.queuedLogHandlerCallback(
+        Upcalls.logHandlerCallback(
           readAddress(arguments),
           readI32(arguments + 8),
           readI32(arguments + 16),

@@ -24,6 +24,25 @@ internal object Upcalls {
     contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
   @JvmStatic
+  fun logHandlerCallback(
+    userData: Long,
+    severity: Int,
+    event: Int,
+    code: Long,
+    message: Long,
+  ): Unit = run {
+    upcall<LogHandler, Boolean>("mln_log_callback", userData, false) { value ->
+      value.callback(
+        LogSeverity(severity.toUInt()),
+        LogEvent(event.toUInt()),
+        code,
+        readViewString(message),
+      )
+      true
+    }
+  }
+
+  @JvmStatic
   fun customGeometrySourceOptionsFetchTile(
     userData: Long,
     map: Long,
@@ -200,8 +219,8 @@ internal expect object UpcallStubs {
   val completion: Long
   val completionRelease: Long
   val releaseRoot: Long
-  val logHandlerCallback: Long
   val httpHeaderTransformCallback: Long
+  val logHandlerCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
   val customVectorSourceOptionsFetchTile: Long

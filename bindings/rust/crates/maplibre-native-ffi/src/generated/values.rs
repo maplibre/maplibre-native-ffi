@@ -1791,8 +1791,14 @@ impl Default for LogEvent {
 #[derive(Clone)]
 pub struct LogHandler {
     /// The callback receives (`severity`, `event`, `code`, `message`).
-    pub callback:
-        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static>,
+    pub callback: std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) + Send + Sync + 'static>,
+    /// The severities that also go to the platform's log, as they do without a
+    /// callback. 0 sends none.
+    ///
+    /// A record that the handler's delivery queue can't accept is dropped.
+    /// These severities alone decide whether a record also goes to the
+    /// platform's log, whether or not the queue accepts it.
+    pub platform_severities: LogSeverityFlag,
 }
 impl std::fmt::Debug for LogHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1802,10 +1808,11 @@ impl std::fmt::Debug for LogHandler {
 impl LogHandler {
     pub fn new<F>(callback: F) -> Self
     where
-        F: Fn(LogSeverity, LogEvent, i64, &str) -> bool + Send + Sync + 'static,
+        F: Fn(LogSeverity, LogEvent, i64, &str) + Send + Sync + 'static,
     {
         Self {
             callback: std::sync::Arc::new(callback),
+            platform_severities: Default::default(),
         }
     }
     unsafe extern "C" fn callback_trampoline(
@@ -1814,18 +1821,18 @@ impl LogHandler {
         event: sys::mln_log_event,
         code: i64,
         message: sys::mln_buffer_view,
-    ) -> bool {
+    ) {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_log_callback", false, || {
-            let value = (state.callback)(
+        callback::invoke("mln_log_callback", (), || {
+            (state.callback)(
                 LogSeverity::from_raw(severity),
                 LogEvent::from_raw(event),
                 code,
                 unsafe { crate::string::borrow_string_view(message) }?,
             );
-            Ok(value)
+            Ok(())
         })
     }
 }
@@ -1834,6 +1841,7 @@ impl ToNative<sys::mln_log_handler> for LogHandler {
         let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
         raw.callback = Some(Self::callback_trampoline as _);
+        raw.platform_severities = to_native(&self.platform_severities, arena)?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };

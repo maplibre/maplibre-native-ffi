@@ -21,19 +21,15 @@ internal actual object UpcallStubs {
   actual val releaseRoot: Long
     get() = upcallFunction(2)
 
-  actual val logHandlerCallback: Long
-    get() =
-      throw MaplibreException(
-        Status.UNSUPPORTED,
-        "logHandlerCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
-      )
-
   actual val httpHeaderTransformCallback: Long
     get() =
       throw MaplibreException(
         Status.UNSUPPORTED,
         "httpHeaderTransformCallback needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
+
+  actual val logHandlerCallback: Long
+    get() = upcallFunction(3)
 
   actual val customGeometrySourceOptionsFetchTile: Long
     get() = upcallFunction(4)
@@ -78,9 +74,6 @@ internal actual object UpcallStubs {
 
   actual val cameraTransitionHandlerCallback: Long
     get() = upcallFunction(13)
-
-  val queuedLogHandlerCallback: Long
-    get() = upcallFunction(3)
 }
 
 private fun upcallFunction(site: Int): Long = unsignedWord(mln_kw_upcall_function(site))

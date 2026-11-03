@@ -6,9 +6,7 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
-fn consumeLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, _: []const u8) maplibre.Error!bool {
-    return true;
-}
+fn ignoreLog(_: ?*anyopaque, _: maplibre.LogSeverity, _: maplibre.LogEvent, _: i64, _: []const u8) maplibre.Error!void {}
 
 fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibre.ResourceRequest) maplibre.Error!void {
     var owned = request;
@@ -23,7 +21,7 @@ fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
 
 pub fn main() !void {
     const allocator = std.heap.smp_allocator;
-    try maplibre.setLogCallback(.{ .callback = consumeLog }, null);
+    try maplibre.setLogCallback(.{ .callback = ignoreLog }, null);
 
     const runtime = try maplibre.Runtime.create(.{}, null);
     _ = try resolve(try runtime.setResourceProvider(allocator, .{ .callback = passThrough }, null));

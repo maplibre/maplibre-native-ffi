@@ -63,10 +63,6 @@ typedef enum mln_log_event : uint32_t {
 /**
  * Receives a log message.
  *
- * Without an mln_delivery_queue, return true if you handled the message, or
- * false to also send it to the platform's log. With an mln_delivery_queue,
- * the platform's log never gets the message.
- *
  * Threads:
  * Runs on the thread that logged the message, or on a background thread for the
  * severities that mln_log_set_async_severity_mask() selects. The callback can't
@@ -75,8 +71,7 @@ typedef enum mln_log_event : uint32_t {
  * Lifetimes:
  * `message` stays valid until the callback returns.
  */
-MLN_BINDING("failure=false;queue_result=true")
-typedef bool (*mln_log_callback)(
+typedef void (*mln_log_callback)(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
 );
@@ -88,6 +83,15 @@ typedef struct mln_log_handler {
   void* user_data MLN_BINDING("kind=context");
   mln_user_data_release release_user_data;
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
+  /**
+   * The severities that also go to the platform's log, as they do without a
+   * callback. 0 sends none.
+   *
+   * A record that the handler's delivery queue can't accept is dropped. These
+   * severities alone decide whether a record also goes to the platform's log,
+   * whether or not the queue accepts it.
+   */
+  mln_log_severity_flags platform_severities;
 } mln_log_handler MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );

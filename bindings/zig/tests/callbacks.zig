@@ -10,9 +10,8 @@ const support = @import("fixture.zig");
 const LogProbe = struct {
     saw_parse_error: support.Flag = .{},
 
-    fn record(self: *LogProbe, severity: maplibre.LogSeverity, event: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!bool {
+    fn record(self: *LogProbe, severity: maplibre.LogSeverity, event: maplibre.LogEvent, _: i64, message: []const u8) maplibre.Error!void {
         if (severity == .@"error" and event == .parse_style and message.len != 0) self.saw_parse_error.set();
-        return true;
     }
 
     fn handler(self: *LogProbe) maplibre.LogHandler {
