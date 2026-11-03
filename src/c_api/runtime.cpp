@@ -149,12 +149,12 @@ auto mln_runtime_clear_http_header_transform(
   });
 }
 
-auto mln_runtime_run_ambient_cache_operation(
-  mln_runtime runtime, mln_ambient_cache_operation operation,
+auto mln_runtime_run_cache_database_operation(
+  mln_runtime runtime, mln_cache_database_operation operation,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::run_ambient_cache_operation_start(
+    return mln::core::run_cache_database_operation_start(
       runtime, operation, completion
     );
   });

@@ -51,8 +51,8 @@ def offline() -> None:
     # #region ambient
     # 50 MiB
     runtime.set_maximum_ambient_cache_size(50 * 1024 * 1024).result()
-    runtime.run_ambient_cache_operation(
-        mln.AmbientCacheOperation.CLEAR
+    runtime.run_cache_database_operation(
+        mln.CacheDatabaseOperation.CLEAR
     ).result()
     # #endregion ambient
 

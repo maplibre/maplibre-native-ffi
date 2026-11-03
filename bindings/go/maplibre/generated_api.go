@@ -16,40 +16,45 @@ import (
 	"unsafe"
 )
 
-// AmbientCacheOperation corresponds to mln_ambient_cache_operation. An action
-// on a runtime's ambient cache.
+// CacheDatabaseOperation corresponds to mln_cache_database_operation. A
+// maintenance action on a runtime's cache database.
 //
-// The ambient cache holds the resources that maps load, apart from the ones
-// that offline regions hold.
+// The cache database is the file that RuntimeOptions.CachePath names. It holds
+// the ambient cache, meaning the resources that maps loaded, and the offline
+// regions.
 //
-// See mln_ambient_cache_operation in the C API reference:
+// See mln_cache_database_operation in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type AmbientCacheOperation uint32
+type CacheDatabaseOperation uint32
 
 const (
+	// Deletes the ambient cache's resources and frees the space they used. Offline
+	// regions keep their resources.
+	CacheDatabaseOperationClear CacheDatabaseOperation = CacheDatabaseOperation(C.MLN_CACHE_DATABASE_OPERATION_CLEAR)
+	// Keeps the ambient cache's resources, but makes maps check each one with the
+	// server before they use it again. Offline regions keep their resources as they
+	// are.
+	CacheDatabaseOperationInvalidate CacheDatabaseOperation = CacheDatabaseOperation(C.MLN_CACHE_DATABASE_OPERATION_INVALIDATE)
+	// Compacts the whole database file to free the disk space that it no longer
+	// uses.
+	CacheDatabaseOperationPack CacheDatabaseOperation = CacheDatabaseOperation(C.MLN_CACHE_DATABASE_OPERATION_PACK)
 	// Deletes the whole database, offline regions included, and starts an empty
 	// one.
-	AmbientCacheOperationResetDatabase AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE)
-	// Shrinks the database file to free the disk space it no longer uses.
-	AmbientCacheOperationPackDatabase AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE)
-	// Makes the library check each cached resource for changes before it uses the
-	// resource again.
-	AmbientCacheOperationInvalidate AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_INVALIDATE)
-	AmbientCacheOperationClear      AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_CLEAR)
+	CacheDatabaseOperationReset CacheDatabaseOperation = CacheDatabaseOperation(C.MLN_CACHE_DATABASE_OPERATION_RESET)
 )
 
-func (value AmbientCacheOperation) String() string {
+func (value CacheDatabaseOperation) String() string {
 	switch value {
 	case 1:
-		return "AmbientCacheOperationResetDatabase"
+		return "CacheDatabaseOperationClear"
 	case 2:
-		return "AmbientCacheOperationPackDatabase"
+		return "CacheDatabaseOperationInvalidate"
 	case 3:
-		return "AmbientCacheOperationInvalidate"
+		return "CacheDatabaseOperationPack"
 	case 4:
-		return "AmbientCacheOperationClear"
+		return "CacheDatabaseOperationReset"
 	}
-	return fmt.Sprintf("AmbientCacheOperation(%d)", value)
+	return fmt.Sprintf("CacheDatabaseOperation(%d)", value)
 }
 
 // CameraChangeMode corresponds to mln_camera_change_mode. Whether a camera
@@ -4639,8 +4644,8 @@ type RuntimeOptions struct {
 	// The directory that asset:// URLs load from. Empty uses the working directory,
 	// or the app's assets on Android.
 	AssetPath string
-	// The database file that holds the ambient cache and offline regions. Empty
-	// keeps them in memory.
+	// The cache database file, which holds the ambient cache and offline regions.
+	// Empty keeps them in memory.
 	CachePath string
 }
 
@@ -8637,13 +8642,14 @@ func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
 	}, completionUnit)
 }
 
-// RunAmbientCacheOperation runs an action on the runtime's ambient cache.
+// RunCacheDatabaseOperation runs a maintenance action on the runtime's cache
+// database.
 //
-// See mln_runtime_run_ambient_cache_operation in the C API reference:
+// See mln_runtime_run_cache_database_operation in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) RunCacheDatabaseOperation(operation CacheDatabaseOperation) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.mln_ambient_cache_operation(operation), completion, diagnostic))
+		return int32(C.mln_runtime_run_cache_database_operation(C.mln_runtime(raw), C.mln_cache_database_operation(operation), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -8692,8 +8698,7 @@ func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransf
 
 // SetMaximumAmbientCacheSize limits the size of the runtime's ambient cache.
 //
-// size is in bytes. Offline regions count toward it, but the library evicts
-// only ambient cache resources to stay within it.
+// size is in bytes. Offline regions don't count toward it.
 //
 // See mln_runtime_set_maximum_ambient_cache_size in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html

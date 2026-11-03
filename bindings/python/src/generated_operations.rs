@@ -7931,10 +7931,10 @@ impl RuntimeHandle {
         Ok(future)
     }
     #[pyo3(signature = (operation))]
-    fn run_ambient_cache_operation(
+    fn run_cache_database_operation(
         &self,
         py: Python<'_>,
-        operation: sys::mln_ambient_cache_operation,
+        operation: sys::mln_cache_database_operation,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -7942,7 +7942,7 @@ impl RuntimeHandle {
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_runtime_run_ambient_cache_operation(
+                    sys::mln_runtime_run_cache_database_operation(
                         handle, operation, completion, diagnostic,
                     )
                 },

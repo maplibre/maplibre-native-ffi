@@ -7568,13 +7568,13 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Runs an action on the runtime's ambient cache.
+  /// Runs a maintenance action on the runtime's cache database.
   ///
-  /// See `mln_runtime_run_ambient_cache_operation` in the
+  /// See `mln_runtime_run_cache_database_operation` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> runAmbientCacheOperation(AmbientCacheOperation operation) =>
+  Future<void> runCacheDatabaseOperation(CacheDatabaseOperation operation) =>
       _run(
-        (arena, completion) => raw.mln_runtime_run_ambient_cache_operation(
+        (arena, completion) => raw.mln_runtime_run_cache_database_operation(
           _handle.raw,
           operation.rawValue,
           completion,
@@ -7646,8 +7646,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
 
   /// Limits the size of the runtime's ambient cache.
   ///
-  /// `size` is in bytes. Offline regions count toward it, but the library
-  /// evicts only ambient cache resources to stay within it.
+  /// `size` is in bytes. Offline regions don't count toward it.
   ///
   /// See `mln_runtime_set_maximum_ambient_cache_size` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

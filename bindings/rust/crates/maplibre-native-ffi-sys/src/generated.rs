@@ -2,11 +2,6 @@
 use super::*;
 
 pub const MLN_C_VERSION: u32 = 0;
-pub type mln_ambient_cache_operation = u32;
-pub const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE: mln_ambient_cache_operation = 1;
-pub const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE: mln_ambient_cache_operation = 2;
-pub const MLN_AMBIENT_CACHE_OPERATION_INVALIDATE: mln_ambient_cache_operation = 3;
-pub const MLN_AMBIENT_CACHE_OPERATION_CLEAR: mln_ambient_cache_operation = 4;
 pub type mln_animation_option_field = u32;
 pub const MLN_ANIMATION_OPTION_DURATION: mln_animation_option_field = 1;
 pub const MLN_ANIMATION_OPTION_VELOCITY: mln_animation_option_field = 2;
@@ -20,6 +15,11 @@ pub const MLN_BOUND_OPTION_MAX_ZOOM: mln_bound_option_field = 4;
 pub const MLN_BOUND_OPTION_MIN_PITCH: mln_bound_option_field = 8;
 pub const MLN_BOUND_OPTION_MAX_PITCH: mln_bound_option_field = 16;
 pub const MLN_BOUND_OPTION_UNBOUNDED: mln_bound_option_field = 32;
+pub type mln_cache_database_operation = u32;
+pub const MLN_CACHE_DATABASE_OPERATION_CLEAR: mln_cache_database_operation = 1;
+pub const MLN_CACHE_DATABASE_OPERATION_INVALIDATE: mln_cache_database_operation = 2;
+pub const MLN_CACHE_DATABASE_OPERATION_PACK: mln_cache_database_operation = 3;
+pub const MLN_CACHE_DATABASE_OPERATION_RESET: mln_cache_database_operation = 4;
 pub type mln_camera_change_mode = u32;
 pub const MLN_CAMERA_CHANGE_MODE_IMMEDIATE: mln_camera_change_mode = 0;
 pub const MLN_CAMERA_CHANGE_MODE_ANIMATED: mln_camera_change_mode = 1;
@@ -2994,9 +2994,9 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_run_ambient_cache_operation(
+    pub fn mln_runtime_run_cache_database_operation(
         runtime: mln_runtime,
-        operation: mln_ambient_cache_operation,
+        operation: mln_cache_database_operation,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

@@ -12,13 +12,13 @@ static void ambient_cache_calls_validate_their_arguments(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_completion completion = mln_test_discard_completion();
   MLN_TEST_INVALID(
-    mln_runtime_run_ambient_cache_operation(runtime, 5, &completion, NULL)
+    mln_runtime_run_cache_database_operation(runtime, 5, &completion, NULL)
   );
-  MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
-    MLN_HANDLE_NULL, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &completion, NULL
+  MLN_TEST_INVALID(mln_runtime_run_cache_database_operation(
+    MLN_HANDLE_NULL, MLN_CACHE_DATABASE_OPERATION_CLEAR, &completion, NULL
   ));
-  MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
-    runtime, MLN_AMBIENT_CACHE_OPERATION_CLEAR, NULL, NULL
+  MLN_TEST_INVALID(mln_runtime_run_cache_database_operation(
+    runtime, MLN_CACHE_DATABASE_OPERATION_CLEAR, NULL, NULL
   ));
   MLN_TEST_INVALID(
     mln_runtime_set_maximum_ambient_cache_size(runtime, 1024, NULL, NULL)
@@ -56,13 +56,13 @@ typedef struct cache_case {
 
 static const cache_case cache_cases[] = {
   {"no change", CHANGE_NONE, 0, 0, ENTRY_KEPT},
-  {"a pack", CHANGE_OPERATION, MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE, 0,
+  {"a pack", CHANGE_OPERATION, MLN_CACHE_DATABASE_OPERATION_PACK, 0,
    ENTRY_KEPT},
-  {"an invalidation", CHANGE_OPERATION, MLN_AMBIENT_CACHE_OPERATION_INVALIDATE,
+  {"an invalidation", CHANGE_OPERATION, MLN_CACHE_DATABASE_OPERATION_INVALIDATE,
    0, ENTRY_INVALIDATED},
-  {"a clear", CHANGE_OPERATION, MLN_AMBIENT_CACHE_OPERATION_CLEAR, 0,
+  {"a clear", CHANGE_OPERATION, MLN_CACHE_DATABASE_OPERATION_CLEAR, 0,
    ENTRY_REMOVED},
-  {"a reset", CHANGE_OPERATION, MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE, 0,
+  {"a reset", CHANGE_OPERATION, MLN_CACHE_DATABASE_OPERATION_RESET, 0,
    ENTRY_REMOVED},
   {"a generous budget", CHANGE_BUDGET, 0, 64 * 1024 * 1024, ENTRY_KEPT},
   {"a zero budget", CHANGE_BUDGET, 0, 0, ENTRY_REMOVED},
@@ -85,7 +85,7 @@ static void apply_change(mln_runtime runtime, const cache_case* row) {
     case CHANGE_OPERATION: {
       mln_test_completion completion = mln_test_completion_default(0);
       MLN_TEST_OK_MESSAGE(
-        mln_runtime_run_ambient_cache_operation(
+        mln_runtime_run_cache_database_operation(
           runtime, row->operation, &completion.descriptor, NULL
         ),
         row->label
@@ -185,7 +185,7 @@ static void revalidation_keeps_omitted_cache_validators(void) {
   mln_map first = load_style(runtime);
   const cache_case invalidate = {
     "invalidate before revalidation", CHANGE_OPERATION,
-    MLN_AMBIENT_CACHE_OPERATION_INVALIDATE, 0, ENTRY_INVALIDATED
+    MLN_CACHE_DATABASE_OPERATION_INVALIDATE, 0, ENTRY_INVALIDATED
   };
   apply_change(runtime, &invalidate);
   mln_map second = load_style(runtime);
@@ -243,8 +243,8 @@ static void touch_shared_cache(void* argument) {
   mln_test_completion operation = mln_test_completion_default(0);
   bool submitted = false;
   if (thread->create_status == MLN_STATUS_OK) {
-    thread->operation_status = mln_runtime_run_ambient_cache_operation(
-      runtime, MLN_AMBIENT_CACHE_OPERATION_INVALIDATE, &operation.descriptor,
+    thread->operation_status = mln_runtime_run_cache_database_operation(
+      runtime, MLN_CACHE_DATABASE_OPERATION_INVALIDATE, &operation.descriptor,
       NULL
     );
     submitted = thread->operation_status == MLN_STATUS_OK;

@@ -1,8 +1,8 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
-  AmbientCacheOperation,
   BoundOptions,
+  CacheDatabaseOperation,
   CameraDelta,
   CameraFitOptions,
   CameraFitUpdate,
@@ -822,9 +822,9 @@ export interface NativeOperations {
     token: object | undefined,
     completion: NativeCompletion,
   ): void;
-  mln_runtime_run_ambient_cache_operation(
+  mln_runtime_run_cache_database_operation(
     runtime: bigint,
-    operation: AmbientCacheOperation,
+    operation: CacheDatabaseOperation,
     completion: NativeCompletion,
   ): void;
   mln_runtime_set_event_handler(

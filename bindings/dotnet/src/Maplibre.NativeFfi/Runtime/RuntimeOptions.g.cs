@@ -14,8 +14,8 @@ namespace Maplibre.NativeFfi;
 /// directory, or the app's assets on Android.
 /// </param>
 /// <param name="CachePath">
-/// The database file that holds the ambient cache and offline regions. Empty
-/// keeps them in memory.
+/// The cache database file, which holds the ambient cache and offline regions.
+/// Empty keeps them in memory.
 /// </param>
 public readonly partial record struct RuntimeOptions(string AssetPath, string CachePath)
 {

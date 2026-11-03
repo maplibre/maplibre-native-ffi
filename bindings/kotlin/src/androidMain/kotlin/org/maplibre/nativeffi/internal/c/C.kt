@@ -1320,7 +1320,7 @@ internal actual object C {
   actual external fun mln_runtime_release(runtime: Long, completion: Long, outDiagnostic: Long): Int
 
   @JvmStatic
-  actual external fun mln_runtime_run_ambient_cache_operation(
+  actual external fun mln_runtime_run_cache_database_operation(
     runtime: Long,
     operation: Int,
     completion: Long,

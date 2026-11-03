@@ -1572,50 +1572,51 @@ using OfflineDatabase = std::shared_ptr<mln::DatabaseFileSource>;
 
 }  // namespace
 
-auto run_ambient_cache_operation_start(
-  mln_runtime runtime, mln_ambient_cache_operation operation,
+auto run_cache_database_operation_start(
+  mln_runtime runtime, mln_cache_database_operation operation,
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
   switch (operation) {
-    case MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE:
-    case MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE:
-    case MLN_AMBIENT_CACHE_OPERATION_INVALIDATE:
-    case MLN_AMBIENT_CACHE_OPERATION_CLEAR:
+    case MLN_CACHE_DATABASE_OPERATION_RESET:
+    case MLN_CACHE_DATABASE_OPERATION_PACK:
+    case MLN_CACHE_DATABASE_OPERATION_INVALIDATE:
+    case MLN_CACHE_DATABASE_OPERATION_CLEAR:
       break;
     default:
-      set_thread_error("ambient cache operation is invalid");
+      set_thread_error("cache database operation is invalid");
       return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   return submit_offline_operation(
-    live, present_nothing<&mln_runtime_run_ambient_cache_operation>, completion,
+    live, present_nothing<&mln_runtime_run_cache_database_operation>,
+    completion,
     [operation](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
       auto callback = [state](std::exception_ptr exception) -> void {
         complete_from_exception(
-          state, exception, "ambient cache operation failed"
+          state, exception, "cache database operation failed"
         );
       };
 
       switch (operation) {
-        case MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE:
+        case MLN_CACHE_DATABASE_OPERATION_RESET:
           database->resetDatabase(std::move(callback));
           break;
-        case MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE:
+        case MLN_CACHE_DATABASE_OPERATION_PACK:
           database->packDatabase(std::move(callback));
           break;
-        case MLN_AMBIENT_CACHE_OPERATION_INVALIDATE:
+        case MLN_CACHE_DATABASE_OPERATION_INVALIDATE:
           database->invalidateAmbientCache(std::move(callback));
           break;
-        case MLN_AMBIENT_CACHE_OPERATION_CLEAR:
+        case MLN_CACHE_DATABASE_OPERATION_CLEAR:
           database->clearAmbientCache(std::move(callback));
           break;
         default:
           throw std::logic_error(
-            "ambient cache operation failed after validation"
+            "cache database operation failed after validation"
           );
       }
     }

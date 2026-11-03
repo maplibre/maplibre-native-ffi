@@ -114,7 +114,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/WebGlContextDescriptor.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/WebGlContextKind.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderTarget/WglContextDescriptor.g.cs",
-    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/CacheDatabaseOperation.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/CameraChangeMode.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeader.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderRule.g.cs",

@@ -61,7 +61,7 @@ fn offline(allocator: std.mem.Allocator) !void {
     defer resized.deinit();
     try resized.wait(null);
 
-    var cleared = try runtime.runAmbientCacheOperation(.clear, null);
+    var cleared = try runtime.runCacheDatabaseOperation(.clear, null);
     defer cleared.deinit();
     try cleared.wait(null);
     // #endregion ambient

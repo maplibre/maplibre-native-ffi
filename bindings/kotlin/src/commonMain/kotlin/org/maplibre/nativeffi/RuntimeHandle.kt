@@ -300,15 +300,15 @@ internal constructor(
     nativeRetire(this, binding) { check(C.mln_runtime_release(handle, completion, diagnostic)) }
 
   /**
-   * Runs an action on the runtime's ambient cache.
+   * Runs a maintenance action on the runtime's cache database.
    *
-   * See `mln_runtime_run_ambient_cache_operation` in the
+   * See `mln_runtime_run_cache_database_operation` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun runAmbientCacheOperation(operation: AmbientCacheOperation): Deferred<Unit> =
+  public fun runCacheDatabaseOperation(operation: CacheDatabaseOperation): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
-        C.mln_runtime_run_ambient_cache_operation(
+        C.mln_runtime_run_cache_database_operation(
           handle,
           operation.rawValue.toInt(),
           completion,
@@ -354,8 +354,7 @@ internal constructor(
   /**
    * Limits the size of the runtime's ambient cache.
    *
-   * `size` is in bytes. Offline regions count toward it, but the library evicts only ambient cache
-   * resources to stay within it.
+   * `size` is in bytes. Offline regions don't count toward it.
    *
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

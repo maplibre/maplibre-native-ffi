@@ -2356,12 +2356,12 @@ pub const Runtime = struct {
         return released;
     }
 
-    /// Runs an action on the runtime's ambient cache.
+    /// Runs a maintenance action on the runtime's cache database.
     ///
-    /// See `mln_runtime_run_ambient_cache_operation` in the
+    /// See `mln_runtime_run_cache_database_operation` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn runAmbientCacheOperation(self: Runtime, operation: AmbientCacheOperation, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_run_ambient_cache_operation", .handle, self, call.unit, null, diagnostic, .{operation});
+    pub fn runCacheDatabaseOperation(self: Runtime, operation: CacheDatabaseOperation, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+        return call.submit("mln_runtime_run_cache_database_operation", .handle, self, call.unit, null, diagnostic, .{operation});
     }
 
     /// Sends the events of the runtime and its maps to a callback.
@@ -2404,8 +2404,7 @@ pub const Runtime = struct {
 
     /// Limits the size of the runtime's ambient cache.
     ///
-    /// `size` is in bytes. Offline regions count toward it, but the library evicts
-    /// only ambient cache resources to stay within it.
+    /// `size` is in bytes. Offline regions don't count toward it.
     ///
     /// See `mln_runtime_set_maximum_ambient_cache_size` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2542,28 +2541,6 @@ pub const StyleExpression = struct {
     }
 };
 
-/// An action on a runtime's ambient cache.
-///
-/// The ambient cache holds the resources that maps load, apart from the ones
-/// that offline regions hold.
-///
-/// See `mln_ambient_cache_operation` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const AmbientCacheOperation = enum(u32) {
-    /// Deletes the whole database, offline regions included, and starts an
-    /// empty one.
-    reset_database = 1,
-    /// Shrinks the database file to free the disk space it no longer uses.
-    pack_database = 2,
-    /// Makes the library check each cached resource for changes before it uses
-    /// the resource again.
-    invalidate = 3,
-    clear = 4,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
 /// How a camera change animates.
 ///
 /// See `mln_animation_options` in the
@@ -2642,6 +2619,33 @@ pub const BoundOptions = struct {
             .max_pitch = if (raw.fields & c.MLN_BOUND_OPTION_MAX_PITCH != 0) raw.max_pitch else null,
         };
     }
+};
+
+/// A maintenance action on a runtime's cache database.
+///
+/// The cache database is the file that `RuntimeOptions.cache_path` names. It
+/// holds the ambient cache, meaning the resources that maps loaded, and the
+/// offline regions.
+///
+/// See `mln_cache_database_operation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const CacheDatabaseOperation = enum(u32) {
+    /// Deletes the ambient cache's resources and frees the space they used.
+    /// Offline regions keep their resources.
+    clear = 1,
+    /// Keeps the ambient cache's resources, but makes maps check each one with
+    /// the server before they use it again. Offline regions keep their
+    /// resources as they are.
+    invalidate = 2,
+    /// Compacts the whole database file to free the disk space that it no
+    /// longer uses.
+    pack = 3,
+    /// Deletes the whole database, offline regions included, and starts an
+    /// empty one.
+    reset = 4,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// A map's whole camera.
@@ -6653,8 +6657,8 @@ pub const RuntimeOptions = struct {
     /// The directory that `asset://` URLs load from. Empty uses the working
     /// directory, or the app's assets on Android.
     asset_path: []const u8 = &.{},
-    /// The database file that holds the ambient cache and offline regions.
-    /// Empty keeps them in memory.
+    /// The cache database file, which holds the ambient cache and offline
+    /// regions. Empty keeps them in memory.
     cache_path: []const u8 = &.{},
     pub fn toNative(self: RuntimeOptions) status.Error!c.mln_runtime_options {
         var raw = std.mem.zeroes(c.mln_runtime_options);

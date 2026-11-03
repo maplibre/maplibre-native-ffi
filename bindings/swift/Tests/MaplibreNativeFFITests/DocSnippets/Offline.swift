@@ -47,7 +47,7 @@ private func offline() async throws {
   // #region ambient
   // 50 MiB
   try await runtime.setMaximumAmbientCacheSize(50 * 1024 * 1024)
-  try await runtime.runAmbientCacheOperation(.clear)
+  try await runtime.runCacheDatabaseOperation(.clear)
   // #endregion ambient
 
   // #region download

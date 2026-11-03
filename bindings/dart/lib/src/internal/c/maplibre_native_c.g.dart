@@ -1766,12 +1766,6 @@ final class mln_wgl_context_descriptor extends Struct {
   external Pointer<Void> get_proc_address;
 }
 
-// mln_ambient_cache_operation
-const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1;
-const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2;
-const MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3;
-const MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4;
-
 // mln_animation_option_field
 const MLN_ANIMATION_OPTION_DURATION = 1;
 const MLN_ANIMATION_OPTION_VELOCITY = 2;
@@ -1786,6 +1780,12 @@ const MLN_BOUND_OPTION_MAX_ZOOM = 4;
 const MLN_BOUND_OPTION_MIN_PITCH = 8;
 const MLN_BOUND_OPTION_MAX_PITCH = 16;
 const MLN_BOUND_OPTION_UNBOUNDED = 32;
+
+// mln_cache_database_operation
+const MLN_CACHE_DATABASE_OPERATION_CLEAR = 1;
+const MLN_CACHE_DATABASE_OPERATION_INVALIDATE = 2;
+const MLN_CACHE_DATABASE_OPERATION_PACK = 3;
+const MLN_CACHE_DATABASE_OPERATION_RESET = 4;
 
 // mln_camera_change_mode
 const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
@@ -4709,7 +4709,7 @@ external int mln_runtime_release(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_runtime_run_ambient_cache_operation(
+external int mln_runtime_run_cache_database_operation(
   int runtime,
   int operation,
   Pointer<mln_completion> completion,

@@ -2,7 +2,7 @@
 // tests, which never run them.
 package org.maplibre.nativeffi.docsnippets
 
-import org.maplibre.nativeffi.AmbientCacheOperation
+import org.maplibre.nativeffi.CacheDatabaseOperation
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LatLngBounds
 import org.maplibre.nativeffi.OfflineRegionDefinition
@@ -59,7 +59,7 @@ private suspend fun offline() {
   // 50 MiB
   runtime.setMaximumAmbientCacheSize(50uL * 1024uL * 1024uL).await()
   runtime
-    .runAmbientCacheOperation(AmbientCacheOperation.CLEAR)
+    .runCacheDatabaseOperation(CacheDatabaseOperation.CLEAR)
     .await()
   // #endregion ambient
 

@@ -7,37 +7,42 @@ import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.values.flagLabel
 
 /**
- * An action on a runtime's ambient cache.
+ * A maintenance action on a runtime's cache database.
  *
- * The ambient cache holds the resources that maps load, apart from the ones that offline regions
- * hold.
+ * The cache database is the file that `RuntimeOptions.cachePath` names. It holds the ambient cache,
+ * meaning the resources that maps loaded, and the offline regions.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
- * See `mln_ambient_cache_operation` in the
+ * See `mln_cache_database_operation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 @JvmInline
-public value class AmbientCacheOperation(public val rawValue: UInt) {
+public value class CacheDatabaseOperation(public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
-      1u -> "RESET_DATABASE"
-      2u -> "PACK_DATABASE"
-      3u -> "INVALIDATE"
-      4u -> "CLEAR"
-      else -> "AmbientCacheOperation($rawValue)"
+      1u -> "CLEAR"
+      2u -> "INVALIDATE"
+      3u -> "PACK"
+      4u -> "RESET"
+      else -> "CacheDatabaseOperation($rawValue)"
     }
 
   public companion object {
-    /** Deletes the whole database, offline regions included, and starts an empty one. */
-    public val RESET_DATABASE: AmbientCacheOperation = AmbientCacheOperation(1u)
-    /** Shrinks the database file to free the disk space it no longer uses. */
-    public val PACK_DATABASE: AmbientCacheOperation = AmbientCacheOperation(2u)
     /**
-     * Makes the library check each cached resource for changes before it uses the resource again.
+     * Deletes the ambient cache's resources and frees the space they used. Offline regions keep
+     * their resources.
      */
-    public val INVALIDATE: AmbientCacheOperation = AmbientCacheOperation(3u)
-    public val CLEAR: AmbientCacheOperation = AmbientCacheOperation(4u)
+    public val CLEAR: CacheDatabaseOperation = CacheDatabaseOperation(1u)
+    /**
+     * Keeps the ambient cache's resources, but makes maps check each one with the server before
+     * they use it again. Offline regions keep their resources as they are.
+     */
+    public val INVALIDATE: CacheDatabaseOperation = CacheDatabaseOperation(2u)
+    /** Compacts the whole database file to free the disk space that it no longer uses. */
+    public val PACK: CacheDatabaseOperation = CacheDatabaseOperation(3u)
+    /** Deletes the whole database, offline regions included, and starts an empty one. */
+    public val RESET: CacheDatabaseOperation = CacheDatabaseOperation(4u)
   }
 }
 
@@ -2221,7 +2226,8 @@ public data class RuntimeOptions(
    */
   public val assetPath: String = "",
   /**
-   * The database file that holds the ambient cache and offline regions. Empty keeps them in memory.
+   * The cache database file, which holds the ambient cache and offline regions. Empty keeps them in
+   * memory.
    */
   public val cachePath: String = "",
 )

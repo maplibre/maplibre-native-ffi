@@ -141,8 +141,8 @@ void mln_doc_offline(void) {
   wait_for_done();
 
   // #region ambient
-  mln_runtime_run_ambient_cache_operation(
-    runtime, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &done, NULL
+  mln_runtime_run_cache_database_operation(
+    runtime, MLN_CACHE_DATABASE_OPERATION_CLEAR, &done, NULL
   );
   // #endregion ambient
   wait_for_done();

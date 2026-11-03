@@ -11,37 +11,6 @@ import {
 } from "./internal/native_registrations.ts";
 
 /**
- * An action on a runtime's ambient cache.
- *
- * The ambient cache holds the resources that maps load, apart from the ones
- * that offline regions hold.
- *
- * See `mln_ambient_cache_operation` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export const AmbientCacheOperation = {
-  /**
-   * Deletes the whole database, offline regions included, and starts an empty
-   * one.
-   */
-  resetDatabase: 1,
-  /**
-   * Shrinks the database file to free the disk space it no longer uses.
-   */
-  packDatabase: 2,
-  /**
-   * Makes the library check each cached resource for changes before it uses the
-   * resource again.
-   */
-  invalidate: 3,
-  clear: 4,
-} as const;
-/** One of the AmbientCacheOperation values, or a value this binding does not know. */
-export type AmbientCacheOperation =
-  | (typeof AmbientCacheOperation)[keyof typeof AmbientCacheOperation]
-  | (number & {});
-
-/**
  * How a camera change animates.
  *
  * See `mln_animation_options` in the
@@ -93,6 +62,44 @@ export interface BoundOptions {
    */
   unbounded?: boolean;
 }
+
+/**
+ * A maintenance action on a runtime's cache database.
+ *
+ * The cache database is the file that `RuntimeOptions.cachePath` names. It
+ * holds the ambient cache, meaning the resources that maps loaded, and the
+ * offline regions.
+ *
+ * See `mln_cache_database_operation` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export const CacheDatabaseOperation = {
+  /**
+   * Deletes the ambient cache's resources and frees the space they used.
+   * Offline regions keep their resources.
+   */
+  clear: 1,
+  /**
+   * Keeps the ambient cache's resources, but makes maps check each one with the
+   * server before they use it again. Offline regions keep their resources as
+   * they are.
+   */
+  invalidate: 2,
+  /**
+   * Compacts the whole database file to free the disk space that it no longer
+   * uses.
+   */
+  pack: 3,
+  /**
+   * Deletes the whole database, offline regions included, and starts an empty
+   * one.
+   */
+  reset: 4,
+} as const;
+/** One of the CacheDatabaseOperation values, or a value this binding does not know. */
+export type CacheDatabaseOperation =
+  | (typeof CacheDatabaseOperation)[keyof typeof CacheDatabaseOperation]
+  | (number & {});
 
 /**
  * A map's whole camera.
@@ -2862,8 +2869,8 @@ export interface RuntimeOptions {
    */
   assetPath?: string;
   /**
-   * The database file that holds the ambient cache and offline regions. Empty
-   * keeps them in memory.
+   * The cache database file, which holds the ambient cache and offline regions.
+   * Empty keeps them in memory.
    */
   cachePath?: string;
 }
