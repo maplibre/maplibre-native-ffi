@@ -104,6 +104,12 @@ enum class SyncPoint : std::uint8_t {
   // the map's pending still-image request, reported as partial so that it
   // cannot complete the image.
   StillImageFrameHeldBack,
+  // The driver is about to forward a missing-image request to the map. The
+  // engine's image-manager lock is held; a handler must not enter the renderer.
+  RenderStyleImageMissing,
+  // The driver is about to select the map update for a frame attempt.
+  // No lock is held.
+  RenderUpdateSelecting,
   // A run loop in src/platform/run_loop has submitted its stop task from
   // stop(), and the loop may already be destroyed.
   RunLoopStopSubmitted,

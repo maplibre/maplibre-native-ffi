@@ -2249,6 +2249,13 @@ auto render_session_render_update_on_driver(
   }
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
+  mln::testing::hit(mln::testing::SyncPoint::RenderUpdateSelecting);
+  // Select before draining: a missing-image reply queues renderer work before
+  // publishing its map update. Reading a newer update after draining could
+  // render it without that reply, then wait for an update already consumed.
+  auto [update, desired, update_generation] =
+    map_latest_update_snapshot(*live->map_object);
+
   // Deliver tile and resource results first: destroying the tiles they retire
   // enqueues the GPU-release work that map_run_render_jobs() drains. This must
   // stay ahead of the early returns below, or a frame with no update to render
@@ -2256,8 +2263,6 @@ auto render_session_render_update_on_driver(
   live->scheduler.drain();
   map_run_render_jobs(*live->map_object);
 
-  auto [update, desired, update_generation] =
-    map_latest_update_snapshot(*live->map_object);
   if (out_map_update_generation != nullptr) {
     *out_map_update_generation = update_generation;
   }
