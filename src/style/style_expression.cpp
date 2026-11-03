@@ -176,7 +176,6 @@ auto to_native_inputs(
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_STYLE_EXPRESSION_INPUT_ZOOM) |
     MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER |
-    MLN_STYLE_EXPRESSION_INPUT_ELEVATION |
     MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID;
   if ((inputs.fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
@@ -194,10 +193,6 @@ auto to_native_inputs(
       inputs, MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER,
       inputs.color_ramp_parameter, "color_ramp_parameter",
       out_context.colorRampParameter
-    ) ||
-    !finite_input(
-      inputs, MLN_STYLE_EXPRESSION_INPUT_ELEVATION, inputs.elevation,
-      "elevation", out_context.elevation
     )
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;

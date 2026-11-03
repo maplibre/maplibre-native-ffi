@@ -6756,10 +6756,8 @@ pub const StyleExpressionInfo = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 pub const StyleExpressionInputs = struct {
     zoom: ?f64 = null,
-    /// The value that `heatmap-density` and `line-progress` read.
+    /// The value of `heatmap-density`, `line-progress`, and `elevation`.
     color_ramp_parameter: ?f64 = null,
-    /// The value that `elevation` reads when `color_ramp_parameter` isn't set.
-    elevation: ?f64 = null,
     /// The feature to evaluate against, as a GeoJSON feature, or empty for
     /// none.
     feature: []const u8 = &.{},
@@ -6779,7 +6777,6 @@ pub const StyleExpressionInputs = struct {
         raw.size = @sizeOf(c.mln_style_expression_inputs);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ZOOM, &raw.zoom, self.zoom);
         marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER, &raw.color_ramp_parameter, self.color_ramp_parameter);
-        marshal.present(&raw.fields, c.MLN_STYLE_EXPRESSION_INPUT_ELEVATION, &raw.elevation, self.elevation);
         raw.feature = marshal.view(self.feature);
         raw.feature_state = marshal.view(self.feature_state);
         raw.global_state = marshal.view(self.global_state);
@@ -6797,7 +6794,6 @@ pub const StyleExpressionInputs = struct {
         return .{
             .zoom = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_ZOOM != 0) raw.zoom else null,
             .color_ramp_parameter = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER != 0) raw.color_ramp_parameter else null,
-            .elevation = if (raw.fields & c.MLN_STYLE_EXPRESSION_INPUT_ELEVATION != 0) raw.elevation else null,
             .feature = try marshal.copyView(allocator, raw.feature),
             .feature_state = try marshal.copyView(allocator, raw.feature_state),
             .global_state = try marshal.copyView(allocator, raw.global_state),

@@ -2843,10 +2843,6 @@ fn generated_input_mln_style_expression_inputs<'py>(
         raw.color_ramp_parameter = field.extract::<f64>()?;
         raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
     }
-    if let Some(field) = generated_present(value, "elevation")? {
-        raw.elevation = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
-    }
     raw.feature = storage.json(value.getattr("feature")?, true)?;
     raw.feature_state = storage.json(value.getattr("feature_state")?, true)?;
     raw.global_state = storage.json(value.getattr("global_state")?, true)?;

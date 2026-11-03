@@ -387,7 +387,6 @@ pub const MLN_STATUS_ALREADY_EXISTS: mln_status = -11;
 pub type mln_style_expression_input_field = u32;
 pub const MLN_STYLE_EXPRESSION_INPUT_ZOOM: mln_style_expression_input_field = 1;
 pub const MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER: mln_style_expression_input_field = 2;
-pub const MLN_STYLE_EXPRESSION_INPUT_ELEVATION: mln_style_expression_input_field = 4;
 pub const MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID: mln_style_expression_input_field = 8;
 pub type mln_style_expression_option_field = u32;
 pub const MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE: mln_style_expression_option_field = 1;
@@ -1495,7 +1494,6 @@ pub struct mln_style_expression_inputs {
     pub fields: mln_style_expression_input_fields,
     pub zoom: f64,
     pub color_ramp_parameter: f64,
-    pub elevation: f64,
     pub feature: mln_buffer_view,
     pub feature_state: mln_buffer_view,
     pub global_state: mln_buffer_view,

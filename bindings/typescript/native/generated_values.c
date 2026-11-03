@@ -5936,16 +5936,6 @@ bool mln_ts_write_style_expression_inputs(
     }
     out->fields |= MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER;
   }
-  if (!mln_ts_member(call, value, "elevation", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "elevation");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->elevation = (double)number;
-    }
-    out->fields |= MLN_STYLE_EXPRESSION_INPUT_ELEVATION;
-  }
   if (!mln_ts_member(call, value, "feature", &member)) return false;
   mln_ts_path(child, sizeof child, path, "feature");
   if (!mln_ts_read_json_view(call, member, &out->feature, child)) return false;

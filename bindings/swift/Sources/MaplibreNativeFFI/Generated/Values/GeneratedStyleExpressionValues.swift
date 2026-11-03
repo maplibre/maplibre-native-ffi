@@ -29,10 +29,8 @@ public struct StyleExpressionInfo: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
 public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   public var zoom: Double?
-  /// The value that `heatmap-density` and `line-progress` read.
+  /// The value of `heatmap-density`, `line-progress`, and `elevation`.
   public var colorRampParameter: Double?
-  /// The value that `elevation` reads when `color_ramp_parameter` isn't set.
-  public var elevation: Double?
   /// The feature to evaluate against, as a GeoJSON feature, or empty for none.
   public var feature: String
   /// The feature's state, as a JSON object, or empty for none.
@@ -47,7 +45,6 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   public init(
     zoom: Double? = nil,
     colorRampParameter: Double? = nil,
-    elevation: Double? = nil,
     feature: String = "",
     featureState: String = "",
     globalState: String = "",
@@ -56,7 +53,6 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
   ) {
     self.zoom = zoom
     self.colorRampParameter = colorRampParameter
-    self.elevation = elevation
     self.feature = feature
     self.featureState = featureState
     self.globalState = globalState
@@ -73,8 +69,6 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
     colorRampParameter = raw
       .fields & MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
       .rawValue != 0 ? raw.color_ramp_parameter : nil
-    elevation = raw.fields & MLN_STYLE_EXPRESSION_INPUT_ELEVATION
-      .rawValue != 0 ? raw.elevation : nil
     feature = try NativeString.copyUTF8(
       data: raw.feature.data,
       size: raw.feature.size
@@ -107,10 +101,6 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
     if let item = colorRampParameter {
       raw.fields |= MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
         .rawValue; raw.color_ramp_parameter = item
-    }
-    if let item = elevation {
-      raw.fields |= MLN_STYLE_EXPRESSION_INPUT_ELEVATION.rawValue; raw
-        .elevation = item
     }
     raw.feature = arena.view(feature)
     raw.feature_state = arena.view(featureState)
