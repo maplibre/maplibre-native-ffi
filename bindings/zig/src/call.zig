@@ -114,6 +114,10 @@ fn isHandle(comptime T: type) bool {
     return @typeInfo(T) == .@"struct" and @hasDecl(T, "native_name");
 }
 
+fn isOptionalHandle(comptime T: type) bool {
+    return @typeInfo(T) == .optional and isHandle(@typeInfo(T).optional.child);
+}
+
 fn Param(comptime function: anytype, comptime index: usize) type {
     return @typeInfo(@TypeOf(function)).@"fn".param_types[index].?;
 }
@@ -218,6 +222,8 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                 const input = args[index];
                 if (comptime isHandle(Field)) {
                     native[offset + index] = input.raw;
+                } else if (comptime isOptionalHandle(Field)) {
+                    native[offset + index] = if (input) |handle| handle.raw else 0;
                 } else if (comptime marks(Field, "caller_sized_text")) {
                     native[offset + index] = @ptrCast(self.text_storage.ptr);
                 } else if (comptime marks(Field, "text_capacity")) {

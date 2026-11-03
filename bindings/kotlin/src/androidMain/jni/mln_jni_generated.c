@@ -154,23 +154,6 @@ static void mln_geo_json_source_data_release_jni(
   mln_geo_json_source_data_release((mln_geo_json_source_data)data);
 }
 
-static jint mln_graphics_device_create_jni(
-  JNIEnv* env, jclass type, jlong options, jlong out_device,
-  jlong out_diagnostic
-) {
-  return (jint)mln_graphics_device_create(
-    MLN_JNI_POINTER(const mln_graphics_device_options*, options),
-    MLN_JNI_POINTER(mln_graphics_device*, out_device),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static void mln_graphics_device_release_jni(
-  JNIEnv* env, jclass type, jlong device
-) {
-  mln_graphics_device_release((mln_graphics_device)device);
-}
-
 static jint mln_http_header_transform_response_set_header_jni(
   JNIEnv* env, jclass type, jlong response, jlong name, jlong value,
   jlong out_diagnostic
@@ -342,20 +325,6 @@ static jint mln_map_apply_camera_delta_jni(
   );
 }
 
-static jint mln_map_attach_graphics_device_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong device, jlong descriptor,
-  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_graphics_device_texture(
-    (mln_map)map, (mln_graphics_device)device,
-    MLN_JNI_POINTER(const mln_graphics_device_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_attach_metal_borrowed_texture_jni(
   JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
   jlong out_session, jlong completion, jlong out_diagnostic
@@ -392,6 +361,20 @@ static jint mln_map_attach_metal_surface_jni(
     (mln_map)map,
     MLN_JNI_POINTER(const mln_metal_surface_descriptor*, descriptor),
     MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
+    MLN_JNI_POINTER(mln_render_session*, out_session),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_attach_offscreen_jni(
+  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
+  jlong device, jlong out_session, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_attach_offscreen(
+    (mln_map)map, MLN_JNI_POINTER(const mln_offscreen_descriptor*, descriptor),
+    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
+    (mln_offscreen_device)device,
     MLN_JNI_POINTER(mln_render_session*, out_session),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
@@ -1411,6 +1394,23 @@ static jint mln_network_set_status_jni(
   );
 }
 
+static jint mln_offscreen_device_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_offscreen_device_create(
+    MLN_JNI_POINTER(const mln_offscreen_device_options*, options),
+    MLN_JNI_POINTER(mln_offscreen_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_offscreen_device_release_jni(
+  JNIEnv* env, jclass type, jlong device
+) {
+  mln_offscreen_device_release((mln_offscreen_device)device);
+}
+
 static jint mln_open_gl_supported_context_provider_mask_jni(
   JNIEnv* env, jclass type
 ) {
@@ -2197,10 +2197,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_geo_json_source_data_create_jni},
   {"mln_geo_json_source_data_release", "(J)V",
    (void*)mln_geo_json_source_data_release_jni},
-  {"mln_graphics_device_create", "(JJJ)I",
-   (void*)mln_graphics_device_create_jni},
-  {"mln_graphics_device_release", "(J)V",
-   (void*)mln_graphics_device_release_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2229,14 +2225,14 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_style_source_json_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
-  {"mln_map_attach_graphics_device_texture", "(JJJJJJJ)I",
-   (void*)mln_map_attach_graphics_device_texture_jni},
   {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_borrowed_texture_jni},
   {"mln_map_attach_metal_owned_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_owned_texture_jni},
   {"mln_map_attach_metal_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_surface_jni},
+  {"mln_map_attach_offscreen", "(JJJJJJJ)I",
+   (void*)mln_map_attach_offscreen_jni},
   {"mln_map_attach_open_gl_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_open_gl_borrowed_texture_jni},
   {"mln_map_attach_open_gl_owned_texture", "(JJJJJJ)I",
@@ -2391,6 +2387,10 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_update_camera", "(JJJJ)I", (void*)mln_map_update_camera_jni},
   {"mln_network_get_status", "(JJ)I", (void*)mln_network_get_status_jni},
   {"mln_network_set_status", "(IJ)I", (void*)mln_network_set_status_jni},
+  {"mln_offscreen_device_create", "(JJJ)I",
+   (void*)mln_offscreen_device_create_jni},
+  {"mln_offscreen_device_release", "(J)V",
+   (void*)mln_offscreen_device_release_jni},
   {"mln_open_gl_supported_context_provider_mask", "()I",
    (void*)mln_open_gl_supported_context_provider_mask_jni},
   {"mln_plugin_get_register_function_v1", "()J",
@@ -2561,10 +2561,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_geo_json_source_data_create_jni},
   {"mln_geo_json_source_data_release", "(J)V",
    (void*)mln_geo_json_source_data_release_jni},
-  {"mln_graphics_device_create", "(JJJ)I",
-   (void*)mln_graphics_device_create_jni},
-  {"mln_graphics_device_release", "(J)V",
-   (void*)mln_graphics_device_release_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2593,14 +2589,14 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_add_style_source_json_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
-  {"mln_map_attach_graphics_device_texture", "(JJJJJJJ)I",
-   (void*)mln_map_attach_graphics_device_texture_jni},
   {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_borrowed_texture_jni},
   {"mln_map_attach_metal_owned_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_owned_texture_jni},
   {"mln_map_attach_metal_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_metal_surface_jni},
+  {"mln_map_attach_offscreen", "(JJJJJJJ)I",
+   (void*)mln_map_attach_offscreen_jni},
   {"mln_map_attach_open_gl_borrowed_texture", "(JJJJJJ)I",
    (void*)mln_map_attach_open_gl_borrowed_texture_jni},
   {"mln_map_attach_open_gl_owned_texture", "(JJJJJJ)I",
@@ -2755,6 +2751,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_map_update_camera", "(JJJJ)I", (void*)mln_map_update_camera_jni},
   {"mln_network_get_status", "(JJ)I", (void*)mln_network_get_status_jni},
   {"mln_network_set_status", "(IJ)I", (void*)mln_network_set_status_jni},
+  {"mln_offscreen_device_create", "(JJJ)I",
+   (void*)mln_offscreen_device_create_jni},
+  {"mln_offscreen_device_release", "(J)V",
+   (void*)mln_offscreen_device_release_jni},
   {"mln_open_gl_supported_context_provider_mask", "()I",
    (void*)mln_open_gl_supported_context_provider_mask_jni},
   {"mln_plugin_get_register_function_v1", "()J",

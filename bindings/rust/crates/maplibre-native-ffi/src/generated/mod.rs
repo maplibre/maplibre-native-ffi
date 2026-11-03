@@ -15,12 +15,12 @@ mod acquired_frame;
 pub use acquired_frame::*;
 mod geo_json_source_data;
 pub use geo_json_source_data::*;
-mod graphics_device;
-pub use graphics_device::*;
 mod map;
 pub use map::*;
 mod map_projection;
 pub use map_projection::*;
+mod offscreen_device;
+pub use offscreen_device::*;
 mod render_session;
 pub use render_session::*;
 mod resource_request;
@@ -43,10 +43,6 @@ static_assertions::assert_impl_all!(GeoJsonSourceDataHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_not_impl_any!(GeoJsonSourceDataHandle: Clone);
 #[cfg(test)]
-static_assertions::assert_impl_all!(GraphicsDeviceHandle: Send, Sync);
-#[cfg(test)]
-static_assertions::assert_not_impl_any!(GraphicsDeviceHandle: Clone);
-#[cfg(test)]
 static_assertions::assert_impl_all!(MapHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_not_impl_any!(MapHandle: Clone);
@@ -54,6 +50,10 @@ static_assertions::assert_not_impl_any!(MapHandle: Clone);
 static_assertions::assert_impl_all!(MapProjectionHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_not_impl_any!(MapProjectionHandle: Clone);
+#[cfg(test)]
+static_assertions::assert_impl_all!(OffscreenDeviceHandle: Send, Sync);
+#[cfg(test)]
+static_assertions::assert_not_impl_any!(OffscreenDeviceHandle: Clone);
 #[cfg(test)]
 static_assertions::assert_impl_all!(RenderSessionHandle: Send, Sync);
 #[cfg(test)]

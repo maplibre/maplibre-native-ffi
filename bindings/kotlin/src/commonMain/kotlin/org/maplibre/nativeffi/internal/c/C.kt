@@ -46,10 +46,6 @@ internal expect object C {
 
   fun mln_geo_json_source_data_release(data: Long): Unit
 
-  fun mln_graphics_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
-
-  fun mln_graphics_device_release(device: Long): Unit
-
   fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -143,16 +139,6 @@ internal expect object C {
 
   fun mln_map_apply_camera_delta(map: Long, delta: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_attach_graphics_device_texture(
-    map: Long,
-    device: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_attach_metal_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -175,6 +161,16 @@ internal expect object C {
     map: Long,
     descriptor: Long,
     options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_offscreen(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    device: Long,
     outSession: Long,
     completion: Long,
     outDiagnostic: Long,
@@ -698,6 +694,10 @@ internal expect object C {
   fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int
 
   fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
+
+  fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
+
+  fun mln_offscreen_device_release(device: Long): Unit
 
   fun mln_open_gl_supported_context_provider_mask(): Int
 

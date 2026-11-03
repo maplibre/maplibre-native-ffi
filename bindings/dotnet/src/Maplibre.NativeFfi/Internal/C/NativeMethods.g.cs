@@ -87,16 +87,6 @@ internal static unsafe partial class NativeMethods
     internal static partial void mln_geo_json_source_data_release(MlnGeoJsonSourceData data);
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_graphics_device_create(
-        mln_graphics_device_options* options,
-        MlnGraphicsDevice* out_device,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_graphics_device_release(MlnGraphicsDevice device);
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
         mln_http_header_transform_response* response,
         mln_buffer_view name,
@@ -220,17 +210,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_graphics_device_texture(
-        MlnMap map,
-        MlnGraphicsDevice device,
-        mln_graphics_device_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_attach_metal_borrowed_texture(
         MlnMap map,
         mln_metal_borrowed_texture_descriptor* descriptor,
@@ -255,6 +234,17 @@ internal static unsafe partial class NativeMethods
         MlnMap map,
         mln_metal_surface_descriptor* descriptor,
         mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_offscreen(
+        MlnMap map,
+        mln_offscreen_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnOffscreenDevice device,
         MlnRenderSession* out_session,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
@@ -971,6 +961,16 @@ internal static unsafe partial class NativeMethods
         mln_network_status status,
         mln_diagnostic* out_diagnostic
     );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_offscreen_device_create(
+        mln_offscreen_device_options* options,
+        MlnOffscreenDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial void mln_offscreen_device_release(MlnOffscreenDevice device);
 
     [LibraryImport(LibraryName)]
     internal static partial uint mln_open_gl_supported_context_provider_mask();

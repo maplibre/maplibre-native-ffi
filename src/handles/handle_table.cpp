@@ -59,8 +59,8 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_delivery_queue";
     case HandleKind::StyleExpression:
       return "mln_style_expression";
-    case HandleKind::GraphicsDevice:
-      return "mln_graphics_device";
+    case HandleKind::OffscreenDevice:
+      return "mln_offscreen_device";
   }
   return nullptr;
 }

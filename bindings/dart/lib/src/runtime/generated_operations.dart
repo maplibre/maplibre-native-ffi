@@ -329,28 +329,6 @@ Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
   return result;
 }
 
-Pointer<raw.mln_graphics_device_options> _writeGraphicsDeviceOptions(
-  GraphicsDeviceOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_graphics_device_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_graphics_device_options>();
-  result.ref.size = sizeOf<raw.mln_graphics_device_options>();
-  if (value.adapterIndex != null) {
-    result.ref.fields |= raw.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
-    result.ref.adapter_index = _nativeInteger(
-      value.adapterIndex!,
-      0,
-      4294967295,
-    );
-  }
-  if (value.singleContext != null) {
-    result.ref.fields |= raw.MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
-    result.ref.single_context = value.singleContext!;
-  }
-  return result;
-}
-
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
   Allocator arena, {
@@ -728,15 +706,49 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   return result;
 }
 
-Pointer<raw.mln_graphics_device_texture_descriptor>
-_writeGraphicsDeviceTextureDescriptor(
-  GraphicsDeviceTextureDescriptor value,
+Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
+  MetalBorrowedTexture value,
   Allocator arena, {
-  Pointer<raw.mln_graphics_device_texture_descriptor>? into,
+  Pointer<raw.mln_metal_borrowed_texture>? into,
 }) {
-  final result = into ?? arena<raw.mln_graphics_device_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_graphics_device_texture_descriptor>();
+  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_metal_borrowed_texture_descriptor>
+_writeMetalBorrowedTextureDescriptor(
+  MetalBorrowedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeMetalBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  result.ref.command_queue = Pointer<Void>.fromAddress(
+    value.commandQueue.address,
+  ).cast();
   return result;
 }
 
@@ -836,52 +848,6 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   return result;
 }
 
-Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
-  MetalBorrowedTexture value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  return result;
-}
-
-Pointer<raw.mln_metal_borrowed_texture_descriptor>
-_writeMetalBorrowedTextureDescriptor(
-  MetalBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeMetalBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
-  result.ref.command_queue = Pointer<Void>.fromAddress(
-    value.commandQueue.address,
-  ).cast();
-  return result;
-}
-
 Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
   MetalContextDescriptor value,
   Allocator arena, {
@@ -919,6 +885,17 @@ Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
   result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
   result.ref.layer = Pointer<Void>.fromAddress(value.layer.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_offscreen_descriptor> _writeOffscreenDescriptor(
+  OffscreenDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_offscreen_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_offscreen_descriptor>();
+  result.ref.size = sizeOf<raw.mln_offscreen_descriptor>();
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   return result;
 }
 
@@ -1732,6 +1709,28 @@ Pointer<raw.mln_camera_update> _writeCameraUpdate(
     registrations,
   ).ref;
   result.ref.gesture_phase = value.gesturePhase.rawValue;
+  return result;
+}
+
+Pointer<raw.mln_offscreen_device_options> _writeOffscreenDeviceOptions(
+  OffscreenDeviceOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_offscreen_device_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_offscreen_device_options>();
+  result.ref.size = sizeOf<raw.mln_offscreen_device_options>();
+  if (value.adapterIndex != null) {
+    result.ref.fields |= raw.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
+    result.ref.adapter_index = _nativeInteger(
+      value.adapterIndex!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.singleContext != null) {
+    result.ref.fields |= raw.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
+    result.ref.single_context = value.singleContext!;
+  }
   return result;
 }
 
@@ -3218,80 +3217,6 @@ final class GeoJsonSourceDataHandle implements Finalizable {
   });
 }
 
-/// Issued native handle id.
-extension type const _NativeGraphicsDevice(int raw) implements NativeHandle {}
-
-/// Owner of one native handle.
-///
-/// A GPU device that the library creates to render maps into textures.
-///
-/// See `mln_graphics_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class GraphicsDeviceHandle implements Finalizable {
-  GraphicsDeviceHandle._(_NativeGraphicsDevice handle)
-    : _state = NativeHandleState(handle, 'GraphicsDeviceHandle');
-  final NativeHandleState<_NativeGraphicsDevice> _state;
-  // ignore: unused_element
-  _NativeGraphicsDevice get _handle => _state.handle;
-
-  /// The native handle id.
-  int get id => _state.handleId;
-
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
-  bool get isClosed => _state.isClosed;
-
-  @override
-  String toString() =>
-      'GraphicsDeviceHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
-
-  /// Creates a GPU device for rendering maps into textures.
-  ///
-  /// Render sessions on several maps can share one device.
-  ///
-  /// See `mln_graphics_device_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when this build's render backend can't create a
-  ///   device.
-  /// - `Status.nativeError` when `adapter_index` names no GPU, or the platform
-  ///   can't create the device.
-  static GraphicsDeviceHandle create({GraphicsDeviceOptions? options}) =>
-      withNativeArena((arena) {
-        ensureAbiVersion();
-        final outDevice = arena<Uint64>();
-        _check(
-          raw.mln_graphics_device_create(
-            options == null
-                ? nullptr
-                : _writeGraphicsDeviceOptions(options, arena),
-            outDevice,
-            nativeDiagnostic,
-          ),
-        );
-        return _adoptOwned(
-          outDevice.value,
-          () => GraphicsDeviceHandle._(_NativeGraphicsDevice(outDevice.value)),
-          (handle) {
-            raw.mln_graphics_device_release(handle);
-          },
-        );
-      });
-
-  /// Releases a graphics device.
-  ///
-  /// Render sessions on the device keep working until they detach.
-  ///
-  /// See `mln_graphics_device_release` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-  void close() => _state.close((handle) {
-    raw.mln_graphics_device_release(handle.raw);
-    return nativeStatusOk;
-  });
-}
-
 extension type MapHandleDiscarding._(MapHandle _owner) {
   _NativeMap get _handle => _owner._handle;
   _CallbackRoots get _callbackRoots => _owner._callbackRoots;
@@ -4128,50 +4053,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         );
       });
 
-  /// Attaches a render session that draws the map into a texture on `device`.
-  ///
-  /// `options` must select `RenderDriverKind.coreWorker`. Read the frames back
-  /// with `RenderSessionHandle.readTexture()`.
-  ///
-  /// See `mln_map_attach_graphics_device_texture` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` when the map already has a render session.
-  NewRenderSession attachGraphicsDeviceTexture(
-    GraphicsDeviceHandle device,
-    GraphicsDeviceTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_CallbackRoots());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_map_attach_graphics_device_texture(
-          _handle.raw,
-          device._handle.raw,
-          _writeGraphicsDeviceTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
-        },
-      ),
-      NewRenderSession.new,
-    );
-  }
-
   /// Creates a session that renders the map into a ring of your Metal textures.
   ///
   /// See `mln_map_attach_metal_borrowed_texture` in the
@@ -4274,6 +4155,58 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           _handle.raw,
           _writeMetalSurfaceDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(
+            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
+          );
+        },
+      ),
+      NewRenderSession.new,
+    );
+  }
+
+  /// Attaches a render session that renders the map offscreen.
+  ///
+  /// Read each image's pixels with `RenderSessionHandle.readTexture()`.
+  /// `options` must select `RenderDriverKind.coreWorker`.
+  ///
+  /// The session renders on `device`. When `device` is null, the session
+  /// creates a device with the default options, and releases it when the
+  /// session ends.
+  ///
+  /// See `mln_map_attach_offscreen` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the map already has a render session.
+  /// - `Status.unsupported` when `device` is null and this build's render
+  ///   backend can't create a device.
+  /// - `Status.nativeError` when `device` is null and the platform can't create
+  ///   a device.
+  NewRenderSession attachOffscreen(
+    OffscreenDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    OffscreenDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_offscreen(
+          _handle.raw,
+          _writeOffscreenDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          (device?._handle.raw ?? 0),
           outSession,
           completion,
           nativeDiagnostic,
@@ -6079,6 +6012,83 @@ final class MapProjectionHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
+  });
+}
+
+/// Issued native handle id.
+extension type const _NativeOffscreenDevice(int raw) implements NativeHandle {}
+
+/// Owner of one native handle.
+///
+/// A GPU device that the library creates to render maps offscreen.
+///
+/// See `mln_offscreen_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class OffscreenDeviceHandle implements Finalizable {
+  OffscreenDeviceHandle._(_NativeOffscreenDevice handle)
+    : _state = NativeHandleState(handle, 'OffscreenDeviceHandle');
+  final NativeHandleState<_NativeOffscreenDevice> _state;
+  // ignore: unused_element
+  _NativeOffscreenDevice get _handle => _state.handle;
+
+  /// The native handle id.
+  int get id => _state.handleId;
+
+  /// Whether the binding has accepted a close, dispose, discard, or release
+  /// of this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'OffscreenDeviceHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+
+  /// Creates a GPU device for rendering maps offscreen.
+  ///
+  /// `MapHandle.attachOffscreen()` creates a device of its own when it gets
+  /// none. Create one to share it among the sessions on many maps, or to pick a
+  /// GPU.
+  ///
+  /// See `mln_offscreen_device_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when this build's render backend can't create a
+  ///   device.
+  /// - `Status.nativeError` when `adapter_index` names no GPU, or the platform
+  ///   can't create the device.
+  static OffscreenDeviceHandle create({OffscreenDeviceOptions? options}) =>
+      withNativeArena((arena) {
+        ensureAbiVersion();
+        final outDevice = arena<Uint64>();
+        _check(
+          raw.mln_offscreen_device_create(
+            options == null
+                ? nullptr
+                : _writeOffscreenDeviceOptions(options, arena),
+            outDevice,
+            nativeDiagnostic,
+          ),
+        );
+        return _adoptOwned(
+          outDevice.value,
+          () =>
+              OffscreenDeviceHandle._(_NativeOffscreenDevice(outDevice.value)),
+          (handle) {
+            raw.mln_offscreen_device_release(handle);
+          },
+        );
+      });
+
+  /// Releases an offscreen device.
+  ///
+  /// Render sessions on the device keep working until they detach.
+  ///
+  /// See `mln_offscreen_device_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+  void close() => _state.close((handle) {
+    raw.mln_offscreen_device_release(handle.raw);
+    return nativeStatusOk;
   });
 }
 

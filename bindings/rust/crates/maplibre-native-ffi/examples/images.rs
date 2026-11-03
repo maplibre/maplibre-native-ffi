@@ -30,19 +30,14 @@ async fn images(runtime: &RuntimeHandle) -> Result<()> {
     // #endregion style
 
     // #region attach
-    // None selects the default adapter.
-    let device = GraphicsDeviceHandle::create(None)?;
-
-    let texture = GraphicsDeviceTextureDescriptor::new(extent);
+    let offscreen = OffscreenDescriptor::new(extent);
     // The library renders on its own thread.
     let attach_options =
         RenderSessionAttachOptions::new(RenderDriverKind::CoreWorker);
 
-    let (session, attached) = map.attach_graphics_device_texture(
-        &device,
-        &texture,
-        &attach_options,
-    )?;
+    // With no device, the session creates its own.
+    let (session, attached) =
+        map.attach_offscreen(&offscreen, &attach_options, None)?;
     attached.await?;
     // #endregion attach
 
@@ -66,7 +61,6 @@ async fn images(runtime: &RuntimeHandle) -> Result<()> {
     // #endregion read
 
     drop(session);
-    drop(device);
     map.release().map_err(|(_, error)| error)?.await?;
 
     Ok(())

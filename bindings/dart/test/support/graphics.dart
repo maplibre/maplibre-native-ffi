@@ -1,8 +1,8 @@
 /// GPU contexts from `mln_test_graphics`, the shared test library in
 /// `tests/graphics`, loaded from the install prefix the suite runs against.
 ///
-/// A test attaches an owned texture in such a context only for what a graphics
-/// device texture lacks: acquired frames, and a Vulkan queue lock. Both exist
+/// A test attaches an owned texture in such a context only for what an
+/// offscreen session lacks: acquired frames, and a Vulkan queue lock. Both exist
 /// only on Metal and Vulkan builds, so an OpenGL build opens no context here.
 library;
 

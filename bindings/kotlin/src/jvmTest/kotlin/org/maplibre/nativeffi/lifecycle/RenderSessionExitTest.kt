@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.RenderResult
 import org.maplibre.nativeffi.libraryProperties
 import org.maplibre.nativeffi.loadNativeLibrary
-import org.maplibre.nativeffi.render.withDeviceTexture
+import org.maplibre.nativeffi.render.withOffscreenSession
 import org.maplibre.nativeffi.runChildJvm
 import org.maplibre.nativeffi.runSuspendTest
 
@@ -64,7 +64,7 @@ object RenderSessionExitProbe {
    * no update after its still image, so nothing but abandon resolves that demand before exit.
    */
   private fun exitWithParkedDemand(): Unit = runSuspendTest {
-    withDeviceTexture(onFrameWake = { if (exiting) println(ABANDONED_AT_EXIT) }) {
+    withOffscreenSession(onFrameWake = { if (exiting) println(ABANDONED_AT_EXIT) }) {
       setStyle(EMPTY_STYLE_JSON)
       renderStill()
       val rendered = renderFrame().disposition
@@ -83,7 +83,7 @@ object RenderSessionExitProbe {
 
   /** Exits from a session completion, on the core worker thread that delivers it. */
   private fun exitFromCompletion(): Unit = runSuspendTest {
-    withDeviceTexture { exitInsideCompletion(session::reduceMemoryUse) }
+    withOffscreenSession { exitInsideCompletion(session::reduceMemoryUse) }
   }
 
   /**

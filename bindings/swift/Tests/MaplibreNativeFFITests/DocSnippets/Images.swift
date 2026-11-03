@@ -29,11 +29,8 @@ private func images(runtime: RuntimeHandle) async throws {
   // #endregion style
 
   // #region attach
-  let device = try GraphicsDeviceHandle.create()
-
-  let attached = try map.attachGraphicsDeviceTexture(
-    device,
-    descriptor: GraphicsDeviceTextureDescriptor(extent: extent),
+  let attached = try map.attachOffscreen(
+    descriptor: OffscreenDescriptor(extent: extent),
     // The library renders on its own thread.
     options: RenderSessionAttachOptions(driver: .coreWorker)
   )
@@ -59,7 +56,6 @@ private func images(runtime: RuntimeHandle) async throws {
   // #endregion read
 
   try session.dispose()
-  device.close()
   try await map.close()
 }
 

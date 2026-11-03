@@ -376,6 +376,8 @@ class Values:
         if value.registration:
             return f"{self.prepared(value, expression)}.ref"
         if value.kind == "handle":
+            if value.nullable:
+                return f"({expression}?._handle.raw ?? 0)"
             return f"{expression}._handle.raw"
         if value.kind == "native_pointer":
             return f"Pointer<Void>.fromAddress({expression}.address).cast()"

@@ -33,17 +33,12 @@ def images(runtime: mln.RuntimeHandle) -> None:
     # #endregion style
 
     # #region attach
-    device = mln.GraphicsDeviceHandle.create()
-
-    session, session_ready = (
-        map_handle.attach_graphics_device_texture(
-            device,
-            mln.GraphicsDeviceTextureDescriptor(extent=extent),
-            # The library renders on its own thread.
-            mln.RenderSessionAttachOptions(
-                driver=mln.RenderDriverKind.CORE_WORKER
-            ),
-        )
+    session, session_ready = map_handle.attach_offscreen(
+        mln.OffscreenDescriptor(extent=extent),
+        # The library renders on its own thread.
+        mln.RenderSessionAttachOptions(
+            driver=mln.RenderDriverKind.CORE_WORKER
+        ),
     )
     session_ready.result()
     # #endregion attach
@@ -68,7 +63,6 @@ def images(runtime: mln.RuntimeHandle) -> None:
     # #endregion read
 
     session.dispose()
-    device.close()
     map_handle.close().result()
 
 

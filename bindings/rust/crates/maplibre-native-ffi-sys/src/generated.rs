@@ -113,9 +113,6 @@ pub const MLN_GPU_SYNC_KIND_FLAG_VULKAN_TIMELINE_SEMAPHORE: mln_gpu_sync_kind_fl
 pub const MLN_GPU_SYNC_KIND_FLAG_SYNC_FD: mln_gpu_sync_kind_flag = 16;
 pub const MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT: mln_gpu_sync_kind_flag = 32;
 pub const MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE: mln_gpu_sync_kind_flag = 64;
-pub type mln_graphics_device_option_field = u32;
-pub const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX: mln_graphics_device_option_field = 1;
-pub const MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT: mln_graphics_device_option_field = 2;
 pub type mln_log_event = u32;
 pub const MLN_LOG_EVENT_GENERAL: mln_log_event = 0;
 pub const MLN_LOG_EVENT_SETUP: mln_log_event = 1;
@@ -185,6 +182,9 @@ pub const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY: mln_offline_region_definition_
 pub type mln_offline_region_download_state = u32;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE: mln_offline_region_download_state = 0;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE: mln_offline_region_download_state = 1;
+pub type mln_offscreen_device_option_field = u32;
+pub const MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX: mln_offscreen_device_option_field = 1;
+pub const MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT: mln_offscreen_device_option_field = 2;
 pub type mln_open_gl_client_api = u32;
 pub const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED: mln_open_gl_client_api = 0;
 pub const MLN_OPEN_GL_CLIENT_API_GL: mln_open_gl_client_api = 1;
@@ -737,20 +737,6 @@ pub struct mln_gpu_sync {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_graphics_device_options {
-    pub size: u32,
-    pub fields: mln_graphics_device_option_fields,
-    pub adapter_index: u32,
-    pub single_context: bool,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_graphics_device_texture_descriptor {
-    pub size: u32,
-    pub extent: mln_logical_extent,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_http_header {
     pub name: mln_buffer_view,
     pub value: mln_buffer_view,
@@ -987,6 +973,20 @@ pub struct mln_offline_tile_pyramid_region_definition {
     pub max_zoom: f64,
     pub pixel_ratio: f32,
     pub include_ideographs: bool,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_offscreen_descriptor {
+    pub size: u32,
+    pub extent: mln_logical_extent,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_offscreen_device_options {
+    pub size: u32,
+    pub fields: mln_offscreen_device_option_fields,
+    pub adapter_index: u32,
+    pub single_context: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1720,10 +1720,6 @@ pub type mln_free_camera_option_fields = u32;
 pub struct mln_geo_json_source_data(pub u64);
 pub type mln_geo_json_source_option_fields = u32;
 pub type mln_gpu_sync_kind_flags = u32;
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_graphics_device(pub u64);
-pub type mln_graphics_device_option_fields = u32;
 pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
@@ -1753,6 +1749,10 @@ pub struct mln_map_projection(pub u64);
 pub type mln_map_tile_option_fields = u32;
 pub type mln_map_viewport_option_fields = u32;
 pub type mln_offline_region_id = i64;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_offscreen_device(pub u64);
+pub type mln_offscreen_device_option_fields = u32;
 pub type mln_open_gl_context_provider_flags = u32;
 pub type mln_projection_mode_fields = u32;
 pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
@@ -1816,9 +1816,9 @@ native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
     mln_geo_json_source_data,
-    mln_graphics_device,
     mln_map,
     mln_map_projection,
+    mln_offscreen_device,
     mln_render_frame_batch,
     mln_render_session,
     mln_resource_request,
@@ -1910,12 +1910,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_geo_json_source_data_release(data: mln_geo_json_source_data);
-    pub fn mln_graphics_device_create(
-        options: *const mln_graphics_device_options,
-        out_device: *mut mln_graphics_device,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_graphics_device_release(device: mln_graphics_device);
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: mln_buffer_view,
@@ -2009,15 +2003,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_graphics_device_texture(
-        map: mln_map,
-        device: mln_graphics_device,
-        descriptor: *const mln_graphics_device_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_attach_metal_borrowed_texture(
         map: mln_map,
         descriptor: *const mln_metal_borrowed_texture_descriptor,
@@ -2038,6 +2023,15 @@ unsafe extern "C" {
         map: mln_map,
         descriptor: *const mln_metal_surface_descriptor,
         options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_offscreen(
+        map: mln_map,
+        descriptor: *const mln_offscreen_descriptor,
+        options: *const mln_render_session_attach_options,
+        device: mln_offscreen_device,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
@@ -2604,6 +2598,12 @@ unsafe extern "C" {
         status: mln_network_status,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_offscreen_device_create(
+        options: *const mln_offscreen_device_options,
+        out_device: *mut mln_offscreen_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_offscreen_device_release(device: mln_offscreen_device);
     pub fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags;
     pub fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1;
     pub fn mln_projected_meters_for_lat_lng(

@@ -314,17 +314,29 @@ def lower_input(
     js = f"call->argv[{call.index}]"
     path = f'"{public_name_}"'
     call.index += 1
-    lowered.arguments.append(
-        f"{public_name_}.id" if value.kind == "handle" else public_name_
-    )
     if value.kind == "handle":
         values.check(value, "in")
         locals_.append(f"uint64_t {local} = 0;")
-        body.append(f"if (!mln_ts_read_u64(call, {js}, &{local}, {path})) goto done;")
+        read = f"if (!mln_ts_read_u64(call, {js}, &{local}, {path})) goto done;"
         args.append(local)
-        lowered.parameters.append(PublicParameter(public_name_, values.ts(value), None))
-        lowered.native_parameters.append(NativeParameter(public_name_, "bigint"))
+        if value.nullable:
+            body.append(f"if (!mln_ts_is_absent(call, {js})) {{ {read} }}")
+            lowered.arguments.append(f"{public_name_}?.id")
+            lowered.parameters.append(
+                PublicParameter(public_name_, values.ts(value), "undefined")
+            )
+            lowered.native_parameters.append(
+                NativeParameter(public_name_, "bigint | undefined")
+            )
+        else:
+            body.append(read)
+            lowered.arguments.append(f"{public_name_}.id")
+            lowered.parameters.append(
+                PublicParameter(public_name_, values.ts(value), None)
+            )
+            lowered.native_parameters.append(NativeParameter(public_name_, "bigint"))
         return
+    lowered.arguments.append(public_name_)
     if value.kind == "array" or is_counted(value):
         values.check(value, "in")
         count_parameter = next(p for p in function.parameters if p.name == value.length)

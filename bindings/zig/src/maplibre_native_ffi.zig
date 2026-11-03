@@ -190,54 +190,6 @@ pub const GeoJsonSourceData = struct {
     }
 };
 
-/// A GPU device that the library creates to render maps into textures.
-///
-/// See `mln_graphics_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const GraphicsDevice = struct {
-    raw: u64,
-    closed: bool = false,
-    pub const native_name = "mln_graphics_device";
-    const methods = owner.Handle(@This(), "GraphicsDevice", struct {
-        fn dispose(raw: u64) status.Error!void {
-            c.mln_graphics_device_release(raw);
-        }
-    }.dispose);
-    pub const adopt = methods.adopt;
-    pub const id = methods.id;
-    pub const isClosed = methods.isClosed;
-    pub const format = methods.format;
-    pub const deinit = methods.deinit;
-    /// Creates a GPU device for rendering maps into textures.
-    ///
-    /// Render sessions on several maps can share one device.
-    ///
-    /// See `mln_graphics_device_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when this build's render backend can't create a
-    ///   device.
-    /// - `error.NativeError` when `adapter_index` names no GPU, or the platform
-    ///   can't create the device.
-    pub fn create(options: ?GraphicsDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GraphicsDevice {
-        return call.invoke("mln_graphics_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(GraphicsDevice) });
-    }
-
-    /// Releases a graphics device.
-    ///
-    /// Render sessions on the device keep working until they detach.
-    ///
-    /// See `mln_graphics_device_release` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-    pub fn release(self: *GraphicsDevice) void {
-        if (self.closed) return;
-        c.mln_graphics_device_release(self.raw);
-        self.closed = true;
-    }
-};
-
 /// A map, with its style and camera.
 ///
 /// See `mln_map` in the
@@ -398,22 +350,6 @@ pub const Map = struct {
         return call.submit("mln_map_apply_camera_delta", .handle, self, call.command, null, diagnostic, .{delta});
     }
 
-    /// Attaches a render session that draws the map into a texture on `device`.
-    ///
-    /// `options` must select `RenderDriverKind.core_worker`. Read the frames back
-    /// with `RenderSession.readTexture()`.
-    ///
-    /// See `mln_map_attach_graphics_device_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidState` when the map already has a render session.
-    pub fn attachGraphicsDeviceTexture(self: Map, device: GraphicsDevice, descriptor: GraphicsDeviceTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_graphics_device_texture", .handle, self, call.unit, null, diagnostic, .{ device, descriptor, options, call.adopt(RenderSession) });
-        return .{ .session = started.outputs, .ready = started.ready };
-    }
-
     /// Creates a session that renders the map into a ring of your Metal textures.
     ///
     /// See `mln_map_attach_metal_borrowed_texture` in the
@@ -463,6 +399,29 @@ pub const Map = struct {
             return .{ .session = started.outputs, .ready = started.ready };
         }
     }.function else {};
+
+    /// Attaches a render session that renders the map offscreen.
+    ///
+    /// Read each image's pixels with `RenderSession.readTexture()`. `options` must
+    /// select `RenderDriverKind.core_worker`.
+    ///
+    /// The session renders on `device`. When `device` is null, the session creates
+    /// a device with the default options, and releases it when the session ends.
+    ///
+    /// See `mln_map_attach_offscreen` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` when the map already has a render session.
+    /// - `error.Unsupported` when `device` is null and this build's render backend
+    ///   can't create a device.
+    /// - `error.NativeError` when `device` is null and the platform can't create a
+    ///   device.
+    pub fn attachOffscreen(self: Map, descriptor: OffscreenDescriptor, options: RenderSessionAttachOptions, device: ?OffscreenDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+        const started = try call.submit("mln_map_attach_offscreen", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, device, call.adopt(RenderSession) });
+        return .{ .session = started.outputs, .ready = started.ready };
+    }
 
     /// Creates a session that renders the map into a ring of your OpenGL textures.
     ///
@@ -1494,6 +1453,55 @@ pub const MapProjection = struct {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn setCamera(self: MapProjection, camera: CameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         return call.invoke("mln_map_projection_set_camera", .handle, self, null, diagnostic, .{camera});
+    }
+};
+
+/// A GPU device that the library creates to render maps offscreen.
+///
+/// See `mln_offscreen_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const OffscreenDevice = struct {
+    raw: u64,
+    closed: bool = false,
+    pub const native_name = "mln_offscreen_device";
+    const methods = owner.Handle(@This(), "OffscreenDevice", struct {
+        fn dispose(raw: u64) status.Error!void {
+            c.mln_offscreen_device_release(raw);
+        }
+    }.dispose);
+    pub const adopt = methods.adopt;
+    pub const id = methods.id;
+    pub const isClosed = methods.isClosed;
+    pub const format = methods.format;
+    pub const deinit = methods.deinit;
+    /// Creates a GPU device for rendering maps offscreen.
+    ///
+    /// `Map.attachOffscreen()` creates a device of its own when it gets none.
+    /// Create one to share it among the sessions on many maps, or to pick a GPU.
+    ///
+    /// See `mln_offscreen_device_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when this build's render backend can't create a
+    ///   device.
+    /// - `error.NativeError` when `adapter_index` names no GPU, or the platform
+    ///   can't create the device.
+    pub fn create(options: ?OffscreenDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!OffscreenDevice {
+        return call.invoke("mln_offscreen_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(OffscreenDevice) });
+    }
+
+    /// Releases an offscreen device.
+    ///
+    /// Render sessions on the device keep working until they detach.
+    ///
+    /// See `mln_offscreen_device_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    pub fn release(self: *OffscreenDevice) void {
+        if (self.closed) return;
+        c.mln_offscreen_device_release(self.raw);
+        self.closed = true;
     }
 };
 
@@ -3402,51 +3410,6 @@ pub const GpuSyncKindFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// Options for `GraphicsDevice.create()`.
-///
-/// See `mln_graphics_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-pub const GraphicsDeviceOptions = struct {
-    /// The GPU to use, as an index into the platform's list of GPUs.
-    adapter_index: ?u32 = null,
-    /// Whether the device's texture sessions take turns in one OpenGL context
-    /// instead of having one each. Only an EGL device reads it.
-    single_context: ?bool = null,
-    pub fn toNative(self: GraphicsDeviceOptions) c.mln_graphics_device_options {
-        var raw = std.mem.zeroes(c.mln_graphics_device_options);
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_graphics_device_options);
-        marshal.present(&raw.fields, c.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
-        marshal.present(&raw.fields, c.MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, self.single_context);
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_graphics_device_options) GraphicsDeviceOptions {
-        return .{
-            .adapter_index = if (raw.fields & c.MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
-            .single_context = if (raw.fields & c.MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT != 0) raw.single_context else null,
-        };
-    }
-};
-
-/// The texture that `Map.attachGraphicsDeviceTexture()` draws into.
-///
-/// See `mln_graphics_device_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-pub const GraphicsDeviceTextureDescriptor = struct {
-    extent: LogicalExtent,
-    pub fn toNative(self: GraphicsDeviceTextureDescriptor) c.mln_graphics_device_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_graphics_device_texture_descriptor);
-        raw.size = @sizeOf(c.mln_graphics_device_texture_descriptor);
-        raw.extent = self.extent.toNative();
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_graphics_device_texture_descriptor) GraphicsDeviceTextureDescriptor {
-        return .{
-            .extent = LogicalExtent.fromNative(raw.extent),
-        };
-    }
-};
-
 /// An HTTP header.
 ///
 /// `name` follows the rules of `HttpHeaderTransformResponse.setHeader()`.
@@ -4450,6 +4413,51 @@ pub const OfflineTilePyramidRegionDefinition = struct {
             .max_zoom = raw.max_zoom,
             .pixel_ratio = raw.pixel_ratio,
             .include_ideographs = raw.include_ideographs,
+        };
+    }
+};
+
+/// The image that `Map.attachOffscreen()` renders.
+///
+/// See `mln_offscreen_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+pub const OffscreenDescriptor = struct {
+    extent: LogicalExtent,
+    pub fn toNative(self: OffscreenDescriptor) c.mln_offscreen_descriptor {
+        var raw = std.mem.zeroes(c.mln_offscreen_descriptor);
+        raw.size = @sizeOf(c.mln_offscreen_descriptor);
+        raw.extent = self.extent.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_offscreen_descriptor) OffscreenDescriptor {
+        return .{
+            .extent = LogicalExtent.fromNative(raw.extent),
+        };
+    }
+};
+
+/// Options for `OffscreenDevice.create()`.
+///
+/// See `mln_offscreen_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+pub const OffscreenDeviceOptions = struct {
+    /// The GPU to use, as an index into the platform's list of GPUs.
+    adapter_index: ?u32 = null,
+    /// Whether the device's sessions take turns in one OpenGL context instead
+    /// of having one each. Only an EGL device reads it.
+    single_context: ?bool = null,
+    pub fn toNative(self: OffscreenDeviceOptions) c.mln_offscreen_device_options {
+        var raw = std.mem.zeroes(c.mln_offscreen_device_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_offscreen_device_options);
+        marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
+        marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, self.single_context);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_offscreen_device_options) OffscreenDeviceOptions {
+        return .{
+            .adapter_index = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
+            .single_context = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT != 0) raw.single_context else null,
         };
     }
 };

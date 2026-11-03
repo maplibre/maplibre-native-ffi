@@ -1226,60 +1226,6 @@ pub struct GpuSyncKindFlag: u32 {
 }
 }
 
-/// Options for `GraphicsDeviceHandle::create()`.
-///
-/// See `mln_graphics_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct GraphicsDeviceOptions {
-    /// The GPU to use, as an index into the platform's list of GPUs.
-    pub adapter_index: Option<u32>,
-    /// Whether the device's texture sessions take turns in one OpenGL context
-    /// instead of having one each. Only an EGL device reads it.
-    pub single_context: Option<bool>,
-}
-impl ToNative<sys::mln_graphics_device_options> for GraphicsDeviceOptions {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_graphics_device_options> {
-        let mut raw: sys::mln_graphics_device_options = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_graphics_device_options>() as _;
-        raw.fields = 0;
-        if let Some(item) = &self.adapter_index {
-            raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
-            raw.adapter_index = *item;
-        }
-        if let Some(item) = &self.single_context {
-            raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
-            raw.single_context = *item;
-        }
-        Ok(raw)
-    }
-}
-
-/// The texture that `MapHandle::attach_graphics_device_texture()` draws into.
-///
-/// See `mln_graphics_device_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GraphicsDeviceTextureDescriptor {
-    pub extent: LogicalExtent,
-}
-impl GraphicsDeviceTextureDescriptor {
-    pub const fn new(extent: LogicalExtent) -> Self {
-        Self { extent }
-    }
-}
-impl ToNative<sys::mln_graphics_device_texture_descriptor> for GraphicsDeviceTextureDescriptor {
-    fn to_native(
-        &self,
-        arena: &mut InputArena,
-    ) -> Result<sys::mln_graphics_device_texture_descriptor> {
-        let mut raw: sys::mln_graphics_device_texture_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_graphics_device_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
-        Ok(raw)
-    }
-}
-
 /// An HTTP header.
 ///
 /// `name` follows the rules of `HttpHeaderTransformResponse::set_header()`.
@@ -2547,6 +2493,57 @@ impl FromNative<sys::mln_offline_tile_pyramid_region_definition>
             pixel_ratio: raw.pixel_ratio,
             include_ideographs: raw.include_ideographs,
         })
+    }
+}
+
+/// The image that `MapHandle::attach_offscreen()` renders.
+///
+/// See `mln_offscreen_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OffscreenDescriptor {
+    pub extent: LogicalExtent,
+}
+impl OffscreenDescriptor {
+    pub const fn new(extent: LogicalExtent) -> Self {
+        Self { extent }
+    }
+}
+impl ToNative<sys::mln_offscreen_descriptor> for OffscreenDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_offscreen_descriptor> {
+        let mut raw: sys::mln_offscreen_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_offscreen_descriptor>() as _;
+        raw.extent = to_native(&self.extent, arena)?;
+        Ok(raw)
+    }
+}
+
+/// Options for `OffscreenDeviceHandle::create()`.
+///
+/// See `mln_offscreen_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct OffscreenDeviceOptions {
+    /// The GPU to use, as an index into the platform's list of GPUs.
+    pub adapter_index: Option<u32>,
+    /// Whether the device's sessions take turns in one OpenGL context instead
+    /// of having one each. Only an EGL device reads it.
+    pub single_context: Option<bool>,
+}
+impl ToNative<sys::mln_offscreen_device_options> for OffscreenDeviceOptions {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_offscreen_device_options> {
+        let mut raw: sys::mln_offscreen_device_options = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_offscreen_device_options>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.adapter_index {
+            raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
+            raw.adapter_index = *item;
+        }
+        if let Some(item) = &self.single_context {
+            raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
+            raw.single_context = *item;
+        }
+        Ok(raw)
     }
 }
 

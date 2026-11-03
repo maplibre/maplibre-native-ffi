@@ -86,6 +86,14 @@ func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
 	return state.raw
 }
 
+// leaseOptional passes the null handle for a nil owner.
+func (arena *bindingArena) leaseOptional(owner *bindingOwner) uint64 {
+	if owner == nil {
+		return 0
+	}
+	return arena.lease(owner)
+}
+
 func (arena *bindingArena) fail(message string) {
 	panic(bindingFailure{newBindingError(StatusInvalidArgument, message)})
 }

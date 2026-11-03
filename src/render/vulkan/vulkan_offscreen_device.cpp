@@ -14,7 +14,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "maplibre_native_c.h"
-#include "render/graphics_device.hpp"
+#include "render/offscreen_device.hpp"
 #include "render/render_session_common.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_texture_session.hpp"
@@ -55,17 +55,18 @@ struct Candidate {
   VkPhysicalDeviceProperties properties{};
 };
 
-class VulkanGraphicsDevice final : public GraphicsDevice {
+class VulkanOffscreenDevice final : public OffscreenDevice {
  public:
-  VulkanGraphicsDevice() = default;
-  VulkanGraphicsDevice(const VulkanGraphicsDevice&) = delete;
-  auto operator=(const VulkanGraphicsDevice&) -> VulkanGraphicsDevice& = delete;
-  VulkanGraphicsDevice(VulkanGraphicsDevice&&) = delete;
-  auto operator=(VulkanGraphicsDevice&&) -> VulkanGraphicsDevice& = delete;
+  VulkanOffscreenDevice() = default;
+  VulkanOffscreenDevice(const VulkanOffscreenDevice&) = delete;
+  auto operator=(const VulkanOffscreenDevice&)
+    -> VulkanOffscreenDevice& = delete;
+  VulkanOffscreenDevice(VulkanOffscreenDevice&&) = delete;
+  auto operator=(VulkanOffscreenDevice&&) -> VulkanOffscreenDevice& = delete;
 
   // The loader may already have torn itself down in an exit handler, so a
   // device that outlives the start of process exit stays with the process.
-  ~VulkanGraphicsDevice() override {
+  ~VulkanOffscreenDevice() override {
     if (process_exiting()) {
       return;
     }
@@ -79,7 +80,7 @@ class VulkanGraphicsDevice final : public GraphicsDevice {
     }
   }
 
-  auto create(const mln_graphics_device_options& options) -> mln_status {
+  auto create(const mln_offscreen_device_options& options) -> mln_status {
     auto* const get_instance_proc_addr = vulkan_system_get_instance_proc_addr();
     if (get_instance_proc_addr == nullptr) {
       set_thread_error("the Vulkan loader is not available");
@@ -101,7 +102,7 @@ class VulkanGraphicsDevice final : public GraphicsDevice {
     }
     mln::Log::Info(
       mln::Event::Render,
-      std::string{"graphics device uses Vulkan physical device "} +
+      std::string{"offscreen device uses Vulkan physical device "} +
         static_cast<const char*>(candidate->properties.deviceName)
     );
     context_ = mln_vulkan_context_descriptor{
@@ -211,7 +212,7 @@ class VulkanGraphicsDevice final : public GraphicsDevice {
   }
 
   auto select_physical_device(
-    const mln_graphics_device_options& options,
+    const mln_offscreen_device_options& options,
     std::optional<Candidate>& out_candidate
   ) -> mln_status {
     auto count = uint32_t{};
@@ -228,7 +229,7 @@ class VulkanGraphicsDevice final : public GraphicsDevice {
     devices.resize(count);
 
     const auto named =
-      (options.fields & MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX) != 0U;
+      (options.fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) != 0U;
     if (named && options.adapter_index >= devices.size()) {
       const auto message = "adapter_index " +
                            std::to_string(options.adapter_index) +
@@ -343,11 +344,11 @@ class VulkanGraphicsDevice final : public GraphicsDevice {
 
 }  // namespace
 
-auto create_backend_graphics_device(
-  const mln_graphics_device_options& options,
-  std::shared_ptr<GraphicsDevice>& out_device
+auto create_backend_offscreen_device(
+  const mln_offscreen_device_options& options,
+  std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status {
-  auto device = std::make_shared<VulkanGraphicsDevice>();
+  auto device = std::make_shared<VulkanOffscreenDevice>();
   const auto status = device->create(options);
   if (status != MLN_STATUS_OK) {
     return status;

@@ -402,7 +402,14 @@ def operation(
         if value.kind == "handle" and value.native in OWNERS:
             public = OWNERS[value.native]
             rust = f"&{public}"
-            setup.append(f"        let {local}_handle = {local}.input();")
+            if value.nullable:
+                rust = f"Option<{rust}>"
+                public += " | None"
+                setup.append(
+                    f"        let {local}_handle = {local}.map_or(sys::{value.native}(0), |handle| handle.input());"
+                )
+            else:
+                setup.append(f"        let {local}_handle = {local}.input();")
             arguments[parameter.name] = f"{local}_handle"
         else:
             values.supported(value, input=True)
@@ -467,7 +474,13 @@ def operation(
             public += " | None"
         py_parameters.append(f"{python_name}: {public}" + (" = None" if absent else ""))
         python_arguments.append(
-            python_name + "._native" if value.kind == "handle" else python_name
+            (
+                f"None if {python_name} is None else {python_name}._native"
+                if value.nullable
+                else python_name + "._native"
+            )
+            if value.kind == "handle"
+            else python_name
         )
         native_signature.append(local + ("=None" if absent else ""))
     for i, declaration in enumerate(py_parameters):

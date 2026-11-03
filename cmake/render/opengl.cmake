@@ -225,7 +225,7 @@ function(mln_ffi_configure_renderer target)
     list(
       APPEND MLN_FFI_OPENGL_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_graphics_device.cpp)
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_offscreen_device.cpp)
     if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD|Darwin)$")
       # Supplies the EGL entry points, so nothing links an EGL loader.
       list(APPEND MLN_FFI_OPENGL_SOURCES
@@ -233,7 +233,7 @@ function(mln_ffi_configure_renderer target)
     endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
-         ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_graphics_device.cpp)
+         ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_offscreen_device.cpp)
   endif()
   set_source_files_properties(
     ${MLN_FFI_OPENGL_SOURCES}

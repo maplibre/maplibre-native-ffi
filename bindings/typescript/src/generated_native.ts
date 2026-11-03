@@ -15,8 +15,6 @@ import type {
   FreeCameraOptions,
   GeoJsonSourceOptions,
   GpuSync,
-  GraphicsDeviceOptions,
-  GraphicsDeviceTextureDescriptor,
   HttpHeaderTransform,
   LatLng,
   LatLngBounds,
@@ -36,6 +34,8 @@ import type {
   NetworkStatus,
   OfflineRegionDefinition,
   OfflineRegionDownloadState,
+  OffscreenDescriptor,
+  OffscreenDeviceOptions,
   OpenGlBorrowedTextureDescriptor,
   OpenGlContextProviderFlag,
   OpenGlOwnedTextureDescriptor,
@@ -101,10 +101,6 @@ export interface NativeOperations {
     data: bigint,
     token: object | undefined,
   ): void;
-  mln_graphics_device_create(
-    options: GraphicsDeviceOptions | undefined,
-  ): bigint;
-  mln_graphics_device_release(device: bigint, token: object | undefined): void;
   mln_lat_lng_for_projected_meters(meters: ProjectedMeters | undefined): LatLng;
   mln_log_clear_callback(): void;
   mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
@@ -169,13 +165,6 @@ export interface NativeOperations {
     delta: CameraDelta | undefined,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_attach_graphics_device_texture(
-    map: bigint,
-    device: bigint,
-    descriptor: GraphicsDeviceTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
   mln_map_attach_metal_borrowed_texture(
     map: bigint,
     descriptor: MetalBorrowedTextureDescriptor,
@@ -192,6 +181,13 @@ export interface NativeOperations {
     map: bigint,
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_offscreen(
+    map: bigint,
+    descriptor: OffscreenDescriptor,
+    options: RenderSessionAttachOptions,
+    device: bigint | undefined,
     completion: NativeCompletion,
   ): bigint;
   mln_map_attach_open_gl_borrowed_texture(
@@ -620,6 +616,10 @@ export interface NativeOperations {
   ): void;
   mln_network_get_status(): NetworkStatus;
   mln_network_set_status(status: NetworkStatus): void;
+  mln_offscreen_device_create(
+    options: OffscreenDeviceOptions | undefined,
+  ): bigint;
+  mln_offscreen_device_release(device: bigint, token: object | undefined): void;
   mln_open_gl_supported_context_provider_mask(): OpenGlContextProviderFlag;
   mln_plugin_get_register_function_v1(): bigint;
   mln_projected_meters_for_lat_lng(

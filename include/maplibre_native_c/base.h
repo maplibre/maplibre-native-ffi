@@ -120,10 +120,10 @@ typedef uint64_t mln_style_expression MLN_BINDING(
   "kind=handle;release=mln_style_expression_release;"
   "dispose=mln_style_expression_release"
 );
-/** A GPU device that the library creates to render maps into textures. */
-typedef uint64_t mln_graphics_device MLN_BINDING(
-  "kind=handle;release=mln_graphics_device_release;"
-  "dispose=mln_graphics_device_release"
+/** A GPU device that the library creates to render maps offscreen. */
+typedef uint64_t mln_offscreen_device MLN_BINDING(
+  "kind=handle;release=mln_offscreen_device_release;"
+  "dispose=mln_offscreen_device_release"
 );
 /** A camera view for converting between screen points and coordinates. */
 typedef uint64_t mln_map_projection MLN_BINDING(

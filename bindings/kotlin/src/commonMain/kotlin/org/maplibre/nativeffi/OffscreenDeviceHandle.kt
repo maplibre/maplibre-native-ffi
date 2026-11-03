@@ -7,17 +7,17 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
- * A GPU device that the library creates to render maps into textures.
+ * A GPU device that the library creates to render maps offscreen.
  *
- * See `mln_graphics_device` in the
+ * See `mln_offscreen_device` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
-public class GraphicsDeviceHandle
+public class OffscreenDeviceHandle
 internal constructor(
   handle: Long,
 ) : AutoCloseable {
   internal val binding =
-    HandleState("GraphicsDeviceHandle", handle, GeneratedOwnerDisposal::graphicsDevice)
+    HandleState("OffscreenDeviceHandle", handle, GeneratedOwnerDisposal::offscreenDevice)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /** The native handle value. It stays readable after close. */
   public val id: ULong
@@ -28,27 +28,28 @@ internal constructor(
     get() = binding.isReleased
 
   /**
-   * Releases a graphics device.
+   * Releases an offscreen device.
    *
    * Render sessions on the device keep working until they detach.
    *
-   * See `mln_graphics_device_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   * See `mln_offscreen_device_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
    */
   public override fun close(): Unit =
-    nativeClose(this, binding) { C.mln_graphics_device_release(handle) }
+    nativeClose(this, binding) { C.mln_offscreen_device_release(handle) }
 
   override fun toString(): String =
-    "GraphicsDeviceHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+    "OffscreenDeviceHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
 
   public companion object {
     /**
-     * Creates a GPU device for rendering maps into textures.
+     * Creates a GPU device for rendering maps offscreen.
      *
-     * Render sessions on several maps can share one device.
+     * `MapHandle.attachOffscreen()` creates a device of its own when it gets none. Create one to
+     * share it among the sessions on many maps, or to pick a GPU.
      *
-     * See `mln_graphics_device_create` in the
-     * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+     * See `mln_offscreen_device_create` in the
+     * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
      *
      * Errors:
      *
@@ -56,17 +57,17 @@ internal constructor(
      * - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the platform can't create the
      *   device.
      */
-    public fun create(options: GraphicsDeviceOptions? = null): GraphicsDeviceHandle =
+    public fun create(options: OffscreenDeviceOptions? = null): OffscreenDeviceHandle =
       nativeCall(null, null) {
         val out = allocate(8, w(8, 8, 4))
         check(
-          C.mln_graphics_device_create(
-            options?.let { writeGraphicsDeviceOptions(it) } ?: 0L,
+          C.mln_offscreen_device_create(
+            options?.let { writeOffscreenDeviceOptions(it) } ?: 0L,
             out,
             diagnostic,
           ),
         )
-        adopt(out, GeneratedOwnerDisposal::graphicsDevice) { GraphicsDeviceHandle(it) }
+        adopt(out, GeneratedOwnerDisposal::offscreenDevice) { OffscreenDeviceHandle(it) }
       }
   }
 }

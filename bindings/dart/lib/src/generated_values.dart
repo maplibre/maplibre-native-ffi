@@ -2050,36 +2050,6 @@ final class GeoJsonSourceOptions extends _Value {
   ]);
 }
 
-/// Options for `GraphicsDeviceHandle.create()`.
-///
-/// See `mln_graphics_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-final class GraphicsDeviceOptions extends _Value {
-  const GraphicsDeviceOptions({this.adapterIndex, this.singleContext});
-
-  /// The GPU to use, as an index into the platform's list of GPUs.
-  final int? adapterIndex;
-
-  /// Whether the device's texture sessions take turns in one OpenGL context
-  /// instead of having one each. Only an EGL device reads it.
-  final bool? singleContext;
-
-  /// A copy of this value with the given members replaced.
-  GraphicsDeviceOptions copyWith({int? adapterIndex, bool? singleContext}) =>
-      GraphicsDeviceOptions(
-        adapterIndex: adapterIndex ?? this.adapterIndex,
-        singleContext: singleContext ?? this.singleContext,
-      );
-
-  @override
-  List<Object?> get _members => [adapterIndex, singleContext];
-  @override
-  String toString() => _describe('GraphicsDeviceOptions', const [
-    'adapterIndex',
-    'singleContext',
-  ]);
-}
-
 /// A point in the Web Mercator projection, in meters.
 ///
 /// See `mln_projected_meters` in the
@@ -2481,23 +2451,88 @@ final class CameraDelta extends _Value {
   ]);
 }
 
-/// The texture that `MapHandle.attachGraphicsDeviceTexture()` draws into.
+/// A Metal texture of a borrowed ring.
 ///
-/// See `mln_graphics_device_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-final class GraphicsDeviceTextureDescriptor extends _Value {
-  const GraphicsDeviceTextureDescriptor({required this.extent});
-  final LogicalExtent extent;
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTexture extends _Value {
+  const MetalBorrowedTexture({required this.texture});
+
+  /// Your MTLTexture.
+  final NativePointer texture;
 
   /// A copy of this value with the given members replaced.
-  GraphicsDeviceTextureDescriptor copyWith({LogicalExtent? extent}) =>
-      GraphicsDeviceTextureDescriptor(extent: extent ?? this.extent);
+  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
+      MetalBorrowedTexture(texture: texture ?? this.texture);
 
   @override
-  List<Object?> get _members => [extent];
+  List<Object?> get _members => [texture];
   @override
-  String toString() =>
-      _describe('GraphicsDeviceTextureDescriptor', const ['extent']);
+  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
+}
+
+/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
+/// and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+///
+/// `extent` sets the map's size and the session's scale factor, so give it the
+/// map's scale factor. `physical_width` and `physical_height` give the
+/// textures' size in pixels. The textures must all have that size, one device,
+/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
+///
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
+///
+/// See `mln_metal_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTextureDescriptor extends _Value {
+  MetalBorrowedTextureDescriptor({
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<MetalBorrowedTexture> textures,
+    this.commandQueue = NativePointer.nullPointer,
+  }) : textures = List.unmodifiable(textures);
+  final LogicalExtent extent;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<MetalBorrowedTexture> textures;
+
+  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
+  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
+  final NativePointer commandQueue;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTextureDescriptor copyWith({
+    LogicalExtent? extent,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+    NativePointer? commandQueue,
+  }) => MetalBorrowedTextureDescriptor(
+    extent: extent ?? this.extent,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    commandQueue: commandQueue ?? this.commandQueue,
+  );
+
+  @override
+  List<Object?> get _members => [
+    extent,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    commandQueue,
+  ];
+  @override
+  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
+    'extent',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'commandQueue',
+  ]);
 }
 
 /// Tells the caller that work is ready for it.
@@ -2654,90 +2689,6 @@ final class RenderSessionAttachOptions extends _Value {
   ]);
 }
 
-/// A Metal texture of a borrowed ring.
-///
-/// See `mln_metal_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTexture extends _Value {
-  const MetalBorrowedTexture({required this.texture});
-
-  /// Your MTLTexture.
-  final NativePointer texture;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
-      MetalBorrowedTexture(texture: texture ?? this.texture);
-
-  @override
-  List<Object?> get _members => [texture];
-  @override
-  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
-}
-
-/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
-/// and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
-///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The textures must all have that size, one device,
-/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
-///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
-///
-/// See `mln_metal_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTextureDescriptor extends _Value {
-  MetalBorrowedTextureDescriptor({
-    required this.extent,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<MetalBorrowedTexture> textures,
-    this.commandQueue = NativePointer.nullPointer,
-  }) : textures = List.unmodifiable(textures);
-  final LogicalExtent extent;
-  final int physicalWidth;
-  final int physicalHeight;
-  final List<MetalBorrowedTexture> textures;
-
-  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
-  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
-  final NativePointer commandQueue;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTextureDescriptor copyWith({
-    LogicalExtent? extent,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<MetalBorrowedTexture>? textures,
-    NativePointer? commandQueue,
-  }) => MetalBorrowedTextureDescriptor(
-    extent: extent ?? this.extent,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-    commandQueue: commandQueue ?? this.commandQueue,
-  );
-
-  @override
-  List<Object?> get _members => [
-    extent,
-    physicalWidth,
-    physicalHeight,
-    textures,
-    commandQueue,
-  ];
-  @override
-  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
-    'extent',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-    'commandQueue',
-  ]);
-}
-
 /// The Metal device that a render session uses.
 ///
 /// See `mln_metal_context_descriptor` in the
@@ -2846,6 +2797,24 @@ final class MetalSurfaceDescriptor extends _Value {
   @override
   String toString() =>
       _describe('MetalSurfaceDescriptor', const ['extent', 'context', 'layer']);
+}
+
+/// The image that `MapHandle.attachOffscreen()` renders.
+///
+/// See `mln_offscreen_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+final class OffscreenDescriptor extends _Value {
+  const OffscreenDescriptor({required this.extent});
+  final LogicalExtent extent;
+
+  /// A copy of this value with the given members replaced.
+  OffscreenDescriptor copyWith({LogicalExtent? extent}) =>
+      OffscreenDescriptor(extent: extent ?? this.extent);
+
+  @override
+  List<Object?> get _members => [extent];
+  @override
+  String toString() => _describe('OffscreenDescriptor', const ['extent']);
 }
 
 /// The WGL objects that a render session makes its OpenGL context from.
@@ -4370,6 +4339,36 @@ final class CameraUpdate extends _Value {
     'camera',
     'animation',
     'gesturePhase',
+  ]);
+}
+
+/// Options for `OffscreenDeviceHandle.create()`.
+///
+/// See `mln_offscreen_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+final class OffscreenDeviceOptions extends _Value {
+  const OffscreenDeviceOptions({this.adapterIndex, this.singleContext});
+
+  /// The GPU to use, as an index into the platform's list of GPUs.
+  final int? adapterIndex;
+
+  /// Whether the device's sessions take turns in one OpenGL context instead of
+  /// having one each. Only an EGL device reads it.
+  final bool? singleContext;
+
+  /// A copy of this value with the given members replaced.
+  OffscreenDeviceOptions copyWith({int? adapterIndex, bool? singleContext}) =>
+      OffscreenDeviceOptions(
+        adapterIndex: adapterIndex ?? this.adapterIndex,
+        singleContext: singleContext ?? this.singleContext,
+      );
+
+  @override
+  List<Object?> get _members => [adapterIndex, singleContext];
+  @override
+  String toString() => _describe('OffscreenDeviceOptions', const [
+    'adapterIndex',
+    'singleContext',
   ]);
 }
 

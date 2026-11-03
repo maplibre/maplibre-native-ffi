@@ -12,9 +12,9 @@ const int MLN_C_VERSION = 0;
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_queue = Uint64;
 typedef mln_geo_json_source_data = Uint64;
-typedef mln_graphics_device = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
+typedef mln_offscreen_device = Uint64;
 typedef mln_render_frame_batch = Uint64;
 typedef mln_render_session = Uint64;
 typedef mln_resource_request = Uint64;
@@ -438,23 +438,6 @@ final class mln_gpu_sync extends Struct {
   external int value;
 }
 
-final class mln_graphics_device_options extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int fields;
-  @Uint32()
-  external int adapter_index;
-  @Bool()
-  external bool single_context;
-}
-
-final class mln_graphics_device_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-}
-
 final class mln_http_header extends Struct {
   external mln_buffer_view name;
   external mln_buffer_view value;
@@ -750,6 +733,23 @@ final class mln_offline_tile_pyramid_region_definition extends Struct {
   external double pixel_ratio;
   @Bool()
   external bool include_ideographs;
+}
+
+final class mln_offscreen_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_extent extent;
+}
+
+final class mln_offscreen_device_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Uint32()
+  external int adapter_index;
+  @Bool()
+  external bool single_context;
 }
 
 final class mln_open_gl_borrowed_texture extends Struct {
@@ -1759,10 +1759,6 @@ const MLN_GPU_SYNC_KIND_FLAG_SYNC_FD = 16;
 const MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT = 32;
 const MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE = 64;
 
-// mln_graphics_device_option_field
-const MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX = 1;
-const MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT = 2;
-
 // mln_log_event
 const MLN_LOG_EVENT_GENERAL = 0;
 const MLN_LOG_EVENT_SETUP = 1;
@@ -1843,6 +1839,10 @@ const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
 // mln_offline_region_download_state
 const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
 const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
+
+// mln_offscreen_device_option_field
+const MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1;
+const MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 2;
 
 // mln_open_gl_client_api
 const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0;
@@ -2369,22 +2369,6 @@ external void mln_geo_json_source_data_release(int data);
 
 @Native<
   Int32 Function(
-    Pointer<mln_graphics_device_options>,
-    Pointer<mln_graphics_device>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_graphics_device_create(
-  Pointer<mln_graphics_device_options> options,
-  Pointer<mln_graphics_device> out_device,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(mln_graphics_device)>()
-external void mln_graphics_device_release(int device);
-
-@Native<
-  Int32 Function(
     Pointer<mln_http_header_transform_response>,
     mln_buffer_view,
     mln_buffer_view,
@@ -2605,27 +2589,6 @@ external int mln_map_apply_camera_delta(
 @Native<
   Int32 Function(
     mln_map,
-    mln_graphics_device,
-    Pointer<mln_graphics_device_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_graphics_device_texture(
-  int map,
-  int device,
-  Pointer<mln_graphics_device_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
     Pointer<mln_metal_borrowed_texture_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
@@ -2675,6 +2638,27 @@ external int mln_map_attach_metal_surface(
   int map,
   Pointer<mln_metal_surface_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_offscreen_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    mln_offscreen_device,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_offscreen(
+  int map,
+  Pointer<mln_offscreen_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  int device,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
@@ -3942,6 +3926,22 @@ external int mln_network_set_status(
   int status,
   Pointer<mln_diagnostic> out_diagnostic,
 );
+
+@Native<
+  Int32 Function(
+    Pointer<mln_offscreen_device_options>,
+    Pointer<mln_offscreen_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_offscreen_device_create(
+  Pointer<mln_offscreen_device_options> options,
+  Pointer<mln_offscreen_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_offscreen_device)>()
+external void mln_offscreen_device_release(int device);
 
 @Native<Uint32 Function()>()
 external int mln_open_gl_supported_context_provider_mask();

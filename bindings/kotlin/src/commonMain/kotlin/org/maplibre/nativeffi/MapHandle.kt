@@ -286,31 +286,37 @@ internal constructor(
     }
 
   /**
-   * Attaches a render session that draws the map into a texture on `device`.
+   * Attaches a render session that renders the map offscreen.
    *
-   * `options` must select `RenderDriverKind.CORE_WORKER`. Read the frames back with
-   * `RenderSessionHandle.readTexture()`.
+   * Read each image's pixels with `RenderSessionHandle.readTexture()`. `options` must select
+   * `RenderDriverKind.CORE_WORKER`.
    *
-   * See `mln_map_attach_graphics_device_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
+   * The session renders on `device`. When `device` is null, the session creates a device with the
+   * default options, and releases it when the session ends.
+   *
+   * See `mln_map_attach_offscreen` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
    *
    * Errors:
    *
    * - `Status.INVALID_STATE` when the map already has a render session.
+   * - `Status.UNSUPPORTED` when `device` is null and this build's render backend can't create a
+   *   device.
+   * - `Status.NATIVE_ERROR` when `device` is null and the platform can't create a device.
    */
-  public fun attachGraphicsDeviceTexture(
-    device: GraphicsDeviceHandle,
-    descriptor: GraphicsDeviceTextureDescriptor,
+  public fun attachOffscreen(
+    descriptor: OffscreenDescriptor,
     options: RenderSessionAttachOptions,
+    device: OffscreenDeviceHandle? = null,
   ): NewRenderSession =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
-          C.mln_map_attach_graphics_device_texture(
+          C.mln_map_attach_offscreen(
             handle,
-            argument(device, device.binding),
-            writeGraphicsDeviceTextureDescriptor(descriptor),
+            writeOffscreenDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
+            device?.let { argument(it, it.binding) } ?: 0L,
             out,
             completion,
             diagnostic,

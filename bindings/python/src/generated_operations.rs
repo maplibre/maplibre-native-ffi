@@ -2013,38 +2013,6 @@ fn generated_input_mln_gpu_sync<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_graphics_device_options<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_graphics_device_options> {
-    let _ = storage;
-    let mut raw: sys::mln_graphics_device_options = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_graphics_device_options>() as _;
-    raw.fields = 0;
-    if value.is_none() {
-        return Ok(raw);
-    }
-    if let Some(field) = generated_present(value, "adapter_index")? {
-        raw.adapter_index = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_ADAPTER_INDEX;
-    }
-    if let Some(field) = generated_present(value, "single_context")? {
-        raw.single_context = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_GRAPHICS_DEVICE_OPTION_SINGLE_CONTEXT;
-    }
-    Ok(raw)
-}
-
-fn generated_input_mln_graphics_device_texture_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_graphics_device_texture_descriptor> {
-    let mut raw: sys::mln_graphics_device_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_graphics_device_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
-    Ok(raw)
-}
-
 fn generated_input_mln_http_header<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2394,6 +2362,38 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     raw.max_zoom = value.getattr("max_zoom")?.extract::<f64>()?;
     raw.pixel_ratio = value.getattr("pixel_ratio")?.extract::<f32>()?;
     raw.include_ideographs = value.getattr("include_ideographs")?.extract::<bool>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_offscreen_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_offscreen_descriptor> {
+    let mut raw: sys::mln_offscreen_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_offscreen_descriptor>() as _;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_offscreen_device_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_offscreen_device_options> {
+    let _ = storage;
+    let mut raw: sys::mln_offscreen_device_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_offscreen_device_options>() as _;
+    raw.fields = 0;
+    if value.is_none() {
+        return Ok(raw);
+    }
+    if let Some(field) = generated_present(value, "adapter_index")? {
+        raw.adapter_index = field.extract::<u32>()?;
+        raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
+    }
+    if let Some(field) = generated_present(value, "single_context")? {
+        raw.single_context = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
+    }
     Ok(raw)
 }
 
@@ -3168,13 +3168,6 @@ unsafe extern "C" fn generated_dispose_mln_geo_json_source_data(
     sys::MLN_STATUS_OK
 }
 
-unsafe extern "C" fn generated_dispose_mln_graphics_device(
-    handle: sys::mln_graphics_device,
-) -> sys::mln_status {
-    unsafe { sys::mln_graphics_device_release(handle) };
-    sys::MLN_STATUS_OK
-}
-
 unsafe extern "C" fn generated_dispose_mln_map(handle: sys::mln_map) -> sys::mln_status {
     unsafe { sys::mln_map_dispose(handle, std::ptr::null_mut()) }
 }
@@ -3183,6 +3176,13 @@ unsafe extern "C" fn generated_dispose_mln_map_projection(
     handle: sys::mln_map_projection,
 ) -> sys::mln_status {
     unsafe { sys::mln_map_projection_release(handle) };
+    sys::MLN_STATUS_OK
+}
+
+unsafe extern "C" fn generated_dispose_mln_offscreen_device(
+    handle: sys::mln_offscreen_device,
+) -> sys::mln_status {
+    unsafe { sys::mln_offscreen_device_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -3381,53 +3381,6 @@ impl GeoJsonSourceDataHandle {
         };
         let handle = reservation.handle();
         unsafe { call.run(|| sys::mln_geo_json_source_data_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-}
-
-#[pymethods]
-impl GraphicsDeviceHandle {
-    #[staticmethod]
-    #[pyo3(signature = (options=None))]
-    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_graphics_device_options(&options, storage)
-        })?;
-        let mut out_device: sys::mln_graphics_device = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_graphics_device_create(
-                    generated_pointer(&options_value),
-                    &mut out_device,
-                    diagnostic,
-                )
-            })
-        }?;
-        unsafe { GraphicsDeviceHandle::adopt(py, out_device, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
-    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_graphics_device_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_graphics_device_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -3905,51 +3858,6 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (device, descriptor, options))]
-    fn attach_graphics_device_texture(
-        &self,
-        py: Python<'_>,
-        device: &GraphicsDeviceHandle,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let device_handle = device.input();
-        let descriptor_value =
-            generated_input_mln_graphics_device_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_graphics_device_texture(
-                        handle,
-                        device_handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
     #[pyo3(signature = (descriptor, options))]
     fn attach_metal_borrowed_texture(
         &self,
@@ -4057,6 +3965,51 @@ impl MapHandle {
                         handle,
                         &descriptor_value,
                         &options_value,
+                        &mut out_session,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }?;
+        let callback_roots = call.accept_callbacks();
+        let mut out_session_owner =
+            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
+        let out_session_python = unsafe {
+            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
+        }?;
+        let result = PyDict::new(py);
+        result.set_item("session", out_session_python)?;
+        result.set_item("ready", future)?;
+        Ok(result.into_any().unbind())
+    }
+    #[pyo3(signature = (descriptor, options, device=None))]
+    fn attach_offscreen(
+        &self,
+        py: Python<'_>,
+        descriptor: &Bound<'_, PyAny>,
+        options: &Bound<'_, PyAny>,
+        device: Option<&OffscreenDeviceHandle>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_offscreen_descriptor(&descriptor.clone(), storage)?;
+        let options_value =
+            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
+        let device_handle = device.map_or(sys::mln_offscreen_device(0), |handle| handle.input());
+        let handle = self.input();
+        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_map_attach_offscreen(
+                        handle,
+                        &descriptor_value,
+                        &options_value,
+                        device_handle,
                         &mut out_session,
                         completion,
                         diagnostic,
@@ -6834,6 +6787,53 @@ impl MapProjectionHandle {
 }
 
 #[pymethods]
+impl OffscreenDeviceHandle {
+    #[staticmethod]
+    #[pyo3(signature = (options=None))]
+    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_offscreen_device_options(&options, storage)
+        })?;
+        let mut out_device: sys::mln_offscreen_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_offscreen_device_create(
+                    generated_pointer(&options_value),
+                    &mut out_device,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { OffscreenDeviceHandle::adopt(py, out_device, Vec::new()) }
+    }
+    #[pyo3(signature = ())]
+    fn _exit(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_offscreen_device_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_offscreen_device_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+}
+
+#[pymethods]
 impl RenderSessionHandle {
     #[pyo3(signature = ())]
     fn abandon(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8281,12 +8281,6 @@ generated_owner!(
     Some(generated_dispose_mln_geo_json_source_data)
 );
 generated_owner!(
-    GraphicsDeviceHandle,
-    "_GraphicsDeviceHandle",
-    mln_graphics_device,
-    Some(generated_dispose_mln_graphics_device)
-);
-generated_owner!(
     MapHandle,
     "_MapHandle",
     mln_map,
@@ -8297,6 +8291,12 @@ generated_owner!(
     "_MapProjectionHandle",
     mln_map_projection,
     Some(generated_dispose_mln_map_projection)
+);
+generated_owner!(
+    OffscreenDeviceHandle,
+    "_OffscreenDeviceHandle",
+    mln_offscreen_device,
+    Some(generated_dispose_mln_offscreen_device)
 );
 generated_owner!(
     RenderSessionHandle,
@@ -8487,9 +8487,9 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
     module.add_class::<GeoJsonSourceDataHandle>()?;
-    module.add_class::<GraphicsDeviceHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
+    module.add_class::<OffscreenDeviceHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<ResourceTransformRequestHandle>()?;

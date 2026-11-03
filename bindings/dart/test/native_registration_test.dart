@@ -1,7 +1,7 @@
 // Native registrations: wakes and queue locks whose function pointers and
-// context native code in the host supplies. Sessions render on a graphics
-// device texture, which rejects a queue lock, so an accepted lock needs a
-// Vulkan owned texture in a context from tests/graphics.
+// context native code in the host supplies. Sessions render offscreen, which
+// rejects a queue lock, so an accepted lock needs a Vulkan owned texture in a
+// context from tests/graphics.
 import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -78,7 +78,7 @@ void main() {
         releaseUserData: releases.pointer,
       );
       expect(
-        () => attachDeviceTexture(map, _options(frameWake: rejected)),
+        () => attachOffscreenSession(map, _options(frameWake: rejected)),
         _throwsStatus(Status.invalidArgument),
       );
       await releases.wait('the release of the rejected wake');
@@ -86,11 +86,11 @@ void main() {
       // Native code would reject the wake again with an invalid argument, so
       // an invalid state shows that the second call never reached it.
       expect(
-        () => attachDeviceTexture(map, _options(frameWake: rejected)),
+        () => attachOffscreenSession(map, _options(frameWake: rejected)),
         _throwsStatus(Status.invalidState),
       );
 
-      final attachment = attachDeviceTexture(
+      final attachment = attachOffscreenSession(
         map,
         _options(
           frameWake: Wake.native(
@@ -142,11 +142,11 @@ void main() {
     final map = await openRenderMap(emptyStyle);
     final locks = _Recorder();
     final releases = _Recorder();
-    // A graphics device texture takes no lock. Native code reaches that check
+    // An offscreen session takes no lock. Native code reaches that check
     // only with both lock callbacks set, and the binding then releases the
     // context of the rejected lock.
     expect(
-      () => attachDeviceTexture(
+      () => attachOffscreenSession(
         map,
         _options(queueLock: _queueLock(locks, releases)),
       ),

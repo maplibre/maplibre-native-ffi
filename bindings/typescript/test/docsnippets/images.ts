@@ -3,7 +3,6 @@
 
 import {
   CameraUpdateMode,
-  GraphicsDeviceHandle,
   type LatLng,
   MapMode,
   RenderDriverKind,
@@ -34,15 +33,11 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
   // #endregion style
 
   // #region attach
-  const device = GraphicsDeviceHandle.create();
-
-  const { session, ready: sessionReady } =
-    map.attachGraphicsDeviceTexture(
-      device,
-      { extent },
-      // The library renders on its own thread.
-      { driver: RenderDriverKind.coreWorker },
-    );
+  const { session, ready: sessionReady } = map.attachOffscreen(
+    { extent },
+    // The library renders on its own thread.
+    { driver: RenderDriverKind.coreWorker },
+  );
   await sessionReady;
   // #endregion attach
 
@@ -64,7 +59,6 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
   // #endregion read
 
   session.dispose();
-  device.close();
   await map.close();
 }
 

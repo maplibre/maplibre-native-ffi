@@ -26,8 +26,6 @@ from ._generated_values import (
     FreeCameraOptions,
     GeoJsonSourceOptions,
     GpuSync,
-    GraphicsDeviceOptions,
-    GraphicsDeviceTextureDescriptor,
     HttpHeaderTransform,
     LatLng,
     LatLngBounds,
@@ -49,6 +47,8 @@ from ._generated_values import (
     OfflineRegionDownloadState,
     OfflineRegionInfo,
     OfflineRegionStatus,
+    OffscreenDescriptor,
+    OffscreenDeviceOptions,
     OpenGlBorrowedTextureDescriptor,
     OpenGlContextProviderFlag,
     OpenGlOwnedTextureDescriptor,
@@ -98,9 +98,9 @@ if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
         GeoJsonSourceDataHandle,
-        GraphicsDeviceHandle,
         MapHandle,
         MapProjectionHandle,
+        OffscreenDeviceHandle,
         RenderSessionHandle,
         RuntimeHandle,
         StyleExpressionHandle,
@@ -110,11 +110,6 @@ if TYPE_CHECKING:
 class LogicalExtentPhysicalSizeResult(NamedTuple):
     width: int
     height: int
-
-
-class MapAttachGraphicsDeviceTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
 
 
 class MapAttachMetalBorrowedTextureResult(NamedTuple):
@@ -128,6 +123,11 @@ class MapAttachMetalOwnedTextureResult(NamedTuple):
 
 
 class MapAttachMetalSurfaceResult(NamedTuple):
+    session: RenderSessionHandle
+    ready: Future[None]
+
+
+class MapAttachOffscreenResult(NamedTuple):
     session: RenderSessionHandle
     ready: Future[None]
 
@@ -325,42 +325,6 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
         return self._native.close()
 
 
-class _GraphicsDeviceHandleOperations(GeneratedOperations):
-    _native: _native._GraphicsDeviceHandle
-
-    @classmethod
-    def create(
-        cls, options: GraphicsDeviceOptions | None = None
-    ) -> GraphicsDeviceHandle:
-        """Creates a GPU device for rendering maps into textures.
-
-        Render sessions on several maps can share one device.
-
-        See `mln_graphics_device_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-
-        Errors:
-
-        - `Status.UNSUPPORTED` when this build's render backend can't create
-          a device.
-        - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the
-          platform can't create the device.
-        """
-        return _adopt_value(
-            _native._GraphicsDeviceHandle.create(options), "GraphicsDeviceHandle", None
-        )
-
-    def close(self) -> None:
-        """Releases a graphics device.
-
-        Render sessions on the device keep working until they detach.
-
-        See `mln_graphics_device_release` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-        """
-        return self._native.close()
-
-
 class _MapHandleOperations(GeneratedOperations):
     _native: _native._MapHandle
 
@@ -521,33 +485,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.apply_camera_delta(delta)
 
-    def attach_graphics_device_texture(
-        self,
-        device: GraphicsDeviceHandle,
-        descriptor: GraphicsDeviceTextureDescriptor,
-        options: RenderSessionAttachOptions,
-    ) -> MapAttachGraphicsDeviceTextureResult:
-        """Attaches a render session that draws the map into a texture on
-        `device`.
-
-        `options` must select `RenderDriverKind.CORE_WORKER`. Read the frames
-        back with `RenderSessionHandle.read_texture()`.
-
-        See `mln_map_attach_graphics_device_texture` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
-
-        Errors:
-
-        - `Status.INVALID_STATE` when the map already has a render session.
-        """
-        raw = self._native.attach_graphics_device_texture(
-            device._native, descriptor, options
-        )
-        return MapAttachGraphicsDeviceTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
-
     def attach_metal_borrowed_texture(
         self,
         descriptor: MetalBorrowedTextureDescriptor,
@@ -609,6 +546,40 @@ class _MapHandleOperations(GeneratedOperations):
         """
         raw = self._native.attach_metal_surface(descriptor, options)
         return MapAttachMetalSurfaceResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            ready=raw["ready"],
+        )
+
+    def attach_offscreen(
+        self,
+        descriptor: OffscreenDescriptor,
+        options: RenderSessionAttachOptions,
+        device: OffscreenDeviceHandle | None = None,
+    ) -> MapAttachOffscreenResult:
+        """Attaches a render session that renders the map offscreen.
+
+        Read each image's pixels with `RenderSessionHandle.read_texture()`.
+        `options` must select `RenderDriverKind.CORE_WORKER`.
+
+        The session renders on `device`. When `device` is null, the session
+        creates a device with the default options, and releases it when the
+        session ends.
+
+        See `mln_map_attach_offscreen` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` when the map already has a render session.
+        - `Status.UNSUPPORTED` when `device` is null and this build's render
+          backend can't create a device.
+        - `Status.NATIVE_ERROR` when `device` is null and the platform can't
+          create a device.
+        """
+        raw = self._native.attach_offscreen(
+            descriptor, options, None if device is None else device._native
+        )
+        return MapAttachOffscreenResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             ready=raw["ready"],
         )
@@ -1815,6 +1786,46 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
         return self._native.set_camera(camera)
+
+
+class _OffscreenDeviceHandleOperations(GeneratedOperations):
+    _native: _native._OffscreenDeviceHandle
+
+    @classmethod
+    def create(
+        cls, options: OffscreenDeviceOptions | None = None
+    ) -> OffscreenDeviceHandle:
+        """Creates a GPU device for rendering maps offscreen.
+
+        `MapHandle.attach_offscreen()` creates a device of its own when it
+        gets none. Create one to share it among the sessions on many maps, or
+        to pick a GPU.
+
+        See `mln_offscreen_device_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when this build's render backend can't create
+          a device.
+        - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the
+          platform can't create the device.
+        """
+        return _adopt_value(
+            _native._OffscreenDeviceHandle.create(options),
+            "OffscreenDeviceHandle",
+            None,
+        )
+
+    def close(self) -> None:
+        """Releases an offscreen device.
+
+        Render sessions on the device keep working until they detach.
+
+        See `mln_offscreen_device_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+        """
+        return self._native.close()
 
 
 class _RenderSessionHandleOperations(GeneratedOperations):

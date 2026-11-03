@@ -2088,22 +2088,6 @@ public data class GeoJsonSourceOptions(
 )
 
 /**
- * Options for `GraphicsDeviceHandle.create()`.
- *
- * See `mln_graphics_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
- */
-public data class GraphicsDeviceOptions(
-  /** The GPU to use, as an index into the platform's list of GPUs. */
-  public val adapterIndex: UInt? = null,
-  /**
-   * Whether the device's texture sessions take turns in one OpenGL context instead of having one
-   * each. Only an EGL device reads it.
-   */
-  public val singleContext: Boolean? = null,
-)
-
-/**
  * A point in the Web Mercator projection, in meters.
  *
  * See `mln_projected_meters` in the
@@ -2112,6 +2096,22 @@ public data class GraphicsDeviceOptions(
 public data class ProjectedMeters(
   public val northing: Double = 0.0,
   public val easting: Double = 0.0,
+)
+
+/**
+ * Options for `OffscreenDeviceHandle.create()`.
+ *
+ * See `mln_offscreen_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ */
+public data class OffscreenDeviceOptions(
+  /** The GPU to use, as an index into the platform's list of GPUs. */
+  public val adapterIndex: UInt? = null,
+  /**
+   * Whether the device's sessions take turns in one OpenGL context instead of having one each. Only
+   * an EGL device reads it.
+   */
+  public val singleContext: Boolean? = null,
 )
 
 /**
@@ -2285,46 +2285,6 @@ public data class CameraDelta(
 )
 
 /**
- * The texture that `MapHandle.attachGraphicsDeviceTexture()` draws into.
- *
- * See `mln_graphics_device_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/graphics__device_8h.html).
- */
-public data class GraphicsDeviceTextureDescriptor(
-  public val extent: LogicalExtent,
-)
-
-/**
- * Options for attaching a render session to a map.
- *
- * See `mln_render_session_attach_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class RenderSessionAttachOptions(
-  public val driver: RenderDriverKind,
-  /** How many textures a ring that the session creates has, up to 8. Zero picks a default. */
-  public val requestedTextureRingDepth: UInt = 0u,
-  /**
-   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
-   * one of them that its target supports. Zero lets the session pick a kind that names no object to
-   * wait on.
-   */
-  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
-  /**
-   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
-   * called again until a drain takes them.
-   */
-  public val frameWake: Wake = Wake(),
-  /**
-   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
-   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
-   */
-  public val driverWorkWake: Wake = Wake(),
-  /** Your lock on the Vulkan queue, when you submit to it yourself. */
-  public val queueLock: QueueLock = QueueLock(),
-)
-
-/**
  * A Metal texture of a borrowed ring.
  *
  * See `mln_metal_borrowed_texture` in the
@@ -2359,6 +2319,36 @@ public data class MetalBorrowedTextureDescriptor(
    * your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
    */
   public val commandQueue: NativePointer,
+)
+
+/**
+ * Options for attaching a render session to a map.
+ *
+ * See `mln_render_session_attach_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class RenderSessionAttachOptions(
+  public val driver: RenderDriverKind,
+  /** How many textures a ring that the session creates has, up to 8. Zero picks a default. */
+  public val requestedTextureRingDepth: UInt = 0u,
+  /**
+   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
+   * one of them that its target supports. Zero lets the session pick a kind that names no object to
+   * wait on.
+   */
+  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
+  /**
+   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
+   * called again until a drain takes them.
+   */
+  public val frameWake: Wake = Wake(),
+  /**
+   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
+   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
+   */
+  public val driverWorkWake: Wake = Wake(),
+  /** Your lock on the Vulkan queue, when you submit to it yourself. */
+  public val queueLock: QueueLock = QueueLock(),
 )
 
 /**
@@ -2408,6 +2398,16 @@ public data class MetalSurfaceDescriptor(
   public val context: MetalContextDescriptor,
   /** Your CAMetalLayer. */
   public val layer: NativePointer,
+)
+
+/**
+ * The image that `MapHandle.attachOffscreen()` renders.
+ *
+ * See `mln_offscreen_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ */
+public data class OffscreenDescriptor(
+  public val extent: LogicalExtent,
 )
 
 /**
