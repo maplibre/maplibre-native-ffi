@@ -37,6 +37,11 @@ pub struct MapShared {
 }
 
 impl MapShared {
+    /// The view of the last published snapshot, from any thread.
+    pub fn view(&self) -> MlnMapView {
+        self.snapshot.lock().unwrap().view
+    }
+
     pub fn next_generation(&self) -> u64 {
         self.generation.fetch_add(1, Ordering::SeqCst) + 1
     }

@@ -408,12 +408,6 @@ pub unsafe extern "C" fn mln_render_session_dump_debug_logs(session: u64, comple
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_dump_debug_logs") }
 }
 
-/// `mln_render_session_service_driver_work` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_service_driver_work(session: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_service_driver_work") }
-}
-
 /// `mln_acquired_frame_discard` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_acquired_frame_discard(frame: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
@@ -834,12 +828,6 @@ pub unsafe extern "C" fn mln_map_attach_vulkan_surface(map: u64, descriptor: *co
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_attach_open_gl_surface(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_open_gl_surface") }
-}
-
-/// `mln_map_attach_web_gpu_surface` (surface.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_web_gpu_surface") }
 }
 
 /// `mln_render_session_set_metal_surface_target` (surface.h): not implemented.

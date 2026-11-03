@@ -154,6 +154,14 @@ static void test_layouts(void) {
   FIELD(mln_render_session_capabilities, consumer_sync_kinds);
   TYPE(mln_offscreen_descriptor);
   FIELD(mln_offscreen_descriptor, logical_size);
+  TYPE(mln_web_gpu_context_descriptor);
+  FIELD(mln_web_gpu_context_descriptor, device);
+  FIELD(mln_web_gpu_context_descriptor, queue);
+  TYPE(mln_web_gpu_surface_descriptor);
+  FIELD(mln_web_gpu_surface_descriptor, logical_size);
+  FIELD(mln_web_gpu_surface_descriptor, context);
+  FIELD(mln_web_gpu_surface_descriptor, surface);
+  FIELD(mln_web_gpu_surface_descriptor, format);
   TYPE(mln_offscreen_device_options);
   FIELD(mln_offscreen_device_options, client_api);
   TYPE(mln_texture_readback_result);

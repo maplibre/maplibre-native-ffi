@@ -23,6 +23,10 @@ macro_rules! layouts {
 layouts! {
     "mln_diagnostic" => MlnDiagnostic { "message" => message },
     "mln_buffer_view" => MlnBufferView { "size" => size },
+    "mln_web_gpu_context_descriptor" => MlnWebGpuContextDescriptor { "device" => device, "queue" => queue },
+    "mln_web_gpu_surface_descriptor" => MlnWebGpuSurfaceDescriptor {
+        "logical_size" => logical_size, "context" => context, "surface" => surface, "format" => format,
+    },
     "mln_logical_extent" => MlnLogicalExtent { "scale_factor" => scale_factor },
     "mln_completion_result" => MlnCompletionResult {
         "generation" => generation, "diagnostic" => diagnostic, "value" => value, "value_count" => value_count,

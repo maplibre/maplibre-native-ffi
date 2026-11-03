@@ -20,4 +20,5 @@ mod map;
 mod runtime;
 mod session;
 mod stubs;
+mod surface_session;
 mod types;

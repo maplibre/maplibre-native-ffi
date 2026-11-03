@@ -551,6 +551,26 @@ pub struct MlnRenderSessionCapabilities {
     pub consumer_sync_kinds: u32,
 }
 
+/// `mln_web_gpu_context_descriptor`
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct MlnWebGpuContextDescriptor {
+    pub instance: *mut c_void,
+    pub device: *mut c_void,
+    pub queue: *mut c_void,
+}
+
+/// `mln_web_gpu_surface_descriptor`
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct MlnWebGpuSurfaceDescriptor {
+    pub size: u32,
+    pub logical_size: MlnLogicalSize,
+    pub context: MlnWebGpuContextDescriptor,
+    pub surface: *mut c_void,
+    pub format: u32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct MlnOffscreenDescriptor {
