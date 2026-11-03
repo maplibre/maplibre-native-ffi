@@ -128,6 +128,11 @@ function(mln_ffi_add_maplibre_native_next_library target)
                            INTERFACE "${emdawn_port}")
     target_link_options(mln_ffi_render_dependencies INTERFACE
                         "${emdawn_port}" "-sJSPI")
+    # The port allocates on several threads at once (tile workers, the render
+    # thread). dlmalloc's global lock made those threads wait on each other,
+    # and zooming stutter; mimalloc gives each thread its own heap.
+    target_link_options(mln_ffi_platform_dependencies INTERFACE
+                        "-sMALLOC=mimalloc")
     return()
   endif()
   # The test harness drives Vulkan itself, as it does for the C++ build.
