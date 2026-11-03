@@ -37,7 +37,7 @@ def test_a_camera_end_handler_survives_a_collection_and_still_runs(
     del update
     gc.collect()
     # Cancelling the transition runs the handler before the command completes.
-    result(map_handle.cancel_camera_transition(3))
+    result(map_handle.cancel_camera_transitions_with_id(3))
     assert ended.is_set()
 
 

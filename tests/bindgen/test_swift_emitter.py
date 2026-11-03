@@ -200,11 +200,12 @@ class SwiftEmitterTests(unittest.TestCase):
             .splitlines()[1:]
         )
         self.assertIn(
-            "`MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, "
-            "or a gesture's `GesturePhase.cancel` stopped the change",
+            "`MapHandle.cancelCameraTransitions()`, "
+            "`MapHandle.cancelCameraTransitionsWithId()`, a gesture's "
+            "`GesturePhase.begin` or `GesturePhase.cancel`",
             summary,
         )
-        self.assertNotIn("mln_map_cancel_transitions", summary)
+        self.assertNotIn("mln_map_cancel_camera_transitions", summary)
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")

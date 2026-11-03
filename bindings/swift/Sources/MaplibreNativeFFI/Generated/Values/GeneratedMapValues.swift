@@ -15,8 +15,8 @@ public struct AnimationOptions: Sendable {
   /// The zoom level at the peak of a fly animation.
   public var minZoom: Double?
   public var easing: UnitBezier?
-  /// An ID that `MapHandle.cancelCameraTransition()` cancels the change by.
-  /// Several changes can share one.
+  /// An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
+  /// by. Several changes can share one.
   public var transitionId: UInt64?
   public var endHandler: CameraTransitionHandler
   public init(
@@ -595,6 +595,12 @@ private func invokeCameraTransitionHandlerCallback(
 
 /// How a camera change ended.
 ///
+/// A camera delta that pans and also scales, rotates, or pitches animates as
+/// two parts, and any other change as one. When the parts of a change end in
+/// different ways, the change reports `CameraTransitionOutcome.cancelled` if
+/// any part was cancelled, then `CameraTransitionOutcome.replaced` if any part
+/// was replaced.
+///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraTransitionOutcome: RawRepresentable,
@@ -606,18 +612,30 @@ public struct CameraTransitionOutcome: RawRepresentable,
     self.rawValue = rawValue
   }
 
-  /// The camera finished the change, or a later camera change replaced it.
+  /// The camera finished the change.
   public static let completed: CameraTransitionOutcome = .init(rawValue: 0)
-  /// `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or
-  /// a gesture's `GesturePhase.cancel` stopped the change.
+  /// `MapHandle.cancelCameraTransitions()`,
+  /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
+  /// `GesturePhase.begin` or `GesturePhase.cancel`,
+  /// `MapHandle.setFreeCameraOptions()`, or a resize that moves the camera back
+  /// inside its bounds stopped the change.
   public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
   /// The map closed before the change ended.
   public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
+  /// A later camera change set every camera field that a part of the change
+  /// still animated, so that part stopped.
+  ///
+  /// A fly animates its center and zoom together, and an anchor animates the
+  /// center together with the fields it keeps in place, so a later change of
+  /// any of them replaces them all. A part that a later change took only some
+  /// fields from keeps animating the others, and ends as they end.
+  public static let replaced: CameraTransitionOutcome = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
     case 0: return "completed"
     case 1: return "cancelled"
     case 2: return "closed"
+    case 3: return "replaced"
     default: return "CameraTransitionOutcome(\(rawValue))"
     }
   }
@@ -893,6 +911,9 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
 
 /// Where a camera change falls in a gesture that the user makes.
 ///
+/// `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
+/// and `GesturePhase.end` and `GesturePhase.cancel` end it.
+///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct GesturePhase: RawRepresentable, CustomStringConvertible,
@@ -905,10 +926,15 @@ public struct GesturePhase: RawRepresentable, CustomStringConvertible,
 
   /// The change isn't part of a gesture.
   public static let none: GesturePhase = .init(rawValue: 0)
+  /// The gesture starts. This cancels every running camera animation before the
+  /// change applies.
   public static let begin: GesturePhase = .init(rawValue: 1)
+  /// The gesture continues. To start a gesture that keeps the running camera
+  /// animations, start it with this phase instead of `GesturePhase.begin`.
   public static let update: GesturePhase = .init(rawValue: 2)
   public static let end: GesturePhase = .init(rawValue: 3)
-  /// The platform cancelled the gesture. This also cancels camera changes.
+  /// The platform cancelled the gesture. This also cancels every running camera
+  /// animation after the change applies.
   public static let cancel: GesturePhase = .init(rawValue: 4)
   public var description: String {
     switch rawValue {

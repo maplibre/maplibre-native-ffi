@@ -26,7 +26,6 @@ private fun flyEnded(completed: Boolean) {}
 
 // #region gesture
 private fun beginGesture(map: MapHandle) {
-  map.discarding.cancelTransitions()
   map.discarding.applyCameraDelta(
     CameraDelta(gesturePhase = GesturePhase.BEGIN),
   )

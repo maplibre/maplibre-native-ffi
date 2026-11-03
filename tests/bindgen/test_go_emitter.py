@@ -84,10 +84,10 @@ class GoEmitterTests(unittest.TestCase):
 
     def test_a_summary_names_the_go_symbols_of_the_c_identifiers(self):
         source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn("MapHandle.CancelTransitions()", source)
-        self.assertIn("MapHandle.CancelCameraTransition()", source)
-        self.assertIn("GesturePhaseCancel stopped", source)
-        self.assertNotIn("// mln_map_cancel_transitions()", source)
+        self.assertIn("MapHandle.CancelCameraTransitions()", source)
+        self.assertIn("MapHandle.CancelCameraTransitionsWithId()", source)
+        self.assertIn("GesturePhaseCancel, MapHandle.SetFreeCameraOptions()", source)
+        self.assertNotIn("// mln_map_cancel_camera_transitions()", source)
 
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):
         source = emitted(go, real_api())["generated_api.go"]

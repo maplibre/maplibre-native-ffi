@@ -1436,6 +1436,7 @@ internal enum mln_camera_transition_outcome : uint
     MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
     MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
     MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2,
+    MLN_CAMERA_TRANSITION_OUTCOME_REPLACED = 3,
 }
 
 internal enum mln_camera_update_mode : uint

@@ -179,7 +179,7 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
     }),
     "a command",
   );
-  await bounded(map.cancelCameraTransition(maximum), "a command");
+  await bounded(map.cancelCameraTransitionsWithId(maximum), "a command");
   assert.equal(
     (await callbackArrival(ended, "the end handler")).outcome,
     CameraTransitionOutcome.cancelled,

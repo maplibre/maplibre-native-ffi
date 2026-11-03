@@ -18,7 +18,7 @@ public sealed class CallbackLifetimeTests
         Gc.Collect();
 
         // The handler runs before the cancellation completes.
-        await fixture.Map.CancelCameraTransitionAsync(ulong.MaxValue);
+        await fixture.Map.CancelCameraTransitionsWithIdAsync(ulong.MaxValue);
         var end = Assert.Single(ends);
         Assert.Equal(CameraTransitionOutcome.Cancelled, end.Outcome);
         Assert.NotEqual(0UL, end.Generation);

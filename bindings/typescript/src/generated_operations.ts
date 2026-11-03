@@ -1272,37 +1272,39 @@ export class MapHandle extends Owner {
   }
 
   /**
+   * Stops every running camera animation where it is.
+   *
+   * The end handler of each stopped animation reports
+   * `CameraTransitionOutcome.cancelled`.
+   *
+   * See `mln_map_cancel_camera_transitions` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  cancelCameraTransitions(): Promise<CommandCompletion> {
+    return command((completion) =>
+      native.mln_map_cancel_camera_transitions(this.id, completion),
+    );
+  }
+
+  /**
    * Stops the running camera animations whose animation options set
    * `transitionId`.
    *
    * Other animations keep running. The end handler of each stopped animation
    * reports `CameraTransitionOutcome.cancelled`.
    *
-   * See `mln_map_cancel_camera_transition` in the
+   * See `mln_map_cancel_camera_transitions_with_id` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  cancelCameraTransition(transitionId: bigint): Promise<CommandCompletion> {
+  cancelCameraTransitionsWithId(
+    transitionId: bigint,
+  ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_cancel_camera_transition(
+      native.mln_map_cancel_camera_transitions_with_id(
         this.id,
         transitionId,
         completion,
       ),
-    );
-  }
-
-  /**
-   * Stops every running camera animation where it is.
-   *
-   * The end handler of each stopped animation reports
-   * `CameraTransitionOutcome.cancelled`.
-   *
-   * See `mln_map_cancel_transitions` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  cancelTransitions(): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_cancel_transitions(this.id, completion),
     );
   }
 
@@ -2019,8 +2021,9 @@ export class MapHandle extends Owner {
   /**
    * Places the camera at a position and orientation in space.
    *
-   * The map adjusts them to a camera that it can show, and stops running camera
-   * animations.
+   * The map adjusts them to a camera that it can show. It stops running camera
+   * animations first, and their end handlers report
+   * `CameraTransitionOutcome.cancelled`.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2679,34 +2682,34 @@ export class MapHandleDiscarding {
   }
 
   /**
+   * Stops every running camera animation where it is.
+   *
+   * The end handler of each stopped animation reports
+   * `CameraTransitionOutcome.cancelled`.
+   *
+   * See `mln_map_cancel_camera_transitions` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  cancelCameraTransitions(): void {
+    native.mln_map_cancel_camera_transitions(this.#owner.id, undefined);
+  }
+
+  /**
    * Stops the running camera animations whose animation options set
    * `transitionId`.
    *
    * Other animations keep running. The end handler of each stopped animation
    * reports `CameraTransitionOutcome.cancelled`.
    *
-   * See `mln_map_cancel_camera_transition` in the
+   * See `mln_map_cancel_camera_transitions_with_id` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  cancelCameraTransition(transitionId: bigint): void {
-    native.mln_map_cancel_camera_transition(
+  cancelCameraTransitionsWithId(transitionId: bigint): void {
+    native.mln_map_cancel_camera_transitions_with_id(
       this.#owner.id,
       transitionId,
       undefined,
     );
-  }
-
-  /**
-   * Stops every running camera animation where it is.
-   *
-   * The end handler of each stopped animation reports
-   * `CameraTransitionOutcome.cancelled`.
-   *
-   * See `mln_map_cancel_transitions` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  cancelTransitions(): void {
-    native.mln_map_cancel_transitions(this.#owner.id, undefined);
   }
 
   /**
@@ -3011,8 +3014,9 @@ export class MapHandleDiscarding {
   /**
    * Places the camera at a position and orientation in space.
    *
-   * The map adjusts them to a camera that it can show, and stops running camera
-   * animations.
+   * The map adjusts them to a camera that it can show. It stops running camera
+   * animations first, and their end handlers report
+   * `CameraTransitionOutcome.cancelled`.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

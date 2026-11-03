@@ -25,20 +25,20 @@ auto mln_map_apply_camera_delta(
   });
 }
 
-auto mln_map_cancel_transitions(
+auto mln_map_cancel_camera_transitions(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_cancel_transitions(map, completion);
+    return mln::core::map_cancel_camera_transitions(map, completion);
   });
 }
 
-auto mln_map_cancel_camera_transition(
+auto mln_map_cancel_camera_transitions_with_id(
   mln_map map, uint64_t transition_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_cancel_camera_transition(
+    return mln::core::map_cancel_camera_transitions_with_id(
       map, transition_id, completion
     );
   });

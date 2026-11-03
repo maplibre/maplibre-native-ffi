@@ -337,16 +337,16 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_cancel_camera_transition(
+  actual external fun mln_map_cancel_camera_transitions(
     map: Long,
-    transitionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_cancel_transitions(
+  actual external fun mln_map_cancel_camera_transitions_with_id(
     map: Long,
+    transitionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

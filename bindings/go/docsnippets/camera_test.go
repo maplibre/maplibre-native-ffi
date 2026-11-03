@@ -15,9 +15,6 @@ func flyEnded(completed bool) {}
 
 // #region gesture
 func beginGesture(m *maplibre.MapHandle) error {
-	if err := m.Discarding().CancelTransitions(); err != nil {
-		return err
-	}
 	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
 		GesturePhase: maplibre.GesturePhaseBegin,
 	})

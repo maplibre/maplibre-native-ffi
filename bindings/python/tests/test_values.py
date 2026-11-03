@@ -118,7 +118,7 @@ def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip
         ),
     )
     result(map_handle.update_camera(ease))
-    result(map_handle.cancel_camera_transition(largest))
+    result(map_handle.cancel_camera_transitions_with_id(largest))
     assert [end.outcome for end in ends] == [mln.CameraTransitionOutcome.CANCELLED]
 
 

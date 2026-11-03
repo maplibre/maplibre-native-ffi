@@ -381,8 +381,167 @@ static void the_handler_runs_whatever_the_event_mask_selects(void) {
   jump.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   jump.camera.zoom = 3.0;
   const uint64_t generation = update_camera_generation(map, &jump);
-  assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "replaced");
+  assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "replaced");
   TEST_ASSERT_EQUAL_UINT64(generation, atomic_load(&probe.generation));
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A fly animates its center and zoom together, so a jump of its zoom replaces
+// all of it. An ease animates its fields apart, so a jump of one of them
+// leaves it running.
+static void a_later_change_replaces_a_running_one(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  update.camera = test_camera();
+  update_camera(map, &update);
+
+  mln_test_transition_end first;
+  mln_test_transition_end_init(&first);
+  const mln_camera_update first_ease = ease_to_zoom(18.0, 60000.0, &first);
+  update_camera(map, &first_ease);
+  mln_test_transition_end second;
+  mln_test_transition_end_init(&second);
+  const mln_camera_update second_ease = ease_to_zoom(4.0, 60000.0, &second);
+  update_camera(map, &second_ease);
+  assert_ended(&first, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "first ease");
+  MLN_TEST_OK(mln_test_map_fence(map));
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&second.calls));
+
+  mln_test_transition_end flight;
+  mln_test_transition_end_init(&flight);
+  mln_camera_update fly = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  fly.mode = MLN_CAMERA_UPDATE_MODE_FLY;
+  fly.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  fly.camera.center = (mln_lat_lng){.latitude = 40.0, .longitude = -74.0};
+  fly.camera.zoom = 9.0;
+  fly.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  fly.animation.duration_ms = 60000.0;
+  fly.animation.end_handler = mln_test_transition_end_handler(&flight);
+  update_camera(map, &fly);
+  assert_ended(&second, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "second ease");
+
+  mln_test_transition_end jumped;
+  mln_test_transition_end_init(&jumped);
+  mln_camera_update jump = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  jump.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  jump.camera.zoom = 7.0;
+  jump.animation.end_handler = mln_test_transition_end_handler(&jumped);
+  update_camera(map, &jump);
+  assert_ended(&flight, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "fly");
+  assert_ended(&jumped, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "jump");
+  TEST_ASSERT_FALSE(read_settled_snapshot(runtime, map).transition_in_progress);
+
+  mln_test_transition_end partial;
+  mln_test_transition_end_init(&partial);
+  mln_camera_update ease = fly;
+  ease.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  ease.animation.end_handler = mln_test_transition_end_handler(&partial);
+  update_camera(map, &ease);
+  jump.animation.end_handler = (mln_camera_transition_handler){0};
+  update_camera(map, &jump);
+  MLN_TEST_OK(mln_test_map_fence(map));
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&partial.calls));
+  TEST_ASSERT_TRUE(read_settled_snapshot(runtime, map).transition_in_progress);
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
+  );
+  assert_ended(&partial, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "partial");
+
+  // A zoom limit below the camera's zoom jumps to the limit.
+  mln_test_transition_end limited;
+  mln_test_transition_end_init(&limited);
+  const mln_camera_update zoom_in = ease_to_zoom(18.0, 60000.0, &limited);
+  update_camera(map, &zoom_in);
+  mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
+  bounds.fields = MLN_BOUND_OPTION_MAX_ZOOM;
+  bounds.max_zoom = 5.0;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
+  );
+  assert_ended(&limited, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "bounds");
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, query_camera(map).zoom);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void free_camera_options_and_a_constraining_resize_cancel(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  update.camera = test_camera();
+  update_camera(map, &update);
+
+  mln_test_transition_end placed;
+  mln_test_transition_end_init(&placed);
+  const mln_camera_update eased = ease_to_zoom(18.0, 60000.0, &placed);
+  update_camera(map, &eased);
+  mln_free_camera_options free_camera = {
+    .size = sizeof(mln_free_camera_options)
+  };
+  free_camera.fields = MLN_FREE_CAMERA_OPTION_POSITION;
+  free_camera.position = (mln_vec3){.x = 0.25, .y = 0.25, .z = 0.5};
+  MLN_TEST_AWAIT_OK(mln_map_set_free_camera_options(
+    map, &free_camera, &completion.descriptor, NULL
+  ));
+  assert_ended(&placed, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "free camera");
+
+  // The 64-pixel view fits inside the bounds, east of their center, and a
+  // wider view crosses their east edge, so the resize moves the camera.
+  mln_map_viewport_options viewport = {.size = sizeof(viewport)};
+  viewport.fields = MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+  viewport.constrain_mode = MLN_CONSTRAIN_MODE_SCREEN;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
+  );
+  update.camera = (mln_camera_options){.size = sizeof(mln_camera_options)};
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
+                         MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
+  update.camera.center = (mln_lat_lng){.latitude = 0.0, .longitude = 9.0};
+  update.camera.zoom = 5.0;
+  update_camera(map, &update);
+  mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
+  bounds.fields = MLN_BOUND_OPTION_BOUNDS;
+  bounds.bounds = (mln_lat_lng_bounds){{-10.0, -10.0}, {10.0, 10.0}};
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 9.0, query_camera(map).center.longitude);
+
+  mln_test_transition_end resized;
+  mln_test_transition_end_init(&resized);
+  mln_camera_update pitch = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  pitch.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  pitch.camera.fields = MLN_CAMERA_OPTION_PITCH;
+  pitch.camera.pitch = 20.0;
+  pitch.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  pitch.animation.duration_ms = 60000.0;
+  pitch.animation.end_handler = mln_test_transition_end_handler(&resized);
+  update_camera(map, &pitch);
+  MLN_TEST_AWAIT_OK(mln_map_resize(
+    map, (mln_logical_size){.width = 128, .height = 64}, &completion.descriptor,
+    NULL
+  ));
+  assert_ended(&resized, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "resize");
+  TEST_ASSERT_TRUE(query_camera(map).center.longitude < 9.0);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -390,7 +549,7 @@ static void the_handler_runs_whatever_the_event_mask_selects(void) {
 
 // Without a render session a transition never advances, so each outcome below
 // ends a transition that is still running.
-static void cancel_transitions_commits_and_leaves_the_camera(void) {
+static void cancel_camera_transitions_commits_and_leaves_the_camera(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_camera_update update = {
@@ -405,7 +564,7 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   const mln_camera_update eased = ease_to_zoom(18.0, 60000.0, &probe);
   update_camera(map, &eased);
   mln_test_completion cancel = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_cancel_transitions(map, &cancel.descriptor, NULL));
+  MLN_TEST_OK(mln_map_cancel_camera_transitions(map, &cancel.descriptor, NULL));
   MLN_TEST_OK(mln_test_completion_finish(&cancel));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "cancelled");
@@ -420,7 +579,7 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   );
 
   MLN_TEST_AWAIT_OK(
-    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_DOUBLE(
     settled, read_settled_snapshot(runtime, map).view.camera.zoom
@@ -429,15 +588,17 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
 
   mln_completion rejected = mln_test_discard_completion();
   MLN_TEST_INVALID(
-    mln_map_cancel_transitions(MLN_HANDLE_NULL, &rejected, NULL)
+    mln_map_cancel_camera_transitions(MLN_HANDLE_NULL, &rejected, NULL)
   );
   mln_completion invalid_completion = {.size = sizeof(mln_completion)};
-  MLN_TEST_INVALID(mln_map_cancel_transitions(map, &invalid_completion, NULL));
+  MLN_TEST_INVALID(
+    mln_map_cancel_camera_transitions(map, &invalid_completion, NULL)
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void cancel_camera_transition_ends_only_its_identity(void) {
+static void cancel_camera_transitions_with_id_ends_only_its_identity(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_camera_update update = {
@@ -484,7 +645,7 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   update_camera(map, &bearing_ease);
   TEST_ASSERT_TRUE(read_settled_snapshot(runtime, map).transition_in_progress);
 
-  MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transition(
+  MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transitions_with_id(
     map, UINT64_MAX, &completion.descriptor, NULL
   ));
   assert_ended(&zoom, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "zoom");
@@ -494,10 +655,10 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   TEST_ASSERT_TRUE(cancelled.transition_in_progress);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&bearing.calls));
 
-  MLN_TEST_AWAIT_OK(
-    mln_map_cancel_camera_transition(map, 8, &completion.descriptor, NULL)
-  );
-  MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transition(
+  MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transitions_with_id(
+    map, 8, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transitions_with_id(
     map, UINT64_MAX, &completion.descriptor, NULL
   ));
   const mln_map_snapshot unchanged = read_settled_snapshot(runtime, map);
@@ -514,16 +675,16 @@ static void cancel_camera_transition_ends_only_its_identity(void) {
   jump.camera.fields = MLN_CAMERA_OPTION_BEARING;
   jump.camera.bearing = 45.0;
   update_camera(map, &jump);
-  assert_ended(&bearing, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "bearing");
+  assert_ended(&bearing, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "bearing");
   TEST_ASSERT_FALSE(read_settled_snapshot(runtime, map).transition_in_progress);
 
   mln_completion rejected = mln_test_discard_completion();
-  MLN_TEST_INVALID(
-    mln_map_cancel_camera_transition(MLN_HANDLE_NULL, 7, &rejected, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_cancel_camera_transitions_with_id(
+    MLN_HANDLE_NULL, 7, &rejected, NULL
+  ));
   mln_completion invalid_completion = {.size = sizeof(mln_completion)};
   MLN_TEST_INVALID(
-    mln_map_cancel_camera_transition(map, 7, &invalid_completion, NULL)
+    mln_map_cancel_camera_transitions_with_id(map, 7, &invalid_completion, NULL)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -554,9 +715,26 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
   TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.view.camera.zoom);
 
-  mln_test_transition_end probe;
-  mln_test_transition_end_init(&probe);
-  const mln_camera_update eased = ease_to_zoom(3.0, 60000.0, &probe);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A gesture that starts with UPDATE keeps a running animation of other fields,
+// BEGIN cancels it before its own change, and CANCEL cancels animations that
+// started during the gesture.
+static void a_gesture_begin_cancels_running_transitions(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  update.camera = test_camera();
+  update_camera(map, &update);
+
+  mln_test_transition_end kept;
+  mln_test_transition_end_init(&kept);
+  const mln_camera_update eased = ease_to_zoom(3.0, 60000.0, &kept);
   update_camera(map, &eased);
   mln_camera_update gesture = {
     .size = sizeof(mln_camera_update),
@@ -564,15 +742,31 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   };
   gesture.camera.fields = MLN_CAMERA_OPTION_BEARING;
   gesture.camera.bearing = 20.0;
+  gesture.gesture_phase = MLN_GESTURE_PHASE_UPDATE;
+  update_camera(map, &gesture);
+  mln_map_snapshot snapshot = read_settled_snapshot(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
+  TEST_ASSERT_TRUE(snapshot.transition_in_progress);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, snapshot.view.camera.bearing);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&kept.calls));
+
+  gesture.camera.bearing = 30.0;
   gesture.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   update_camera(map, &gesture);
-  MLN_TEST_OK(mln_test_map_fence(map));
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.calls));
+  assert_ended(&kept, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "begin");
+  snapshot = read_settled_snapshot(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
+  TEST_ASSERT_FALSE(snapshot.transition_in_progress);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 30.0, snapshot.view.camera.bearing);
 
+  mln_test_transition_end started;
+  mln_test_transition_end_init(&started);
+  const mln_camera_update during = ease_to_zoom(3.0, 60000.0, &started);
+  update_camera(map, &during);
   gesture.gesture_phase = MLN_GESTURE_PHASE_CANCEL;
   update_camera(map, &gesture);
   TEST_ASSERT_FALSE(read_settled_snapshot(runtime, map).gesture_in_progress);
-  assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "gesture");
+  assert_ended(&started, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "cancel");
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -642,7 +836,7 @@ static void an_animated_delta_reports_its_end_once(void) {
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&cancelled.calls));
   MLN_TEST_AWAIT_OK(
-    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
   );
   assert_ended(&cancelled, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "delta");
 
@@ -673,7 +867,7 @@ static void an_animated_delta_replaces_the_running_one(void) {
   const double replacement_zoom = query_camera(map).zoom;
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&replaced.calls));
   apply_delta(map, &second);
-  assert_ended(&replaced, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED, "replaced");
+  assert_ended(&replaced, MLN_CAMERA_TRANSITION_OUTCOME_REPLACED, "replaced");
 
   render_until_ended(&fixture, &replacing);
   assert_ended(
@@ -701,12 +895,27 @@ static void a_delta_carries_its_gesture_phase(void) {
   };
   update.camera = test_camera();
   update_camera(map, &update);
+  mln_test_transition_end running;
+  mln_test_transition_end_init(&running);
+  mln_camera_update pitch = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  pitch.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  pitch.camera.fields = MLN_CAMERA_OPTION_PITCH;
+  pitch.camera.pitch = 50.0;
+  pitch.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  pitch.animation.duration_ms = 60000.0;
+  pitch.animation.end_handler = mln_test_transition_end_handler(&running);
+  update_camera(map, &pitch);
 
   mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
   delta.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   apply_delta(map, &delta);
+  assert_ended(&running, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "begin");
   mln_map_snapshot snapshot = read_settled_snapshot(runtime, map);
   TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
+  TEST_ASSERT_FALSE(snapshot.transition_in_progress);
   TEST_ASSERT_EQUAL_DOUBLE(11.0, snapshot.view.camera.zoom);
 
   delta.fields = MLN_CAMERA_DELTA_SCALE;
@@ -876,9 +1085,12 @@ MLN_TEST_GROUP {
   RUN_TEST(an_unobserved_animation_publishes_its_final_snapshot);
   RUN_TEST(an_immediate_command_completes_before_its_completion);
   RUN_TEST(the_handler_runs_whatever_the_event_mask_selects);
-  RUN_TEST(cancel_transitions_commits_and_leaves_the_camera);
-  RUN_TEST(cancel_camera_transition_ends_only_its_identity);
+  RUN_TEST(a_later_change_replaces_a_running_one);
+  RUN_TEST(free_camera_options_and_a_constraining_resize_cancel);
+  RUN_TEST(cancel_camera_transitions_commits_and_leaves_the_camera);
+  RUN_TEST(cancel_camera_transitions_with_id_ends_only_its_identity);
   RUN_TEST(gesture_phase_publishes_the_snapshot_flag);
+  RUN_TEST(a_gesture_begin_cancels_running_transitions);
   RUN_TEST(an_animated_delta_reports_its_end_once);
   RUN_TEST(an_animated_delta_replaces_the_running_one);
   RUN_TEST(a_delta_carries_its_gesture_phase);

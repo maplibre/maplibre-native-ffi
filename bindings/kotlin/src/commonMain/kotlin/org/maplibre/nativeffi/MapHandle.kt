@@ -489,32 +489,37 @@ internal constructor(
     }
 
   /**
+   * Stops every running camera animation where it is.
+   *
+   * The end handler of each stopped animation reports `CameraTransitionOutcome.CANCELLED`.
+   *
+   * See `mln_map_cancel_camera_transitions` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  public fun cancelCameraTransitions(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
+      check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic))
+    }
+
+  /**
    * Stops the running camera animations whose animation options set `transitionId`.
    *
    * Other animations keep running. The end handler of each stopped animation reports
    * `CameraTransitionOutcome.CANCELLED`.
    *
-   * See `mln_map_cancel_camera_transition` in the
+   * See `mln_map_cancel_camera_transitions_with_id` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun cancelCameraTransition(transitionId: ULong): Deferred<CommandCompletion> =
+  public fun cancelCameraTransitionsWithId(transitionId: ULong): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic),
+        C.mln_map_cancel_camera_transitions_with_id(
+          handle,
+          transitionId.toLong(),
+          completion,
+          diagnostic,
+        ),
       )
-    }
-
-  /**
-   * Stops every running camera animation where it is.
-   *
-   * The end handler of each stopped animation reports `CameraTransitionOutcome.CANCELLED`.
-   *
-   * See `mln_map_cancel_transitions` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cancelTransitions(): Deferred<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_cancel_transitions(handle, completion, diagnostic))
     }
 
   /**
@@ -1304,7 +1309,8 @@ internal constructor(
   /**
    * Places the camera at a position and orientation in space.
    *
-   * The map adjusts them to a camera that it can show, and stops running camera animations.
+   * The map adjusts them to a camera that it can show. It stops running camera animations first,
+   * and their end handlers report `CameraTransitionOutcome.CANCELLED`.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1920,18 +1926,23 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       check(C.mln_map_begin_command_group(handle, completion, diagnostic))
     }
 
-  /** [MapHandle.cancelCameraTransition] without its completion. */
-  public fun cancelCameraTransition(transitionId: ULong): Unit =
+  /** [MapHandle.cancelCameraTransitions] without its completion. */
+  public fun cancelCameraTransitions(): Unit =
     nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic),
-      )
+      check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic))
     }
 
-  /** [MapHandle.cancelTransitions] without its completion. */
-  public fun cancelTransitions(): Unit =
+  /** [MapHandle.cancelCameraTransitionsWithId] without its completion. */
+  public fun cancelCameraTransitionsWithId(transitionId: ULong): Unit =
     nativeDiscard(owner, binding) {
-      check(C.mln_map_cancel_transitions(handle, completion, diagnostic))
+      check(
+        C.mln_map_cancel_camera_transitions_with_id(
+          handle,
+          transitionId.toLong(),
+          completion,
+          diagnostic,
+        ),
+      )
     }
 
   /** [MapHandle.dumpDebugLogs] without its completion. */

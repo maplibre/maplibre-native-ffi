@@ -67,6 +67,11 @@ public value class CameraChangeMode(public val rawValue: UInt) {
 /**
  * How a camera change ended.
  *
+ * A camera delta that pans and also scales, rotates, or pitches animates as two parts, and any
+ * other change as one. When the parts of a change end in different ways, the change reports
+ * `CameraTransitionOutcome.CANCELLED` if any part was cancelled, then
+ * `CameraTransitionOutcome.REPLACED` if any part was replaced.
+ *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_camera_transition_outcome` in the
@@ -79,19 +84,30 @@ public value class CameraTransitionOutcome(public val rawValue: UInt) {
       0u -> "COMPLETED"
       1u -> "CANCELLED"
       2u -> "CLOSED"
+      3u -> "REPLACED"
       else -> "CameraTransitionOutcome($rawValue)"
     }
 
   public companion object {
-    /** The camera finished the change, or a later camera change replaced it. */
+    /** The camera finished the change. */
     public val COMPLETED: CameraTransitionOutcome = CameraTransitionOutcome(0u)
     /**
-     * `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or a gesture's
-     * `GesturePhase.CANCEL` stopped the change.
+     * `MapHandle.cancelCameraTransitions()`, `MapHandle.cancelCameraTransitionsWithId()`, a
+     * gesture's `GesturePhase.BEGIN` or `GesturePhase.CANCEL`, `MapHandle.setFreeCameraOptions()`,
+     * or a resize that moves the camera back inside its bounds stopped the change.
      */
     public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(1u)
     /** The map closed before the change ended. */
     public val CLOSED: CameraTransitionOutcome = CameraTransitionOutcome(2u)
+    /**
+     * A later camera change set every camera field that a part of the change still animated, so
+     * that part stopped.
+     *
+     * A fly animates its center and zoom together, and an anchor animates the center together with
+     * the fields it keeps in place, so a later change of any of them replaces them all. A part that
+     * a later change took only some fields from keeps animating the others, and ends as they end.
+     */
+    public val REPLACED: CameraTransitionOutcome = CameraTransitionOutcome(3u)
   }
 }
 
@@ -198,6 +214,9 @@ public value class FrameDemandFlag(public val rawValue: UInt) {
 /**
  * Where a camera change falls in a gesture that the user makes.
  *
+ * `GesturePhase.BEGIN` and `GesturePhase.UPDATE` mark a gesture in progress, and `GesturePhase.END`
+ * and `GesturePhase.CANCEL` end it.
+ *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_gesture_phase` in the
@@ -218,10 +237,20 @@ public value class GesturePhase(public val rawValue: UInt) {
   public companion object {
     /** The change isn't part of a gesture. */
     public val NONE: GesturePhase = GesturePhase(0u)
+    /**
+     * The gesture starts. This cancels every running camera animation before the change applies.
+     */
     public val BEGIN: GesturePhase = GesturePhase(1u)
+    /**
+     * The gesture continues. To start a gesture that keeps the running camera animations, start it
+     * with this phase instead of `GesturePhase.BEGIN`.
+     */
     public val UPDATE: GesturePhase = GesturePhase(2u)
     public val END: GesturePhase = GesturePhase(3u)
-    /** The platform cancelled the gesture. This also cancels camera changes. */
+    /**
+     * The platform cancelled the gesture. This also cancels every running camera animation after
+     * the change applies.
+     */
     public val CANCEL: GesturePhase = GesturePhase(4u)
   }
 }
@@ -2283,8 +2312,8 @@ public data class AnimationOptions(
   public val minZoom: Double? = null,
   public val easing: UnitBezier? = null,
   /**
-   * An ID that `MapHandle.cancelCameraTransition()` cancels the change by. Several changes can
-   * share one.
+   * An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change by. Several changes
+   * can share one.
    */
   public val transitionId: ULong? = null,
   public val endHandler: CameraTransitionHandler = CameraTransitionHandler(),

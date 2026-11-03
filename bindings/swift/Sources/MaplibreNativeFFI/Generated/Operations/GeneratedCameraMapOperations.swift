@@ -104,40 +104,42 @@ public extension MapHandle {
     }
   }
 
-  /// Stops the running camera animations whose animation options set
-  /// `transitionId`.
+  /// Stops every running camera animation where it is.
   ///
-  /// Other animations keep running. The end handler of each stopped animation
-  /// reports `CameraTransitionOutcome.cancelled`.
+  /// The end handler of each stopped animation reports
+  /// `CameraTransitionOutcome.cancelled`.
   ///
-  /// See `mln_map_cancel_camera_transition` in the
+  /// See `mln_map_cancel_camera_transitions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func cancelCameraTransition(_ bindingArg0: UInt64) async throws
-    -> CommandCompletion
-  {
+  func cancelCameraTransitions() async throws -> CommandCompletion {
     try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_cancel_camera_transition(
+      mln_map_cancel_camera_transitions(
         raw,
-        bindingArg0,
         completion,
         diagnostic
       )
     }
   }
 
-  /// Stops every running camera animation where it is.
+  /// Stops the running camera animations whose animation options set
+  /// `transitionId`.
   ///
-  /// The end handler of each stopped animation reports
-  /// `CameraTransitionOutcome.cancelled`.
+  /// Other animations keep running. The end handler of each stopped animation
+  /// reports `CameraTransitionOutcome.cancelled`.
   ///
-  /// See `mln_map_cancel_transitions` in the
+  /// See `mln_map_cancel_camera_transitions_with_id` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
-  func cancelTransitions() async throws -> CommandCompletion {
+  func cancelCameraTransitionsWithId(
+    transitionId bindingArg0: UInt64
+  ) async throws
+    -> CommandCompletion
+  {
     try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_cancel_transitions(
+      mln_map_cancel_camera_transitions_with_id(
         raw,
+        bindingArg0,
         completion,
         diagnostic
       )
@@ -242,8 +244,9 @@ public extension MapHandle {
 
   /// Places the camera at a position and orientation in space.
   ///
-  /// The map adjusts them to a camera that it can show, and stops running
-  /// camera animations.
+  /// The map adjusts them to a camera that it can show. It stops running camera
+  /// animations first, and their end handlers report
+  /// `CameraTransitionOutcome.cancelled`.
   ///
   /// See `mln_map_set_free_camera_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -378,22 +381,25 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func cancelCameraTransition(_ bindingArg0: UInt64) throws {
+  func cancelCameraTransitions() throws {
     try owner
-      .nativeInvoke { raw, _, diagnostic in mln_map_cancel_camera_transition(
+      .nativeInvoke { raw, _, diagnostic in mln_map_cancel_camera_transitions(
         raw,
-        bindingArg0,
         nil,
         diagnostic
       ) }
   }
 
-  func cancelTransitions() throws {
-    try owner.nativeInvoke { raw, _, diagnostic in mln_map_cancel_transitions(
-      raw,
-      nil,
-      diagnostic
-    ) }
+  func cancelCameraTransitionsWithId(transitionId bindingArg0: UInt64) throws {
+    try owner
+      .nativeInvoke { raw, _, diagnostic in
+        mln_map_cancel_camera_transitions_with_id(
+          raw,
+          bindingArg0,
+          nil,
+          diagnostic
+        )
+      }
   }
 
   func dumpDebugLogs() throws {

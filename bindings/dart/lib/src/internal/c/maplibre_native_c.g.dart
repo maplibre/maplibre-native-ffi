@@ -1774,6 +1774,7 @@ const MLN_CAMERA_OPTION_FOV = 256;
 const MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0;
 const MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1;
 const MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2;
+const MLN_CAMERA_TRANSITION_OUTCOME_REPLACED = 3;
 
 // mln_camera_update_mode
 const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
@@ -2877,6 +2878,15 @@ external int mln_map_camera_for_lat_lngs(
 );
 
 @Native<
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+>()
+external int mln_map_cancel_camera_transitions(
+  int map,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
   Int32 Function(
     mln_map,
     Uint64,
@@ -2884,18 +2894,9 @@ external int mln_map_camera_for_lat_lngs(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_cancel_camera_transition(
+external int mln_map_cancel_camera_transitions_with_id(
   int map,
   int transition_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
-external int mln_map_cancel_transitions(
-  int map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

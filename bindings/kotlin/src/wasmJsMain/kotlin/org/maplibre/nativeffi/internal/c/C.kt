@@ -473,21 +473,24 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_cancel_camera_transition(
+  actual fun mln_map_cancel_camera_transitions(
+    map: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_map_cancel_camera_transitions(map, word(completion), word(outDiagnostic))
+
+  actual fun mln_map_cancel_camera_transitions_with_id(
     map: Long,
     transitionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_cancel_camera_transition(
+    mln_kw_mln_map_cancel_camera_transitions_with_id(
       map,
       transitionId,
       word(completion),
       word(outDiagnostic),
     )
-
-  actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_map_cancel_transitions(map, word(completion), word(outDiagnostic))
 
   actual fun mln_map_dispose(map: Long, outDiagnostic: Long): Int =
     mln_kw_mln_map_dispose(map, word(outDiagnostic))
@@ -2201,14 +2204,19 @@ private fun mln_kw_mln_map_camera_for_lat_lngs(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_camera_for_lat_lngs(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_cancel_camera_transition(p0: Long, p1: Long, p2: Int, p3: Int): Int =
+private fun mln_kw_mln_map_cancel_camera_transitions(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_cancel_camera_transition(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_cancel_camera_transitions(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_map_cancel_transitions(p0: Long, p1: Int, p2: Int): Int =
+private fun mln_kw_mln_map_cancel_camera_transitions_with_id(
+  p0: Long,
+  p1: Long,
+  p2: Int,
+  p3: Int,
+): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_cancel_transitions(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_cancel_camera_transitions_with_id(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_dispose(p0: Long, p1: Int): Int =

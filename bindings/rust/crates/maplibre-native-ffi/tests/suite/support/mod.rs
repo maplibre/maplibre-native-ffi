@@ -77,7 +77,7 @@ pub fn assert_panicking_void_callback_is_reported() {
         ..Default::default()
     };
     wait_for(fixture.map().update_camera(&update));
-    wait_for(fixture.map().cancel_camera_transition(u64::MAX));
+    wait_for(fixture.map().cancel_camera_transitions_with_id(u64::MAX));
     let deadline = Instant::now() + timeout();
     let error = loop {
         let report = reports

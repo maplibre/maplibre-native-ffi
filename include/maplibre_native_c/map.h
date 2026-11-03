@@ -347,17 +347,38 @@ typedef struct mln_unit_bezier {
   double y2;
 } mln_unit_bezier;
 
-/** How a camera change ended. */
+/**
+ * How a camera change ended.
+ *
+ * A camera delta that pans and also scales, rotates, or pitches animates as
+ * two parts, and any other change as one. When the parts of a change end in
+ * different ways, the change reports MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED
+ * if any part was cancelled, then MLN_CAMERA_TRANSITION_OUTCOME_REPLACED if
+ * any part was replaced.
+ */
 typedef enum mln_camera_transition_outcome : uint32_t {
-  /** The camera finished the change, or a later camera change replaced it. */
+  /** The camera finished the change. */
   MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
   /**
-   * mln_map_cancel_transitions(), mln_map_cancel_camera_transition(), or a
-   * gesture's MLN_GESTURE_PHASE_CANCEL stopped the change.
+   * mln_map_cancel_camera_transitions(),
+   * mln_map_cancel_camera_transitions_with_id(), a gesture's
+   * MLN_GESTURE_PHASE_BEGIN or MLN_GESTURE_PHASE_CANCEL,
+   * mln_map_set_free_camera_options(), or a resize that moves the camera back
+   * inside its bounds stopped the change.
    */
   MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
   /** The map closed before the change ended. */
   MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2,
+  /**
+   * A later camera change set every camera field that a part of the change
+   * still animated, so that part stopped.
+   *
+   * A fly animates its center and zoom together, and an anchor animates the
+   * center together with the fields it keeps in place, so a later change of
+   * any of them replaces them all. A part that a later change took only some
+   * fields from keeps animating the others, and ends as they end.
+   */
+  MLN_CAMERA_TRANSITION_OUTCOME_REPLACED = 3,
 } mln_camera_transition_outcome;
 
 /** The end of a camera change. */
@@ -411,8 +432,8 @@ typedef struct mln_animation_options {
   mln_unit_bezier easing
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_EASING");
   /**
-   * An ID that mln_map_cancel_camera_transition() cancels the change by.
-   * Several changes can share one.
+   * An ID that mln_map_cancel_camera_transitions_with_id() cancels the change
+   * by. Several changes can share one.
    */
   uint64_t transition_id
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_TRANSITION_ID");
@@ -429,14 +450,30 @@ typedef enum mln_camera_update_mode : uint32_t {
   MLN_CAMERA_UPDATE_MODE_FLY = 2,
 } mln_camera_update_mode;
 
-/** Where a camera change falls in a gesture that the user makes. */
+/**
+ * Where a camera change falls in a gesture that the user makes.
+ *
+ * MLN_GESTURE_PHASE_BEGIN and MLN_GESTURE_PHASE_UPDATE mark a gesture in
+ * progress, and MLN_GESTURE_PHASE_END and MLN_GESTURE_PHASE_CANCEL end it.
+ */
 typedef enum mln_gesture_phase : uint32_t {
   /** The change isn't part of a gesture. */
   MLN_GESTURE_PHASE_NONE = 0,
+  /**
+   * The gesture starts. This cancels every running camera animation before
+   * the change applies.
+   */
   MLN_GESTURE_PHASE_BEGIN = 1,
+  /**
+   * The gesture continues. To start a gesture that keeps the running camera
+   * animations, start it with this phase instead of MLN_GESTURE_PHASE_BEGIN.
+   */
   MLN_GESTURE_PHASE_UPDATE = 2,
   MLN_GESTURE_PHASE_END = 3,
-  /** The platform cancelled the gesture. This also cancels camera changes. */
+  /**
+   * The platform cancelled the gesture. This also cancels every running camera
+   * animation after the change applies.
+   */
   MLN_GESTURE_PHASE_CANCEL = 4,
 } mln_gesture_phase;
 

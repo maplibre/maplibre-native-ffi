@@ -35,8 +35,8 @@ pub struct AnimationOptions {
     /// The zoom level at the peak of a fly animation.
     pub min_zoom: Option<f64>,
     pub easing: Option<UnitBezier>,
-    /// An ID that `MapHandle::cancel_camera_transition()` cancels the change
-    /// by. Several changes can share one.
+    /// An ID that `MapHandle::cancel_camera_transitions_with_id()` cancels the
+    /// change by. Several changes can share one.
     pub transition_id: Option<u64>,
     pub end_handler: CameraTransitionHandler,
 }
@@ -536,17 +536,33 @@ impl ToNative<sys::mln_camera_transition_handler> for CameraTransitionHandler {
 native_enum! {
 /// How a camera change ended.
 ///
+/// A camera delta that pans and also scales, rotates, or pitches animates as
+/// two parts, and any other change as one. When the parts of a change end in
+/// different ways, the change reports `CameraTransitionOutcome::Cancelled` if
+/// any part was cancelled, then `CameraTransitionOutcome::Replaced` if any part
+/// was replaced.
+///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum CameraTransitionOutcome: u32 {
-    /// The camera finished the change, or a later camera change replaced it.
+    /// The camera finished the change.
     Completed = 0,
-    /// `MapHandle::cancel_transitions()`,
-    /// `MapHandle::cancel_camera_transition()`, or a gesture's
-    /// `GesturePhase::Cancel` stopped the change.
+    /// `MapHandle::cancel_camera_transitions()`,
+    /// `MapHandle::cancel_camera_transitions_with_id()`, a gesture's
+    /// `GesturePhase::Begin` or `GesturePhase::Cancel`,
+    /// `MapHandle::set_free_camera_options()`, or a resize that moves the
+    /// camera back inside its bounds stopped the change.
     Cancelled = 1,
     /// The map closed before the change ended.
     Closed = 2,
+    /// A later camera change set every camera field that a part of the change
+    /// still animated, so that part stopped.
+    ///
+    /// A fly animates its center and zoom together, and an anchor animates the
+    /// center together with the fields it keeps in place, so a later change of
+    /// any of them replaces them all. A part that a later change took only some
+    /// fields from keeps animating the others, and ends as they end.
+    Replaced = 3,
 } Unknown
 }
 impl Default for CameraTransitionOutcome {
@@ -1168,15 +1184,23 @@ impl<'a> ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions<'a>
 native_enum! {
 /// Where a camera change falls in a gesture that the user makes.
 ///
+/// `GesturePhase::Begin` and `GesturePhase::Update` mark a gesture in progress,
+/// and `GesturePhase::End` and `GesturePhase::Cancel` end it.
+///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum GesturePhase: u32 {
     /// The change isn't part of a gesture.
     None = 0,
+    /// The gesture starts. This cancels every running camera animation before
+    /// the change applies.
     Begin = 1,
+    /// The gesture continues. To start a gesture that keeps the running camera
+    /// animations, start it with this phase instead of `GesturePhase::Begin`.
     Update = 2,
     End = 3,
-    /// The platform cancelled the gesture. This also cancels camera changes.
+    /// The platform cancelled the gesture. This also cancels every running
+    /// camera animation after the change applies.
     Cancel = 4,
 } Unknown
 }

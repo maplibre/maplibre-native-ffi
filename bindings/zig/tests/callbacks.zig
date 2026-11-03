@@ -310,7 +310,7 @@ test "a camera end handler inside a command runs once when its transition ends" 
     };
     try support.expectCommitted(try fixture.map.updateCamera(update, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
-    try support.expectCommitted(try fixture.map.cancelCameraTransition(3, null));
+    try support.expectCommitted(try fixture.map.cancelCameraTransitionsWithId(3, null));
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
     try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
 }

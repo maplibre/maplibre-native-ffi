@@ -26,8 +26,8 @@ public sealed record AnimationOptions
     public UnitBezier? Easing { get; init; }
 
     /// <summary>
-    /// An ID that <c>MapHandle.CancelCameraTransitionAsync()</c> cancels the
-    /// change by. Several changes can share one.
+    /// An ID that <c>MapHandle.CancelCameraTransitionsWithIdAsync()</c> cancels
+    /// the change by. Several changes can share one.
     /// </summary>
     public ulong? TransitionId { get; init; }
     public CameraTransitionHandler EndHandler { get; init; }

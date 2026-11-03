@@ -309,17 +309,17 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_cancel_camera_transition =
+  private val mln_map_cancel_camera_transitions =
+    Ffm.downcall("mln_map_cancel_camera_transitions", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_cancel_camera_transitions_with_id =
     Ffm.downcall(
-      "mln_map_cancel_camera_transition",
+      "mln_map_cancel_camera_transitions_with_id",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_cancel_transitions =
-    Ffm.downcall("mln_map_cancel_transitions", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_dispose = Ffm.downcall("mln_map_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_dump_debug_logs =
     Ffm.downcall("mln_map_dump_debug_logs", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
@@ -1701,17 +1701,24 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_cancel_camera_transition(
+  actual fun mln_map_cancel_camera_transitions(
+    map: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int = mln_map_cancel_camera_transitions.invokeExact(map, completion, outDiagnostic) as Int
+
+  actual fun mln_map_cancel_camera_transitions_with_id(
     map: Long,
     transitionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_cancel_camera_transition.invokeExact(map, transitionId, completion, outDiagnostic)
-      as Int
-
-  actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_map_cancel_transitions.invokeExact(map, completion, outDiagnostic) as Int
+    mln_map_cancel_camera_transitions_with_id.invokeExact(
+      map,
+      transitionId,
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_map_dispose(map: Long, outDiagnostic: Long): Int =
     mln_map_dispose.invokeExact(map, outDiagnostic) as Int

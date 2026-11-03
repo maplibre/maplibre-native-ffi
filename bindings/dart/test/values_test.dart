@@ -218,7 +218,7 @@ void main() {
         ),
       ),
     );
-    await expectCommitted(map.cancelCameraTransition(maximum));
+    await expectCommitted(map.cancelCameraTransitionsWithId(maximum));
     final end = await within(ended.future, 'the end handler');
     expect(end.outcome, CameraTransitionOutcome.cancelled);
   });

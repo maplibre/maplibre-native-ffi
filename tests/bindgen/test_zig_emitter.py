@@ -193,11 +193,11 @@ void mln_query_release(mln_query query);
             for line in outcome.split('@"cancelled" = 1,')[0].splitlines()
         )
         self.assertIn(
-            "`Map.cancelTransitions()`, `Map.cancelCameraTransition()`, or "
-            "a gesture's `GesturePhase.cancel` stopped the change",
+            "`Map.cancelCameraTransitions()`, `Map.cancelCameraTransitionsWithId()`, "
+            "a gesture's `GesturePhase.begin` or `GesturePhase.cancel`",
             summary,
         )
-        self.assertNotIn("mln_map_cancel_transitions", summary)
+        self.assertNotIn("mln_map_cancel_camera_transitions", summary)
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)

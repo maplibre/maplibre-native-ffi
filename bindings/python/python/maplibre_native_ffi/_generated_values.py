@@ -240,6 +240,12 @@ class CameraChangeMode(UnknownIntEnum):
 class CameraTransitionOutcome(UnknownIntEnum):
     """How a camera change ended.
 
+    A camera delta that pans and also scales, rotates, or pitches animates as
+    two parts, and any other change as one. When the parts of a change end in
+    different ways, the change reports `CameraTransitionOutcome.CANCELLED` if
+    any part was cancelled, then `CameraTransitionOutcome.REPLACED` if any
+    part was replaced.
+
     See `mln_camera_transition_outcome` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
@@ -247,6 +253,7 @@ class CameraTransitionOutcome(UnknownIntEnum):
     COMPLETED = 0
     CANCELLED = 1
     CLOSED = 2
+    REPLACED = 3
 
 
 class CameraUpdateMode(UnknownIntEnum):
@@ -291,6 +298,9 @@ class FrameDemandFlag(IntFlag):
 
 class GesturePhase(UnknownIntEnum):
     """Where a camera change falls in a gesture that the user makes.
+
+    `GesturePhase.BEGIN` and `GesturePhase.UPDATE` mark a gesture in
+    progress, and `GesturePhase.END` and `GesturePhase.CANCEL` end it.
 
     See `mln_gesture_phase` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -994,8 +1004,8 @@ class AnimationOptions:
     easing: UnitBezier | None = None
 
     transition_id: int | None = None
-    """An ID that `MapHandle.cancel_camera_transition()` cancels the change by.
-    Several changes can share one.
+    """An ID that `MapHandle.cancel_camera_transitions_with_id()` cancels the
+    change by. Several changes can share one.
     """
 
     end_handler: CameraTransitionHandler = field(

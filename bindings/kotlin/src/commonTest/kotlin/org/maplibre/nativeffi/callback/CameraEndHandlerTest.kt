@@ -27,7 +27,7 @@ class CameraEndHandlerTest {
       // Only the binding holds the handler, so it survives a collection. Cancelling the largest
       // identity ends the ease that carries it, so the 64-bit identity crossed whole both times.
       requestCollection()
-      map.cancelCameraTransition(ULong.MAX_VALUE).await()
+      map.cancelCameraTransitionsWithId(ULong.MAX_VALUE).await()
       val end = ended.awaitWithin("the end handler")
       assertEquals(CameraTransitionOutcome.CANCELLED, end.outcome)
       assertNotEquals(0uL, end.generation)

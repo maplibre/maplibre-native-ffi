@@ -59,8 +59,8 @@ export interface AnimationOptions {
   minZoom?: number;
   easing?: UnitBezier;
   /**
-   * An ID that `MapHandle.cancelCameraTransition()` cancels the change by.
-   * Several changes can share one.
+   * An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
+   * by. Several changes can share one.
    */
   transitionId?: bigint;
   endHandler?: CameraTransitionHandler;
@@ -323,23 +323,42 @@ export type CameraTransitionHandler = (end: CameraTransitionEnd) => void;
 /**
  * How a camera change ended.
  *
+ * A camera delta that pans and also scales, rotates, or pitches animates as two
+ * parts, and any other change as one. When the parts of a change end in
+ * different ways, the change reports `CameraTransitionOutcome.cancelled` if any
+ * part was cancelled, then `CameraTransitionOutcome.replaced` if any part was
+ * replaced.
+ *
  * See `mln_camera_transition_outcome` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const CameraTransitionOutcome = {
   /**
-   * The camera finished the change, or a later camera change replaced it.
+   * The camera finished the change.
    */
   completed: 0,
   /**
-   * `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or a
-   * gesture's `GesturePhase.cancel` stopped the change.
+   * `MapHandle.cancelCameraTransitions()`,
+   * `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
+   * `GesturePhase.begin` or `GesturePhase.cancel`,
+   * `MapHandle.setFreeCameraOptions()`, or a resize that moves the camera back
+   * inside its bounds stopped the change.
    */
   cancelled: 1,
   /**
    * The map closed before the change ended.
    */
   closed: 2,
+  /**
+   * A later camera change set every camera field that a part of the change
+   * still animated, so that part stopped.
+   *
+   * A fly animates its center and zoom together, and an anchor animates the
+   * center together with the fields it keeps in place, so a later change of any
+   * of them replaces them all. A part that a later change took only some fields
+   * from keeps animating the others, and ends as they end.
+   */
+  replaced: 3,
 } as const;
 /** One of the CameraTransitionOutcome values, or a value this binding does not know. */
 export type CameraTransitionOutcome =
@@ -648,6 +667,9 @@ export interface GeoJsonSourceOptions {
 /**
  * Where a camera change falls in a gesture that the user makes.
  *
+ * `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
+ * and `GesturePhase.end` and `GesturePhase.cancel` end it.
+ *
  * See `mln_gesture_phase` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
@@ -656,11 +678,20 @@ export const GesturePhase = {
    * The change isn't part of a gesture.
    */
   none: 0,
+  /**
+   * The gesture starts. This cancels every running camera animation before the
+   * change applies.
+   */
   begin: 1,
+  /**
+   * The gesture continues. To start a gesture that keeps the running camera
+   * animations, start it with this phase instead of `GesturePhase.begin`.
+   */
   update: 2,
   end: 3,
   /**
-   * The platform cancelled the gesture. This also cancels camera changes.
+   * The platform cancelled the gesture. This also cancels every running camera
+   * animation after the change applies.
    */
   cancel: 4,
 } as const;

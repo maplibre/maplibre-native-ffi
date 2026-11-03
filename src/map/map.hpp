@@ -446,9 +446,10 @@ auto map_update_camera(
 auto map_apply_camera_delta(
   mln_map map, const mln_camera_delta* delta, const mln_completion* completion
 ) -> mln_status;
-auto map_cancel_transitions(mln_map map, const mln_completion* completion)
-  -> mln_status;
-auto map_cancel_camera_transition(
+auto map_cancel_camera_transitions(
+  mln_map map, const mln_completion* completion
+) -> mln_status;
+auto map_cancel_camera_transitions_with_id(
   mln_map map, uint64_t transition_id, const mln_completion* completion
 ) -> mln_status;
 auto map_camera_query_start(mln_map map, const mln_completion* completion)

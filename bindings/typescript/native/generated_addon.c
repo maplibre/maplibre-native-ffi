@@ -1475,7 +1475,37 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_cancel_camera_transition(
+static napi_value mln_ts_export_mln_map_cancel_camera_transitions(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_completion(
+        call, call->argv[1], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_map_cancel_camera_transitions(arg_map, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_cancel_camera_transitions_with_id(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
@@ -1505,38 +1535,9 @@ static napi_value mln_ts_export_mln_map_cancel_camera_transition(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_cancel_camera_transition(
+  status = mln_map_cancel_camera_transitions_with_id(
     arg_map, arg_transition_id, present_completion, &diagnostic
   );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_cancel_transitions(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  if (!mln_ts_read_completion(
-        call, call->argv[1], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_cancel_transitions(arg_map, present_completion, &diagnostic);
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -6741,9 +6742,10 @@ static const mln_ts_export exports[] = {
   {"mln_map_camera_for_lat_lng_bounds",
    mln_ts_export_mln_map_camera_for_lat_lng_bounds},
   {"mln_map_camera_for_lat_lngs", mln_ts_export_mln_map_camera_for_lat_lngs},
-  {"mln_map_cancel_camera_transition",
-   mln_ts_export_mln_map_cancel_camera_transition},
-  {"mln_map_cancel_transitions", mln_ts_export_mln_map_cancel_transitions},
+  {"mln_map_cancel_camera_transitions",
+   mln_ts_export_mln_map_cancel_camera_transitions},
+  {"mln_map_cancel_camera_transitions_with_id",
+   mln_ts_export_mln_map_cancel_camera_transitions_with_id},
   {"mln_map_dispose", mln_ts_export_mln_map_dispose},
   {"mln_map_dump_debug_logs", mln_ts_export_mln_map_dump_debug_logs},
   {"mln_map_end_command_group", mln_ts_export_mln_map_end_command_group},

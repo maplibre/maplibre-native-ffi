@@ -37,7 +37,7 @@ fn a_camera_end_handler_inside_a_command_runs_once_when_its_transition_ends() {
     };
     wait_for(fixture.map().update_camera(&update));
     drop(update);
-    wait_for(fixture.map().cancel_camera_transition(u64::MAX));
+    wait_for(fixture.map().cancel_camera_transitions_with_id(u64::MAX));
     let end = outcomes.recv_timeout(timeout()).unwrap();
     assert_eq!(end.outcome, CameraTransitionOutcome::Cancelled);
     assert_ne!(end.generation, 0);

@@ -440,21 +440,21 @@ int32_t mln_kw_mln_map_camera_for_lat_lngs(
   );
 }
 
-int32_t mln_kw_mln_map_cancel_camera_transition(
-  int64_t map, int64_t transition_id, uintptr_t completion,
-  uintptr_t out_diagnostic
+int32_t mln_kw_mln_map_cancel_camera_transitions(
+  int64_t map, uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_cancel_camera_transition(
-    (mln_map)map, (uint64_t)transition_id, (const mln_completion*)completion,
+  return (int32_t)mln_map_cancel_camera_transitions(
+    (mln_map)map, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }
 
-int32_t mln_kw_mln_map_cancel_transitions(
-  int64_t map, uintptr_t completion, uintptr_t out_diagnostic
+int32_t mln_kw_mln_map_cancel_camera_transitions_with_id(
+  int64_t map, int64_t transition_id, uintptr_t completion,
+  uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_cancel_transitions(
-    (mln_map)map, (const mln_completion*)completion,
+  return (int32_t)mln_map_cancel_camera_transitions_with_id(
+    (mln_map)map, (uint64_t)transition_id, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }

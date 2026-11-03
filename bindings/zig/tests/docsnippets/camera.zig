@@ -23,7 +23,6 @@ fn onFlyEnd(
 
 // #region gesture
 fn beginGesture(map: maplibre.Map) !void {
-    try map.discarding().cancelTransitions(null);
     try map.discarding().applyCameraDelta(
         .{ .gesture_phase = .begin },
         null,

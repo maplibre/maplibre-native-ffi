@@ -23,7 +23,8 @@ import Testing
       )
       try await fixture.map.updateCamera(update)
     }
-    _ = try await fixture.map.cancelCameraTransition(UInt64.max)
+    _ = try await fixture.map
+      .cancelCameraTransitionsWithId(transitionId: UInt64.max)
     await awaitCondition("the end handler") { !ends.value.isEmpty }
     #expect(ends.value.count == 1)
     #expect(ends.value.first?.outcome == .cancelled)

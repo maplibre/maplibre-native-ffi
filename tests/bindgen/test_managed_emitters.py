@@ -522,7 +522,9 @@ namespace Maplibre.NativeFfi.Internal.Callback {
 class DotnetDocTests(unittest.TestCase):
     def test_a_summary_names_the_dotnet_symbols_of_the_c_identifiers(self):
         outcome = emitted(dotnet, real_api())["Map/CameraTransitionOutcome.g.cs"]
-        self.assertIn("<c>MapHandle.CancelTransitionsAsync()</c>", outcome)
-        self.assertIn("<c>MapHandle.CancelCameraTransitionAsync()</c>", outcome)
-        self.assertIn("<c>GesturePhase.Cancel</c> stopped", outcome)
-        self.assertNotIn("mln_map_cancel_transitions()", outcome)
+        self.assertIn("<c>MapHandle.CancelCameraTransitionsAsync()</c>", outcome)
+        self.assertIn("<c>MapHandle.CancelCameraTransitionsWithIdAsync()</c>", outcome)
+        self.assertIn(
+            "<c>GesturePhase.Begin</c> or <c>GesturePhase.Cancel</c>", outcome
+        )
+        self.assertNotIn("mln_map_cancel_camera_transitions()", outcome)

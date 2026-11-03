@@ -766,35 +766,40 @@ impl MapHandle {
         )
     }
 
+    /// Stops every running camera animation where it is.
+    ///
+    /// The end handler of each stopped animation reports
+    /// `CameraTransitionOutcome::Cancelled`.
+    ///
+    /// See `mln_map_cancel_camera_transitions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn cancel_camera_transitions(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call();
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_cancel_camera_transitions(map, completion, out_diagnostic)
+        })
+    }
+
     /// Stops the running camera animations whose animation options set
     /// `transition_id`.
     ///
     /// Other animations keep running. The end handler of each stopped animation
     /// reports `CameraTransitionOutcome::Cancelled`.
     ///
-    /// See `mln_map_cancel_camera_transition` in the
+    /// See `mln_map_cancel_camera_transitions_with_id` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn cancel_camera_transition(
+    pub fn cancel_camera_transitions_with_id(
         &self,
         transition_id: u64,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_cancel_camera_transition(map, transition_id, completion, out_diagnostic)
-        })
-    }
-
-    /// Stops every running camera animation where it is.
-    ///
-    /// The end handler of each stopped animation reports
-    /// `CameraTransitionOutcome::Cancelled`.
-    ///
-    /// See `mln_map_cancel_transitions` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn cancel_transitions(&self) -> Result<NativeFuture<CommandCompletion>> {
-        let call = self.inner.call();
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_cancel_transitions(map, completion, out_diagnostic)
+            sys::mln_map_cancel_camera_transitions_with_id(
+                map,
+                transition_id,
+                completion,
+                out_diagnostic,
+            )
         })
     }
 
@@ -1612,8 +1617,9 @@ impl MapHandle {
 
     /// Places the camera at a position and orientation in space.
     ///
-    /// The map adjusts them to a camera that it can show, and stops running
-    /// camera animations.
+    /// The map adjusts them to a camera that it can show. It stops running
+    /// camera animations first, and their end handlers report
+    /// `CameraTransitionOutcome::Cancelled`.
     ///
     /// See `mln_map_set_free_camera_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2319,32 +2325,37 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
+    /// Stops every running camera animation where it is.
+    ///
+    /// The end handler of each stopped animation reports
+    /// `CameraTransitionOutcome::Cancelled`.
+    ///
+    /// See `mln_map_cancel_camera_transitions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn cancel_camera_transitions(&self) -> Result<()> {
+        let call = self.0.inner.call();
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_cancel_camera_transitions(map, completion, out_diagnostic)
+        })
+    }
+
     /// Stops the running camera animations whose animation options set
     /// `transition_id`.
     ///
     /// Other animations keep running. The end handler of each stopped animation
     /// reports `CameraTransitionOutcome::Cancelled`.
     ///
-    /// See `mln_map_cancel_camera_transition` in the
+    /// See `mln_map_cancel_camera_transitions_with_id` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn cancel_camera_transition(&self, transition_id: u64) -> Result<()> {
+    pub fn cancel_camera_transitions_with_id(&self, transition_id: u64) -> Result<()> {
         let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_cancel_camera_transition(map, transition_id, completion, out_diagnostic)
-        })
-    }
-
-    /// Stops every running camera animation where it is.
-    ///
-    /// The end handler of each stopped animation reports
-    /// `CameraTransitionOutcome::Cancelled`.
-    ///
-    /// See `mln_map_cancel_transitions` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn cancel_transitions(&self) -> Result<()> {
-        let call = self.0.inner.call();
-        call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_cancel_transitions(map, completion, out_diagnostic)
+            sys::mln_map_cancel_camera_transitions_with_id(
+                map,
+                transition_id,
+                completion,
+                out_diagnostic,
+            )
         })
     }
 
@@ -2712,8 +2723,9 @@ impl MapHandleDiscarding<'_> {
 
     /// Places the camera at a position and orientation in space.
     ///
-    /// The map adjusts them to a camera that it can show, and stops running
-    /// camera animations.
+    /// The map adjusts them to a camera that it can show. It stops running
+    /// camera animations first, and their end handlers report
+    /// `CameraTransitionOutcome::Cancelled`.
     ///
     /// See `mln_map_set_free_camera_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

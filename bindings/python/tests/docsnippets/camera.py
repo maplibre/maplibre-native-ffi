@@ -14,7 +14,6 @@ def fly_ended(completed: bool) -> None:
 
 # #region gesture
 def begin_gesture(map_handle: mln.MapHandle) -> None:
-    map_handle.discarding.cancel_transitions()
     map_handle.discarding.apply_camera_delta(
         mln.CameraDelta(gesture_phase=mln.GesturePhase.BEGIN)
     )

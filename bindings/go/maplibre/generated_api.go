@@ -77,18 +77,34 @@ func (value CameraChangeMode) String() string {
 // CameraTransitionOutcome corresponds to mln_camera_transition_outcome. How a
 // camera change ended.
 //
+// A camera delta that pans and also scales, rotates, or pitches animates as two
+// parts, and any other change as one. When the parts of a change end in
+// different ways, the change reports CameraTransitionOutcomeCancelled if any
+// part was cancelled, then CameraTransitionOutcomeReplaced if any part was
+// replaced.
+//
 // See mln_camera_transition_outcome in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraTransitionOutcome uint32
 
 const (
-	// The camera finished the change, or a later camera change replaced it.
+	// The camera finished the change.
 	CameraTransitionOutcomeCompleted CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED)
-	// MapHandle.CancelTransitions(), MapHandle.CancelCameraTransition(), or a
-	// gesture's GesturePhaseCancel stopped the change.
+	// MapHandle.CancelCameraTransitions(),
+	// MapHandle.CancelCameraTransitionsWithId(), a gesture's GesturePhaseBegin or
+	// GesturePhaseCancel, MapHandle.SetFreeCameraOptions(), or a resize that moves
+	// the camera back inside its bounds stopped the change.
 	CameraTransitionOutcomeCancelled CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED)
 	// The map closed before the change ended.
 	CameraTransitionOutcomeClosed CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CLOSED)
+	// A later camera change set every camera field that a part of the change still
+	// animated, so that part stopped.
+	//
+	// A fly animates its center and zoom together, and an anchor animates the
+	// center together with the fields it keeps in place, so a later change of any
+	// of them replaces them all. A part that a later change took only some fields
+	// from keeps animating the others, and ends as they end.
+	CameraTransitionOutcomeReplaced CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_REPLACED)
 )
 
 func (value CameraTransitionOutcome) String() string {
@@ -99,6 +115,8 @@ func (value CameraTransitionOutcome) String() string {
 		return "CameraTransitionOutcomeCancelled"
 	case 2:
 		return "CameraTransitionOutcomeClosed"
+	case 3:
+		return "CameraTransitionOutcomeReplaced"
 	}
 	return fmt.Sprintf("CameraTransitionOutcome(%d)", value)
 }
@@ -191,17 +209,25 @@ func (value FrameDemandFlag) String() string {
 // GesturePhase corresponds to mln_gesture_phase. Where a camera change falls in
 // a gesture that the user makes.
 //
+// GesturePhaseBegin and GesturePhaseUpdate mark a gesture in progress, and
+// GesturePhaseEnd and GesturePhaseCancel end it.
+//
 // See mln_gesture_phase in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type GesturePhase uint32
 
 const (
 	// The change isn't part of a gesture.
-	GesturePhaseNone   GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_NONE)
-	GesturePhaseBegin  GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_BEGIN)
+	GesturePhaseNone GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_NONE)
+	// The gesture starts. This cancels every running camera animation before the
+	// change applies.
+	GesturePhaseBegin GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_BEGIN)
+	// The gesture continues. To start a gesture that keeps the running camera
+	// animations, start it with this phase instead of GesturePhaseBegin.
 	GesturePhaseUpdate GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_UPDATE)
 	GesturePhaseEnd    GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_END)
-	// The platform cancelled the gesture. This also cancels camera changes.
+	// The platform cancelled the gesture. This also cancels every running camera
+	// animation after the change applies.
 	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
 )
 
@@ -1826,8 +1852,8 @@ type AnimationOptions struct {
 	// The zoom level at the peak of a fly animation.
 	MinZoom *float64
 	Easing  *UnitBezier
-	// An ID that MapHandle.CancelCameraTransition() cancels the change by. Several
-	// changes can share one.
+	// An ID that MapHandle.CancelCameraTransitionsWithId() cancels the change by.
+	// Several changes can share one.
 	TransitionId *uint64
 	EndHandler   CameraTransitionHandler
 }
@@ -6435,30 +6461,30 @@ func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *Ca
 	}, completionOf(copyCameraOptions))
 }
 
-// CancelCameraTransition stops the running camera animations whose animation
-// options set transitionId.
-//
-// Other animations keep running. The end handler of each stopped animation
-// reports CameraTransitionOutcomeCancelled.
-//
-// See mln_map_cancel_camera_transition in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) CancelCameraTransition(transitionId uint64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_cancel_camera_transition(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
-	}, completionCommand)
-}
-
-// CancelTransitions stops every running camera animation where it is.
+// CancelCameraTransitions stops every running camera animation where it is.
 //
 // The end handler of each stopped animation reports
 // CameraTransitionOutcomeCancelled.
 //
-// See mln_map_cancel_transitions in the C API reference:
+// See mln_map_cancel_camera_transitions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) CancelCameraTransitions() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
+		return int32(C.mln_map_cancel_camera_transitions(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
+}
+
+// CancelCameraTransitionsWithId stops the running camera animations whose
+// animation options set transitionId.
+//
+// Other animations keep running. The end handler of each stopped animation
+// reports CameraTransitionOutcomeCancelled.
+//
+// See mln_map_cancel_camera_transitions_with_id in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+func (receiver *MapHandle) CancelCameraTransitionsWithId(transitionId uint64) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_cancel_camera_transitions_with_id(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7167,8 +7193,9 @@ func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state 
 // SetFreeCameraOptions places the camera at a position and orientation in
 // space.
 //
-// The map adjusts them to a camera that it can show, and stops running camera
-// animations.
+// The map adjusts them to a camera that it can show. It stops running camera
+// animations first, and their end handlers report
+// CameraTransitionOutcomeCancelled.
 //
 // See mln_map_set_free_camera_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
@@ -8649,17 +8676,17 @@ func (view MapHandleDiscarding) BeginCommandGroup() error {
 	})
 }
 
-func (view MapHandleDiscarding) CancelCameraTransition(transitionId uint64) error {
+func (view MapHandleDiscarding) CancelCameraTransitions() error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_cancel_camera_transition(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
+		return int32(C.mln_map_cancel_camera_transitions(C.mln_map(raw), completion, diagnostic))
 	})
 }
 
-func (view MapHandleDiscarding) CancelTransitions() error {
+func (view MapHandleDiscarding) CancelCameraTransitionsWithId(transitionId uint64) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
+		return int32(C.mln_map_cancel_camera_transitions_with_id(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
 	})
 }
 

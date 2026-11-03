@@ -248,14 +248,14 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_cancel_camera_transition(
+  fun mln_map_cancel_camera_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_cancel_camera_transitions_with_id(
     map: Long,
     transitionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
-
-  fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
 

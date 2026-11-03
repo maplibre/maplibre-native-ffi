@@ -404,9 +404,9 @@ static void a_camera_end_handler_runs_its_end_then_its_release(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
-  MLN_TEST_AWAIT_OK(
-    mln_map_cancel_camera_transition(map, 7, &completion.descriptor, NULL)
-  );
+  MLN_TEST_AWAIT_OK(mln_map_cancel_camera_transitions_with_id(
+    map, 7, &completion.descriptor, NULL
+  ));
   dispatch_until(queue.handle, &log, 'r');
   TEST_ASSERT_EQUAL_STRING("Er", log.kinds);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, log.generations[0]);
