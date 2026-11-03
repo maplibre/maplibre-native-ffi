@@ -140,9 +140,10 @@ internal object TestGraphics {
   val backend: TestBackend by lazy { TestBackend.ofBuild() }
 
   /**
-   * The driver of the owned texture that REND-01 reads back. WebGL reads it back from a core worker
-   * over a transferred canvas, and the other render tests drive the page's existing context, so the
-   * suite covers both WebGL context kinds. Every other backend reads it back on [thread].
+   * The driver of the owned texture that the render tests read back. WebGL reads it back from a
+   * core worker over a transferred canvas, and the other render tests drive the page's existing
+   * context, so the suite covers both WebGL context kinds. Every other backend reads it back on
+   * [thread].
    */
   val readbackDriver: RenderDriverKind
     get() =

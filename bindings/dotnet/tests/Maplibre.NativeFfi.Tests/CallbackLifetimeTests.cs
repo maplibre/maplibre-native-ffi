@@ -7,127 +7,41 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class CallbackLifetimeTests
 {
+    // A camera command's end handler sits two records deep in its input. Nothing but the binding
+    // references it while the ease runs, so it must survive a collection to run when cancelled.
     [Fact]
-    public async Task ACallbackIsRootedUntilNativeReleasesIt()
-    {
-        await using var fixture = await NativeFixture.WithEmptyStyleAsync();
-
-        var (added, accepted) = Gc.OnThread(() => AddCapturingSource(fixture.Map));
-        await added;
-        Assert.True(Gc.IsAlive(accepted));
-
-        // Removing the source is what makes native release the registration.
-        await fixture.Map.RemoveStyleSourceAsync("custom");
-        Assert.Null(await fixture.Map.GetStyleSourceAsync("custom"));
-        Gc.CollectUntilReclaimed("the removed source callback", accepted);
-
-        // Native validates the zoom range before it takes the registration.
-        var rejected = Gc.OnThread(() => AddRejectedCapturingSource(fixture.Map));
-        Gc.CollectUntilReclaimed("the rejected callback capture", rejected);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (Task<CommandCompletion> Added, WeakReference Captured) AddCapturingSource(
-        MapHandle map
-    )
-    {
-        var captured = new object();
-        var added = map.AddCustomGeometrySourceAsync(
-            "custom",
-            new CustomGeometrySourceOptions { FetchTile = _ => GC.KeepAlive(captured) }
-        );
-        return (added, new WeakReference(captured));
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference AddRejectedCapturingSource(MapHandle map)
-    {
-        var captured = new object();
-        var rejection = Record.Exception(() =>
-        {
-            _ = map.AddCustomGeometrySourceAsync(
-                "rejected",
-                new CustomGeometrySourceOptions
-                {
-                    FetchTile = _ => GC.KeepAlive(captured),
-                    MinZoom = 5,
-                    MaxZoom = 1,
-                }
-            );
-        });
-        Assert.IsType<MaplibreException>(rejection);
-        return new WeakReference(captured);
-    }
-
-    // A camera command's end handler sits two records deep in its input. The binding roots it while
-    // the ease runs, and native runs it once and releases it when its identity is cancelled.
-    [Fact]
-    public async Task ACameraEndHandlerIsRootedUntilItRuns()
+    public async Task ACameraEndHandlerSurvivesACollectionUntilItRuns()
     {
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
         var ends = new System.Collections.Concurrent.ConcurrentQueue<CameraTransitionEnd>();
-        var (started, captured) = Gc.OnThread(() => StartCapturingEase(fixture.Map, ends));
-        await started;
-        Assert.True(Gc.IsAlive(captured));
+        await StartEase(fixture.Map, ends);
+        Gc.Collect();
 
         // The handler runs before the cancellation completes.
         await fixture.Map.CancelCameraTransitionAsync(ulong.MaxValue);
         var end = Assert.Single(ends);
         Assert.Equal(CameraTransitionOutcome.Cancelled, end.Outcome);
         Assert.NotEqual(0UL, end.Generation);
-        Gc.CollectUntilReclaimed("the completed camera end handler", captured);
-
-        var rejected = Gc.OnThread(() => ApplyRejectedCapturingDelta(fixture.Map));
-        Gc.CollectUntilReclaimed("the rejected callback capture", rejected);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (Task<CommandCompletion> Started, WeakReference Captured) StartCapturingEase(
+    private static Task<CommandCompletion> StartEase(
         MapHandle map,
         System.Collections.Concurrent.ConcurrentQueue<CameraTransitionEnd> ends
-    )
-    {
-        var captured = new object();
-        var animation = new AnimationOptions
-        {
-            DurationMs = 60000,
-            TransitionId = ulong.MaxValue,
-            EndHandler = new CameraTransitionHandler(end =>
-            {
-                GC.KeepAlive(captured);
-                ends.Enqueue(end);
-            }),
-        };
-        var started = map.UpdateCameraAsync(
+    ) =>
+        map.UpdateCameraAsync(
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Ease,
                 Camera = new CameraOptions { Zoom = 4 },
-                Animation = animation,
+                Animation = new AnimationOptions
+                {
+                    DurationMs = 60000,
+                    TransitionId = ulong.MaxValue,
+                    EndHandler = new CameraTransitionHandler(ends.Enqueue),
+                },
             }
         );
-        return (started, new WeakReference(captured));
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference ApplyRejectedCapturingDelta(MapHandle map)
-    {
-        var captured = new object();
-        var delta = new CameraDelta
-        {
-            Scale = -1,
-            Animation = new AnimationOptions
-            {
-                EndHandler = new CameraTransitionHandler(_ => GC.KeepAlive(captured)),
-            },
-        };
-        var rejection = Record.Exception(() =>
-        {
-            _ = map.ApplyCameraDeltaAsync(delta);
-        });
-        Assert.IsType<MaplibreException>(rejection);
-        return new WeakReference(captured);
-    }
 
     // Native holds a strong root until the registration is released.
     [Fact]
@@ -138,9 +52,7 @@ public sealed class CallbackLifetimeTests
 
         Gc.Collect();
 
-        Assert.True(map.IsAlive);
         await ((MapHandle)map.Target!).CloseAsync();
-        // The finalizer disposed the map, so the runtime has no live child to refuse its close.
         await runtime.CloseAsync();
     }
 

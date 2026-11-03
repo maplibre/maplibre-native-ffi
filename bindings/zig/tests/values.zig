@@ -7,8 +7,8 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
-// Host strings cross as views. Native rejects NUL in paths before a C-string
-// consumer reads them, while other views preserve NUL.
+// Host strings cross as views with their length, so a NUL inside one reaches
+// native rather than ending the string.
 test "host strings use views and native-lent strings decode" {
     const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".param_types[0].?;
     var raw_request = std.mem.zeroes(RawRequest);
@@ -17,11 +17,6 @@ test "host strings use views and native-lent strings decode" {
     // A callback argument borrows native's text rather than copying it.
     const request = try maplibre.ResourceRequestInfo.fromNative(raw_request);
     try testing.expectEqual(@as([*]const u8, lent_url), request.resolved_url.ptr);
-
-    var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidArgument, maplibre.Runtime.create(.{ .asset_path = "asset\x00path" }, &diagnostic));
-    try testing.expect(diagnostic.status != null);
-    try testing.expect(std.mem.indexOf(u8, diagnostic.message(), "embedded NUL") != null);
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -142,9 +137,7 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     try testing.expectError(error.InvalidArgument, maplibre.setNetworkStatus(@fromBackingInt(900), null));
 
     // Cancelling the identifier ends only the ease that carries it, so the
-    // identifier crossed whole both times. The end handler sits two records
-    // deep in the command's input and runs once, before the cancellation
-    // completes.
+    // identifier crossed whole both times.
     const transition_id: u64 = 0x8000_0000_0000_0029;
     var ended = support.EndProbe{};
     const update: maplibre.CameraUpdate = .{
@@ -156,7 +149,6 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id & 0x7fff_ffff_ffff_ffff, null));
     try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
     try support.expectCommitted(try fixture.map.cancelCameraTransition(transition_id, null));
-    try ended.releases.waitFor(1);
     try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
     try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
 }
@@ -182,11 +174,6 @@ test "an array input is copied at submission" {
     defer copy.deinit();
     try testing.expectEqual(@as(usize, pixels.len), copy.value.pixels.len);
     for (copy.value.pixels) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
-}
-
-test "a record round trips through generated conversion" {
-    const options: maplibre.MapOptions = .{ .initial_extent = .{ .width = 256, .height = 128, .scale_factor = 2.0 } };
-    try testing.expectEqual(options, maplibre.MapOptions.fromNative(options.toNative()));
 }
 
 test "synchronous calls fill caller-sized outputs in input order" {

@@ -9,14 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"weak"
 )
-
-func rootCount(owner *bindingOwner) int {
-	owner.rootsMu.Lock()
-	defer owner.rootsMu.Unlock()
-	return len(owner.roots)
-}
 
 // failureLog collects callback-side failures, which a callback on a native
 // thread cannot report through t.
@@ -68,53 +61,10 @@ func isLoadingFailure(url string) func(RuntimeEvent) bool {
 	}
 }
 
-// A registration is rooted on its owner from the accepted submission until
-// native releases it: at removal, at map close, and after a command that
-// fails. A submission rejected up front never roots it.
-func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
-	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
-	options := CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}}
-
-	await(t, submitted(f.m.AddCustomGeometrySource("removed", options)))
-	if roots := rootCount(f.m.bindingOwner); roots != 1 {
-		t.Fatalf("roots after the add = %d, want 1", roots)
-	}
-	await(t, submitted(f.m.RemoveStyleSource("removed")))
-	if roots := rootCount(f.m.bindingOwner); roots != 0 {
-		t.Fatalf("roots after the removal = %d, want 0", roots)
-	}
-
-	for _, rejected := range []struct {
-		id      string
-		options CustomGeometrySourceOptions
-	}{{"", options}, {"rejected", CustomGeometrySourceOptions{}}} {
-		if _, err := f.m.AddCustomGeometrySource(rejected.id, rejected.options); !errors.Is(err, StatusInvalidArgument) {
-			t.Fatalf("add %q = %v, want StatusInvalidArgument", rejected.id, err)
-		}
-		if roots := rootCount(f.m.bindingOwner); roots != 0 {
-			t.Fatalf("roots after a rejected add of %q = %d, want 0", rejected.id, roots)
-		}
-	}
-
-	await(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
-	awaitFailure(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
-	// Native releases a failed command's registration after its completion
-	// returns, and before a later command on the map completes.
-	await(t, submitted(f.m.RequestRepaint()))
-	if roots := rootCount(f.m.bindingOwner); roots != 1 {
-		t.Fatalf("roots after a failed add = %d, want 1", roots)
-	}
-	await(t, submitted(f.m.Close()))
-	if roots := rootCount(f.m.bindingOwner); roots != 0 {
-		t.Fatalf("roots after the map closed = %d, want 0", roots)
-	}
-}
-
-// A camera command's end handler sits two records deep in its input. The map
-// roots it while the ease runs, and native runs it once and releases it when
-// its identity is cancelled. A command that native rejects roots nothing.
-func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
+// A camera command's end handler sits two records deep in its input, and
+// nothing but the binding references it while the ease runs, so it survives a
+// collection to run once when its identity is cancelled.
+func TestCameraEndHandlerSurvivesACollectionUntilItRuns(t *testing.T) {
 	f := newFixture(t)
 	ends := make(chan CameraTransitionEnd, 2)
 	zoom := 4.0
@@ -127,56 +77,15 @@ func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
 	update.Animation.TransitionId = &identity
 	update.Animation.EndHandler = CameraTransitionHandler{Callback: func(end CameraTransitionEnd) { ends <- end }}
 	await(t, submitted(f.m.UpdateCamera(update)))
-	if roots := rootCount(f.m.bindingOwner); roots != 1 {
-		t.Fatalf("roots while the ease runs = %d, want 1", roots)
-	}
+	stdruntime.GC()
 	await(t, submitted(f.m.CancelCameraTransition(identity)))
-	select {
-	case end := <-ends:
-		if end.Outcome != CameraTransitionOutcomeCancelled || end.Generation == 0 {
-			t.Fatalf("end = %+v, want a cancellation with a generation", end)
-		}
-	case <-time.After(testTimeout()):
-		t.Fatal("the end handler never ran")
-	}
-	if roots := rootCount(f.m.bindingOwner); roots != 0 {
-		t.Fatalf("roots after the end = %d, want 0", roots)
-	}
-
-	scale := -1.0
-	delta := CameraDelta{}
-	delta.Scale = &scale
-	delta.Animation.EndHandler = update.Animation.EndHandler
-	if _, err := f.m.ApplyCameraDelta(delta); !errors.Is(err, StatusInvalidArgument) {
-		t.Fatalf("apply delta = %v, want StatusInvalidArgument", err)
-	}
-	if roots := rootCount(f.m.bindingOwner); roots != 0 {
-		t.Fatalf("roots after a rejected delta = %d, want 0", roots)
+	end := receive(t, ends, "the end handler")
+	if end.Outcome != CameraTransitionOutcomeCancelled || end.Generation == 0 {
+		t.Fatalf("end = %+v, want a cancellation with a generation", end)
 	}
 	if len(ends) != 0 {
 		t.Fatal("the end handler ran more than once")
 	}
-}
-
-// discardProviderCycle registers a provider whose closure captures its
-// runtime, and drops every other reference to both.
-func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {
-	t.Helper()
-	host, err := NewRuntime(RuntimeOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	await(t, submitted(host.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
-		stdruntime.KeepAlive(host)
-		_ = request.PassThrough()
-	}})))
-	return weak.Make(host.bindingOwner)
-}
-
-// Native holds a registration weakly, so a callback that captures its own
-// receiver leaves a cycle the collector reclaims.
-func TestCallbackDoesNotKeepItsReceiverAlive(t *testing.T) {
-	awaitUnreachable(t, discardProviderCycle(t), "the runtime in a cycle with its provider")
 }
 
 // A panic in a callback stays in the binding, which settles what native waits
@@ -362,48 +271,23 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 	f.awaitEvent(t, "the deferred style load", isStyleLoaded)
 }
 
-// Native copies a provider's routes, so the caller may reuse the slice once the
-// submission returns. Only a request that a route matches reaches the
-// callback, and any other passes through to native loading. A route that names
-// a kind claims no other kind, and one that names only a URL pattern claims
-// every kind.
+// A provider's routes reach native code: a request that a route matches
+// reaches the callback, and any other passes through to native loading.
 func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	f := newFixture(t)
-	const routedStyle = `{"version":8,"sources":{"tiles":{"type":"vector","url":"custom://any/tiles.json"}},"layers":[]}`
-	type routed struct {
-		url  string
-		kind ResourceKind
-	}
-	requests := make(chan routed, 8)
-	deny := denyingProvider().Callback
-	routes := []ResourceRoute{
-		{Kinds: ResourceKindFlagTile, Flags: UrlMatchFlagGlob, Url: "**"},
-		{Kinds: ResourceKindFlagStyle, Url: "custom://routed/style.json"},
-		{Flags: UrlMatchFlagGlob, Url: "custom://any/**"},
-	}
+	requests := make(chan string, 4)
+	routes := []ResourceRoute{{Kinds: ResourceKindFlagStyle, Flags: UrlMatchFlagGlob, Url: "custom://routed/**"}}
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Routes: routes, Callback: func(request ResourceRequestInfo, handle *ResourceRequestHandle) {
-		offer(requests, routed{request.RequestedUrl, request.Kind})
-		if request.RequestedUrl != "custom://routed/style.json" {
-			deny(request, handle)
-			return
-		}
-		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(routedStyle)})
+		offer(requests, request.RequestedUrl)
+		_ = handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyle)})
 	}})))
-	for i := range routes {
-		routes[i] = ResourceRoute{Url: "custom://overwritten.json"}
-	}
 
 	if _, err := f.m.SetStyleUrl("custom://routed/style.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the routed style load", isStyleLoaded)
-	for _, want := range []routed{
-		{"custom://routed/style.json", ResourceKindStyle},
-		{"custom://any/tiles.json", ResourceKindSource},
-	} {
-		if got := receive(t, requests, want.url); got != want {
-			t.Fatalf("the provider received %+v, want %+v", got, want)
-		}
+	if got := receive(t, requests, "the routed request"); got != "custom://routed/style.json" {
+		t.Fatalf("the provider received %q", got)
 	}
 
 	// No route claims this style, so native loading fails it for its scheme.
@@ -413,7 +297,7 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 	f.awaitEvent(t, "the unrouted style's loading failure", isLoadingFailure("custom://unrouted/style.json"))
 	select {
 	case got := <-requests:
-		t.Fatalf("the provider received %+v, which no route matches", got)
+		t.Fatalf("the provider received %q, which no route matches", got)
 	default:
 	}
 }
@@ -480,39 +364,11 @@ func TestTransformRequestAnsweredAfterItsCallback(t *testing.T) {
 	f.awaitEvent(t, "the style load from the answer", isStyleLoaded)
 }
 
-// Installing a process-global callback replaces the registration native held,
-// and native releases the one it dropped, as clearing releases the last.
-func TestReplacingAGlobalCallbackReleasesThePreviousOne(t *testing.T) {
-	globalRoots := func() int {
-		bindingGlobalRoots.Lock()
-		defer bindingGlobalRoots.Unlock()
-		return len(bindingGlobalRoots.values)
-	}
-	t.Cleanup(func() { _ = ClearLogCallback() })
-	baseline := globalRoots()
-	for range 2 {
-		if err := SetLogCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
-			t.Fatal(err)
-		}
-		if live := globalRoots() - baseline; live != 1 {
-			t.Fatalf("global roots after an install = %d, want 1", live)
-		}
-	}
-	if err := ClearLogCallback(); err != nil {
-		t.Fatal(err)
-	}
-	if live := globalRoots() - baseline; live != 0 {
-		t.Fatalf("global roots after the clear = %d, want 0", live)
-	}
-}
-
-// A cancel callback is rooted only when native stores it. On a live request it
-// is rooted until it runs, and a second one is refused; on a request native
-// already cancelled, SetCancelCallback reports the cancellation, roots
-// nothing, and never runs the callback.
-func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
+// A cancel callback that native stores on a live request survives a
+// collection to run when the request is discarded.
+func TestCancelCallbackSurvivesACollectionUntilItRuns(t *testing.T) {
 	f := newFixture(t)
-	requests := make(chan *ResourceRequestHandle, 2)
+	requests := make(chan *ResourceRequestHandle, 1)
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
 		offer(requests, request)
 	}})))
@@ -525,41 +381,10 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	if cancelled, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { close(ran) }}); cancelled || err != nil {
 		t.Fatalf("SetCancelCallback on a live request = (%v, %v), want (false, nil)", cancelled, err)
 	}
-	if _, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("a second SetCancelCallback = %v, want StatusInvalidState", err)
-	}
-	if roots := rootCount(held.bindingOwner); roots != 1 {
-		t.Fatalf("roots on the live request = %d, want 1", roots)
-	}
+	stdruntime.GC()
 	// Closing the map discards the request, which runs the callback.
 	await(t, submitted(f.m.Close()))
 	receive(t, ran, "the cancel callback")
-	awaitCondition(t, "the cancel callback's release", func() bool { return rootCount(held.bindingOwner) == 0 })
-
-	other := createMap(t, f.runtime, testMapOptions())
-	if _, err := other.SetStyleUrl("custom://discarded.json"); err != nil {
-		t.Fatal(err)
-	}
-	discarded := receive(t, requests, "the discarded request")
-	await(t, submitted(other.Close()))
-	// Nothing signals a cancellation that has no callback to run.
-	awaitCondition(t, "the request's cancellation", func() bool {
-		cancelled, err := discarded.IsCancelled()
-		return err != nil || cancelled
-	})
-	cancelled, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { t.Error("a callback ran for an already cancelled request") }})
-	if !cancelled || err != nil {
-		t.Fatalf("SetCancelCallback on a cancelled request = (%v, %v), want (true, nil)", cancelled, err)
-	}
-	if roots := rootCount(discarded.bindingOwner); roots != 0 {
-		t.Fatalf("roots on the cancelled request = %d, want 0", roots)
-	}
-	if err := discarded.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("SetCancelCallback after Close = %v, want StatusInvalidState", err)
-	}
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}

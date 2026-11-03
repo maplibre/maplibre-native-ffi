@@ -1,4 +1,4 @@
-//! Handle ownership: the ABI check at creation, close, drop order, and exit.
+//! Handle ownership: ids, a refused close, and exit with live handles.
 
 use std::sync::mpsc;
 
@@ -7,27 +7,16 @@ use maplibre_native_ffi::*;
 use crate::support::*;
 
 #[test]
-fn a_handle_formats_its_id_and_dispose_consumes_it() {
-    let (runtime, map) = Fixture::new().into_parts();
+fn a_handle_formats_its_id() {
+    let fixture = Fixture::new();
+    let map = fixture.map();
     assert_eq!(
         format!("{map:?}"),
         format!("MapHandle(id=0x{:x})", map.id())
     );
-
-    map.dispose().unwrap();
-    // A runtime accepts its dispose while its disposed map retires.
-    runtime.dispose().unwrap();
 }
 
-#[test]
-fn a_projection_release_consumes_it() {
-    let fixture = Fixture::new();
-    let projection =
-        MapProjectionHandle::create(&fixture.map().get_snapshot().unwrap().view).unwrap();
-    assert_ne!(projection.id(), 0);
-    projection.release().unwrap();
-}
-
+// A host routes events that it drains after close by the id it kept.
 #[test]
 fn a_handle_id_names_its_events() {
     let fixture = Fixture::new();
@@ -35,8 +24,6 @@ fn a_handle_id_names_its_events() {
     let event = fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     wait_for(loaded);
     assert_eq!(event.source, fixture.map().id());
-    // A host routes events that it drains after close by the id it kept.
-    assert_eq!(fixture.map().id(), event.source);
 }
 
 #[test]
@@ -51,22 +38,6 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
 
     wait_for(map.release());
     wait_for(runtime.release());
-}
-
-#[test]
-fn dropping_a_runtime_before_its_map_disposes_it_and_the_map_still_releases() {
-    let _global = global_state();
-    let reports = capture_reports();
-
-    let (runtime, map) = Fixture::new().into_parts();
-    // A runtime owner holds no reference to its maps, so its drop disposes it
-    // at once, and native retires it once the map is gone.
-    drop(runtime);
-    wait_for(map.release());
-
-    set_reporter(None);
-    let leaked = leaks(&reports);
-    assert!(leaked.is_empty(), "{leaked:?}");
 }
 
 /// Set in the child process that the exit test runs.

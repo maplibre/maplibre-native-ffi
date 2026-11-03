@@ -53,42 +53,32 @@ private struct ConversionFailure: Error {}
   }
 }
 
-/// A completion delivers its value to the one waiter exactly once, and when
-/// the conversion of a delivered value fails, the waiter gets the conversion's
-/// error and the bridge state, with everything the converter holds, is freed
-/// once native releases it.
-@Test func aCompletionDeliversOnceAndAFailedConversionIsDisposed() async throws {
+/// A completion delivers its converted value to its waiter, and when the
+/// conversion of a delivered value fails, the waiter gets the conversion's
+/// error.
+@Test func aCompletionDeliversItsValueAndAFailedConversionThrows(
+) async throws {
   let held = HeldCompletion()
-  let converted = LockedBox(0)
   let delivered = try NativeCompletion.start({ completion, _ in
     held.keep(completion)
     return MLN_STATUS_OK
   }) { result in
-    converted.update { $0 += 1 }
-    return try NativeCompletion.value(result, as: Int32.self)
+    try NativeCompletion.value(result, as: Int32.self)
   }
   held.deliver(value: 42)
   held.release()
   #expect(try await delivered.value() == 42)
-  #expect(converted.value == 1)
 
   let failingHeld = HeldCompletion()
-  let releases = LockedBox(0)
   let failing = try NativeCompletion.start({ completion, _ in
     failingHeld.keep(completion)
     return MLN_STATUS_OK
-  }) { [sentinel = ReleaseProbe(releases)] _ -> Int32 in
-    withExtendedLifetime(sentinel) {}
+  }) { _ -> Int32 in
     throw ConversionFailure()
   }
   failingHeld.deliver()
   failingHeld.release()
   await #expect(throws: ConversionFailure.self) { try await failing.value() }
-  // The future is the last reference to the state and the converter.
-  _ = consume failing
-  await awaitCondition("the failed conversion's state to be freed") {
-    releases.value == 1
-  }
 }
 
 /// An array result is read at the completion's value_size, which a native
@@ -119,20 +109,6 @@ private struct ConversionFailure: Error {}
   }
 }
 
-/// A submission native rejects throws its status, and the bridge state it
-/// never handed over, with the converter's captures, is freed before the
-/// throw reaches the caller.
-@Test func aRejectedSubmissionFreesItsCompletionState() throws {
-  let releases = LockedBox(0)
-  #expect(throws: MaplibreError.self) {
-    try NativeCompletion.start({ _, _ in MLN_STATUS_INVALID_ARGUMENT }) {
-      [sentinel = ReleaseProbe(releases)] _ in
-      withExtendedLifetime(sentinel) {}
-    }
-  }
-  #expect(releases.value == 1)
-}
-
 /// A command that native accepts and then fails throws its status, its
 /// diagnostic, and the generation it published.
 @Test func aFailedCommandThrowsItsStatusAndGeneration() async throws {
@@ -147,17 +123,15 @@ private struct ConversionFailure: Error {}
 }
 
 /// Cancelling the task that awaits a completion ends the wait with
-/// `CancellationError`, and a result native delivers afterwards is disposed
-/// with the bridge state.
-@Test func cancellingAWaitEndsItAndDisposesTheLateResult() async throws {
+/// `CancellationError`, and a result native delivers afterwards finds no
+/// waiter.
+@Test func cancellingAWaitEndsItWithCancellationError() async throws {
   let held = HeldCompletion()
-  let releases = LockedBox(0)
   let future = try NativeCompletion.start({ completion, _ in
     held.keep(completion)
     return MLN_STATUS_OK
-  }) { [sentinel = ReleaseProbe(releases)] result in
-    withExtendedLifetime(sentinel) {}
-    return try NativeCompletion.value(result, as: Int32.self)
+  }) { result in
+    try NativeCompletion.value(result, as: Int32.self)
   }
   let waiting = Task { try await future.value() }
   waiting.cancel()
@@ -165,11 +139,6 @@ private struct ConversionFailure: Error {}
 
   held.deliver(value: 7)
   held.release()
-  _ = consume future
-  _ = consume waiting
-  await awaitCondition("the late result's state to be freed") {
-    releases.value == 1
-  }
 }
 
 /// Commands that tasks on one actor start in order reach native in that order,

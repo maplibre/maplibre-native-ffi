@@ -39,37 +39,6 @@ test "an owned-texture session renders a frame that reads back as pixels" {
     try renderAndReadBack(owned);
 }
 
-const ThreadRender = struct {
-    map: maplibre.Map,
-    driver: ?maplibre.RenderDriverKind = null,
-    result: anyerror!void = error.NotRun,
-
-    fn run(self: *ThreadRender) void {
-        self.result = self.render();
-    }
-
-    fn render(self: *ThreadRender) !void {
-        const owned = try support.OwnedTexture.attach(self.map, extent, .caller_graphics_thread);
-        defer owned.close();
-        self.driver = (try owned.session.getCapabilities(null)).driver;
-        try renderAndReadBack(owned);
-        try owned.detach();
-    }
-};
-
-// A caller-driven session belongs to the thread that first services it. Zig
-// has no managed event loop, so the thread is one the test spawns, and every
-// session call, attachment through detach, runs there.
-test "a caller-driven session is serviced from a thread the test spawns" {
-    const fixture = try createFixture();
-    defer fixture.destroy();
-    var render = ThreadRender{ .map = fixture.map };
-    const thread = try std.Thread.spawn(.{}, ThreadRender.run, .{&render});
-    thread.join();
-    try render.result;
-    try testing.expectEqual(@as(?maplibre.RenderDriverKind, .caller_graphics_thread), render.driver);
-}
-
 // Before any demand, native reports the drain and the acquire as not ready,
 // which read as empty and as null.
 test "a drain before any demand returns no batch" {
@@ -149,36 +118,4 @@ test "disposing a parent graph retires its acquired frame and session" {
     // The graphics context outlives the session, so the test waits for the
     // runtime to retire everything before the deferred teardown destroys it.
     try fixture.releaseRuntimeWhenChildless();
-}
-
-// A release completes once the session has retired, so the host may destroy
-// the graphics context while the map stays open.
-test "a released session lets the host destroy its graphics context" {
-    const fixture = try createFixture();
-    defer fixture.destroy();
-    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
-    errdefer owned.close();
-    _ = try owned.renderUntilRendered();
-    const retired = try owned.session.release(null);
-    try support.resolve(retired);
-    owned.close();
-}
-
-// Scoped cleanup disposes an attached session without reporting retirement.
-// The map's release completes after the session releases its map attachment,
-// so the host may destroy the graphics context then.
-test "a session that scoped cleanup disposes retires before its map releases" {
-    const fixture = try createFixture();
-    defer fixture.destroy();
-    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
-    errdefer {
-        fixture.closeMap() catch {};
-        owned.close();
-    }
-    {
-        defer owned.session.deinit();
-        _ = try owned.renderUntilRendered();
-    }
-    try fixture.closeMap();
-    owned.close();
 }

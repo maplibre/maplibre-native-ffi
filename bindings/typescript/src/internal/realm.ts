@@ -30,8 +30,6 @@ export interface RootHolder {
 
 const realmRoots: RootHolder = { roots: new Map() };
 let transaction: Registrations | undefined;
-// The roots that a holder took and native code has not released.
-let liveCount = 0;
 
 /** The host values that one call registers with native code. */
 export class Registrations {
@@ -47,7 +45,6 @@ export class Registrations {
     for (const [root, value] of this.#entries) {
       holder.roots.set(root, value);
       root.holder = new WeakRef(holder);
-      liveCount++;
     }
     this.#entries.length = 0;
   }
@@ -78,9 +75,6 @@ function register(value: unknown): Root {
   return transaction.add(value);
 }
 
-/** Runs after each root release, for the suite's waits on one. */
-export const rootReleaseListeners = new Set<() => void>();
-
 function retire(root: Root): void {
   const holder = root.holder;
   if (holder === undefined) {
@@ -88,10 +82,6 @@ function retire(root: Root): void {
   }
   root.holder = undefined;
   holder.deref()?.roots.delete(root);
-  liveCount--;
-  for (const listener of rootReleaseListeners) {
-    listener();
-  }
 }
 
 /**
@@ -110,8 +100,6 @@ export function defineCallbacks(table: readonly CallbackAdapter[]): void {
 // Pending binding Promises hold the event loop through the addon's
 // threadsafe function. Nothing else does.
 let pending = 0;
-// The completions and thread starts that wait for native code.
-let outstanding = 0;
 
 export function hold(): void {
   // Counts only a hold that took, so a call that throws here, such as a
@@ -134,31 +122,13 @@ export function unhold(): void {
  */
 export function awaitNative(): () => void {
   hold();
-  outstanding++;
   let held = true;
   return () => {
     if (held) {
       held = false;
-      outstanding--;
       unhold();
     }
   };
-}
-
-/**
- * The completions and thread starts that wait for native code, for the
- * suite's leak checks.
- */
-export function pendingCompletions(): number {
-  return outstanding;
-}
-
-/**
- * The callback roots that native code may still call through, for the
- * suite's leak checks. Each root leaves when native code releases it.
- */
-export function liveRoots(): number {
-  return liveCount;
 }
 
 /**

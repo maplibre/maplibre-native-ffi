@@ -83,17 +83,6 @@ internal class CallbackOwner {
     }
   }
 
-  /** Counts the callbacks this owner roots, which native has taken and not yet released. */
-  fun rootCountForTesting(): Int = locked {
-    var count = 0
-    var root = first
-    while (root != null) {
-      count += 1
-      root = root.next
-    }
-    count
-  }
-
   companion object {
     val global = CallbackOwner()
   }

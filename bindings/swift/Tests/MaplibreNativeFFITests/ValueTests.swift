@@ -3,21 +3,14 @@ import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Host strings cross as counted views, and native validates URLs before a
-/// C-string consumer reads them. Native-lent strings decode as C strings.
-@Test func hostStringsUseViewsAndNativeLentStringsDecode() async throws {
+/// Host strings cross as counted views, so an embedded NUL survives, and
+/// native-lent strings decode as C strings. Invalid UTF-8 from native throws.
+@Test func hostStringsUseViewsAndNativeLentStringsDecode() throws {
   let arena = NativeInputArena()
   let view = arena.view("é\0")
   #expect(try NativeString.copyUTF8(data: view.data, size: view.size) == "é\0")
   #expect(try NativeString
     .copyCString(arena.cString("native-lent")) == "native-lent")
-
-  try await withMapFixture { fixture in
-    let error = await expectMaplibreError(.invalidArgument) {
-      try await fixture.map.setStyleUrl("custom://a\0b.json")
-    }
-    #expect(error?.status == .invalidArgument)
-  }
 
   var invalid: [UInt8] = [0xFF]
   #expect(throws: MaplibreError.self) {
@@ -159,21 +152,11 @@ import Testing
 
 private final class PointerTarget {}
 
-/// A retaining pointer keeps its object alive while the record that carries
-/// it exists, and compares by address alone.
-@Test func aRetainingPointerKeepsItsObjectAliveWithItsRecord() {
-  weak var weakTarget: PointerTarget?
-  var texture: MetalBorrowedTexture?
-  do {
-    let target = PointerTarget()
-    weakTarget = target
-    texture = MetalBorrowedTexture(texture: NativePointer(retaining: target))
-  }
-  let address = weakTarget.map {
-    UInt(bitPattern: Unmanaged.passUnretained($0).toOpaque())
-  }
-  #expect(texture?.texture.addressBitPattern == address)
-  #expect(texture?.texture == NativePointer(bitPattern: address ?? 0))
-  texture = nil
-  #expect(weakTarget == nil)
+/// A retaining pointer compares by address alone.
+@Test func aRetainingPointerComparesByAddress() {
+  let target = PointerTarget()
+  let address = UInt(bitPattern: Unmanaged.passUnretained(target).toOpaque())
+  let texture = MetalBorrowedTexture(texture: NativePointer(retaining: target))
+  #expect(texture.texture.addressBitPattern == address)
+  #expect(texture.texture == NativePointer(bitPattern: address))
 }

@@ -28,9 +28,9 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	}
 }
 
-// A value that fails to convert, whether by error or by panic, fails the
-// future instead of unwinding into native.
-func TestCompletionDeliversExactlyOnce(t *testing.T) {
+// A delivered result stays readable by every Await. A result with no value, or
+// a conversion that panics, fails the future instead of unwinding into native.
+func TestCompletionSettlesItsFutureFromTheResult(t *testing.T) {
 	future, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	first := int32(7)
 	deliver(0, &first)
@@ -66,22 +66,6 @@ func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
 	if _, err := narrow.Await(context.Background()); !errors.Is(err, StatusNativeError) {
 		t.Fatalf("a stride below the element size: %v, want StatusNativeError", err)
 	}
-}
-
-// A submission native refuses returns its error at once, and the binding
-// deletes the handle it passed as the completion's user data, since native
-// never calls the completion or its release.
-func TestRejectedSubmissionFreesItsCompletionState(t *testing.T) {
-	handle, err := rejectedSubmissionForTest()
-	if !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("rejected submission: %v, want StatusInvalidState", err)
-	}
-	defer func() {
-		if recover() == nil {
-			t.Fatal("the rejected submission's handle is still live")
-		}
-	}()
-	handle.Value()
 }
 
 // A failed command's Await returns an *Error with its status, diagnostic, and

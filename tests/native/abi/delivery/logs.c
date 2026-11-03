@@ -186,6 +186,7 @@ LOG_STATE_CASE(a_handler_on_a_released_queue_refuses_its_records) {
   mln_test_delivery_queue_release(&queue);
 
   dump_debug_logs();
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&queue.wakes));
   MLN_TEST_OK(mln_log_clear_callback(NULL));
 }
 

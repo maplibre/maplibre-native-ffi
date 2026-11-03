@@ -122,19 +122,14 @@ pub const Counter = struct {
 pub const EndProbe = struct {
     ends: std.atomic.Value(u32) = .init(0),
     outcome: maplibre.CameraTransitionOutcome = .completed,
-    releases: Counter = .{},
 
     fn record(self: *EndProbe, end: maplibre.CameraTransitionEnd) maplibre.Error!void {
         self.outcome = end.outcome;
         _ = self.ends.fetchAdd(1, .release);
     }
 
-    fn released(self: *EndProbe) void {
-        self.releases.add();
-    }
-
     pub fn handler(self: *EndProbe) maplibre.CameraTransitionHandler {
-        return .init(self, record, released);
+        return .init(self, record, null);
     }
 };
 

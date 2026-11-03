@@ -1,9 +1,9 @@
 // The browser's HTTP transport, end to end: a style loaded from a real origin.
 //
-// This is the one test that puts a request on the network; everything else in
-// the suite reads embedded fixtures or answers through a resource provider. The
-// origin comes from the browser runner, which serves the style document, so
-// this covers the browser target alone.
+// The browser has no sockets, so the loopback server that the other platforms'
+// transport cases use is not available here. The origin comes from the browser
+// runner, which serves the style document, so this covers the browser target
+// alone.
 
 #include <maplibre_native_c.h>
 

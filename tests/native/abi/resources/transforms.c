@@ -422,8 +422,8 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
 static const char token_header[] = "X-Test-Token";
 static const char token_value[] = "secret-token";
 
-// Adds the token header to every request, and records the kinds and the last
-// URL it saw.
+// Adds the token header to every request, and records how many it saw and the
+// last one's kind.
 typedef struct token_transform {
   atomic_int calls;
   atomic_uint last_kind;

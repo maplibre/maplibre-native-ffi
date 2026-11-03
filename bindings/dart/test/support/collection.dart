@@ -1,5 +1,5 @@
-/// Forced garbage collection through the VM service, for tests of what an
-/// owner keeps reachable and what a native finalizer disposes.
+/// Forced garbage collection through the VM service, for tests that check a
+/// callback still runs after a collection.
 library;
 
 import 'dart:async';
@@ -12,17 +12,13 @@ import 'package:test/test.dart';
 
 import 'fixture.dart';
 
-/// How many full collections [collectGarbageUntil] runs before it fails.
-const _collections = 10;
-
-/// Runs full collections of this isolate's group until [collected] holds.
+/// Runs a full collection of this isolate's group.
 ///
 /// The VM service serves on loopback only. A collection clears weak
 /// references and runs native finalizers before its reply arrives.
-Future<void> collectGarbageUntil(bool Function() collected, String what) =>
-    within(_collectUntil(collected, what), 'garbage collection of $what');
+Future<void> collectGarbage() => within(_collect(), 'garbage collection');
 
-Future<void> _collectUntil(bool Function() collected, String what) async {
+Future<void> _collect() async {
   final previous = await developer.Service.getInfo();
   final service = await developer.Service.controlWebServer(enable: true);
   final uri = service.serverUri!;
@@ -35,25 +31,21 @@ Future<void> _collectUntil(bool Function() collected, String what) async {
     ),
   );
   try {
-    for (var attempt = 0; attempt < _collections; attempt++) {
-      if (collected()) return;
-      socket.add(
-        jsonEncode({
-          'jsonrpc': '2.0',
-          'id': '$attempt',
-          'method': 'getAllocationProfile',
-          'params': {
-            'isolateId': developer.Service.getIsolateId(Isolate.current),
-            'gc': true,
-          },
-        }),
-      );
-      do {
-        expect(await replies.moveNext(), isTrue);
-      } while (replies.current['id'] != '$attempt');
-      expect(replies.current['error'], isNull);
-    }
-    if (!collected()) fail('$_collections collections left $what reachable');
+    socket.add(
+      jsonEncode({
+        'jsonrpc': '2.0',
+        'id': 'gc',
+        'method': 'getAllocationProfile',
+        'params': {
+          'isolateId': developer.Service.getIsolateId(Isolate.current),
+          'gc': true,
+        },
+      }),
+    );
+    do {
+      expect(await replies.moveNext(), isTrue);
+    } while (replies.current['id'] != 'gc');
+    expect(replies.current['error'], isNull);
   } finally {
     await replies.cancel();
     await socket.close();

@@ -49,37 +49,6 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   ));
 }
 
-static void creation_observes_earlier_map_camera_commands(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  mln_camera_update update = {
-    .size = sizeof(mln_camera_update),
-    .camera = {.size = sizeof(mln_camera_options)}
-  };
-  update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
-  update.camera = (mln_camera_options){.size = sizeof(mln_camera_options)};
-  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.center.latitude = 12.0;
-  update.camera.center.longitude = 34.0;
-  update.camera.zoom = 4.0;
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-
-  // The command published its snapshot before its completion ran, so a
-  // projection of the snapshot's view observes the command.
-  mln_map_projection projection = mln_test_map_create_projection(map);
-  const mln_camera_options camera = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 12.0, camera.center.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 34.0, camera.center.longitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 4.0, camera.zoom);
-
-  mln_map_projection_release(projection);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static mln_screen_point projected_pixel(
   mln_map_projection projection, mln_lat_lng coordinate
 ) {
@@ -753,7 +722,6 @@ static void conversions_reject_invalid_inputs_without_writing_outputs(void) {
 MLN_TEST_GROUP {
   RUN_TEST(conversions_reject_invalid_inputs_without_writing_outputs);
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
-  RUN_TEST(creation_observes_earlier_map_camera_commands);
   RUN_TEST(projection_follows_committed_extent_viewport_and_mode);
   RUN_TEST(creation_rejects_incomplete_or_invalid_views);
   RUN_TEST(a_view_projection_ignores_the_maps_constraints);

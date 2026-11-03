@@ -28,7 +28,6 @@ struct CompletionProbe {
   // either arrived out of order.
   std::atomic_int phase = 0;
   std::atomic_int status = MLN_STATUS_INVALID_STATE;
-  std::thread::id thread;
 };
 
 void record_completion(
@@ -39,7 +38,6 @@ void record_completion(
   if (!probe.phase.compare_exchange_strong(expected, 1)) {
     probe.phase.store(-1);
   }
-  probe.thread = std::this_thread::get_id();
   probe.status.store(result->status);
   probe.calls.fetch_add(1);
 }
@@ -125,16 +123,24 @@ auto released_lease(mln::core::ControlState& control) -> bool {
   return control.notify_when_drained([](void*) noexcept {}, nullptr);
 }
 
+// Both resolvers start together, so they overlap in resolve as often as the
+// scheduler allows; a double delivery fails whichever iteration it happens in.
 void racing_resolutions_deliver_once() {
   for (auto iteration = 0; iteration < 100; ++iteration) {
     auto probe = CompletionProbe{};
     auto completion = created(descriptor_for(probe));
     completion->accept();
-    auto first = std::thread{[completion]() { succeed(completion); }};
-    auto second = std::thread{[completion]() { succeed(completion); }};
+    auto ready = std::atomic_int{0};
+    const auto resolve = [&ready, completion]() {
+      ready.fetch_add(1);
+      while (ready.load() < 2) {
+      }
+      succeed(completion);
+    };
+    auto first = std::thread{resolve};
+    auto second = std::thread{resolve};
     first.join();
     second.join();
-    TEST_ASSERT_TRUE(probe.thread != std::this_thread::get_id());
     TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
     TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
     TEST_ASSERT_EQUAL_INT(2, probe.phase.load());

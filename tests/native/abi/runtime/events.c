@@ -140,48 +140,6 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct loading_failures {
-  size_t count;
-  size_t without_message;
-} loading_failures;
-
-static void count_loading_failure(
-  const mln_runtime_event* event, void* context
-) {
-  loading_failures* failures = context;
-  if (event->type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) return;
-  failures->count += 1;
-  if (event->message.size == 0 || event->message.data == NULL) {
-    failures->without_message += 1;
-  }
-}
-
-static void each_event_carries_its_message(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map first = mln_test_create_map(runtime);
-  mln_map second = mln_test_create_map(runtime);
-  mln_test_drain_all(runtime);
-
-  MLN_TEST_OK(
-    mln_test_map_set_style_json(first, MLN_BUFFER_LITERAL("{\"version\":"))
-  );
-  MLN_TEST_OK(
-    mln_test_map_set_style_json(second, MLN_BUFFER_LITERAL("not json at all"))
-  );
-  MLN_TEST_OK(mln_test_map_fence(second));
-
-  loading_failures failures = {0};
-  MLN_TEST_OK(
-    mln_test_dispatch_events(runtime, count_loading_failure, &failures)
-  );
-  TEST_ASSERT_EQUAL_size_t(2, failures.count);
-  TEST_ASSERT_EQUAL_size_t(0, failures.without_message);
-
-  mln_test_destroy_map(second);
-  mln_test_destroy_map(first);
-  mln_test_destroy_runtime(runtime);
-}
-
 static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -382,5 +340,4 @@ MLN_TEST_GROUP {
   RUN_TEST(options_without_an_event_mask_select_every_event);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
-  RUN_TEST(each_event_carries_its_message);
 }

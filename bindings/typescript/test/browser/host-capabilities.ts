@@ -136,8 +136,7 @@ export const capabilities: Capabilities = {
   bufferTransfer: (buffer, length) => void buffer.transfer(length),
   disposers: true,
   beforeLoad: () =>
-    (globalThis as { mlnTsBeforeLoad?: { error: unknown; pending: number } })
-      .mlnTsBeforeLoad!,
+    (globalThis as { mlnTsBeforeLoad?: unknown }).mlnTsBeforeLoad,
   testGraphics: () => testGraphics,
   // Nothing holds a page open, so no timer needs to let go.
   unrefTimer: () => {},

@@ -6,8 +6,9 @@
 // encoded with FastPFOR and one without, both carrying "water" and "admin"
 // source layers. Every case waits for a positive signal. A static map's still
 // image completes once the tile has loaded and rendered, after which a decoded
-// tile yields its features. A tile the map cannot decode yields none, so that
-// case waits instead for the tile parse warning that map.h documents.
+// tile yields its features. A tile the map cannot decode, which map.h says
+// fails to load, yields none, so that case waits instead for the parse warning
+// MapLibre logs for it.
 //
 // Every case runs for each way a tile reaches the map: a vector source's tile
 // URL, which a resource provider answers, and a custom vector source, which

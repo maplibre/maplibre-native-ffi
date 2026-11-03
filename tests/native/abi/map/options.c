@@ -643,24 +643,9 @@ static void generations_increase_across_submitting_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void map_creation_rejects_a_degenerate_extent(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_test_map_options();
-  options.initial_extent.width = 0;
-  mln_map map = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_test_map_create_status(runtime, &options, &map));
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "initial extent"));
-  options = mln_test_map_options();
-  options.initial_extent.scale_factor = INFINITY;
-  MLN_TEST_INVALID(mln_test_map_create_status(runtime, &options, &map));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
-  mln_test_destroy_runtime(runtime);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(every_option_command_round_trips_through_the_snapshot);
   RUN_TEST(option_descriptors_reject_what_they_cannot_express);
-  RUN_TEST(map_creation_rejects_a_degenerate_extent);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_fixes_scale_factor);
   RUN_TEST(resizes_apply_in_order_and_the_last_sets_the_extent);
   RUN_TEST(generations_increase_across_submitting_threads);

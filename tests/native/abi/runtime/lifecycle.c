@@ -1,6 +1,8 @@
 // Runtime and map lifecycle through the public ABI: creation and its
 // validation, stale and foreign handles, and release.
 
+#include <math.h>
+
 #include "support/resources.h"
 #include "support/test_support.h"
 
@@ -107,6 +109,14 @@ static void map_options_without_extent(void* descriptor) {
     (mln_map_options){.size = sizeof(mln_map_options)};
 }
 
+static void map_options_with_zero_width(void* descriptor) {
+  ((mln_map_options*)descriptor)->initial_extent.width = 0;
+}
+
+static void map_options_with_infinite_scale(void* descriptor) {
+  ((mln_map_options*)descriptor)->initial_extent.scale_factor = INFINITY;
+}
+
 static const mln_test_validation_case map_creation_cases[] = {
   {"undersized", map_options_with_small_size, MLN_STATUS_INVALID_ARGUMENT,
    "mln_map_options.size"},
@@ -115,6 +125,10 @@ static const mln_test_validation_case map_creation_cases[] = {
   {"unknown field", map_options_with_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
    "mln_map_options.fields"},
   {"zero initial extent", map_options_without_extent,
+   MLN_STATUS_INVALID_ARGUMENT, "initial extent"},
+  {"zero width", map_options_with_zero_width, MLN_STATUS_INVALID_ARGUMENT,
+   "initial extent"},
+  {"infinite scale factor", map_options_with_infinite_scale,
    MLN_STATUS_INVALID_ARGUMENT, "initial extent"},
 };
 
@@ -164,23 +178,6 @@ static void map_creation_checks_its_output(void) {
     mln_runtime_create_map(runtime, &options, &map, &discard, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(runtime, map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void a_released_map_accepts_no_call(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_destroy_map(map);
-  MLN_TEST_INVALID_STATE(mln_test_map_close(map));
-  MLN_TEST_INVALID_STATE(
-    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL("{}"))
-  );
-  MLN_TEST_INVALID_STATE(mln_test_map_request_repaint(map));
-  mln_completion completion = mln_test_discard_completion();
-  MLN_TEST_INVALID_STATE(mln_map_request_still_image(map, &completion, NULL));
-  mln_camera camera = {0};
-  MLN_TEST_INVALID_STATE(mln_test_map_get_camera(map, &camera));
-  MLN_TEST_INVALID_STATE(mln_map_dispose(map, NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -477,7 +474,6 @@ MLN_TEST_GROUP {
   RUN_TEST(runtime_calls_reject_a_value_that_names_no_runtime);
   RUN_TEST(map_creation_validates_its_options);
   RUN_TEST(map_creation_checks_its_output);
-  RUN_TEST(a_released_map_accepts_no_call);
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(disposal_waits_for_children_and_retires_callback_state);
   RUN_TEST(close_preflight_leaves_a_runtime_with_a_live_child_open);

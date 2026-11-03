@@ -175,15 +175,6 @@ func latLngArrayCompletionForTest(widen int, points []LatLng) *Future[[]LatLng] 
 	return &Future[[]LatLng]{state: state}
 }
 
-func rejectedSubmissionForTest() (cgo.Handle, error) {
-	var submitted cgo.Handle
-	_, err := startCompletion(func(completion *C.mln_completion, _ *C.mln_diagnostic) int32 {
-		submitted = bindingHandleOf(completion.user_data)
-		return int32(C.MLN_STATUS_INVALID_STATE)
-	}, completionUnit)
-	return submitted, err
-}
-
 func staleCallbackCellForTest() (unsafe.Pointer, func()) {
 	handle := cgo.NewHandle(struct{}{})
 	cell := bindingHandleCell(handle)

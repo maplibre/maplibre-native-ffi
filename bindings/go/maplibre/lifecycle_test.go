@@ -5,10 +5,11 @@ import (
 	"fmt"
 	stdruntime "runtime"
 	"testing"
-	"weak"
 )
 
-func TestClosingTwiceIsSafe(t *testing.T) {
+// Once a close is accepted, a second close and any other call fail with
+// StatusInvalidState and a diagnostic, and Dispose does nothing.
+func TestCallsAfterCloseFailWithInvalidState(t *testing.T) {
 	f := newFixture(t)
 	await(t, submitted(f.m.Close()))
 	if _, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
@@ -144,36 +145,36 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	}
 }
 
-// A map holds its runtime: with no other reference left, a collection neither
-// makes the runtime unreachable nor breaks the map, and the runtime becomes
-// unreachable, and so due for disposal, only once the map is gone too.
+// A map holds its runtime. With no other reference to the runtime left, it
+// survives a collection: the map's commands still run, and the event handler
+// that the runtime holds still receives the map's events.
 func TestChildKeepsItsParentAlive(t *testing.T) {
-	// No fixture: its cleanup would keep the runtime reachable. The map's
-	// cleanup closes it if the test fails, and the collector then reclaims the
-	// runtime.
-	runtime, err := NewRuntime(RuntimeOptions{})
+	// No fixture: its cleanup would keep the runtime reachable.
+	runtime, err := NewRuntime(RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	parent := weak.Make(runtime.bindingOwner)
-	m := createMap(t, runtime, testMapOptions())
-	t.Cleanup(func() {
-		if m != nil {
-			await(t, submitted(m.Close()))
+	f := &fixture{pendingEvents: make(chan RuntimeEvent, 4096)}
+	if err := runtime.Discarding().SetEventHandler(RuntimeEventHandler{Callback: func(events []RuntimeEvent) {
+		for _, event := range events {
+			offer(f.pendingEvents, event)
 		}
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	f.m = createMap(t, runtime, testMapOptions())
+	// The map is the runtime's only owner, so the teardown reaches the runtime
+	// through it.
+	t.Cleanup(func() {
+		parent := f.m.bindingOwner.parent.(*RuntimeHandle)
+		if future, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
+			await(t, submitted(future, err))
+		}
+		await(t, submitted(parent.Close()))
 	})
 	runtime = nil
 
-	// A completed collection clears a weak pointer to anything it found
-	// unreachable.
 	stdruntime.GC()
-	if parent.Value() == nil {
-		t.Fatal("the runtime became unreachable while its map is live")
-	}
-	await(t, submitted(m.SetStyleJson(emptyStyle)))
-
-	// Closing the map leaves nothing that holds the runtime.
-	await(t, submitted(m.Close()))
-	m = nil
-	awaitUnreachable(t, parent, "the runtime once its map closed")
+	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
+	f.awaitEvent(t, "the style load", isStyleLoaded)
 }

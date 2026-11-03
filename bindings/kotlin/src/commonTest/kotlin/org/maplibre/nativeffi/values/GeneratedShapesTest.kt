@@ -6,14 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlinx.coroutines.CompletableDeferred
-import org.maplibre.nativeffi.AnimationOptions
 import org.maplibre.nativeffi.CameraOptions
-import org.maplibre.nativeffi.CameraTransitionEnd
-import org.maplibre.nativeffi.CameraTransitionHandler
-import org.maplibre.nativeffi.CameraTransitionOutcome
 import org.maplibre.nativeffi.CameraUpdate
-import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.FeatureStateSelector
 import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.LatLng
@@ -168,36 +162,10 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits() = runSuspendTest {
-    withMap {
-      // The binding passes an unknown enum value through unchanged, and native rejects it.
-      assertFailsWithStatus(Status.INVALID_ARGUMENT) {
-        setNetworkStatus(org.maplibre.nativeffi.NetworkStatus(900u))
-      }
-
-      // Cancelling the largest identity ends the ease that carries it, so the identity crossed
-      // whole both times.
-      val ended = CompletableDeferred<CameraTransitionEnd>()
-      val animation =
-        AnimationOptions(
-          durationMs = 60000.0,
-          transitionId = ULong.MAX_VALUE,
-          endHandler = CameraTransitionHandler { ended.complete(it) },
-        )
-      map
-        .updateCamera(
-          CameraUpdate(
-            mode = CameraUpdateMode.EASE,
-            camera = CameraOptions(zoom = 4.0),
-            animation = animation,
-          ),
-        )
-        .await()
-      map.cancelCameraTransition(ULong.MAX_VALUE).await()
-      assertEquals(
-        CameraTransitionOutcome.CANCELLED,
-        ended.awaitWithin("the end handler").outcome,
-      )
+  fun anOpenEnumPassesAnUnknownValueThroughToNative() = runSuspendTest {
+    // The binding passes the value through unchanged, and native rejects it.
+    assertFailsWithStatus(Status.INVALID_ARGUMENT) {
+      setNetworkStatus(org.maplibre.nativeffi.NetworkStatus(900u))
     }
   }
 

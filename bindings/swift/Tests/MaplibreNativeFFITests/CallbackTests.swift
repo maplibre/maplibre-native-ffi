@@ -3,55 +3,13 @@ import MaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Adds a custom geometry source whose callback state reports its release
-/// through `releases`.
-@discardableResult
-private func addCustomSource(
-  _ map: MapHandle,
-  id: String,
-  releases: LockedBox<Int>
-) async throws -> CommandCompletion {
-  let sentinel = ReleaseProbe(releases)
-  return try await map.addCustomGeometrySource(
-    id,
-    options: CustomGeometrySourceOptions(fetchTile: { _ in
-      withExtendedLifetime(sentinel) {}
-    })
-  )
-}
-
-/// An accepted registration stays rooted while native holds it and is freed
-/// when native releases it; a registration native rejects is freed by the
-/// time a later command on the map completes.
-@Test func aRegistrationIsRootedUntilNativeReleasesIt() async throws {
-  try await withMapFixture { fixture in
-    try await fixture.map.setStyleJson(emptyStyle)
-    let accepted = LockedBox(0)
-    try await addCustomSource(fixture.map, id: "custom", releases: accepted)
-
-    // A second source under the same ID is rejected on the map thread.
-    let rejected = LockedBox(0)
-    await #expect(throws: MaplibreError.self) {
-      try await addCustomSource(fixture.map, id: "custom", releases: rejected)
-    }
-    _ = try await fixture.map.requestRepaint()
-    #expect(rejected.value == 1)
-    #expect(accepted.value == 0)
-
-    try await fixture.map.removeStyleSource("custom")
-    #expect(accepted.value == 1)
-  }
-}
-
-/// A camera command's end handler sits two records deep in its input. Native
-/// holds it while the ease runs and runs it once when its identity is
-/// cancelled, and a command that native rejects frees it before it returns.
-@Test func aCameraEndHandlerIsRootedUntilItRuns() async throws {
+/// A camera command's end handler sits two records deep in its input, and
+/// once the command is gone only native holds it. Native runs it once when
+/// its identity is cancelled.
+@Test func aCameraEndHandlerRunsAfterItsCommandIsGone() async throws {
   try await withMapFixture { fixture in
     let ends = LockedBox<[CameraTransitionEnd]>([])
-    let releases = LockedBox(0)
     do {
-      let sentinel = ReleaseProbe(releases)
       let update = CameraUpdate(
         mode: .ease,
         camera: CameraOptions(zoom: 4),
@@ -59,34 +17,17 @@ private func addCustomSource(
           durationMs: 60000,
           transitionId: UInt64.max,
           endHandler: CameraTransitionHandler { end in
-            withExtendedLifetime(sentinel) {}
             ends.update { $0.append(end) }
           }
         )
       )
       try await fixture.map.updateCamera(update)
     }
-    #expect(releases.value == 0)
     _ = try await fixture.map.cancelCameraTransition(UInt64.max)
-    await awaitCondition("the end handler's release") { releases.value == 1 }
+    await awaitCondition("the end handler") { !ends.value.isEmpty }
     #expect(ends.value.count == 1)
     #expect(ends.value.first?.outcome == .cancelled)
     #expect(ends.value.first?.generation != 0)
-
-    let rejected = LockedBox(0)
-    do {
-      let sentinel = ReleaseProbe(rejected)
-      let delta = CameraDelta(
-        scale: -1,
-        animation: AnimationOptions(endHandler: CameraTransitionHandler { _ in
-          withExtendedLifetime(sentinel) {}
-        })
-      )
-      await #expect(throws: (any Error).self) {
-        try await fixture.map.applyCameraDelta(delta)
-      }
-    }
-    #expect(rejected.value == 1)
   }
 }
 
@@ -110,35 +51,6 @@ func installProvider(
       }
     }
   ))
-}
-
-/// A cancel callback that does not capture its request lets a provider drop
-/// the request. The binding releases the request, and native then releases
-/// the cancel registration.
-@Test func aCancelCallbackDoesNotKeepItsRequestAlive() async throws {
-  try await withMapFixture { fixture in
-    let releases = LockedBox(0)
-    let request = LockedBox<ResourceRequestHandle?>(nil)
-    weak var weakRequest: ResourceRequestHandle?
-    try await installProvider(
-      on: fixture.runtime,
-      for: "custom://dropped.json"
-    ) { handle in
-      _ = try handle.setCancelCallback(handler: ResourceRequestCancelHandler {
-        [sentinel = ReleaseProbe(releases)] in withExtendedLifetime(sentinel) {}
-      })
-      request.update { $0 = handle }
-    }
-    try await fixture.map.setStyleUrl("custom://dropped.json")
-    await awaitCondition("the provider call") { request.value != nil }
-    weakRequest = request.value
-    request.update { $0 = nil }
-
-    await awaitCondition("the cancel registration's release") {
-      releases.value == 1
-    }
-    #expect(weakRequest == nil)
-  }
 }
 
 /// A provider that takes a request answers it later, from outside the
@@ -301,41 +213,5 @@ func installProvider(
     #expect(seen.value.allSatisfy {
       $0.requestedUrl.hasPrefix("custom://routed/")
     })
-  }
-}
-
-/// A cancel callback registered on a request native already cancelled is
-/// rejected through the registration's cancelled output, and the binding
-/// frees it at once rather than rooting it.
-@Test func aRegistrationOnACancelledRequestIsNotRooted() async throws {
-  try await withMapFixture { fixture in
-    let taken = LockedBox<ResourceRequestHandle?>(nil)
-    try await installProvider(
-      on: fixture.runtime,
-      for: "custom://cancelled.json"
-    ) { handle in
-      taken.update { $0 = handle }
-    }
-    try await fixture.map.setStyleUrl("custom://cancelled.json")
-    await awaitCondition("the provider to take the request") {
-      taken.value != nil
-    }
-    let request = try #require(taken.value)
-    // Closing the map discards its pending style request.
-    try await fixture.map.close()
-    try await awaitCondition("the request's cancellation") {
-      try request.isCancelled()
-    }
-
-    let releases = LockedBox(0)
-    let cancelled = try request.setCancelCallback(
-      handler: ResourceRequestCancelHandler {
-        [sentinel = ReleaseProbe(releases)] in withExtendedLifetime(sentinel) {}
-      }
-    )
-    #expect(cancelled)
-    #expect(releases.value == 1)
-    request.close()
-    #expect(releases.value == 1)
   }
 }

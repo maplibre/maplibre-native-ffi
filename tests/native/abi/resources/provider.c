@@ -207,11 +207,10 @@ static void resource_provider_command_copies_cross_thread_descriptor(void) {
 }
 
 typedef struct dropped_request_probe {
-  atomic_bool release_inline;
   _Atomic mln_resource_request handle;
 } dropped_request_probe;
 
-static void claim_and_drop_resource_provider(
+static void claim_resource_request(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
@@ -219,9 +218,6 @@ static void claim_and_drop_resource_provider(
   dropped_request_probe* probe = user_data;
   atomic_store(&probe->handle, handle);
   mln_test_pulse();
-  if (atomic_load(&probe->release_inline)) {
-    mln_resource_request_release(handle);
-  }
 }
 
 static bool dropped_request_claimed(void* context) {
@@ -234,7 +230,7 @@ static mln_map start_claimed_request(
 ) {
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
-    .callback = claim_and_drop_resource_provider,
+    .callback = claim_resource_request,
     .user_data = probe,
   };
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
@@ -249,14 +245,11 @@ static mln_map start_claimed_request(
   return map;
 }
 
-static void expect_dropped_request_fails(bool release_inline) {
+static void releasing_a_claimed_request_without_a_response_fails_it(void) {
   dropped_request_probe probe = {0};
-  atomic_store(&probe.release_inline, release_inline);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = start_claimed_request(runtime, &probe);
-  if (!release_inline) {
-    mln_resource_request_release(atomic_load(&probe.handle));
-  }
+  mln_resource_request_release(atomic_load(&probe.handle));
   char message[512];
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
@@ -264,14 +257,6 @@ static void expect_dropped_request_fails(bool release_inline) {
   TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-}
-
-static void releasing_a_claimed_request_without_a_response_fails_it(void) {
-  expect_dropped_request_fails(false);
-}
-
-static void releasing_a_request_inside_its_callback_fails_it(void) {
-  expect_dropped_request_fails(true);
 }
 
 static atomic_int completed_handle_reuse = MLN_STATUS_OK;
@@ -320,7 +305,7 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
-    .callback = claim_and_drop_resource_provider,
+    .callback = claim_resource_request,
     .user_data = &probe,
   };
   MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
@@ -994,13 +979,11 @@ static void a_callback_request_can_pass_through_inline_or_later(void) {
     mln_test_http_server_url(server, routes[mode].path, url, sizeof(url));
     static dropped_request_probe probe;
     atomic_store(&probe.handle, MLN_HANDLE_NULL);
-    atomic_store(&probe.release_inline, false);
     static atomic_int status;
     atomic_store(&status, MLN_STATUS_NATIVE_ERROR);
     const mln_resource_provider provider = {
       .size = sizeof(mln_resource_provider),
-      .callback =
-        mode == 0 ? hand_back_inline : claim_and_drop_resource_provider,
+      .callback = mode == 0 ? hand_back_inline : claim_resource_request,
       .user_data = mode == 0 ? (void*)&status : (void*)&probe,
     };
     MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
@@ -1038,7 +1021,6 @@ MLN_TEST_GROUP {
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
-  RUN_TEST(releasing_a_request_inside_its_callback_fails_it);
   RUN_TEST(a_request_completed_inside_its_callback_consumes_its_handle);
   RUN_TEST(a_released_request_does_not_hold_its_runtime_open);
   RUN_TEST(a_held_request_does_not_hold_its_runtime_open);

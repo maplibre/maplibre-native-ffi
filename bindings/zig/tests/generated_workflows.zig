@@ -17,15 +17,11 @@ test "discarded commands are fenced and synchronous rejection returns an error" 
 const ProviderProbe = struct {
     runtime: maplibre.Runtime,
     calls: std.atomic.Value(usize) = .init(0),
-    releases: std.atomic.Value(usize) = .init(0),
     fn provide(self: *@This(), _: maplibre.ResourceRequestInfo, handle: maplibre.ResourceRequest) maplibre.Error!void {
         _ = self.calls.fetchAdd(1, .seq_cst);
         var owned = handle;
         defer owned.deinit();
         try self.runtime.discarding().clearResourceTransform(null);
-    }
-    fn release(self: *@This()) void {
-        _ = self.releases.fetchAdd(1, .seq_cst);
     }
 };
 
@@ -35,11 +31,10 @@ test "a provider can deinit its request inside its callback" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     var probe = ProviderProbe{ .runtime = fixture.runtime };
-    try fixture.setProvider(.init(&probe, ProviderProbe.provide, ProviderProbe.release));
+    try fixture.setProvider(.init(&probe, ProviderProbe.provide, null));
     _ = try support.resolve(try fixture.map.setStyleUrl("binding-test://style", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
     try support.expectCommitted(try fixture.runtime.clearResourceProvider(null));
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.seq_cst));
-    try testing.expectEqual(@as(usize, 1), probe.releases.load(.seq_cst));
 }

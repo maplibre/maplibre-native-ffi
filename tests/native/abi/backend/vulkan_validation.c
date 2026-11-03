@@ -6,8 +6,9 @@
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
-// Non-dispatchable handles whose value lies entirely in the high 32 bits: a
-// carrier that truncated them to a 32-bit pointer would pass null.
+// Non-dispatchable handles with bits above the low 32: a carrier that
+// truncated them to a 32-bit pointer would pass a different handle, and null
+// for high_view_handle.
 static const mln_vulkan_non_dispatchable_handle high_handle =
   UINT64_C(0x8000000000000001);
 static const mln_vulkan_non_dispatchable_handle high_view_handle =

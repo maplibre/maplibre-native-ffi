@@ -214,27 +214,24 @@ let pulsingFrameWake = Wake(callback: { Pulse.shared.signal() })
 extension RenderSessionHandle {
   /// Demands frames until one renders, and returns its result. Each demand
   /// forces a frame, and a demand whose frame does not render, such as one
-  /// before the style loads, is followed by another.
+  /// before the style loads, is followed at once by another, whose result
+  /// pulses the wait.
   @discardableResult
   func awaitRenderedFrame(
     sourceLocation: SourceLocation = #_sourceLocation
   ) async throws -> RenderFrameResult? {
-    var pending: UInt64?
+    var token: UInt64 = 1
     var rendered: RenderFrameResult?
-    var token: UInt64 = 0
+    try requestFrame(demand: FrameDemand(flags: [.force], token: token))
     try await awaitCondition(
       "a rendered frame",
       sourceLocation: sourceLocation
     ) {
-      if pending == nil {
-        token += 1
-        try requestFrame(demand: FrameDemand(flags: [.force], token: token))
-        pending = token
-      }
-      for result in try drainFrameResults() where result.token == pending {
+      for result in try drainFrameResults() where result.token == token {
         guard result.disposition == .rendered else {
-          pending = nil
-          continue
+          token += 1
+          try requestFrame(demand: FrameDemand(flags: [.force], token: token))
+          return false
         }
         rendered = result
         return true

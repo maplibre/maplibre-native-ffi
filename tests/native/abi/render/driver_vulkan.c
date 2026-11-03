@@ -850,7 +850,7 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
 }
 
 // The ring counts as the session's alone even when the host released its frame
-// just before abandon and the driver has not run the release yet:
+// just before abandon, so the driver may not have run the release yet:
 // CPU_COMPLETE attests that the host's GPU read is done.
 static void abandon_destroys_an_owned_texture_ring(void) {
   counter_reset();

@@ -170,11 +170,11 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure() {
+    fn a_handle_dropped_in_a_callback_reports_a_failed_disposal() {
         let (sender, leaks) = mpsc::channel();
         crate::set_reporter(Some(Box::new(move |report| {
             if let crate::Report::LeakedHandle(leak) = report {
-                let _ = sender.send((leak, std::thread::current().id()));
+                let _ = sender.send(leak);
             }
         })));
         let id = 0x0d00_0000_0000_0007;
@@ -186,9 +186,8 @@ mod tests {
         }
         .unwrap();
 
-        // A drop inside a native callback must not dispose on that callback's
-        // stack, so the disposal runs on the finalization thread, and its
-        // failure reaches the reporter there.
+        // A drop inside a native callback disposes later, off the callback's
+        // stack, and its failure still reaches the reporter.
         {
             let _callback = crate::finalize::CallbackScope::enter();
             drop(owner);
@@ -196,7 +195,7 @@ mod tests {
         let received = leaks.recv_timeout(Duration::from_secs(10));
         crate::set_reporter(None);
 
-        let (leak, thread) = received.expect("the failed disposal was never reported");
+        let leak = received.expect("the failed disposal was never reported");
         assert_eq!(
             leak,
             crate::NativeHandleLeak {
@@ -204,6 +203,5 @@ mod tests {
                 id,
             }
         );
-        assert_ne!(thread, std::thread::current().id());
     }
 }

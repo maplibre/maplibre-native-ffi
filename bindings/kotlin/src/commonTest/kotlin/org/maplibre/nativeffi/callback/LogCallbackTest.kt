@@ -4,10 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.LogEvent
-import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.clearLogCallback
-import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.setTestLogCallback
 import org.maplibre.nativeffi.withMap
@@ -15,18 +13,13 @@ import org.maplibre.nativeffi.withMap
 /** The process-global log callback. */
 class LogCallbackTest {
   @Test
-  fun replacingTheLogCallbackReleasesThePreviousRegistration() = runSuspendTest {
-    val roots = CallbackOwner.global
-    val base = roots.rootCountForTesting()
+  fun aReplacementLogCallbackReceivesNativeRecords() = runSuspendTest {
     val parsed = CompletableDeferred<LogEvent>()
     try {
       setTestLogCallback {}
-      assertEquals(base + 1, roots.rootCountForTesting())
-
-      // Native releases the replaced registration before the replacement returns.
+      // Native releases the replaced registration before the replacement returns, and the binding
+      // keeps the replacement.
       setTestLogCallback { event -> if (event == LogEvent.PARSE_STYLE) parsed.complete(event) }
-      awaitDeliveries()
-      assertEquals(base + 1, roots.rootCountForTesting())
 
       withMap {
         // A style whose center has the wrong JSON type logs a parser warning.
@@ -41,7 +34,5 @@ class LogCallbackTest {
     } finally {
       clearLogCallback()
     }
-    awaitDeliveries()
-    assertEquals(base, roots.rootCountForTesting())
   }
 }

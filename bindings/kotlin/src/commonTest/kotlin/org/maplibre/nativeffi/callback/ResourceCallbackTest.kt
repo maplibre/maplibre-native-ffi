@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.callback
 
-import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
@@ -26,62 +25,36 @@ import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.UrlMatchFlag
 import org.maplibre.nativeffi.assertFailsWithStatus
-import org.maplibre.nativeffi.awaitDeliveries
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.deny
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.interceptUncaught
+import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.serve
 import org.maplibre.nativeffi.withMap
 
-/** The resource provider and transform callbacks: what they root and what they hand out. */
+/** The resource provider and transform callbacks, and the request handles they hand out. */
 @OptIn(ExperimentalAtomicApi::class)
 class ResourceCallbackTest {
-
   @Test
-  fun aCancelCallbackIsRootedUntilNativeReleasesIt() = runSuspendTest {
+  fun aCancelCallbackSurvivesACollectionAndRunsWhenNativeCancels() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
       val request = claimed.awaitWithin("the provider to claim the request")
-      val cancels = AtomicInt(0)
-
-      assertFalse(
-        request.setCancelCallback(ResourceRequestCancelHandler { cancels.addAndFetch(1) }),
-      )
-      assertEquals(1, request.bindingCallbacks.rootCountForTesting())
-      // Native keeps the first registration, and the rejected second one keeps no root.
-      assertFailsWithStatus(Status.INVALID_STATE) {
-        request.setCancelCallback(ResourceRequestCancelHandler {})
+      try {
+        val cancelled = CompletableDeferred<Unit>()
+        assertFalse(registerCancel(request, cancelled))
+        // Only the root holds the callback, so it survives a collection. Releasing the map cancels
+        // its pending request, and native runs the callback.
+        requestCollection()
+        map.release().awaitWithin("the map release")
+        cancelled.awaitWithin("the cancel callback")
+      } finally {
+        request.close()
       }
-      assertEquals(1, request.bindingCallbacks.rootCountForTesting())
-
-      // Provider removal waits for the callback to return. Closing the unanswered request then
-      // releases its cancel registration, which reaches Kotlin before the root count is read.
-      runtime.clearResourceProvider().awaitWithin("provider removal")
-      request.close()
-      awaitDeliveries()
-      assertEquals(0, request.bindingCallbacks.rootCountForTesting())
-      assertEquals(0, cancels.load())
     }
-  }
-
-  @Test
-  fun aCancelRegistrationNativeDoesNotStoreIsNotRooted() = runSuspendTest {
-    val claimed = CompletableDeferred<ResourceRequestHandle>()
-    val request =
-      withMap(provider = claimingProvider(STYLE_URL, claimed)) {
-        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-        claimed.awaitWithin("the provider to claim the request")
-      }
-    // The fixture has released the runtime, whose teardown cancelled the request. The request
-    // outlives the runtime until the provider releases it.
-    val cancels = AtomicInt(0)
-    assertTrue(request.setCancelCallback(ResourceRequestCancelHandler { cancels.addAndFetch(1) }))
-    assertEquals(0, request.bindingCallbacks.rootCountForTesting())
-    assertEquals(0, cancels.load())
-    request.close()
   }
 
   @Test
@@ -131,9 +104,9 @@ class ResourceCallbackTest {
       request.complete(
         ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray()),
       )
-      // The accepted response consumed the handle, so the owner has nothing left to release, and
-      // native refuses a second answer on the stale handle.
-      assertTrue(request.binding.isReleased)
+      // The accepted response consumed the handle, so it reads as closed, and native refuses a
+      // second answer on the stale handle.
+      assertTrue(request.isClosed)
       assertFailsWithStatus(Status.INVALID_STATE) {
         request.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
@@ -159,9 +132,9 @@ class ResourceCallbackTest {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
       val request = received.awaitWithin("the transform callback")
       request.complete(REWRITTEN_URL)
-      // The accepted answer consumed the handle, so native refuses a second answer on the stale
-      // handle.
-      assertTrue(request.binding.isReleased)
+      // The accepted answer consumed the handle, so it reads as closed, and native refuses a
+      // second answer on the stale handle.
+      assertTrue(request.isClosed)
       assertFailsWithStatus(Status.INVALID_STATE) { request.complete(REWRITTEN_URL) }
       // The online source cannot load the rewritten scheme.
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
@@ -215,6 +188,10 @@ class ResourceCallbackTest {
       assertEquals(2, seen.load().size, "requests the provider saw: ${seen.load()}")
     }
   }
+
+  // A function of its own, so the test keeps no reference to the callback.
+  private fun registerCancel(request: ResourceRequestHandle, cancelled: CompletableDeferred<Unit>) =
+    request.setCancelCallback(ResourceRequestCancelHandler { cancelled.complete(Unit) })
 
   /** Claims the request for [url] without answering it, and hands it to [claimed]. */
   private fun claimingProvider(url: String, claimed: CompletableDeferred<ResourceRequestHandle>) =

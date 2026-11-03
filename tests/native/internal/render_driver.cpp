@@ -1,5 +1,6 @@
 // A render session's driver while it is busy: queued demands, waits for map
-// updates, barriers, and abandon.
+// updates, barriers, and abandon, and how injected native failures finish its
+// demands.
 
 #include <array>
 #include <atomic>

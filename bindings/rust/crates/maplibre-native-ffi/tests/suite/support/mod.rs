@@ -142,24 +142,6 @@ impl Wake for Signal {
     }
 }
 
-/// Blocks until `condition` holds, for state that changes with no wake to
-/// announce it. As in the C suite's harness, the thread parks between checks
-/// until the deadline.
-///
-/// This poll is for CB-08 only: a request takes a single cancel registration,
-/// which that test spends, so nothing is left to wake the test when MapLibre
-/// cancels the request. Every other wait uses a wake, through [`Signal`] or a
-/// channel.
-pub fn await_condition(what: &str, mut condition: impl FnMut() -> bool) {
-    const RECHECK: Duration = Duration::from_millis(5);
-    let deadline = Instant::now() + timeout();
-    while !condition() {
-        let now = Instant::now();
-        assert!(now < deadline, "timed out waiting for {what}");
-        std::thread::park_timeout(RECHECK.min(deadline - now));
-    }
-}
-
 /// Blocks until a submitted operation completes and returns its value. A
 /// refused release's error carries the handle, so `E` is generic.
 #[track_caller]

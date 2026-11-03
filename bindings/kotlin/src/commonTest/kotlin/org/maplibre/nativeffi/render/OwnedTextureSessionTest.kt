@@ -127,18 +127,6 @@ class OwnedTextureSessionTest {
       mapFixture.map.release().awaitWithin("the map release")
     }
   }
-
-  @Test
-  fun aCallerDrivenSessionIsServicedFromTheGraphicsThread() = runSuspendTest {
-    withOwnedTexture {
-      setStyle(RED_BACKGROUND_STYLE)
-      // The fixture services the session from a coroutine on TestGraphics.thread, woken by the
-      // session's driver-work and frame wakes: a thread of its own on the threaded targets, and the
-      // page's event loop on wasm.
-      renderStill()
-      assertEquals(RenderResult.RENDERED, renderFrame().disposition)
-    }
-  }
 }
 
 /** A style that paints every pixel opaque red. */

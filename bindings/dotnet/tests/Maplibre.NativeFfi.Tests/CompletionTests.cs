@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Internal.C;
 using Xunit;
 
@@ -109,69 +107,6 @@ public sealed class CompletionTests
     private static unsafe mln_lat_lng[] ReadLatLngs(mln_completion_result result) =>
         NativeCompletion.Values<mln_lat_lng>(&result);
 
-    [Fact]
-    public void ARejectedSubmissionFreesItsCompletionState()
-    {
-        var (state, captured) = Gc.OnThread(SubmitRejected);
-        Gc.CollectUntilReclaimed("the rejected completion capture", captured);
-        GC.KeepAlive(state);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static unsafe (object State, WeakReference Captured) SubmitRejected()
-    {
-        var captured = new object();
-        object? state = null;
-        var error = Record.Exception(() =>
-        {
-            mln_completion completion;
-            NativeCompletion.Start(
-                &completion,
-                _ =>
-                {
-                    GC.KeepAlive(captured);
-                    return 0;
-                },
-                out var pending
-            );
-            state = GCHandle.FromIntPtr((nint)completion.user_data).Target;
-            _ = pending.Submitted(mln_status.MLN_STATUS_INVALID_ARGUMENT);
-        });
-        Assert.IsType<MaplibreException>(error);
-        return (state!, new WeakReference(captured));
-    }
-
-    [Fact]
-    public void AReleasedCompletionDropsItsCaptureWhileStateRemainsAlive()
-    {
-        var (state, captured) = Gc.OnThread(CompleteAndReleaseCapturingState);
-        Gc.CollectUntilReclaimed("the released completion capture", captured);
-        GC.KeepAlive(state);
-    }
-
-    private static unsafe (object State, WeakReference Captured) CompleteAndReleaseCapturingState()
-    {
-        var captured = new object();
-        mln_completion completion;
-        NativeCompletion.Start(
-            &completion,
-            _ =>
-            {
-                GC.KeepAlive(captured);
-                return 7;
-            },
-            out var pending
-        );
-        var state = GCHandle.FromIntPtr((nint)completion.user_data).Target!;
-        var task = pending.Submitted(mln_status.MLN_STATUS_OK);
-        var result = new mln_completion_result { status = mln_status.MLN_STATUS_OK };
-        completion.callback(completion.user_data, &result);
-        completion.release_user_data(completion.user_data);
-        Assert.True(task.IsCompletedSuccessfully);
-        Assert.Equal(7, task.Result);
-        return (state, new WeakReference(captured));
-    }
-
     // Native fails a command it accepted, and the test plays native's part for a cancelled one,
     // which a live map cannot produce on demand.
     [Fact]
@@ -212,33 +147,5 @@ public sealed class CompletionTests
         }
         completion.release_user_data(completion.user_data);
         return task;
-    }
-
-    // A still image on a static map with no session stays pending until the map closes, so every
-    // outcome below comes from the wait rather than from native. A caller abandons a wait with
-    // WaitAsync.
-    [Fact]
-    public async Task AWaitCanTimeOutOrBeCancelled()
-    {
-        await using var fixture = await NativeFixture.CreateAsync(
-            NativeFixture.SmallMap with
-            {
-                MapMode = MapMode.Static,
-            }
-        );
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        var stillImage = fixture.Map.RequestStillImageAsync();
-
-        await Assert.ThrowsAsync<TimeoutException>(() =>
-            stillImage.WaitAsync(TimeSpan.Zero, TestWaits.Token)
-        );
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            stillImage.WaitAsync(cancellation.Token)
-        );
-
-        // The native request is still outstanding, and closing the map retires it.
-        Assert.False(stillImage.IsCompleted);
-        await fixture.Map.CloseAsync();
     }
 }

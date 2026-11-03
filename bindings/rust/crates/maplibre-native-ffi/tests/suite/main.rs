@@ -3,7 +3,6 @@
 //!
 //! Native semantics are tested once, in tests/native. A test here calls native
 //! only to reach a binding code path, and it asserts what the binding does.
-//! tests/conformance/rust.toml maps each conformance case to its test.
 //!
 //! The browser build runs its own few tests, in `browser`, because its GPU
 //! contexts come from JavaScript rather than tests/graphics.

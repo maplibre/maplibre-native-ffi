@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi
 
-import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 
 internal actual class TestThread actual constructor(block: () -> Unit) {
@@ -25,31 +24,14 @@ internal actual class TestThread actual constructor(block: () -> Unit) {
 }
 
 internal actual class TestWeakReference actual constructor(value: Any) {
-  val queue = ReferenceQueue<Any>()
-  private val reference = WeakReference(value, queue)
+  private val reference = WeakReference(value)
 
   actual val value: Any?
     get() = reference.get()
-
-  actual val isCleared: Boolean
-    get() = reference.get() == null
-}
-
-internal actual suspend fun awaitCollected(reference: TestWeakReference): Boolean {
-  val deadline = System.nanoTime() + GC_WAIT_NANOS
-  while (System.nanoTime() < deadline) {
-    if (reference.isCleared) return true
-    Runtime.getRuntime().gc()
-    if (reference.queue.remove(GC_ROUND_MILLIS) != null) return true
-  }
-  return reference.isCleared
 }
 
 internal actual suspend fun requestCollection() {
   Runtime.getRuntime().gc()
 }
-
-private const val GC_WAIT_NANOS = 30_000_000_000L
-private const val GC_ROUND_MILLIS = 100L
 
 internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)? = null

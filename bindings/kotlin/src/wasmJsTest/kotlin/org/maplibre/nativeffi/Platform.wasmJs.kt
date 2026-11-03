@@ -7,9 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
-import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /** The pool size the suite loads the module with, unlike the module's default of 20. */
 internal const val TEST_POOL_SIZE: Int = 24
@@ -35,23 +33,11 @@ internal actual class TestWeakReference actual constructor(value: Any) {
 
   actual val value: Any?
     get() = deref(reference)?.get()
-
-  actual val isCleared: Boolean
-    get() = deref(reference) == null
 }
 
-// Karma starts Chromium with --expose-gc, so each round runs a full collection.
-internal actual suspend fun awaitCollected(reference: TestWeakReference): Boolean =
-  withTimeoutOrNull(WAIT_TIMEOUT) {
-    while (!reference.isCleared) {
-      // The page keeps a weak reference's value until the task that read it ends.
-      yield()
-      collectGarbage()
-    }
-    true
-  } ?: reference.isCleared
-
+// Karma starts Chromium with --expose-gc, which defines globalThis.gc.
 internal actual suspend fun requestCollection() {
+  // The page keeps a weak reference's value until the task that read it ends.
   yield()
   collectGarbage()
 }
@@ -66,10 +52,6 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
 // Native consumes each record and queues it, and the page runs the callback as it dispatches.
 internal actual fun setTestLogCallback(callback: (LogEvent) -> Unit) {
   setLogCallback(QueuedLogHandler { _, event, _, _ -> callback(event) })
-}
-
-internal actual suspend fun awaitDeliveries() {
-  HostDelivery.dispatch()
 }
 
 private fun replaceReportError(sink: (JsReference<Throwable>) -> Boolean): JsAny =

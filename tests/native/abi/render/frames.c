@@ -429,7 +429,7 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
 // destroys a Vulkan or Metal renderer, whose objects the host never reads,
 // and keeps an OpenGL or WebGPU one, which only its graphics thread may
 // destroy.
-static void acquired_frame_release_after_abandon_is_cpu_only(void) {
+static void an_acquired_frame_still_releases_after_abandon(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
@@ -798,7 +798,7 @@ MLN_TEST_GROUP {
 #endif
   RUN_TEST(only_the_sessions_backend_describes_its_frame_texture);
   RUN_TEST(accessors_and_release_reject_a_broken_frame_or_record);
-  RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);
+  RUN_TEST(an_acquired_frame_still_releases_after_abandon);
   RUN_TEST(a_stale_release_during_detach_is_refused_before_its_sync);
   RUN_TEST(borrowed_views_hold_a_frame_until_every_view_ends);
   RUN_TEST(disposing_a_frame_quarantines_only_its_slot);

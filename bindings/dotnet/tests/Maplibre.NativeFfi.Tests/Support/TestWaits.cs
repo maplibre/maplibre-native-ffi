@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.ExceptionServices;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -43,7 +42,7 @@ internal static class TestWaits
             : 1;
 }
 
-/// <summary>Forces the collections that liveness assertions depend on.</summary>
+/// <summary>Forces a full collection, so a value that nothing roots would be reclaimed.</summary>
 internal static class Gc
 {
     internal static void Collect()
@@ -51,63 +50,5 @@ internal static class Gc
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-    }
-
-    // Mono conservatively scans native stacks. Run capture construction and
-    // liveness probes on threads that exit, so stale stack words cannot root them.
-    internal static T OnThread<T>(Func<T> action)
-    {
-        T result = default!;
-        Exception? failure = null;
-        var worker = new Thread(() =>
-        {
-            try
-            {
-                result = action();
-            }
-            catch (Exception error)
-            {
-                failure = error;
-            }
-        });
-        worker.Start();
-        worker.Join();
-        if (failure is not null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
-        return result;
-    }
-
-    internal static void OnThread(Action action) =>
-        OnThread(() =>
-        {
-            action();
-            return true;
-        });
-
-    internal static bool IsAlive(WeakReference value)
-    {
-        // Collect before starting the probe: its OS stack may reuse a former probe's
-        // stale target pointer, which Mono would conservatively mark during collection.
-        Collect();
-        return OnThread(() => value.IsAlive);
-    }
-
-    /// <summary>
-    /// Collects until every value is reclaimed, failing the test at the shared deadline.
-    /// </summary>
-    /// <remarks>
-    /// A completion's task finishes inside its callback, but native releases the completion's GC
-    /// handle afterwards on the runtime worker, so an object the completion reaches can stay
-    /// rooted for a moment after the awaited call returns. Each pass's collections and finalizer
-    /// wait give the worker that moment.
-    /// </remarks>
-    internal static void CollectUntilReclaimed(string what, params WeakReference[] values)
-    {
-        var elapsed = Stopwatch.StartNew();
-        while (values.Any(IsAlive))
-        {
-            if (elapsed.Elapsed >= TestWaits.Deadline)
-                throw new TimeoutException($"Timed out waiting for {what} to be collected.");
-        }
     }
 }

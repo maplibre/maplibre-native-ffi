@@ -21,6 +21,4 @@ internal actual object NativeRoots {
   actual fun get(token: Long): Any? = roots[token]
 
   actual fun release(token: Long): Any? = roots.remove(token)
-
-  fun countForTesting(): Int = roots.size
 }

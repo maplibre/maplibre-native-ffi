@@ -1082,20 +1082,24 @@ static void a_target_scale_that_differs_from_the_map_attaches_with_a_warning(
     .size = sizeof(mln_log_handler), .callback = record_render_warning
   };
   MLN_TEST_OK(mln_log_set_callback(&handler, NULL));
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_test_map_options();
-  options.initial_extent.scale_factor = 3.0;
-  mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_render_fixture fixture = {0};
-  const bool attached = mln_test_render_fixture_create(map, &fixture);
-  const bool logged =
-    attached && mln_test_wait_for_flag(&render_warning_logged);
+  // The log callback belongs to the process, so a failed assertion still
+  // clears it.
+  if (TEST_PROTECT()) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map_options options = mln_test_map_options();
+    options.initial_extent.scale_factor = 3.0;
+    mln_map map = mln_test_create_map_with_options(runtime, &options);
+    mln_test_render_fixture fixture = {0};
+    TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_wait_for_flag(&render_warning_logged),
+      "the attach logged no render warning"
+    );
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
   (void)mln_log_clear_callback(NULL);
-  TEST_ASSERT_TRUE(attached);
-  TEST_ASSERT_TRUE_MESSAGE(logged, "the attach logged no render warning");
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {

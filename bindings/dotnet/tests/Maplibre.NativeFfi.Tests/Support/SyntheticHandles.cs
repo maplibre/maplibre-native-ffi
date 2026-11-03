@@ -13,10 +13,7 @@ namespace Maplibre.NativeFfi.Tests;
 /// </remarks>
 internal static class SyntheticHandles
 {
-    private const ulong RuntimeKind = 0x01UL << 56;
     private const ulong ResourceRequestKind = 0x0CUL << 56;
-
-    internal static MlnRuntime Runtime(ulong ordinal = 1) => new(RuntimeKind | ordinal);
 
     internal static MlnResourceRequest ResourceRequest(ulong ordinal = 1) =>
         new(ResourceRequestKind | ordinal);

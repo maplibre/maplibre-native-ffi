@@ -91,14 +91,10 @@ export interface Capabilities {
   /** The host defines `Symbol.dispose` and `Symbol.asyncDispose`. */
   readonly disposers?: true;
   /**
-   * What a call made before the browser module loaded threw, and how many
-   * entries it left pending. Other hosts load the addon as they import the
-   * binding, so no call precedes the load.
+   * What a call made before the browser module loaded threw. Other hosts load
+   * the addon as they import the binding, so no call precedes the load.
    */
-  readonly beforeLoad?: () => {
-    readonly error: unknown;
-    readonly pending: number;
-  };
+  readonly beforeLoad?: () => unknown;
   /** Loads the test-only addon over tests/graphics. */
   readonly testGraphics: () => unknown;
   readonly unrefTimer: (timer: ReturnType<typeof setTimeout>) => void;
@@ -129,7 +125,6 @@ function runtimeCommand(script: string, args: readonly string[]) {
         "--allow-ffi",
         "--allow-read",
         "--allow-env",
-        "--v8-flags=--expose-gc",
         script,
         ...args,
       ],
@@ -137,7 +132,7 @@ function runtimeCommand(script: string, args: readonly string[]) {
   }
   // A Bun script outside any node_modules installs a package it cannot
   // resolve from the registry, which would find the published backends.
-  const flags = host === "node" ? ["--expose-gc"] : ["--no-install"];
+  const flags = host === "bun" ? ["--no-install"] : [];
   return {
     command: process.execPath,
     args: [...flags, script, ...args],

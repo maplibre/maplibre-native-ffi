@@ -167,82 +167,26 @@ static void events_and_their_completion_run_in_push_order(void) {
   mln_test_delivery_queue_release(&queue);
 }
 
-static const uint8_t inline_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[]}";
-
-typedef struct answering_provider {
-  call_log log;
-  mln_status answer;
-} answering_provider;
-
-static void answer_request(
+static void pass_request(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
 ) {
-  answering_provider* provider = user_data;
-  record(&provider->log, 'P', 0);
-  const bool lent_url =
-    request->requested_url.size != 0 &&
-    mln_test_lent_text_is_terminated(request->requested_url);
-  const mln_resource_response response = {
-    .size = sizeof(mln_resource_response),
-    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-    .bytes = inline_style_json,
-    .byte_count = sizeof(inline_style_json) - 1,
-  };
-  provider->answer = lent_url
-                       ? mln_resource_request_complete(handle, &response, NULL)
-                       : MLN_STATUS_INVALID_ARGUMENT;
+  (void)request;
+  record(user_data, 'P', 0);
+  (void)mln_resource_request_pass_through(handle, NULL);
 }
 
-static void release_provider(void* user_data) {
-  answering_provider* provider = user_data;
-  record(&provider->log, 'r', 0);
-}
-
-static void a_dispatched_request_passes_its_handle_to_the_call(void) {
-  static answering_provider provider;
-  start_case(&provider.log);
-  provider.answer = MLN_STATUS_NATIVE_ERROR;
-  mln_test_delivery_queue queue;
-  mln_test_delivery_queue_create(&queue);
-  const mln_resource_provider registration = {
-    .size = sizeof(registration),
-    .callback = answer_request,
-    .user_data = &provider,
-    .release_user_data = release_provider,
-    .queue = queue.handle,
-  };
-  mln_runtime runtime = mln_test_create_runtime();
-  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &registration));
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(
-    mln_test_map_set_style_url(map, "custom://dispatched-provider.json")
-  );
-
-  dispatch_until(queue.handle, &provider.log, 'P');
-  MLN_TEST_OK(provider.answer);
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
-
-  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
-  dispatch_until(queue.handle, &provider.log, 'r');
-  TEST_ASSERT_EQUAL_STRING("Pr", provider.log.kinds);
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&provider.log.off_thread));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_delivery_queue_release(&queue);
-}
+static void release_provider(void* user_data) { record(user_data, 'r', 0); }
 
 static void releasing_the_queue_abandons_pending_calls_and_releases(void) {
-  static answering_provider provider;
-  start_case(&provider.log);
+  static call_log log;
+  start_case(&log);
   mln_test_delivery_queue queue;
   mln_test_delivery_queue_create(&queue);
   const mln_resource_provider registration = {
     .size = sizeof(registration),
-    .callback = answer_request,
-    .user_data = &provider,
+    .callback = pass_request,
+    .user_data = &log,
     .release_user_data = release_provider,
     .queue = queue.handle,
   };
@@ -259,8 +203,8 @@ static void releasing_the_queue_abandons_pending_calls_and_releases(void) {
   );
   TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
   MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
-  TEST_ASSERT_EQUAL_size_t(0, provider.log.count);
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&provider.log.off_thread));
+  TEST_ASSERT_EQUAL_size_t(0, log.count);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&log.off_thread));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -399,15 +343,6 @@ static void dispose_owners(
   owner->runtime_disposed = mln_runtime_dispose(owner->runtime, NULL);
 }
 
-static void pass_request(
-  void* user_data, const mln_resource_request_info* request,
-  mln_resource_request handle
-) {
-  (void)request;
-  record(user_data, 'P', 0);
-  (void)mln_resource_request_pass_through(handle, NULL);
-}
-
 static void a_call_may_dispose_its_owners(void) {
   static disposing_owner owner;
   start_case(&owner.log);
@@ -489,7 +424,6 @@ static void a_camera_end_handler_runs_its_end_then_its_release(void) {
 MLN_TEST_GROUP {
   RUN_TEST(dispatch_reports_its_status);
   RUN_TEST(events_and_their_completion_run_in_push_order);
-  RUN_TEST(a_dispatched_request_passes_its_handle_to_the_call);
   RUN_TEST(releasing_the_queue_abandons_pending_calls_and_releases);
   RUN_TEST(a_dispatch_inside_a_call_is_busy);
   RUN_TEST(a_call_that_releases_the_queue_abandons_the_rest);

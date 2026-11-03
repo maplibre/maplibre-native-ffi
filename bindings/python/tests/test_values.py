@@ -203,14 +203,6 @@ def test_json_crosses_as_json_dumps_and_json_loads_values(
 
 
 def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> None:
-    zoom = mln.StyleExpressionHandle.create(
-        ["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]
-    )
-    try:
-        assert zoom.evaluate(mln.StyleExpressionInputs(zoom=5.0)) == 50.0
-    finally:
-        zoom.close()
-
     # The result outgrows the runtime's first storage, so the call runs again.
     text = "a" * 1000
     long = mln.StyleExpressionHandle.create(text)

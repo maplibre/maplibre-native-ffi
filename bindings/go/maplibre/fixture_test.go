@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"weak"
 )
 
 // The suite's shared fixture: one runtime and one map per test, a resource
@@ -237,50 +236,5 @@ func notify(wake chan<- struct{}) {
 	select {
 	case wake <- struct{}{}:
 	default:
-	}
-}
-
-// awaitUnreachable runs the collector until the object behind pointer is
-// unreachable, which is when its cleanup is due to dispose it.
-func awaitUnreachable[T any](t *testing.T, pointer weak.Pointer[T], what string) {
-	t.Helper()
-	awaitCondition(t, what, func() bool {
-		stdruntime.GC()
-		return pointer.Value() == nil
-	})
-}
-
-// closeOnceCollected runs the collector until runtime closes, which it refuses
-// while a map is live, and so shows that cleanup disposed every map the test
-// dropped. A runtime command orders a map's retirement, which disposal only
-// schedules.
-func closeOnceCollected(t *testing.T, runtime *RuntimeHandle, what string) {
-	t.Helper()
-	awaitCondition(t, what, func() bool {
-		stdruntime.GC()
-		await(t, submitted(runtime.ClearResourceTransform()))
-		teardown, err := runtime.Close()
-		if errors.Is(err, StatusInvalidState) {
-			return false
-		}
-		await(t, submitted(teardown, err))
-		return true
-	})
-}
-
-// awaitCondition re-checks ready until it holds. Only states that raise no
-// wake of their own use it: a collection, and a request's cancelled flag.
-func awaitCondition(t *testing.T, what string, ready func() bool) {
-	t.Helper()
-	recheck := time.NewTicker(time.Millisecond)
-	defer recheck.Stop()
-	deadline := time.NewTimer(testTimeout())
-	defer deadline.Stop()
-	for !ready() {
-		select {
-		case <-recheck.C:
-		case <-deadline.C:
-			t.Fatalf("timed out waiting for %s", what)
-		}
 	}
 }

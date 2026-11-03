@@ -48,17 +48,6 @@ void main() {
     _expectRed(await within(worker.session.readTexture(), 'texture readback'));
   });
 
-  test('an attach with a core-worker driver completes on its own', () async {
-    final map = await openRenderMap(emptyStyle);
-    // Nothing services driver work, so only a core-worker driver completes.
-    final attachment = attachDeviceTexture(
-      map,
-      const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
-    );
-    addTearDown(() => releaseSession(attachment.session));
-    await within(attachment.ready, 'attachment');
-  });
-
   test(
     'a disposed attached session lets its map release before its device goes',
     () async {
@@ -78,24 +67,6 @@ void main() {
       attachment.session.dispose();
       // A dispose reports no retirement, so the map's release waits for it.
       await within(map.close(), 'map close');
-      device.close();
-    },
-  );
-
-  test(
-    'closing an attached session completes before its device goes',
-    () async {
-      final map = await openRenderMap(emptyStyle);
-      final device = openGraphicsDevice();
-      final attachment = map.attachGraphicsDeviceTexture(
-        device,
-        _descriptor,
-        const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
-      );
-      addTearDown(() => releaseSession(attachment.session));
-      await within(attachment.ready, 'attachment');
-
-      await within(attachment.session.close(), 'session close');
       device.close();
     },
   );

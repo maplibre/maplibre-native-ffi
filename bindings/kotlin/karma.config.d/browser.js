@@ -41,7 +41,7 @@ config.browserNoActivityTimeout = 120000;
 // Headless Chromium renders through SwiftShader where the host has no GPU it
 // can use, with the flags that scripts/run-browser-test.mjs passes the native
 // suite for the module's backend, which MLN_KOTLIN_WASM_RENDER_BACKEND names.
-// The collection tests call globalThis.gc, which --expose-gc defines.
+// requestCollection calls globalThis.gc, which --expose-gc defines.
 const renderBackend = process.env.MLN_KOTLIN_WASM_RENDER_BACKEND;
 const backendFlags = {
   webgl: ["--enable-unsafe-swiftshader"],

@@ -326,6 +326,9 @@ func TestFrameDiscardsOnce(t *testing.T) {
 	checkHandleMembers(t, frame, "AcquiredFrameHandle", true)
 }
 
+// A view checks that it is used on the thread that it was lent on. The binding
+// locks the viewing goroutine to its OS thread while the view is open, so a
+// goroutine that yields inside the callback keeps passing that check.
 func TestFrameViewSurvivesYielding(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
