@@ -427,13 +427,9 @@ static napi_value mln_ts_export_mln_log_set_callback(
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
   memset(&arg_handler, 0, sizeof arg_handler);
   arg_handler.size = sizeof arg_handler;
-  if (!mln_ts_read_function(call, call->argv[0], "handler")) goto done;
-  if (!mln_ts_read_registration(
-        call, call->argv[0], &arg_handler.user_data,
-        &arg_handler.release_user_data, &arg_handler.queue
-      ))
+  if (!mln_ts_read_record(call, call->argv[0], "handler")) goto done;
+  if (!mln_ts_write_log_handler(call, call->argv[0], &arg_handler, "handler"))
     goto done;
-  arg_handler.callback = mln_ts_dispatch_log_callback;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_log_set_callback(&arg_handler, &diagnostic);

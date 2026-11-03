@@ -176,7 +176,6 @@ int main() {
       assert(event == MLN_LOG_EVENT_SHADER && code == 3);
       assert(std::strcmp(static_cast<const char*>(text.data), "borrowed") == 0);
       ++invoked;
-      return true;
     },
     &invoked, copied
   );

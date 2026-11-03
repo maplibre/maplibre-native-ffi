@@ -126,7 +126,7 @@ static const mln_completion probe_discarding_completion = {
   .callback = probe_discard,
 };
 
-static inline bool probe_consume_log(
+static inline void probe_consume_log(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message
 ) {
@@ -135,7 +135,6 @@ static inline bool probe_consume_log(
   (void)event;
   (void)code;
   (void)message;
-  return true;
 }
 
 // A style whose GeoJSON source keeps the tile workers busy. Its glyph and

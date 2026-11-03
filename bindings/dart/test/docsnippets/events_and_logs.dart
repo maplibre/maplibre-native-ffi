@@ -47,8 +47,12 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
 
   // #region logs
   // The callback runs in this isolate. The binding queues each call.
-  setLogCallback((severity, _, _, message) {
-    writeLog(severity, message);
-  });
+  setLogCallback(
+    LogHandler(
+      callback: (severity, _, _, message) {
+        writeLog(severity, message);
+      },
+    ),
+  );
   // #endregion logs
 }

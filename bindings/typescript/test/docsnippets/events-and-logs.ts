@@ -52,8 +52,10 @@ export async function eventsAndLogs(
 
   // #region logs
   // The callback runs on this thread. The binding queues each call.
-  setLogCallback((severity, _event, _code, message) => {
-    writeLog(severity, message);
+  setLogCallback({
+    callback: (severity, _event, _code, message) => {
+      writeLog(severity, message);
+    },
   });
   // #endregion logs
 }

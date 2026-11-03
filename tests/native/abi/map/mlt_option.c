@@ -76,7 +76,7 @@ static void serve_recorded_tile(
 // outlives any registration a failing case leaves behind.
 static atomic_bool mlt_parse_warning_logged;
 
-static bool record_mlt_parse_warning(
+static void record_mlt_parse_warning(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message_view
 ) {
@@ -89,7 +89,6 @@ static bool record_mlt_parse_warning(
   ) {
     mln_test_flag_set(&mlt_parse_warning_logged);
   }
-  return false;
 }
 
 typedef struct mlt_map {

@@ -67,11 +67,8 @@ func eventsAndLogs(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 			_ maplibre.LogEvent,
 			_ int64,
 			message string,
-		) bool {
+		) {
 			writeLog(severity, message)
-			// Consume the record. Return false to let the platform logger
-			// print it too.
-			return true
 		},
 	})
 	if err != nil {

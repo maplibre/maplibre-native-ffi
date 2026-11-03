@@ -5,8 +5,8 @@ internal actual object UpcallStubs {
   actual val completion: Long = Jni.upcallStub("completion")
   actual val completionRelease: Long = Jni.upcallStub("completionRelease")
   actual val releaseRoot: Long = Jni.upcallStub("releaseRoot")
-  actual val logHandlerCallback: Long = Jni.upcallStub("logHandlerCallback")
   actual val httpHeaderTransformCallback: Long = Jni.upcallStub("httpHeaderTransformCallback")
+  actual val logHandlerCallback: Long = Jni.upcallStub("logHandlerCallback")
   actual val customGeometrySourceOptionsFetchTile: Long =
     Jni.upcallStub("customGeometrySourceOptionsFetchTile")
   actual val customGeometrySourceOptionsCancelTile: Long =

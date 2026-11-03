@@ -962,12 +962,23 @@ export type LogEvent = (typeof LogEvent)[keyof typeof LogEvent] | (number & {});
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
-export type LogHandler = (
-  severity: LogSeverity,
-  event: LogEvent,
-  code: bigint,
-  message: string,
-) => void;
+export interface LogHandler {
+  callback: (
+    severity: LogSeverity,
+    event: LogEvent,
+    code: bigint,
+    message: string,
+  ) => void;
+  /**
+   * The severities that also go to the platform's log, as they do without a
+   * callback. 0 sends none.
+   *
+   * A record that the handler's delivery queue can't accept is dropped. These
+   * severities alone decide whether a record also goes to the platform's log,
+   * whether or not the queue accepts it.
+   */
+  platformSeverities?: LogSeverityFlag;
+}
 
 /**
  * The severity of a log message.

@@ -50,12 +50,6 @@ internal val NETWORK_URLS: List<ResourceRoute> by lazy {
 }
 
 /**
- * Installs [callback] as the process-global log callback, in the form that the target takes. The
- * callback consumes each record.
- */
-internal expect fun setTestLogCallback(callback: (LogEvent) -> Unit)
-
-/**
  * Claims the requests that [routes] match, every request by default, and answers each one that
  * [serve] leaves to it with a NOT_FOUND error, so no test reaches the network or the file system.
  * [serve] returns true for the requests it handles itself. Native matches the routes, so a request

@@ -9,8 +9,6 @@ import Foundation
 /// the severities that `setLogAsyncSeverityMask()` selects. The callback can't
 /// call the library.
 ///
-/// A thrown error answers `false` and is reported to standard error.
-///
 /// See `mln_log_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public typealias LogCallback = @Sendable (
@@ -18,7 +16,7 @@ public typealias LogCallback = @Sendable (
   _ event: LogEvent,
   _ code: Int64,
   _ message: String
-) throws -> Bool
+) -> Void
 
 /// The part of the library that logged a message.
 ///
@@ -83,14 +81,26 @@ public struct LogEvent: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogHandler: Sendable {
   public var callback: LogCallback
-  public init(callback: @escaping LogCallback) {
+  /// The severities that also go to the platform's log, as they do without a
+  /// callback. 0 sends none.
+  ///
+  /// A record that the handler's delivery queue can't accept is dropped. These
+  /// severities alone decide whether a record also goes to the platform's log,
+  /// whether or not the queue accepts it.
+  public var platformSeverities: LogSeverityFlag
+  public init(
+    callback: @escaping LogCallback,
+    platformSeverities: LogSeverityFlag = .init(rawValue: 0)
+  ) {
     self.callback = callback
+    self.platformSeverities = platformSeverities
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_log_handler {
     var raw = mln_log_handler()
     raw.size = UInt32(MemoryLayout<mln_log_handler>.size)
     raw.callback = invokeLogHandlerCallback
+    raw.platform_severities = platformSeverities.rawValue
     raw.user_data = arena.callback(self)
     raw.release_user_data = releaseGeneratedCallback
     return raw
@@ -103,18 +113,16 @@ private func invokeLogHandlerCallback(
   event: mln_log_event,
   code: Int64,
   message: mln_buffer_view
-) -> Bool {
-  guard let user_data else { return false }
+) {
+  guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<LogHandler>>.fromOpaque(user_data)
     .takeUnretainedValue()
-  do { return try box.value.callback(
+  do { try box.value.callback(
     LogSeverity(rawValue: severity.rawValue),
     LogEvent(rawValue: event.rawValue),
     code,
     NativeString.copyUTF8(data: message.data, size: message.size)
-  ) } catch {
-    reportToStandardError("mln_log_callback failed: \(error)\n"); return false
-  }
+  ) } catch { reportToStandardError("mln_log_callback failed: \(error)\n") }
 }
 
 /// The severity of a log message.

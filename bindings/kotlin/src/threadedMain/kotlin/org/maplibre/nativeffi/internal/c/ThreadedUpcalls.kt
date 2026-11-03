@@ -4,7 +4,6 @@ package org.maplibre.nativeffi.internal.c
 import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.*
 import org.maplibre.nativeffi.internal.callback.statusUpcall
-import org.maplibre.nativeffi.internal.callback.upcall
 import org.maplibre.nativeffi.internal.callback.withCallbackScope
 import org.maplibre.nativeffi.internal.memory.*
 
@@ -13,23 +12,6 @@ import org.maplibre.nativeffi.internal.memory.*
  * calling thread.
  */
 internal object ThreadedUpcalls {
-  @JvmStatic
-  fun logHandlerCallback(
-    userData: Long,
-    severity: Int,
-    event: Int,
-    code: Long,
-    message: Long,
-  ): Boolean =
-    upcall<LogHandler, Boolean>("mln_log_callback", userData, false) { value ->
-      value.callback(
-        LogSeverity(severity.toUInt()),
-        LogEvent(event.toUInt()),
-        code,
-        readViewString(message),
-      )
-    }
-
   @JvmStatic
   fun httpHeaderTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
     statusUpcall<HttpHeaderTransform>("mln_http_header_transform_callback", userData, -5) { value ->

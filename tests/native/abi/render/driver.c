@@ -1129,7 +1129,7 @@ static void wakes_may_call_back_into_the_session(void) {
 // outlives any registration a failing case leaves behind.
 static atomic_bool render_warning_logged;
 
-static bool record_render_warning(
+static void record_render_warning(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message
 ) {
@@ -1139,7 +1139,6 @@ static bool record_render_warning(
   if (severity == MLN_LOG_SEVERITY_WARNING && event == MLN_LOG_EVENT_RENDER) {
     mln_test_flag_set(&render_warning_logged);
   }
-  return false;
 }
 
 static bool driver_woken(void* context) {

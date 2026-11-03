@@ -36,7 +36,7 @@ func TestProcessExitsCleanlyWithLiveHandles(t *testing.T) {
 }
 
 func exitWithLiveHandles(t *testing.T) {
-	if err := SetLogCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) bool { return false }}); err != nil {
+	if err := SetLogCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) {}}); err != nil {
 		t.Fatal(err)
 	}
 	// The process exits before the fixture's cleanups can close anything.

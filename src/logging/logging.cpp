@@ -27,11 +27,13 @@ class CallbackLogObserver final : public mln::Log::Observer {
  public:
   CallbackLogObserver(
     mln_log_callback callback, void* user_data,
-    mln_user_data_release release_user_data
+    mln_user_data_release release_user_data,
+    mln_log_severity_flags platform_severities
   )
       : callback_(callback),
         user_data_(user_data),
-        release_user_data_(release_user_data) {}
+        release_user_data_(release_user_data),
+        platform_severities_(platform_severities) {}
 
   ~CallbackLogObserver() override {
     if (release_user_data_ == nullptr || mln::core::process_exiting()) {
@@ -55,33 +57,39 @@ class CallbackLogObserver final : public mln::Log::Observer {
     }
 
     const auto forbid = mln::core::ForbidReentry{log_reentry_diagnostic};
-    return callback_(
+    callback_(
       user_data_, static_cast<mln_log_severity>(severity),
       static_cast<mln_log_event>(event), code,
       mln_buffer_view{.data = message.data(), .size = message.size()}
     );
+    // MapLibre sends a record to the platform logger when onRecord returns
+    // false.
+    const auto bit = 1U << static_cast<std::uint32_t>(severity);
+    return (platform_severities_ & bit) == 0U;
   }
 
  private:
   mln_log_callback callback_ = nullptr;
   void* user_data_ = nullptr;
   mln_user_data_release release_user_data_ = nullptr;
+  mln_log_severity_flags platform_severities_ = 0;
 };
 
-// Consumes each record and queues a copy, or leaves a record the queue
-// refuses to the platform logger.
+// Queues a copy of each record. A record the queue refuses is dropped.
 auto queue_log_record(
   void* registration, mln_log_severity severity, mln_log_event event,
   std::int64_t code, mln_buffer_view message
-) noexcept -> bool {
+) noexcept -> void {
   const auto record = mln::delivery::LogArguments{
     .severity = severity,
     .event = event,
     .code = code,
     .message = message,
   };
-  return static_cast<const mln::delivery::QueuedRegistration*>(registration)
-    ->push(record);
+  static_cast<void>(
+    static_cast<const mln::delivery::QueuedRegistration*>(registration)
+      ->push(record)
+  );
 }
 
 auto set_severity_async(
@@ -101,6 +109,10 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
   }
   if (handler->size < sizeof(mln_log_handler)) {
     set_thread_error("mln_log_handler.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if ((handler->platform_severities & ~MLN_LOG_SEVERITY_FLAG_ALL) != 0U) {
+    set_thread_error("log handler platform_severities contains unknown bits");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto queue = std::shared_ptr<mln::delivery::DeliveryQueueState>{};
@@ -124,7 +136,7 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
     );
     auto observer = std::make_unique<CallbackLogObserver>(
       &queue_log_record, registration.get(),
-      &mln::delivery::QueuedRegistration::retire
+      &mln::delivery::QueuedRegistration::retire, handler->platform_severities
     );
     static_cast<void>(registration.release());
     mln::Log::setObserver(std::move(observer));
@@ -132,7 +144,8 @@ auto set_log_callback(const mln_log_handler* handler) -> mln_status {
   }
   mln::Log::setObserver(
     std::make_unique<CallbackLogObserver>(
-      handler->callback, handler->user_data, handler->release_user_data
+      handler->callback, handler->user_data, handler->release_user_data,
+      handler->platform_severities
     )
   );
   return MLN_STATUS_OK;

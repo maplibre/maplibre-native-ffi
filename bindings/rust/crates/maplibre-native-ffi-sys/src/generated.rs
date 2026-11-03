@@ -843,6 +843,7 @@ pub struct mln_log_handler {
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
+    pub platform_severities: mln_log_severity_flags,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1862,7 +1863,7 @@ pub type mln_log_callback = Option<
         event: mln_log_event,
         code: i64,
         message: mln_buffer_view,
-    ) -> bool,
+    ),
 >;
 pub type mln_log_severity_flags = u32;
 #[repr(transparent)]

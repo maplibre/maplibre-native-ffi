@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
+import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
@@ -87,6 +88,23 @@ public fun clearLogCallback(): Unit =
 public fun setLogAsyncSeverityMask(mask: LogSeverityFlag): Unit =
   nativeCall(null, null) {
     check(C.mln_log_set_async_severity_mask(mask.rawValue.toInt(), diagnostic))
+  }
+
+/**
+ * Sends the log messages of every runtime in the process to a callback.
+ *
+ * The callback replaces the one set before.
+ *
+ * Runs on the thread that logged the message, or on a background thread for the severities that
+ * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
+ *
+ * See `mln_log_set_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
+public fun setLogCallback(handler: LogHandler): Unit =
+  nativeCall(null, null) {
+    check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
+    accept(CallbackOwner.global)
   }
 
 /**

@@ -617,7 +617,7 @@ static void sources_that_share_a_callback_answer_their_own_tiles(void) {
 static atomic_bool tile_error_logged;
 static char tile_error_fragment[64];
 
-static bool record_tile_error(
+static void record_tile_error(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   mln_buffer_view message_view
 ) {
@@ -631,7 +631,6 @@ static bool record_tile_error(
   ) {
     mln_test_flag_set(&tile_error_logged);
   }
-  return false;
 }
 
 static bool tile_error_reported(void* context) {

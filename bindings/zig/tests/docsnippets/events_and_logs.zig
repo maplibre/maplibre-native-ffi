@@ -66,12 +66,9 @@ fn onLog(
     _: maplibre.LogEvent,
     _: i64,
     message: []const u8,
-) anyerror!bool {
+) anyerror!void {
     // The message is valid only during this callback.
     writeLog(severity, message);
-    // Consume the record. Return false to let the platform logger
-    // print it too.
-    return true;
 }
 // #endregion logs
 

@@ -5,7 +5,7 @@ using Maplibre.NativeFfi;
 
 MaplibreNative.LoadNativeLibrary();
 MaplibreNative.SetLogAsyncSeverityMask(LogSeverityFlag.All);
-MaplibreNative.SetLogCallback(new LogHandler((_, _, _, _) => false));
+MaplibreNative.SetLogCallback(new LogHandler { Callback = (_, _, _, _) => { } });
 
 var held = new TaskCompletionSource<ResourceRequestHandle>(
     TaskCreationOptions.RunContinuationsAsynchronously

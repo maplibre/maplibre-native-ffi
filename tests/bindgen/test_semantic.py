@@ -896,10 +896,6 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
         self.assertTrue(model.callbacks["mln_notice_callback"].queued)
         self.assertTrue(model.callbacks["mln_query_callback"].queued)
         self.assertFalse(model.callbacks["mln_notice_release"].queued)
-        # What native code answers for a queued call to a callback with a
-        # result; a void callback needs no answer.
-        self.assertEqual(model.callbacks["mln_notice_callback"].queue_result, "1")
-        self.assertIsNone(model.callbacks["mln_query_callback"].queue_result)
         registration = model.operations_by_name[
             "mln_notice_set_callback"
         ].registrations[0]
@@ -927,19 +923,9 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
         )
         for before, after, error in (
             (
-                ";queue_result=1",
-                "",
-                "declares its queue_result",
-            ),
-            (
-                "queue_result=1",
-                "queue_result=4294967296",
-                "queue_result must be an integer",
-            ),
-            (
-                queue_member,
-                "} mln_notice_handler",
-                "queue_result requires a queued callback",
+                "typedef void (*mln_notice_callback)(void* context, int code, const char* text);",
+                'typedef unsigned (*mln_notice_callback)(void* context) BIND("failure=0");',
+                "a queued callback returns void",
             ),
             (
                 queue_member,

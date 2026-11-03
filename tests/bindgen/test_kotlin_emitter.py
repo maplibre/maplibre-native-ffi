@@ -366,20 +366,17 @@ class KotlinLayoutTests(unittest.TestCase):
         for lowering in split:
             values.split_codecs(lowering)
         values.codecs()
-        # The registrations whose answer a callback computes, or a rule
-        # replaces, differ by target, so common code takes none of them.
+        # The registrations whose answer a rule replaces differ by target, so
+        # common code takes none of them.
         self.assertEqual(
             {
                 value.native
                 for value in values.bound.public_values.values()
                 if kotlin_callbacks.splits(value, values)
             },
-            {"mln_log_handler", "mln_http_header_transform"},
+            {"mln_http_header_transform"},
         )
-        registrations = {
-            "mln_log_set_callback",
-            "mln_runtime_set_http_header_transform",
-        }
+        registrations = {"mln_runtime_set_http_header_transform"}
         response = "mln_http_header_transform_response_set_header"
         self.assertEqual(set(split[kotlin_callbacks.ASYNC]), registrations)
         self.assertEqual(
@@ -397,16 +394,11 @@ class KotlinLayoutTests(unittest.TestCase):
                     callback = values.bound.callbacks[site.callback]
                     self.assertTrue(callback.queued)
 
-    def test_callback_results_answer_native_in_their_c_types(self):
+    def test_a_status_callback_answers_native_with_a_status(self):
         outputs = emitted(kotlin, real_api())
         threaded = outputs[
             "src/threadedMain/kotlin/org/maplibre/nativeffi/internal/c/ThreadedUpcalls.kt"
         ]
-        # A bool callback answers with a Boolean, and fails with false.
-        self.assertIn(
-            'upcall<LogHandler, Boolean>("mln_log_callback", userData, false)',
-            threaded,
-        )
         # A status callback returns nothing and throws to fail, so its site
         # answers success itself and maps a throw to a status.
         self.assertIn(
@@ -417,13 +409,7 @@ class KotlinLayoutTests(unittest.TestCase):
         callbacks = outputs[
             "src/threadedMain/kotlin/org/maplibre/nativeffi/GeneratedThreadedCallbacks.kt"
         ]
-        self.assertIn("message: String): Boolean\n", callbacks)
         self.assertIn("outResponse: HttpHeaderTransformResponse)\n", callbacks)
-        # Kotlin/Wasm's queue form answers native's queue result.
-        wasm = outputs[
-            "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c/WasmUpcalls.kt"
-        ]
-        self.assertIn("readViewString(message)); true }; true }", wasm)
 
     def test_each_queued_site_has_a_wasm_trampoline_that_runs_it(self):
         outputs = emitted(kotlin, real_api())
@@ -440,10 +426,9 @@ class KotlinLayoutTests(unittest.TestCase):
         self.assertIn("completion", names)
         self.assertIn("releaseRoot", names)
         self.assertIn("wakeCallback", names)
-        self.assertIn("queuedLogHandlerCallback", names)
+        self.assertIn("logHandlerCallback", names)
         # A site that native calls on its own thread has no trampoline.
         self.assertNotIn("queueLockLock", names)
-        self.assertNotIn("logHandlerCallback", names)
         # Each trampoline passes its number, which runs its own site and is the
         # function pointer that its registration writes.
         for number, site in enumerate(names):
@@ -456,11 +441,8 @@ class KotlinLayoutTests(unittest.TestCase):
                 self.assertIn(
                     f"val {site}: Long\n    get() = upcallFunction({number})", stubs
                 )
-        # A record argument crosses as the address of the trampoline's copy, and
-        # a queued callback answers native's queue result.
+        # A record argument crosses as the address of the trampoline's copy.
         self.assertIn("const mln_buffer_view* message_address = &message;", glue)
-        log = glue[glue.index(" mln_kw_upcall_queuedLogHandlerCallback(") :]
-        self.assertIn("  return true;\n}", log[: log.index("\n}") + 2])
 
     def test_native_registrations_mirror_their_c_records(self):
         _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(

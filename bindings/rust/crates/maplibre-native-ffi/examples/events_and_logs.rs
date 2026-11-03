@@ -60,9 +60,6 @@ async fn events_and_logs(runtime: &RuntimeHandle) -> Result<()> {
     set_log_callback(LogHandler::new(
         |severity, _event, _code, message| {
             write_log(severity, message);
-            // Consume the record. Return false to let the platform
-            // logger print it too.
-            true
         },
     ))?;
     // #endregion logs

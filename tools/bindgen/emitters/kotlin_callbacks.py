@@ -10,11 +10,10 @@ the form that `async_hosts` gives a host that cannot run code on a native
 thread:
 
 - A `queue` registration's callbacks receive what a queue delivery carries and
-  return nothing. A threaded target's site runs the callback and returns what
-  queue mode answers. The site owns each handle that the call passes with
-  ownership, and releases it when the callback throws or the registration is
-  gone. Kotlin/Wasm also names the registration's queue, so the page runs the
-  site when it dispatches the queue.
+  return nothing. A threaded target's site runs the callback. The site owns
+  each handle that the call passes with ownership, and releases it when the
+  callback throws or the registration is gone. Kotlin/Wasm also names the
+  registration's queue, so the page runs the site when it dispatches the queue.
 - A `wake` registration names the queue too, and a `native` or callback-less
   registration keeps its callbacks.
 
@@ -26,16 +25,14 @@ calls the host's native function directly. Common code holds the registration
 in an internal member of the record. The threaded source set declares its
 factory, because a Kotlin/Wasm page has no native functions of its own to pass.
 
-A registration whose answer a callback computes, or a rule replaces, is split:
-its forms differ by target, so common code declares none of them (see
-`Values.split`). The threaded targets, which run Kotlin on MapLibre's threads,
-take it under its own name in the `threadedMain` source set, with callbacks
-that compute native's answer as the C callback does. Kotlin/Wasm takes the form
-that `async_hosts` gives it under a name that says so: `Queued` before a queue
-form, whose callbacks return nothing, and `Rules` after a rules form, which
-holds only the native rules. The operations that take a split registration,
-and the scoped responses of its callbacks, are extensions in the source set of
-each form.
+A registration whose answer a rule replaces is split: its forms differ by
+target, so common code declares none of them (see `Values.split`). The threaded
+targets, which run Kotlin on MapLibre's threads, take it under its own name in
+the `threadedMain` source set, with callbacks that compute native's answer as
+the C callback does. Kotlin/Wasm takes its rules form, which holds only the
+native rules, under the name with `Rules` after it. The operations that take a
+split registration, and the scoped responses of its callbacks, are extensions
+in the source set of each form.
 """
 
 from __future__ import annotations
@@ -82,12 +79,6 @@ def status_callback(callback):
     return callback.status
 
 
-def answered(callback):
-    """Whether native code answers a queued call in the callback's place: it
-    returns a value that its host callback would compute."""
-    return callback.queue_result is not None
-
-
 def form(value, values):
     """The `async_hosts` form of a registration, or None."""
     return async_hosts.form(values.bound, value)
@@ -95,26 +86,12 @@ def form(value, values):
 
 def splits(value, values):
     """Whether a registration's forms differ by target, so common code declares none."""
-    if not value.registration:
-        return False
-    registration_form = form(value, values)
-    if registration_form == "rules":
-        return True
-    return registration_form == "queue" and any(
-        answered(values.bound.callbacks[field.value.native])
-        for field in async_hosts.callback_fields(value)
-    )
+    return bool(value.registration) and form(value, values) == "rules"
 
 
 def split(value, values):
     """Whether [value] takes a target's own form in the current split lowering."""
-    if not values.split:
-        return False
-    if value.registration:
-        return splits(value, values)
-    if value.kind == "callback":
-        return answered(values.bound.callbacks[value.native])
-    return False
+    return bool(values.split) and splits(value, values)
 
 
 def public_name(value, values):
@@ -122,14 +99,7 @@ def public_name(value, values):
     base = name(value.native)
     if values.split != ASYNC or not split(value, values):
         return base
-    if value.registration and form(value, values) == "rules":
-        return base + "Rules"
-    return "Queued" + base
-
-
-def queued(value, values):
-    """Whether a callback takes its queue shape: it returns nothing, and native answers."""
-    return answered(values.bound.callbacks[value.native]) and values.split != THREADED
+    return base + "Rules"
 
 
 def split_registration(plan, values):
@@ -167,11 +137,7 @@ def check(value, values):
             raise Unsupported("callback needs its context parameter")
         for parameter in callback.arguments:
             values.check(parameter.value)
-        if (
-            callback.result.native != "void"
-            and not status_callback(callback)
-            and not queued(value, values)
-        ):
+        if callback.result.native != "void" and not status_callback(callback):
             values.check(callback.result)
     elif value.registration:
         for field in values.fields(value):
@@ -194,22 +160,10 @@ def split_note(value, values):
         finally:
             values.split = THREADED
         return f"Kotlin/Wasm takes `{wasm}` in its place."
-    if value.registration and form(value, values) == "rules":
-        return (
-            "This is the Kotlin/Wasm form, which holds only native header rules, "
-            "because the page cannot run Kotlin while native waits for an answer. "
-            f"The JVM, Android, and Kotlin/Native take `{name(value.native)}`."
-        )
-    if value.registration:
-        return (
-            "This is the Kotlin/Wasm queue form: the page receives each call after "
-            "native has answered it. The JVM, Android, and Kotlin/Native take "
-            f"`{name(value.native)}`, whose callback computes the answer."
-        )
-    answer = values.bound.callbacks[value.native].queue_result
     return (
-        "The page receives the call after native has answered it, so the callback "
-        f"returns nothing, and native answers `{answer}` as it does for a queue."
+        "This is the Kotlin/Wasm form, which holds only native header rules, "
+        "because the page cannot run Kotlin while native waits for an answer. "
+        f"The JVM, Android, and Kotlin/Native take `{name(value.native)}`."
     )
 
 
@@ -254,7 +208,7 @@ def throw_note(value, values):
     """What native receives, and where the throwable goes, when a callback throws."""
     callback = values.bound.callbacks[value.native]
     report = "the binding reports it as a `CallbackException`"
-    if callback.failure == "contain" or queued(value, values):
+    if callback.failure == "contain":
         return f"If it throws, {report}."
     if status_callback(callback):
         return (
@@ -277,15 +231,11 @@ def declaration_doc(value, values):
             thread_note(value, values),
             throw_note(value, values),
         )
-        summary = found.summary if found else ""
-        if split(value, values):
-            note = split_note(value, values)
-            summary = f"{summary} {note}" if summary else note
         # The thread note replaces the C threads.
         return docs.block_comment(
-            replace(found, summary=summary, notes=notes, threads=())
+            replace(found, notes=notes, threads=())
             if found
-            else docs.Doc(value.native, summary, notes=notes),
+            else docs.Doc(value.native, "", notes=notes),
             symbol,
         )
     if accepts_native(value, values) and found:
@@ -315,9 +265,7 @@ def declaration(value, values):
         )
         returns = (
             "Unit"
-            if callback.result.native == "void"
-            or status_callback(callback)
-            or queued(value, values)
+            if callback.result.native == "void" or status_callback(callback)
             else values.public(callback.result)
         )
         return (
@@ -732,18 +680,11 @@ def queued_site(
 ):
     """Register the site of a queue-shaped callback.
 
-    The site answers native as queue mode does, whatever the callback does. It
-    owns each handle that the call passes with ownership before it looks up the
-    registration, and releases the handle when the callback throws or the
-    registration is gone, so a call that a queue carries reaches the same
-    site.
+    The site owns each handle that the call passes with ownership before it
+    looks up the registration, and releases the handle when the callback throws
+    or the registration is gone, so a call that a queue carries reaches the
+    same site.
     """
-    result = carrier(callback.result, values)
-    answer = (
-        "Unit"
-        if callback.result.native == "void"
-        else result_literal(callback, callback.queue_result, values, "queue result")
-    )
     adopted, owners, arguments = [], [], []
     for parameter in callback.arguments:
         if owns(callback, parameter):
@@ -775,17 +716,14 @@ def queued_site(
         statements = [*adopted, f"if (!{call}) {{ {released} }}"]
     else:
         statements = [call]
-    # A void site's body converts to Unit, so only a result needs an answer.
-    if answer != "Unit":
-        statements.append(answer)
     body = "run { " + "; ".join(statements) + " }"
     sites(values)[site_name] = Site(
         site_name,
         parameters,
         callback.result.ctype,
-        result,
+        "Unit",
         body,
-        answer,
+        "Unit",
         callback.native,
         values.split,
         "queue",

@@ -70,9 +70,6 @@ private suspend fun eventsAndLogs(runtime: RuntimeHandle) {
   setLogCallback(
     LogHandler { severity, _, _, message ->
       writeLog(severity, message)
-      // Consume the record. Return false to let the platform logger
-      // print it too.
-      true
     },
   )
   // #endregion logs

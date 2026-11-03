@@ -215,7 +215,7 @@ class RustEmitterTests(unittest.TestCase):
             source,
         )
 
-    def test_a_callback_documents_its_arguments_and_returns_a_bool_result(self):
+    def test_a_callback_documents_its_arguments(self):
         values = emitted(rust, real_api())[
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
@@ -225,8 +225,6 @@ class RustEmitterTests(unittest.TestCase):
             "    pub callback: std::sync::Arc<dyn ",
             values,
         )
-        self.assertIn("Fn(LogSeverity, LogEvent, i64, &str) -> bool", values)
-        self.assertIn('callback::invoke("mln_log_callback", false, ||', values)
 
     def test_docs_name_the_rust_symbols_of_c_declarations(self):
         values = emitted(rust, real_api())[

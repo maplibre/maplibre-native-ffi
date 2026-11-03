@@ -653,12 +653,9 @@ mln_status mln_ticket_on_cancel(
 #endif
 
 #ifdef MLN_PROTOCOL_DELIVERY
-// A queue registration outside any command, whose callback returns a result
-// that native code supplies for a queued call.
+// A queue registration outside any command.
 typedef void (*mln_notice_release)(void* context);
-typedef unsigned (*mln_notice_callback)(
-  void* context, int code, const char* text
-) BIND("failure=0;queue_result=1");
+typedef void (*mln_notice_callback)(void* context, int code, const char* text);
 // Its release must not call back into the API.
 typedef struct mln_notice_handler {
   unsigned int size;

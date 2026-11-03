@@ -3975,10 +3975,18 @@ pub const LogEvent = enum(u32) {
 pub const LogHandler = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: *const fn (context: ?*anyopaque, severity: LogSeverity, event: LogEvent, code: i64, message: []const u8) anyerror!bool,
+    callback: *const fn (context: ?*anyopaque, severity: LogSeverity, event: LogEvent, code: i64, message: []const u8) anyerror!void,
+    /// The severities that also go to the platform's log, as they do without a
+    /// callback. 0 sends none.
+    ///
+    /// A record that the handler's delivery queue can't accept is dropped.
+    /// These severities alone decide whether a record also goes to the
+    /// platform's log, whether or not the queue accepts it.
+    platform_severities: LogSeverityFlag = .{},
     pub fn toNative(self: LogHandler, roots: *callbacks.Roots) status.Error!c.mln_log_handler {
         var raw = std.mem.zeroes(c.mln_log_handler);
         raw.size = @sizeOf(c.mln_log_handler);
+        raw.platform_severities = self.platform_severities.toNative();
         raw.callback = callbackTrampoline;
         const retained = try roots.retain(LogHandler, self);
         raw.user_data = retained;
@@ -3990,15 +3998,11 @@ pub const LogHandler = struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), callback_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) anyerror!marshal.CallbackResult(c.mln_log_callback) {
                 const state = callbacks.Registration(LogHandler).get(callback_arg_0);
                 const host = state.value.callback;
-                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try marshal.borrowView(callback_arg_4)) catch |err| {
-                    callbacks.reportError("mln_log_callback", err);
-                    return false;
-                };
-                return result;
+                try host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try marshal.borrowView(callback_arg_4));
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3, native_arg_4) catch |err| {
             callbacks.reportError("mln_log_callback", err);
-            return false;
+            return;
         };
     }
     /// Builds a `LogHandler` whose callbacks receive `context`, a pointer, as
@@ -4017,7 +4021,7 @@ pub const LogHandler = struct {
                 }
             }.call,
             .callback = struct {
-                fn call(erased: ?*anyopaque, argument_0: LogSeverity, argument_1: LogEvent, argument_2: i64, argument_3: []const u8) anyerror!bool {
+                fn call(erased: ?*anyopaque, argument_0: LogSeverity, argument_1: LogEvent, argument_2: i64, argument_3: []const u8) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2, argument_3);
                 }
             }.call,

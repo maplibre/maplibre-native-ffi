@@ -2838,13 +2838,13 @@ static mln_jni_upcall mln_jni_completionRelease_upcall = {
 static mln_jni_upcall mln_jni_releaseRoot_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls", "releaseRoot", "(J)V", NULL
 };
-static mln_jni_upcall mln_jni_logHandlerCallback_upcall = {
-  "org/maplibre/nativeffi/internal/c/ThreadedUpcalls", "logHandlerCallback",
-  "(JIIJJ)Z", NULL
-};
 static mln_jni_upcall mln_jni_httpHeaderTransformCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/ThreadedUpcalls",
   "httpHeaderTransformCallback", "(JIJJ)I", NULL
+};
+static mln_jni_upcall mln_jni_logHandlerCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "logHandlerCallback", "(JIIJJ)V",
+  NULL
 };
 static mln_jni_upcall mln_jni_customGeometrySourceOptionsFetchTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
@@ -2911,24 +2911,6 @@ static void mln_jni_releaseRoot(void* userData) {
   mln_jni_upcall_void(&mln_jni_releaseRoot_upcall, arguments);
 }
 
-static bool mln_jni_logHandlerCallback(
-  void* userData, mln_log_severity severity, mln_log_event event, int64_t code,
-  mln_buffer_view message
-) {
-  jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)},
-    {.i = (jint)severity},
-    {.i = (jint)event},
-    {.j = (jlong)code},
-    {.j = MLN_JNI_ADDRESS(&message)}
-  };
-  jboolean result = false;
-  mln_jni_upcall_boolean(
-    &mln_jni_logHandlerCallback_upcall, arguments, &result
-  );
-  return (bool)result;
-}
-
 static mln_status mln_jni_httpHeaderTransformCallback(
   void* userData, mln_resource_kind kind, mln_buffer_view url,
   mln_http_header_transform_response* outResponse
@@ -2944,6 +2926,20 @@ static mln_status mln_jni_httpHeaderTransformCallback(
     &mln_jni_httpHeaderTransformCallback_upcall, arguments, &result
   );
   return (mln_status)result;
+}
+
+static void mln_jni_logHandlerCallback(
+  void* userData, mln_log_severity severity, mln_log_event event, int64_t code,
+  mln_buffer_view message
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.i = (jint)severity},
+    {.i = (jint)event},
+    {.j = (jlong)code},
+    {.j = MLN_JNI_ADDRESS(&message)}
+  };
+  mln_jni_upcall_void(&mln_jni_logHandlerCallback_upcall, arguments);
 }
 
 static void mln_jni_customGeometrySourceOptionsFetchTile(
@@ -3087,8 +3083,8 @@ mln_jni_upcall* const mln_jni_upcalls[] = {
   &mln_jni_completion_upcall,
   &mln_jni_completionRelease_upcall,
   &mln_jni_releaseRoot_upcall,
-  &mln_jni_logHandlerCallback_upcall,
   &mln_jni_httpHeaderTransformCallback_upcall,
+  &mln_jni_logHandlerCallback_upcall,
   &mln_jni_customGeometrySourceOptionsFetchTile_upcall,
   &mln_jni_customGeometrySourceOptionsCancelTile_upcall,
   &mln_jni_customVectorSourceOptionsFetchTile_upcall,
@@ -3107,8 +3103,8 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_completion,
   (void*)mln_jni_completionRelease,
   (void*)mln_jni_releaseRoot,
-  (void*)mln_jni_logHandlerCallback,
   (void*)mln_jni_httpHeaderTransformCallback,
+  (void*)mln_jni_logHandlerCallback,
   (void*)mln_jni_customGeometrySourceOptionsFetchTile,
   (void*)mln_jni_customGeometrySourceOptionsCancelTile,
   (void*)mln_jni_customVectorSourceOptionsFetchTile,

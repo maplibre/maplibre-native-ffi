@@ -102,7 +102,7 @@ const liveWork: object[] = [];
  * or the realm right after it returns. Returns the session.
  */
 export async function liveNativeWork(): Promise<RenderSessionHandle> {
-  setLogCallback(() => {});
+  setLogCallback({ callback: () => {} });
   const runtime = await RuntimeHandle.create();
   await runtime.setEventHandler(() => {});
   let hold!: (handle: ResourceRequestHandle) => void;

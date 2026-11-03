@@ -817,7 +817,7 @@ internal static unsafe class GeneratedValues
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static byte InvokeLogHandlerCallback(
+    private static void InvokeLogHandlerCallback(
         void* user_data,
         mln_log_severity severity,
         mln_log_event @event,
@@ -827,24 +827,16 @@ internal static unsafe class GeneratedValues
     {
         try
         {
-            var answer = ((LogHandler)NativeCallbackRoot.Value(user_data)).Callback;
-            return answer is null
-                ? (byte)0
-                : (byte)(
-                    answer(
-                        (global::Maplibre.NativeFfi.LogSeverity)severity,
-                        (global::Maplibre.NativeFfi.LogEvent)@event,
-                        code,
-                        RuntimeStructs.CopyUtf8((sbyte*)message.data, message.size)
-                    )
-                        ? 1
-                        : 0
-                );
+            ((LogHandler)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
+                (global::Maplibre.NativeFfi.LogSeverity)severity,
+                (global::Maplibre.NativeFfi.LogEvent)@event,
+                code,
+                RuntimeStructs.CopyUtf8((sbyte*)message.data, message.size)
+            );
         }
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_log_callback", error);
-            return (byte)0;
         }
     }
 
@@ -858,6 +850,7 @@ internal static unsafe class GeneratedValues
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null ? null : &InvokeLogHandlerCallback;
         }
+        native.platform_severities = (uint)value.PlatformSeverities;
         return native;
     }
 

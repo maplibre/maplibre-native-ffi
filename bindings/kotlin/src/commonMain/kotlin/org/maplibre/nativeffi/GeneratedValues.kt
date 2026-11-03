@@ -4150,6 +4150,41 @@ public data class LogicalExtentPhysicalSizeResult(
 )
 
 /**
+ * A log callback, for `setLogCallback()`.
+ *
+ * Runs on the thread that logged the message, or on a background thread for the severities that
+ * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
+ *
+ * See `mln_log_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
+public data class LogHandler(
+  /**
+   * The severities that also go to the platform's log, as they do without a callback. 0 sends none.
+   *
+   * A record that the handler's delivery queue can't accept is dropped. These severities alone
+   * decide whether a record also goes to the platform's log, whether or not the queue accepts it.
+   */
+  public val platformSeverities: LogSeverityFlag = LogSeverityFlag.NONE,
+  public val callback: LogCallback,
+)
+
+/**
+ * Receives a log message.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
+ * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_log_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
+public fun interface LogCallback {
+  public operator fun invoke(severity: LogSeverity, event: LogEvent, code: Long, message: String)
+}
+
+/**
  * The callbacks and options of a custom geometry source.
  *
  * Zoom levels are whole numbers from 0 to 32.

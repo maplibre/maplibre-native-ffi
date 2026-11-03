@@ -239,6 +239,7 @@ typedef struct mln_log_handler {
   void* user_data;
   mln_user_data_release release_user_data;
   mln_delivery_queue queue;
+  mln_log_severity_flags platform_severities;
 } mln_log_handler;
 
 mln_status mln_log_set_callback(

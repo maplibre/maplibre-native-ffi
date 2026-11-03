@@ -319,9 +319,6 @@ class CallbackPlan:
     # Whether a registration that names a delivery queue carries the callback,
     # so native code copies its arguments and queues the call.
     queued: bool = False
-    # The result that native code answers for a queued call, from the
-    # `queue_result=` of a queued callback that returns a value.
-    queue_result: str | None = None
     # Whether native code relies on the callback's work being done when it
     # returns, so a binding must run it on the calling thread rather than
     # deliver it later, even when it returns nothing.
@@ -1714,7 +1711,6 @@ class Binder:
             is_status(function.result),
             synchronous=typedef.metadata.get("synchronous") == "true",
             queued=name in self.queued,
-            queue_result=typedef.metadata.get("queue_result"),
         )
 
     def bind(self, *, require_complete: bool = False) -> BoundApi:

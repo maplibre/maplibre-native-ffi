@@ -58,9 +58,6 @@ private func writeLog(_: LogSeverity, _: String) {}
   // Runs on a library thread, and can't call the library.
   try setLogCallback(handler: LogHandler { severity, _, _, message in
     writeLog(severity, message)
-    // Consume the record. Return false to let the platform logger
-    // print it too.
-    return true
   })
   // #endregion logs
 }
