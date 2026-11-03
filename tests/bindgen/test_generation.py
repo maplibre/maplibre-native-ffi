@@ -30,6 +30,31 @@ PROTOCOL_GAPS = {
 }
 
 
+# A complete record and the option bag that it converts to.
+OPTIONS_SOURCE = """
+typedef enum BIND("kind=bitmask") mln_view_option_field : uint32_t {
+  MLN_VIEW_OPTION_ZOOM = 1U << 0U,
+  MLN_VIEW_OPTION_ANCHOR = 1U << 1U,
+  MLN_VIEW_OPTION_CENTER = 1U << 2U,
+} mln_view_option_field;
+typedef uint32_t mln_view_option_fields;
+typedef struct mln_point { double x; double y; } mln_point;
+typedef struct mln_view_options {
+  uint32_t size;
+  mln_view_option_fields fields;
+  double zoom BIND("mask=fields;bit=MLN_VIEW_OPTION_ZOOM");
+  mln_point anchor BIND("mask=fields;bit=MLN_VIEW_OPTION_ANCHOR");
+  mln_point center BIND("mask=fields;bit=MLN_VIEW_OPTION_CENTER");
+} mln_view_options;
+typedef struct mln_view {
+  mln_point center;
+  double zoom;
+} mln_view BIND("options=mln_view_options");
+mln_status mln_read_view(mln_view *out_view BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_write_view(const mln_view_options *options, mln_diagnostic *out_diagnostic);
+"""
+
+
 class GenerationTests(unittest.TestCase):
     def parse(self, source, *, owned_map=False):
         api = parse(
@@ -201,6 +226,67 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 self.assertIn(lent, source)
                 self.assertIn(plain, source)
                 self.assertNotIn("storedWidth", source)
+
+    def test_a_complete_record_converts_to_its_option_bag(self):
+        # The record's members come in another order than the bag's, and the
+        # bag has a member, `anchor`, that the record lacks.
+        api = parse(
+            OPTIONS_SOURCE, defines=("MLN_PROTOCOL_STANDARD_TYPES",), header="view.h"
+        )
+        validate(api)
+        expected = {
+            dart: (
+                "ViewOptions toOptions() => ViewOptions(zoom: zoom, center: center);",
+            ),
+            dotnet: (
+                "public ViewOptions ToOptions() => new()\n    {\n        Zoom = Zoom,\n        Center = Center,\n    };",
+            ),
+            go: (
+                "func (value View) ToOptions() ViewOptions { return ViewOptions{Zoom: &value.Zoom, Center: &value.Center} }",
+            ),
+            kotlin: (
+                "public fun toOptions(): ViewOptions = ViewOptions(zoom = zoom, center = center)",
+            ),
+            python: (
+                "def to_options(self) -> ViewOptions:",
+                "return ViewOptions(zoom=self.zoom, center=self.center)",
+            ),
+            rust: (
+                "pub const fn to_options(self) -> ViewOptions { ViewOptions { zoom: Some(self.zoom), anchor: None, center: Some(self.center) } }",
+            ),
+            swift: (
+                "public func toOptions() -> ViewOptions {\n    ViewOptions(`zoom`: `zoom`, `center`: `center`)",
+            ),
+            typescript: (
+                "export function viewToOptions(view: View): ViewOptions {\n  return {\n    zoom: view.zoom,\n    center: view.center,\n  };",
+            ),
+            zig: (
+                'pub fn toOptions(self: View) ViewOptions {\n        return .{\n            .@"zoom" = self.@"zoom",\n            .@"center" = self.@"center",\n        };',
+            ),
+        }
+        self.assertEqual(set(expected), set(EMITTERS))
+        for emitter, lines in expected.items():
+            with self.subTest(emitter=emitter.__name__):
+                self.assertEqual(emitter.lower(api).unsupported, {})
+                source = self.rendered(emitter, api)
+                for line in lines:
+                    self.assertIn(line, source)
+                self.assertRegex(source, r"ViewOptions(`|</c>)? that set each of its")
+
+    def test_an_input_record_converts_its_absent_members_to_zero(self):
+        # A TypeScript input record may omit a member, which native reads as
+        # zero, so its conversion sets the zero rather than leaving it unset.
+        api = parse(
+            OPTIONS_SOURCE
+            + "mln_status mln_check_view(mln_view view, mln_diagnostic *out_diagnostic);\n",
+            defines=("MLN_PROTOCOL_STANDARD_TYPES",),
+            header="view.h",
+        )
+        validate(api)
+        source = self.rendered(typescript, api)
+        self.assertIn(
+            "    zoom: view.zoom ?? 0,\n    center: view.center ?? {},", source
+        )
 
     def rendered(self, emitter, api):
         return "\n".join(emitter.lower(api).files.values())

@@ -682,9 +682,9 @@ internal actual object C {
 
   actual fun mln_map_projection_get_camera(
     projection: Long,
-    outCamera: Long,
+    outResult: Long,
     outDiagnostic: Long,
-  ): Int = mln_kw_mln_map_projection_get_camera(projection, word(outCamera), word(outDiagnostic))
+  ): Int = mln_kw_mln_map_projection_get_camera(projection, word(outResult), word(outDiagnostic))
 
   actual fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
@@ -1069,11 +1069,11 @@ internal actual object C {
 
   actual fun mln_map_set_projection_mode(
     map: Long,
-    mode: Long,
+    options: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_set_projection_mode(map, word(mode), word(completion), word(outDiagnostic))
+    mln_kw_mln_map_set_projection_mode(map, word(options), word(completion), word(outDiagnostic))
 
   actual fun mln_map_set_rendering_stats_view_enabled(
     map: Long,

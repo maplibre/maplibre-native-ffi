@@ -70,6 +70,14 @@ PLATFORMS = (
 # reports the handle stale afterwards. A binding whose release consumes its
 # owner keeps the function reachable through what the release returns.
 #
+# options=<record> on a record's typedef names the option bag that a complete
+# record converts to, such as mln_camera to mln_camera_options. Each binding
+# generates the conversion, which sets every member of the bag that the record
+# holds and leaves the bag's other members unset. Each member of the record has
+# a same-named member of the same type in the bag, behind its presence mask,
+# and the bag has no member that a conversion could leave out but native
+# requires.
+#
 # native_object=true marks an integer that names a host graphics object, such as
 # a VkImage or an OpenGL texture name. Native code uses the object it names as
 # it would a pointer, so a binding treats it as one: Rust marks an operation
@@ -157,6 +165,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "queue_result",
         "synchronous",
         "native_object",
+        "options",
     }
 )
 ENUM_KEYS = frozenset({"kind"})
@@ -1081,6 +1090,8 @@ def validate(api: Api) -> None:
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
             )
+        if "options" in typedef.metadata:
+            errors.extend(options_errors(api, typedef, context))
         if typedef.metadata.get("kind") == "callback_registration":
             record = api.records_by_name.get(typedef.name)
             fields = {field.name: field for field in record.fields} if record else {}
@@ -1224,6 +1235,43 @@ def validate(api: Api) -> None:
 BY_POINTER = "pointer"
 EMBEDDED = "embedded"
 DELIVERED = "delivered"
+
+
+def options_errors(api: Api, typedef, context: str) -> list[str]:
+    """Check that a record converts to the option bag its `options` names."""
+    target = typedef.metadata["options"]
+    record = api.records_by_name.get(typedef.name)
+    if record is None or record.kind != "struct" or typedef.metadata.get("kind"):
+        return [f"{context}: options requires a plain struct"]
+    bag = api.records_by_name.get(target)
+    if bag is None or bag.kind != "struct":
+        return [f"{context}: options names an absent struct {target!r}"]
+    errors = []
+    members = {field.name: field for field in bag.fields}
+    for field in record.fields:
+        fcontext = f"{field.location}: {record.name}.{field.name}"
+        match = members.get(field.name)
+        roles = {"kind", "mask", "bit", "tag", "variant", "length", "required"}
+        if roles & field.metadata.keys() or not field.name:
+            errors.append(f"{fcontext}: a record with options holds plain members")
+        elif match is None:
+            errors.append(f"{fcontext}: {target} has no member {field.name!r}")
+        elif match.type.spelling != field.type.spelling:
+            errors.append(
+                f"{fcontext}: {target}.{field.name} is {match.type.spelling}, "
+                f"not {field.type.spelling}"
+            )
+        elif "mask" not in match.metadata:
+            errors.append(f"{fcontext}: {target}.{field.name} has no presence bit")
+    for field in bag.fields:
+        if field.metadata.get("kind") in CONTROL_FIELD_KINDS:
+            continue
+        if "mask" not in field.metadata:
+            errors.append(
+                f"{context}: options requires {target}.{field.name} to have a "
+                "presence bit"
+            )
+    return errors
 
 
 def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:

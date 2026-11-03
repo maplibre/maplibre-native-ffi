@@ -1,7 +1,12 @@
 """Generate allocator-free Zig values from resolved scalar and record plans."""
 
 from ..model import Unsupported
-from ..semantic import ValuePlan, enum_member_prefix, required_callbacks
+from ..semantic import (
+    ValuePlan,
+    conversion_doc,
+    enum_member_prefix,
+    required_callbacks,
+)
 from .zig import SCALARS, doc, documented, identifier, pascal, type_name
 
 
@@ -177,6 +182,9 @@ class Values:
                 raise Unsupported(f"Zig: {value.native}: variant requires tag decoding")
             self.add(field.value)
         self.used[value.native] = value
+        if value.options:
+            # The record converts to its option bag.
+            self.add(self.bound.values[value.options])
 
     def add_variants(self, union):
         if not union.tag or any(
@@ -319,10 +327,28 @@ class Values:
 {chr(10).join(copies)}
         }};
     }}
-}};
+{self.to_options(value)}}};
 """
 
         return rendered
+
+    def to_options(self, value: ValuePlan) -> str:
+        """The method that converts a complete record to its option bag."""
+        if not value.options:
+            return ""
+        bag = self.bound.values[value.options]
+        held = {field.name for field in value.fields if field.public}
+        members = "".join(
+            f"            .{identifier(field.name)} = self.{identifier(field.name)},\n"
+            for field in bag.fields
+            if field.public and field.name in held
+        )
+        public = self.public(value)
+        return (
+            doc(self.bound, conversion_doc(value.native), "    ")
+            + f"    pub fn toOptions(self: {public}) {self.public(bag)} {{\n"
+            + f"        return .{{\n{members}        }};\n    }}\n"
+        )
 
     def enumeration(self, value):
         public = self.public(value)

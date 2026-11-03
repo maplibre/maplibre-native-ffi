@@ -121,11 +121,11 @@ void mln_ts_dispatch_runtime_event_callback(
   void* user_data, const mln_event_batch_view* events
 );
 void mln_ts_dispatch_wake_callback(void* user_data);
-napi_value mln_ts_read_bound_options(
-  napi_env env, const mln_bound_options* source, size_t size
-);
 napi_value mln_ts_read_camera(
   napi_env env, const mln_camera* source, size_t size
+);
+napi_value mln_ts_read_camera_bounds(
+  napi_env env, const mln_camera_bounds* source, size_t size
 );
 napi_value mln_ts_read_camera_options(
   napi_env env, const mln_camera_options* source, size_t size
@@ -148,8 +148,8 @@ napi_value mln_ts_read_event_batch_view(
 napi_value mln_ts_read_event_batch_view_events(
   napi_env env, const mln_event_batch_view* source
 );
-napi_value mln_ts_read_free_camera_options(
-  napi_env env, const mln_free_camera_options* source, size_t size
+napi_value mln_ts_read_free_camera(
+  napi_env env, const mln_free_camera* source, size_t size
 );
 napi_value mln_ts_read_gpu_sync(
   napi_env env, const mln_gpu_sync* source, size_t size
@@ -175,17 +175,20 @@ napi_value mln_ts_read_lat_lng_bounds(
 napi_value mln_ts_read_logical_extent(
   napi_env env, const mln_logical_extent* source, size_t size
 );
+napi_value mln_ts_read_map_projection_camera_result(
+  napi_env env, const mln_map_projection_camera_result* source, size_t size
+);
 napi_value mln_ts_read_map_snapshot(
   napi_env env, const mln_map_snapshot* source, size_t size
 );
-napi_value mln_ts_read_map_tile_options(
-  napi_env env, const mln_map_tile_options* source, size_t size
+napi_value mln_ts_read_map_tile_settings(
+  napi_env env, const mln_map_tile_settings* source, size_t size
 );
 napi_value mln_ts_read_map_view(
   napi_env env, const mln_map_view* source, size_t size
 );
-napi_value mln_ts_read_map_viewport_options(
-  napi_env env, const mln_map_viewport_options* source, size_t size
+napi_value mln_ts_read_map_viewport(
+  napi_env env, const mln_map_viewport* source, size_t size
 );
 napi_value mln_ts_read_metal_texture_frame(
   napi_env env, const mln_metal_texture_frame* source, size_t size
@@ -480,6 +483,9 @@ bool mln_ts_write_map_tile_options(
 bool mln_ts_write_map_view(
   mln_ts_call* call, napi_value value, mln_map_view* out, const char* path
 );
+bool mln_ts_write_map_viewport(
+  mln_ts_call* call, napi_value value, mln_map_viewport* out, const char* path
+);
 bool mln_ts_write_map_viewport_options(
   mln_ts_call* call, napi_value value, mln_map_viewport_options* out,
   const char* path
@@ -562,6 +568,10 @@ bool mln_ts_write_projected_meters(
 );
 bool mln_ts_write_projection_mode(
   mln_ts_call* call, napi_value value, mln_projection_mode* out,
+  const char* path
+);
+bool mln_ts_write_projection_mode_options(
+  mln_ts_call* call, napi_value value, mln_projection_mode_options* out,
   const char* path
 );
 bool mln_ts_write_quaternion(

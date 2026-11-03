@@ -552,55 +552,6 @@ void mln_ts_dispatch_wake_callback(void* user_data) {
   (void)received;
 }
 
-napi_value mln_ts_read_bound_options(
-  napi_env env, const mln_bound_options* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if ((source->fields & MLN_BOUND_OPTION_BOUNDS) != 0) {
-    if (!mln_ts_set(
-          env, result, "bounds",
-          mln_ts_read_lat_lng_bounds(
-            env, &(source->bounds), sizeof(source->bounds)
-          )
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0) {
-    if (!mln_ts_set(
-          env, result, "minZoom", mln_ts_number(env, (double)(source->min_zoom))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0) {
-    if (!mln_ts_set(
-          env, result, "maxZoom", mln_ts_number(env, (double)(source->max_zoom))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0) {
-    if (!mln_ts_set(
-          env, result, "minPitch",
-          mln_ts_number(env, (double)(source->min_pitch))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0) {
-    if (!mln_ts_set(
-          env, result, "maxPitch",
-          mln_ts_number(env, (double)(source->max_pitch))
-        ))
-      return NULL;
-  }
-  if (!mln_ts_set(
-        env, result, "unbounded",
-        mln_ts_bool(env, (source->fields & MLN_BOUND_OPTION_UNBOUNDED) != 0)
-      ))
-    return NULL;
-  return result;
-}
-
 napi_value mln_ts_read_camera(
   napi_env env, const mln_camera* source, size_t size
 ) {
@@ -643,6 +594,42 @@ napi_value mln_ts_read_camera(
   if (!mln_ts_set(
         env, result, "fieldOfView",
         mln_ts_number(env, (double)(source->field_of_view))
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_camera_bounds(
+  napi_env env, const mln_camera_bounds* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "bounds",
+        mln_ts_read_lat_lng_bounds(
+          env, &(source->bounds), sizeof(source->bounds)
+        )
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "unbounded", mln_ts_bool(env, source->unbounded)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "minZoom", mln_ts_number(env, (double)(source->min_zoom))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "maxZoom", mln_ts_number(env, (double)(source->max_zoom))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "minPitch", mln_ts_number(env, (double)(source->min_pitch))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "maxPitch", mln_ts_number(env, (double)(source->max_pitch))
       ))
     return NULL;
   return result;
@@ -825,28 +812,24 @@ napi_value mln_ts_read_event_batch_view_events(
   return result;
 }
 
-napi_value mln_ts_read_free_camera_options(
-  napi_env env, const mln_free_camera_options* source, size_t size
+napi_value mln_ts_read_free_camera(
+  napi_env env, const mln_free_camera* source, size_t size
 ) {
   (void)size;
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
-  if ((source->fields & MLN_FREE_CAMERA_OPTION_POSITION) != 0) {
-    if (!mln_ts_set(
-          env, result, "position",
-          mln_ts_read_vec3(env, &(source->position), sizeof(source->position))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0) {
-    if (!mln_ts_set(
-          env, result, "orientation",
-          mln_ts_read_quaternion(
-            env, &(source->orientation), sizeof(source->orientation)
-          )
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "position",
+        mln_ts_read_vec3(env, &(source->position), sizeof(source->position))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "orientation",
+        mln_ts_read_quaternion(
+          env, &(source->orientation), sizeof(source->orientation)
+        )
+      ))
+    return NULL;
   return result;
 }
 
@@ -1002,6 +985,20 @@ napi_value mln_ts_read_logical_extent(
   return result;
 }
 
+napi_value mln_ts_read_map_projection_camera_result(
+  napi_env env, const mln_map_projection_camera_result* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "camera",
+        mln_ts_read_camera(env, &(source->camera), sizeof(source->camera))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_map_snapshot(
   napi_env env, const mln_map_snapshot* source, size_t size
 ) {
@@ -1049,19 +1046,21 @@ napi_value mln_ts_read_map_snapshot(
     return NULL;
   if (!mln_ts_set(
         env, result, "tile",
-        mln_ts_read_map_tile_options(env, &(source->tile), sizeof(source->tile))
+        mln_ts_read_map_tile_settings(
+          env, &(source->tile), sizeof(source->tile)
+        )
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "bounds",
-        mln_ts_read_bound_options(
+        mln_ts_read_camera_bounds(
           env, &(source->bounds), sizeof(source->bounds)
         )
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "freeCamera",
-        mln_ts_read_free_camera_options(
+        mln_ts_read_free_camera(
           env, &(source->free_camera), sizeof(source->free_camera)
         )
       ))
@@ -1074,53 +1073,40 @@ napi_value mln_ts_read_map_snapshot(
   return result;
 }
 
-napi_value mln_ts_read_map_tile_options(
-  napi_env env, const mln_map_tile_options* source, size_t size
+napi_value mln_ts_read_map_tile_settings(
+  napi_env env, const mln_map_tile_settings* source, size_t size
 ) {
   (void)size;
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
-  if ((source->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0) {
-    if (!mln_ts_set(
-          env, result, "prefetchZoomDelta",
-          mln_ts_number(env, (double)(source->prefetch_zoom_delta))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0) {
-    if (!mln_ts_set(
-          env, result, "lodMinRadius",
-          mln_ts_number(env, (double)(source->lod_min_radius))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0) {
-    if (!mln_ts_set(
-          env, result, "lodScale",
-          mln_ts_number(env, (double)(source->lod_scale))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) {
-    if (!mln_ts_set(
-          env, result, "lodPitchThreshold",
-          mln_ts_number(env, (double)(source->lod_pitch_threshold))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0) {
-    if (!mln_ts_set(
-          env, result, "lodZoomShift",
-          mln_ts_number(env, (double)(source->lod_zoom_shift))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_TILE_OPTION_LOD_MODE) != 0) {
-    if (!mln_ts_set(
-          env, result, "lodMode", mln_ts_number(env, (double)(source->lod_mode))
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "prefetchZoomDelta",
+        mln_ts_number(env, (double)(source->prefetch_zoom_delta))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "lodMinRadius",
+        mln_ts_number(env, (double)(source->lod_min_radius))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "lodScale", mln_ts_number(env, (double)(source->lod_scale))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "lodPitchThreshold",
+        mln_ts_number(env, (double)(source->lod_pitch_threshold))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "lodZoomShift",
+        mln_ts_number(env, (double)(source->lod_zoom_shift))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "lodMode", mln_ts_number(env, (double)(source->lod_mode))
+      ))
+    return NULL;
   return result;
 }
 
@@ -1151,7 +1137,7 @@ napi_value mln_ts_read_map_view(
     return NULL;
   if (!mln_ts_set(
         env, result, "viewport",
-        mln_ts_read_map_viewport_options(
+        mln_ts_read_map_viewport(
           env, &(source->viewport), sizeof(source->viewport)
         )
       ))
@@ -1159,42 +1145,34 @@ napi_value mln_ts_read_map_view(
   return result;
 }
 
-napi_value mln_ts_read_map_viewport_options(
-  napi_env env, const mln_map_viewport_options* source, size_t size
+napi_value mln_ts_read_map_viewport(
+  napi_env env, const mln_map_viewport* source, size_t size
 ) {
   (void)size;
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
-  if ((source->fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0) {
-    if (!mln_ts_set(
-          env, result, "northOrientation",
-          mln_ts_number(env, (double)(source->north_orientation))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0) {
-    if (!mln_ts_set(
-          env, result, "constrainMode",
-          mln_ts_number(env, (double)(source->constrain_mode))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0) {
-    if (!mln_ts_set(
-          env, result, "viewportMode",
-          mln_ts_number(env, (double)(source->viewport_mode))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0) {
-    if (!mln_ts_set(
-          env, result, "frustumOffset",
-          mln_ts_read_edge_insets(
-            env, &(source->frustum_offset), sizeof(source->frustum_offset)
-          )
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "northOrientation",
+        mln_ts_number(env, (double)(source->north_orientation))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "constrainMode",
+        mln_ts_number(env, (double)(source->constrain_mode))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "viewportMode",
+        mln_ts_number(env, (double)(source->viewport_mode))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "frustumOffset",
+        mln_ts_read_edge_insets(
+          env, &(source->frustum_offset), sizeof(source->frustum_offset)
+        )
+      ))
+    return NULL;
   return result;
 }
 
@@ -1497,24 +1475,18 @@ napi_value mln_ts_read_projection_mode(
   (void)size;
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
-  if ((source->fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0) {
-    if (!mln_ts_set(
-          env, result, "axonometric", mln_ts_bool(env, source->axonometric)
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_PROJECTION_MODE_X_SKEW) != 0) {
-    if (!mln_ts_set(
-          env, result, "xSkew", mln_ts_number(env, (double)(source->x_skew))
-        ))
-      return NULL;
-  }
-  if ((source->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0) {
-    if (!mln_ts_set(
-          env, result, "ySkew", mln_ts_number(env, (double)(source->y_skew))
-        ))
-      return NULL;
-  }
+  if (!mln_ts_set(
+        env, result, "axonometric", mln_ts_bool(env, source->axonometric)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "xSkew", mln_ts_number(env, (double)(source->x_skew))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "ySkew", mln_ts_number(env, (double)(source->y_skew))
+      ))
+    return NULL;
   return result;
 }
 
@@ -4444,7 +4416,6 @@ bool mln_ts_write_map_view(
   mln_ts_path(child, sizeof child, path, "projectionMode");
   if (!mln_ts_is_absent(call, member)) {
     memset(&out->projection_mode, 0, sizeof out->projection_mode);
-    out->projection_mode.size = sizeof out->projection_mode;
     if (!mln_ts_read_record(call, member, child)) return false;
     if (!mln_ts_write_projection_mode(
           call, member, &out->projection_mode, child
@@ -4455,9 +4426,55 @@ bool mln_ts_write_map_view(
   mln_ts_path(child, sizeof child, path, "viewport");
   if (!mln_ts_is_absent(call, member)) {
     memset(&out->viewport, 0, sizeof out->viewport);
-    out->viewport.size = sizeof out->viewport;
     if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_map_viewport_options(call, member, &out->viewport, child))
+    if (!mln_ts_write_map_viewport(call, member, &out->viewport, child))
+      return false;
+  }
+  return true;
+}
+
+bool mln_ts_write_map_viewport(
+  mln_ts_call* call, napi_value value, mln_map_viewport* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "northOrientation", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "northOrientation");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->north_orientation = (mln_north_orientation)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "constrainMode", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "constrainMode");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->constrain_mode = (mln_constrain_mode)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "viewportMode", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "viewportMode");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->viewport_mode = (mln_viewport_mode)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "frustumOffset", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "frustumOffset");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->frustum_offset, 0, sizeof out->frustum_offset);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_edge_insets(call, member, &out->frustum_offset, child))
       return false;
   }
   return true;
@@ -5252,7 +5269,6 @@ bool mln_ts_write_projection_mode(
       if (!mln_ts_read_bool(call, member, &flag, child)) return false;
       out->axonometric = flag;
     }
-    out->fields |= MLN_PROJECTION_MODE_AXONOMETRIC;
   }
   if (!mln_ts_member(call, value, "xSkew", &member)) return false;
   mln_ts_path(child, sizeof child, path, "xSkew");
@@ -5262,7 +5278,6 @@ bool mln_ts_write_projection_mode(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->x_skew = (double)number;
     }
-    out->fields |= MLN_PROJECTION_MODE_X_SKEW;
   }
   if (!mln_ts_member(call, value, "ySkew", &member)) return false;
   mln_ts_path(child, sizeof child, path, "ySkew");
@@ -5272,7 +5287,46 @@ bool mln_ts_write_projection_mode(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->y_skew = (double)number;
     }
-    out->fields |= MLN_PROJECTION_MODE_Y_SKEW;
+  }
+  return true;
+}
+
+bool mln_ts_write_projection_mode_options(
+  mln_ts_call* call, napi_value value, mln_projection_mode_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "axonometric", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "axonometric");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->axonometric = flag;
+    }
+    out->fields |= MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
+  }
+  if (!mln_ts_member(call, value, "xSkew", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "xSkew");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->x_skew = (double)number;
+    }
+    out->fields |= MLN_PROJECTION_MODE_OPTION_X_SKEW;
+  }
+  if (!mln_ts_member(call, value, "ySkew", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "ySkew");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->y_skew = (double)number;
+    }
+    out->fields |= MLN_PROJECTION_MODE_OPTION_Y_SKEW;
   }
   return true;
 }

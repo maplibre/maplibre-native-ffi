@@ -67,6 +67,16 @@ internal unsafe struct mln_camera
     public double field_of_view;
 }
 
+internal unsafe struct mln_camera_bounds
+{
+    public mln_lat_lng_bounds bounds;
+    public byte unbounded;
+    public double min_zoom;
+    public double max_zoom;
+    public double min_pitch;
+    public double max_pitch;
+}
+
 internal unsafe struct mln_camera_delta
 {
     public uint size;
@@ -250,6 +260,12 @@ internal unsafe struct mln_frame_demand
     public ulong token;
 }
 
+internal unsafe struct mln_free_camera
+{
+    public mln_vec3 position;
+    public mln_quaternion orientation;
+}
+
 internal unsafe struct mln_free_camera_options
 {
     public uint size;
@@ -385,6 +401,12 @@ internal unsafe struct mln_map_options
     public byte tile_cache_enabled;
 }
 
+internal unsafe struct mln_map_projection_camera_result
+{
+    public uint size;
+    public mln_camera camera;
+}
+
 internal unsafe struct mln_map_snapshot
 {
     public uint size;
@@ -396,9 +418,9 @@ internal unsafe struct mln_map_snapshot
     public byte transition_in_progress;
     public ulong event_mask;
     public ulong latest_render_update_generation;
-    public mln_map_tile_options tile;
-    public mln_bound_options bounds;
-    public mln_free_camera_options free_camera;
+    public mln_map_tile_settings tile;
+    public mln_camera_bounds bounds;
+    public mln_free_camera free_camera;
     public mln_map_view view;
 }
 
@@ -414,13 +436,31 @@ internal unsafe struct mln_map_tile_options
     public mln_tile_lod_mode lod_mode;
 }
 
+internal unsafe struct mln_map_tile_settings
+{
+    public uint prefetch_zoom_delta;
+    public double lod_min_radius;
+    public double lod_scale;
+    public double lod_pitch_threshold;
+    public double lod_zoom_shift;
+    public mln_tile_lod_mode lod_mode;
+}
+
 internal unsafe struct mln_map_view
 {
     public uint size;
     public mln_camera camera;
     public mln_logical_extent extent;
     public mln_projection_mode projection_mode;
-    public mln_map_viewport_options viewport;
+    public mln_map_viewport viewport;
+}
+
+internal unsafe struct mln_map_viewport
+{
+    public mln_north_orientation north_orientation;
+    public mln_constrain_mode constrain_mode;
+    public mln_viewport_mode viewport_mode;
+    public mln_edge_insets frustum_offset;
 }
 
 internal unsafe struct mln_map_viewport_options
@@ -655,8 +695,15 @@ internal unsafe struct mln_projected_meters
 
 internal unsafe struct mln_projection_mode
 {
+    public byte axonometric;
+    public double x_skew;
+    public double y_skew;
+}
+
+internal unsafe struct mln_projection_mode_options
+{
     public uint size;
-    public mln_projection_mode_field fields;
+    public mln_projection_mode_option_field fields;
     public byte axonometric;
     public double x_skew;
     public double y_skew;
@@ -1632,11 +1679,11 @@ internal enum mln_open_gl_context_provider_flag : uint
     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4,
 }
 
-internal enum mln_projection_mode_field : uint
+internal enum mln_projection_mode_option_field : uint
 {
-    MLN_PROJECTION_MODE_AXONOMETRIC = 1,
-    MLN_PROJECTION_MODE_X_SKEW = 2,
-    MLN_PROJECTION_MODE_Y_SKEW = 4,
+    MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1,
+    MLN_PROJECTION_MODE_OPTION_X_SKEW = 2,
+    MLN_PROJECTION_MODE_OPTION_Y_SKEW = 4,
 }
 
 internal enum mln_render_abandon_disposition : uint

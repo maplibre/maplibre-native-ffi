@@ -89,15 +89,17 @@ typedef enum MLN_BINDING(
 /** A set of mln_free_camera_option_field bits. */
 typedef uint32_t mln_free_camera_option_fields;
 
-/** The fields that mln_projection_mode sets. */
-typedef enum MLN_BINDING("kind=bitmask") mln_projection_mode_field : uint32_t {
-  MLN_PROJECTION_MODE_AXONOMETRIC = 1U << 0U,
-  MLN_PROJECTION_MODE_X_SKEW = 1U << 1U,
-  MLN_PROJECTION_MODE_Y_SKEW = 1U << 2U,
-} mln_projection_mode_field;
+/** The fields that mln_projection_mode_options sets. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_projection_mode_option_field : uint32_t {
+  MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1U << 0U,
+  MLN_PROJECTION_MODE_OPTION_X_SKEW = 1U << 1U,
+  MLN_PROJECTION_MODE_OPTION_Y_SKEW = 1U << 2U,
+} mln_projection_mode_option_field;
 
-/** A set of mln_projection_mode_field bits. */
-typedef uint32_t mln_projection_mode_fields;
+/** A set of mln_projection_mode_option_field bits. */
+typedef uint32_t mln_projection_mode_option_fields;
 
 /** A debug overlay that the map draws. */
 typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_flag : uint32_t {
@@ -296,7 +298,41 @@ typedef struct mln_camera {
   double roll;
   /** The vertical field of view, in degrees. */
   double field_of_view;
-} mln_camera;
+} mln_camera MLN_BINDING("options=mln_camera_options");
+
+// Helpers for C callers. Each binding generates its own, so the generator
+// skips these.
+#ifndef MLN_BINDGEN
+
+/**
+ * Makes camera options that set every member of `camera`.
+ *
+ * Use it to send a camera that you read back, such as to restore a saved
+ * camera or to move another map to the same camera. The options don't set
+ * `anchor`.
+ */
+static inline mln_camera_options mln_camera_to_options(mln_camera camera) {
+  mln_camera_options options;
+  options.size = sizeof(options);
+  options.fields = MLN_CAMERA_OPTION_CENTER |
+                   MLN_CAMERA_OPTION_CENTER_ALTITUDE |
+                   MLN_CAMERA_OPTION_PADDING | MLN_CAMERA_OPTION_ZOOM |
+                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
+                   MLN_CAMERA_OPTION_ROLL | MLN_CAMERA_OPTION_FOV;
+  options.center = camera.center;
+  options.center_altitude = camera.center_altitude;
+  options.padding = camera.padding;
+  options.anchor.x = 0.0;
+  options.anchor.y = 0.0;
+  options.zoom = camera.zoom;
+  options.bearing = camera.bearing;
+  options.pitch = camera.pitch;
+  options.roll = camera.roll;
+  options.field_of_view = camera.field_of_view;
+  return options;
+}
+
+#endif  // MLN_BINDGEN
 
 /**
  * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
@@ -503,6 +539,16 @@ typedef struct mln_free_camera_options {
     MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_ORIENTATION");
 } mln_free_camera_options;
 
+/**
+ * A map camera's whole position and orientation in three dimensions.
+ *
+ * Its members mean the same as those of mln_free_camera_options.
+ */
+typedef struct mln_free_camera {
+  mln_vec3 position;
+  mln_quaternion orientation;
+} mln_free_camera;
+
 /** The fields that mln_feature_state_selector sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -554,6 +600,27 @@ typedef struct mln_bound_options {
   /** The highest pitch, in degrees. */
   double max_pitch MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MAX_PITCH");
 } mln_bound_options;
+
+/**
+ * All the limits on a map's camera.
+ *
+ * Its members mean the same as those of mln_bound_options.
+ */
+typedef struct mln_camera_bounds {
+  /**
+   * The area that the camera's center stays within. When `unbounded` is true,
+   * it covers the whole world.
+   */
+  mln_lat_lng_bounds bounds;
+  /** Whether no area limits the camera's center. */
+  bool unbounded;
+  double min_zoom;
+  double max_zoom;
+  /** The lowest pitch, in degrees. */
+  double min_pitch;
+  /** The highest pitch, in degrees. */
+  double max_pitch;
+} mln_camera_bounds;
 
 /** An offline region that covers a rectangle of the map. */
 typedef struct mln_offline_tile_pyramid_region_definition {
@@ -754,14 +821,27 @@ typedef struct mln_projected_meters {
 } mln_projected_meters;
 
 /** Settings that skew the map or draw it without perspective. */
-typedef struct mln_projection_mode {
+typedef struct mln_projection_mode_options {
   uint32_t size;
-  mln_projection_mode_fields fields;
+  mln_projection_mode_option_fields fields;
   /** Whether the map draws without perspective. */
   bool axonometric
-    MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_AXONOMETRIC");
-  double x_skew MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_X_SKEW");
-  double y_skew MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_Y_SKEW");
+    MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_OPTION_AXONOMETRIC");
+  double x_skew
+    MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_OPTION_X_SKEW");
+  double y_skew
+    MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_OPTION_Y_SKEW");
+} mln_projection_mode_options;
+
+/**
+ * A map's whole projection mode.
+ *
+ * Its members mean the same as those of mln_projection_mode_options.
+ */
+typedef struct mln_projection_mode {
+  bool axonometric;
+  double x_skew;
+  double y_skew;
 } mln_projection_mode;
 
 /** How the map orients and constrains its view. */
@@ -778,13 +858,25 @@ typedef struct mln_map_viewport_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
 } mln_map_viewport_options;
 
+/**
+ * A map's whole viewport.
+ *
+ * Its members mean the same as those of mln_map_viewport_options.
+ */
+typedef struct mln_map_viewport {
+  mln_north_orientation north_orientation;
+  mln_constrain_mode constrain_mode;
+  mln_viewport_mode viewport_mode;
+  mln_edge_insets frustum_offset;
+} mln_map_viewport;
+
 /** One view of a map: its camera, size, and projection. */
 typedef struct mln_map_view {
   uint32_t size;
   mln_camera camera;
   mln_logical_extent extent;
   mln_projection_mode projection_mode;
-  mln_map_viewport_options viewport;
+  mln_map_viewport viewport;
 } mln_map_view;
 
 /**
@@ -818,6 +910,21 @@ typedef struct mln_map_tile_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MODE");
 } mln_map_tile_options;
 
+/**
+ * All the settings for how a map picks the tiles to load.
+ *
+ * Its members mean the same as those of mln_map_tile_options.
+ */
+typedef struct mln_map_tile_settings {
+  uint32_t prefetch_zoom_delta;
+  double lod_min_radius;
+  double lod_scale;
+  /** The pitch, in degrees, above which the map lowers the detail. */
+  double lod_pitch_threshold;
+  double lod_zoom_shift;
+  mln_tile_lod_mode lod_mode;
+} mln_map_tile_settings;
+
 /** A map's state, as mln_map_get_snapshot() reads it. */
 typedef struct mln_map_snapshot {
   uint32_t size;
@@ -832,9 +939,9 @@ typedef struct mln_map_snapshot {
   mln_runtime_event_flags event_mask;
   /** Counts the render updates that the map has made for its render session. */
   uint64_t latest_render_update_generation;
-  mln_map_tile_options tile;
-  mln_bound_options bounds;
-  mln_free_camera_options free_camera;
+  mln_map_tile_settings tile;
+  mln_camera_bounds bounds;
+  mln_free_camera free_camera;
   mln_map_view view;
 } mln_map_snapshot;
 

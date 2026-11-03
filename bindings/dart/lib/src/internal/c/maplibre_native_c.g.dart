@@ -154,6 +154,20 @@ final class mln_camera extends Struct {
   external double field_of_view;
 }
 
+final class mln_camera_bounds extends Struct {
+  external mln_lat_lng_bounds bounds;
+  @Bool()
+  external bool unbounded;
+  @Double()
+  external double min_zoom;
+  @Double()
+  external double max_zoom;
+  @Double()
+  external double min_pitch;
+  @Double()
+  external double max_pitch;
+}
+
 final class mln_camera_delta extends Struct {
   @Uint32()
   external int size;
@@ -390,6 +404,11 @@ final class mln_frame_demand extends Struct {
   external int token;
 }
 
+final class mln_free_camera extends Struct {
+  external mln_vec3 position;
+  external mln_quaternion orientation;
+}
+
 final class mln_free_camera_options extends Struct {
   @Uint32()
   external int size;
@@ -545,6 +564,12 @@ final class mln_map_options extends Struct {
   external bool tile_cache_enabled;
 }
 
+final class mln_map_projection_camera_result extends Struct {
+  @Uint32()
+  external int size;
+  external mln_camera camera;
+}
+
 final class mln_map_snapshot extends Struct {
   @Uint32()
   external int size;
@@ -564,9 +589,9 @@ final class mln_map_snapshot extends Struct {
   external int event_mask;
   @Uint64()
   external int latest_render_update_generation;
-  external mln_map_tile_options tile;
-  external mln_bound_options bounds;
-  external mln_free_camera_options free_camera;
+  external mln_map_tile_settings tile;
+  external mln_camera_bounds bounds;
+  external mln_free_camera free_camera;
   external mln_map_view view;
 }
 
@@ -589,13 +614,38 @@ final class mln_map_tile_options extends Struct {
   external int lod_mode;
 }
 
+final class mln_map_tile_settings extends Struct {
+  @Uint32()
+  external int prefetch_zoom_delta;
+  @Double()
+  external double lod_min_radius;
+  @Double()
+  external double lod_scale;
+  @Double()
+  external double lod_pitch_threshold;
+  @Double()
+  external double lod_zoom_shift;
+  @Uint32()
+  external int lod_mode;
+}
+
 final class mln_map_view extends Struct {
   @Uint32()
   external int size;
   external mln_camera camera;
   external mln_logical_extent extent;
   external mln_projection_mode projection_mode;
-  external mln_map_viewport_options viewport;
+  external mln_map_viewport viewport;
+}
+
+final class mln_map_viewport extends Struct {
+  @Uint32()
+  external int north_orientation;
+  @Uint32()
+  external int constrain_mode;
+  @Uint32()
+  external int viewport_mode;
+  external mln_edge_insets frustum_offset;
 }
 
 final class mln_map_viewport_options extends Struct {
@@ -869,6 +919,15 @@ final class mln_projected_meters extends Struct {
 }
 
 final class mln_projection_mode extends Struct {
+  @Bool()
+  external bool axonometric;
+  @Double()
+  external double x_skew;
+  @Double()
+  external double y_skew;
+}
+
+final class mln_projection_mode_options extends Struct {
   @Uint32()
   external int size;
   @Uint32()
@@ -1899,10 +1958,10 @@ const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4;
 
-// mln_projection_mode_field
-const MLN_PROJECTION_MODE_AXONOMETRIC = 1;
-const MLN_PROJECTION_MODE_X_SKEW = 2;
-const MLN_PROJECTION_MODE_Y_SKEW = 4;
+// mln_projection_mode_option_field
+const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1;
+const MLN_PROJECTION_MODE_OPTION_X_SKEW = 2;
+const MLN_PROJECTION_MODE_OPTION_Y_SKEW = 4;
 
 // mln_render_abandon_disposition
 const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
@@ -3155,13 +3214,13 @@ external int mln_map_projection_create(
 @Native<
   Int32 Function(
     mln_map_projection,
-    Pointer<mln_camera_options>,
+    Pointer<mln_map_projection_camera_result>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_projection_get_camera(
   int projection,
-  Pointer<mln_camera_options> out_camera,
+  Pointer<mln_map_projection_camera_result> out_result,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -3673,14 +3732,14 @@ external int mln_map_set_image_source_url(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_projection_mode>,
+    Pointer<mln_projection_mode_options>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_projection_mode(
   int map,
-  Pointer<mln_projection_mode> mode,
+  Pointer<mln_projection_mode_options> options,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

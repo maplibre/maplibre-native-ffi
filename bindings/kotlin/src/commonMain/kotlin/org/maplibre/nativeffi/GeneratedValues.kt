@@ -1873,6 +1873,58 @@ public data class Camera(
   public val roll: Double = 0.0,
   /** The vertical field of view, in degrees. */
   public val fieldOfView: Double = 0.0,
+) {
+  /** Converts this `Camera` to `CameraOptions` that set each of its members. */
+  public fun toOptions(): CameraOptions =
+    CameraOptions(
+      center = center,
+      centerAltitude = centerAltitude,
+      padding = padding,
+      zoom = zoom,
+      bearing = bearing,
+      pitch = pitch,
+      roll = roll,
+      fieldOfView = fieldOfView,
+    )
+}
+
+/**
+ * A point on the screen, in logical pixels from the map's top-left corner.
+ *
+ * See `mln_screen_point` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class ScreenPoint(
+  public val x: Double = 0.0,
+  public val y: Double = 0.0,
+)
+
+/**
+ * A camera, with only the members that `fields` selects.
+ *
+ * See `mln_camera_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraOptions(
+  public val center: LatLng? = null,
+  /** The altitude of the center, in meters above sea level. */
+  public val centerAltitude: Double? = null,
+  /** Insets from the map's edges. The camera centers within the rest. */
+  public val padding: EdgeInsets? = null,
+  /**
+   * The screen point that a change to the zoom, bearing, or pitch keeps in place. A `center`
+   * overrides it.
+   */
+  public val anchor: ScreenPoint? = null,
+  public val zoom: Double? = null,
+  /** The rotation from north, in degrees. */
+  public val bearing: Double? = null,
+  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
+  public val pitch: Double? = null,
+  /** The roll, in degrees. */
+  public val roll: Double? = null,
+  /** The vertical field of view, in degrees. */
+  public val fieldOfView: Double? = null,
 )
 
 /**
@@ -1888,29 +1940,32 @@ public data class LogicalExtent(
 )
 
 /**
- * Settings that skew the map or draw it without perspective.
+ * A map's whole projection mode.
+ *
+ * Its members mean the same as those of `ProjectionModeOptions`.
  *
  * See `mln_projection_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class ProjectionMode(
-  /** Whether the map draws without perspective. */
-  public val axonometric: Boolean? = null,
-  public val xSkew: Double? = null,
-  public val ySkew: Double? = null,
+  public val axonometric: Boolean = false,
+  public val xSkew: Double = 0.0,
+  public val ySkew: Double = 0.0,
 )
 
 /**
- * How the map orients and constrains its view.
+ * A map's whole viewport.
  *
- * See `mln_map_viewport_options` in the
+ * Its members mean the same as those of `MapViewportOptions`.
+ *
+ * See `mln_map_viewport` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class MapViewportOptions(
-  public val northOrientation: NorthOrientation? = null,
-  public val constrainMode: ConstrainMode? = null,
-  public val viewportMode: ViewportMode? = null,
-  public val frustumOffset: EdgeInsets? = null,
+public data class MapViewport(
+  public val northOrientation: NorthOrientation = NorthOrientation.UP,
+  public val constrainMode: ConstrainMode = ConstrainMode.NONE,
+  public val viewportMode: ViewportMode = ViewportMode.DEFAULT,
+  public val frustumOffset: EdgeInsets = EdgeInsets(),
 )
 
 /**
@@ -1923,7 +1978,7 @@ public data class MapView(
   public val camera: Camera = Camera(),
   public val extent: LogicalExtent = LogicalExtent(),
   public val projectionMode: ProjectionMode = ProjectionMode(),
-  public val viewport: MapViewportOptions = MapViewportOptions(),
+  public val viewport: MapViewport = MapViewport(),
 )
 
 /**
@@ -2183,17 +2238,6 @@ public data class PremultipliedRgba8Image(
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
-
-/**
- * A point on the screen, in logical pixels from the map's top-left corner.
- *
- * See `mln_screen_point` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class ScreenPoint(
-  public val x: Double = 0.0,
-  public val y: Double = 0.0,
-)
 
 /**
  * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
@@ -2696,34 +2740,6 @@ public data class CameraFitOptions(
 )
 
 /**
- * A camera, with only the members that `fields` selects.
- *
- * See `mln_camera_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraOptions(
-  public val center: LatLng? = null,
-  /** The altitude of the center, in meters above sea level. */
-  public val centerAltitude: Double? = null,
-  /** Insets from the map's edges. The camera centers within the rest. */
-  public val padding: EdgeInsets? = null,
-  /**
-   * The screen point that a change to the zoom, bearing, or pitch keeps in place. A `center`
-   * overrides it.
-   */
-  public val anchor: ScreenPoint? = null,
-  public val zoom: Double? = null,
-  /** The rotation from north, in degrees. */
-  public val bearing: Double? = null,
-  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
-  public val pitch: Double? = null,
-  /** The roll, in degrees. */
-  public val roll: Double? = null,
-  /** The vertical field of view, in degrees. */
-  public val fieldOfView: Double? = null,
-)
-
-/**
  * A rectangle of coordinates, from its southwest to its northeast corner.
  *
  * See `mln_lat_lng_bounds` in the
@@ -2768,49 +2784,45 @@ public data class FeatureStateSelector(
 )
 
 /**
- * How the map picks the tiles to load.
+ * All the settings for how a map picks the tiles to load.
  *
- * The `lod_` members lower the level of detail away from the camera, so the map loads fewer tiles
- * when the pitch is high.
+ * Its members mean the same as those of `MapTileOptions`.
  *
- * See `mln_map_tile_options` in the
+ * See `mln_map_tile_settings` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class MapTileOptions(
-  /**
-   * How many zoom levels lower the map also loads tiles for, so it can show a coarse map while the
-   * current tiles load. 0 loads only the current tiles.
-   */
-  public val prefetchZoomDelta: UInt? = null,
-  /** The radius around the view point, in tiles, that keeps full detail. */
-  public val lodMinRadius: Double? = null,
-  /** Scales the distance to the view point. Above 1 lowers the detail. */
-  public val lodScale: Double? = null,
+public data class MapTileSettings(
+  public val prefetchZoomDelta: UInt,
+  public val lodMinRadius: Double,
+  public val lodScale: Double,
   /** The pitch, in degrees, above which the map lowers the detail. */
-  public val lodPitchThreshold: Double? = null,
-  /** Zoom levels to add for picking the detail. Below 0 loads fewer tiles. */
-  public val lodZoomShift: Double? = null,
-  /** `TileLodMode.DISTANCE` ignores `lod_min_radius`. */
-  public val lodMode: TileLodMode? = null,
+  public val lodPitchThreshold: Double,
+  public val lodZoomShift: Double,
+  public val lodMode: TileLodMode,
 )
 
 /**
- * Limits on the camera, for `MapHandle.setBounds()`.
+ * All the limits on a map's camera.
  *
- * See `mln_bound_options` in the
+ * Its members mean the same as those of `BoundOptions`.
+ *
+ * See `mln_camera_bounds` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class BoundOptions(
-  /** The area that the camera's center stays within. */
-  public val bounds: LatLngBounds? = null,
-  public val minZoom: Double? = null,
-  public val maxZoom: Double? = null,
+public data class CameraBounds(
+  /**
+   * The area that the camera's center stays within. When `unbounded` is true, it covers the whole
+   * world.
+   */
+  public val bounds: LatLngBounds,
+  /** Whether no area limits the camera's center. */
+  public val unbounded: Boolean,
+  public val minZoom: Double,
+  public val maxZoom: Double,
   /** The lowest pitch, in degrees. */
-  public val minPitch: Double? = null,
+  public val minPitch: Double,
   /** The highest pitch, in degrees. */
-  public val maxPitch: Double? = null,
-  /** Removes the area that limits the camera's center. */
-  public val unbounded: Boolean = false,
+  public val maxPitch: Double,
 )
 
 /**
@@ -2839,20 +2851,16 @@ public data class Quaternion(
 )
 
 /**
- * The camera's position and orientation in three dimensions.
+ * A map camera's whole position and orientation in three dimensions.
  *
- * See `mln_free_camera_options` in the
+ * Its members mean the same as those of `FreeCameraOptions`.
+ *
+ * See `mln_free_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class FreeCameraOptions(
-  /**
-   * The camera's position in Web Mercator units, where the world is 1 wide, (0,
-   * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the altitude in the same
-   *    units.
-   */
-  public val position: Vec3? = null,
-  /** The camera's rotation from looking straight down with north at the top of the screen. */
-  public val orientation: Quaternion? = null,
+public data class FreeCamera(
+  public val position: Vec3,
+  public val orientation: Quaternion,
 )
 
 /**
@@ -2873,9 +2881,9 @@ public data class MapSnapshot(
   public val eventMask: RuntimeEventFlag,
   /** Counts the render updates that the map has made for its render session. */
   public val latestRenderUpdateGeneration: ULong,
-  public val tile: MapTileOptions,
-  public val bounds: BoundOptions,
-  public val freeCamera: FreeCameraOptions,
+  public val tile: MapTileSettings,
+  public val bounds: CameraBounds,
+  public val freeCamera: FreeCamera,
   public val view: MapView,
 )
 
@@ -3018,6 +3026,55 @@ public data class StyleTransitionOptions(
 )
 
 /**
+ * Limits on the camera, for `MapHandle.setBounds()`.
+ *
+ * See `mln_bound_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class BoundOptions(
+  /** The area that the camera's center stays within. */
+  public val bounds: LatLngBounds? = null,
+  public val minZoom: Double? = null,
+  public val maxZoom: Double? = null,
+  /** The lowest pitch, in degrees. */
+  public val minPitch: Double? = null,
+  /** The highest pitch, in degrees. */
+  public val maxPitch: Double? = null,
+  /** Removes the area that limits the camera's center. */
+  public val unbounded: Boolean = false,
+)
+
+/**
+ * The camera's position and orientation in three dimensions.
+ *
+ * See `mln_free_camera_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class FreeCameraOptions(
+  /**
+   * The camera's position in Web Mercator units, where the world is 1 wide, (0,
+   * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the altitude in the same
+   *    units.
+   */
+  public val position: Vec3? = null,
+  /** The camera's rotation from looking straight down with north at the top of the screen. */
+  public val orientation: Quaternion? = null,
+)
+
+/**
+ * Settings that skew the map or draw it without perspective.
+ *
+ * See `mln_projection_mode_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class ProjectionModeOptions(
+  /** Whether the map draws without perspective. */
+  public val axonometric: Boolean? = null,
+  public val xSkew: Double? = null,
+  public val ySkew: Double? = null,
+)
+
+/**
  * Options for a style image, as the
  * &#91;sprite&#93;(https://maplibre.org/maplibre-style-spec/sprite/) spec describes them.
  *
@@ -3042,6 +3099,46 @@ public data class StyleImageOptions(
 )
 
 /**
+ * How the map picks the tiles to load.
+ *
+ * The `lod_` members lower the level of detail away from the camera, so the map loads fewer tiles
+ * when the pitch is high.
+ *
+ * See `mln_map_tile_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MapTileOptions(
+  /**
+   * How many zoom levels lower the map also loads tiles for, so it can show a coarse map while the
+   * current tiles load. 0 loads only the current tiles.
+   */
+  public val prefetchZoomDelta: UInt? = null,
+  /** The radius around the view point, in tiles, that keeps full detail. */
+  public val lodMinRadius: Double? = null,
+  /** Scales the distance to the view point. Above 1 lowers the detail. */
+  public val lodScale: Double? = null,
+  /** The pitch, in degrees, above which the map lowers the detail. */
+  public val lodPitchThreshold: Double? = null,
+  /** Zoom levels to add for picking the detail. Below 0 loads fewer tiles. */
+  public val lodZoomShift: Double? = null,
+  /** `TileLodMode.DISTANCE` ignores `lod_min_radius`. */
+  public val lodMode: TileLodMode? = null,
+)
+
+/**
+ * How the map orients and constrains its view.
+ *
+ * See `mln_map_viewport_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MapViewportOptions(
+  public val northOrientation: NorthOrientation? = null,
+  public val constrainMode: ConstrainMode? = null,
+  public val viewportMode: ViewportMode? = null,
+  public val frustumOffset: EdgeInsets? = null,
+)
+
+/**
  * A camera change for `MapHandle.updateCamera()`.
  *
  * A jump uses only the end handler of `animation`, and the handler runs as soon as the camera
@@ -3055,6 +3152,16 @@ public data class CameraUpdate(
   public val camera: CameraOptions = CameraOptions(),
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
+)
+
+/**
+ * A projection's camera, as `MapProjectionHandle.getCamera()` reports it.
+ *
+ * See `mln_map_projection_camera_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ */
+public data class MapProjectionCameraResult(
+  public val camera: Camera,
 )
 
 /**

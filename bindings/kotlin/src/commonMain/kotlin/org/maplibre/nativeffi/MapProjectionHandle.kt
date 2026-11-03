@@ -33,11 +33,11 @@ internal constructor(
    * See `mln_map_projection_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public fun getCamera(): CameraOptions =
+  public fun getCamera(): MapProjectionCameraResult =
     nativeCall(this, binding) {
-      val out = sized(120, w(8, 8, 4))
+      val out = sized(w(104, 104, 100), w(8, 8, 4))
       check(C.mln_map_projection_get_camera(handle, out, diagnostic))
-      readCameraOptions(out)
+      readMapProjectionCameraResult(out)
     }
 
   /**

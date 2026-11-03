@@ -21,11 +21,11 @@ auto mln_map_projection_release(mln_map_projection projection) noexcept
 }
 
 auto mln_map_projection_get_camera(
-  mln_map_projection projection, mln_camera_options* out_camera,
+  mln_map_projection projection, mln_map_projection_camera_result* out_result,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_projection_get_camera(projection, out_camera);
+    return mln::core::map_projection_get_camera(projection, out_result);
   });
 }
 

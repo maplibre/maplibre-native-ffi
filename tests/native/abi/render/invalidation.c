@@ -321,7 +321,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
 
 typedef struct update_state {
   mln_geo_json_source_data data;
-  mln_map_tile_options initial_tile;
+  mln_map_tile_settings initial_tile;
 } update_state;
 
 static void add_empty_geojson(mln_map map, update_state* state) {

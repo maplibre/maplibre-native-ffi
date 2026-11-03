@@ -203,6 +203,14 @@ class Doc:
     hidden: tuple[str, ...] = ()
 
 
+def conversion(record: str, options: str) -> Doc:
+    """The documentation of a record's generated conversion to the option bag
+    that its `options` annotation names."""
+    return Doc(
+        record, f"Converts this `{record}` to `{options}` that set each of its members."
+    )
+
+
 def index(api: Api) -> dict[str, Doc]:
     """The documentation of each documented public declaration.
 

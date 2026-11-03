@@ -27,8 +27,8 @@ public readonly partial record struct MapSnapshot(
     bool TransitionInProgress,
     RuntimeEventFlag EventMask,
     ulong LatestRenderUpdateGeneration,
-    MapTileOptions Tile,
-    BoundOptions Bounds,
-    FreeCameraOptions FreeCamera,
+    MapTileSettings Tile,
+    CameraBounds Bounds,
+    FreeCamera FreeCamera,
     MapView View
 );

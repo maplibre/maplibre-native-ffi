@@ -14,6 +14,7 @@ from ..semantic import (
     BoundApi,
     FieldPlan,
     ValuePlan,
+    conversion_doc,
     enum_member_prefix,
     required_callbacks,
     required_member,
@@ -214,6 +215,9 @@ class Values:
                     )
             self.supported(field.value)
         self.plans[plan.native] = plan
+        if plan.options:
+            # The record converts to its option bag.
+            self.supported(self.bound.values[plan.options])
 
     def fields(self, plan: ValuePlan) -> tuple[FieldPlan, ...]:
         controls = {field.name for field in plan.fields if not field.public} | {
@@ -1156,6 +1160,8 @@ class Values:
                 + f"    public {required}{type_} {member} {{ get; init; }}"
                 + (f" = {zero};" if zero else "")
             )
+        if plan.options:
+            raise Unsupported(f"{plan.native}: options requires a positional record")
         declaration = f"public {'sealed record' if masked else 'readonly partial record struct'} {name}\n{{\n"
         if not masked:
             declaration += (
@@ -1343,5 +1349,28 @@ class Values:
             )
             + ")"
         )
-        body = self.parameterless(plan, primary=True) + self.native_members(plan)
+        body = (
+            self.parameterless(plan, primary=True)
+            + self.native_members(plan)
+            + self.to_options(plan)
+        )
         return f"{declaration}\n{{\n{body}}}\n" if body else declaration + ";\n"
+
+    def to_options(self, plan: ValuePlan) -> str:
+        """The method that converts a complete record to its option bag."""
+        if not plan.options:
+            return ""
+        bag = self.bound.values[plan.options]
+        held = {field.name: name for name, field in self.members(plan)}
+        assignments = "".join(
+            f"        {name} = {held[field.name]},\n"
+            for name, field in self.members(bag)
+            if field.name in held
+        )
+        return (
+            docs.xml_comment(
+                self.bound.doc(conversion_doc(plan.native)), self.symbols(), "    "
+            )
+            + f"    public {public_name(bag.native)} ToOptions() => new()\n"
+            + f"    {{\n{assignments}    }};\n"
+        )

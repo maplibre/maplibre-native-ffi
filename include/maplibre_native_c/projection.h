@@ -34,10 +34,16 @@ MLN_API void mln_map_projection_release(
   mln_map_projection projection
 ) MLN_NOEXCEPT;
 
+/** A projection's camera, as mln_map_projection_get_camera() reports it. */
+typedef struct mln_map_projection_camera_result {
+  uint32_t size;
+  mln_camera camera;
+} mln_map_projection_camera_result;
+
 /** Reads the projection's camera. */
 MLN_API mln_status mln_map_projection_get_camera(
   mln_map_projection projection,
-  mln_camera_options* out_camera MLN_BINDING("direction=out"),
+  mln_map_projection_camera_result* out_result MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

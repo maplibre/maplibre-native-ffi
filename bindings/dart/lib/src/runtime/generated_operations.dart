@@ -104,6 +104,94 @@ Camera _readCamera(raw.mln_camera source) => Camera(
   fieldOfView: source.field_of_view,
 );
 
+Pointer<raw.mln_screen_point> _writeScreenPoint(
+  ScreenPoint value,
+  Allocator arena, {
+  Pointer<raw.mln_screen_point>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_point>();
+  result.ref.x = value.x;
+  result.ref.y = value.y;
+  return result;
+}
+
+ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
+    ScreenPoint(x: source.x, y: source.y);
+
+Pointer<raw.mln_camera_options> _writeCameraOptions(
+  CameraOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_camera_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_camera_options>();
+  result.ref.size = sizeOf<raw.mln_camera_options>();
+  if (value.center != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
+    result.ref.center = _writeLatLng(value.center!, arena).ref;
+  }
+  if (value.centerAltitude != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+    result.ref.center_altitude = value.centerAltitude!;
+  }
+  if (value.padding != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_PADDING;
+    result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
+  }
+  if (value.anchor != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ANCHOR;
+    result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
+  }
+  if (value.zoom != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ZOOM;
+    result.ref.zoom = value.zoom!;
+  }
+  if (value.bearing != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_BEARING;
+    result.ref.bearing = value.bearing!;
+  }
+  if (value.pitch != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_PITCH;
+    result.ref.pitch = value.pitch!;
+  }
+  if (value.roll != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ROLL;
+    result.ref.roll = value.roll!;
+  }
+  if (value.fieldOfView != null) {
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_FOV;
+    result.ref.field_of_view = value.fieldOfView!;
+  }
+  return result;
+}
+
+CameraOptions _readCameraOptions(
+  raw.mln_camera_options source,
+) => CameraOptions(
+  center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
+      ? _readLatLng(source.center)
+      : null,
+  centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
+      ? source.center_altitude
+      : null,
+  padding: (source.fields & raw.MLN_CAMERA_OPTION_PADDING) != 0
+      ? _readEdgeInsets(source.padding)
+      : null,
+  anchor: (source.fields & raw.MLN_CAMERA_OPTION_ANCHOR) != 0
+      ? _readScreenPoint(source.anchor)
+      : null,
+  zoom: (source.fields & raw.MLN_CAMERA_OPTION_ZOOM) != 0 ? source.zoom : null,
+  bearing: (source.fields & raw.MLN_CAMERA_OPTION_BEARING) != 0
+      ? source.bearing
+      : null,
+  pitch: (source.fields & raw.MLN_CAMERA_OPTION_PITCH) != 0
+      ? source.pitch
+      : null,
+  roll: (source.fields & raw.MLN_CAMERA_OPTION_ROLL) != 0 ? source.roll : null,
+  fieldOfView: (source.fields & raw.MLN_CAMERA_OPTION_FOV) != 0
+      ? source.field_of_view
+      : null,
+);
+
 Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   LogicalExtent value,
   Allocator arena, {
@@ -129,82 +217,37 @@ Pointer<raw.mln_projection_mode> _writeProjectionMode(
   Pointer<raw.mln_projection_mode>? into,
 }) {
   final result = into ?? arena<raw.mln_projection_mode>();
-  result.ref.size = sizeOf<raw.mln_projection_mode>();
-  if (value.axonometric != null) {
-    result.ref.fields |= raw.MLN_PROJECTION_MODE_AXONOMETRIC;
-    result.ref.axonometric = value.axonometric!;
-  }
-  if (value.xSkew != null) {
-    result.ref.fields |= raw.MLN_PROJECTION_MODE_X_SKEW;
-    result.ref.x_skew = value.xSkew!;
-  }
-  if (value.ySkew != null) {
-    result.ref.fields |= raw.MLN_PROJECTION_MODE_Y_SKEW;
-    result.ref.y_skew = value.ySkew!;
-  }
+  result.ref.axonometric = value.axonometric;
+  result.ref.x_skew = value.xSkew;
+  result.ref.y_skew = value.ySkew;
   return result;
 }
 
 ProjectionMode _readProjectionMode(raw.mln_projection_mode source) =>
     ProjectionMode(
-      axonometric: (source.fields & raw.MLN_PROJECTION_MODE_AXONOMETRIC) != 0
-          ? source.axonometric
-          : null,
-      xSkew: (source.fields & raw.MLN_PROJECTION_MODE_X_SKEW) != 0
-          ? source.x_skew
-          : null,
-      ySkew: (source.fields & raw.MLN_PROJECTION_MODE_Y_SKEW) != 0
-          ? source.y_skew
-          : null,
+      axonometric: source.axonometric,
+      xSkew: source.x_skew,
+      ySkew: source.y_skew,
     );
 
-Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
-  MapViewportOptions value,
+Pointer<raw.mln_map_viewport> _writeMapViewport(
+  MapViewport value,
   Allocator arena, {
-  Pointer<raw.mln_map_viewport_options>? into,
+  Pointer<raw.mln_map_viewport>? into,
 }) {
-  final result = into ?? arena<raw.mln_map_viewport_options>();
-  result.ref.size = sizeOf<raw.mln_map_viewport_options>();
-  if (value.northOrientation != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
-    result.ref.north_orientation = value.northOrientation!.rawValue;
-  }
-  if (value.constrainMode != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
-    result.ref.constrain_mode = value.constrainMode!.rawValue;
-  }
-  if (value.viewportMode != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
-    result.ref.viewport_mode = value.viewportMode!.rawValue;
-  }
-  if (value.frustumOffset != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
-    result.ref.frustum_offset = _writeEdgeInsets(
-      value.frustumOffset!,
-      arena,
-    ).ref;
-  }
+  final result = into ?? arena<raw.mln_map_viewport>();
+  result.ref.north_orientation = value.northOrientation.rawValue;
+  result.ref.constrain_mode = value.constrainMode.rawValue;
+  result.ref.viewport_mode = value.viewportMode.rawValue;
+  result.ref.frustum_offset = _writeEdgeInsets(value.frustumOffset, arena).ref;
   return result;
 }
 
-MapViewportOptions _readMapViewportOptions(
-  raw.mln_map_viewport_options source,
-) => MapViewportOptions(
-  northOrientation:
-      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0
-      ? NorthOrientation.fromRawValue(source.north_orientation)
-      : null,
-  constrainMode:
-      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0
-      ? ConstrainMode.fromRawValue(source.constrain_mode)
-      : null,
-  viewportMode: (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0
-      ? ViewportMode.fromRawValue(source.viewport_mode)
-      : null,
-  frustumOffset:
-      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0
-      ? _readEdgeInsets(source.frustum_offset)
-      : null,
+MapViewport _readMapViewport(raw.mln_map_viewport source) => MapViewport(
+  northOrientation: NorthOrientation.fromRawValue(source.north_orientation),
+  constrainMode: ConstrainMode.fromRawValue(source.constrain_mode),
+  viewportMode: ViewportMode.fromRawValue(source.viewport_mode),
+  frustumOffset: _readEdgeInsets(source.frustum_offset),
 );
 
 Pointer<raw.mln_map_view> _writeMapView(
@@ -220,7 +263,7 @@ Pointer<raw.mln_map_view> _writeMapView(
     value.projectionMode,
     arena,
   ).ref;
-  result.ref.viewport = _writeMapViewportOptions(value.viewport, arena).ref;
+  result.ref.viewport = _writeMapViewport(value.viewport, arena).ref;
   return result;
 }
 
@@ -228,7 +271,7 @@ MapView _readMapView(raw.mln_map_view source) => MapView(
   camera: _readCamera(source.camera),
   extent: _readLogicalExtent(source.extent),
   projectionMode: _readProjectionMode(source.projection_mode),
-  viewport: _readMapViewportOptions(source.viewport),
+  viewport: _readMapViewport(source.viewport),
 );
 
 RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
@@ -540,20 +583,6 @@ Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   result.ref.byte_length = bytespixels.size;
   return result;
 }
-
-Pointer<raw.mln_screen_point> _writeScreenPoint(
-  ScreenPoint value,
-  Allocator arena, {
-  Pointer<raw.mln_screen_point>? into,
-}) {
-  final result = into ?? arena<raw.mln_screen_point>();
-  result.ref.x = value.x;
-  result.ref.y = value.y;
-  return result;
-}
-
-ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
-    ScreenPoint(x: source.x, y: source.y);
 
 Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   UnitBezier value,
@@ -1123,80 +1152,6 @@ Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   return result;
 }
 
-Pointer<raw.mln_camera_options> _writeCameraOptions(
-  CameraOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_camera_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_camera_options>();
-  result.ref.size = sizeOf<raw.mln_camera_options>();
-  if (value.center != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
-    result.ref.center = _writeLatLng(value.center!, arena).ref;
-  }
-  if (value.centerAltitude != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
-    result.ref.center_altitude = value.centerAltitude!;
-  }
-  if (value.padding != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_PADDING;
-    result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
-  }
-  if (value.anchor != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_ANCHOR;
-    result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
-  }
-  if (value.zoom != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_ZOOM;
-    result.ref.zoom = value.zoom!;
-  }
-  if (value.bearing != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_BEARING;
-    result.ref.bearing = value.bearing!;
-  }
-  if (value.pitch != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_PITCH;
-    result.ref.pitch = value.pitch!;
-  }
-  if (value.roll != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_ROLL;
-    result.ref.roll = value.roll!;
-  }
-  if (value.fieldOfView != null) {
-    result.ref.fields |= raw.MLN_CAMERA_OPTION_FOV;
-    result.ref.field_of_view = value.fieldOfView!;
-  }
-  return result;
-}
-
-CameraOptions _readCameraOptions(
-  raw.mln_camera_options source,
-) => CameraOptions(
-  center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
-      ? _readLatLng(source.center)
-      : null,
-  centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
-      ? source.center_altitude
-      : null,
-  padding: (source.fields & raw.MLN_CAMERA_OPTION_PADDING) != 0
-      ? _readEdgeInsets(source.padding)
-      : null,
-  anchor: (source.fields & raw.MLN_CAMERA_OPTION_ANCHOR) != 0
-      ? _readScreenPoint(source.anchor)
-      : null,
-  zoom: (source.fields & raw.MLN_CAMERA_OPTION_ZOOM) != 0 ? source.zoom : null,
-  bearing: (source.fields & raw.MLN_CAMERA_OPTION_BEARING) != 0
-      ? source.bearing
-      : null,
-  pitch: (source.fields & raw.MLN_CAMERA_OPTION_PITCH) != 0
-      ? source.pitch
-      : null,
-  roll: (source.fields & raw.MLN_CAMERA_OPTION_ROLL) != 0 ? source.roll : null,
-  fieldOfView: (source.fields & raw.MLN_CAMERA_OPTION_FOV) != 0
-      ? source.field_of_view
-      : null,
-);
-
 Pointer<raw.mln_lat_lng_bounds> _writeLatLngBounds(
   LatLngBounds value,
   Allocator arena, {
@@ -1239,119 +1194,23 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   return result;
 }
 
-Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
-  MapTileOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_map_tile_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_map_tile_options>();
-  result.ref.size = sizeOf<raw.mln_map_tile_options>();
-  if (value.prefetchZoomDelta != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
-    result.ref.prefetch_zoom_delta = _nativeInteger(
-      value.prefetchZoomDelta!,
-      0,
-      4294967295,
+MapTileSettings _readMapTileSettings(raw.mln_map_tile_settings source) =>
+    MapTileSettings(
+      prefetchZoomDelta: source.prefetch_zoom_delta,
+      lodMinRadius: source.lod_min_radius,
+      lodScale: source.lod_scale,
+      lodPitchThreshold: source.lod_pitch_threshold,
+      lodZoomShift: source.lod_zoom_shift,
+      lodMode: TileLodMode.fromRawValue(source.lod_mode),
     );
-  }
-  if (value.lodMinRadius != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
-    result.ref.lod_min_radius = value.lodMinRadius!;
-  }
-  if (value.lodScale != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_SCALE;
-    result.ref.lod_scale = value.lodScale!;
-  }
-  if (value.lodPitchThreshold != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
-    result.ref.lod_pitch_threshold = value.lodPitchThreshold!;
-  }
-  if (value.lodZoomShift != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
-    result.ref.lod_zoom_shift = value.lodZoomShift!;
-  }
-  if (value.lodMode != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MODE;
-    result.ref.lod_mode = value.lodMode!.rawValue;
-  }
-  return result;
-}
 
-MapTileOptions _readMapTileOptions(
-  raw.mln_map_tile_options source,
-) => MapTileOptions(
-  prefetchZoomDelta:
-      (source.fields & raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0
-      ? source.prefetch_zoom_delta
-      : null,
-  lodMinRadius: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0
-      ? source.lod_min_radius
-      : null,
-  lodScale: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_SCALE) != 0
-      ? source.lod_scale
-      : null,
-  lodPitchThreshold:
-      (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0
-      ? source.lod_pitch_threshold
-      : null,
-  lodZoomShift: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0
-      ? source.lod_zoom_shift
-      : null,
-  lodMode: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MODE) != 0
-      ? TileLodMode.fromRawValue(source.lod_mode)
-      : null,
-);
-
-Pointer<raw.mln_bound_options> _writeBoundOptions(
-  BoundOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_bound_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_bound_options>();
-  result.ref.size = sizeOf<raw.mln_bound_options>();
-  if (value.unbounded) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_UNBOUNDED;
-  }
-  if (value.bounds != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_BOUNDS;
-    result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
-  }
-  if (value.minZoom != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_ZOOM;
-    result.ref.min_zoom = value.minZoom!;
-  }
-  if (value.maxZoom != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_ZOOM;
-    result.ref.max_zoom = value.maxZoom!;
-  }
-  if (value.minPitch != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_PITCH;
-    result.ref.min_pitch = value.minPitch!;
-  }
-  if (value.maxPitch != null) {
-    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_PITCH;
-    result.ref.max_pitch = value.maxPitch!;
-  }
-  return result;
-}
-
-BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
-  unbounded: (source.fields & raw.MLN_BOUND_OPTION_UNBOUNDED) != 0,
-  bounds: (source.fields & raw.MLN_BOUND_OPTION_BOUNDS) != 0
-      ? _readLatLngBounds(source.bounds)
-      : null,
-  minZoom: (source.fields & raw.MLN_BOUND_OPTION_MIN_ZOOM) != 0
-      ? source.min_zoom
-      : null,
-  maxZoom: (source.fields & raw.MLN_BOUND_OPTION_MAX_ZOOM) != 0
-      ? source.max_zoom
-      : null,
-  minPitch: (source.fields & raw.MLN_BOUND_OPTION_MIN_PITCH) != 0
-      ? source.min_pitch
-      : null,
-  maxPitch: (source.fields & raw.MLN_BOUND_OPTION_MAX_PITCH) != 0
-      ? source.max_pitch
-      : null,
+CameraBounds _readCameraBounds(raw.mln_camera_bounds source) => CameraBounds(
+  bounds: _readLatLngBounds(source.bounds),
+  unbounded: source.unbounded,
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+  minPitch: source.min_pitch,
+  maxPitch: source.max_pitch,
 );
 
 Pointer<raw.mln_vec3> _writeVec3(
@@ -1385,33 +1244,10 @@ Pointer<raw.mln_quaternion> _writeQuaternion(
 Quaternion _readQuaternion(raw.mln_quaternion source) =>
     Quaternion(x: source.x, y: source.y, z: source.z, w: source.w);
 
-Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
-  FreeCameraOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_free_camera_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_free_camera_options>();
-  result.ref.size = sizeOf<raw.mln_free_camera_options>();
-  if (value.position != null) {
-    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_POSITION;
-    result.ref.position = _writeVec3(value.position!, arena).ref;
-  }
-  if (value.orientation != null) {
-    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_ORIENTATION;
-    result.ref.orientation = _writeQuaternion(value.orientation!, arena).ref;
-  }
-  return result;
-}
-
-FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
-    FreeCameraOptions(
-      position: (source.fields & raw.MLN_FREE_CAMERA_OPTION_POSITION) != 0
-          ? _readVec3(source.position)
-          : null,
-      orientation: (source.fields & raw.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0
-          ? _readQuaternion(source.orientation)
-          : null,
-    );
+FreeCamera _readFreeCamera(raw.mln_free_camera source) => FreeCamera(
+  position: _readVec3(source.position),
+  orientation: _readQuaternion(source.orientation),
+);
 
 MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   debugFlags: MapDebugFlag.fromRawValue(source.debug_flags),
@@ -1422,9 +1258,9 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   transitionInProgress: source.transition_in_progress,
   eventMask: RuntimeEventFlag.fromRawValue(source.event_mask),
   latestRenderUpdateGeneration: source.latest_render_update_generation,
-  tile: _readMapTileOptions(source.tile),
-  bounds: _readBoundOptions(source.bounds),
-  freeCamera: _readFreeCameraOptions(source.free_camera),
+  tile: _readMapTileSettings(source.tile),
+  bounds: _readCameraBounds(source.bounds),
+  freeCamera: _readFreeCamera(source.free_camera),
   view: _readMapView(source.view),
 );
 
@@ -1585,6 +1421,83 @@ StyleTransitionOptions _readStyleTransitionOptions(
       : null,
 );
 
+MapProjectionCameraResult _readMapProjectionCameraResult(
+  raw.mln_map_projection_camera_result source,
+) => MapProjectionCameraResult(camera: _readCamera(source.camera));
+
+Pointer<raw.mln_bound_options> _writeBoundOptions(
+  BoundOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_bound_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_bound_options>();
+  result.ref.size = sizeOf<raw.mln_bound_options>();
+  if (value.unbounded) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_UNBOUNDED;
+  }
+  if (value.bounds != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_BOUNDS;
+    result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
+  }
+  if (value.minZoom != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_ZOOM;
+    result.ref.min_zoom = value.minZoom!;
+  }
+  if (value.maxZoom != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_ZOOM;
+    result.ref.max_zoom = value.maxZoom!;
+  }
+  if (value.minPitch != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_PITCH;
+    result.ref.min_pitch = value.minPitch!;
+  }
+  if (value.maxPitch != null) {
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_PITCH;
+    result.ref.max_pitch = value.maxPitch!;
+  }
+  return result;
+}
+
+Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
+  FreeCameraOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_free_camera_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_free_camera_options>();
+  result.ref.size = sizeOf<raw.mln_free_camera_options>();
+  if (value.position != null) {
+    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_POSITION;
+    result.ref.position = _writeVec3(value.position!, arena).ref;
+  }
+  if (value.orientation != null) {
+    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_ORIENTATION;
+    result.ref.orientation = _writeQuaternion(value.orientation!, arena).ref;
+  }
+  return result;
+}
+
+Pointer<raw.mln_projection_mode_options> _writeProjectionModeOptions(
+  ProjectionModeOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_projection_mode_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_projection_mode_options>();
+  result.ref.size = sizeOf<raw.mln_projection_mode_options>();
+  if (value.axonometric != null) {
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_OPTION_AXONOMETRIC;
+    result.ref.axonometric = value.axonometric!;
+  }
+  if (value.xSkew != null) {
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_OPTION_X_SKEW;
+    result.ref.x_skew = value.xSkew!;
+  }
+  if (value.ySkew != null) {
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_OPTION_Y_SKEW;
+    result.ref.y_skew = value.ySkew!;
+  }
+  return result;
+}
+
 Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   StyleImageOptions value,
   Allocator arena, {
@@ -1643,6 +1556,73 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   if (value.keepUnused != null) {
     result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED;
     result.ref.keep_unused = value.keepUnused!;
+  }
+  return result;
+}
+
+Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
+  MapTileOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_map_tile_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_tile_options>();
+  result.ref.size = sizeOf<raw.mln_map_tile_options>();
+  if (value.prefetchZoomDelta != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+    result.ref.prefetch_zoom_delta = _nativeInteger(
+      value.prefetchZoomDelta!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.lodMinRadius != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+    result.ref.lod_min_radius = value.lodMinRadius!;
+  }
+  if (value.lodScale != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_SCALE;
+    result.ref.lod_scale = value.lodScale!;
+  }
+  if (value.lodPitchThreshold != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+    result.ref.lod_pitch_threshold = value.lodPitchThreshold!;
+  }
+  if (value.lodZoomShift != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+    result.ref.lod_zoom_shift = value.lodZoomShift!;
+  }
+  if (value.lodMode != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MODE;
+    result.ref.lod_mode = value.lodMode!.rawValue;
+  }
+  return result;
+}
+
+Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
+  MapViewportOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_map_viewport_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_map_viewport_options>();
+  result.ref.size = sizeOf<raw.mln_map_viewport_options>();
+  if (value.northOrientation != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+    result.ref.north_orientation = value.northOrientation!.rawValue;
+  }
+  if (value.constrainMode != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+    result.ref.constrain_mode = value.constrainMode!.rawValue;
+  }
+  if (value.viewportMode != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+    result.ref.viewport_mode = value.viewportMode!.rawValue;
+  }
+  if (value.frustumOffset != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+    result.ref.frustum_offset = _writeEdgeInsets(
+      value.frustumOffset!,
+      arena,
+    ).ref;
   }
   return result;
 }
@@ -3747,10 +3727,10 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setProjectionMode(ProjectionMode mode) => _discard(
+  void setProjectionMode(ProjectionModeOptions options) => _discard(
     (arena, completion) => raw.mln_map_set_projection_mode(
       _handle.raw,
-      _writeProjectionMode(mode, arena),
+      _writeProjectionModeOptions(options, arena),
       completion,
       nativeDiagnostic,
     ),
@@ -5447,18 +5427,19 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Sets whether the map draws in perspective or axonometric projection, and
   /// how much it skews the view.
   ///
-  /// Settings that `mode` doesn't set keep their current values.
+  /// Settings that `options` doesn't set keep their current values.
   ///
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> setProjectionMode(ProjectionMode mode) => _command(
-    (arena, completion) => raw.mln_map_set_projection_mode(
-      _handle.raw,
-      _writeProjectionMode(mode, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
+  Future<CommandCompletion> setProjectionMode(ProjectionModeOptions options) =>
+      _command(
+        (arena, completion) => raw.mln_map_set_projection_mode(
+          _handle.raw,
+          _writeProjectionModeOptions(options, arena),
+          completion,
+          nativeDiagnostic,
+        ),
+      );
 
   /// Shows or hides an overlay of rendering statistics on the map.
   ///
@@ -5740,17 +5721,17 @@ final class MapProjectionHandle implements Finalizable {
   ///
   /// See `mln_map_projection_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  CameraOptions getCamera() => withNativeArena((arena) {
-    final outCamera = arena<raw.mln_camera_options>();
-    outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+  MapProjectionCameraResult getCamera() => withNativeArena((arena) {
+    final outResult = arena<raw.mln_map_projection_camera_result>();
+    outResult.ref.size = sizeOf<raw.mln_map_projection_camera_result>();
     _check(
       raw.mln_map_projection_get_camera(
         _handle.raw,
-        outCamera,
+        outResult,
         nativeDiagnostic,
       ),
     );
-    return _readCameraOptions(outCamera.ref);
+    return _readMapProjectionCameraResult(outResult.ref);
   });
 
   /// Finds the coordinate at a screen point.

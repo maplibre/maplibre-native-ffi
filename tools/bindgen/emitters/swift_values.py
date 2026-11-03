@@ -1,7 +1,7 @@
 """Generate Swift record values and C conversion from typed semantic plans."""
 
 from ..model import Unsupported
-from ..semantic import enum_member_prefix
+from ..semantic import conversion_doc, enum_member_prefix
 from .swift import SCALARS, camel, doc, identifier, name
 
 
@@ -115,6 +115,9 @@ class Values:
                 )
             self.add(field.value)
         self.used[value.native] = value
+        if value.options:
+            # The record converts to its option bag.
+            self.add(self.bound.values[value.options])
 
     def add_variants(self, union):
         if not union.tag or any(
@@ -239,10 +242,27 @@ class Values:
   init(raw: {value.native}) {{
 {chr(10).join(captures)}
   }}
-{encoder}}}
+{encoder}{self.to_options(value)}}}
 """
 
         return rendered
+
+    def to_options(self, value):
+        """The method that converts a complete record to its option bag."""
+        if not value.options:
+            return ""
+        bag = self.bound.values[value.options]
+        held = {field.name for field in value.fields if field.public}
+        arguments = ", ".join(
+            f"{identifier(camel(field.name))}: {identifier(camel(field.name))}"
+            for field in bag.fields
+            if field.public and field.name in held
+        )
+        return (
+            doc(self.bound, conversion_doc(value.native), "  ")
+            + f"  public func toOptions() -> {self.public(bag)} {{\n"
+            + f"    {self.public(bag)}({arguments})\n  }}\n"
+        )
 
     def enumeration(self, value):
         public = self.public(value)

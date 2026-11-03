@@ -209,11 +209,11 @@ MLN_API mln_status mln_map_set_free_camera_options(
  * Sets whether the map draws in perspective or axonometric projection, and how
  * much it skews the view.
  *
- * Settings that `mode` doesn't set keep their current values.
+ * Settings that `options` doesn't set keep their current values.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode,
+  mln_map map, const mln_projection_mode_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from ..model import Unsupported
 from ..protocol import STATUS
-from ..semantic import enum_member_prefix
+from ..semantic import conversion_doc, enum_member_prefix
 from .go import doc, name, native_identifier, symbols
 
 
@@ -127,6 +127,9 @@ class Values:
             for f in value.fields:
                 if f.public:
                     self.require(f.value, input)
+            if value.options:
+                # The record converts to its option bag.
+                self.require(self.api.values[value.options], True)
         elif value.kind == "union":
             if not value.tag:
                 self.fail(value, "union requires a discriminator")
@@ -222,6 +225,23 @@ class Values:
                 f"func native{typename}(input {typename}, arena *bindingArena) C.{native} {{ {'; '.join(lines)}; return raw }}"
             )
         return chunks
+
+    def to_options(self, value):
+        """The method that converts a complete record to its option bag."""
+        bag = self.api.values[value.options]
+        held = {f.name: member for member, _, f in self.members(value)}
+        assignments = []
+        for member, v, f in self.members(bag):
+            if v is None or f.name not in held:
+                continue
+            if not self.type(v).startswith("*"):
+                self.fail(bag, f"{f.name} needs a pointer to convert from a record")
+            assignments.append(f"{member}: &value.{held[f.name]}")
+        return (
+            doc(self.api, conversion_doc(value.native), "ToOptions", operation=True)
+            + f"func (value {public(value.native)}) ToOptions() {public(bag.native)} "
+            + f"{{ return {public(bag.native)}{{{', '.join(assignments)}}} }}"
+        )
 
     def owner(self, native):
         return name(self.api.handles[native].stem) + "Handle"
@@ -546,6 +566,8 @@ class Values:
             )
             if value.registration and accepts_native(self, value):
                 chunks.append(native_constructor(self, value))
+            if value.options:
+                chunks.append(self.to_options(value))
             if native not in self.api.values:
                 continue
             if native in self.api.returned:

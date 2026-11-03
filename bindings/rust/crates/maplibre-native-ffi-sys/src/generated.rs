@@ -201,10 +201,10 @@ pub type mln_open_gl_context_provider_flag = u32;
 pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL: mln_open_gl_context_provider_flag = 1;
 pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL: mln_open_gl_context_provider_flag = 2;
 pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL: mln_open_gl_context_provider_flag = 4;
-pub type mln_projection_mode_field = u32;
-pub const MLN_PROJECTION_MODE_AXONOMETRIC: mln_projection_mode_field = 1;
-pub const MLN_PROJECTION_MODE_X_SKEW: mln_projection_mode_field = 2;
-pub const MLN_PROJECTION_MODE_Y_SKEW: mln_projection_mode_field = 4;
+pub type mln_projection_mode_option_field = u32;
+pub const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC: mln_projection_mode_option_field = 1;
+pub const MLN_PROJECTION_MODE_OPTION_X_SKEW: mln_projection_mode_option_field = 2;
+pub const MLN_PROJECTION_MODE_OPTION_Y_SKEW: mln_projection_mode_option_field = 4;
 pub type mln_render_abandon_disposition = u32;
 pub const MLN_RENDER_ABANDON_DISPOSITION_CLEAN: mln_render_abandon_disposition = 0;
 pub const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED: mln_render_abandon_disposition = 1;
@@ -519,6 +519,16 @@ pub struct mln_camera {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_camera_bounds {
+    pub bounds: mln_lat_lng_bounds,
+    pub unbounded: bool,
+    pub min_zoom: f64,
+    pub max_zoom: f64,
+    pub min_pitch: f64,
+    pub max_pitch: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_camera_delta {
     pub size: u32,
     pub fields: mln_camera_delta_fields,
@@ -703,6 +713,12 @@ pub struct mln_frame_demand {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_free_camera {
+    pub position: mln_vec3,
+    pub orientation: mln_quaternion,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_free_camera_options {
     pub size: u32,
     pub fields: mln_free_camera_option_fields,
@@ -827,6 +843,12 @@ pub struct mln_map_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_map_projection_camera_result {
+    pub size: u32,
+    pub camera: mln_camera,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_map_snapshot {
     pub size: u32,
     pub debug_flags: mln_map_debug_flags,
@@ -837,9 +859,9 @@ pub struct mln_map_snapshot {
     pub transition_in_progress: bool,
     pub event_mask: mln_runtime_event_flags,
     pub latest_render_update_generation: u64,
-    pub tile: mln_map_tile_options,
-    pub bounds: mln_bound_options,
-    pub free_camera: mln_free_camera_options,
+    pub tile: mln_map_tile_settings,
+    pub bounds: mln_camera_bounds,
+    pub free_camera: mln_free_camera,
     pub view: mln_map_view,
 }
 #[repr(C)]
@@ -856,12 +878,30 @@ pub struct mln_map_tile_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_map_tile_settings {
+    pub prefetch_zoom_delta: u32,
+    pub lod_min_radius: f64,
+    pub lod_scale: f64,
+    pub lod_pitch_threshold: f64,
+    pub lod_zoom_shift: f64,
+    pub lod_mode: mln_tile_lod_mode,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_map_view {
     pub size: u32,
     pub camera: mln_camera,
     pub extent: mln_logical_extent,
     pub projection_mode: mln_projection_mode,
-    pub viewport: mln_map_viewport_options,
+    pub viewport: mln_map_viewport,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_map_viewport {
+    pub north_orientation: mln_north_orientation,
+    pub constrain_mode: mln_constrain_mode,
+    pub viewport_mode: mln_viewport_mode,
+    pub frustum_offset: mln_edge_insets,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1086,8 +1126,15 @@ pub struct mln_projected_meters {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_projection_mode {
+    pub axonometric: bool,
+    pub x_skew: f64,
+    pub y_skew: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_projection_mode_options {
     pub size: u32,
-    pub fields: mln_projection_mode_fields,
+    pub fields: mln_projection_mode_option_fields,
     pub axonometric: bool,
     pub x_skew: f64,
     pub y_skew: f64,
@@ -1786,7 +1833,7 @@ pub type mln_offline_region_id = i64;
 pub struct mln_offscreen_device(pub u64);
 pub type mln_offscreen_device_option_fields = u32;
 pub type mln_open_gl_context_provider_flags = u32;
-pub type mln_projection_mode_fields = u32;
+pub type mln_projection_mode_option_fields = u32;
 pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_render_backend_flags = u32;
 #[repr(transparent)]
@@ -2287,7 +2334,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_projection_get_camera(
         projection: mln_map_projection,
-        out_camera: *mut mln_camera_options,
+        out_result: *mut mln_map_projection_camera_result,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_lat_lng_for_pixel(
@@ -2502,7 +2549,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_set_projection_mode(
         map: mln_map,
-        mode: *const mln_projection_mode,
+        options: *const mln_projection_mode_options,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

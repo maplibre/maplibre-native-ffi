@@ -1822,18 +1822,18 @@ impl MapHandle {
     /// Sets whether the map draws in perspective or axonometric projection, and
     /// how much it skews the view.
     ///
-    /// Settings that `mode` doesn't set keep their current values.
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn set_projection_mode(
         &self,
-        mode: &ProjectionMode,
+        options: &ProjectionModeOptions,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
-        let mode = call.reference(&mode)?;
+        let options = call.reference(&options)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_projection_mode(map, mode, completion, out_diagnostic)
+            sys::mln_map_set_projection_mode(map, options, completion, out_diagnostic)
         })
     }
 
@@ -2865,15 +2865,15 @@ impl MapHandleDiscarding<'_> {
     /// Sets whether the map draws in perspective or axonometric projection, and
     /// how much it skews the view.
     ///
-    /// Settings that `mode` doesn't set keep their current values.
+    /// Settings that `options` doesn't set keep their current values.
     ///
     /// See `mln_map_set_projection_mode` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<()> {
+    pub fn set_projection_mode(&self, options: &ProjectionModeOptions) -> Result<()> {
         let mut call = self.0.inner.call();
-        let mode = call.reference(&mode)?;
+        let options = call.reference(&options)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_projection_mode(map, mode, completion, out_diagnostic)
+            sys::mln_map_set_projection_mode(map, options, completion, out_diagnostic)
         })
     }
 

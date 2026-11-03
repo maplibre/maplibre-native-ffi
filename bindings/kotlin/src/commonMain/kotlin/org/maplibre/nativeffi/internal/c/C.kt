@@ -367,7 +367,7 @@ internal expect object C {
 
   fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int
 
-  fun mln_map_projection_get_camera(projection: Long, outCamera: Long, outDiagnostic: Long): Int
+  fun mln_map_projection_get_camera(projection: Long, outResult: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
@@ -576,7 +576,12 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_set_projection_mode(map: Long, mode: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_set_projection_mode(
+    map: Long,
+    options: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_map_set_rendering_stats_view_enabled(
     map: Long,

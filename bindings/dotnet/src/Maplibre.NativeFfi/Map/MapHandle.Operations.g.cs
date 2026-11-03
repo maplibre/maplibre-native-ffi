@@ -2178,19 +2178,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// how much it skews the view.
     /// </summary>
     /// <remarks>
-    /// <para>Settings that <c>mode</c> doesn't set keep their current
+    /// <para>Settings that <c>options</c> doesn't set keep their current
     /// values.</para>
     /// <para>See <c>mln_map_set_projection_mode</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
-    public Task<CommandCompletion> SetProjectionModeAsync(ProjectionMode mode)
+    public Task<CommandCompletion> SetProjectionModeAsync(ProjectionModeOptions options)
     {
         using var scope = new NativeCallScope(this);
-        var nativeMode = NativeProjectionMode(mode);
+        var nativeOptions = NativeProjectionModeOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_projection_mode(
             Handle,
-            &nativeMode,
+            &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -3152,15 +3152,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetProjectionMode(ProjectionMode mode)
+        public void SetProjectionMode(ProjectionModeOptions options)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
-            var nativeMode = NativeProjectionMode(mode);
+            var nativeOptions = NativeProjectionModeOptions(options);
             Check(
                 NativeMethods.mln_map_set_projection_mode(
                     receiverHandle,
-                    &nativeMode,
+                    &nativeOptions,
                     null,
                     Diagnostic
                 )

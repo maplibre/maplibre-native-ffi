@@ -9,7 +9,13 @@ from typing import NoReturn
 
 from .. import async_hosts, docs
 from ..model import Unsupported
-from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_member
+from ..semantic import (
+    BoundApi,
+    ValuePlan,
+    conversion_doc,
+    enum_member_prefix,
+    required_member,
+)
 
 SCALARS = {
     "bool": "bool",
@@ -187,6 +193,9 @@ class Values:
             self.inputs[plan.native] = plan
         else:
             self.outputs.add(plan.native)
+        if plan.options:
+            # The record converts to its option bag.
+            self.supported(self.api.values[plan.options], input=True)
 
     def type(self, plan: ValuePlan, *, input: bool = False) -> str:
         """The annotation of a value. An input takes any sequence or byte
@@ -620,6 +629,23 @@ class Values:
             return f" = field(default_factory=lambda: {public_name(plan.native)}())"
         self.fail(plan, "missing zero value")
 
+    def to_options(self, plan: ValuePlan) -> str:
+        """The method that converts a complete record to its option bag."""
+        bag = self.api.values[plan.options]
+        held = {field.name for field in plan.fields if field.public}
+        arguments = ", ".join(
+            f"{field_name(field.name)}=self.{field_name(field.name)}"
+            for field in bag.fields
+            if field.public and field.name in held
+        )
+        return (
+            f"\n    def to_options(self) -> {public_name(bag.native)}:\n"
+            + docs.docstring(
+                self.api.doc(conversion_doc(plan.native)), self.symbol, "        "
+            )
+            + f"        return {public_name(bag.native)}({arguments})\n"
+        )
+
     def record_sources(
         self,
         plan,
@@ -710,6 +736,8 @@ class Values:
                 + ")\n"
             )
         python[-1] += extra_methods
+        if plan.options:
+            python[-1] += self.to_options(plan)
         if not copied or name not in self.outputs:
             return "", "\n".join(python)
         rust.append(

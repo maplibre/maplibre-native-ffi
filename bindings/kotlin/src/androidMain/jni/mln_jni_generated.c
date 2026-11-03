@@ -782,12 +782,12 @@ static jint mln_map_projection_create_jni(
 }
 
 static jint mln_map_projection_get_camera_jni(
-  JNIEnv* env, jclass type, jlong projection, jlong out_camera,
+  JNIEnv* env, jclass type, jlong projection, jlong out_result,
   jlong out_diagnostic
 ) {
   return (jint)mln_map_projection_get_camera(
     (mln_map_projection)projection,
-    MLN_JNI_POINTER(mln_camera_options*, out_camera),
+    MLN_JNI_POINTER(mln_map_projection_camera_result*, out_result),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -1163,11 +1163,11 @@ static jint mln_map_set_image_source_url_jni(
 }
 
 static jint mln_map_set_projection_mode_jni(
-  JNIEnv* env, jclass type, jlong map, jlong mode, jlong completion,
+  JNIEnv* env, jclass type, jlong map, jlong options, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_map_set_projection_mode(
-    (mln_map)map, MLN_JNI_POINTER(const mln_projection_mode*, mode),
+    (mln_map)map, MLN_JNI_POINTER(const mln_projection_mode_options*, options),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );

@@ -10,7 +10,13 @@ from .. import async_hosts, docs
 from ..managed_contracts import DART_RESERVED
 from ..model import Unsupported
 from ..names import camel, pascal
-from ..semantic import BoundApi, ValuePlan, enum_member_prefix, required_callbacks
+from ..semantic import (
+    BoundApi,
+    ValuePlan,
+    conversion_doc,
+    enum_member_prefix,
+    required_callbacks,
+)
 from .dart_native import Declarations, dart_type
 
 SCALARS = {
@@ -197,6 +203,9 @@ class Values:
             for field in self.fields(value):
                 self.check(field.value)
         self.used[value.native] = value
+        if value.options:
+            # The record converts to its option bag.
+            self.check(self.bound.values[value.options])
 
     # How each registration reaches this isolate; see async_hosts.py.
     def wake(self, value):
@@ -553,6 +562,24 @@ class Values:
         else:
             raise Unsupported(f"{value.native}: result capture needs a conversion")
         return result
+
+    def to_options(self, value):
+        """The method that converts a complete record to its option bag."""
+        if not value.options:
+            return ""
+        bag = self.bound.values[value.options]
+        held = {field.name for _, _, field in self.members(value)}
+        arguments = ", ".join(
+            f"{name}: {name}"
+            for name, _, field in self.members(bag)
+            if field.name in held
+        )
+        public = public_name(bag.native)
+        return (
+            "\n"
+            + doc(self.bound, conversion_doc(value.native), "  ")
+            + f"  {public} toOptions() => {public}({arguments});\n"
+        )
 
     def members(self, value):
         """The public members of a record: (name, type, field)."""
@@ -1351,7 +1378,7 @@ class Values:
                     + ");\n"
                 )
             declarations.append(
-                f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}\n  @override List<Object?> get _members => [{compared}];\n"
+                f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}{self.to_options(value)}\n  @override List<Object?> get _members => [{compared}];\n"
                 f"  @override String toString() => _describe('{public}', const [{described}]);\n}}\n"
                 + "".join("\n" + helper for helper in helpers)
             )

@@ -235,6 +235,46 @@ void mln_session_release(mln_session session);
             ):
                 validate(self.parse(handle + 'BIND("after_release=true")\n' + function))
 
+    def test_options_names_a_bag_with_each_record_member_behind_a_bit(self):
+        source = """
+typedef enum BIND("kind=bitmask") view_field : unsigned { ZOOM = 1, TILT = 2 } view_field;
+typedef unsigned view_fields;
+typedef struct view_options {
+  unsigned size;
+  view_fields fields;
+  double zoom BIND("mask=fields;bit=ZOOM");
+  double tilt BIND("mask=fields;bit=TILT");
+} view_options;
+typedef struct view { double zoom; double tilt; } view BIND("options=view_options");
+mln_status read_view(view *out_view BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status write_view(const view_options *options, mln_diagnostic *out_diagnostic);
+"""
+        validate(self.parse(source))
+        for before, after, message in (
+            ("options=view_options", "options=lens", "absent struct 'lens'"),
+            (
+                "double tilt; }",
+                "float tilt; }",
+                "view_options.tilt is double, not float",
+            ),
+            ("double tilt; }", "double tilt; double roll; }", "has no member 'roll'"),
+            (
+                'double tilt BIND("mask=fields;bit=TILT");',
+                "double tilt;",
+                "view_options.tilt has no presence bit",
+            ),
+            (
+                '  double tilt BIND("mask=fields;bit=TILT");\n',
+                '  double tilt BIND("mask=fields;bit=TILT");\n  double width BIND("required=true");\n',
+                "options requires view_options.width to have a presence bit",
+            ),
+        ):
+            with (
+                self.subTest(message=message),
+                self.assertRaisesRegex(ModelError, message),
+            ):
+                validate(self.parse(source.replace(before, after, 1)))
+
     def test_duplicate_metadata_is_rejected_at_the_declaration(self):
         with self.assertRaisesRegex(
             ModelError, "duplicate binding metadata 'execution'"

@@ -180,6 +180,10 @@ class ValuePlan:
     # An integer that names a host graphics object, which native code uses as
     # it would a pointer.
     native_object: bool = False
+    # The option bag that a complete record converts to: each of the record's
+    # members sets the bag's member of the same name, and the bag's other
+    # members stay unset. The schema checks that the members correspond.
+    options: str | None = None
 
     @property
     def unwrapped(self) -> ValuePlan:
@@ -631,6 +635,11 @@ class BoundApi:
                     index[value.native],
                     threads(value.native, value.registration.callbacks),
                 )
+        for value in self.values.values():
+            if value.options:
+                index[conversion_doc(value.native)] = docs.conversion(
+                    value.native, value.options
+                )
         for native, callback in self.callbacks.items():
             if native in index:
                 index[native] = docs.with_parameters(
@@ -743,6 +752,11 @@ class BoundApi:
     @property
     def operations_by_name(self) -> dict[str, OperationPlan]:
         return {operation.name: operation for operation in self.operations}
+
+
+def conversion_doc(native: str) -> str:
+    """The documentation key of a record's conversion to its option bag."""
+    return f"{native}#options"
 
 
 def output_member(name: str) -> str:
@@ -1175,7 +1189,20 @@ class Binder:
                     ),
                     **common,
                 )
+                if options := record_metadata.get("options"):
+                    if not plain_value(value):
+                        raise ModelError(
+                            [f"{context}: a record with options holds plain values"]
+                        )
+                    value = replace(value, options=options)
                 self.values[name] = value
+                if options:
+                    # A binding converts to the bag, so the bag is a value too.
+                    self.value(
+                        CType("record", options, "struct " + options, options),
+                        {},
+                        f"{context} options",
+                    )
                 return value
             finally:
                 self.resolving.remove(name)

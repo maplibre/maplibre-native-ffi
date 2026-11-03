@@ -33,8 +33,6 @@ struct FeatureStateSnapshot;
 
 auto camera_options_default() noexcept -> mln_camera_options;
 auto camera_fit_options_default() noexcept -> mln_camera_fit_options;
-auto bound_options_default() noexcept -> mln_bound_options;
-auto free_camera_options_default() noexcept -> mln_free_camera_options;
 auto geojson_source_options_default() noexcept -> mln_geo_json_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
@@ -488,7 +486,7 @@ auto map_projection_create(
 ) -> mln_status;
 auto map_projection_release(mln_map_projection projection) -> void;
 auto map_projection_get_camera(
-  mln_map_projection projection, mln_camera_options* out_camera
+  mln_map_projection projection, mln_map_projection_camera_result* out_result
 ) -> mln_status;
 auto map_projection_set_camera(
   mln_map_projection projection, const mln_camera_options* camera
@@ -562,7 +560,8 @@ auto validate_bound_options_input(const mln_bound_options* options)
 auto validate_free_camera_options_input(const mln_free_camera_options* options)
   -> mln_status;
 auto map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode, const mln_completion* completion
+  mln_map map, const mln_projection_mode_options* options,
+  const mln_completion* completion
 ) -> mln_status;
 auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status;
 auto map_scale_factor(mln_map map) -> double;

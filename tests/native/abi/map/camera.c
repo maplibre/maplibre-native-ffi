@@ -773,7 +773,7 @@ static double jumped_longitude(mln_map map, double longitude) {
   return query_camera(map).camera.center.longitude;
 }
 
-static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {
+static mln_camera_bounds read_bounds(mln_runtime runtime, mln_map map) {
   MLN_TEST_OK(mln_test_map_fence(map));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
@@ -954,13 +954,16 @@ static void flights_reject_unrepresentable_derived_durations(void) {
 
 // The unbounded state is distinct from world bounds, which the
 // southwest/northeast pair alone cannot express: world bounds stop a jump that
-// unbounded wraps.
+// unbounded wraps. An unbounded center reports the whole world as its bounds.
 static void unbounded_and_world_bounds_stay_distinct(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_bound_options snapshot = read_bounds(runtime, map);
-  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  mln_camera_bounds snapshot = read_bounds(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.unbounded);
+  TEST_ASSERT_EQUAL_DOUBLE(-90.0, snapshot.bounds.southwest.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(-180.0, snapshot.bounds.southwest.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(90.0, snapshot.bounds.northeast.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(180.0, snapshot.bounds.northeast.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
 
   mln_bound_options world = {.size = sizeof(mln_bound_options)};
@@ -974,8 +977,7 @@ static void unbounded_and_world_bounds_stay_distinct(void) {
   );
 
   snapshot = read_bounds(runtime, map);
-  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_FALSE(snapshot.unbounded);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, snapshot.bounds.northeast.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, jumped_longitude(map, 200.0));
 
@@ -986,8 +988,7 @@ static void unbounded_and_world_bounds_stay_distinct(void) {
   );
 
   snapshot = read_bounds(runtime, map);
-  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  TEST_ASSERT_TRUE(snapshot.unbounded);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

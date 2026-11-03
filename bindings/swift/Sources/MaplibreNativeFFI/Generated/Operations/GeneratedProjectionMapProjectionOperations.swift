@@ -26,16 +26,16 @@ public extension MapProjectionHandle {
   ///
   /// See `mln_map_projection_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func getCamera() throws -> CameraOptions {
-    var value0 = mln_camera_options()
-    value0.size = UInt32(MemoryLayout<mln_camera_options>.size)
+  func getCamera() throws -> MapProjectionCameraResult {
+    var value0 = mln_map_projection_camera_result()
+    value0.size = UInt32(MemoryLayout<mln_map_projection_camera_result>.size)
     return try nativeInvoke { raw, _, diagnostic in
       mln_map_projection_get_camera(
         raw,
         &value0,
         diagnostic
       )
-    } result: { CameraOptions(raw: value0) }
+    } result: { MapProjectionCameraResult(raw: value0) }
   }
 
   /// Finds the coordinate at a screen point.
