@@ -1,11 +1,13 @@
 #ifndef MLN_NATIVE_TESTS_RENDER_H
 #define MLN_NATIVE_TESTS_RENDER_H
 
-// The backend-neutral render fixture: an owned texture target attached with a
-// context the fixture creates for the preset's backend. On native targets the
-// context comes from tests/graphics through render_graphics.c; in the browser
-// it comes from render_webgl.c or render_webgpu.c, which CMake selects by
-// preset.
+// The backend-neutral render fixtures. An offscreen fixture renders on a
+// device that its session creates, and reads back only. A borrowed fixture
+// renders into a ring of textures that the fixture creates on a host device
+// for the preset's backend, and hands each frame to the case. On native
+// targets the host device comes from tests/graphics through render_graphics.c;
+// in the browser it comes from render_webgl.c or render_webgpu.c, which CMake
+// selects by preset.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -34,18 +36,49 @@ typedef struct mln_test_render_fixture {
   atomic_uint driver_wakes;
 } mln_test_render_fixture;
 
-bool mln_test_render_fixture_create(
+// Asks a borrowed fixture for the preset's driver: the caller-driver for an
+// OpenGL or WebGPU device, and the core worker for a Vulkan or Metal one.
+#define MLN_TEST_PRESET_DRIVER UINT32_MAX
+
+// Attaches a 64x64 offscreen session with no device, on the core worker, so
+// the session creates its own device. It renders and reads back, and hands no
+// frames to the case.
+bool mln_test_render_fixture_create_offscreen(
   mln_map map, mln_test_render_fixture* fixture
 );
+
+// Attaches a session on the preset's driver to a borrowed ring of two 64x64
+// RGBA8 textures that the fixture creates and owns. The case acquires its
+// frames, and cannot read them back through the session.
+bool mln_test_render_fixture_create_borrowed(
+  mln_map map, mln_test_render_fixture* fixture
+);
+
+// Attaches a session on `driver`, or on the preset's driver for
+// MLN_TEST_PRESET_DRIVER, to a borrowed ring of `depth` textures, up to
+// MLN_TEXTURE_RING_MAX_DEPTH, that the fixture creates and owns.
+bool mln_test_render_fixture_create_borrowed_ring(
+  mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
+);
+
+// Attaches the preset's owned texture target on the preset's driver: a ring of
+// two textures that the session allocates on the fixture's host device. Only
+// the cases that check owned textures themselves use it.
+bool mln_test_render_fixture_create_owned(
+  mln_map map, mln_test_render_fixture* fixture
+);
+
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
-// Submits the preset's owned-texture attach with the caller's options, whose
-// driver it replaces with the preset's, and the caller's completion, and
-// returns without waiting for the attach. Returns the submission's status, or
-// MLN_STATUS_NATIVE_ERROR, submitting nothing, when the backend cannot create
-// a context. On MLN_STATUS_OK the fixture holds the attaching session, which
-// the case retires; mln_test_render_fixture_destroy() then releases the
-// backend state, and detaches and destroys the session if it is still live.
+// Submits a borrowed attach with the caller's options, whose driver it
+// replaces with the preset's, and the caller's completion, and returns without
+// waiting for the attach. The ring has as many textures as the options'
+// requested_texture_ring_depth, or two for zero. Returns the submission's
+// status, or MLN_STATUS_NATIVE_ERROR, submitting nothing, when the backend
+// cannot create the ring. On MLN_STATUS_OK the fixture holds the attaching
+// session, which the case retires; mln_test_render_fixture_destroy() then
+// releases the backend state, and detaches and destroys the session if it is
+// still live.
 mln_status mln_test_render_fixture_start_attach(
   mln_map map, const mln_render_session_attach_options* options,
   const mln_completion* completion, mln_test_render_fixture* fixture
@@ -110,13 +143,6 @@ bool mln_test_transferred_webgl_surface_create(
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-// Attaches a session to a borrowed ring of `depth` 64x64 RGBA8 textures, up to
-// MLN_TEXTURE_RING_MAX_DEPTH, that the fixture creates on the thread's device
-// and owns.
-bool mln_test_webgpu_borrowed_ring_create(
-  mln_map map, mln_test_render_fixture* fixture, size_t depth
-);
-
 // The WGPUTexture at `index` of a borrowed ring fixture, or null past its end.
 void* mln_test_webgpu_ring_texture(
   const mln_test_render_fixture* fixture, size_t index

@@ -239,7 +239,9 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   mln_test_render_fixture_destroy(&fixture);
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_borrowed_texture(map, &fixture),
+    mln_test_render_fixture_create_borrowed_ring(
+      map, &fixture, 1, MLN_TEST_PRESET_DRIVER
+    ),
     mln_test_graphics_last_error()
   );
   call.session = fixture.session;

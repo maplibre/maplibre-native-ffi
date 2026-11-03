@@ -117,7 +117,7 @@ static mln_status render_pmtiles(mln_runtime runtime, const char* archive_url) {
     map, mln_test_buffer_view(style, (size_t)written)
   );
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   const mln_status status = mln_test_render_still_image(&fixture, map);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);

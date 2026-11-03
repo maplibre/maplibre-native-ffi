@@ -6,6 +6,7 @@
 // the support layer includes this header.
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "maplibre_native_c.h"
 #include "render.h"
@@ -14,37 +15,49 @@
 extern "C" {
 #endif
 
+// The driver that the preset's host device drives its sessions with.
 uint32_t mln_test_backend_driver(void);
 
-// Creates a host-owned context and submits a 64x64 owned-texture attach with
-// it. Returns false, submitting nothing, when the context cannot be created.
-// Otherwise writes the backend state and the submission's status.
-bool mln_test_backend_attach(
-  mln_map map, const mln_render_session_attach_options* options,
-  void** out_state, mln_render_session* out_session,
-  const mln_completion* completion, mln_status* out_status
-);
-
-// Releases what mln_test_backend_attach() created.
-void mln_test_backend_destroy(void* state);
-
-// The shape of mln_test_backend_attach(), for fixtures that attach another
-// kind of target. The state it writes is released with
-// mln_test_backend_destroy().
+// The shape of an attach that a fixture makes: it creates what the target
+// needs, then submits the attach with `options` and `completion`. Returns
+// false, submitting nothing, when the target's objects cannot be created.
+// Otherwise writes the backend state, which mln_test_backend_destroy()
+// releases, and the submission's status.
 typedef bool (*mln_test_backend_attach_fn)(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 );
 
+// How many textures a ring has when `options` requests its depth: as many as
+// for a ring that the session would own.
+size_t mln_test_render_ring_depth(
+  const mln_render_session_attach_options* options
+);
+
+// Creates a borrowed ring of 64x64 textures on the host device, as many as
+// mln_test_render_ring_depth() gives for `options`, and attaches it with the
+// requested depth cleared.
+bool mln_test_backend_attach_borrowed(
+  mln_map map, const mln_render_session_attach_options* options,
+  void** out_state, mln_render_session* out_session,
+  const mln_completion* completion, mln_status* out_status
+);
+
+// Attaches a 64x64 owned texture target on the host device.
+bool mln_test_backend_attach_owned(
+  mln_map map, const mln_render_session_attach_options* options,
+  void** out_state, mln_render_session* out_session,
+  const mln_completion* completion, mln_status* out_status
+);
+
+// Releases what an attach function created. Null releases nothing.
+void mln_test_backend_destroy(void* state);
+
+// Attaches with `attach` on the preset's driver, and waits for the attach.
 bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
-);
-
-bool mln_test_render_fixture_create_with_driver(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_backend_attach_fn attach, uint32_t driver
 );
 
 #if defined(__EMSCRIPTEN__)

@@ -102,7 +102,7 @@ static int render_and_return(
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(tile_cache_style_json));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   render_at(&fixture, map, 0.0, 0.0);
   const int first = atomic_load(&server->tile_loads);

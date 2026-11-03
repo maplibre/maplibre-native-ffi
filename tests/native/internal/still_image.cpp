@@ -47,21 +47,13 @@ void read_center_pixel(
   mln_test_completion_destroy(&readback);
 }
 
-// Renders one forced frame, which renders the session's latest update again,
-// and releases it so the texture ring never fills.
+// Renders one forced frame, which renders the session's latest update again.
 void render_forced_frame(const mln_test_render_fixture& fixture) {
   mln_test_render_request_forced(&fixture, 1);
   const auto batch = mln_test_render_wait_for_results(&fixture);
   const auto result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
-  auto frame = mln_acquired_frame{MLN_HANDLE_NULL};
-  MLN_TEST_OK(
-    mln_render_session_acquire_frame(fixture.session, &frame, nullptr)
-  );
-  auto cpu_complete = mln_gpu_sync{};
-  cpu_complete.size = sizeof(mln_gpu_sync);
-  MLN_TEST_OK(mln_acquired_frame_release(frame, &cpu_complete, nullptr));
 }
 
 // A still image completes only with a frame that rendered the map as its
@@ -79,7 +71,7 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
   const auto map = mln_test_create_map_with_options(runtime, &options);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   auto fixture = mln_test_render_fixture{};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   // A static map publishes no update for the new style until a still image
   // requests one, so the session's latest update still shows red.
@@ -174,7 +166,7 @@ void a_request_behind_an_unfinished_demand_still_renders() {
   const auto map = mln_test_create_map_with_options(runtime, &options);
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   auto fixture = mln_test_render_fixture{};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
 
   auto first = mln_test_completion_default(0);

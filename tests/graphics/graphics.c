@@ -1522,6 +1522,16 @@ static bool gl_load(mln_test_graphics* graphics) {
   return true;
 }
 
+// Clears the current context's errors, so that the next glGetError() reports
+// only the calls after this. An error belongs to its context, but the API 26
+// Android emulator also reports one that another context on the thread raised,
+// such as the library's session context. The loop is bounded in case a driver
+// never clears an error.
+static void gl_clear_errors(const gl_functions* gl) {
+  for (int flag = 0; flag < 16 && gl->get_error() != 0; flag += 1) {
+  }
+}
+
 static bool gl_texture_create(
   mln_test_graphics* graphics, mln_test_graphics_texture* texture
 ) {
@@ -1530,6 +1540,7 @@ static bool gl_texture_create(
   bool created = false;
   if (gl_load(graphics)) {
     const gl_functions* gl = &graphics->gl;
+    gl_clear_errors(gl);
     uint32_t name = 0;
     gl->gen_textures(1, &name);
     gl->bind_texture(GL_TEXTURE_2D_VALUE, name);
@@ -1578,6 +1589,7 @@ static bool gl_texture_read(
   gl_current saved;
   if (!gl_enter(graphics, &saved)) return false;
   const gl_functions* gl = &graphics->gl;
+  gl_clear_errors(gl);
   uint32_t framebuffer = 0;
   gl->gen_framebuffers(1, &framebuffer);
   gl->bind_framebuffer(GL_FRAMEBUFFER_VALUE, framebuffer);

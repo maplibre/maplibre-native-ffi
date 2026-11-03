@@ -650,7 +650,7 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
   mln_map map = mln_test_create_map(runtime);
   const scenario_context context = {.runtime = runtime, .map = map};
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_drain_all(runtime);
   event_log* log = &scenario_log;
   log_reset(log);
@@ -778,7 +778,7 @@ static void failed_loads_report_their_text(void) {
   mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_FLAG_ALL);
   const scenario_context context = {.runtime = runtime, .map = map};
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_drain_all(runtime);
   event_log* log = &scenario_log;
   log_reset(log);
@@ -948,7 +948,7 @@ static void sprites_and_glyphs_name_the_resource_they_report(void) {
   mln_map map = mln_test_create_map(runtime);
   const scenario_context context = {.runtime = runtime, .map = map};
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_drain_all(runtime);
   event_log* log = &scenario_log;
   log_reset(log);
@@ -993,7 +993,7 @@ static void a_failed_sprite_names_itself_to_a_failed_still_image(void) {
     create_static_map(runtime, MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR);
   scenario_context context = {.runtime = runtime, .map = map};
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   log_reset(&scenario_log);
 
   MLN_TEST_AWAIT_OK(mln_map_set_style_json(
@@ -1039,7 +1039,7 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   ));
   submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(render_still_image(&fixture, map, NULL, 0));
 
   event_log* log = &scenario_log;

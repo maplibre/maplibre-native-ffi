@@ -210,7 +210,7 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
     mln_map map = mln_test_create_map(runtime);
     mln_test_render_fixture fixture = {0};
     TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_render_fixture_create(map, &fixture), row->label
+      mln_test_render_fixture_create_offscreen(map, &fixture), row->label
     );
     MLN_TEST_OK_MESSAGE(
       mln_test_map_set_style_json(map, mln_buffer_view_from_cstr(row->style)),
@@ -234,7 +234,7 @@ static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_map_set_style_json(
     map, MLN_BUFFER_LITERAL(
            "{\"version\":8,\"sources\":{},\"transition\":{\"duration\":0},"
@@ -270,7 +270,7 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_map_set_style_json(
     map,
     MLN_BUFFER_LITERAL(
@@ -545,7 +545,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
@@ -629,7 +629,7 @@ static void frame_results_report_whether_the_map_was_fully_loaded(void) {
          )
   );
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   // A frame of the loaded style asks for the tile. The first update the
   // session finds can still be one from before the style loaded.
@@ -695,7 +695,7 @@ static void a_drawn_frame_reports_its_statistics(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_map_set_style_json(
     map, MLN_BUFFER_LITERAL(
            "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\","

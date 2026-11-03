@@ -94,7 +94,7 @@ static void maps_of_one_runtime_render_the_glyphs_they_share(void) {
   mln_test_provider* provider = install_glyph_provider(runtime);
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   render_text(runtime, map, &fixture, expected);
   TEST_ASSERT_FALSE_MESSAGE(all_white(expected), "the label did not render");
   mln_test_render_fixture_destroy(&fixture);
@@ -108,8 +108,10 @@ static void maps_of_one_runtime_render_the_glyphs_they_share(void) {
   mln_map second_map = mln_test_create_map(runtime);
   mln_test_render_fixture first = {0};
   mln_test_render_fixture second = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(first_map, &first));
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(second_map, &second));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(first_map, &first));
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_offscreen(second_map, &second)
+  );
   render_text(runtime, first_map, &first, actual);
   TEST_ASSERT_EQUAL_MEMORY(expected, actual, pixel_bytes);
   render_text(runtime, second_map, &second, actual);

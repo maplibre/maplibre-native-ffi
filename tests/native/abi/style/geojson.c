@@ -415,7 +415,7 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   ));
 
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   source_query query = {
     .fixture = &fixture,
     .sources = sources,
@@ -572,7 +572,7 @@ static void render_points(
   draw_source(map, "points");
 
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   static const char* const sources[] = {"points"};
   source_query query = {
     .fixture = &fixture,
@@ -636,7 +636,7 @@ static void a_url_source_loads_through_the_resource_provider(void) {
   draw_source(map, "points");
 
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   static const char* const sources[] = {"points"};
   source_query query = {
     .fixture = &fixture,

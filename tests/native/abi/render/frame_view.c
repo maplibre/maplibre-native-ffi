@@ -283,7 +283,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   mln_map map = mln_test_create_map(runtime);
   prepare(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   mln_map_view views[row_count];
   mln_screen_point drawn[row_count];
@@ -354,7 +354,7 @@ static void each_frame_of_a_transition_reports_its_own_view(void) {
   mln_map map = mln_test_create_map(runtime);
   prepare(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   apply(map, &rows[0]);
   mln_test_render_until_idle(runtime, map, &fixture);
 
@@ -417,7 +417,7 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   render_frame(&fixture, 1);
   mln_render_session_snapshot before = {
     .size = sizeof(mln_render_session_snapshot)
@@ -461,7 +461,7 @@ static void a_session_resize_reports_the_render_update_of_its_extent(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   render_frame(&fixture, 1);
 
   const mln_logical_extent resized = {

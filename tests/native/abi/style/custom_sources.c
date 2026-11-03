@@ -414,7 +414,7 @@ static void start_rendering(
   add_source(kind, map, probe);
   draw_source(kind, map);
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create(map, fixture), kind->name
+    mln_test_render_fixture_create_offscreen(map, fixture), kind->name
   );
   probe_target fetched = {.probe = probe, .root_fetches = 1};
   TEST_ASSERT_TRUE_MESSAGE(

@@ -17,7 +17,18 @@ static void attach(
   *runtime = mln_test_create_runtime();
   *map = mln_test_create_map(*runtime);
   mln_test_render_prepare_map(*map);
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(*map, fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(*map, fixture));
+}
+
+// attach() for a case that resizes the session, which only a session that
+// owns its texture does.
+static void attach_offscreen(
+  mln_runtime* runtime, mln_map* map, mln_test_render_fixture* fixture
+) {
+  *runtime = mln_test_create_runtime();
+  *map = mln_test_create_map(*runtime);
+  mln_test_render_prepare_map(*map);
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(*map, fixture));
 }
 
 static void detach(
@@ -299,7 +310,7 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
-  attach(&runtime, &map, &fixture);
+  attach_offscreen(&runtime, &map, &fixture);
   mln_test_render_request_forced(&fixture, 301);
   const mln_render_frame_result old_frame = take_one_result(&fixture);
 
@@ -378,7 +389,7 @@ static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   const uint64_t old_generation = read_snapshot(fixture.session).generation;
 
   MLN_TEST_RENDER_AWAIT(
@@ -417,7 +428,7 @@ static void attaching_sizes_the_map_to_the_target(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   // A later query completes after the resize that the attach submitted.
   MLN_TEST_OK(mln_test_map_fence(map));
   expect_map_size(map, 64, 64);
@@ -432,7 +443,7 @@ static void a_resize_applies_while_a_command_group_holds_the_update(void) {
   mln_runtime runtime;
   mln_map map;
   mln_test_render_fixture fixture = {0};
-  attach(&runtime, &map, &fixture);
+  attach_offscreen(&runtime, &map, &fixture);
   MLN_TEST_AWAIT_OK(
     mln_map_begin_command_group(map, &completion.descriptor, NULL)
   );
@@ -512,7 +523,7 @@ static void still_image_completes_under_if_needed_keepalive_demands(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   mln_test_completion still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, NULL));
@@ -609,7 +620,7 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   );
   MLN_TEST_OK(mln_test_map_fence(map));
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   mln_test_render_until_idle(runtime, map, &fixture);
   request_waiting(&fixture, 621);
   expect_waiting(&fixture);

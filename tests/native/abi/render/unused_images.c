@@ -79,7 +79,7 @@ static void only_images_set_with_keep_unused_survive_when_unused(void) {
   options.map_mode = MLN_MAP_MODE_STATIC;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   MLN_TEST_OK(mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(style_json)));
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
 

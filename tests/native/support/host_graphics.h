@@ -1,9 +1,10 @@
 #ifndef MLN_NATIVE_TESTS_HOST_GRAPHICS_H
 #define MLN_NATIVE_TESTS_HOST_GRAPHICS_H
 
-// Render fixtures whose target the host creates: a borrowed texture or a
-// presentation surface from tests/graphics, for the preset's backend. The
-// browser presets have neither, because their contexts come from JavaScript.
+// The tests/graphics objects behind a native target's borrowed, owned, and
+// surface fixtures, and the fixtures that only native targets have: a
+// presentation surface, and variants of the others for the preset's backend.
+// The browser presets have none, because their contexts come from JavaScript.
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -24,25 +25,9 @@ extern "C" {
 // The size of every fixture target, in pixels, at a scale factor of 1.
 #define MLN_TEST_HOST_TARGET_SIZE 64U
 
-// Asks mln_test_render_fixture_create_borrowed_ring() for the preset's driver.
-#define MLN_TEST_PRESET_DRIVER UINT32_MAX
-
-// Attaches a session to a borrowed ring of one texture that the fixture
-// creates, with the preset's driver. The fixture owns the texture until it is
-// destroyed.
-bool mln_test_render_fixture_create_borrowed_texture(
-  mln_map map, mln_test_render_fixture* fixture
-);
-
-// Attaches a session on `driver` to a borrowed ring of `depth` textures, up to
-// MLN_TEXTURE_RING_MAX_DEPTH, that the fixture creates and owns.
-bool mln_test_render_fixture_create_borrowed_ring(
-  mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
-);
-
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-// mln_test_render_fixture_create() for a session-owned ring of `pixel_format`,
-// an MTLPixelFormat value.
+// mln_test_render_fixture_create_owned() for a ring of `pixel_format`, an
+// MTLPixelFormat value.
 bool mln_test_render_fixture_create_metal_owned_texture(
   mln_map map, mln_test_render_fixture* fixture, uint64_t pixel_format
 );
@@ -96,7 +81,7 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner
 );
 
-// mln_test_render_fixture_create() for a session whose context names
+// mln_test_render_fixture_create_owned() for a session whose context names
 // `wrap`'s vkGetDeviceProcAddr, when `wrap` is non-null, and with the host
 // queue lock `queue_lock`, when that is non-null.
 bool mln_test_render_fixture_create_vulkan_owned_texture(
@@ -133,8 +118,8 @@ void mln_test_render_fixture_keep_graphics_until_exit(
   const mln_test_render_fixture* fixture
 );
 
-// The graphics object whose context a fixture from this header or from
-// mln_test_render_fixture_create() attached with.
+// The graphics object whose context a borrowed, owned, or surface fixture
+// attached with, or null for an offscreen fixture.
 mln_test_graphics* mln_test_render_fixture_graphics(
   const mln_test_render_fixture* fixture
 );

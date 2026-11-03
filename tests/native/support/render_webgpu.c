@@ -180,7 +180,7 @@ uint32_t mln_test_backend_driver(void) {
   return MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
 }
 
-bool mln_test_backend_attach(
+bool mln_test_backend_attach_owned(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
@@ -209,13 +209,12 @@ void mln_test_backend_destroy(void* state) { destroy_backend_state(state); }
 // RGBA8 pixels is 256 bytes, the row alignment of a texture-to-buffer copy.
 enum { ring_texture_size = 64 };
 
-static MLN_TEST_THREAD_LOCAL size_t attach_ring_depth = 1;
-
-static bool attach_borrowed_ring(
+bool mln_test_backend_attach_borrowed(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
+  const size_t depth = mln_test_render_ring_depth(options);
   mln_web_gpu_context_descriptor context = {0};
   if (!thread_context(&context)) {
     return false;
@@ -225,7 +224,7 @@ static bool attach_borrowed_ring(
     return false;
   }
   mln_web_gpu_borrowed_texture entries[MLN_TEXTURE_RING_MAX_DEPTH];
-  for (size_t index = 0; index < attach_ring_depth; index += 1) {
+  for (size_t index = 0; index < depth; index += 1) {
     const WGPUTextureDescriptor texture_descriptor = {
       .usage = WGPUTextureUsage_RenderAttachment |
                WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopySrc,
@@ -268,23 +267,12 @@ static bool attach_borrowed_ring(
   descriptor.texture_count = ring->texture_count;
   descriptor.format = WGPUTextureFormat_RGBA8Unorm;
   *out_state = ring;
+  mln_render_session_attach_options attach = *options;
+  attach.requested_texture_ring_depth = 0;
   *out_status = mln_map_attach_web_gpu_borrowed_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
-}
-
-bool mln_test_webgpu_borrowed_ring_create(
-  mln_map map, mln_test_render_fixture* fixture, size_t depth
-) {
-  if (depth == 0 || depth > MLN_TEXTURE_RING_MAX_DEPTH) {
-    return false;
-  }
-  attach_ring_depth = depth;
-  const bool attached =
-    mln_test_render_fixture_create_with(map, fixture, attach_borrowed_ring);
-  attach_ring_depth = 1;
-  return attached;
 }
 
 void* mln_test_webgpu_ring_texture(
@@ -533,10 +521,18 @@ bool mln_test_webgpu_read_ring_texture(
 
 void mln_test_release_thread_gpu_resources(void) {
   if (thread_webgpu_state.device != NULL) {
-    // Destroy rather than only release: emdawnwebgpu returns the device's
-    // runtime keepalive when device.lost settles, which only destroying
-    // resolves.
+    // Destroy rather than only release, so the device's GPU memory returns
+    // now. The browser reports the loss later, on this thread's event loop,
+    // and emdawnwebgpu then calls into the module on whatever pthread that Web
+    // Worker hosts by then, or on the freed stack of none. The report holds
+    // no runtime keepalive, so the thread waits for it here, while the
+    // instance and the device still live.
+    const WGPUFuture lost = wgpuDeviceGetLostFuture(thread_webgpu_state.device);
     wgpuDeviceDestroy(thread_webgpu_state.device);
+    if (!await_future(thread_webgpu_state.instance, lost)) {
+      fprintf(stderr, "this thread's WebGPU device never reported its loss\n");
+      abort();
+    }
     wgpuDeviceRelease(thread_webgpu_state.device);
   }
   if (thread_webgpu_state.adapter != NULL) {
@@ -548,12 +544,13 @@ void mln_test_release_thread_gpu_resources(void) {
   thread_webgpu_state = (webgpu_state){0};
   thread_webgpu_attempted = false;
 #if defined(__EMSCRIPTEN__)
-  // device.lost resolves through the JS job queue, so the thread has to reach
-  // its event loop before the keepalive count settles. emscripten_sleep()
-  // suspends and resumes through a task, which lets those jobs run; the
-  // blocking sleep helper uses Atomics.wait and never would. The wait is on the
-  // count itself, bounded, and aborts on expiry, because a thread that keeps a
-  // keepalive is never reported as exited and blocks its joiner for good.
+  // emdawnwebgpu holds a runtime keepalive for each request still pending,
+  // such as a buffer map, until this thread's event loop settles it.
+  // emscripten_sleep() suspends and resumes through a task, which lets those
+  // settle; the blocking sleep helper uses Atomics.wait and never would. The
+  // wait is on the count itself, bounded, and aborts on expiry, because a
+  // thread that keeps a keepalive is never reported as exited and blocks its
+  // joiner for good.
   for (unsigned int attempt = 0;
        attempt < 1000 && emscripten_runtime_keepalive_check(); attempt += 1) {
     emscripten_sleep(1);

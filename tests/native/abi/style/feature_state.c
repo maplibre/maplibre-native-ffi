@@ -304,7 +304,7 @@ static void rendered_features_carry_state_from_the_last_frame(void) {
   set_state(map, feature, "{\"hover\":true}");
 
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   rendered_query query = {.fixture = &fixture};
   TEST_ASSERT_TRUE(
     mln_test_style_render_until(&fixture, feature_rendered, &query, "a feature")

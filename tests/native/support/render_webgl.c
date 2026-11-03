@@ -1,4 +1,5 @@
 
+#include <GLES3/gl3.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <stdatomic.h>
@@ -61,16 +62,42 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
   delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
 });
 
+// The calling thread's host context, on a canvas of its own.
 typedef struct webgl_state {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
   char id[32];
-  void* canvas_shared_ptr;
 } webgl_state;
+
+// What a fixture holds: the textures of a borrowed ring, which live in the
+// thread's context, or a transferred canvas. An owned target holds nothing,
+// because the thread's context outlives it.
+typedef struct webgl_fixture_state {
+  bool transferred;
+  GLuint textures[MLN_TEXTURE_RING_MAX_DEPTH];
+  size_t texture_count;
+  char id[32];
+  void* canvas_shared_ptr;
+} webgl_fixture_state;
 
 static atomic_uint webgl_canvas_counter;
 static MLN_TEST_THREAD_LOCAL webgl_state thread_webgl_state;
 
-static bool create_backend_state(void** out_state, void* out_context) {
+static mln_open_gl_context_descriptor describe_context(
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context
+) {
+  return (mln_open_gl_context_descriptor){
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL,
+    .data = {
+      .web_gl = {
+        .context = context,
+      }
+    },
+  };
+}
+
+// Makes the thread's host context current, creating it first, and describes
+// it.
+static bool thread_context(mln_open_gl_context_descriptor* out_context) {
   webgl_state* state = &thread_webgl_state;
   if (state->context > 0) {
     if (
@@ -79,16 +106,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
     ) {
       return false;
     }
-    *(mln_open_gl_context_descriptor*)out_context =
-      (mln_open_gl_context_descriptor){
-        .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL,
-        .data = {
-          .web_gl = {
-            .context = state->context,
-          }
-        },
-    };
-    *out_state = state;
+    *out_context = describe_context(state->context);
     return true;
   }
 
@@ -134,16 +152,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
     return false;
   }
 
-  *(mln_open_gl_context_descriptor*)out_context =
-    (mln_open_gl_context_descriptor){
-      .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL,
-      .data = {
-        .web_gl = {
-          .context = state->context,
-        }
-      },
-  };
-  *out_state = state;
+  *out_context = describe_context(state->context);
   return true;
 }
 
@@ -152,27 +161,37 @@ static void destroy_backend_state(void* opaque_state) {
   // fixtures on one test thread share one host-owned context; the thread-level
   // cleanup releases it after the suite or foreign thread exits. A transferred
   // canvas has no host-owned context and is released with its fixture.
-  webgl_state* state = opaque_state;
-  if (state != NULL && state != &thread_webgl_state) {
+  webgl_fixture_state* state = opaque_state;
+  if (state == NULL) {
+    return;
+  }
+  if (state->transferred) {
     mln_test_unregister_transferred_offscreen_canvas(state->id);
     free(state->canvas_shared_ptr);
-    free(state);
+  } else if (
+    state->texture_count > 0 && thread_webgl_state.context > 0 &&
+    emscripten_webgl_make_context_current(thread_webgl_state.context) ==
+      EMSCRIPTEN_RESULT_SUCCESS
+  ) {
+    glDeleteTextures((GLsizei)state->texture_count, state->textures);
   }
+  free(state);
 }
 
 uint32_t mln_test_backend_driver(void) {
   return MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
 }
 
-bool mln_test_backend_attach(
+bool mln_test_backend_attach_owned(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
   mln_open_gl_context_descriptor context = {0};
-  if (!create_backend_state(out_state, &context)) {
+  if (!thread_context(&context)) {
     return false;
   }
+  *out_state = NULL;
   mln_open_gl_owned_texture_descriptor descriptor = {
     .size = sizeof(mln_open_gl_owned_texture_descriptor)
   };
@@ -182,6 +201,66 @@ bool mln_test_backend_attach(
   descriptor.context = context;
   *out_status = mln_map_attach_open_gl_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+  );
+  return true;
+}
+
+// The textures live in the thread's context, which the session renders in
+// when it services on this thread.
+bool mln_test_backend_attach_borrowed(
+  mln_map map, const mln_render_session_attach_options* options,
+  void** out_state, mln_render_session* out_session,
+  const mln_completion* completion, mln_status* out_status
+) {
+  const size_t depth = mln_test_render_ring_depth(options);
+  mln_open_gl_context_descriptor context = {0};
+  if (!thread_context(&context)) {
+    return false;
+  }
+  webgl_fixture_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+  glGenTextures((GLsizei)depth, state->textures);
+  state->texture_count = depth;
+  mln_open_gl_borrowed_texture entries[MLN_TEXTURE_RING_MAX_DEPTH];
+  bool named = true;
+  for (size_t index = 0; index < depth; index += 1) {
+    named = named && state->textures[index] != 0;
+    glBindTexture(GL_TEXTURE_2D, state->textures[index]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(
+      GL_TEXTURE_2D, 0, GL_RGBA8, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL
+    );
+    entries[index] = (mln_open_gl_borrowed_texture){
+      .texture = state->textures[index],
+    };
+  }
+  glBindTexture(GL_TEXTURE_2D, 0);
+  const GLenum error = glGetError();
+  if (!named || error != GL_NO_ERROR) {
+    fprintf(stderr, "creating a WebGL ring texture failed: 0x%x\n", error);
+    destroy_backend_state(state);
+    return false;
+  }
+  mln_open_gl_borrowed_texture_descriptor descriptor = {
+    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
+  };
+  descriptor.extent.width = 64;
+  descriptor.extent.height = 64;
+  descriptor.extent.scale_factor = 1.0;
+  descriptor.physical_width = 64;
+  descriptor.physical_height = 64;
+  descriptor.context = context;
+  descriptor.textures = entries;
+  descriptor.texture_count = depth;
+  descriptor.target = GL_TEXTURE_2D;
+  *out_state = state;
+  mln_render_session_attach_options attach = *options;
+  attach.requested_texture_ring_depth = 0;
+  *out_status = mln_map_attach_open_gl_borrowed_texture(
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
 }
@@ -205,10 +284,11 @@ bool mln_test_transferred_webgl_surface_create(
   mln_test_render_reserve_session();
   *fixture = (mln_test_render_fixture){0};
   fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
-  webgl_state* state = calloc(1, sizeof(*state));
+  webgl_fixture_state* state = calloc(1, sizeof(*state));
   if (state == NULL) {
     return false;
   }
+  state->transferred = true;
   const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
   (void)snprintf(state->id, sizeof(state->id), "mln-transfer-%u", serial);
   state->canvas_shared_ptr =

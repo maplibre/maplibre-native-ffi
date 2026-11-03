@@ -48,7 +48,7 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(square_style_json))
   );
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
 
   // The source tiles on a worker, so the first rendered frames show only the
   // background. Render until the square lands on the center pixel.

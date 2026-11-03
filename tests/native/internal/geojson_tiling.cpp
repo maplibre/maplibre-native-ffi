@@ -103,7 +103,7 @@ void replaced_data_that_a_slice_outlives_retires_on_its_worker() {
   add_drawn_source(runtime, map, first);
 
   auto fixture = mln_test_render_fixture{};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   sync.hold(SyncPoint::GeoJsonTileSlice);
   TEST_ASSERT_TRUE(render_until(
     fixture, [&] { return sync.hits(SyncPoint::GeoJsonTileSlice) >= 1; },
@@ -148,7 +148,7 @@ void the_synchronous_tiling_override_slices_without_the_datas_worker() {
   mln_geo_json_source_data_release(first);
 
   auto fixture = mln_test_render_fixture{};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   TEST_ASSERT_TRUE(render_until(
     fixture, [&] { return holds_the_name(fixture, "first"); },
     "the first data's tiles"
