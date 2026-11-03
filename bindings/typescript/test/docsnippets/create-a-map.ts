@@ -22,11 +22,11 @@ export async function createAMap(): Promise<void> {
   // #endregion runtime
 
   // #region map
-  const { map, ready } = runtime.createMap({
+  const map = runtime.createMap({
     initialExtent: { width: 800, height: 600, scaleFactor: 2 },
     mapMode: MapMode.continuous,
   });
-  await ready;
+  await map.ready;
   // #endregion map
 
   // #region style

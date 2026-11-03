@@ -121,7 +121,7 @@ def render_to_window(
 ) -> None:
     global session, paused
     # #region attach
-    session, ready = map_handle.attach_vulkan_surface(
+    session = map_handle.attach_vulkan_surface(
         mln.VulkanSurfaceDescriptor(
             # The window's size in logical pixels. The map's
             # scale factor turns it into pixels.
@@ -137,7 +137,7 @@ def render_to_window(
             frame_wake=mln.Wake(on_frame_wake),
         ),
     )
-    ready.result()
+    session.ready.result()
     # #endregion attach
 
     demand_frame()

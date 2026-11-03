@@ -68,12 +68,11 @@
       finalLayout: 5 // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-    let borrowed = try map.attachVulkanBorrowedTexture(
+    session = try map.attachVulkanBorrowedTexture(
       descriptor: ring,
       options: options
     )
-    session = borrowed.session
-    try await borrowed.ready.value
+    try await session.ready
     // #endregion attach-borrowed
 
     try drawFrame()

@@ -4251,18 +4251,6 @@ public data class StyleExpressionInfo(
   public val isZoomConstant: Boolean,
 )
 
-/** A new session and the completion that reports it ready. */
-public data class NewRenderSession(
-  public val session: RenderSessionHandle,
-  public val ready: kotlinx.coroutines.Deferred<Unit>,
-)
-
-/** A new map and the completion that reports it ready. */
-public data class NewMap(
-  public val map: MapHandle,
-  public val ready: kotlinx.coroutines.Deferred<Unit>,
-)
-
 public data class LogicalExtentPhysicalSizeResult(
   public val width: UInt,
   public val height: UInt,

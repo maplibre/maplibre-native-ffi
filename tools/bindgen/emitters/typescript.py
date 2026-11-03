@@ -93,10 +93,6 @@ def owner_native(entry: Lowered) -> str | None:
     return entry.owner or entry.plan.factory
 
 
-def attachment_name(owned: OwnedOutputPlan) -> str:
-    return "New" + owner_class(owned.handle).removesuffix("Handle")
-
-
 def scoped_name(native: str) -> str:
     return "Scoped" + public_name(native)
 

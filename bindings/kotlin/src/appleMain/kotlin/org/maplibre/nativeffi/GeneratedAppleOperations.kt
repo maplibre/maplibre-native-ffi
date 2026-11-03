@@ -43,7 +43,7 @@ public fun <T> AcquiredFrameHandle.withMetalTexture(block: (MetalTextureFrame) -
 public fun MapHandle.attachMetalBorrowedTexture(
   descriptor: MetalBorrowedTextureDescriptor,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   nativeCall(this, binding) {
     attach(
       { out, completion ->
@@ -57,10 +57,9 @@ public fun MapHandle.attachMetalBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachMetalBorrowedTexture) },
+      { created, ready -> RenderSessionHandle(created, this@attachMetalBorrowedTexture, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
-      ::NewRenderSession,
     )
   }
 
@@ -77,7 +76,7 @@ public fun MapHandle.attachMetalBorrowedTexture(
 public fun MapHandle.attachMetalSurface(
   descriptor: MetalSurfaceDescriptor,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   nativeCall(this, binding) {
     attach(
       { out, completion ->
@@ -91,10 +90,9 @@ public fun MapHandle.attachMetalSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachMetalSurface) },
+      { created, ready -> RenderSessionHandle(created, this@attachMetalSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
-      ::NewRenderSession,
     )
   }
 

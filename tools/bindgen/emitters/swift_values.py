@@ -9,7 +9,6 @@ class Values:
     def __init__(self, bound):
         self.bound = bound
         self.used = {}
-        self.attachments = {}
         self.views = {}
 
     def public(self, value):

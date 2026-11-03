@@ -42,15 +42,14 @@ export async function eventsAndLogs(
   // #endregion handler
 
   // #region mask
-  const created = runtime.createMap({
+  map = runtime.createMap({
     initialExtent: { width: 512, height: 512, scaleFactor: 1 },
     eventMask:
       RuntimeEventFlag.mapStyleLoaded |
       RuntimeEventFlag.mapLoadingFailed,
   });
   // #endregion mask
-  map = created.map;
-  await created.ready;
+  await map.ready;
 
   // #region logs
   // The callback runs on this thread. The binding queues each call.

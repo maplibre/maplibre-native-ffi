@@ -433,11 +433,7 @@ def lower(api: Api | BoundApi) -> Lowered:
             and handle.release in supported
         ):
             async_disposable.add(owner)
-        immediate_completion = any(
-            plan.completion
-            and any(output.handle.native == native for output in plan.owned_outputs)
-            for plan in bound.operations
-        )
+        immediate_completion = native in bound.readied_handles
         extra = ", Task completion" if immediate_completion else ""
         extra_argument = ", completion" if immediate_completion else ""
         adopt_extra = ", Task completion" if immediate_completion else ""
@@ -474,11 +470,9 @@ def lower(api: Api | BoundApi) -> Lowered:
             )
         constructor = []
         if immediate_completion:
-            constructor.append(
-                "// Mono may retain a completed continuation on its worker stack.\n"
-                "// Clear its holder so it no longer roots this handle.\n"
-                "Ready = completion.ContinueWith(static (finished, retained) => { ((System.Runtime.CompilerServices.StrongBox<object?>)retained!).Value = null; return finished; }, new System.Runtime.CompilerServices.StrongBox<object?>(this), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
-            )
+            # The completion's own task, which holds no reference to the
+            # handle, so an unreachable handle is finalized while it waits.
+            constructor.append("Ready = completion;")
         constructor.append(
             f"state = new(handle, {destroy}, nameof({owner}), Abandon{', retainedParent: parent' if handle.parent else ''});"
         )

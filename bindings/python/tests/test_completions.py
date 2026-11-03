@@ -105,7 +105,7 @@ def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
     # resolves once both creations have finished, and the maps stay with
     # their owner, which closes them.
     result(harness.runtime.clear_resource_transform())
-    for owner in (created.map, awaited.map, map_handle):
+    for owner in (created, awaited, map_handle):
         assert owner.get_snapshot() is not None
         assert result(owner.close()) is None
     assert result(harness.runtime.close()) is None

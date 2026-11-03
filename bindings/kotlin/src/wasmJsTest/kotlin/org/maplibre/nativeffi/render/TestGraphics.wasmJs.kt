@@ -4,8 +4,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.maplibre.nativeffi.AcquiredFrameHandle
 import org.maplibre.nativeffi.MapHandle
-import org.maplibre.nativeffi.NewRenderSession
 import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.attachWebGpuBorrowedTexture
 import org.maplibre.nativeffi.withWebGpuTexture
 
@@ -17,7 +17,7 @@ internal actual fun TestGraphics.attachBackendBorrowedTexture(
   textures: List<TestTexture>,
   context: TestGraphicsContext,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   when (backend) {
     TestBackend.WEBGPU ->
       map.attachWebGpuBorrowedTexture(webGpuBorrowedTexture(textures, context), options)

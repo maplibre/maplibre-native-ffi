@@ -69,8 +69,8 @@ export async function routeRequests(
 export async function burst(started: () => void): Promise<never> {
   const runtime: RuntimeHandle = await RuntimeHandle.create();
   await runtime.setEventHandler({ callback: () => {} });
-  const { map, ready } = runtime.createMap({ initialExtent: renderExtent });
-  await ready;
+  const map = runtime.createMap({ initialExtent: renderExtent });
+  await map.ready;
   let ended = 0;
   for (let round = 0; ; round++) {
     const pending: Promise<unknown>[] = [
@@ -119,18 +119,18 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
   await runtime.setResourceTransform({
     callback: (_kind, _url, request) => request.close(),
   });
-  const { map: pending, ready: pendingReady } = runtime.createMap({
+  const pending = runtime.createMap({
     initialExtent: renderExtent,
   });
   liveWork.push(runtime, pending);
-  await pendingReady;
+  await pending.ready;
   // The load waits for the held request, so its result is discarded.
   pending.discarding.setStyleUrl("exit://style.json");
   // The provider callback holds nothing alive, so a bounded wait does.
   liveWork.push(await callbackArrival(held, "the held request"));
 
-  const { map, ready } = runtime.createMap({ initialExtent: renderExtent });
-  await ready;
+  const map = runtime.createMap({ initialExtent: renderExtent });
+  await map.ready;
   await bounded(map.setStyleJson(backgroundStyle()), "a command");
   await bounded(
     map.addCustomGeometrySource("custom", { fetchTile() {} }),

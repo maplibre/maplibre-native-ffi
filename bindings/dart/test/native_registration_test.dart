@@ -85,7 +85,7 @@ void main() {
         _throwsStatus(Status.invalidState),
       );
 
-      final attachment = attachOffscreenSession(
+      final session = attachOffscreenSession(
         map,
         _options(
           frameWake: Wake.native(
@@ -95,9 +95,8 @@ void main() {
           ),
         ),
       );
-      final session = attachment.session;
       addTearDown(() => releaseSession(session));
-      await within(attachment.ready, 'attachment');
+      await within(session.ready, 'attachment');
 
       session.demandFrame(FrameDemand(flags: FrameDemandFlag.force, token: 1));
       await wakes.wait('the frame wake');
@@ -119,14 +118,14 @@ void main() {
     // answers at once. The host shares no queue with the session.
     final locks = _Recorder();
     final releases = _Recorder();
-    final attachment = TestGraphics.open().attachBorrowedTexture(
+    final session = TestGraphics.open().attachBorrowedTexture(
       map,
       _size,
       _options(queueLock: _queueLock(locks, releases)),
     );
-    addTearDown(() => releaseSession(attachment.session));
-    await within(attachment.ready, 'attachment');
-    await within(attachment.session.close(), 'session close');
+    addTearDown(() => releaseSession(session));
+    await within(session.ready, 'attachment');
+    await within(session.close(), 'session close');
     await releases.wait('the release of the accepted queue lock');
     expect(releases.contexts, [3]);
     locks.close();

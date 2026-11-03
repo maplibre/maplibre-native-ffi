@@ -38,6 +38,11 @@ final Object _openGlFrameSkip = buildExposesCoreWorkerFrames
     ? false
     : 'An OpenGL core-worker session exposes no frames to view';
 
+/// Only a Metal or Vulkan build opens a context from `tests/graphics`.
+final Object _testGraphicsSkip = buildOpensTestGraphics
+    ? false
+    : 'An OpenGL build opens no test graphics context';
+
 void main() {
   test(
     'an offscreen session renders a frame that reads back as pixels',
@@ -58,22 +63,53 @@ void main() {
     () async {
       final map = await openRenderMap(emptyStyle);
       final device = openOffscreenDevice();
-      final attachment = map.attachOffscreen(
+      final session = map.attachOffscreen(
         _descriptor,
         const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
         device: device,
       );
-      addTearDown(() => releaseSession(attachment.session));
-      await within(attachment.ready, 'attachment');
+      addTearDown(() => releaseSession(session));
+      await within(session.ready, 'attachment');
 
-      attachment.session.dispose();
-      expect(attachment.session.isClosed, isTrue);
+      session.dispose();
+      expect(session.isClosed, isTrue);
       // A second dispose is a no-op.
-      attachment.session.dispose();
+      session.dispose();
       // A dispose reports no retirement, so the map's release waits for it.
       await within(map.close(), 'map close');
       device.close();
     },
+  );
+
+  test(
+    'a session disposed while it attaches fails its ready only where awaited',
+    () async {
+      final map = await openRenderMap(emptyStyle);
+      // Nothing services a caller-driven session, so it is still attaching.
+      final session = TestGraphics.open().attachBorrowedTexture(
+        map,
+        const LogicalSize(width: renderSize, height: renderSize),
+        const RenderSessionAttachOptions(
+          driver: RenderDriverKind.callerGraphicsThread,
+        ),
+      );
+      addTearDown(() => releaseSession(session));
+      session.dispose();
+      // The disposal fails the attach before the map's release finishes, and
+      // the zone would report a failure that nothing handled.
+      await within(map.close(), 'map close');
+      await expectLater(
+        session.ready,
+        throwsA(
+          isA<MaplibreException>().having(
+            (error) => error.status,
+            'status',
+            Status.targetLost,
+          ),
+        ),
+      );
+    },
+    skip: _testGraphicsSkip,
   );
 
   test(

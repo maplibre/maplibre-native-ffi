@@ -47,7 +47,9 @@ class PythonEmitterTests(unittest.TestCase):
             "fixture._enum": module("_enum", UnknownIntEnum=enum.IntEnum),
             "fixture._native": native or MagicMock(),
             "fixture._completion": module("_completion", CommandCompletion=object),
-            "fixture._future": module("_future", map_future=None),
+            "fixture._future": module(
+                "_future", map_future=None, completed_future=None
+            ),
             "fixture._operation": module(
                 "_operation",
                 GeneratedOperations=GeneratedOperations,

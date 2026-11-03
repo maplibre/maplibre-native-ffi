@@ -298,7 +298,6 @@
 /rust/crates/maplibre-native-ffi/src/generated/style_expression.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/values.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/status.rs linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift linguist-generated=true

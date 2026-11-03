@@ -17,7 +17,6 @@ import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MapMode
-import org.maplibre.nativeffi.NewRenderSession
 import org.maplibre.nativeffi.OffscreenDescriptor
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderFrameResult
@@ -241,7 +240,7 @@ internal fun attachOffscreenSession(
   width: Int,
   height: Int,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   map.attachOffscreen(
     OffscreenDescriptor(LogicalSize(width.toUInt(), height.toUInt())),
     options,
@@ -253,7 +252,7 @@ internal fun attachOffscreenSession(
  */
 internal suspend fun <T> MapFixture.withRenderSession(
   driver: RenderDriverKind,
-  attach: suspend (RenderSessionAttachOptions) -> NewRenderSession,
+  attach: suspend (RenderSessionAttachOptions) -> RenderSessionHandle,
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,
 ): T {
@@ -268,13 +267,13 @@ internal suspend fun <T> MapFixture.withRenderSession(
         },
       driverWorkWake = Wake { wakes.trySend(Unit) },
     )
-  val attachment = withContext(TestGraphics.thread) { attach(options) }
+  val session = withContext(TestGraphics.thread) { attach(options) }
   try {
-    val fixture = RenderSessionFixture(this, attachment.session, wakes, driver)
-    fixture.complete(attachment.ready, "the attach")
+    val fixture = RenderSessionFixture(this, session, wakes, driver)
+    fixture.complete(session.ready, "the attach")
     return fixture.block()
   } finally {
-    withContext(NonCancellable + TestGraphics.thread) { attachment.session.abandonAndClose() }
+    withContext(NonCancellable + TestGraphics.thread) { session.abandonAndClose() }
   }
 }
 

@@ -119,7 +119,7 @@
     windowSurface: UInt64
   ) async throws {
     // #region attach
-    let attached = try map.attachVulkanSurface(
+    session = try map.attachVulkanSurface(
       descriptor: VulkanSurfaceDescriptor(
         // The window's size in logical pixels. The map's scale factor
         // turns it into pixels.
@@ -135,8 +135,7 @@
         frameWake: Wake(callback: onFrameWake)
       )
     )
-    session = attached.session
-    try await attached.ready.value
+    try await session.ready
     // #endregion attach
 
     try demandFrame()

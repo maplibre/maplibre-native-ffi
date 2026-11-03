@@ -10,7 +10,6 @@ import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MetalBorrowedTexture
 import org.maplibre.nativeffi.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.NativePointer
-import org.maplibre.nativeffi.NewRenderSession
 import org.maplibre.nativeffi.OpenGlBorrowedTexture
 import org.maplibre.nativeffi.OpenGlBorrowedTextureDescriptor
 import org.maplibre.nativeffi.OpenGlClientApi
@@ -20,6 +19,7 @@ import org.maplibre.nativeffi.OpenGlContextOwnership
 import org.maplibre.nativeffi.OpenGlContextProviderFlag
 import org.maplibre.nativeffi.RenderBackendFlag
 import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.VulkanBorrowedTexture
 import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.VulkanContextDescriptor
@@ -210,7 +210,7 @@ internal object TestGraphics {
     map: MapHandle,
     textures: List<TestTexture>,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
+  ): RenderSessionHandle {
     val context = context()
     val texture = textures.first()
     val logicalSize = LogicalSize(texture.width, texture.height)
@@ -339,7 +339,7 @@ internal expect fun TestGraphics.attachBackendBorrowedTexture(
   textures: List<TestTexture>,
   context: TestGraphicsContext,
   options: RenderSessionAttachOptions,
-): NewRenderSession
+): RenderSessionHandle
 
 /** Reads the texture size of [frame] on a backend whose view only some targets declare. */
 internal expect fun TestGraphics.backendTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt>

@@ -43,7 +43,7 @@ public fun <T> AcquiredFrameHandle.withVulkanTexture(block: (VulkanTextureFrame)
 public fun MapHandle.attachVulkanBorrowedTexture(
   descriptor: VulkanBorrowedTextureDescriptor,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   nativeCall(this, binding) {
     attach(
       { out, completion ->
@@ -57,10 +57,9 @@ public fun MapHandle.attachVulkanBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachVulkanBorrowedTexture) },
+      { created, ready -> RenderSessionHandle(created, this@attachVulkanBorrowedTexture, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
-      ::NewRenderSession,
     )
   }
 
@@ -77,7 +76,7 @@ public fun MapHandle.attachVulkanBorrowedTexture(
 public fun MapHandle.attachVulkanSurface(
   descriptor: VulkanSurfaceDescriptor,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   nativeCall(this, binding) {
     attach(
       { out, completion ->
@@ -91,10 +90,9 @@ public fun MapHandle.attachVulkanSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachVulkanSurface) },
+      { created, ready -> RenderSessionHandle(created, this@attachVulkanSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
-      ::NewRenderSession,
     )
   }
 

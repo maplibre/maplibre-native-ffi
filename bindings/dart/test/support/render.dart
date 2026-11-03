@@ -47,7 +47,7 @@ OffscreenDeviceHandle openOffscreenDevice() {
 }
 
 /// Attaches an offscreen session of the render size, on a device of its own.
-NewRenderSession attachOffscreenSession(
+RenderSessionHandle attachOffscreenSession(
   MapHandle map,
   RenderSessionAttachOptions options,
 ) => map.attachOffscreen(OffscreenDescriptor(logicalSize: _size), options);
@@ -75,18 +75,18 @@ final class WorkerSession {
   }
 
   static Future<WorkerSession> _attach(
-    NewRenderSession Function(RenderSessionAttachOptions options) attach,
+    RenderSessionHandle Function(RenderSessionAttachOptions options) attach,
   ) async {
     late final WorkerSession worker;
-    final attachment = attach(
+    final session = attach(
       RenderSessionAttachOptions(
         driver: RenderDriverKind.coreWorker,
         frameWake: Wake(callback: () => worker._frames.notify()),
       ),
     );
-    worker = WorkerSession._(attachment.session);
-    addTearDown(() => releaseSession(worker.session));
-    await within(attachment.ready, 'attachment');
+    worker = WorkerSession._(session);
+    addTearDown(() => releaseSession(session));
+    await within(session.ready, 'attachment');
     return worker;
   }
 

@@ -13,11 +13,11 @@ function copyPixels(_data: Uint8Array, _stride: number): void {}
 
 export async function images(runtime: RuntimeHandle): Promise<void> {
   // #region map
-  const { map, ready: mapReady } = runtime.createMap({
+  const map = runtime.createMap({
     initialExtent: { width: 800, height: 600, scaleFactor: 2 },
     mapMode: MapMode.static,
   });
-  await mapReady;
+  await map.ready;
   // #endregion map
 
   // #region style
@@ -27,12 +27,12 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
   // #endregion style
 
   // #region attach
-  const { session, ready: sessionReady } = map.attachOffscreen(
+  const session = map.attachOffscreen(
     { logicalSize: { width: 800, height: 600 } },
     // The library renders on its own thread.
     { driver: RenderDriverKind.coreWorker },
   );
-  await sessionReady;
+  await session.ready;
   // #endregion attach
 
   // #region image
@@ -63,11 +63,11 @@ export async function imagesTile(
   y: number,
 ): Promise<void> {
   // #region tile
-  const { map, ready } = runtime.createMap({
+  const map = runtime.createMap({
     initialExtent: { width: 512, height: 512, scaleFactor: 1 },
     mapMode: MapMode.tile,
   });
-  await ready;
+  await map.ready;
 
   map.discarding.updateCamera({
     mode: CameraUpdateMode.jump,

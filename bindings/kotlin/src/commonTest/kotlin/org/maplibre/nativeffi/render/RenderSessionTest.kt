@@ -185,7 +185,7 @@ class RenderSessionTest {
           16,
           RenderSessionAttachOptions(driver = RenderDriverKind.CORE_WORKER),
         )
-      next.session.use { next.ready.awaitWithin("the next attach") }
+      next.use { next.ready.awaitWithin("the next attach") }
     }
   }
 }

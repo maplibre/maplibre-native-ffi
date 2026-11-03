@@ -119,46 +119,6 @@ class LogicalExtentPhysicalSizeResult(NamedTuple):
     height: int
 
 
-class MapAttachMetalBorrowedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachMetalSurfaceResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachOffscreenResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachOpenGlBorrowedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachOpenGlSurfaceResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachVulkanBorrowedTextureResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class MapAttachVulkanSurfaceResult(NamedTuple):
-    session: RenderSessionHandle
-    ready: Future[None]
-
-
-class RuntimeCreateMapResult(NamedTuple):
-    map: MapHandle
-    ready: Future[None]
-
-
 class _AcquiredFrameHandleOperations(GeneratedOperations):
     _native: _native._AcquiredFrameHandle
 
@@ -466,7 +426,7 @@ class _MapHandleOperations(GeneratedOperations):
         self,
         descriptor: MetalBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
-    ) -> MapAttachMetalBorrowedTextureResult:
+    ) -> RenderSessionHandle:
         """Creates a session that renders the map into a ring of your Metal
         textures.
 
@@ -480,14 +440,11 @@ class _MapHandleOperations(GeneratedOperations):
           `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_metal_borrowed_texture(descriptor, options)
-        return MapAttachMetalBorrowedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions
-    ) -> MapAttachMetalSurfaceResult:
+    ) -> RenderSessionHandle:
         """Creates a session that renders the map to a Metal layer.
 
         See `mln_map_attach_metal_surface` in the
@@ -499,17 +456,14 @@ class _MapHandleOperations(GeneratedOperations):
           `RenderBackendFlag.METAL`.
         """
         raw = self._native.attach_metal_surface(descriptor, options)
-        return MapAttachMetalSurfaceResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_offscreen(
         self,
         descriptor: OffscreenDescriptor,
         options: RenderSessionAttachOptions,
         device: OffscreenDeviceHandle | None = None,
-    ) -> MapAttachOffscreenResult:
+    ) -> RenderSessionHandle:
         """Attaches a render session that renders the map offscreen.
 
         Read each image's pixels with `RenderSessionHandle.read_texture()`.
@@ -530,16 +484,13 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_offscreen(
             descriptor, options, None if device is None else device._native
         )
-        return MapAttachOffscreenResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_open_gl_borrowed_texture(
         self,
         descriptor: OpenGlBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
-    ) -> MapAttachOpenGlBorrowedTextureResult:
+    ) -> RenderSessionHandle:
         """Creates a session that renders the map into a ring of your OpenGL
         textures.
 
@@ -554,14 +505,11 @@ class _MapHandleOperations(GeneratedOperations):
           `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_open_gl_borrowed_texture(descriptor, options)
-        return MapAttachOpenGlBorrowedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_open_gl_surface(
         self, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions
-    ) -> MapAttachOpenGlSurfaceResult:
+    ) -> RenderSessionHandle:
         """Creates a session that renders the map to an OpenGL surface.
 
         See `mln_map_attach_open_gl_surface` in the
@@ -574,16 +522,13 @@ class _MapHandleOperations(GeneratedOperations):
           platform.
         """
         raw = self._native.attach_open_gl_surface(descriptor, options)
-        return MapAttachOpenGlSurfaceResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_vulkan_borrowed_texture(
         self,
         descriptor: VulkanBorrowedTextureDescriptor,
         options: RenderSessionAttachOptions,
-    ) -> MapAttachVulkanBorrowedTextureResult:
+    ) -> RenderSessionHandle:
         """Creates a session that renders the map into a ring of your Vulkan
         images.
 
@@ -597,14 +542,11 @@ class _MapHandleOperations(GeneratedOperations):
           `producer_sync_kinds` in `options`.
         """
         raw = self._native.attach_vulkan_borrowed_texture(descriptor, options)
-        return MapAttachVulkanBorrowedTextureResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_vulkan_surface(
         self, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions
-    ) -> MapAttachVulkanSurfaceResult:
+    ) -> RenderSessionHandle:
         """Creates a session that renders the map to a Vulkan surface.
 
         See `mln_map_attach_vulkan_surface` in the
@@ -616,10 +558,7 @@ class _MapHandleOperations(GeneratedOperations):
           `RenderBackendFlag.VULKAN`.
         """
         raw = self._native.attach_vulkan_surface(descriptor, options)
-        return MapAttachVulkanSurfaceResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            ready=raw["ready"],
-        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def begin_command_group(self) -> Future[CommandCompletion]:
         """Holds back the map's changes from rendering until
@@ -2474,16 +2413,14 @@ class _RuntimeHandleOperations(GeneratedOperations):
             _native._RuntimeHandle.create(options), "RuntimeHandle", None
         )
 
-    def create_map(self, options: MapOptions) -> RuntimeCreateMapResult:
+    def create_map(self, options: MapOptions) -> MapHandle:
         """Creates a map on `runtime`.
 
         See `mln_runtime_create_map` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
         raw = self._native.create_map(options)
-        return RuntimeCreateMapResult(
-            map=_adopt_value(raw["map"], "MapHandle", self), ready=raw["ready"]
-        )
+        return _adopt_value(raw["map"], "MapHandle", self, raw["ready"])
 
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: Buffer

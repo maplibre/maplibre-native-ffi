@@ -9,8 +9,8 @@ import { backgroundStyle } from "../support/styles.ts";
 
 const runtime = await RuntimeHandle.create();
 const events = await listen(runtime);
-const { map, ready } = runtime.createMap(mapOptions);
-await ready;
+const map = runtime.createMap(mapOptions);
+await map.ready;
 await map.setStyleJson(backgroundStyle());
 await events.awaitEventType(RuntimeEventType.mapStyleLoaded, map.id);
 await map.close();

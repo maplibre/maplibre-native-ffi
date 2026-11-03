@@ -24,11 +24,9 @@ public extension MapHandle {
     descriptor bindingArg0: OffscreenDescriptor,
     options bindingArg1: RenderSessionAttachOptions,
     device bindingArg2: OffscreenDeviceHandle? = nil
-  ) throws -> NewRenderSession {
+  ) throws -> RenderSessionHandle {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
+    return try nativeAttach { raw, arena, completion, diagnostic in
       try mln_map_attach_offscreen(
         raw,
         arena.store(bindingArg0.nativeValue()),
@@ -38,6 +36,10 @@ public extension MapHandle {
         completion,
         diagnostic
       )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    } adopt: { ready in try RenderSessionHandle(
+      adopting: value0,
+      parent: self,
+      ready: ready
+    ) }
   }
 }

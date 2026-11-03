@@ -109,17 +109,18 @@ Future<List<T>?> _queryOptionalList<T>(
 /// admission and completes once the owner is ready.
 ///
 /// [adopt] gives the handle its owner as soon as native code admits the call,
-/// and [result] pairs that owner with its readiness, which keeps the owner
-/// reachable until it completes.
-A _attach<T extends Object, A>(
+/// and passes the owner its readiness. The readiness doesn't keep the owner
+/// reachable, so an owner dropped before it is ready is still finalized. A
+/// failure that nothing awaits is not reported to the zone, and an `await` of
+/// the readiness still sees it.
+T _attach<T extends Object>(
   int Function(
     Allocator arena,
     Pointer<raw.mln_completion> completion,
     Pointer<Uint64> output,
   )
   start,
-  T Function(int handle) adopt,
-  A Function(T owner, Future<void> ready) result,
+  T Function(int handle, Future<void> ready) adopt,
 ) {
   var handle = 0;
   final ready = submitNativeCompletion<void>(
@@ -130,20 +131,9 @@ A _attach<T extends Object, A>(
       return status;
     }),
     decode: (_) {},
-  );
-  final T owner;
-  try {
-    owner = adopt(handle);
-  } catch (_) {
-    ready.ignore();
-    rethrow;
-  }
-  return result(owner, ready.whenComplete(() => _keepAlive(owner)));
+  )..ignore();
+  return adopt(handle, ready);
 }
-
-@pragma('vm:never-inline')
-@pragma('dart2js:noInline')
-void _keepAlive(Object? value) {}
 
 /// One prepared callback descriptor, which its registration transaction
 /// rejects unless native code accepts the call that carries it.

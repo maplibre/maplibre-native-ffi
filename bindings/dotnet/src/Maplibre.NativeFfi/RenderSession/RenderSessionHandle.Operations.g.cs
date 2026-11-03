@@ -32,21 +32,7 @@ public sealed unsafe partial class RenderSessionHandle
 
     internal RenderSessionHandle(MapHandle parent, MlnRenderSession handle, Task completion)
     {
-        // Mono may retain a completed continuation on its worker stack.
-        // Clear its holder so it no longer roots this handle.
-        Ready = completion
-            .ContinueWith(
-                static (finished, retained) =>
-                {
-                    ((System.Runtime.CompilerServices.StrongBox<object?>)retained!).Value = null;
-                    return finished;
-                },
-                new System.Runtime.CompilerServices.StrongBox<object?>(this),
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default
-            )
-            .Unwrap();
+        Ready = completion;
         state = new(
             handle,
             StartRelease,

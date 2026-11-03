@@ -89,17 +89,16 @@ internal constructor(
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun createMap(options: MapOptions): NewMap =
+  public fun createMap(options: MapOptions): MapHandle =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
           C.mln_runtime_create_map(handle, writeMapOptions(options), out, completion, diagnostic)
         },
         GeneratedOwnerDisposal::map,
-        { MapHandle(it, this@RuntimeHandle) },
+        { created, ready -> MapHandle(created, this@RuntimeHandle, ready) },
         null,
         { it.dispose() },
-        ::NewMap,
       )
     }
 

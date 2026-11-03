@@ -515,6 +515,8 @@ def operation(
         arguments[receiver.name] = "&mut handle" if receiver_pointer else "handle"
     outputs = []
     product = None
+    # Whether the call returns the owner it creates with its readiness.
+    readied = False
     for output in plan.outputs:
         if text and output.name == text.result_length:
             continue
@@ -657,34 +659,25 @@ def operation(
                 )
             body.append('        result.set_item("ready", future)?;')
             body.append("        Ok(result.into_any().unbind())")
-            product_name = public_name(function.name) + "Result"
-            product_fields = [
-                f"    {output_member(output)}: {OWNERS[value.native]}"
-                for output, value in outputs
-            ]
-            product_fields.append(f"    ready: {public_result}")
-            product = (
-                "class "
-                + product_name
-                + "(NamedTuple):\n"
-                + "\n".join(product_fields)
-                + "\n"
+            # The owner that the call creates exposes the completion that
+            # reports it ready.
+            if len(outputs) != 1:
+                raise unsupported(function, "an attach requires one immediate owner")
+            output, value = outputs[0]
+            parent = next(
+                (
+                    owner.parent_parameter
+                    for owner in plan.owned_outputs
+                    if owner.parameter == output
+                ),
+                None,
             )
-            parent_names = {
-                owner.parameter: owner.parent_parameter for owner in plan.owned_outputs
-            }
-            public_copies = []
-            for output, value in outputs:
-                parent = parent_names.get(output)
-                parent = (
-                    "self" if receiver and parent == receiver.name else parent or "None"
-                )
-                public_copies.append(
-                    f"{output_member(output)}=_adopt_value(raw[{output_member(output)!r}], {OWNERS[value.native]!r}, {parent})"
-                )
-            public_copies.append('ready=raw["ready"]')
-            expression = f"{product_name}(" + ", ".join(public_copies) + ")"
-            public_result = product_name
+            parent = (
+                "self" if receiver and parent == receiver.name else parent or "None"
+            )
+            expression = f'_adopt_value(raw[{output_member(output)!r}], {OWNERS[value.native]!r}, {parent}, raw["ready"])'
+            public_result = OWNERS[value.native]
+            readied = True
             native_result = "dict[str, Any]"
         elif plan.result:
             converted = values.facade_copy(plan.result, "value")
@@ -868,7 +861,7 @@ def operation(
     signature = ", ".join(["self", *py_parameters])
     facade_setup = (
         f"        raw = self._native.{name}({', '.join(python_arguments)})\n"
-        if product
+        if product or readied
         else ""
     )
     # A form that passes no completion reports none of its errors.
@@ -1200,27 +1193,52 @@ def lower(api: Api | BoundApi) -> Lowered:
             if public_dispose(handle)
             else ""
         )
-        owner_classes.append(f'''class {owner}(_{owner}Operations, {mixin}):
-{docs.docstring(bound.doc(native), symbols(bound), "    ")}    __module__ = "maplibre_native_ffi"
-    _handle_name = "{owner}"
+        readied = bound.readied_handles.get(native)
+        # A handle that no attach created, such as a borrowed one, is ready.
+        from_native = (
+            """
+    @classmethod
+    def _from_native(cls, native, parent=None, ready=None):
+        owner = cls.__new__(cls)
+        owner._native = native
+        owner._parent = parent
+        owner._ready = completed_future() if ready is None else ready
+        return owner
 
-    def __init__(self):
-        raise TypeError("native handles are returned by their owning operations")
-
+    @property
+    def ready(self) -> Future[None]:
+        \"\"\"Completes once the """
+            + readied
+            + """ is ready, and fails with `MaplibreError` when it
+        fails to become ready. The """
+            + readied
+            + """ takes calls before then.\"\"\"
+        return self._ready
+"""
+            if readied
+            else """
     @classmethod
     def _from_native(cls, native, parent=None):
         owner = cls.__new__(cls)
         owner._native = native
         owner._parent = parent
         return owner
-
+"""
+        )
+        owner_classes.append(f'''class {owner}(_{owner}Operations, {mixin}):
+{docs.docstring(bound.doc(native), symbols(bound), "    ")}    __module__ = "maplibre_native_ffi"
+    _handle_name = "{owner}"
+{"    _ready: Future[None]" + chr(10) if readied else ""}
+    def __init__(self):
+        raise TypeError("native handles are returned by their owning operations")
+{from_native}
     @property
     def id(self) -> int:
         """{id_doc}"""
         return int(self._native.id)
 {dispose}''')
     files["python/maplibre_native_ffi/_generated_owners.py"] = (
-        f'"""{notice}"""\nfrom ._lifecycle import NativeHandleMixin, ScopedHandleMixin\n'
+        f'"""{notice}"""\nfrom concurrent.futures import Future\n\nfrom ._future import completed_future\nfrom ._lifecycle import NativeHandleMixin, ScopedHandleMixin\n'
         + "\n".join(
             f"from ._generated_operations import _{owner}Operations"
             for owner in OWNERS.values()

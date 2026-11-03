@@ -38,7 +38,7 @@ def events_and_logs(runtime: mln.RuntimeHandle) -> None:
     # #endregion handler
 
     # #region mask
-    map_handle, ready = runtime.create_map(
+    map_handle = runtime.create_map(
         mln.MapOptions(
             initial_extent=mln.LogicalExtent(
                 width=512, height=512, scale_factor=1.0
@@ -48,7 +48,7 @@ def events_and_logs(runtime: mln.RuntimeHandle) -> None:
         )
     )
     # #endregion mask
-    ready.result()
+    map_handle.ready.result()
 
     # #region logs
     # The callback runs on the binding's dispatcher thread.

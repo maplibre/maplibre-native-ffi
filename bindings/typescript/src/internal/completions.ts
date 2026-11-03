@@ -160,23 +160,20 @@ export function threadStart<T>(
 
 /**
  * An operation that creates its owner at once in a pending state, such as a
- * map creation or a render-session attach, and reports it ready later. The
- * readiness keeps the owner reachable until it settles.
+ * map creation or a render-session attach, and reports it ready later.
+ * `adopt` receives the readiness, which the owner exposes as its `ready`. The
+ * readiness doesn't keep the owner reachable, so an owner dropped before it is
+ * ready is still finalized. A rejection that nothing awaits is not reported as
+ * unhandled, and an `await` of `ready` still sees it.
  */
 export function attach<T>(
   start: (completion: NativeCompletion) => bigint,
-  adopt: (handle: bigint) => T,
-): [T, Promise<void>] {
+  adopt: (handle: bigint, ready: Promise<void>) => T,
+): T {
   let handle = 0n;
   const ready = submitRun((completion) => {
     handle = start(completion);
   });
-  let owner: T;
-  try {
-    owner = adopt(handle);
-  } catch (error) {
-    ready.catch(() => {});
-    throw error;
-  }
-  return [owner, ready.then(() => void owner)];
+  ready.catch(() => {});
+  return adopt(handle, ready);
 }

@@ -105,6 +105,13 @@ class NativeFuture[T](Future[T]):
             return self.set_running_or_notify_cancel()
 
 
+def completed_future() -> Future[None]:
+    """Return a future that has already completed with ``None``."""
+    future: Future[None] = Future()
+    future.set_result(None)
+    return future
+
+
 def map_future[T, U](
     source: Future[T],
     transform: Callable[[T], U],

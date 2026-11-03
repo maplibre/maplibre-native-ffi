@@ -9,7 +9,7 @@ private func copyPixels(_: Data, stride _: UInt32) {}
 
 private func images(runtime: RuntimeHandle) async throws {
   // #region map
-  let created = try runtime.createMap(
+  let map = try runtime.createMap(
     options: MapOptions(
       initialExtent: LogicalExtent(
         width: 800,
@@ -19,8 +19,7 @@ private func images(runtime: RuntimeHandle) async throws {
       mapMode: .static
     )
   )
-  let map = created.map
-  try await created.ready.value
+  try await map.ready
   // #endregion map
 
   // #region style
@@ -29,15 +28,14 @@ private func images(runtime: RuntimeHandle) async throws {
   // #endregion style
 
   // #region attach
-  let attached = try map.attachOffscreen(
+  let session = try map.attachOffscreen(
     descriptor: OffscreenDescriptor(
       logicalSize: LogicalSize(width: 800, height: 600)
     ),
     // The library renders on its own thread.
     options: RenderSessionAttachOptions(driver: .coreWorker)
   )
-  let session = attached.session
-  try await attached.ready.value
+  try await session.ready
   // #endregion attach
 
   // #region image
@@ -68,7 +66,7 @@ private func imagesTile(
   y: UInt32
 ) async throws {
   // #region tile
-  let created = try runtime.createMap(
+  let map = try runtime.createMap(
     options: MapOptions(
       initialExtent: LogicalExtent(
         width: 512,
@@ -78,8 +76,7 @@ private func imagesTile(
       mapMode: .tile
     )
   )
-  let map = created.map
-  try await created.ready.value
+  try await map.ready
 
   try map.discarding.updateCamera(CameraUpdate(
     mode: .jump,

@@ -625,6 +625,9 @@ BIND("execution=lifecycle") mln_status attach(
         self.assertEqual((owner.parameter, owner.parent_parameter), ("owner", "parent"))
         self.assertEqual(owner.handle.finalize, ("abandon_child", "close_child"))
         self.assertEqual(operation.owned_outputs, (owner,))
+        # The child is ready once the completion runs, which a binding exposes
+        # on the child under the output's name.
+        self.assertEqual(model.readied_handles, {"child": "owner"})
         with self.assertRaisesRegex(ModelError, "requires its parent handle input"):
             bind(
                 self.parse(

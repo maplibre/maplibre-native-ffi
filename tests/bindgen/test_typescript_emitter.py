@@ -335,7 +335,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("  initialExtent: LogicalExtent;\n", values)
         self.assertIn("  mapMode?: MapMode;\n", values)
         self.assertIn("  assetPath?: string;\n", values)
-        self.assertIn("createMap(options: MapOptions): NewMap", operations)
+        self.assertIn("createMap(options: MapOptions): MapHandle", operations)
         self.assertIn(
             "  static create(options?: RuntimeOptions): Promise<RuntimeHandle> {",
             operations,
@@ -391,7 +391,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
 
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an
-        # attachment, and one that waits for a thread to start runs on a thread
+        # owner whose `ready` is one, and one that waits for a thread to start runs on a thread
         # of its own, so only the categories that return synchronously can
         # hold the calling thread.
         asynchronous = {

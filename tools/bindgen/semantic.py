@@ -618,6 +618,21 @@ class BoundApi:
         )
 
     @functools.cached_property
+    def readied_handles(self) -> dict[str, str]:
+        """The handle types that an `attach` operation creates at once and
+        reports ready through its completion, such as a map or a render
+        session, each with the noun that its output names. A binding whose
+        handle is a reference type exposes that readiness on the handle, and a
+        handle that it gets any other way, such as one a callback borrows, is
+        ready at once."""
+        return {
+            owned.handle.native: output_member(owned.parameter)
+            for plan in self.operations
+            if plan.completion
+            for owned in plan.completion.immediate_owners
+        }
+
+    @functools.cached_property
     def enum_numbers(self) -> dict[str, int]:
         return {
             member.name: member.value

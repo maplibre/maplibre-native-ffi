@@ -29,8 +29,8 @@ type Request =
  */
 async function exit(): Promise<never> {
   const runtime = await RuntimeHandle.create();
-  const { map, ready } = runtime.createMap(mapOptions);
-  await ready;
+  const map = runtime.createMap(mapOptions);
+  await map.ready;
   await map.setStyleJson(emptyStyle());
   process.on("exit", () => postToParent({ exited: true }));
   process.exit(0);

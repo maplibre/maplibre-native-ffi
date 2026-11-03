@@ -593,11 +593,9 @@ def owned(plan, values, native):
     create = f"{{ {owner_name(handle)}(it{parent}) }}"
     attachment = immediate_owner and bool(plan.completion)
     if attachment:
-        returns = "New" + name(handle.native)
-        values.attachments[returns] = (
-            identifier(output_member(plan.owned_outputs[0].parameter)),
-            result,
-        )
+        # The owner exposes the completion that reports it ready.
+        returns = owner_name(handle)
+        create = f"{{ created, ready -> {owner_name(handle)}(created{parent}, ready) }}"
     else:
         returns = f"Deferred<{result_type}>" if plan.completion else result_type
     head = f"  public fun {method}({declaration(params)}): {returns} ="
@@ -620,7 +618,7 @@ def owned(plan, values, native):
         call = native.status(plan.function, arguments)
         body = (
             f"attach({{ out, completion -> {call} }}, {disposal(handle)}, {create}, "
-            f"{callbacks}, {drop}, ::{returns})"
+            f"{callbacks}, {drop})"
         )
     else:
         slot = next(

@@ -20,6 +20,11 @@ public class MapHandle
 internal constructor(
   handle: Long,
   @Suppress("unused") private val parent: RuntimeHandle?,
+  /**
+   * Completes once the map is ready, and fails with a [MaplibreException] when it fails to become
+   * ready. The map takes calls before then.
+   */
+  public val ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
   borrowed: Boolean = false,
 ) : AsyncReleasable, AutoCloseable {
   internal val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)
@@ -255,7 +260,7 @@ internal constructor(
     descriptor: OffscreenDescriptor,
     options: RenderSessionAttachOptions,
     device: OffscreenDeviceHandle? = null,
-  ): NewRenderSession =
+  ): RenderSessionHandle =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -270,10 +275,9 @@ internal constructor(
           )
         },
         GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@MapHandle) },
+        { created, ready -> RenderSessionHandle(created, this@MapHandle, ready) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::NewRenderSession,
       )
     }
 
@@ -291,7 +295,7 @@ internal constructor(
   public fun attachOpenGlBorrowedTexture(
     descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession =
+  ): RenderSessionHandle =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -305,10 +309,9 @@ internal constructor(
           )
         },
         GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@MapHandle) },
+        { created, ready -> RenderSessionHandle(created, this@MapHandle, ready) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::NewRenderSession,
       )
     }
 
@@ -326,7 +329,7 @@ internal constructor(
   public fun attachOpenGlSurface(
     descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession =
+  ): RenderSessionHandle =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
@@ -340,10 +343,9 @@ internal constructor(
           )
         },
         GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@MapHandle) },
+        { created, ready -> RenderSessionHandle(created, this@MapHandle, ready) },
         { it.bindingCallbacks },
         { it.dispose() },
-        ::NewRenderSession,
       )
     }
 

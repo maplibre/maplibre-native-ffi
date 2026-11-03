@@ -43,7 +43,7 @@ public fun <T> AcquiredFrameHandle.withWebGpuTexture(block: (WebGpuTextureFrame)
 public fun MapHandle.attachWebGpuBorrowedTexture(
   descriptor: WebGpuBorrowedTextureDescriptor,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   nativeCall(this, binding) {
     attach(
       { out, completion ->
@@ -57,10 +57,9 @@ public fun MapHandle.attachWebGpuBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachWebGpuBorrowedTexture) },
+      { created, ready -> RenderSessionHandle(created, this@attachWebGpuBorrowedTexture, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
-      ::NewRenderSession,
     )
   }
 
@@ -77,7 +76,7 @@ public fun MapHandle.attachWebGpuBorrowedTexture(
 public fun MapHandle.attachWebGpuSurface(
   descriptor: WebGpuSurfaceDescriptor,
   options: RenderSessionAttachOptions,
-): NewRenderSession =
+): RenderSessionHandle =
   nativeCall(this, binding) {
     attach(
       { out, completion ->
@@ -91,10 +90,9 @@ public fun MapHandle.attachWebGpuSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { RenderSessionHandle(it, this@attachWebGpuSurface) },
+      { created, ready -> RenderSessionHandle(created, this@attachWebGpuSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
-      ::NewRenderSession,
     )
   }
 

@@ -14,6 +14,7 @@ import {
 } from "../src/index.ts";
 import { openRuntime } from "./support/fixture.ts";
 import {
+  attachCallerSession,
   attachSession,
   attachVulkanSession,
   backend,
@@ -24,7 +25,7 @@ import {
   demandFrame,
   TestSession,
 } from "./support/graphics.ts";
-import { bounded, test } from "./support/harness.ts";
+import { bounded, test, turn } from "./support/harness.ts";
 import { backgroundStyle } from "./support/styles.ts";
 
 const red = [255, 0, 0, 255];
@@ -55,8 +56,8 @@ test(
   "using disposes an attached session, which then refuses calls, and the map releases",
   async () => {
     const map = await openRenderMap();
-    const { session, ready } = attachSession(map, {});
-    await bounded(ready, "the attachment");
+    const session = attachSession(map, {});
+    await bounded(session.ready, "the attachment");
     demandFrame(session, 1n);
     session[Symbol.dispose]();
     session[Symbol.dispose]();
@@ -70,8 +71,8 @@ test(
   "await using waits until an attached session has retired, so the map takes another",
   async () => {
     const map = await openRenderMap();
-    const { session, ready } = attachSession(map, {});
-    await bounded(ready, "the attachment");
+    const session = attachSession(map, {});
+    await bounded(session.ready, "the attachment");
     demandFrame(session, 1n);
     await bounded(session[Symbol.asyncDispose](), "the disposal");
     await session[Symbol.asyncDispose]();
@@ -126,6 +127,21 @@ test("a drain before any demand returns no results", async () => {
   const worker = await TestSession.offscreen(map);
   // Native writes a null batch, which reads as no results.
   assert.deepEqual(worker.session.drainFrameResults(), []);
+});
+
+test("a session disposed while it attaches rejects its ready without an unhandled rejection", async () => {
+  const map = await openRenderMap();
+  const session = attachCallerSession(map);
+  session.dispose();
+  // The disposal fails the attach before the map's release finishes, and a
+  // later turn reports a rejection that nothing handled.
+  await bounded(map.close(), "the map release");
+  await turn();
+  await assert.rejects(
+    session.ready,
+    (error: unknown) =>
+      error instanceof MaplibreError && error.status === Status.targetLost,
+  );
 });
 
 test("a caller-driven session is serviced from the event loop", async () => {
@@ -224,8 +240,8 @@ test("a native registration reaches native unchanged, a call consumes it, and a 
   // Native code calls the probe's wake with the probe's context directly.
   const probe = new NativeProbe();
   const frameWake = nativeWake(probe);
-  const { session, ready } = attachSession(map, { frameWake });
-  await bounded(ready, "the attachment");
+  const session = attachSession(map, { frameWake });
+  await bounded(session.ready, "the attachment");
   demandFrame(session, 1n);
   await probe.arrival("wake");
 
@@ -285,8 +301,8 @@ test("a native queue lock reaches a session whose target takes one", async () =>
     assert.deepEqual(probe.events, ["release"]);
     return;
   }
-  const { session, ready } = attachVulkanSession(map, { queueLock });
-  await bounded(ready, "the attachment");
+  const session = attachVulkanSession(map, { queueLock });
+  await bounded(session.ready, "the attachment");
   demandFrame(session, 1n);
   await probe.arrival("unlock");
   await bounded(session.detach(), "the detach");
