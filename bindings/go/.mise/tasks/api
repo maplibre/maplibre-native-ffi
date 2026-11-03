@@ -12,6 +12,6 @@ mkdir -p build
 # packages are not published under the docs site.
 doc2go \
   -out build/doc2go \
-  -home github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre \
+  -home maplibre.org/maplibre-native-ffi/go/maplibre \
   -pagefind=false \
   ./maplibre

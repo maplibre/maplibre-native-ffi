@@ -1,3 +1,3 @@
-module github.com/maplibre/maplibre-native-ffi/bindings/go
+module maplibre.org/maplibre-native-ffi/go
 
 go 1.26

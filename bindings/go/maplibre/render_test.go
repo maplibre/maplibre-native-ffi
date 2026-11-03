@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/testsupport"
+	"maplibre.org/maplibre-native-ffi/go/internal/testsupport"
 )
 
 // The render tests build only with the backend tag that `mise run
