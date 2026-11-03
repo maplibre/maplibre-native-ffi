@@ -2270,14 +2270,6 @@ pub const Runtime = struct {
         self.closed = true;
     }
 
-    /// Reads the runtime's event mask.
-    ///
-    /// See `mln_runtime_get_event_mask` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn getEventMask(self: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!RuntimeEventFlag {
-        return call.invoke("mln_runtime_get_event_mask", .handle, self, null, diagnostic, .{call.out(RuntimeEventFlag)});
-    }
-
     /// Reads the offline region `region_id`.
     ///
     /// The result is null when the cache file has no region with that ID.
@@ -2374,17 +2366,6 @@ pub const Runtime = struct {
         return call.submit("mln_runtime_set_event_handler", .handle, self, call.command, null, diagnostic, .{handler});
     }
 
-    /// Selects the runtime's own events that reach the event callback.
-    ///
-    /// Each map selects its events with `Map.setEventMask()` instead. A runtime
-    /// starts with every event selected.
-    ///
-    /// See `mln_runtime_set_event_mask` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setEventMask(self: Runtime, mask: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_runtime_set_event_mask", .handle, self, null, diagnostic, .{mask});
-    }
-
     /// Adds headers to the runtime's HTTP requests.
     ///
     /// The transform replaces the one set before. In a browser or on OpenHarmony,
@@ -2426,8 +2407,12 @@ pub const Runtime = struct {
         return call.submit("mln_runtime_set_offline_region_download_state", .handle, self, call.unit, null, diagnostic, .{ region_id, state });
     }
 
-    /// Sets whether the runtime reports the download progress of the offline region
-    /// `region_id` as events.
+    /// Selects the events that the runtime reports about the download of the
+    /// offline region `region_id`.
+    ///
+    /// `events` holds bits of `RuntimeEventFlag.all_runtime_events` and replaces
+    /// the region's previous selection. `RuntimeEventFlag.none` stops the region's
+    /// events.
     ///
     /// See `mln_runtime_set_offline_region_observed` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2435,8 +2420,8 @@ pub const Runtime = struct {
     /// Errors:
     ///
     /// - `error.NotFound` when the cache file has no region `region_id`.
-    pub fn setOfflineRegionObserved(self: Runtime, region_id: i64, observed: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_runtime_set_offline_region_observed", .handle, self, call.unit, null, diagnostic, .{ region_id, observed });
+    pub fn setOfflineRegionObserved(self: Runtime, region_id: i64, events: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+        return call.submit("mln_runtime_set_offline_region_observed", .handle, self, call.unit, null, diagnostic, .{ region_id, events });
     }
 
     /// Serves the runtime's network requests through a callback.
@@ -6600,7 +6585,7 @@ pub const RuntimeEventTileAction = struct {
 /// Only maps in `MapMode.continuous` raise
 /// `RuntimeEventType.map_loading_finished`, `RuntimeEventType.map_idle`, and
 /// the render frame and render map events. Offline region events come only for
-/// the regions that `Runtime.setOfflineRegionObserved()` observes.
+/// the regions and types that `Runtime.setOfflineRegionObserved()` selects.
 ///
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

@@ -236,12 +236,13 @@ auto mln_runtime_get_offline_region_status(
 }
 
 auto mln_runtime_set_offline_region_observed(
-  mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_runtime runtime, mln_offline_region_id region_id,
+  mln_runtime_event_flags events, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::offline_region_set_observed_start(
-      runtime, region_id, observed, completion
+      runtime, region_id, events, completion
     );
   });
 }
@@ -308,22 +309,6 @@ auto mln_runtime_clear_event_handler(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::clear_runtime_event_handler(runtime, completion);
-  });
-}
-
-auto mln_runtime_set_event_mask(
-  mln_runtime runtime, uint64_t mask, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::set_runtime_event_mask(runtime, mask);
-  });
-}
-
-auto mln_runtime_get_event_mask(
-  mln_runtime runtime, uint64_t* out_mask, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::get_runtime_event_mask(runtime, out_mask);
   });
 }
 

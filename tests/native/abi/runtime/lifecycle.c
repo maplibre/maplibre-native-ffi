@@ -56,16 +56,10 @@ static void expect_runtime_calls_reject(
   const mln_completion discard = mln_test_discard_completion();
   const mln_map_options map_options = mln_test_map_options();
   mln_map map = MLN_HANDLE_NULL;
-  uint64_t mask = 0;
   MLN_TEST_STATUS(expected, mln_runtime_release(handle, &discard, NULL));
   MLN_TEST_STATUS(expected, mln_runtime_dispose(handle, NULL));
   MLN_TEST_STATUS(
     expected, mln_runtime_set_event_handler(handle, NULL, &discard, NULL)
-  );
-  MLN_TEST_STATUS(expected, mln_runtime_get_event_mask(handle, &mask, NULL));
-  MLN_TEST_STATUS(
-    expected,
-    mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_FLAG_ALL, NULL)
   );
   MLN_TEST_STATUS(
     expected, mln_runtime_create_map(handle, &map_options, &map, &discard, NULL)
@@ -216,8 +210,7 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
     MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime, &discard, NULL)
   );
 
-  uint64_t mask = 0;
-  MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &mask, NULL));
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -315,8 +308,10 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
   mln_test_thread_join(thread);
   MLN_TEST_OK(atomic_load(&probe.status));
 
-  uint64_t mask = 0;
-  MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
+  const mln_completion discard = mln_test_discard_completion();
+  MLN_TEST_INVALID_STATE(
+    mln_runtime_clear_resource_transform(runtime, &discard, NULL)
+  );
 }
 
 static void pass_resource(
@@ -349,8 +344,10 @@ static void disposal_waits_for_children_and_retires_callback_state(void) {
   const mln_map_options map_options = mln_test_map_options();
   MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
-  uint64_t mask = 0;
-  MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
+  const mln_completion discard = mln_test_discard_completion();
+  MLN_TEST_INVALID_STATE(
+    mln_runtime_clear_resource_transform(runtime, &discard, NULL)
+  );
   TEST_ASSERT_FALSE(atomic_load(&released));
   MLN_TEST_OK(mln_map_dispose(map, NULL));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&released));

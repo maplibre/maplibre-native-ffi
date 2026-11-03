@@ -134,7 +134,7 @@ internal sealed class NativeFixture : IAsyncDisposable
         }
         finally
         {
-            if (Runtime is not null && IsLive(() => Runtime.GetEventMask()))
+            if (Runtime is not null && IsLive(() => Runtime.Discarding.ClearResourceTransform()))
                 await Runtime.CloseAsync();
             // Runtime teardown retires the event handler before the semaphore is disposed.
             events.Dispose();

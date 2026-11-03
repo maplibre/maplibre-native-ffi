@@ -4894,16 +4894,6 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Reads the runtime's event mask.
-   *
-   * See `mln_runtime_get_event_mask` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  getEventMask(): RuntimeEventFlag {
-    return native.mln_runtime_get_event_mask(this.id);
-  }
-
-  /**
    * Reads the offline region `regionId`.
    *
    * The result is null when the cache file has no region with that ID.
@@ -5037,19 +5027,6 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Selects the runtime's own events that reach the event callback.
-   *
-   * Each map selects its events with `MapHandle.setEventMask()` instead. A
-   * runtime starts with every event selected.
-   *
-   * See `mln_runtime_set_event_mask` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  setEventMask(mask: RuntimeEventFlag): void {
-    native.mln_runtime_set_event_mask(this.id, mask);
-  }
-
-  /**
    * Adds headers to the runtime's HTTP requests.
    *
    * The transform replaces the one set before. In a browser or on OpenHarmony,
@@ -5123,8 +5100,12 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Sets whether the runtime reports the download progress of the offline
-   * region `regionId` as events.
+   * Selects the events that the runtime reports about the download of the
+   * offline region `regionId`.
+   *
+   * `events` holds bits of `RuntimeEventFlag.allRuntimeEvents` and replaces the
+   * region's previous selection. `RuntimeEventFlag.none` stops the region's
+   * events.
    *
    * See `mln_runtime_set_offline_region_observed` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5133,12 +5114,15 @@ export class RuntimeHandle extends Owner {
    *
    * - `Status.notFound` when the cache file has no region `regionId`.
    */
-  setOfflineRegionObserved(regionId: bigint, observed: boolean): Promise<void> {
+  setOfflineRegionObserved(
+    regionId: bigint,
+    events: RuntimeEventFlag,
+  ): Promise<void> {
     return run((completion) =>
       native.mln_runtime_set_offline_region_observed(
         this.id,
         regionId,
-        observed,
+        events,
         completion,
       ),
     );

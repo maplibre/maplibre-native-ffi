@@ -96,7 +96,7 @@ fn offline(allocator: std.mem.Allocator) !void {
     // #region progress
     var observed = try runtime.setOfflineRegionObserved(
         region.value.id,
-        true,
+        maplibre.RuntimeEventFlag.all_runtime_events,
         null,
     );
     defer observed.deinit();

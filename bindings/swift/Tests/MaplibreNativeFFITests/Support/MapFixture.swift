@@ -121,7 +121,7 @@ final class MapFixture: Sendable {
       Issue.record("closing the fixture map failed: \(error)")
     }
     do {
-      if try isLive({ _ = try runtime.getEventMask() }) {
+      if try isLive({ try runtime.discarding.clearResourceTransform() }) {
         try await runtime.close()
       }
     } catch {

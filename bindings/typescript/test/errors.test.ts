@@ -21,13 +21,13 @@ test("a failed call carries its status, an unknown status code, and its own diag
   const map = await fixture.openStyledMap();
 
   assert.throws(
-    () => fixture.runtime.setEventMask(1n << 40n),
+    () => map.discarding.setEventMask(1n << 40n),
     (error) =>
       error instanceof MaplibreError &&
       error.status === Status.invalidArgument &&
       error.statusName === "invalidArgument" &&
-      error.diagnostic === "mask contains unknown bits" &&
-      error.message === "invalidArgument: mask contains unknown bits",
+      error.diagnostic === "mask must be valid" &&
+      error.message === "invalidArgument: mask must be valid",
   );
   // An asynchronous failure carries the diagnostic of its own completion.
   await assert.rejects(

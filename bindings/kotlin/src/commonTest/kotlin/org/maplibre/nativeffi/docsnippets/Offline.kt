@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.LatLngBounds
 import org.maplibre.nativeffi.OfflineRegionDefinition
 import org.maplibre.nativeffi.OfflineRegionDownloadState
 import org.maplibre.nativeffi.OfflineTilePyramidRegionDefinition
+import org.maplibre.nativeffi.RuntimeEventFlag
 import org.maplibre.nativeffi.RuntimeEventHandler
 import org.maplibre.nativeffi.RuntimeEventPayload
 import org.maplibre.nativeffi.RuntimeHandle
@@ -95,7 +96,12 @@ private suspend fun offline() {
   // #endregion download
 
   // #region progress
-  runtime.setOfflineRegionObserved(region.id, true).await()
+  runtime
+    .setOfflineRegionObserved(
+      region.id,
+      RuntimeEventFlag.ALL_RUNTIME_EVENTS,
+    )
+    .await()
   // #endregion progress
 
   // #region manage

@@ -2039,13 +2039,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_runtime_get_event_mask(
-      runtime.toULong(),
-      outMask.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_runtime_get_offline_region(
     runtime: Long,
     regionId: Long,
@@ -2142,13 +2135,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_runtime_set_event_mask(runtime: Long, mask: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_runtime_set_event_mask(
-      runtime.toULong(),
-      mask.toULong(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_runtime_set_http_header_transform(
     runtime: Long,
     transform: Long,
@@ -2193,14 +2179,14 @@ internal actual object C {
   actual fun mln_runtime_set_offline_region_observed(
     runtime: Long,
     regionId: Long,
-    observed: Boolean,
+    events: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_set_offline_region_observed(
       runtime.toULong(),
       regionId,
-      observed,
+      events.toULong(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

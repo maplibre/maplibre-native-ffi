@@ -83,7 +83,9 @@ def offline() -> None:
     # #endregion download
 
     # #region progress
-    runtime.set_offline_region_observed(region.id, True).result()
+    runtime.set_offline_region_observed(
+        region.id, mln.RuntimeEventFlag.ALL_RUNTIME_EVENTS
+    ).result()
     # #endregion progress
 
     # #region manage

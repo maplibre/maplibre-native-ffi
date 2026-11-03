@@ -883,8 +883,6 @@ internal expect object C {
 
   fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
 
-  fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int
-
   fun mln_runtime_get_offline_region(
     runtime: Long,
     regionId: Long,
@@ -931,8 +929,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_set_event_mask(runtime: Long, mask: Long, outDiagnostic: Long): Int
-
   fun mln_runtime_set_http_header_transform(
     runtime: Long,
     transform: Long,
@@ -958,7 +954,7 @@ internal expect object C {
   fun mln_runtime_set_offline_region_observed(
     runtime: Long,
     regionId: Long,
-    observed: Boolean,
+    events: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

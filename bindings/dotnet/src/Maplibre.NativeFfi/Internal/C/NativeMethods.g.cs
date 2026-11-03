@@ -1284,13 +1284,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_get_event_mask(
-        MlnRuntime runtime,
-        ulong* out_mask,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_get_offline_region(
         MlnRuntime runtime,
         long region_id,
@@ -1353,13 +1346,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_set_event_mask(
-        MlnRuntime runtime,
-        ulong mask,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_set_http_header_transform(
         MlnRuntime runtime,
         mln_http_header_transform* transform,
@@ -1388,7 +1374,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_runtime_set_offline_region_observed(
         MlnRuntime runtime,
         long region_id,
-        byte observed,
+        ulong events,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

@@ -172,19 +172,6 @@ impl RuntimeHandle {
         })
     }
 
-    /// Reads the runtime's event mask.
-    ///
-    /// See `mln_runtime_get_event_mask` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn get_event_mask(&self) -> Result<RuntimeEventFlag> {
-        let mut call = self.inner.call();
-        let mut out_mask: sys::mln_runtime_event_flags = Default::default();
-        call.status(|runtime, out_diagnostic| unsafe {
-            sys::mln_runtime_get_event_mask(runtime, &mut out_mask, out_diagnostic)
-        })?;
-        Ok(RuntimeEventFlag::from_bits_retain(out_mask))
-    }
-
     /// Reads the offline region `region_id`.
     ///
     /// The result is null when the cache file has no region with that ID.
@@ -363,21 +350,6 @@ impl RuntimeHandle {
         })
     }
 
-    /// Selects the runtime's own events that reach the event callback.
-    ///
-    /// Each map selects its events with `MapHandle::set_event_mask()` instead.
-    /// A runtime starts with every event selected.
-    ///
-    /// See `mln_runtime_set_event_mask` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_event_mask(&self, mask: RuntimeEventFlag) -> Result<()> {
-        let mut call = self.inner.call();
-        call.status(|runtime, out_diagnostic| unsafe {
-            sys::mln_runtime_set_event_mask(runtime, mask.bits(), out_diagnostic)
-        })?;
-        Ok(())
-    }
-
     /// Adds headers to the runtime's HTTP requests.
     ///
     /// The transform replaces the one set before. In a browser or on
@@ -460,8 +432,11 @@ impl RuntimeHandle {
         )
     }
 
-    /// Sets whether the runtime reports the download progress of the offline
-    /// region `region_id` as events.
+    /// Selects the events that the runtime reports about the download of the
+    /// offline region `region_id`.
+    ///
+    /// `events` holds bits of `RuntimeEventFlag::ALL_RUNTIME_EVENTS` and
+    /// replaces the region's previous selection.
     ///
     /// See `mln_runtime_set_offline_region_observed` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -472,7 +447,7 @@ impl RuntimeHandle {
     pub fn set_offline_region_observed(
         &self,
         region_id: i64,
-        observed: bool,
+        events: RuntimeEventFlag,
     ) -> Result<NativeFuture<()>> {
         let call = self.inner.call();
         call.complete(
@@ -480,7 +455,7 @@ impl RuntimeHandle {
                 sys::mln_runtime_set_offline_region_observed(
                     runtime,
                     region_id,
-                    observed,
+                    events.bits(),
                     completion,
                     out_diagnostic,
                 )

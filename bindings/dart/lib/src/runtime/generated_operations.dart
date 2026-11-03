@@ -7447,18 +7447,6 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     (handle) => raw.mln_runtime_dispose(handle.raw, nativeDiagnostic),
   );
 
-  /// Reads the runtime's event mask.
-  ///
-  /// See `mln_runtime_get_event_mask` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  RuntimeEventFlag getEventMask() => withNativeArena((arena) {
-    final outMask = arena<Uint64>();
-    _check(
-      raw.mln_runtime_get_event_mask(_handle.raw, outMask, nativeDiagnostic),
-    );
-    return RuntimeEventFlag.fromRawValue(outMask.value);
-  });
-
   /// Reads the offline region `regionId`.
   ///
   /// The result is null when the cache file has no region with that ID.
@@ -7603,21 +7591,6 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
         );
       });
 
-  /// Selects the runtime's own events that reach the event callback.
-  ///
-  /// Each map selects its events with `MapHandle.setEventMask()` instead. A
-  /// runtime starts with every event selected.
-  ///
-  /// See `mln_runtime_set_event_mask` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void setEventMask(RuntimeEventFlag mask) => _check(
-    raw.mln_runtime_set_event_mask(
-      _handle.raw,
-      mask.rawValue,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Adds headers to the runtime's HTTP requests.
   ///
   /// The transform replaces the one set before. In a browser or on OpenHarmony,
@@ -7682,8 +7655,12 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Sets whether the runtime reports the download progress of the offline
-  /// region `regionId` as events.
+  /// Selects the events that the runtime reports about the download of the
+  /// offline region `regionId`.
+  ///
+  /// `events` holds bits of `RuntimeEventFlag.allRuntimeEvents` and replaces
+  /// the region's previous selection. `RuntimeEventFlag.none` stops the
+  /// region's events.
   ///
   /// See `mln_runtime_set_offline_region_observed` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -7691,11 +7668,14 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.notFound` when the cache file has no region `regionId`.
-  Future<void> setOfflineRegionObserved(int regionId, bool observed) => _run(
+  Future<void> setOfflineRegionObserved(
+    int regionId,
+    RuntimeEventFlag events,
+  ) => _run(
     (arena, completion) => raw.mln_runtime_set_offline_region_observed(
       _handle.raw,
       regionId,
-      observed,
+      events.rawValue,
       completion,
       nativeDiagnostic,
     ),

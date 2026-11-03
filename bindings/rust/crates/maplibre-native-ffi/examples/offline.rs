@@ -87,7 +87,10 @@ async fn offline() -> Result<()> {
 
     // #region progress
     runtime
-        .set_offline_region_observed(region.id, true)?
+        .set_offline_region_observed(
+            region.id,
+            RuntimeEventFlag::ALL_RUNTIME_EVENTS,
+        )?
         .await?;
     // #endregion progress
 

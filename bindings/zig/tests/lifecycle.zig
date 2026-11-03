@@ -33,7 +33,7 @@ test "copied handles report native invalid state after release" {
 
     try support.closeRuntimeHandle(&fixture.runtime);
     try testing.expectError(error.InvalidState, support.closeRuntimeHandle(&runtime_copy));
-    try testing.expectError(error.InvalidState, runtime_copy.getEventMask(null));
+    try testing.expectError(error.InvalidState, runtime_copy.discarding().clearResourceTransform(null));
 }
 
 // A handle's id is the source that its events carry, and a close leaves it in

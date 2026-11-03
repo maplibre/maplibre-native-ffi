@@ -46,8 +46,8 @@ test "optional fields and masks round-trip through presence bits" {
     var mask = maplibre.RuntimeEventFlag.all;
     mask.map_tile_action = false;
     mask.offline_region_status_changed = false;
-    try fixture.runtime.setEventMask(mask, null);
-    try testing.expectEqual(mask, try fixture.runtime.getEventMask(null));
+    try support.expectCommitted(try fixture.map.setEventMask(mask, null));
+    try testing.expectEqual(mask, (try fixture.map.getSnapshot(null)).event_mask);
 }
 
 // Native steps through a batch by the stride it reports, which may exceed the

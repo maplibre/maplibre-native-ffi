@@ -125,7 +125,7 @@ void main() {
     final camera = await within(map.getCamera(), 'camera query');
     expect(camera.generation, greaterThanOrEqualTo(before.generation));
     expect(
-      () => fixture.runtime.setEventMask(
+      () => map.discarding.setEventMask(
         const RuntimeEventFlag.fromRawValue(1 << 40),
       ),
       throwsA(

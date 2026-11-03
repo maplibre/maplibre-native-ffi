@@ -1657,9 +1657,6 @@ internal actual object C {
   actual fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int =
     mln_kw_mln_runtime_dispose(runtime, word(outDiagnostic))
 
-  actual fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_runtime_get_event_mask(runtime, word(outMask), word(outDiagnostic))
-
   actual fun mln_runtime_get_offline_region(
     runtime: Long,
     regionId: Long,
@@ -1742,9 +1739,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_runtime_set_event_mask(runtime: Long, mask: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_runtime_set_event_mask(runtime, mask, word(outDiagnostic))
-
   actual fun mln_runtime_set_http_header_transform(
     runtime: Long,
     transform: Long,
@@ -1789,14 +1783,14 @@ internal actual object C {
   actual fun mln_runtime_set_offline_region_observed(
     runtime: Long,
     regionId: Long,
-    observed: Boolean,
+    events: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_runtime_set_offline_region_observed(
       runtime,
       regionId,
-      if (observed) 1 else 0,
+      events,
       word(completion),
       word(outDiagnostic),
     )
@@ -3092,11 +3086,6 @@ private fun mln_kw_mln_runtime_delete_offline_region(p0: Long, p1: Long, p2: Int
 private fun mln_kw_mln_runtime_dispose(p0: Long, p1: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_dispose(p0, p1)")
 
-private fun mln_kw_mln_runtime_get_event_mask(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_get_event_mask(p0, p1, p2)",
-  )
-
 private fun mln_kw_mln_runtime_get_offline_region(p0: Long, p1: Long, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_get_offline_region(p0, p1, p2, p3)",
@@ -3150,11 +3139,6 @@ private fun mln_kw_mln_runtime_set_event_handler(p0: Long, p1: Int, p2: Int, p3:
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_event_handler(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_runtime_set_event_mask(p0: Long, p1: Long, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_event_mask(p0, p1, p2)",
-  )
-
 private fun mln_kw_mln_runtime_set_http_header_transform(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_http_header_transform(p0, p1, p2, p3)",
@@ -3184,7 +3168,7 @@ private fun mln_kw_mln_runtime_set_offline_region_download_state(
 private fun mln_kw_mln_runtime_set_offline_region_observed(
   p0: Long,
   p1: Long,
-  p2: Int,
+  p2: Long,
   p3: Int,
   p4: Int,
 ): Int =

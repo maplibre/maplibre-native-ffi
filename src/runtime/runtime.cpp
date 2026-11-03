@@ -17,7 +17,6 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -517,24 +516,28 @@ auto fill_region_info(
   return MLN_STATUS_OK;
 }
 
-// Reports whether an offline region event would reach the queue: the region
-// must be observed and the runtime's mask must select the type. The three
+// Reports whether the region's observation selects the event type. The caller
+// holds the state's mutex.
+auto region_selects(
+  const mln::core::OfflineRegionEventState& state,
+  mln_offline_region_id region_id, mln_runtime_event_type type
+) -> bool {
+  const auto observed = state.observed_regions.find(region_id);
+  return observed != state.observed_regions.end() &&
+         ((observed->second >> type) & 1U) != 0U;
+}
+
+// Reports whether an offline region event would reach the queue. The three
 // observer callbacks call this before they build anything.
-// `push_offline_region_event()` checks the region again, because the two run at
-// different times and a region can be unobserved in between.
+// `push_offline_region_event()` checks again, because the two run at different
+// times and the region's observation can change in between.
 auto region_event_selected(
   const std::shared_ptr<mln::core::OfflineRegionEventState>& state,
   mln_offline_region_id region_id, mln_runtime_event_type type
 ) -> bool {
   const std::scoped_lock state_lock(state->mutex);
-  auto* runtime = state->runtime;
-  if (!state->alive || runtime == nullptr) {
-    return false;
-  }
-  if (!mln::core::event_selected(runtime->event_state->mask, type)) {
-    return false;
-  }
-  return state->observed_regions.contains(region_id);
+  return state->alive && state->runtime != nullptr &&
+         region_selects(*state, region_id, type);
 }
 
 auto push_offline_region_event(
@@ -550,8 +553,7 @@ auto push_offline_region_event(
     auto* runtime = state->runtime;
     if (
       !state->alive || runtime == nullptr ||
-      !state->observed_regions.contains(region_id) ||
-      !mln::core::event_selected(runtime->event_state->mask, type)
+      !region_selects(*state, region_id, type)
     ) {
       return;
     }
@@ -892,9 +894,6 @@ auto create_runtime(
     [runtime, asset_path = std::move(asset_path),
      cache_path = std::move(cache_path)]() mutable -> void {
       runtime->event_state = std::make_shared<RuntimeEventState>();
-      runtime->event_state->mask.store(
-        MLN_RUNTIME_EVENT_FLAG_ALL, std::memory_order_relaxed
-      );
       runtime->asset_path = std::move(asset_path);
       runtime->cache_path = std::move(cache_path);
       runtime->offline_event_state =
@@ -1999,20 +1998,27 @@ auto offline_region_get_status_start(
 }
 
 auto offline_region_set_observed_start(
-  mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  const mln_completion* completion
+  mln_runtime runtime, mln_offline_region_id region_id,
+  mln_runtime_event_flags events, const mln_completion* completion
 ) -> mln_status {
+  if (
+    (events &
+     ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS)) != 0U
+  ) {
+    set_thread_error("events must be offline region event flags");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, present_nothing<&mln_runtime_set_offline_region_observed>, completion,
-    [region_id, observed, offline_event_state = live->offline_event_state](
+    [region_id, events, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, region_id, observed, offline_event_state](
+        [database, state, region_id, events, offline_event_state](
           mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
@@ -2041,13 +2047,15 @@ auto offline_region_set_observed_start(
               );
               return;
             }
-            if (observed) {
-              offline_event_state->observed_regions.insert(region_id);
+            if (events != 0U) {
+              offline_event_state->observed_regions.insert_or_assign(
+                region_id, events
+              );
             } else {
               offline_event_state->observed_regions.erase(region_id);
             }
           }
-          auto observer = observed
+          auto observer = events != 0U
                             ? std::make_unique<OfflineRegionRuntimeObserver>(
                                 offline_event_state, region_id
                               )
@@ -2528,41 +2536,6 @@ auto clear_runtime_event_handler(
       previous = std::move(live->event_state->registration);
     }
   });
-}
-
-auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
-  const auto live = lease_runtime(runtime);
-  if (live == nullptr) return recorded_handle_fault_status();
-  if (!live->control.acquire()) {
-    set_thread_error("runtime is closing");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto control_lease = ControlLease{&live->control};
-  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_FLAG_ALL)) != 0U) {
-    set_thread_error("mask contains unknown bits");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  // The whole value is stored, including the map-event bits this runtime's own
-  // producers never test, so a getter reports what a host wrote.
-  live->event_state->mask.store(mask, std::memory_order_relaxed);
-  return MLN_STATUS_OK;
-}
-
-auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
-  -> mln_status {
-  if (out_mask == nullptr) {
-    set_thread_error("out_mask must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto live = lease_runtime(runtime);
-  if (live == nullptr) return recorded_handle_fault_status();
-  if (!live->control.acquire()) {
-    set_thread_error("runtime is closing");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto control_lease = ControlLease{&live->control};
-  *out_mask = live->event_state->mask.load(std::memory_order_relaxed);
-  return MLN_STATUS_OK;
 }
 
 auto retain_runtime_map(mln_runtime runtime) -> mln_status {

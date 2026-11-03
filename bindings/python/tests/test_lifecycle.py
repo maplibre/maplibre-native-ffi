@@ -113,7 +113,7 @@ def test_a_refused_close_leaves_the_handle_usable(
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):
-        harness.runtime.get_event_mask()
+        harness.runtime.discarding.clear_resource_transform()
 
 
 def test_a_child_keeps_its_parent_alive() -> None:

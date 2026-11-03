@@ -792,7 +792,6 @@ export interface NativeOperations {
     completion: NativeCompletion,
   ): void;
   mln_runtime_dispose(runtime: bigint, token: object | undefined): void;
-  mln_runtime_get_event_mask(runtime: bigint): RuntimeEventFlag;
   mln_runtime_get_offline_region(
     runtime: bigint,
     regionId: bigint,
@@ -832,7 +831,6 @@ export interface NativeOperations {
     handler: RuntimeEventHandler,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_runtime_set_event_mask(runtime: bigint, mask: RuntimeEventFlag): void;
   mln_runtime_set_http_header_transform(
     runtime: bigint,
     transform: HttpHeaderTransform,
@@ -852,7 +850,7 @@ export interface NativeOperations {
   mln_runtime_set_offline_region_observed(
     runtime: bigint,
     regionId: bigint,
-    observed: boolean,
+    events: RuntimeEventFlag,
     completion: NativeCompletion,
   ): void;
   mln_runtime_set_resource_provider(

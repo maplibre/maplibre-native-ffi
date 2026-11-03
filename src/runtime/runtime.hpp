@@ -12,7 +12,7 @@
 #include <shared_mutex>
 #include <string>
 #include <string_view>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -149,7 +149,6 @@ struct MapEventState {
 struct RuntimeEventRegistration;
 
 struct RuntimeEventState {
-  std::atomic<uint64_t> mask;
   // Written by runtime commands; offline producers hold their observer lock.
   std::shared_ptr<RuntimeEventRegistration> registration;
 };
@@ -326,7 +325,10 @@ struct OfflineRegionEventState {
   std::mutex mutex;
   RuntimeObject* runtime = nullptr;
   bool alive = false;
-  std::unordered_set<mln_offline_region_id> observed_regions;
+  // The event types that each observed region reports. A region that reports
+  // none has no entry.
+  std::unordered_map<mln_offline_region_id, mln_runtime_event_flags>
+    observed_regions;
 };
 
 struct RuntimeObject {
@@ -373,9 +375,6 @@ auto set_runtime_event_handler(
 auto clear_runtime_event_handler(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
-auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status;
-auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
-  -> mln_status;
 auto set_resource_provider(
   mln_runtime runtime, const mln_resource_provider* provider,
   const mln_completion* completion
@@ -444,8 +443,8 @@ auto offline_region_get_status_start(
   const mln_completion* completion
 ) -> mln_status;
 auto offline_region_set_observed_start(
-  mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  const mln_completion* completion
+  mln_runtime runtime, mln_offline_region_id region_id,
+  mln_runtime_event_flags events, const mln_completion* completion
 ) -> mln_status;
 
 struct OfflineRegionDownloadStateRequest {

@@ -160,19 +160,6 @@ internal constructor(
     nativeClose(this, binding) { check(C.mln_runtime_dispose(handle, diagnostic)) }
 
   /**
-   * Reads the runtime's event mask.
-   *
-   * See `mln_runtime_get_event_mask` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun getEventMask(): RuntimeEventFlag =
-    nativeCall(this, binding) {
-      val out = allocate(8, w(8, 8, 4))
-      check(C.mln_runtime_get_event_mask(handle, out, diagnostic))
-      RuntimeEventFlag(readU64(out))
-    }
-
-  /**
    * Reads the offline region `regionId`.
    *
    * The result is null when the cache file has no region with that ID.
@@ -338,20 +325,6 @@ internal constructor(
     }
 
   /**
-   * Selects the runtime's own events that reach the event callback.
-   *
-   * Each map selects its events with `MapHandle.setEventMask()` instead. A runtime starts with
-   * every event selected.
-   *
-   * See `mln_runtime_set_event_mask` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun setEventMask(mask: RuntimeEventFlag): Unit =
-    nativeCall(this, binding) {
-      check(C.mln_runtime_set_event_mask(handle, mask.rawValue.toLong(), diagnostic))
-    }
-
-  /**
    * Limits the size of the runtime's ambient cache.
    *
    * `size` is in bytes. Offline regions don't count toward it.
@@ -395,8 +368,11 @@ internal constructor(
     }
 
   /**
-   * Sets whether the runtime reports the download progress of the offline region `regionId` as
-   * events.
+   * Selects the events that the runtime reports about the download of the offline region
+   * `regionId`.
+   *
+   * `events` holds bits of `RuntimeEventFlag.ALL_RUNTIME_EVENTS` and replaces the region's previous
+   * selection. `RuntimeEventFlag.NONE` stops the region's events.
    *
    * See `mln_runtime_set_offline_region_observed` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -405,13 +381,13 @@ internal constructor(
    *
    * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
-  public fun setOfflineRegionObserved(regionId: Long, observed: Boolean): Deferred<Unit> =
+  public fun setOfflineRegionObserved(regionId: Long, events: RuntimeEventFlag): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_offline_region_observed(
           handle,
           regionId,
-          observed,
+          events.rawValue.toLong(),
           completion,
           diagnostic,
         ),

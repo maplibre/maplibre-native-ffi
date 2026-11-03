@@ -4,6 +4,7 @@
 import {
   CacheDatabaseOperation,
   OfflineRegionDownloadState,
+  RuntimeEventFlag,
   RuntimeHandle,
 } from "../../src/index.ts";
 
@@ -79,7 +80,10 @@ export async function offline(): Promise<void> {
   // #endregion download
 
   // #region progress
-  await runtime.setOfflineRegionObserved(region.id, true);
+  await runtime.setOfflineRegionObserved(
+    region.id,
+    RuntimeEventFlag.allRuntimeEvents,
+  );
   // #endregion progress
 
   // #region manage

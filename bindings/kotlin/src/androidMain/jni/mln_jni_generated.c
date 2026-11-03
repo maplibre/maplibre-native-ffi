@@ -1907,15 +1907,6 @@ static jint mln_runtime_dispose_jni(
   );
 }
 
-static jint mln_runtime_get_event_mask_jni(
-  JNIEnv* env, jclass type, jlong runtime, jlong out_mask, jlong out_diagnostic
-) {
-  return (jint)mln_runtime_get_event_mask(
-    (mln_runtime)runtime, MLN_JNI_POINTER(mln_runtime_event_flags*, out_mask),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_runtime_get_offline_region_jni(
   JNIEnv* env, jclass type, jlong runtime, jlong region_id, jlong completion,
   jlong out_diagnostic
@@ -2003,15 +1994,6 @@ static jint mln_runtime_set_event_handler_jni(
   );
 }
 
-static jint mln_runtime_set_event_mask_jni(
-  JNIEnv* env, jclass type, jlong runtime, jlong mask, jlong out_diagnostic
-) {
-  return (jint)mln_runtime_set_event_mask(
-    (mln_runtime)runtime, (mln_runtime_event_flags)mask,
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_runtime_set_http_header_transform_jni(
   JNIEnv* env, jclass type, jlong runtime, jlong transform, jlong completion,
   jlong out_diagnostic
@@ -2048,11 +2030,12 @@ static jint mln_runtime_set_offline_region_download_state_jni(
 }
 
 static jint mln_runtime_set_offline_region_observed_jni(
-  JNIEnv* env, jclass type, jlong runtime, jlong region_id, jboolean observed,
+  JNIEnv* env, jclass type, jlong runtime, jlong region_id, jlong events,
   jlong completion, jlong out_diagnostic
 ) {
   return (jint)mln_runtime_set_offline_region_observed(
-    (mln_runtime)runtime, (mln_offline_region_id)region_id, (bool)observed,
+    (mln_runtime)runtime, (mln_offline_region_id)region_id,
+    (mln_runtime_event_flags)events,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2451,8 +2434,6 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_runtime_delete_offline_region", "(JJJJ)I",
    (void*)mln_runtime_delete_offline_region_jni},
   {"mln_runtime_dispose", "(JJ)I", (void*)mln_runtime_dispose_jni},
-  {"mln_runtime_get_event_mask", "(JJJ)I",
-   (void*)mln_runtime_get_event_mask_jni},
   {"mln_runtime_get_offline_region", "(JJJJ)I",
    (void*)mln_runtime_get_offline_region_jni},
   {"mln_runtime_get_offline_region_status", "(JJJJ)I",
@@ -2468,15 +2449,13 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_runtime_run_cache_database_operation_jni},
   {"mln_runtime_set_event_handler", "(JJJJ)I",
    (void*)mln_runtime_set_event_handler_jni},
-  {"mln_runtime_set_event_mask", "(JJJ)I",
-   (void*)mln_runtime_set_event_mask_jni},
   {"mln_runtime_set_http_header_transform", "(JJJJ)I",
    (void*)mln_runtime_set_http_header_transform_jni},
   {"mln_runtime_set_maximum_ambient_cache_size", "(JJJJ)I",
    (void*)mln_runtime_set_maximum_ambient_cache_size_jni},
   {"mln_runtime_set_offline_region_download_state", "(JJIJJ)I",
    (void*)mln_runtime_set_offline_region_download_state_jni},
-  {"mln_runtime_set_offline_region_observed", "(JJZJJ)I",
+  {"mln_runtime_set_offline_region_observed", "(JJJJJ)I",
    (void*)mln_runtime_set_offline_region_observed_jni},
   {"mln_runtime_set_resource_provider", "(JJJJ)I",
    (void*)mln_runtime_set_resource_provider_jni},
@@ -2809,8 +2788,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_runtime_delete_offline_region", "(JJJJ)I",
    (void*)mln_runtime_delete_offline_region_jni},
   {"mln_runtime_dispose", "(JJ)I", (void*)mln_runtime_dispose_jni},
-  {"mln_runtime_get_event_mask", "(JJJ)I",
-   (void*)mln_runtime_get_event_mask_jni},
   {"mln_runtime_get_offline_region", "(JJJJ)I",
    (void*)mln_runtime_get_offline_region_jni},
   {"mln_runtime_get_offline_region_status", "(JJJJ)I",
@@ -2826,15 +2803,13 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_runtime_run_cache_database_operation_jni},
   {"mln_runtime_set_event_handler", "(JJJJ)I",
    (void*)mln_runtime_set_event_handler_jni},
-  {"mln_runtime_set_event_mask", "(JJJ)I",
-   (void*)mln_runtime_set_event_mask_jni},
   {"mln_runtime_set_http_header_transform", "(JJJJ)I",
    (void*)mln_runtime_set_http_header_transform_jni},
   {"mln_runtime_set_maximum_ambient_cache_size", "(JJJJ)I",
    (void*)mln_runtime_set_maximum_ambient_cache_size_jni},
   {"mln_runtime_set_offline_region_download_state", "(JJIJJ)I",
    (void*)mln_runtime_set_offline_region_download_state_jni},
-  {"mln_runtime_set_offline_region_observed", "(JJZJJ)I",
+  {"mln_runtime_set_offline_region_observed", "(JJJJJ)I",
    (void*)mln_runtime_set_offline_region_observed_jni},
   {"mln_runtime_set_resource_provider", "(JJJJ)I",
    (void*)mln_runtime_set_resource_provider_jni},

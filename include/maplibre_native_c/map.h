@@ -843,16 +843,21 @@ MLN_API mln_status mln_runtime_get_offline_region_status(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets whether the runtime reports the download progress of the offline region
- * `region_id` as events.
+ * Selects the events that the runtime reports about the download of the
+ * offline region `region_id`.
+ *
+ * `events` holds bits of MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS and replaces
+ * the region's previous selection. MLN_RUNTIME_EVENT_FLAG_NONE stops the
+ * region's events.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_offline_region_observed(
-  mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_runtime runtime, mln_offline_region_id region_id,
+  mln_runtime_event_flags events, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

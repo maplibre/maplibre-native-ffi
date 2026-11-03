@@ -2,22 +2,16 @@
 
 #include "support/test_support.h"
 
-static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
-
 typedef struct foreign_thread_probe {
   mln_runtime runtime;
   mln_map map;
   mln_status drain_status;
-  mln_status runtime_mask_status;
   mln_status map_mask_status;
 } foreign_thread_probe;
 
 static void call_event_api_from_a_foreign_thread(void* argument) {
   foreign_thread_probe* probe = argument;
   probe->drain_status = mln_test_dispatch_events(probe->runtime, NULL, NULL);
-  probe->runtime_mask_status = mln_runtime_set_event_mask(
-    probe->runtime, MLN_RUNTIME_EVENT_FLAG_ALL, NULL
-  );
   probe->map_mask_status =
     mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_FLAG_ALL);
 }
@@ -140,46 +134,23 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void event_masks_change_from_any_thread_and_keep_foreign_bits(void) {
+static void the_event_queue_and_map_mask_accept_any_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_background_style_json);
   mln_test_drain_all(runtime);
-  {
-    foreign_thread_probe probe = {.runtime = runtime, .map = map};
-    mln_test_thread* thread =
-      mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
-    mln_test_thread_join(thread);
+  foreign_thread_probe probe = {.runtime = runtime, .map = map};
+  mln_test_thread* thread =
+    mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
+  mln_test_thread_join(thread);
 
-    // The queue accepts a drain from a foreign thread.
-    MLN_TEST_OK(probe.drain_status);
-    MLN_TEST_OK(probe.runtime_mask_status);
-    MLN_TEST_OK(probe.map_mask_status);
+  // The queue accepts a drain from a foreign thread.
+  MLN_TEST_OK(probe.drain_status);
+  MLN_TEST_OK(probe.map_mask_status);
 
-    uint64_t map_mask = 0;
-    MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_FLAG_ALL, map_mask);
-  }
-  // The setter reads only its own group's bits but stores the whole value, so
-  // a host that reads a mask, sets one bit, and writes it back keeps every
-  // other.
-  {
-    MLN_TEST_INVALID(
-      mln_runtime_set_event_mask(runtime, unknown_mask_bit, NULL)
-    );
-
-    // One in-group bit for the other source kind.
-    uint64_t runtime_mask = 0;
-    MLN_TEST_OK(mln_runtime_set_event_mask(
-      runtime, MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED, NULL
-    ));
-    MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
-    TEST_ASSERT_EQUAL_UINT64(
-      MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED, runtime_mask
-    );
-
-    MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, NULL, NULL));
-  }
+  uint64_t map_mask = 0;
+  MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
+  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_FLAG_ALL, map_mask);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -333,7 +304,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_handler_accepted_before_a_map_receives_its_first_events);
   RUN_TEST(callback_event_state_retires_after_its_last_event);
   RUN_TEST(events_and_their_completion_share_fifo_order);
-  RUN_TEST(event_masks_change_from_any_thread_and_keep_foreign_bits);
+  RUN_TEST(the_event_queue_and_map_mask_accept_any_thread);
   RUN_TEST(options_reject_unknown_event_mask_bits);
   RUN_TEST(options_without_an_event_mask_select_every_event);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);

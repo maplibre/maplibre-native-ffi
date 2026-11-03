@@ -1095,8 +1095,6 @@ internal actual object C {
     )
   private val mln_runtime_dispose =
     Ffm.downcall("mln_runtime_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
-  private val mln_runtime_get_event_mask =
-    Ffm.downcall("mln_runtime_get_event_mask", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_get_offline_region =
     Ffm.downcall(
       "mln_runtime_get_offline_region",
@@ -1155,8 +1153,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_runtime_set_event_mask =
-    Ffm.downcall("mln_runtime_set_event_mask", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_runtime_set_http_header_transform =
     Ffm.downcall(
       "mln_runtime_set_http_header_transform",
@@ -1191,7 +1187,7 @@ internal actual object C {
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
-      JAVA_BOOLEAN,
+      JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -2935,9 +2931,6 @@ internal actual object C {
   actual fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int =
     mln_runtime_dispose.invokeExact(runtime, outDiagnostic) as Int
 
-  actual fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int =
-    mln_runtime_get_event_mask.invokeExact(runtime, outMask, outDiagnostic) as Int
-
   actual fun mln_runtime_get_offline_region(
     runtime: Long,
     regionId: Long,
@@ -3007,9 +3000,6 @@ internal actual object C {
   ): Int =
     mln_runtime_set_event_handler.invokeExact(runtime, handler, completion, outDiagnostic) as Int
 
-  actual fun mln_runtime_set_event_mask(runtime: Long, mask: Long, outDiagnostic: Long): Int =
-    mln_runtime_set_event_mask.invokeExact(runtime, mask, outDiagnostic) as Int
-
   actual fun mln_runtime_set_http_header_transform(
     runtime: Long,
     transform: Long,
@@ -3046,14 +3036,14 @@ internal actual object C {
   actual fun mln_runtime_set_offline_region_observed(
     runtime: Long,
     regionId: Long,
-    observed: Boolean,
+    events: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_runtime_set_offline_region_observed.invokeExact(
       runtime,
       regionId,
-      observed,
+      events,
       completion,
       outDiagnostic,
     ) as Int
