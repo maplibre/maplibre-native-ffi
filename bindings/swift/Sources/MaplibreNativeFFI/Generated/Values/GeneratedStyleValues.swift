@@ -244,9 +244,6 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   public var clusterMinPoints: UInt32?
   public var lineMetrics: Bool?
   public var cluster: Bool?
-  /// Builds tiles while the map renders instead of in the background, so that
-  /// new data shows in the next frame.
-  public var synchronousTiling: Bool?
   public init(
     minZoom: Double? = nil,
     maxZoom: Double? = nil,
@@ -257,8 +254,7 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
     clusterRadius: UInt32? = nil,
     clusterMinPoints: UInt32? = nil,
     lineMetrics: Bool? = nil,
-    cluster: Bool? = nil,
-    synchronousTiling: Bool? = nil
+    cluster: Bool? = nil
   ) {
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -270,7 +266,6 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
     self.clusterMinPoints = clusterMinPoints
     self.lineMetrics = lineMetrics
     self.cluster = cluster
-    self.synchronousTiling = synchronousTiling
   }
 
   init(
@@ -300,9 +295,6 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.line_metrics : nil
     cluster = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER
       .rawValue != 0 ? raw.cluster : nil
-    synchronousTiling = raw
-      .fields & MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING
-      .rawValue != 0 ? raw.synchronous_tiling : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -347,10 +339,6 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
     if let item = cluster {
       raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER.rawValue; raw
         .cluster = item
-    }
-    if let item = synchronousTiling {
-      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING.rawValue; raw
-        .synchronous_tiling = item
     }
     return raw
   }

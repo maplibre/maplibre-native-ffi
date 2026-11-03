@@ -296,7 +296,6 @@ internal unsafe struct mln_geo_json_source_options
     public uint cluster_min_points;
     public byte line_metrics;
     public byte cluster;
-    public byte synchronous_tiling;
 }
 
 internal unsafe struct mln_gpu_sync
@@ -1522,7 +1521,6 @@ internal enum mln_geo_json_source_option_field : uint
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64,
     MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128,
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256,
-    MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 512,
 }
 
 internal enum mln_gesture_phase : uint

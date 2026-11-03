@@ -2133,7 +2133,6 @@ final class GeoJsonSourceOptions extends _Value {
     this.clusterMinPoints,
     this.lineMetrics,
     this.cluster,
-    this.synchronousTiling,
   });
   final double? minZoom;
   final double? maxZoom;
@@ -2148,10 +2147,6 @@ final class GeoJsonSourceOptions extends _Value {
   final bool? lineMetrics;
   final bool? cluster;
 
-  /// Builds tiles while the map renders instead of in the background, so that
-  /// new data shows in the next frame.
-  final bool? synchronousTiling;
-
   /// A copy of this value with the given members replaced.
   GeoJsonSourceOptions copyWith({
     double? minZoom,
@@ -2164,7 +2159,6 @@ final class GeoJsonSourceOptions extends _Value {
     int? clusterMinPoints,
     bool? lineMetrics,
     bool? cluster,
-    bool? synchronousTiling,
   }) => GeoJsonSourceOptions(
     minZoom: minZoom ?? this.minZoom,
     maxZoom: maxZoom ?? this.maxZoom,
@@ -2178,7 +2172,6 @@ final class GeoJsonSourceOptions extends _Value {
     clusterMinPoints: clusterMinPoints ?? this.clusterMinPoints,
     lineMetrics: lineMetrics ?? this.lineMetrics,
     cluster: cluster ?? this.cluster,
-    synchronousTiling: synchronousTiling ?? this.synchronousTiling,
   );
 
   @override
@@ -2193,7 +2186,6 @@ final class GeoJsonSourceOptions extends _Value {
     clusterMinPoints,
     lineMetrics,
     cluster,
-    synchronousTiling,
   ];
   @override
   String toString() => _describe('GeoJsonSourceOptions', const [
@@ -2207,7 +2199,6 @@ final class GeoJsonSourceOptions extends _Value {
     'clusterMinPoints',
     'lineMetrics',
     'cluster',
-    'synchronousTiling',
   ]);
 }
 

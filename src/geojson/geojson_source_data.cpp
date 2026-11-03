@@ -107,11 +107,11 @@ auto validate_clustered_geojson(const mln::GeoJSON& geojson) -> bool {
 }
 
 // Serializes tile slicing over a geojson-vt index. The index caches sliced
-// tiles lazily and unguarded, which is safe upstream because one source's
-// requests either all run inline or all run on the data's one sequenced
-// scheduler. A prepared handle installed on several sources, or a synchronous
-// tiling toggle with async slices in flight, mixes those modes on one index,
-// so every slice takes this wrapper's lock instead.
+// tiles lazily. A prepared handle installed on several sources, or a
+// synchronous tiling toggle with async slices in flight, mixes inline and
+// queued slices on one index, so every slice takes this wrapper's lock. Engine
+// patch 0071 locks every geojson-vt slice too. The wrapper also lets a queued
+// slice hold its data weakly and marks the GeoJsonTileSlice sync point.
 class SerializedGeoJsonData final : public mln::style::GeoJSONData {
  public:
   SerializedGeoJsonData(
@@ -270,13 +270,6 @@ auto effective_geojson_source_options(
   if (has_geojson_source_option(*options, MLN_GEO_JSON_SOURCE_OPTION_CLUSTER)) {
     result.cluster = options->cluster;
   }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING
-    )
-  ) {
-    result.synchronous_tiling = options->synchronous_tiling;
-  }
   return result;
 }
 
@@ -302,8 +295,7 @@ auto validate_and_resolve_geojson_source_options(
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
     MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS |
-    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER |
-    MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
   if ((options->fields & ~known_fields) != 0U) {
     set_thread_error(
       "mln_geo_json_source_options.fields contains unknown bits"
@@ -376,7 +368,6 @@ auto to_native_geojson_source_options(
   native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
   native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
   native.clusterMinPoints = options.cluster_min_points;
-  native.synchronousUpdate = options.synchronous_tiling;
 
   if (options.cluster_properties.size != 0) {
     auto document = mln::JSDocument{};
@@ -455,7 +446,6 @@ auto geojson_source_options_equal(
          left.clusterRadius == right.clusterRadius &&
          left.clusterMaxZoom == right.clusterMaxZoom &&
          left.clusterMinPoints == right.clusterMinPoints &&
-         left.synchronousUpdate == right.synchronousUpdate &&
          cluster_properties_equal(
            left.clusterProperties, right.clusterProperties
          );

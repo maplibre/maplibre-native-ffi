@@ -90,7 +90,6 @@ pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geo_json_source_option_
 pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geo_json_source_option_field = 64;
 pub const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS: mln_geo_json_source_option_field = 128;
 pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER: mln_geo_json_source_option_field = 256;
-pub const MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING: mln_geo_json_source_option_field = 512;
 pub type mln_gesture_phase = u32;
 pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
 pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
@@ -751,7 +750,6 @@ pub struct mln_geo_json_source_options {
     pub cluster_min_points: u32,
     pub line_metrics: bool,
     pub cluster: bool,
-    pub synchronous_tiling: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

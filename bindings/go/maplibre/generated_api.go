@@ -2496,9 +2496,6 @@ type GeoJsonSourceOptions struct {
 	ClusterMinPoints  *uint32
 	LineMetrics       *bool
 	Cluster           *bool
-	// Builds tiles while the map renders instead of in the background, so that new
-	// data shows in the next frame.
-	SynchronousTiling *bool
 }
 
 func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena) C.mln_geo_json_source_options {
@@ -2515,7 +2512,6 @@ func nativeGeoJsonSourceOptions(input GeoJsonSourceOptions, arena *bindingArena)
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint32, C.uint32_t])
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, input.LineMetrics, arena, bindingBool[bool, C.bool])
 	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER, &raw.cluster, input.Cluster, arena, bindingBool[bool, C.bool])
-	bindingMasked(&raw.fields, C.MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, input.SynchronousTiling, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
@@ -7357,11 +7353,12 @@ func (receiver *MapHandle) SetGeoJsonSourceData(sourceId string, data *GeoJsonSo
 }
 
 // SetGeoJsonSourceSynchronousTiling sets whether a GeoJSON source builds its
-// tiles synchronously.
+// tiles while the map renders.
 //
-// This works like the synchronous tiling option of GeoJsonSourceOptions, but
-// enabled can't turn off synchronous tiling that the source's options turned
-// on.
+// When enabled is true, the source builds its tiles while the map renders
+// instead of in the background, so new data shows in the next frame. Until this
+// is called, a source follows the synchronousUpdate member of its source JSON,
+// which defaults to false. This setting replaces that value.
 //
 // See mln_map_set_geo_json_source_synchronous_tiling in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html

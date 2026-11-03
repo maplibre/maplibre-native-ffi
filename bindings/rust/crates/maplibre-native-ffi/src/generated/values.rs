@@ -1153,9 +1153,6 @@ pub struct GeoJsonSourceOptions<'a> {
     pub cluster_min_points: Option<u32>,
     pub line_metrics: Option<bool>,
     pub cluster: Option<bool>,
-    /// Builds tiles while the map renders instead of in the background, so that
-    /// new data shows in the next frame.
-    pub synchronous_tiling: Option<bool>,
 }
 impl<'a> ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_geo_json_source_options> {
@@ -1198,10 +1195,6 @@ impl<'a> ToNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions<'a>
         if let Some(item) = &self.cluster {
             raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
             raw.cluster = *item;
-        }
-        if let Some(item) = &self.synchronous_tiling {
-            raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-            raw.synchronous_tiling = *item;
         }
         Ok(raw)
     }

@@ -130,7 +130,6 @@ typedef enum MLN_BINDING(
   MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 6U,
   MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 1U << 7U,
   MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 1U << 8U,
-  MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 9U,
 } mln_geo_json_source_option_field;
 
 /** A set of mln_geo_json_source_option_field bits. */
@@ -287,13 +286,6 @@ typedef struct mln_geo_json_source_options {
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS");
   bool cluster
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER");
-  /**
-   * Builds tiles while the map renders instead of in the background, so that
-   * new data shows in the next frame.
-   */
-  bool synchronous_tiling MLN_BINDING(
-    "mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING"
-  );
 } mln_geo_json_source_options;
 
 /**
@@ -621,11 +613,12 @@ MLN_API mln_status mln_map_set_geo_json_source_data(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets whether a GeoJSON source builds its tiles synchronously.
+ * Sets whether a GeoJSON source builds its tiles while the map renders.
  *
- * This works like the synchronous tiling option of mln_geo_json_source_options,
- * but `enabled` can't turn off synchronous tiling that the source's options
- * turned on.
+ * When `enabled` is true, the source builds its tiles while the map renders
+ * instead of in the background, so new data shows in the next frame. Until
+ * this is called, a source follows the `synchronousUpdate` member of its
+ * source JSON, which defaults to false. This setting replaces that value.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.

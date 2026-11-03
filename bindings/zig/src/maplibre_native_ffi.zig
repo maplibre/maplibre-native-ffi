@@ -1081,11 +1081,12 @@ pub const Map = struct {
         return call.submit("mln_map_set_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
 
-    /// Sets whether a GeoJSON source builds its tiles synchronously.
+    /// Sets whether a GeoJSON source builds its tiles while the map renders.
     ///
-    /// This works like the synchronous tiling option of `GeoJsonSourceOptions`, but
-    /// `enabled` can't turn off synchronous tiling that the source's options turned
-    /// on.
+    /// When `enabled` is true, the source builds its tiles while the map renders
+    /// instead of in the background, so new data shows in the next frame. Until
+    /// this is called, a source follows the `synchronousUpdate` member of its
+    /// source JSON, which defaults to false. This setting replaces that value.
     ///
     /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3423,9 +3424,6 @@ pub const GeoJsonSourceOptions = struct {
     cluster_min_points: ?u32 = null,
     line_metrics: ?bool = null,
     cluster: ?bool = null,
-    /// Builds tiles while the map renders instead of in the background, so that
-    /// new data shows in the next frame.
-    synchronous_tiling: ?bool = null,
     pub fn toNative(self: GeoJsonSourceOptions) status.Error!c.mln_geo_json_source_options {
         var raw = std.mem.zeroes(c.mln_geo_json_source_options);
         raw.fields = 0;
@@ -3440,7 +3438,6 @@ pub const GeoJsonSourceOptions = struct {
         marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, self.cluster_min_points);
         marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, self.line_metrics);
         marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER, &raw.cluster, self.cluster);
-        marshal.present(&raw.fields, c.MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, self.synchronous_tiling);
         return raw;
     }
 
@@ -3456,7 +3453,6 @@ pub const GeoJsonSourceOptions = struct {
             .cluster_min_points = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0) raw.cluster_min_points else null,
             .line_metrics = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS != 0) raw.line_metrics else null,
             .cluster = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0) raw.cluster else null,
-            .synchronous_tiling = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0) raw.synchronous_tiling else null,
         };
     }
 };

@@ -1674,11 +1674,6 @@ class GeoJsonSourceOptions:
 
     cluster: bool | None = None
 
-    synchronous_tiling: bool | None = None
-    """Builds tiles while the map renders instead of in the background, so that
-    new data shows in the next frame.
-    """
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -1692,7 +1687,6 @@ class GeoJsonSourceOptions:
             cluster_min_points=raw["cluster_min_points"],
             line_metrics=raw["line_metrics"],
             cluster=raw["cluster"],
-            synchronous_tiling=raw["synchronous_tiling"],
         )
 
 

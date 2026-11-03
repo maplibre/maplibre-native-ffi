@@ -1878,10 +1878,6 @@ fn generated_input_mln_geo_json_source_options<'py>(
         raw.cluster = field.extract::<bool>()?;
         raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
     }
-    if let Some(field) = generated_present(value, "synchronous_tiling")? {
-        raw.synchronous_tiling = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-    }
     Ok(raw)
 }
 

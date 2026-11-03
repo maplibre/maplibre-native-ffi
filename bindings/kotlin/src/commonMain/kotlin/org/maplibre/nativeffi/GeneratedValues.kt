@@ -2170,11 +2170,6 @@ public data class GeoJsonSourceOptions(
   public val clusterMinPoints: UInt? = null,
   public val lineMetrics: Boolean? = null,
   public val cluster: Boolean? = null,
-  /**
-   * Builds tiles while the map renders instead of in the background, so that new data shows in the
-   * next frame.
-   */
-  public val synchronousTiling: Boolean? = null,
 )
 
 /**

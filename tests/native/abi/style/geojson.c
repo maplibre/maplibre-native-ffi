@@ -75,8 +75,7 @@ static void every_option(mln_geo_json_source_options* options) {
                     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS |
                     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
                     MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS |
-                    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER |
-                    MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+                    MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
   options->min_zoom = 2.0;
   options->max_zoom = 14.0;
   options->tolerance = 0.5;
@@ -88,7 +87,6 @@ static void every_option(mln_geo_json_source_options* options) {
   options->cluster_min_points = 3;
   options->line_metrics = false;
   options->cluster = true;
-  options->synchronous_tiling = true;
 }
 
 static void undersized(mln_geo_json_source_options* options) {
@@ -412,9 +410,6 @@ static void change_cluster_min_points(mln_geo_json_source_options* options) {
 static void change_buffer(mln_geo_json_source_options* options) {
   options->buffer = 64;
 }
-static void change_synchronous_tiling(mln_geo_json_source_options* options) {
-  options->synchronous_tiling = true;
-}
 
 // MapLibre Native fixes a source's options when it is added, so installed data
 // must carry equal options. Cluster aggregations compare as parsed
@@ -487,7 +482,6 @@ static void prepared_data_must_match_the_source_options(void) {
     {MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS, change_cluster_radius},
     {MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, change_cluster_min_points},
     {MLN_GEO_JSON_SOURCE_OPTION_BUFFER, change_buffer},
-    {MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING, change_synchronous_tiling},
   };
   for (size_t index = 0; index < sizeof(fields) / sizeof(fields[0]);
        index += 1) {

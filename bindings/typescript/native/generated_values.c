@@ -3709,16 +3709,6 @@ bool mln_ts_write_geo_json_source_options(
     }
     out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
   }
-  if (!mln_ts_member(call, value, "synchronousTiling", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "synchronousTiling");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      bool flag = false;
-      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
-      out->synchronous_tiling = flag;
-    }
-    out->fields |= MLN_GEO_JSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-  }
   return true;
 }
 
