@@ -92,7 +92,7 @@ def offline() -> None:
     for stored in runtime.list_offline_regions().result():
         record_region(stored.id, stored.metadata)
 
-    # Resume a download that stopped when the runtime closed.
+    # Resume a download that stopped when the runtime was released.
     runtime.set_offline_region_download_state(
         region.id, mln.OfflineRegionDownloadState.ACTIVE
     ).result()
@@ -102,4 +102,4 @@ def offline() -> None:
     runtime.delete_offline_region(region.id).result()
     # #endregion manage
 
-    runtime.close().result()
+    runtime.release().result()

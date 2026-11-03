@@ -601,7 +601,7 @@ private func invokeResourceProviderCallback(
     reportToStandardError(
       "mln_resource_provider_callback failed: \(error)\n"
     ); ownedHandle
-      .close()
+      .release()
   }
 }
 
@@ -968,7 +968,7 @@ private func invokeResourceTransformCallback(
     reportToStandardError(
       "mln_resource_transform_callback failed: \(error)\n"
     ); ownedRequest
-      .close()
+      .release()
   }
 }
 

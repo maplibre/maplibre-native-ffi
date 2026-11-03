@@ -27,10 +27,10 @@ void main() {
     handle.complete(emptyStyleResponse);
     await expectCommitted(loaded);
 
-    // The accepted answer consumed the handle, so closing it does nothing and
+    // The accepted answer consumed the handle, so releasing it does nothing and
     // native refuses a second answer or any other call on it.
     expect(handle.isClosed, isTrue);
-    handle.close();
+    handle.release();
     final isInvalidState = throwsA(
       isA<MaplibreException>().having(
         (error) => error.status,
@@ -48,7 +48,7 @@ void main() {
     expect(handle.isCancelled, isInvalidState);
   });
 
-  test('a refused answer closes its request and fails it', () async {
+  test('a refused answer retires its request and fails it', () async {
     const styleUrl = 'custom://refused-style.json';
     final handed = Completer<ResourceRequestHandle>();
     final fixture = await openRuntime(
@@ -105,7 +105,7 @@ void main() {
       )!;
       final map = await fixture.openMap();
 
-      // The binding closes the handle the throwing callback abandoned, which
+      // The binding releases the handle the throwing callback abandoned, which
       // fails the request instead of leaving the style load waiting.
       await expectLater(
         within(map.setStyleUrl(styleUrl), 'a command'),
@@ -147,10 +147,10 @@ void main() {
     map.discarding.setStyleUrl(styleUrl);
     final handle = await within(handed.future, 'the provider');
 
-    await within(map.close(), 'map close');
-    await within(fixture.runtime.close(), 'runtime close');
+    await within(map.release(), 'map release');
+    await within(fixture.runtime.release(), 'runtime release');
     expect(await within(cancelled.future, 'the cancel callback'), isTrue);
     expect(zoneErrors, [isA<StateError>()]);
-    handle.close();
+    handle.release();
   });
 }

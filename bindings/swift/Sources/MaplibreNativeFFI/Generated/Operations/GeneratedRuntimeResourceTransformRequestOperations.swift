@@ -7,7 +7,7 @@ public extension ResourceTransformRequestHandle {
   /// Answers a resource transform request with the URL to load instead.
   ///
   /// `url` must not be empty. A failed answer fails the request with
-  /// `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.close()`
+  /// `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.release()`
   /// does.
   ///
   /// See `mln_resource_transform_request_complete` in the
@@ -32,7 +32,7 @@ public extension ResourceTransformRequestHandle {
   /// The library retries a request that failed for a reason it retries, such as
   /// `ResourceErrorReason.connection`, and the retry calls the transform again.
   /// When this call fails, the request fails with `ResourceErrorReason.other`,
-  /// as `ResourceTransformRequestHandle.close()` does.
+  /// as `ResourceTransformRequestHandle.release()` does.
   ///
   /// See `mln_resource_transform_request_fail` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -58,7 +58,7 @@ public extension ResourceTransformRequestHandle {
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func close() {
+  func release() {
     nativeClose { raw in mln_resource_transform_request_release(raw) }
   }
 }

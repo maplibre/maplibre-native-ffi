@@ -12,8 +12,8 @@ async function run(): Promise<void> {
     initialExtent: { width: 32, height: 32, scaleFactor: 1 },
   });
   await map.ready;
-  await map.close();
-  await runtime.close();
+  await map.release();
+  await runtime.release();
   host.__mlnDone();
 }
 void run().catch((error: unknown) =>

@@ -13,7 +13,7 @@ void main() {
 
   test(
     'pending completions keep the process alive until unawaited cleanup ends',
-    () => expectCleanExit(executable, 'unawaited', 'CLOSED_ALL_HANDLES'),
+    () => expectCleanExit(executable, 'unawaited', 'RELEASED_ALL_HANDLES'),
   );
 
   test('shutdown with live handles and callbacks exits cleanly', () async {

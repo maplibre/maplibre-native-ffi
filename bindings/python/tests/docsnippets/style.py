@@ -37,7 +37,7 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
 
     # #region geojson
     # The source keeps its own reference to
-    # the data, so the block can close it.
+    # the data, so the block can release it.
     with mln.GeoJsonSourceDataHandle.create(
         {"type": "Point", "coordinates": [-122.4, 37.8]}
     ) as data:

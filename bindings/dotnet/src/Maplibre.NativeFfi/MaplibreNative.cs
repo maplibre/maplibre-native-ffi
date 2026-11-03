@@ -4,7 +4,7 @@ namespace Maplibre.NativeFfi;
 
 /// <summary>Process-global MapLibre Native FFI entry points.</summary>
 /// <remarks>
-/// A handle that the collector reclaims before it is closed or disposed is reported as a leak
+/// A handle that the collector reclaims before it is released or disposed is reported as a leak
 /// through <see cref="System.Diagnostics.Trace.TraceWarning(string)" />, or on standard error
 /// when the host has added no trace listener.
 /// </remarks>

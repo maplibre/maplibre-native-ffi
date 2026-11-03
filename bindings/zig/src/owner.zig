@@ -44,7 +44,7 @@ pub fn Handle(comptime Self: type, comptime public_name: []const u8, comptime di
             return error.InvalidState;
         }
 
-        /// Returns the native handle value, which stays in place after close.
+        /// Returns the native handle value, which stays in place after release.
         pub fn id(self: Self) u64 {
             return self.raw;
         }

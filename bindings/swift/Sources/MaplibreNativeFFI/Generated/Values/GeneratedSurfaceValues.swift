@@ -47,7 +47,7 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
 ///
 /// The session renders to it with the device that it attached with. It uses the
 /// layer until a replacement or release of the target completes, a detach or
-/// disposal of the session completes, or an abandon of it returns.
+/// release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_metal_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -77,8 +77,8 @@ public struct MetalSurfaceReplacement: Equatable, Hashable, Sendable {
 /// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
 ///
 /// The session uses the surface until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -149,7 +149,7 @@ public struct OpenGlSurfaceReplacement: Equatable, Hashable, Sendable {
 /// The device must have VK_KHR_swapchain enabled, and the queue family of
 /// `graphics_queue_family_index` must support presenting to the surface. The
 /// session creates the swapchain. It uses the surface until a replacement or
-/// release of the target completes, a detach or disposal of the session
+/// release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_surface_descriptor` in the
@@ -190,7 +190,7 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// The session presents to it with the context that it attached with, so the
 /// queue family of that context's `graphics_queue_family_index` must support
 /// presenting to the surface. It uses the surface until a replacement or
-/// release of the target completes, a detach or disposal of the session
+/// release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_surface_replacement` in the

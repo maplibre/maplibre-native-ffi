@@ -99,7 +99,7 @@ async fn offline() -> Result<()> {
         record_region(stored.id, &stored.metadata);
     }
 
-    // Resume a download that stopped when the runtime closed.
+    // Resume a download that stopped when the runtime was released.
     runtime
         .set_offline_region_download_state(
             region.id,

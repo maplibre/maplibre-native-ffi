@@ -68,7 +68,7 @@ static void detach_offscreen_session(mln_test_render_fixture* fixture) {
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
   mln_test_completion_destroy(&detach);
-  MLN_TEST_OK(mln_test_render_session_dispose(fixture->session));
+  MLN_TEST_OK(mln_test_render_session_release(fixture->session));
   *fixture = (mln_test_render_fixture){0};
 }
 

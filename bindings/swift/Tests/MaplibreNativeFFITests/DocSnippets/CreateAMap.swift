@@ -60,6 +60,6 @@ private func createAMap() async throws {
   // #region close
   try session.dispose()
   try map.dispose()
-  try await runtime.close()
+  try await runtime.release()
   // #endregion close
 }

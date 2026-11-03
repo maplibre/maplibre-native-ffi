@@ -100,7 +100,7 @@ mln_style_expression_release(expression);
 
 Most handles are freed right away, so they have one teardown function,
 `void _release(handle)`. Some handles can't be freed until other work finishes,
-such as a runtime that has to wait for its maps to close. These have two:
+such as a runtime that has to wait for its maps to retire. These have two:
 
 - `_release(handle, completion)` is for an orderly shutdown. It rejects a handle
   that isn't ready, such as a runtime that still has maps, and the completion
@@ -108,6 +108,12 @@ such as a runtime that has to wait for its maps to close. These have two:
 - `_dispose(handle)` is for destructors and finalizers, which can't wait or
   handle errors. It accepts the handle in any state and finishes teardown in the
   background.
+
+Every binding names these `release` and `dispose` in its own case, such as
+`ReleaseAsync` and `Dispose` in .NET, and has no other name for either. Its
+scoped cleanup calls one of them: a scope that can wait without blocking a
+thread, such as `await using`, calls the release, and every other scope, such as
+a destructor or Python's `with`, calls the dispose.
 
 ### Types that may grow
 

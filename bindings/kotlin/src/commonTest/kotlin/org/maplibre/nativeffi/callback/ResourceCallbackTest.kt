@@ -53,7 +53,7 @@ class ResourceCallbackTest {
         map.release().awaitWithin("the map release")
         cancelled.awaitWithin("the cancel callback")
       } finally {
-        request.close()
+        request.release()
       }
     }
   }
@@ -111,7 +111,7 @@ class ResourceCallbackTest {
   }
 
   @Test
-  fun aRefusedAnswerClosesItsRequestAndFailsIt() = runSuspendTest {
+  fun aRefusedAnswerEndsItsRequestAndFailsIt() = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {
       map.discarding.setStyleUrl(STYLE_URL)
@@ -134,7 +134,7 @@ class ResourceCallbackTest {
     val transform =
       ResourceTransform(
         callback = { _, url, request ->
-          if (url == STYLE_URL) received.complete(request) else request.close()
+          if (url == STYLE_URL) received.complete(request) else request.release()
         },
       )
     // The provider claims only network requests, so the style reaches the online source, which

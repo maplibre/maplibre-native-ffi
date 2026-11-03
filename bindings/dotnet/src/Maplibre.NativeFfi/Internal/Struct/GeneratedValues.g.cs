@@ -1676,7 +1676,7 @@ internal static unsafe class GeneratedValues
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_resource_provider_callback", error);
-            ownedHandle?.Dispose();
+            ownedHandle?.Release();
         }
     }
 
@@ -1846,7 +1846,7 @@ internal static unsafe class GeneratedValues
         catch (Exception error)
         {
             NativeCallbackFailure.Report("mln_resource_transform_callback", error);
-            ownedRequest?.Dispose();
+            ownedRequest?.Release();
         }
     }
 

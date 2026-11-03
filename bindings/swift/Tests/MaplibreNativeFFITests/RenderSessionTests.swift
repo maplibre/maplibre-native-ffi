@@ -17,10 +17,10 @@ private struct AttachedSession {
   /// The host thread that drives a caller-driven session.
   let thread: RenderThread?
 
-  /// Runs `body`, then closes the fixture, also when `body` throws. The
+  /// Runs `body`, then tears the fixture down, also when `body` throws. The
   /// session retires before its textures and graphics go: a session still
   /// attached when they go away renders into destroyed objects, which crashes
-  /// the process before the failure that skipped the close is reported.
+  /// the process before the failure that skipped the teardown is reported.
   func use<Result>(
     _ body: (AttachedSession) async throws -> Result
   ) async throws -> Result {
@@ -28,18 +28,18 @@ private struct AttachedSession {
     do {
       result = try await body(self)
     } catch {
-      await close()
+      await tearDown()
       throw error
     }
-    await close()
+    await tearDown()
     return result
   }
 
-  /// Detaches and disposes the session, destroys its textures, then closes
+  /// Detaches and disposes the session, destroys its textures, then releases
   /// the map fixture. A session that cannot detach, such as one already
   /// abandoned or never attached, is abandoned instead, and one the test
-  /// closed stays closed.
-  func close() async {
+  /// released or disposed stays closed.
+  func tearDown() async {
     do {
       try await session.detach()
     } catch {
@@ -49,9 +49,9 @@ private struct AttachedSession {
     await destroyTextures()
     thread?.stop()
     do { try session.dispose() } catch {
-      Issue.record("closing the render session failed: \(error)")
+      Issue.record("disposing the render session failed: \(error)")
     }
-    await fixture.close()
+    await fixture.release()
     withExtendedLifetime(graphics) {}
   }
 
@@ -77,7 +77,7 @@ private func destroy(
 }
 
 /// Attaches an offscreen session to a map showing `style` and runs `body`
-/// once the attach completes, closing the session afterwards.
+/// once the attach completes, tearing the session down afterwards.
 private func withOffscreenSession<Result>(
   style: String = emptyStyle,
   _ body: (AttachedSession) async throws -> Result
@@ -105,7 +105,7 @@ private func attachOffscreenSession(
       )
     )
   } catch {
-    await fixture.close()
+    await fixture.release()
     throw error
   }
   let attached = AttachedSession(
@@ -118,15 +118,15 @@ private func attachOffscreenSession(
   do {
     try await session.ready
   } catch {
-    await attached.close()
+    await attached.tearDown()
     throw error
   }
   return attached
 }
 
 /// Attaches a borrowed-texture session with a ring of `ringDepth` textures to
-/// a map showing `style` and runs `body` once the attach completes, closing
-/// the session afterwards.
+/// a map showing `style` and runs `body` once the attach completes, tearing
+/// the session down afterwards.
 private func withBorrowedTextureSession<Result>(
   style: String = emptyStyle,
   ringDepth: Int = 1,
@@ -141,7 +141,7 @@ private func withBorrowedTextureSession<Result>(
       ringDepth: ringDepth
     )
   } catch {
-    await fixture.close()
+    await fixture.release()
     throw error
   }
   return try await attached.use { rendered in
@@ -343,16 +343,16 @@ private func attachBorrowedTexture(
   #expect(rendered.session.isClosed)
   // A second dispose is a no-op.
   try rendered.session.dispose()
-  try await rendered.fixture.map.close()
-  await rendered.fixture.close()
+  try await rendered.fixture.map.release()
+  await rendered.fixture.release()
 }
 
-/// Closing an attached session completes once the session has retired, so
+/// Releasing an attached session completes once the session has retired, so
 /// its map takes another session right away.
-@Test func closingAnAttachedSessionCompletesOnceItHasRetired() async throws {
+@Test func releasingAnAttachedSessionCompletesOnceItHasRetired() async throws {
   try await attachOffscreenSession(style: redStyle).use { rendered in
     #expect(try await rendered.session.awaitRenderedFrame() != nil)
-    try await rendered.session.close()
+    try await rendered.session.release()
     // Native code refuses an attach while the map still has a session.
     let next = try rendered.fixture.map.attachOffscreen(
       descriptor: OffscreenDescriptor(
@@ -377,7 +377,7 @@ private func attachBorrowedTexture(
       callerDriven: true
     )
   } catch {
-    await fixture.close()
+    await fixture.release()
     throw error
   }
   try await attached.use { rendered in
@@ -394,12 +394,12 @@ private func attachBorrowedTexture(
     try await fixture.map.setStyleJson(redStyle)
     #expect(try await session.awaitRenderedFrame()?.disposition == .rendered)
 
-    // Detaching needs the driver serviced; closing needs the thread done with
+    // Detaching needs the driver serviced; releasing needs the thread done with
     // the session. The textures go first, while the thread holds their
     // context.
     try await session.detach()
     await rendered.destroyTextures()
     thread.stop()
-    try await session.close()
+    try await session.release()
   }
 }

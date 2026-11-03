@@ -63,7 +63,7 @@ class GeneratedShapesTest {
         assertEquals(emptyList(), projection.latLngsForPixels(emptyList()))
         assertEquals(emptyList(), projection.latLngsForPixelsUnwrapped(emptyList()))
       } finally {
-        projection.close()
+        projection.release()
       }
     }
   }

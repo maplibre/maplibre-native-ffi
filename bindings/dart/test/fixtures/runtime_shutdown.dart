@@ -7,7 +7,7 @@ import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
 import '../support/fixture.dart';
 
-Future<void> closeRuntimes() async {
+Future<void> releaseRuntimes() async {
   for (var cycle = 0; cycle < 3; cycle++) {
     await Future.wait(
       List.generate(2, (_) async {
@@ -15,19 +15,19 @@ Future<void> closeRuntimes() async {
         final map = runtime.createMap(testMapOptions());
         await map.ready;
         try {
-          await runtime.close();
-          throw StateError('runtime closed with a live map');
+          await runtime.release();
+          throw StateError('runtime released with a live map');
         } on MaplibreException catch (error) {
           if (error.status != Status.invalidState) rethrow;
-          // A rejected close leaves the runtime available for later work.
+          // A rejected release leaves the runtime available for later work.
         }
         await runtime.clearResourceTransform();
-        await map.close();
-        await runtime.close();
+        await map.release();
+        await runtime.release();
       }),
     );
   }
-  print('CLOSED_ALL_HANDLES');
+  print('RELEASED_ALL_HANDLES');
 }
 
 const _emptyStyle = {
@@ -137,7 +137,7 @@ Future<void> exitWithLiveCallbacks() async {
 Future<void> main(List<String> arguments) async {
   switch (arguments.single) {
     case 'unawaited':
-      unawaited(closeRuntimes());
+      unawaited(releaseRuntimes());
     case 'abandoned':
       await abandonHandles();
     case 'session':

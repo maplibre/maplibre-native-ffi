@@ -93,8 +93,8 @@ test(
         "  initialExtent: { width: 64, height: 64, scaleFactor: 1 },",
         "});",
         "await map.ready;",
-        "await map.close();",
-        "await runtime.close();",
+        "await map.release();",
+        "await runtime.release();",
         'console.log("the first copy still works");',
       ].join("\n"),
     );

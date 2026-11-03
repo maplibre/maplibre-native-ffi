@@ -257,10 +257,10 @@ func (value GesturePhase) String() string {
 // other's GPU work on a shared texture.
 //
 // A sync file descriptor or an OpenGL fence signals once, so when
-// AcquiredFrameHandle.Close() succeeds, the session takes the one you pass. A
+// AcquiredFrameHandle.Release() succeeds, the session takes the one you pass. A
 // Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up with
 // each frame, so the one you pass stays yours. Keep it valid until a detach or
-// disposal of the session completes.
+// release of the session completes.
 //
 // See mln_gpu_sync_kind in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
@@ -768,7 +768,7 @@ const (
 	// A later demand with the same flags replaced this one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
 	// The session failed, and RenderSessionHandle.GetFailure() reports why. Once
-	// RenderSessionHandle.Close() completes, you can attach a new session.
+	// RenderSessionHandle.Release() completes, you can attach a new session.
 	RenderResultFailed RenderResult = RenderResult(C.MLN_RENDER_RESULT_FAILED)
 )
 
@@ -3232,7 +3232,7 @@ func nativeMetalBorrowedTexture(input MetalBorrowedTexture, arena *bindingArena)
 // one sample, and MTLTextureUsageRenderTarget.
 //
 // The session uses the textures until a replacement or release of the target
-// completes, a detach or disposal of the session completes, or an abandon of it
+// completes, a detach or release of the session completes, or an abandon of it
 // returns.
 //
 // See mln_metal_borrowed_texture_descriptor in the C API reference:
@@ -3273,7 +3273,7 @@ func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, 
 // textures follow its rules. The ring keeps its depth, device, and command
 // queue, so give it as many textures as it attached with, on the same device.
 // The session uses the textures until a replacement or release of the target
-// completes, a detach or disposal of the session completes, or an abandon of it
+// completes, a detach or release of the session completes, or an abandon of it
 // returns.
 //
 // See mln_metal_borrowed_texture_replacement in the C API reference:
@@ -3349,7 +3349,7 @@ func nativeMetalSurfaceDescriptor(input MetalSurfaceDescriptor, arena *bindingAr
 //
 // The session renders to it with the device that it attached with. It uses the
 // layer until a replacement or release of the target completes, a detach or
-// disposal of the session completes, or an abandon of it returns.
+// release of the session completes, or an abandon of it returns.
 //
 // See mln_metal_surface_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
@@ -3633,7 +3633,7 @@ func nativeOpenGLBorrowedTexture(input OpenGLBorrowedTexture, arena *bindingAren
 // be in your context's share group, with storage of that size.
 //
 // The session uses the textures until a replacement or release of the target
-// completes, a detach or disposal of the session completes, or an abandon of it
+// completes, a detach or release of the session completes, or an abandon of it
 // returns.
 //
 // See mln_open_gl_borrowed_texture_descriptor in the C API reference:
@@ -3675,8 +3675,8 @@ func nativeOpenGLBorrowedTextureDescriptor(input OpenGLBorrowedTextureDescriptor
 // textures follow its rules. The ring keeps its depth, context, and texture
 // target, so give it as many textures as it attached with, in the same share
 // group. The session uses the textures until a replacement or release of the
-// target completes, a detach or disposal of the session completes, or an
-// abandon of it returns.
+// target completes, a detach or release of the session completes, or an abandon
+// of it returns.
 //
 // See mln_open_gl_borrowed_texture_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -3741,7 +3741,7 @@ func nativeOpenGLContextDescriptor(input OpenGLContextDescriptor, arena *binding
 // OpenGL surface to present to, for MapHandle.AttachOpenGLSurface().
 //
 // The session uses the surface until a replacement or release of the target
-// completes, a detach or disposal of the session completes, or an abandon of it
+// completes, a detach or release of the session completes, or an abandon of it
 // returns.
 //
 // See mln_open_gl_surface_descriptor in the C API reference:
@@ -4101,7 +4101,7 @@ type RenderSessionCapabilities struct {
 	Flags            RenderSessionCapabilityFlag
 	// The kind of GPUSync that AcquiredFrameHandle.WithProducerSync() reports.
 	ProducerSyncKind GPUSyncKind
-	// The kinds of GPUSync that AcquiredFrameHandle.Close() accepts.
+	// The kinds of GPUSync that AcquiredFrameHandle.Release() accepts.
 	//
 	// They depend on the target and on what the device supports, so read this field
 	// instead of assuming a kind.
@@ -5450,7 +5450,7 @@ func nativeVulkanBorrowedTexture(input VulkanBorrowedTexture, arena *bindingAren
 // VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 //
 // The session uses the images until a replacement or release of the target
-// completes, a detach or disposal of the session completes, or an abandon of it
+// completes, a detach or release of the session completes, or an abandon of it
 // returns.
 //
 // See mln_vulkan_borrowed_texture_descriptor in the C API reference:
@@ -5497,7 +5497,7 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 // images follow its rules. The ring keeps its depth, context, format,
 // final_layout, and owner, so give it as many images as it attached with, in
 // that format, on the same device. The session uses the images until a
-// replacement or release of the target completes, a detach or disposal of the
+// replacement or release of the target completes, a detach or release of the
 // session completes, or an abandon of it returns.
 //
 // See mln_vulkan_borrowed_texture_replacement in the C API reference:
@@ -5529,7 +5529,7 @@ func nativeVulkanBorrowedTextureReplacement(input VulkanBorrowedTextureReplaceme
 // VulkanContextDescriptor corresponds to mln_vulkan_context_descriptor. The
 // Vulkan device and queue that a render session uses.
 //
-// Keep these objects alive until a detach or disposal of the session completes,
+// Keep these objects alive until a detach or release of the session completes,
 // or an abandon of it returns.
 //
 // See mln_vulkan_context_descriptor in the C API reference:
@@ -5569,7 +5569,7 @@ func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *binding
 // The device must have VK_KHR_swapchain enabled, and the queue family of
 // graphics_queue_family_index must support presenting to the surface. The
 // session creates the swapchain. It uses the surface until a replacement or
-// release of the target completes, a detach or disposal of the session
+// release of the target completes, a detach or release of the session
 // completes, or an abandon of it returns.
 //
 // See mln_vulkan_surface_descriptor in the C API reference:
@@ -5596,7 +5596,7 @@ func nativeVulkanSurfaceDescriptor(input VulkanSurfaceDescriptor, arena *binding
 // The session presents to it with the context that it attached with, so the
 // queue family of that context's graphics_queue_family_index must support
 // presenting to the surface. It uses the surface until a replacement or release
-// of the target completes, a detach or disposal of the session completes, or an
+// of the target completes, a detach or release of the session completes, or an
 // abandon of it returns.
 //
 // See mln_vulkan_surface_replacement in the C API reference:
@@ -5878,7 +5878,7 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *AcquiredFrameHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -5910,7 +5910,7 @@ func (handle *GeoJSONSourceDataHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *GeoJSONSourceDataHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -5941,8 +5941,8 @@ func (handle *MapHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value, which runtime events report as their
-// source. It stays readable after the handle closes, so events drained later
-// still match this handle.
+// source. It stays readable after the handle is released, so events drained
+// later still match this handle.
 func (handle *MapHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -5972,7 +5972,7 @@ func (handle *MapProjectionHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *MapProjectionHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6004,7 +6004,7 @@ func (handle *OffscreenDeviceHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *OffscreenDeviceHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6024,7 +6024,7 @@ func (handle *OffscreenDeviceHandle) String() string {
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
-	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil, nil) })}
+	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
 	return owner
 }
 
@@ -6036,7 +6036,7 @@ func (handle *RenderSessionHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *RenderSessionHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6068,7 +6068,7 @@ func (handle *ResourceRequestHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *ResourceRequestHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6100,7 +6100,7 @@ func (handle *ResourceTransformRequestHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *ResourceTransformRequestHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6132,8 +6132,8 @@ func (handle *RuntimeHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value, which runtime events report as their
-// source. It stays readable after the handle closes, so events drained later
-// still match this handle.
+// source. It stays readable after the handle is released, so events drained
+// later still match this handle.
 func (handle *RuntimeHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6163,7 +6163,7 @@ func (handle *StyleExpressionHandle) owner() *bindingOwner {
 }
 
 // ID returns the native handle value. It stays readable after the handle
-// closes.
+// is released.
 func (handle *StyleExpressionHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
@@ -6281,7 +6281,7 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 	})
 }
 
-// Close gives an acquired frame back to the session once you're done reading
+// Release gives an acquired frame back to the session once you're done reading
 // it.
 //
 // consumerCompletion says when your GPU work that reads the texture finishes.
@@ -6296,7 +6296,7 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 // Errors:
 //   - StatusUnsupported when RenderSessionCapabilities.ConsumerSyncKinds lacks
 //     the kind of consumerCompletion.
-func (receiver *AcquiredFrameHandle) Close(consumerCompletion GPUSync) error {
+func (receiver *AcquiredFrameHandle) Release(consumerCompletion GPUSync) error {
 	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_release(C.mln_acquired_frame(raw), bindingStore(nativeGPUSync(consumerCompletion, arena), arena), diagnostic))
 	})
@@ -6366,13 +6366,13 @@ func NewGeoJSONSourceData(data string, options *GeoJSONSourceOptions) (*GeoJSONS
 	})
 }
 
-// Close releases prepared GeoJSON data.
+// Release releases prepared GeoJSON data.
 //
 // Sources that use the data keep it.
 //
 // See mln_geo_json_source_data_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *GeoJSONSourceDataHandle) Close() error {
+func (receiver *GeoJSONSourceDataHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_geo_json_source_data_release(C.mln_geo_json_source_data(raw))
 		return struct{}{}
@@ -7352,11 +7352,11 @@ func (receiver *MapProjectionHandle) PixelsForLatLngs(coordinates []LatLng) ([]S
 	})
 }
 
-// Close releases a projection.
+// Release releases a projection.
 //
 // See mln_map_projection_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapProjectionHandle) Close() error {
+func (receiver *MapProjectionHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_map_projection_release(C.mln_map_projection(raw))
 		return struct{}{}
@@ -7376,13 +7376,13 @@ func (receiver *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 	})
 }
 
-// Close releases the map.
+// Release releases the map.
 //
 // Detach the map's render session first.
 //
 // See mln_map_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) Close() (*Future[struct{}], error) {
+func (receiver *MapHandle) Release() (*Future[struct{}], error) {
 	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_release(C.mln_map(raw), completion, diagnostic))
 	}, completionUnit)
@@ -8012,13 +8012,13 @@ func NewOffscreenDevice(options *OffscreenDeviceOptions) (*OffscreenDeviceHandle
 	})
 }
 
-// Close releases an offscreen device.
+// Release releases an offscreen device.
 //
 // Render sessions on the device keep working until they detach.
 //
 // See mln_offscreen_device_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
-func (receiver *OffscreenDeviceHandle) Close() error {
+func (receiver *OffscreenDeviceHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_offscreen_device_release(C.mln_offscreen_device(raw))
 		return struct{}{}
@@ -8070,7 +8070,7 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 // finish first. Pending work completes with StatusTargetLost, and pending frame
 // demands finish with RenderResultTargetNotReady. Once the call returns, the
 // library no longer uses your graphics objects, and you can attach another
-// session to the map. Dispose the session afterward.
+// session to the map. Release the session afterward.
 //
 // Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
 // keeps them until the process exits, reports how many it kept, and logs a
@@ -8107,7 +8107,8 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 //   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
 //     StatusNativeError, when the session has failed. The diagnostic carries
 //     the failure's message.
-//   - StatusInvalidState when you detached, abandoned, or disposed the session.
+//   - StatusInvalidState when you detached, abandoned, released, or disposed
+//     the session.
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
 	var outFrame C.mln_acquired_frame
 	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
@@ -8168,8 +8169,8 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 //   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
 //     StatusNativeError, when the session has failed. The diagnostic carries
 //     the failure's message.
-//   - StatusInvalidState when you detached, abandoned, or disposed the session,
-//     or discarded a frame from every texture of its ring.
+//   - StatusInvalidState when you detached, abandoned, released, or disposed
+//     the session, or discarded a frame from every texture of its ring.
 func (receiver *RenderSessionHandle) DemandFrame(demand FrameDemand) error {
 	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_demand_frame(C.mln_render_session(raw), bindingStore(nativeFrameDemand(demand, arena), arena), diagnostic))
@@ -8181,7 +8182,7 @@ func (receiver *RenderSessionHandle) DemandFrame(demand FrameDemand) error {
 // Release every acquired frame first. Pending frame demands finish with
 // RenderResultTargetNotReady. Once the detach completes, the library no longer
 // uses your graphics objects, and you can attach another session to the map.
-// Dispose the session afterward.
+// Release the session afterward.
 //
 // See mln_render_session_detach in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -8192,25 +8193,6 @@ func (receiver *RenderSessionHandle) DemandFrame(demand FrameDemand) error {
 func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_detach(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
-}
-
-// Close releases the session in any state.
-//
-// An attached session detaches first, and frees its graphics objects, unless
-// you hold one of its frames. A session driven by
-// RenderDriverKindCallerGraphicsThread detaches at your next
-// RenderSessionHandle.ServiceDriverWork(), so keep servicing it until the
-// disposal completes. If you release or dispose its map before that service,
-// the session is abandoned instead. Any other session is abandoned as
-// RenderSessionHandle.Abandon() does. Once the disposal completes, the library
-// no longer uses your graphics objects.
-//
-// See mln_render_session_dispose in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) Close() (*Future[struct{}], error) {
-	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -8379,6 +8361,31 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 	}, completionUnit)
 }
 
+// Release releases the session, detaching it first when it is attached.
+//
+// The completion runs once the session retires. From then on, the library no
+// longer uses your graphics objects, and you can attach another session to the
+// map. Pending frame demands finish with RenderResultTargetNotReady.
+//
+// A session driven by RenderDriverKindCallerGraphicsThread detaches at your
+// next RenderSessionHandle.ServiceDriverWork(), so keep servicing it until the
+// release completes. If you release or dispose its map before that service, the
+// session is abandoned instead. A session that isn't attached, such as one that
+// is still attaching or that failed, is abandoned as
+// RenderSessionHandle.Abandon() does.
+//
+// See mln_render_session_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+//
+// Errors:
+//   - StatusInvalidState while you hold one of the session's acquired frames.
+//     Release or discard them first.
+func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
+	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_release(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
+}
+
 // ReleaseTarget lets go of the session's surface or textures, and keeps the
 // rest of the session.
 //
@@ -8427,11 +8434,12 @@ func (receiver *RenderSessionHandle) Resize(logicalSize LogicalSize) (*Future[Co
 // Use it with RenderDriverKindCallerGraphicsThread, and call it from the same
 // thread every time. Call it each time
 // RenderSessionAttachOptions.DriverWorkWake is called, even while you demand no
-// frames, and until a detach or disposal completes. It returns once no work is
-// ready.
+// frames, and until a detach or the session's retirement completes. It returns
+// once no work is ready.
 //
-// It accepts a disposed session until the session retires. The service after
-// the disposal detaches the session and frees its graphics objects.
+// It accepts a released or disposed session until the session retires. The
+// service after the release or disposal detaches the session and frees its
+// graphics objects.
 //
 // See mln_render_session_service_driver_work in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -8516,7 +8524,7 @@ func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(replacement VulkanSu
 // Complete answers a resource request.
 //
 // A failed answer fails the request with ResourceErrorReasonOther, as
-// ResourceRequestHandle.Close() does.
+// ResourceRequestHandle.Release() does.
 //
 // See mln_resource_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8545,7 +8553,7 @@ func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
 // PassThrough hands a resource request back to the library to load as usual.
 //
 // A failed call fails the request with ResourceErrorReasonOther, as
-// ResourceRequestHandle.Close() does.
+// ResourceRequestHandle.Release() does.
 //
 // See mln_resource_request_pass_through in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8558,11 +8566,11 @@ func (receiver *ResourceRequestHandle) PassThrough() error {
 	})
 }
 
-// Close releases a resource request.
+// Release releases a resource request.
 //
 // See mln_resource_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceRequestHandle) Close() error {
+func (receiver *ResourceRequestHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_resource_request_release(C.mln_resource_request(raw))
 		return struct{}{}
@@ -8594,7 +8602,7 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequest
 // Complete answers a resource transform request with the URL to load instead.
 //
 // url must not be empty. A failed answer fails the request with
-// ResourceErrorReasonOther, as ResourceTransformRequestHandle.Close() does.
+// ResourceErrorReasonOther, as ResourceTransformRequestHandle.Release() does.
 //
 // See mln_resource_transform_request_complete in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8609,7 +8617,7 @@ func (receiver *ResourceTransformRequestHandle) Complete(url string) error {
 // The library retries a request that failed for a reason it retries, such as
 // ResourceErrorReasonConnection, and the retry calls the transform again. When
 // this call fails, the request fails with ResourceErrorReasonOther, as
-// ResourceTransformRequestHandle.Close() does.
+// ResourceTransformRequestHandle.Release() does.
 //
 // See mln_resource_transform_request_fail in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -8619,13 +8627,13 @@ func (receiver *ResourceTransformRequestHandle) Fail(error ResourceTransformErro
 	})
 }
 
-// Close releases a resource transform request.
+// Release releases a resource transform request.
 //
 // Releasing a request without an answer fails it with ResourceErrorReasonOther.
 //
 // See mln_resource_transform_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceTransformRequestHandle) Close() error {
+func (receiver *ResourceTransformRequestHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_resource_transform_request_release(C.mln_resource_transform_request(raw))
 		return struct{}{}
@@ -8817,13 +8825,13 @@ func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Fu
 	}, completionListOf(copyOfflineRegionInfo))
 }
 
-// Close releases a runtime.
+// Release releases a runtime.
 //
 // Release the runtime's maps first.
 //
 // See mln_runtime_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) Release() (*Future[struct{}], error) {
 	return bindingStart(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_release(C.mln_runtime(raw), completion, diagnostic))
 	}, completionUnit)
@@ -9011,11 +9019,11 @@ func (receiver *StyleExpressionHandle) Info() (StyleExpressionInfo, error) {
 	})
 }
 
-// Close releases a parsed style expression.
+// Release releases a parsed style expression.
 //
 // See mln_style_expression_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html
-func (receiver *StyleExpressionHandle) Close() error {
+func (receiver *StyleExpressionHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_style_expression_release(C.mln_style_expression(raw))
 		return struct{}{}
@@ -9034,7 +9042,7 @@ func SupportedRenderBackendMask() RenderBackendFlag {
 
 // Dispose releases the map in any state, and finishes in the background.
 //
-// Use it from destructors and finalizers. Otherwise, use MapHandle.Close().
+// Use it from destructors and finalizers. Otherwise, use MapHandle.Release().
 //
 // See mln_map_dispose in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -9044,22 +9052,19 @@ func (receiver *MapHandle) Dispose() error {
 	})
 }
 
-// Dispose releases the session in any state.
+// Dispose releases the session in any state, and finishes in the background.
 //
-// An attached session detaches first, and frees its graphics objects, unless
-// you hold one of its frames. A session driven by
-// RenderDriverKindCallerGraphicsThread detaches at your next
-// RenderSessionHandle.ServiceDriverWork(), so keep servicing it until the
-// disposal completes. If you release or dispose its map before that service,
-// the session is abandoned instead. Any other session is abandoned as
-// RenderSessionHandle.Abandon() does. Once the disposal completes, the library
-// no longer uses your graphics objects.
+// Use it from destructors and finalizers. Otherwise, use
+// RenderSessionHandle.Release(). The session retires as a release does, except
+// that a session whose frames you hold is abandoned, which ends the frames.
+// Keep servicing a session driven by RenderDriverKindCallerGraphicsThread until
+// RenderSessionHandle.ServiceDriverWork() no longer accepts it.
 //
 // See mln_render_session_dispose in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 func (receiver *RenderSessionHandle) Dispose() error {
 	return bindingDo(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), nil, diagnostic))
+		return int32(C.mln_render_session_dispose(C.mln_render_session(raw), diagnostic))
 	})
 }
 
@@ -9714,12 +9719,12 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_provider_callback", failure)
-			owned_handle.Close()
+			owned_handle.Release()
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[ResourceProvider](native_user_data)
 	if !ok || callbacks.Callback == nil {
-		owned_handle.Close()
+		owned_handle.Release()
 		return
 	}
 	callbacks.Callback(copyResourceRequestInfo((*native_request)), owned_handle)
@@ -9732,12 +9737,12 @@ func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, nati
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_resource_transform_callback", failure)
-			owned_request.Close()
+			owned_request.Release()
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[ResourceTransform](native_user_data)
 	if !ok || callbacks.Callback == nil {
-		owned_request.Close()
+		owned_request.Release()
 		return
 	}
 	callbacks.Callback(ResourceKind(native_kind), bindingString(native_url.data, uint64(native_url.size)), owned_request)

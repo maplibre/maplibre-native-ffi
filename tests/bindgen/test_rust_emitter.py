@@ -55,10 +55,11 @@ int mln_map_move(uint64_t map, point call, point value, point future,
 """
 
 # A dispose that is also its handle's release and takes an optional completion.
-DISPOSE_WITH_COMPLETION = """
-typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_dispose;dispose=mln_session_dispose");
+RELEASE_AND_DISPOSE = """
+typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_release;dispose=mln_session_dispose");
 BIND("execution=lifecycle")
-mln_status mln_session_dispose(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+mln_status mln_session_release(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+mln_status mln_session_dispose(mln_session session, mln_diagnostic *out_diagnostic);
 """
 
 
@@ -251,18 +252,16 @@ class RustEmitterTests(unittest.TestCase):
             values,
         )
 
-    def test_a_dispose_with_a_completion_releases_and_disposes(self):
-        api = parse(
-            DISPOSE_WITH_COMPLETION, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",)
-        )
+    def test_a_release_waits_and_a_dispose_does_not(self):
+        api = parse(RELEASE_AND_DISPOSE, defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",))
         validate(api)
         self.assertEqual(rust.lower(api).unsupported, {})
         source = emitted(rust, api)[
             "crates/maplibre-native-ffi/src/generated/session.rs"
         ]
-        # Drop and the sync dispose pass no completion; the release passes one.
+        # Drop disposes, and only the release passes a completion.
         self.assertIn(
-            "dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, std::ptr::null(), out_diagnostic) })",
+            "dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_session_dispose(raw, out_diagnostic) })",
             source,
         )
         # Both consume the owner, and a refusal hands it back.
@@ -277,11 +276,11 @@ class RustEmitterTests(unittest.TestCase):
             "        self.consume(|session| {",
             source,
         )
-        self.assertIn("call.discard(", source)
+        self.assertIn("sys::mln_session_dispose(session, out_diagnostic)", source)
 
     def test_a_release_keeps_after_release_functions_reachable(self):
         api = parse(
-            DISPOSE_WITH_COMPLETION
+            RELEASE_AND_DISPOSE
             + """
 BIND("after_release=true")
 mln_status mln_session_service(mln_session session, mln_diagnostic *out_diagnostic);

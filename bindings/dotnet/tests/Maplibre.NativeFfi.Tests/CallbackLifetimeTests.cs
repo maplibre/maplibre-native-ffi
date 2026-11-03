@@ -45,15 +45,15 @@ public sealed class CallbackLifetimeTests
 
     // Native holds a strong root until the registration is released.
     [Fact]
-    public async Task ACallbackKeepsItsReceiverAliveUntilExplicitClose()
+    public async Task ACallbackKeepsItsReceiverAliveUntilExplicitRelease()
     {
         var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = RegisterCallbackCapturingItsMap(runtime);
 
         Gc.Collect();
 
-        await ((MapHandle)map.Target!).CloseAsync();
-        await runtime.CloseAsync();
+        await ((MapHandle)map.Target!).ReleaseAsync();
+        await runtime.ReleaseAsync();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

@@ -65,7 +65,7 @@ internal static class Images
         // #endregion read
 
         session.Dispose();
-        await map.CloseAsync();
+        await map.ReleaseAsync();
     }
 
     internal static async Task RunTile(
@@ -97,6 +97,6 @@ internal static class Images
         );
         // #endregion tile
 
-        await map.CloseAsync();
+        await map.ReleaseAsync();
     }
 }

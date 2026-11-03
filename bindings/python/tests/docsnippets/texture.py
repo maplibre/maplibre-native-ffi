@@ -33,7 +33,7 @@ def draw_frame() -> None:
     with frame.vulkan_texture() as texture:
         draw_map(texture.image_view)
 
-    frame.close(mln.GpuSync(kind=mln.GpuSyncKind.CPU_COMPLETE))
+    frame.release(mln.GpuSync(kind=mln.GpuSyncKind.CPU_COMPLETE))
     # #endregion acquire
 
 

@@ -221,7 +221,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             lambda raw: VulkanTextureFrame._from_native(raw),
         )
 
-    def close(self, consumer_completion: GpuSync) -> None:
+    def release(self, consumer_completion: GpuSync) -> None:
         """Gives an acquired frame back to the session once you're done reading
         it.
 
@@ -241,7 +241,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
           `RenderSessionCapabilities.consumer_sync_kinds` lacks the kind of
           `consumer_completion`.
         """
-        return self._native.close(consumer_completion)
+        return self._native.release(consumer_completion)
 
 
 class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
@@ -272,7 +272,7 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
             None,
         )
 
-    def close(self) -> None:
+    def release(self) -> None:
         """Releases prepared GeoJSON data.
 
         Sources that use the data keep it.
@@ -280,7 +280,7 @@ class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
         See `mln_geo_json_source_data_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
 
 class _MapHandleOperations(GeneratedOperations):
@@ -1031,7 +1031,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.move_style_layer(layer_id, before_layer_id)
 
-    def close(self) -> Future[None]:
+    def release(self) -> Future[None]:
         """Releases the map.
 
         Detach the map's render session first.
@@ -1039,7 +1039,7 @@ class _MapHandleOperations(GeneratedOperations):
         See `mln_map_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
     def remove_feature_state(
         self, selector: FeatureStateSelector
@@ -1736,13 +1736,13 @@ class _MapProjectionHandleOperations(GeneratedOperations):
             for item in self._native.pixels_for_lat_lngs(coordinates)
         )
 
-    def close(self) -> None:
+    def release(self) -> None:
         """Releases a projection.
 
         See `mln_map_projection_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
     def set_camera(self, camera: CameraOptions) -> None:
         """Moves the projection's camera, without changing the map.
@@ -1788,7 +1788,7 @@ class _OffscreenDeviceHandleOperations(GeneratedOperations):
             None,
         )
 
-    def close(self) -> None:
+    def release(self) -> None:
         """Releases an offscreen device.
 
         Render sessions on the device keep working until they detach.
@@ -1796,7 +1796,7 @@ class _OffscreenDeviceHandleOperations(GeneratedOperations):
         See `mln_offscreen_device_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
 
 class _RenderSessionHandleOperations(GeneratedOperations):
@@ -1811,7 +1811,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         and pending frame demands finish with
         `RenderResult.TARGET_NOT_READY`. Once the call returns, the library
         no longer uses your graphics objects, and you can attach another
-        session to the map. Dispose the session afterward.
+        session to the map. Release the session afterward.
 
         Only the driver thread can destroy OpenGL and WebGPU objects, so
         abandon keeps them until the process exits, reports how many it kept,
@@ -1843,8 +1843,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         - `RenderSessionSnapshot.failure_status`, `Status.TARGET_LOST` or
           `Status.NATIVE_ERROR`, when the session has failed. The diagnostic
           carries the failure's message.
-        - `Status.INVALID_STATE` when you detached, abandoned, or disposed
-          the session.
+        - `Status.INVALID_STATE` when you detached, abandoned, released, or
+          disposed the session.
         """
         return _maybe(
             lambda raw: _adopt_value(raw, "AcquiredFrameHandle", self),
@@ -1900,8 +1900,9 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         - `RenderSessionSnapshot.failure_status`, `Status.TARGET_LOST` or
           `Status.NATIVE_ERROR`, when the session has failed. The diagnostic
           carries the failure's message.
-        - `Status.INVALID_STATE` when you detached, abandoned, or disposed
-          the session, or discarded a frame from every texture of its ring.
+        - `Status.INVALID_STATE` when you detached, abandoned, released, or
+          disposed the session, or discarded a frame from every texture of
+          its ring.
         """
         return self._native.demand_frame(demand)
 
@@ -1911,7 +1912,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         Release every acquired frame first. Pending frame demands finish with
         `RenderResult.TARGET_NOT_READY`. Once the detach completes, the
         library no longer uses your graphics objects, and you can attach
-        another session to the map. Dispose the session afterward.
+        another session to the map. Release the session afterward.
 
         See `mln_render_session_detach` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1922,24 +1923,6 @@ class _RenderSessionHandleOperations(GeneratedOperations):
           detach runs.
         """
         return self._native.detach()
-
-    def close(self) -> Future[None]:
-        """Releases the session in any state.
-
-        An attached session detaches first, and frees its graphics objects,
-        unless you hold one of its frames. A session driven by
-        `RenderDriverKind.CALLER_GRAPHICS_THREAD` detaches at your next
-        `RenderSessionHandle.service_driver_work()`, so keep servicing it
-        until the disposal completes. If you release or dispose its map
-        before that service, the session is abandoned instead. Any other
-        session is abandoned as `RenderSessionHandle.abandon()` does. Once
-        the disposal completes, the library no longer uses your graphics
-        objects.
-
-        See `mln_render_session_dispose` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return self._native.close()
 
     def drain_frame_results(self) -> tuple[RenderFrameResult, ...]:
         """Takes the frame results that the session has queued.
@@ -2088,6 +2071,32 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.reduce_memory_use()
 
+    def release(self) -> Future[None]:
+        """Releases the session, detaching it first when it is attached.
+
+        The completion runs once the session retires. From then on, the
+        library no longer uses your graphics objects, and you can attach
+        another session to the map. Pending frame demands finish with
+        `RenderResult.TARGET_NOT_READY`.
+
+        A session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`
+        detaches at your next `RenderSessionHandle.service_driver_work()`, so
+        keep servicing it until the release completes. If you release or
+        dispose its map before that service, the session is abandoned
+        instead. A session that isn't attached, such as one that is still
+        attaching or that failed, is abandoned as
+        `RenderSessionHandle.abandon()` does.
+
+        See `mln_render_session_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` while you hold one of the session's acquired
+          frames. Release or discard them first.
+        """
+        return self._native.release()
+
     def release_target(self) -> Future[None]:
         """Lets go of the session's surface or textures, and keeps the rest of
         the session.
@@ -2135,12 +2144,12 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         Use it with `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and call it
         from the same thread every time. Call it each time
         `RenderSessionAttachOptions.driver_work_wake` is called, even while
-        you demand no frames, and until a detach or disposal completes. It
-        returns once no work is ready.
+        you demand no frames, and until a detach or the session's retirement
+        completes. It returns once no work is ready.
 
-        It accepts a disposed session until the session retires. The service
-        after the disposal detaches the session and frees its graphics
-        objects.
+        It accepts a released or disposed session until the session retires.
+        The service after the release or disposal detaches the session and
+        frees its graphics objects.
 
         See `mln_render_session_service_driver_work` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2266,7 +2275,7 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         """Answers a resource request.
 
         A failed answer fails the request with `ResourceErrorReason.OTHER`,
-        as `ResourceRequestHandle.close()` does.
+        as `ResourceRequestHandle.release()` does.
 
         See `mln_resource_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2289,7 +2298,7 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         """Hands a resource request back to the library to load as usual.
 
         A failed call fails the request with `ResourceErrorReason.OTHER`, as
-        `ResourceRequestHandle.close()` does.
+        `ResourceRequestHandle.release()` does.
 
         See `mln_resource_request_pass_through` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2300,13 +2309,13 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         """
         return _answer(self, lambda: self._native.pass_through())
 
-    def close(self) -> None:
+    def release(self) -> None:
         """Releases a resource request.
 
         See `mln_resource_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
     def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:
         """Calls a callback when the library cancels a resource request.
@@ -2329,7 +2338,7 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
 
         `url` must not be empty. A failed answer fails the request with
         `ResourceErrorReason.OTHER`, as
-        `ResourceTransformRequestHandle.close()` does.
+        `ResourceTransformRequestHandle.release()` does.
 
         See `mln_resource_transform_request_complete` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2343,14 +2352,14 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
         such as `ResourceErrorReason.CONNECTION`, and the retry calls the
         transform again. When this call fails, the request fails with
         `ResourceErrorReason.OTHER`, as
-        `ResourceTransformRequestHandle.close()` does.
+        `ResourceTransformRequestHandle.release()` does.
 
         See `mln_resource_transform_request_fail` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
         return _answer(self, lambda: self._native.fail(error))
 
-    def close(self) -> None:
+    def release(self) -> None:
         """Releases a resource transform request.
 
         Releasing a request without an answer fails it with
@@ -2359,7 +2368,7 @@ class _ResourceTransformRequestHandleOperations(GeneratedOperations):
         See `mln_resource_transform_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
 
 class _RuntimeHandleOperations(GeneratedOperations):
@@ -2533,7 +2542,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
             lambda value: tuple(OfflineRegionInfo._from_native(item) for item in value),
         )
 
-    def close(self) -> Future[None]:
+    def release(self) -> Future[None]:
         """Releases a runtime.
 
         Release the runtime's maps first.
@@ -2541,7 +2550,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         See `mln_runtime_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
     def run_cache_database_operation(
         self, operation: CacheDatabaseOperation
@@ -2726,13 +2735,13 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
         """
         return StyleExpressionInfo._from_native(self._native.get_info())
 
-    def close(self) -> None:
+    def release(self) -> None:
         """Releases a parsed style expression.
 
         See `mln_style_expression_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
         """
-        return self._native.close()
+        return self._native.release()
 
 
 def init_android(jni_env: int, context: int) -> None:

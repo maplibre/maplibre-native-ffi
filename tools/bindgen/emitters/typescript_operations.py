@@ -71,16 +71,14 @@ class Call:
 
 
 def simple_disposer(bound: BoundApi, native: str | None) -> bool:
-    """Whether a handle's disposal is an immediate call on the handle alone,
-    passing no completion when the dispose takes an optional one."""
+    """Whether a handle's disposal is an immediate call on the handle alone."""
     if not native:
         return False
     plan = bound.operations_by_name.get(native)
-    optional = bool(plan and plan.completion and plan.completion.optional)
     return bool(
         plan
-        and (not plan.completion or optional)
-        and len(plan.function.parameters) == 1 + optional
+        and not plan.completion
+        and len(plan.function.parameters) == 1
         and plan.consumes
     )
 
@@ -118,17 +116,9 @@ def lower_arguments(plan: OperationPlan, values: Values, natives: NativeValues) 
         raise Unsupported("mutable handle receiver requires consumption")
     if plan.factory and plan.factory not in bound.public_handles:
         raise Unsupported("factory requires a generated class")
-    handle_plan = bound.handles.get(receiver) if receiver else None
     method = identifier(plan.member)
-    if (
-        plan.consumes
-        and handle_plan
-        and plan.name == handle_plan.release
-        and not handle_plan.release_inputs
-    ):
-        method = "close"
-    elif receiver and method in OWNER_MEMBERS:
-        # The owner already has these members, and the release is close().
+    if receiver and method in OWNER_MEMBERS:
+        # The owner already has these members.
         raise Unsupported(f"method name {method} is reserved by the owner class")
     lowered = Lowered(plan, receiver, method)
     lowered.registrations = bool(plan.registrations)
@@ -641,7 +631,7 @@ def submit(
         lowered.decoder = natives.decoder(result)
     local = f"arg_{completion.parameter}"
     settle = f"call->argv[{call.index}]"
-    nullable = completion.discardable or completion.optional
+    nullable = completion.discardable
     lowered.native_parameters.append(
         NativeParameter(
             "completion",
@@ -849,8 +839,8 @@ def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
     native = owned.handle.native
     assert owned.handle.cleanup is not None
     cleanup = bound.source.functions_by_name[owned.handle.cleanup]
-    # A dispose takes the handle, then nulls for an optional completion and a
-    # diagnostic, which simple_disposer() allows.
+    # A dispose takes the handle, then null for a diagnostic, which
+    # simple_disposer() allows.
     extra = len(cleanup.parameters) - 1 + bool(cleanup.diagnostic)
     dispose = ", ".join([f"({native})handle", *["NULL"] * extra])
     fields = "".join(f"  {types[member]} {member};\n" for member in members) + "".join(
@@ -939,21 +929,8 @@ def construct(bound, entry: Lowered, owned, handle_expression: str) -> str:
 
 
 def disposer(handle) -> str:
-    # The handle has no owner yet, so the disposal passes no owner token, and
-    # it passes no completion to a dispose that takes one.
-    completion = ", undefined" if handle.dispose_completion else ""
-    return f"(disposed) => native.{handle.cleanup}(disposed, undefined{completion})"
-
-
-def render_dispose(bound, handle, indent: str) -> str:
-    """The synchronous dispose of a handle whose dispose is also its release:
-    the release passes a completion, and this passes none."""
-    text = doc(bound, handle.dispose, indent, discard=True)
-    text += f"{indent}dispose(): void {{\n"
-    text += f"{indent}  closeSync(this, (handle, token) =>\n"
-    text += f"{indent}    native.{handle.dispose}(handle, token, undefined),\n"
-    text += f"{indent}  );\n"
-    return text + f"{indent}}}\n"
+    # The handle has no owner yet, so the disposal passes no owner token.
+    return f"(disposed) => native.{handle.cleanup}(disposed, undefined)"
 
 
 def holder(entry: Lowered) -> str:
@@ -1143,7 +1120,7 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
         text += (
             "\n  /**\n"
             "   * The native handle value, which runtime events report as their\n"
-            "   * source. It stays readable after close, so events drained later\n"
+            "   * source. It stays readable after release, so events drained later\n"
             "   * still match this handle.\n"
             "   */\n"
             "  declare readonly id: bigint;\n"
@@ -1155,24 +1132,14 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
             f"  get discarding(): {public}Discarding {{\n"
             f"    return new {public}Discarding(ADOPT, this);\n  }}\n"
         )
-    # A handle without scoped cleanup gets neither `using` nor `await using`.
-    scoped = [] if handle.scoped_release is None else methods
-    asynchronous = next((e.method for e in scoped if e.shape == "close_async"), None)
-    synchronous = (
-        ("dispose" if scoped and handle.dispose_completion else None)
-        or next(
-            (e.method for e in scoped if e.shape == "close" and e.method == "dispose"),
-            None,
-        )
-        or next(
-            (
-                e.method
-                for e in scoped
-                if e.shape == "close"
-                and all(p.default == "undefined" for p in e.parameters)
-            ),
-            None,
-        )
+    # `await using` calls the scoped release, which waits, and `using` calls
+    # the scoped dispose, which doesn't. A handle without scoped cleanup gets
+    # neither.
+    asynchronous = next(
+        (e.method for e in methods if e.plan.name == handle.scoped_release), None
+    )
+    synchronous = next(
+        (e.method for e in methods if e.plan.name == handle.scoped_dispose), None
     )
     # defineDisposers() installs these when the host defines their symbols.
     if asynchronous or synchronous:
@@ -1192,8 +1159,6 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
     rendered = [
         (entry.method, render_method(bound, values, entry, "  ")) for entry in methods
     ]
-    if handle.dispose_completion:
-        rendered.append(("dispose", render_dispose(bound, handle, "  ")))
     for _, method in sorted(rendered, key=lambda item: item[0]):
         text += "\n" + method
     text += "}\n"
@@ -1295,16 +1260,16 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
             raise Unsupported(f"{callback.native}: one owned argument at most")
         parameter, name = owned[0]
         handle = values.argument_handle(parameter)
-        # The owner adopts the handle before the host value is read, so
-        # closing it after a failure, even a throwing getter's, releases an
-        # unanswered request, which native code then settles.
+        # The owner adopts the handle before the host value is read, so its
+        # release after a failure, even a throwing getter's, ends an unanswered
+        # request, which native code then settles.
         lines += [
             f"const owner = adopt({name} as unknown as bigint, () => new {owner_class(handle)}(ADOPT, {name} as unknown as bigint), {disposer(handle)});",
             "try {",
             f"  {read}",
             f"  callback({', '.join('owner' if n == name else p for n, p in zip(names, passed))});",
             "} catch (error) {",
-            "  owner.close();",
+            "  owner.release();",
             "  throw error;",
             "}",
         ]

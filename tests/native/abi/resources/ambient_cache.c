@@ -228,7 +228,7 @@ typedef struct shared_cache_thread {
   int index;
   mln_status create_status;
   mln_status operation_status;
-  mln_status close_status;
+  mln_status release_status;
 } shared_cache_thread;
 
 static void touch_shared_cache(void* argument) {
@@ -261,7 +261,7 @@ static void touch_shared_cache(void* argument) {
     thread->operation_status = mln_test_completion_settle(&operation);
   }
   if (thread->create_status == MLN_STATUS_OK) {
-    thread->close_status = mln_test_runtime_close(runtime);
+    thread->release_status = mln_test_runtime_release(runtime);
   }
 }
 
@@ -278,7 +278,7 @@ static void two_runtimes_can_use_the_same_cache_database(void) {
       .index = index,
       .create_status = MLN_STATUS_NATIVE_ERROR,
       .operation_status = MLN_STATUS_NATIVE_ERROR,
-      .close_status = MLN_STATUS_NATIVE_ERROR,
+      .release_status = MLN_STATUS_NATIVE_ERROR,
     };
     handles[index] = mln_test_thread_start(touch_shared_cache, &threads[index]);
   }
@@ -289,7 +289,7 @@ static void two_runtimes_can_use_the_same_cache_database(void) {
   for (int index = 0; index < 2; index += 1) {
     MLN_TEST_OK(threads[index].create_status);
     MLN_TEST_OK(threads[index].operation_status);
-    MLN_TEST_OK(threads[index].close_status);
+    MLN_TEST_OK(threads[index].release_status);
   }
 }
 

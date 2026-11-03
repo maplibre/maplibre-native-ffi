@@ -81,7 +81,7 @@ do {
 try check(probeTakeParcel() == nil, "absent parcel")
 let parcel = try probeTakeParcel()
 check(parcel?.id == 42, "published parcel: \(String(describing: parcel))")
-try parcel?.close()
+try parcel?.release()
 do {
   _ = try probeTakeParcel()
   check(false, "an exhausted parcel was not reported")
@@ -98,7 +98,7 @@ let ledger = try ProbeLedgerHandle.open()
 let readings = try ledger.drain().map(\.value)
 check(readings == [7, 9], "strided readings: \(readings)")
 try check(ledger.drain().isEmpty, "drained readings")
-try ledger.close()
+try ledger.release()
 
 // Caller-sized text that fits the runtime's first storage, and text that
 // does not, which the runtime fetches again with enough storage.

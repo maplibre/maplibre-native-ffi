@@ -10,7 +10,7 @@ namespace Maplibre.NativeFfi;
 /// <para>The session presents to it with the context that it attached with, so
 /// the queue family of that context's <c>graphics_queue_family_index</c> must
 /// support presenting to the surface. It uses the surface until a replacement
-/// or release of the target completes, a detach or disposal of the session
+/// or release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.</para>
 /// <para>See <c>mln_vulkan_surface_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>

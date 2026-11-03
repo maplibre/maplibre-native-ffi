@@ -1,6 +1,6 @@
-// Standalone projection close against a conversion on another thread: the
-// close waits for a call already running, and a call that leased the handle
-// before the close but runs after it reports the handle as stale.
+// Standalone projection release against a conversion on another thread: the
+// release waits for a call already running, and a call that leased the
+// handle before the release but runs after it reports the handle as stale.
 
 #include <atomic>
 #include <cstring>
@@ -44,7 +44,7 @@ struct Conversion {
   std::thread thread;
 };
 
-void close_waits_for_a_running_conversion() {
+void release_waits_for_a_running_conversion() {
   SyncPointScope sync;
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
@@ -56,17 +56,19 @@ void close_waits_for_a_running_conversion() {
   Conversion conversion(projection);
   const auto running =
     sync.wait_for_hits(SyncPoint::ProjectionCallRunning, calls + 1);
-  auto close = std::thread([&] {
+  auto releasing = std::thread([&] {
     mln_map_projection_release(projection);
     mln_test_pulse();
   });
   const auto waited = sync.wait_for_hits(SyncPoint::ProjectionCloseWaits, 1);
   sync.release(SyncPoint::ProjectionCallRunning);
-  close.join();
+  releasing.join();
   conversion.thread.join();
 
   TEST_ASSERT_TRUE_MESSAGE(running, "the conversion never ran");
-  TEST_ASSERT_TRUE_MESSAGE(waited, "the close did not wait for the conversion");
+  TEST_ASSERT_TRUE_MESSAGE(
+    waited, "the release did not wait for the conversion"
+  );
   MLN_TEST_OK_MESSAGE(conversion.status.load(), conversion.diagnostic.message);
   TEST_ASSERT_EQUAL_DOUBLE(expected.x, conversion.point.x);
   TEST_ASSERT_EQUAL_DOUBLE(expected.y, conversion.point.y);
@@ -79,7 +81,7 @@ void close_waits_for_a_running_conversion() {
   mln_test_destroy_runtime(runtime);
 }
 
-void a_conversion_that_leased_before_close_reports_a_stale_handle() {
+void a_conversion_that_leased_before_release_reports_a_stale_handle() {
   SyncPointScope sync;
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
@@ -106,6 +108,6 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
 }  // namespace
 
 MLN_TEST_GROUP {
-  RUN_TEST(close_waits_for_a_running_conversion);
-  RUN_TEST(a_conversion_that_leased_before_close_reports_a_stale_handle);
+  RUN_TEST(release_waits_for_a_running_conversion);
+  RUN_TEST(a_conversion_that_leased_before_release_reports_a_stale_handle);
 }

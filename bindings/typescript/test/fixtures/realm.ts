@@ -58,7 +58,7 @@ switch (request.scenario) {
     await burst(() => postToParent({ bursting: true }));
     break;
   case "liveNativeWork":
-    // The case never ends, so its teardowns never close the work before the
+    // The case never ends, so its teardowns never end the work before the
     // parent terminates this realm.
     void execute({
       name: "liveNativeWork",

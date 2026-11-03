@@ -42,6 +42,18 @@ class Presence:
     variant: str | None = None
 
 
+# Every binding names a handle's teardown with C's own verbs, which each
+# emitter only converts to its case, such as `release`, `Release`, and
+# `ReleaseAsync`. The release is the orderly teardown: it rejects a handle that
+# isn't ready, and when the handle retires later, it reports the retirement so
+# a host can wait for it. The dispose never waits or reports back, which a
+# destructor or finalizer needs. A handle that its release frees at once has
+# only the release, which never waits because there is nothing to wait for.
+RELEASE_MEMBER = "release"
+DISPOSE_MEMBER = "dispose"
+DISCARD_MEMBER = "discard"
+
+
 @dataclass(frozen=True)
 class HandlePlan:
     native: str
@@ -61,10 +73,10 @@ class HandlePlan:
     # Whether the handle is a root whose release is a lifecycle operation that
     # reports retirement through its completion, so a host can wait for it.
     observable_root_release: bool = False
-    # The completion parameter of a dispose that is also the handle's release.
-    # The release passes a completion that reports retirement, and the dispose,
-    # like every disposer, passes none.
-    dispose_completion: str | None = None
+    # Whether the release takes a completion that reports the handle's
+    # retirement, so a host can wait for it; the dispose is then a separate
+    # function that takes none.
+    release_waits: bool = False
 
     @property
     def stem(self) -> str:
@@ -79,16 +91,22 @@ class HandlePlan:
 
     @property
     def scoped_release(self) -> str | None:
-        """The operation that scoped cleanup, such as `use` or `with`, calls.
+        """The operation that a scope which can wait without blocking a thread
+        calls, such as TypeScript's `Symbol.asyncDispose`, .NET's
+        `DisposeAsync`, or Kotlin's `useReleasing`: the release.
 
-        A handle with an abandon operation releases only after detach or
-        abandon, so its scope disposes it instead, which accepts any state. A
-        handle with a discard has no scoped cleanup: its release needs what
+        A handle with a discard has no scoped cleanup: its release needs what
         only the host knows, and its discard is safe only for a dropped owner.
         """
-        if self.discard:
-            return None
-        return self.dispose if self.abandon and self.dispose else self.release
+        return None if self.discard else self.release
+
+    @property
+    def scoped_dispose(self) -> str | None:
+        """The operation that every other scope calls, such as TypeScript's
+        `Symbol.dispose`, .NET's `Dispose`, Kotlin's `AutoCloseable.close`,
+        Python's `with`, or Rust's `Drop`: the dispose, which is the release of
+        a handle that its release frees at once."""
+        return None if self.discard else self.dispose
 
 
 @dataclass(frozen=True)
@@ -103,9 +121,6 @@ class CompletionPlan:
     parameter: str
     immediate_owners: tuple[OwnedOutputPlan, ...]
     discardable: bool = False
-    # Whether the completion may be null without being a command's discard: the
-    # function is also its handle's dispose, which passes none.
-    optional: bool = False
 
 
 @dataclass(frozen=True)
@@ -909,18 +924,17 @@ class Binder:
                 view_end=typedef.metadata.get("view_end"),
                 discard=typedef.metadata.get("discard"),
                 observable_root_release=self.observable_root_release(typedef),
-                dispose_completion=self.dispose_completion(typedef),
+                release_waits=any(
+                    is_completion(parameter.type)
+                    for parameter in api.functions_by_name[
+                        typedef.metadata["release"]
+                    ].parameters
+                ),
             )
             for name, typedef in self.typedefs.items()
             if typedef.metadata.get("kind") == "handle"
             and "release" in typedef.metadata
         }
-
-    def dispose_completion(self, typedef) -> str | None:
-        if typedef.metadata.get("dispose") != typedef.metadata["release"]:
-            return None
-        release = self.api.functions_by_name[typedef.metadata["release"]]
-        return next((p.name for p in release.parameters if is_completion(p.type)), None)
 
     def observable_root_release(self, typedef) -> bool:
         release = self.api.functions_by_name[typedef.metadata["release"]]
@@ -1453,11 +1467,6 @@ class Binder:
                 completion_parameter,
                 tuple(owners),
                 discardable=metadata["execution"] == "command",
-                optional=any(
-                    handle.dispose_completion == completion_parameter
-                    and handle.dispose == function.name
-                    for handle in self.handles.values()
-                ),
             )
         # A release consumes its handle; another call that answers its handle
         # once declares consumes=always, as a resource request's completion
@@ -1667,17 +1676,18 @@ class Binder:
         receiver's prefix when its name starts with it, and a factory drops the
         prefix of the handle it creates. A public process global names its verb
         first, as set_log_callback does for mln_log_set_callback; every other
-        name drops `mln_`. A dispose that is also its handle's release is named
-        for the release, which passes the completion, because the dispose
-        passes none.
+        name drops `mln_`. A handle's teardown takes the names that
+        RELEASE_MEMBER describes.
         """
         if factory is not None:
             return function.name.removeprefix(factory + "_")
-        if any(
-            handle.dispose_completion and handle.release == function.name
-            for handle in self.handles.values()
-        ):
-            return "release"
+        for handle in self.handles.values():
+            if function.name == handle.release:
+                return RELEASE_MEMBER
+            if function.name == handle.dispose:
+                return DISPOSE_MEMBER
+            if function.name == handle.discard:
+                return DISCARD_MEMBER
         if receiver is not None:
             parameter = next(p for p in function.parameters if p.name == receiver)
             owner = type_name(parameter.type.pointee or parameter.type)

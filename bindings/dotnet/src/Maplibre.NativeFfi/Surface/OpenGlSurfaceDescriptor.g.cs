@@ -7,7 +7,7 @@ namespace Maplibre.NativeFfi;
 /// </summary>
 /// <remarks>
 /// <para>The session uses the surface until a replacement or release of the
-/// target completes, a detach or disposal of the session completes, or an
+/// target completes, a detach or release of the session completes, or an
 /// abandon of it returns.</para>
 /// <para>See <c>mln_open_gl_surface_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>

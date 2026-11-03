@@ -968,7 +968,7 @@ static void release_transition_close(void* user_data) {
   order->completion.release_user_data(order->completion.user_data);
 }
 
-static void a_map_close_ends_running_transitions(void) {
+static void a_map_release_or_dispose_ends_running_transitions(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = MLN_HANDLE_NULL;
   const mln_map_options map_options = mln_test_map_options();
@@ -1182,7 +1182,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_animated_delta_reports_its_end_once);
   RUN_TEST(an_animated_delta_replaces_the_running_one);
   RUN_TEST(a_delta_carries_its_gesture_phase);
-  RUN_TEST(a_map_close_ends_running_transitions);
+  RUN_TEST(a_map_release_or_dispose_ends_running_transitions);
   RUN_TEST(a_handler_may_submit_a_command);
   RUN_TEST(a_rejected_command_runs_no_handler);
   RUN_TEST(a_rendered_fit_ease_ends_where_the_query_fits);

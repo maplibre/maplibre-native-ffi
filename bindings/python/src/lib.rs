@@ -38,8 +38,8 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     /// # Safety
     ///
     /// `handle` must be a live handle of the matching native type owned by the
-    /// caller, which must later close this state with the matching C API
-    /// destroy function.
+    /// caller, which must later release or dispose it with the matching C API
+    /// function.
     unsafe fn from_handle(handle: T, type_name: &'static str) -> Result<Self, Error> {
         Ok(Self {
             handle: Arc::new(maplibre_core::handle::HandleState::new(handle, type_name)?),

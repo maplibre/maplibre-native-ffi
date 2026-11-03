@@ -13,7 +13,7 @@ def test_native_statuses_carry_their_status_and_diagnostic(
     with pytest.raises(mln.MaplibreError) as not_found:
         result(map_handle.get_style_layer_property("missing", "visibility"))
     with pytest.raises(mln.MaplibreError) as invalid_state:
-        harness.runtime.close()
+        harness.runtime.release()
     with pytest.raises(mln.MaplibreError) as invalid_argument:
         mln.set_network_status(mln.NetworkStatus(999_001))
 

@@ -13,7 +13,7 @@ namespace Maplibre.NativeFfi;
 /// size, <c>format</c>, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to
 /// the context's device.</para>
 /// <para>The session uses the images until a replacement or release of the
-/// target completes, a detach or disposal of the session completes, or an
+/// target completes, a detach or release of the session completes, or an
 /// abandon of it returns.</para>
 /// <para>See <c>mln_vulkan_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>

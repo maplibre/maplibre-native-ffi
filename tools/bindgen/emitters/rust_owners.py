@@ -16,14 +16,10 @@ def module_name(native: str) -> str:
 
 
 def disposer(bound: BoundApi, handle: HandlePlan):
-    """The single-handle call `Drop` makes; an implicit release must be unconditional.
-
-    A dispose that takes a completion gets a null one, so it reports nothing.
-    """
+    """The single-handle call `Drop` makes, which can't wait: the scoped
+    dispose, or the discard. An implicit release must be unconditional."""
     plan = bound.operations_by_name.get(handle.cleanup or handle.release)
-    if plan is None or [p.name for p in plan.function.parameters[1:]] != [
-        name for name in [handle.dispose_completion] if name
-    ]:
+    if plan is None or len(plan.function.parameters) != 1:
         return None
     if not handle.cleanup and plan.function.return_type.kind != "void":
         return None
@@ -44,7 +40,7 @@ def owned_handles(bound: BoundApi) -> dict[str, HandlePlan]:
 def declaration(bound: BoundApi, handle: HandlePlan) -> str:
     native, owner = handle.native, owner_name(handle.native)
     dispose = disposer(bound, handle)
-    arguments = ["raw", *(["std::ptr::null()"] if handle.dispose_completion else [])]
+    arguments = ["raw"]
     if dispose.return_type.kind == "void":
         finalize = f"|raw| {{ unsafe {{ {native_call(dispose, arguments)} }}; Ok(()) }}"
     else:

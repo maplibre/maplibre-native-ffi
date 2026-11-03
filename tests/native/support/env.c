@@ -168,7 +168,7 @@ static void untrack_map(const mln_map map) {
   }
 }
 
-mln_status mln_test_runtime_close(mln_runtime runtime) {
+mln_status mln_test_runtime_release(mln_runtime runtime) {
   mln_test_completion teardown = mln_test_completion_default(0);
   const mln_status status =
     mln_runtime_release(runtime, &teardown.descriptor, MLN_TEST_DIAGNOSTIC);
@@ -231,7 +231,7 @@ mln_status mln_test_map_create_status(
   return MLN_STATUS_OK;
 }
 
-mln_status mln_test_map_start_close(
+mln_status mln_test_map_start_release(
   mln_map map, mln_test_completion* teardown
 ) {
   *teardown = mln_test_completion_default(0);
@@ -246,9 +246,9 @@ mln_status mln_test_map_start_close(
   return MLN_STATUS_OK;
 }
 
-mln_status mln_test_map_close(mln_map map) {
+mln_status mln_test_map_release(mln_map map) {
   mln_test_completion teardown;
-  const mln_status status = mln_test_map_start_close(map, &teardown);
+  const mln_status status = mln_test_map_start_release(map, &teardown);
   if (status != MLN_STATUS_OK) return status;
   const bool completed = mln_test_completion_wait(&teardown, -1);
   const mln_status teardown_status = mln_test_completion_status(&teardown);
@@ -362,7 +362,7 @@ mln_map mln_test_create_styled_map(mln_runtime runtime) {
 }
 
 void mln_test_destroy_runtime(mln_runtime runtime) {
-  MLN_TEST_OK(mln_test_runtime_close(runtime));
+  MLN_TEST_OK(mln_test_runtime_release(runtime));
   release_event_queue(runtime);
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
@@ -732,12 +732,12 @@ bool mln_test_reclaim_thread_resources(void) {
   bool reclaimed = mln_test_render_reclaim_thread_sessions();
   while (tracked_map_count > 0) {
     tracked_map_count -= 1;
-    (void)mln_test_map_close(tracked_maps[tracked_map_count]);
+    (void)mln_test_map_release(tracked_maps[tracked_map_count]);
     reclaimed = true;
   }
   release_empty_map_slots();
   if (tracked_runtime != MLN_HANDLE_NULL) {
-    (void)mln_test_runtime_close(tracked_runtime);
+    (void)mln_test_runtime_release(tracked_runtime);
     release_event_queue(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;

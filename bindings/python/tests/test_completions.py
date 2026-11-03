@@ -103,9 +103,9 @@ def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(
     release.set()
     # Native work continues past the abandoned waits. A later runtime command
     # resolves once both creations have finished, and the maps stay with
-    # their owner, which closes them.
+    # their owner, which releases them.
     result(harness.runtime.clear_resource_transform())
     for owner in (created, awaited, map_handle):
         assert owner.get_snapshot() is not None
-        assert result(owner.close()) is None
-    assert result(harness.runtime.close()) is None
+        assert result(owner.release()) is None
+    assert result(harness.runtime.release()) is None

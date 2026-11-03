@@ -200,7 +200,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   MLN_TEST_INVALID_STATE(
     mln_render_session_get_snapshot(detached, &snapshot, NULL)
   );
-  MLN_TEST_INVALID_STATE(mln_render_session_dispose(detached, NULL, NULL));
+  MLN_TEST_INVALID_STATE(mln_render_session_dispose(detached, NULL));
   MLN_TEST_INVALID(
     mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &discard, NULL)
   );
@@ -676,7 +676,7 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   MLN_TEST_OK(mln_test_render_fixture_start_attach(
     map, &options, &attach.descriptor, &fixture
   ));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
 
   TEST_ASSERT_TRUE(mln_test_completion_wait(&attach, -1));
   const mln_status attach_status = mln_test_completion_status(&attach);
@@ -731,7 +731,7 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   MLN_TEST_OK(mln_render_session_reduce_memory_use(
     fixture.session, &queued.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
   // A caller driver detaches at its next service, which completes the queued
   // command as abandoned first.
   MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
@@ -750,16 +750,16 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
   mln_test_destroy_runtime(runtime);
 }
 
-// How a disposal case leaves its session before disposing it.
+// How a release case leaves its session before releasing it.
 typedef enum disposed_state {
   DISPOSED_ATTACHED,
   DISPOSED_DETACHED,
   DISPOSED_ABANDONED,
 } disposed_state;
 
-// Once the disposal completes, the host may destroy the target's graphics
+// Once the release completes, the host may destroy the target's graphics
 // objects, which the fixture's teardown does.
-static void dispose_completes_once_the_session_has_retired(
+static void release_completes_once_the_session_has_retired(
   disposed_state state
 ) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -783,7 +783,7 @@ static void dispose_completes_once_the_session_has_retired(
 
   mln_test_completion disposed = mln_test_completion_default(0);
   MLN_TEST_OK(
-    mln_render_session_dispose(fixture.session, &disposed.descriptor, NULL)
+    mln_render_session_release(fixture.session, &disposed.descriptor, NULL)
   );
   mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_INVALID_STATE(
@@ -799,38 +799,65 @@ static void dispose_completes_once_the_session_has_retired(
   mln_test_destroy_runtime(runtime);
 }
 
-static void dispose_completes_after_retiring_an_attached_session(void) {
-  dispose_completes_once_the_session_has_retired(DISPOSED_ATTACHED);
+static void release_completes_after_retiring_an_attached_session(void) {
+  release_completes_once_the_session_has_retired(DISPOSED_ATTACHED);
 }
 
-static void dispose_completes_after_retiring_a_detached_session(void) {
-  dispose_completes_once_the_session_has_retired(DISPOSED_DETACHED);
+static void release_completes_after_retiring_a_detached_session(void) {
+  release_completes_once_the_session_has_retired(DISPOSED_DETACHED);
 }
 
-static void dispose_completes_after_retiring_an_abandoned_session(void) {
-  dispose_completes_once_the_session_has_retired(DISPOSED_ABANDONED);
+static void release_completes_after_retiring_an_abandoned_session(void) {
+  release_completes_once_the_session_has_retired(DISPOSED_ABANDONED);
 }
 
-static void dispose_rejects_an_invalid_completion_and_a_released_session(void) {
+static void release_rejects_an_invalid_completion_and_a_released_session(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
   const mln_completion undersized = {0};
   MLN_TEST_INVALID(
-    mln_render_session_dispose(fixture.session, &undersized, NULL)
+    mln_render_session_release(fixture.session, &undersized, NULL)
   );
+  MLN_TEST_INVALID(mln_render_session_release(fixture.session, NULL, NULL));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
   );
 
-  MLN_TEST_OK(mln_test_render_session_dispose(fixture.session));
+  MLN_TEST_OK(mln_test_render_session_release(fixture.session));
   mln_test_completion again = mln_test_completion_default(0);
   MLN_TEST_INVALID_STATE(
-    mln_render_session_dispose(fixture.session, &again.descriptor, NULL)
+    mln_render_session_release(fixture.session, &again.descriptor, NULL)
   );
   mln_test_completion_reject(&again);
   mln_test_completion_destroy(&again);
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A release would abandon a session whose frame the host holds, as a dispose
+// does, so it refuses until the host gives the frame back.
+static void release_rejects_a_session_whose_frame_the_host_holds(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
+  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
+  mln_test_completion refused = mln_test_completion_default(0);
+  MLN_TEST_INVALID_STATE(
+    mln_render_session_release(fixture.session, &refused.descriptor, NULL)
+  );
+  mln_test_completion_reject(&refused);
+  mln_test_completion_destroy(&refused);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
+  );
+
+  mln_test_render_release_frame(&frame);
+  MLN_TEST_OK(mln_test_render_session_release(fixture.session));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -868,7 +895,7 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
   MLN_TEST_OK(mln_map_dispose(map, NULL));
   TEST_ASSERT_FALSE(atomic_load(&retired));
-  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL, NULL));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
   mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_INVALID_STATE(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
@@ -1165,11 +1192,11 @@ static void attach_caller_driven_with_warnings(
   mln_render_frame_batch_release(mln_test_render_wait_for_results(fixture));
 }
 
-// Disposal hands an attached caller-driven session's detach to its driver and
+// A release hands an attached caller-driven session's detach to its driver and
 // wakes it. The next service detaches the session on the host's thread, which
 // frees its graphics objects rather than quarantining them, and the handle is
 // stale once the session retires.
-static void a_disposed_caller_driven_session_detaches_at_its_next_service(
+static void a_released_caller_driven_session_detaches_at_its_next_service(
   void
 ) {
   // The log callback belongs to the process, so a failed assertion still
@@ -1185,7 +1212,7 @@ static void a_disposed_caller_driven_session_detaches_at_its_next_service(
 
     mln_test_completion disposed = mln_test_completion_default(0);
     MLN_TEST_OK(
-      mln_render_session_dispose(fixture.session, &disposed.descriptor, NULL)
+      mln_render_session_release(fixture.session, &disposed.descriptor, NULL)
     );
     TEST_ASSERT_TRUE(mln_test_await(
       driver_woken, &fixture, mln_test_deadline_default(),
@@ -1212,8 +1239,8 @@ static void a_disposed_caller_driven_session_detaches_at_its_next_service(
 }
 
 // A host that stops servicing still gets its map back: the map's release
-// abandons the disposed session, and the abandon logs what it keeps.
-static void a_disposed_caller_driven_session_is_abandoned_when_its_map_releases(
+// abandons the released session, and the abandon logs what it keeps.
+static void a_released_caller_driven_session_is_abandoned_when_its_map_releases(
   void
 ) {
   if (TEST_PROTECT()) {
@@ -1223,10 +1250,10 @@ static void a_disposed_caller_driven_session_is_abandoned_when_its_map_releases(
     attach_caller_driven_with_warnings(map, &fixture);
     mln_test_completion disposed = mln_test_completion_default(0);
     MLN_TEST_OK(
-      mln_render_session_dispose(fixture.session, &disposed.descriptor, NULL)
+      mln_render_session_release(fixture.session, &disposed.descriptor, NULL)
     );
     mln_test_completion released = {0};
-    MLN_TEST_OK(mln_test_map_start_close(map, &released));
+    MLN_TEST_OK(mln_test_map_start_release(map, &released));
     MLN_TEST_OK(mln_test_completion_settle(&disposed));
     MLN_TEST_OK(mln_test_completion_settle(&released));
     MLN_TEST_INVALID_STATE(
@@ -1256,14 +1283,15 @@ MLN_TEST_GROUP {
   RUN_TEST(a_demand_made_while_attaching_renders_after_the_attach);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(a_disposed_attached_session_releases_its_wakes_before_the_device);
-  RUN_TEST(dispose_completes_after_retiring_an_attached_session);
-  RUN_TEST(dispose_completes_after_retiring_a_detached_session);
-  RUN_TEST(dispose_completes_after_retiring_an_abandoned_session);
-  RUN_TEST(dispose_rejects_an_invalid_completion_and_a_released_session);
+  RUN_TEST(release_completes_after_retiring_an_attached_session);
+  RUN_TEST(release_completes_after_retiring_a_detached_session);
+  RUN_TEST(release_completes_after_retiring_an_abandoned_session);
+  RUN_TEST(release_rejects_an_invalid_completion_and_a_released_session);
+  RUN_TEST(release_rejects_a_session_whose_frame_the_host_holds);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
   RUN_TEST(attach_checks_the_queue_lock);
   RUN_TEST(attach_picks_a_producer_sync_kind);
-  RUN_TEST(a_disposed_caller_driven_session_detaches_at_its_next_service);
-  RUN_TEST(a_disposed_caller_driven_session_is_abandoned_when_its_map_releases);
+  RUN_TEST(a_released_caller_driven_session_detaches_at_its_next_service);
+  RUN_TEST(a_released_caller_driven_session_is_abandoned_when_its_map_releases);
 }

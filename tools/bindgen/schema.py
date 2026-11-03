@@ -1147,6 +1147,11 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: a handle takes a dispose or a discard, not both"
                 )
+            # A dispose never reports back, so it takes its handle alone; a
+            # release that reports through a completion needs one beside it.
+            dispose = api.functions_by_name.get(typedef.metadata.get("dispose", ""))
+            if dispose is not None and len(dispose.parameters) != 1:
+                errors.append(f"{context}: a dispose takes only its handle")
             if "view_begin" in typedef.metadata or "view_end" in typedef.metadata:
                 begin = api.functions_by_name.get(
                     typedef.metadata.get("view_begin", "")

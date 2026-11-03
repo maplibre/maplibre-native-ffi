@@ -51,7 +51,7 @@ assert.equal(
 assert.deepEqual([...unknown.bytes.subarray(8, 16)], Array(8).fill(0xab));
 assert.deepEqual([...unknown.bytes.subarray(16)], Array(8).fill(0xcd));
 
-map.close();
+map.release();
 
 // Records that native code steps through by a wider stride than the binding
 // compiled keep their values. The drain releases its batch, so the next drain
@@ -59,4 +59,4 @@ map.close();
 const ledger = ProbeLedgerHandle.open();
 assert.deepEqual(ledger.drain(), [{ value: 7n }, { value: 9n }]);
 assert.deepEqual(ledger.drain(), []);
-ledger.close();
+ledger.release();

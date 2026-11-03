@@ -368,7 +368,7 @@ static void a_request_in_flight_does_not_hold_its_map_open(void) {
     mln_test_http_server_wait_for_requests(server, "/held.json", 1)
   );
 
-  MLN_TEST_OK(mln_test_map_close(map));
+  MLN_TEST_OK(mln_test_map_release(map));
   mln_test_http_server_release_held(server);
   mln_test_destroy_runtime(runtime);
   mln_test_http_server_stop(server);

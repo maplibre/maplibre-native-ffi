@@ -90,7 +90,7 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   };
   MLN_TEST_OK(mln_render_session_abandon(session, &abandoned, NULL));
   MLN_TEST_AWAIT_OK(
-    mln_render_session_dispose(session, &completion.descriptor, NULL)
+    mln_render_session_release(session, &completion.descriptor, NULL)
   );
 
   mln_test_render_fixture fixture = {0};

@@ -69,7 +69,7 @@ static void open_point(locale_map* map) {
   open_map(map, "[\"all\"]", names, 1);
 }
 
-static void close_map(locale_map* map) {
+static void tear_down_map(locale_map* map) {
   mln_test_render_fixture_destroy(&map->fixture);
   mln_test_destroy_map(map->map);
   mln_test_destroy_runtime(map->runtime);
@@ -158,7 +158,7 @@ static void number_format_follows_locale_currency_and_fraction_limits(void) {
     &map,
     "[\"!=\",[\"number-format\",1,{\"locale\":[\"get\",\"locale\"]}],\"\"]"
   ));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static bool compares(
@@ -214,7 +214,7 @@ static void collator_follows_locale_extensions_and_sensitivity(void) {
     &map,
     "[\"==\",\"a\",\"a\",[\"collator\",{\"locale\":[\"get\",\"locale\"]}]]"
   ));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 #define RESOLVED(locale) \
@@ -235,7 +235,7 @@ static void resolved_locale_reports_the_language_and_honored_extensions(void) {
     &map,
     "[\"==\"," RESOLVED("xx-ZZ") ",[\"resolved-locale\",[\"collator\",{}]]]"
   );
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static void collator_compares_on_the_thread_that_lays_out_tiles(void) {
@@ -251,7 +251,7 @@ static void collator_compares_on_the_thread_that_lays_out_tiles(void) {
   const mln_test_feature_list rendered =
     mln_test_style_query_rendered(&map.fixture);
   TEST_ASSERT_EQUAL_HEX32(0x6, feature_mask(&rendered, 4));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 MLN_TEST_GROUP {

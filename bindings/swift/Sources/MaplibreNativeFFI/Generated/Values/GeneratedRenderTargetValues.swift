@@ -101,7 +101,7 @@ public struct GpuSync: Equatable, Hashable, Sendable {
 /// `AcquiredFrameHandle.release()` succeeds, the session takes the one you
 /// pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
 /// up with each frame, so the one you pass stays yours. Keep it valid until a
-/// detach or disposal of the session completes.
+/// detach or release of the session completes.
 ///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -504,8 +504,8 @@ public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
 
 /// The Vulkan device and queue that a render session uses.
 ///
-/// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns.
+/// Keep these objects alive until a detach or release of the session completes,
+/// or an abandon of it returns.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

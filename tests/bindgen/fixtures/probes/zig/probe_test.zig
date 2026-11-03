@@ -94,7 +94,7 @@ test "generated owned callback arguments are released on conversion and host err
     var saved = probe.saved.?;
     saved.release();
     try std.testing.expectEqual(@as(u64, 43), released_query);
-    // The release closed the value, so a second one does not reach native.
+    // The release marked the value closed, so a second one does not reach native.
     try std.testing.expect(saved.isClosed());
     released_query = 0;
     saved.release();

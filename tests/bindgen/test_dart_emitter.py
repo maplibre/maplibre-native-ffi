@@ -24,7 +24,7 @@ from tools.bindgen.schema import validate
 BINDING = ROOT / "bindings/dart"
 
 
-# An event source and a handle that is not one, each closed by a void release.
+# An event source and a handle that is not one, each retired by a void release.
 EVENT_SOURCE_AND_LEASE = """
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close");
 typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_close");
@@ -127,7 +127,7 @@ class DartEmitterTests(unittest.TestCase):
         # the request.
         self.assertRegex(
             operations,
-            r"_NativeResourceRequest\(handle\)\);\s*if \(callback == null\) \{\s*owner\.close\(\);",
+            r"_NativeResourceRequest\(handle\)\);\s*if \(callback == null\) \{\s*owner\.release\(\);",
         )
 
     def test_a_registration_of_one_callback_is_a_class(self):

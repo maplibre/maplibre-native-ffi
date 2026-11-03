@@ -36,7 +36,7 @@ function isStatus(status: number) {
 /** A provider whose one route matches nothing, so every request loads. */
 const nothingClaimed: ResourceProvider = {
   routes: [{ kinds: ResourceKindFlag.unknown, url: "none://" }],
-  callback: (_request, handle) => handle.close(),
+  callback: (_request, handle) => handle.release(),
 };
 
 /** A Promise for the next request that a provider hands over. */
@@ -99,14 +99,14 @@ test(
     handle.complete(styleResponse());
     await bounded(loaded, "the style load");
 
-    // The accepted answer consumed the handle, so closing it does nothing.
+    // The accepted answer consumed the handle, so releasing it does nothing.
     assert.equal(handle.isClosed, true);
-    handle.close();
+    handle.release();
   },
   { needs: ["httpOrigin"] },
 );
 
-test("a refused answer closes its request and fails it", async () => {
+test("a refused answer retires its request and fails it", async () => {
   const refusals: [string, (handle: ResourceRequestHandle) => void, unknown][] =
     [
       // Native code refuses a message with an embedded NUL.
@@ -156,7 +156,7 @@ test("a provider callback error is reported and fails the request", async () => 
   });
   const map = await fixture.openMap();
 
-  // The binding closes the handle that the throwing callback abandoned, which
+  // The binding releases the handle that the throwing callback abandoned, which
   // fails the request instead of leaving the style load waiting.
   await assert.rejects(
     bounded(map.setStyleUrl(url), "a command"),
@@ -177,7 +177,7 @@ test("a provider whose callback getter throws fails the request", async () => {
         if (armed) {
           throw new Error("getter failed");
         }
-        return (_request, handle) => handle.close();
+        return (_request, handle) => handle.release();
       },
     },
   });
@@ -217,7 +217,7 @@ test(
             urls.push(url);
             transform(request);
           } else {
-            request.close();
+            request.release();
           }
         },
       }),
@@ -283,7 +283,7 @@ test("a cancel callback runs once for a request that teardown discards", async (
   const map = await fixture.openMap();
   map.discarding.setStyleUrl(url);
   const [, handle] = await callbackArrival(handed, "the provider");
-  teardown(() => handle.close());
+  teardown(() => handle.release());
   const cancels: boolean[] = [];
   assert.equal(
     handle.setCancelCallback({
@@ -292,9 +292,9 @@ test("a cancel callback runs once for a request that teardown discards", async (
     false,
   );
 
-  await bounded(map.close(), "map close");
-  await bounded(fixture.runtime.close(), "runtime close");
-  // The cancel arrives before the runtime's close completion, through the
+  await bounded(map.release(), "map release");
+  await bounded(fixture.runtime.release(), "runtime release");
+  // The cancel arrives before the runtime's release completion, through the
   // same queue.
   assert.deepEqual(cancels, [true]);
 });

@@ -117,7 +117,7 @@ private final class NativeRetirement<Handle: NativeHandle>: @unchecked Sendable 
     let disposed = handle.disposeAbandoned()
     let detail = disposed ? "" : " (native disposal failed)"
     reportToStandardError(
-      "Leaked \(typeName) native handle 0x\(String(handle.raw, radix: 16))\(detail); close handles explicitly.\n"
+      "Leaked \(typeName) native handle 0x\(String(handle.raw, radix: 16))\(detail); release handles explicitly.\n"
     )
   }
 }

@@ -78,7 +78,7 @@ public sealed class RenderTests
 
     [Theory]
     [MemberData(nameof(Backends))]
-    public void AClosedCallerDrivenSessionRetiresWhileItsThreadServicesIt(
+    public void AReleasedCallerDrivenSessionRetiresWhileItsThreadServicesIt(
         TestGraphicsBackend backend
     )
     {
@@ -90,9 +90,9 @@ public sealed class RenderTests
                 fixture.Await(session.Ready, "the session to be ready");
                 Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
 
-                // The closed session detaches at a service, so the close completes only after
-                // one ran.
-                Assert.True(fixture.CloseSession() > 0);
+                // The released session detaches at a service, so the release completes only
+                // after one ran.
+                Assert.True(fixture.ReleaseSession() > 0);
                 var stale = Assert.Throws<MaplibreException>(session.ServiceDriverWork);
                 Assert.Equal(Status.InvalidState, stale.Status);
             }
@@ -108,7 +108,7 @@ public sealed class RenderTests
                 fixture.Await(session.Ready, "the session to be ready");
 
             // A disposal reports no retirement, so the map's release waits for it.
-            RenderFixture.Complete(fixture.Map.CloseAsync());
+            RenderFixture.Complete(fixture.Map.ReleaseAsync());
         });
     }
 

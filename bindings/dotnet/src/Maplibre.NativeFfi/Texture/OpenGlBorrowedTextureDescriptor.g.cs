@@ -13,7 +13,7 @@ namespace Maplibre.NativeFfi;
 /// <c>OpenGlContextOwnership.Shared</c>. Each texture must be in your context's
 /// share group, with storage of that size.</para>
 /// <para>The session uses the textures until a replacement or release of the
-/// target completes, a detach or disposal of the session completes, or an
+/// target completes, a detach or release of the session completes, or an
 /// abandon of it returns.</para>
 /// <para>See <c>mln_open_gl_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>

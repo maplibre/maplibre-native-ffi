@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.lifecycle
 
-// `useAndClose` is AutoCloseable's `use`, which the suspending `use` imported below would shadow.
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -8,7 +7,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.use as useAndClose
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.MapHandle
@@ -24,15 +22,15 @@ import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.requestCollection
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
-import org.maplibre.nativeffi.use
+import org.maplibre.nativeffi.useReleasing
 
-/** How the generated owners close and keep their parents. */
+/** How the generated owners release and keep their parents. */
 class HandleLifecycleTest {
   @Test
-  fun closingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
+  fun releasingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
     val data = GeoJsonSourceDataHandle.create(POINT_JSON)
-    data.close()
-    data.close()
+    data.release()
+    data.release()
 
     val runtime = RuntimeHandle.create(RuntimeOptions())
     runtime.release().awaitWithin("the runtime teardown")
@@ -47,7 +45,7 @@ class HandleLifecycleTest {
     val id = "0x" + data.id.toString(16)
     assertFalse(data.isClosed)
     assertEquals("GeoJsonSourceDataHandle(id=$id, closed=false)", data.toString())
-    data.close()
+    data.release()
     assertTrue(data.isClosed)
     assertEquals("GeoJsonSourceDataHandle(id=$id, closed=true)", data.toString())
   }
@@ -58,24 +56,30 @@ class HandleLifecycleTest {
     assertFalse(runtime.isClosed)
     runtime.dispose()
     assertTrue(runtime.isClosed)
-    // A second dispose, a close, and either `use` leave the disposed handle as it is.
+    // A second dispose, a close, `use`, and `useReleasing` leave the disposed handle as it is.
     runtime.dispose()
     runtime.close()
     runtime.use {}
-    runtime.useAndClose {}
+    runtime.useReleasing {}
   }
 
   @Test
-  fun closingAHandleWithADisposeDisposesIt() = runSuspendTest {
+  fun useDisposesAHandleWithADispose() = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
-    runtime.useAndClose {}
+    lateinit var map: MapHandle
+
+    // Native refuses to release a runtime with a live map, but accepts its dispose.
+    runtime.use {
+      map = it.createMap(smallMapOptions())
+      map.ready.awaitWithin("the map")
+    }
     assertTrue(runtime.isClosed)
-    runtime.close()
+    map.release().awaitWithin("the map release")
   }
 
   @Test
-  fun useLeavesAnOwnerThatItsBlockReleased() = runSuspendTest {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun useReleasingLeavesAnOwnerThatItsBlockReleased() = runSuspendTest {
+    RuntimeHandle.create(RuntimeOptions()).useReleasing { runtime ->
       runtime.release().awaitWithin("the runtime teardown")
     }
   }
@@ -97,14 +101,14 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun useKeepsTheBlockFailureAndSuppressesTheRefusedRelease() = runSuspendTest {
+  fun useReleasingKeepsTheBlockFailureAndSuppressesTheRefusedRelease() = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     // The live map makes native refuse the runtime release after the block throws.
     val failure =
       assertFailsWith<IllegalStateException> {
-        runtime.use {
+        runtime.useReleasing {
           map = it.createMap(smallMapOptions())
           map.ready.awaitWithin("the map")
           error("the block failure")
@@ -119,12 +123,12 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun useReportsARefusedReleaseAfterTheBlockReturns() = runSuspendTest {
+  fun useReleasingReportsARefusedReleaseAfterTheBlockReturns() = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     assertFailsWithStatus(Status.INVALID_STATE) {
-      runtime.use {
+      runtime.useReleasing {
         map = it.createMap(smallMapOptions())
         map.ready.awaitWithin("the map")
       }
@@ -135,7 +139,7 @@ class HandleLifecycleTest {
   }
 
   @Test
-  fun useReleasesTheOwnerWhenItsBlockReturnsFromTheCaller() = runSuspendTest {
+  fun useReleasingReleasesTheOwnerWhenItsBlockReturnsFromTheCaller() = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     returnFromUse(runtime)
     assertTrue(runtime.isClosed)
@@ -172,7 +176,7 @@ class HandleLifecycleTest {
   }
 
   private suspend fun returnFromUse(runtime: RuntimeHandle) {
-    runtime.use {
+    runtime.useReleasing {
       return
     }
   }

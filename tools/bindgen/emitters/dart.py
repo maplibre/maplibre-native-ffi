@@ -63,22 +63,10 @@ def receiver_handle(plan: OperationPlan, bound: BoundApi) -> tuple[str | None, b
     return receiver, reference
 
 
-def method_name(plan: OperationPlan, bound: BoundApi, *, dispose=False) -> str:
+def method_name(plan: OperationPlan, bound: BoundApi) -> str:
     """The Dart name of an operation: a method, static factory, or top-level
-    function. A receiver's release is its `close`, and a release that also
-    disposes has a synchronous `dispose` besides."""
+    function."""
     name = camel(plan.member)
-    receiver, _ = receiver_handle(plan, bound)
-    handle = bound.handles.get(receiver)
-    if (
-        plan.consumes
-        and handle
-        and plan.name == handle.release
-        and not handle.release_inputs
-    ):
-        name = "close"
-    if dispose:
-        name = "dispose"
     if name in KEYWORDS["dart"]:
         name += "Value"
     return name
@@ -224,11 +212,6 @@ def _lower(api: Api | BoundApi):
             if plan.receiver and plan.completion and plan.completion.discardable:
                 _, discarded = lower_function(plan, local_values, discard=True)
                 methods[owner + "Discarding"].append(discarded)
-            if plan.receiver and plan.completion and plan.completion.optional:
-                _, disposed = lower_function(plan, local_values, dispose=True)
-                methods[owner].append(
-                    doc(bound, plan.name, "  ", discard=True) + disposed
-                )
             generated.append(plan.name)
             if owner != "Globals" and plan.registrations and not plan.owned_outputs:
                 root_owners.add(owner)
@@ -363,14 +346,14 @@ def render_owner(native, handle, bodies, bound, roots):
         + (
             "  /// The native handle id, which runtime events report as their source.\n"
             "  ///\n"
-            "  /// It stays readable after close, so events drained later still match\n"
+            "  /// It stays readable after release, so events drained later still match\n"
             "  /// this handle.\n"
             if native in bound.event_sources
             else "  /// The native handle id.\n"
         )
         + "  int get id => _state.handleId;\n\n"
-        "  /// Whether the binding has accepted a close, dispose, discard, or release\n"
-        "  /// of this handle.\n"
+        "  /// Whether the binding has accepted a release, dispose, or discard of\n"
+        "  /// this handle.\n"
         "  bool get isClosed => _state.isClosed;\n\n"
         "  @override\n"
         f"  String toString() => '{public}(id=0x${{id.toRadixString(16)}}, closed=$isClosed)';\n\n"

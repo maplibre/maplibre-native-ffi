@@ -83,7 +83,7 @@ private func offline() async throws {
     recordRegion(stored.id, stored.metadata)
   }
 
-  // Resume a download that stopped when the runtime closed.
+  // Resume a download that stopped when the runtime was released.
   try await runtime.setOfflineRegionDownloadState(
     region.id,
     state: .active
@@ -94,5 +94,5 @@ private func offline() async throws {
   try await runtime.deleteOfflineRegion(region.id)
   // #endregion manage
 
-  try await runtime.close()
+  try await runtime.release()
 }

@@ -24,9 +24,9 @@ RUNTIME = ROOT / "bindings/swift/Sources/MaplibreNativeFFI"
 
 # A handle whose dispose is also its release and takes an optional completion,
 # as the render session's does.
-DISPOSE_WITH_COMPLETION = """
+RELEASE_AND_DISPOSE = """
 typedef unsigned long long mln_lease BIND(
-  "kind=handle;release=mln_lease_dispose;abandon=mln_lease_abandon;"
+  "kind=handle;release=mln_lease_release;abandon=mln_lease_abandon;"
   "dispose=mln_lease_dispose"
 );
 mln_status mln_lease_open(
@@ -34,10 +34,11 @@ mln_status mln_lease_open(
 );
 mln_status mln_lease_abandon(mln_lease lease, mln_diagnostic* out_diagnostic);
 BIND("execution=lifecycle")
-mln_status mln_lease_dispose(
+mln_status mln_lease_release(
   mln_lease lease, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 );
+mln_status mln_lease_dispose(mln_lease lease, mln_diagnostic* out_diagnostic);
 """
 
 
@@ -97,30 +98,23 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertIn("runtime events report", owners.split("class MapHandle")[1])
         self.assertIn(
             "  /// The native handle, which no later handle in the process reuses.\n"
-            "  /// It stays valid after the handle closes.\n  public var id: UInt64",
+            "  /// It stays valid after the handle is released.\n  public var id: UInt64",
             owners,
         )
 
-    def test_a_dispose_with_a_completion_is_the_close_and_the_dispose(self):
-        outputs = emitted(swift, parse(DISPOSE_WITH_COMPLETION))
+    def test_a_release_waits_and_a_dispose_does_not(self):
+        outputs = emitted(swift, parse(RELEASE_AND_DISPOSE))
         operations = outputs["Generated/Operations/GeneratedApiLeaseOperations.swift"]
-        # The close reports retirement through the completion, and the
-        # dispose, like every disposer, passes none.
-        self.assertEqual(operations.count("func close("), 1)
-        self.assertIn("func close() async throws {", operations)
+        self.assertIn("func release() async throws {", operations)
         self.assertIn(
             "nativeStartClose { raw, completion, diagnostic in "
-            "mln_lease_dispose(raw, completion, diagnostic) }",
+            "mln_lease_release(raw, completion, diagnostic) }",
             operations,
         )
         self.assertIn(
             "func dispose() throws {\n"
-            "  try nativeClose { raw, diagnostic in mln_lease_dispose(raw, nil, diagnostic) }",
+            "  try nativeClose { raw, diagnostic in mln_lease_dispose(raw, diagnostic) }",
             operations,
-        )
-        self.assertIn(
-            "mln_lease_dispose(raw, nil, nil) == MLN_STATUS_OK",
-            outputs["Generated/GeneratedOwners.swift"],
         )
 
     def test_a_first_label_that_repeats_the_method_name_is_omitted(self):

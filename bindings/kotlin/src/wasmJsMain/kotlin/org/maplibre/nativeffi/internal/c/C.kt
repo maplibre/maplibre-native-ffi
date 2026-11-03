@@ -1289,8 +1289,8 @@ internal actual object C {
   actual fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_detach(session, word(completion), word(outDiagnostic))
 
-  actual fun mln_render_session_dispose(session: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_render_session_dispose(session, word(completion), word(outDiagnostic))
+  actual fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_render_session_dispose(session, word(outDiagnostic))
 
   actual fun mln_render_session_drain_frame_results(
     session: Long,
@@ -1402,6 +1402,9 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_render_session_reduce_memory_use(session, word(completion), word(outDiagnostic))
+
+  actual fun mln_render_session_release(session: Long, completion: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_render_session_release(session, word(completion), word(outDiagnostic))
 
   actual fun mln_render_session_release_target(
     session: Long,
@@ -2811,9 +2814,9 @@ private fun mln_kw_mln_render_session_detach(p0: Long, p1: Int, p2: Int): Int =
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_detach(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_render_session_dispose(p0: Long, p1: Int, p2: Int): Int =
+private fun mln_kw_mln_render_session_dispose(p0: Long, p1: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_dispose(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_dispose(p0, p1)",
   )
 
 private fun mln_kw_mln_render_session_drain_frame_results(
@@ -2896,6 +2899,11 @@ private fun mln_kw_mln_render_session_read_texture(p0: Long, p1: Int, p2: Int): 
 private fun mln_kw_mln_render_session_reduce_memory_use(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_reduce_memory_use(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_render_session_release(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_release(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_release_target(p0: Long, p1: Int, p2: Int): Int =

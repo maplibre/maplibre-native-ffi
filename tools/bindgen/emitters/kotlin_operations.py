@@ -82,16 +82,7 @@ def receiver_value(plan):
 
 
 def method_name(plan):
-    """Name an operation's method after its language-neutral member. A release
-    that takes nothing but its handle and completes at once is the owner's
-    `close()`, as in the other bindings."""
-    if (
-        plan.receiver
-        and receiver_value(plan).handle.release == plan.name
-        and not plan.completion
-        and len(plan.inputs) == 1
-    ):
-        return "close"
+    """Name an operation's method after its language-neutral member."""
     return identifier(plan.member)
 
 
@@ -551,14 +542,11 @@ def disposal_method(handle):
     return identifier(handle.cleanup.removeprefix(handle.native + "_"))
 
 
-def disposer_arguments(handle, function, receiver, null):
-    """The arguments before the diagnostic of [function] when it disposes [handle].
-
-    A disposer reports nothing, so it passes [null] for a dispose's optional
-    completion.
-    """
-    if handle.dispose_completion and function.name == handle.dispose:
-        return [receiver, null]
+def disposer_arguments(function, receiver):
+    """The arguments before the diagnostic of [function] when it disposes a
+    handle: the handle alone."""
+    if len(function.parameters) != 1:
+        raise Unsupported(f"{function.name} disposes with more than its handle")
     return [receiver]
 
 
@@ -683,23 +671,11 @@ def lifecycle(plan, values, native):
         return encodings(plan) + "; ".join([*setup, call])
 
     if not plan.completion:
-        close = "nativeClose" if plan.release else "nativeAnswer"
-        return f"  public fun {method}({parameters}): Unit = {close}(this, binding) {{ {body()} }}\n"
-    retire = (
+        consume = "nativeClose" if plan.release else "nativeAnswer"
+        return f"  public fun {method}({parameters}): Unit = {consume}(this, binding) {{ {body()} }}\n"
+    return (
         f"  public fun {method}({parameters}): Deferred<Unit> = "
         f"nativeRetire(this, binding) {{ {body('completion')} }}\n"
-    )
-    if not plan.completion.optional:
-        return retire
-    # The release is also the handle's dispose, which passes no completion.
-    from .kotlin import operation_doc
-
-    dispose = disposal_method(receiver_value(plan).handle)
-    return (
-        retire
-        + "\n"
-        + operation_doc(values.bound, plan, "  ")
-        + f"  public fun {dispose}({parameters}): Unit = nativeClose(this, binding) {{ {body('0L')} }}\n"
     )
 
 
@@ -731,7 +707,7 @@ def owner_disposal(bound, native):
         method = name(handle.native)
         method = method[0].lower() + method[1:]
         function = bound.source.functions_by_name[handle.cleanup]
-        arguments = disposer_arguments(handle, function, "handle", "0L")
+        arguments = disposer_arguments(function, "handle")
         call = (
             native.call(function, arguments)
             if not function.diagnostic

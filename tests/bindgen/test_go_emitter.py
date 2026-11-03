@@ -156,25 +156,6 @@ class GoEmitterTests(unittest.TestCase):
         }
         self.assertEqual(native, {"mln_queue_lock", "mln_wake"})
 
-    def test_a_dispose_that_is_the_release_closes_with_a_completion(self):
-        api = parse("""
-typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_dispose;dispose=mln_lease_dispose");
-BIND("execution=lifecycle")
-mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        validate(api)
-        self.assertEqual(go.lower(api).generated, ["mln_lease_dispose"])
-        source = emitted(go, api)["generated_api.go"]
-        self.assertIn(
-            "func (receiver *LeaseHandle) Close() (*Future[struct{}], error)", source
-        )
-        self.assertIn(
-            "C.mln_lease_dispose(C.mln_lease(raw), completion, diagnostic)", source
-        )
-        self.assertIn("C.mln_lease_dispose(C.mln_lease(raw), nil, nil)", source)
-        self.assertIn("func (receiver *LeaseHandle) Dispose() error", source)
-        self.assertIn("C.mln_lease_dispose(C.mln_lease(raw), nil, diagnostic)", source)
-
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
         source = emitted(go, real_api())["generated_api.go"]
         disposes = {

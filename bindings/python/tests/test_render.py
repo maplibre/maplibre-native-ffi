@@ -29,7 +29,7 @@ from support import (
     TIMEOUT,
     Harness,
     Signal,
-    close_if_live,
+    release_if_live,
     result,
 )
 
@@ -134,9 +134,9 @@ class _Target:
         value: BaseException | None,
         trace: TracebackType | None,
     ) -> None:
-        self.close()
+        self.release()
 
-    def close(self) -> None:
+    def release(self) -> None:
         raise NotImplementedError
 
 
@@ -168,7 +168,7 @@ class Offscreen(_Target):
             result(self.session.ready)
         except BaseException:
             with contextlib.suppress(Exception):
-                self.close()
+                self.release()
             raise
 
     def _attach(
@@ -194,13 +194,13 @@ class Offscreen(_Target):
             if time.monotonic() > deadline:
                 raise AssertionError("timed out waiting for a red frame")
 
-    def close(self) -> None:
-        # A core-worker session detaches as it closes.
+    def release(self) -> None:
+        # A core-worker session detaches as it releases.
         if self.session is not None:
-            result(self.session.close())
+            result(self.session.release())
             self.session = None
         if self.map is not None:
-            close_if_live(self.map)
+            release_if_live(self.map)
 
 
 class BorrowedTexture(_Target):
@@ -231,7 +231,7 @@ class BorrowedTexture(_Target):
         self._finish = threading.Event()
         self._stopping = False
         self._release = False
-        self._closed = False
+        self._released = False
         self.serviced = 0
         self.service_errors: list[BaseException] = []
         self.graphics: graphics.Graphics | None = None
@@ -269,9 +269,9 @@ class BorrowedTexture(_Target):
             result(self.session.ready)
         except BaseException:
             # A session whose attach failed still detaches before it is
-            # destroyed, and close() leaves alive what it cannot detach.
+            # destroyed, and release() leaves alive what it cannot detach.
             with contextlib.suppress(Exception):
-                self.close()
+                self.release()
             raise
 
     def _create_textures(self) -> None:
@@ -364,7 +364,7 @@ class BorrowedTexture(_Target):
                 if self.session is not None:
                     self.session.service_driver_work()
                     self.serviced += 1
-        except BaseException as error:  # noqa: BLE001 - reported by close()
+        except BaseException as error:  # noqa: BLE001 - reported by release()
             self.service_errors.append(error)
         finally:
             while not self._stopping:
@@ -401,14 +401,14 @@ class BorrowedTexture(_Target):
         """Without ``release``, a session may still share the graphics object,
         so everything is left alive rather than destroyed under it.
         """
-        self._closed = True
+        self._released = True
         self.stop_service()
         # No driver call is in flight once servicing stops, so the session
-        # can be destroyed, and it has retired once its close completes.
+        # can be destroyed, and it has retired once its release completes.
         if release and self.session is not None:
-            result(self.session.close())
+            result(self.session.release())
         if release and self.map is not None:
-            close_if_live(self.map)
+            release_if_live(self.map)
         if self._service is not None:
             self._release = release
             self._finish.set()
@@ -419,8 +419,8 @@ class BorrowedTexture(_Target):
             self._close_textures()
             self.graphics.close()
 
-    def close(self) -> None:
-        if self._closed:
+    def release(self) -> None:
+        if self._released:
             return
         try:
             if self.session is not None:
@@ -585,7 +585,7 @@ def test_a_caller_driven_session_is_serviced_from_a_python_thread(
             target.render(wait_for_update=True).disposition == mln.RenderResult.RENDERED
         )
     # A service call publishes its frame before it returns, so
-    # the count is read once closing has stopped the graphics thread.
+    # the count is read once the release has stopped the graphics thread.
     assert target.serviced > 0
 
 
@@ -601,7 +601,7 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
         assert frame is not None
 
         def inspect(view: object) -> int:
-            for release in (lambda: frame.close(DONE), target.session.abandon):
+            for release in (lambda: frame.release(DONE), target.session.abandon):
                 with pytest.raises(mln.MaplibreError) as raised:
                     release()
                 assert raised.value.status == mln.Status.BUSY
@@ -610,8 +610,8 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
         assert target.with_texture(frame, inspect) != 0
         frame.get_result()
         assert not frame.is_closed
-        frame.close(DONE)
-        # A frame closes once, so a discard after close does nothing.
+        frame.release(DONE)
+        # A frame retires once, so a discard after its release does nothing.
         frame.discard()
         assert frame.is_closed
         assert repr(frame) == f"AcquiredFrameHandle(id={frame.id:#x}, closed=true)"
@@ -623,7 +623,7 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-def test_a_borrow_on_another_thread_holds_off_close(
+def test_a_borrow_on_another_thread_holds_off_release(
     harness: Harness, backend: str
 ) -> None:
     with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
@@ -653,13 +653,13 @@ def test_a_borrow_on_another_thread_holds_off_close(
             with pytest.raises(
                 mln.MaplibreError, check=lambda error: error.status == mln.Status.BUSY
             ):
-                frame.close(DONE)
+                frame.release(DONE)
         finally:
             release.set()
             borrower.join()
 
         assert not failures
-        frame.close(DONE)
+        frame.release(DONE)
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,

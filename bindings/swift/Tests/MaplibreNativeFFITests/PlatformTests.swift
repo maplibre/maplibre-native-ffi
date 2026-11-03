@@ -7,7 +7,7 @@ import Testing
 #if os(macOS) || os(Linux) || os(Windows)
   /// A process exits cleanly with its runtime and map live, its resource
   /// provider and log callback installed, and a style request in flight. The C
-  /// API lets a host exit at any point, so nothing is closed first.
+  /// API lets a host exit at any point, so nothing is released first.
   @Test func exitingWithLiveHandlesAndCallbacksIsClean() async {
     await #expect(processExitsWith: .success) {
       try setLogCallback(handler: LogHandler { _, _, _, _ in })

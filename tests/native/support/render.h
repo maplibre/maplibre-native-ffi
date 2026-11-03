@@ -127,10 +127,10 @@ mln_status mln_test_render_fixture_finish_disposal(
   const mln_test_render_fixture* fixture, mln_test_completion* completion
 );
 
-// Disposes `session` and waits until it retires, servicing it meanwhile when
+// Releases `session` and waits until it retires, servicing it meanwhile when
 // it uses the caller-driver. Returns the completion's status, or the status
-// that rejected the disposal.
-mln_status mln_test_render_session_dispose(mln_render_session session);
+// that rejected the release.
+mln_status mln_test_render_session_release(mln_render_session session);
 
 // Releases the graphics device this thread cached. Every thread must call this
 // before its entry function returns: on browser WebGPU a live GPUDevice pins an

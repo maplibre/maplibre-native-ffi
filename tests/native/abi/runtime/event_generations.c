@@ -430,7 +430,7 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
   const size_t live_events = recorder.count;
   recorder_unlock();
   mln_test_render_fixture_destroy(&fixture);
-  MLN_TEST_OK(mln_test_map_close(map));
+  MLN_TEST_OK(mln_test_map_release(map));
   assert_recorder_complete();
 
   size_t loading_finished = 0;

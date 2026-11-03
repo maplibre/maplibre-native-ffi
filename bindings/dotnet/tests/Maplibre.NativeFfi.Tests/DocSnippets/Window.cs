@@ -47,7 +47,7 @@ internal static class Window
                 result.Disposition == RenderResult.Failed
             )
         )
-            // Close the session and attach a new one.
+            // Release the session and attach a new one.
             ReplaceSession();
         else if (!paused)
             RunAtNextRefresh(DemandFrame);
@@ -148,7 +148,7 @@ internal static class Window
         _ = graphicsThreadOptions;
 
         paused = true;
-        await session.CloseAsync();
+        await session.ReleaseAsync();
         DestroySurface(); // For example, with vkDestroySurfaceKHR.
     }
 }

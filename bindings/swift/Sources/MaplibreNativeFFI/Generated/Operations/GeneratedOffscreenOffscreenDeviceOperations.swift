@@ -40,7 +40,7 @@ public extension OffscreenDeviceHandle {
   ///
   /// See `mln_offscreen_device_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-  func close() {
+  func release() {
     nativeClose { raw in mln_offscreen_device_release(raw) }
   }
 }

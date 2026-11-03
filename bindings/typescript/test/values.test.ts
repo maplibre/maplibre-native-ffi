@@ -129,7 +129,7 @@ test("JSON crosses as JSON.stringify and JSON.parse values", async () => {
       "a",
     );
   } finally {
-    expression.close();
+    expression.release();
   }
 
   // A value that JSON.stringify rejects throws its error before native code
@@ -235,7 +235,7 @@ test("a synchronous call fills a caller-sized output array in input order", asyn
     assert.deepEqual(projection.latLngsForPixels([]), []);
     assert.deepEqual(projection.latLngsForPixelsUnwrapped([]), []);
   } finally {
-    projection.close();
+    projection.release();
   }
 });
 
@@ -252,7 +252,7 @@ test("caller-sized text returns a result longer than its first storage", () => {
   try {
     assert.equal(zoom.evaluate({ zoom: 5 }), 50);
   } finally {
-    zoom.close();
+    zoom.release();
   }
 
   // The result outgrows the addon's first storage, so the call runs again.
@@ -261,6 +261,6 @@ test("caller-sized text returns a result longer than its first storage", () => {
   try {
     assert.equal(long.evaluate(), text);
   } finally {
-    long.close();
+    long.release();
   }
 });

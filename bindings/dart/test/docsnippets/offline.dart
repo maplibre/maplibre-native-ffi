@@ -96,7 +96,7 @@ Future<void> offline() async {
     recordRegion(stored.id, stored.metadata);
   }
 
-  // Resume a download that stopped when the runtime closed.
+  // Resume a download that stopped when the runtime was released.
   await runtime.setOfflineRegionDownloadState(
     region.id,
     OfflineRegionDownloadState.active,
@@ -107,5 +107,5 @@ Future<void> offline() async {
   await runtime.deleteOfflineRegion(region.id);
   // #endregion manage
 
-  await runtime.close();
+  await runtime.release();
 }

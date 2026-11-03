@@ -32,7 +32,7 @@ async function runSuite(reload: () => void): Promise<void> {
     run: async () => {
       await liveNativeWork();
       reload();
-      // The host ends this realm; its teardowns must not close the work first.
+      // The host ends this realm; its teardowns must not end the work first.
       await new Promise<never>(() => {});
     },
   });

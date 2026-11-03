@@ -83,7 +83,7 @@ final class MapFixture: Sendable {
       let map = try await makeMap(on: runtime, extent: extent)
       return MapFixture(runtime: runtime, map: map, events: events)
     } catch {
-      try? await runtime.close()
+      try? await runtime.release()
       throw error
     }
   }
@@ -94,7 +94,7 @@ final class MapFixture: Sendable {
   }
 
   /// Creates a map on `runtime` and waits until it is ready. A map that fails
-  /// to become ready is closed before the error propagates.
+  /// to become ready is released before the error propagates.
   static func makeMap(
     on runtime: RuntimeHandle,
     extent: LogicalExtent = LogicalExtent(width: 8, height: 8, scaleFactor: 1)
@@ -105,28 +105,28 @@ final class MapFixture: Sendable {
     do {
       try await map.ready
     } catch {
-      try? await map.close()
+      try? await map.release()
       throw error
     }
     return map
   }
 
-  /// Closes the map, if the test left it open, and then the runtime, waiting
+  /// Releases the map, if the test left it live, and then the runtime, waiting
   /// for native teardown so no native thread outlives the test.
-  func close() async {
+  func release() async {
     do {
       if try isLive({ _ = try map.getSnapshot() }) {
-        try await map.close()
+        try await map.release()
       }
     } catch {
-      Issue.record("closing the fixture map failed: \(error)")
+      Issue.record("releasing the fixture map failed: \(error)")
     }
     do {
       if try isLive({ try runtime.discarding.clearResourceTransform() }) {
-        try await runtime.close()
+        try await runtime.release()
       }
     } catch {
-      Issue.record("closing the fixture runtime failed: \(error)")
+      Issue.record("releasing the fixture runtime failed: \(error)")
     }
   }
 
@@ -155,7 +155,7 @@ final class MapFixture: Sendable {
   }
 }
 
-/// Runs `body` with a fresh fixture and closes it afterwards, whether or not
+/// Runs `body` with a fresh fixture and releases it afterwards, whether or not
 /// `body` throws.
 func withMapFixture<Result>(
   extent: LogicalExtent = LogicalExtent(width: 32, height: 32, scaleFactor: 1),
@@ -165,10 +165,10 @@ func withMapFixture<Result>(
   let fixture = try await MapFixture.make(extent: extent, routes: routes)
   do {
     let result = try await body(fixture)
-    await fixture.close()
+    await fixture.release()
     return result
   } catch {
-    await fixture.close()
+    await fixture.release()
     throw error
   }
 }

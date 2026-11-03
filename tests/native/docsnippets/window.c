@@ -196,7 +196,7 @@ void mln_doc_window(
   (void)graphics_thread_options;
 
   paused = true;
-  mln_render_session_dispose(session, &done, NULL);
+  mln_render_session_release(session, &done, NULL);
   wait_for_done();
 
   destroy_surface();  // For example, with vkDestroySurfaceKHR.

@@ -368,9 +368,6 @@ def release(op: Operation) -> tuple[str, str, set[str]]:
         return released(op)
     if len(op.plan.function.parameters) != 1:
         return called(op, converted(op))
-    # Dispose already runs the release when no separate dispose exists.
-    if handle.dispose in {None, handle.release}:
-        return op.owners[op.receiver], "", set()
     return (
         op.owners[op.receiver],
         f"    public void {op.declared}() {{ state.Close(); }}\n",
@@ -390,9 +387,10 @@ def release_async(op: Operation) -> tuple[str, str, set[str]]:
                 f"public Task {op.declared}()",
                 ["state.Close(idempotent: false);", "return teardown;"],
             )
-            # A scope that exits after an explicit close or dispose does
-            # nothing, as .NET requires of a repeated dispose.
-            + "\n    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;\n\n"
+            # `await using` waits for the release. A scope that exits after an
+            # explicit release or dispose does nothing, as .NET requires of a
+            # repeated dispose.
+            + "\n    ValueTask IAsyncDisposable.DisposeAsync() => state.Close() ? new(teardown) : default;\n\n"
             + method(
                 f"private mln_status StartRelease({native_type} handle, mln_diagnostic* _)",
                 [
@@ -522,7 +520,7 @@ def drain(op: Operation, call: Call) -> tuple[str, str, set[str]]:
         "}",
         "finally",
         "{",
-        f"    {native_call(release, disposer_arguments(batch, release, camel(plan.drain.batch.name)), 'null')};",
+        f"    {native_call(release, disposer_arguments(release, camel(plan.drain.batch.name)), 'null')};",
         "}",
     ]
     return op.emit(call, result_type, body)

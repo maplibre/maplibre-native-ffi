@@ -34,7 +34,7 @@ void drainFrameResults() {
   if (results.any(
     (result) => result.disposition == RenderResult.failed,
   )) {
-    replaceSession(); // Close the session and attach a new one.
+    replaceSession(); // Release the session and attach a new one.
   } else if (!paused) {
     atNextRefresh(demandFrame);
   }
@@ -120,6 +120,6 @@ Future<void> renderToWindow(
   // #endregion service
 
   paused = true;
-  await session.close();
+  await session.release();
   destroySurface();
 }

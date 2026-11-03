@@ -42,7 +42,7 @@ function drainFrameResults(): void {
       ({ disposition }) => disposition === RenderResult.failed,
     )
   ) {
-    replaceSession(); // Close the session and attach a new one.
+    replaceSession(); // Release the session and attach a new one.
   } else if (!paused) {
     atNextRefresh(demandFrame);
   }
@@ -130,6 +130,6 @@ export async function renderToWindow(
   void graphicsThreadOptions;
 
   paused = true;
-  await session.close();
+  await session.release();
   destroySurface();
 }

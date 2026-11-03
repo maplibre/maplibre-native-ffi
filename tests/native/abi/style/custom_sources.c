@@ -397,7 +397,7 @@ static void accepted_adds_release_their_callback_state(void) {
       1, atomic_load(&probe.release_count), kind->name
     );
 
-    MLN_TEST_OK(mln_test_map_close(map));
+    MLN_TEST_OK(mln_test_map_release(map));
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       2, atomic_load(&probe.release_count), kind->name
     );
@@ -809,7 +809,7 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
     )
   );
 
-  MLN_TEST_OK(mln_test_map_close(map));
+  MLN_TEST_OK(mln_test_map_release(map));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&vector_probe.release_count));
   mln_test_destroy_runtime(runtime);
@@ -945,7 +945,7 @@ static void custom_sources_take_and_validate_every_option(void) {
     )
   );
 
-  MLN_TEST_OK(mln_test_map_close(map));
+  MLN_TEST_OK(mln_test_map_release(map));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&vector_probe.release_count));
   mln_test_destroy_runtime(runtime);

@@ -32,15 +32,19 @@ internal constructor(
   private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)
   /**
    * The native handle value, which runtime events report as their source. It stays readable after
-   * close, so events drained later still match this handle.
+   * release, so events drained later still match this handle.
    */
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release, dispose, close, or discard has ended the handle. */
+  /** Whether a release, dispose, or discard has ended the handle. */
   public override val isClosed: Boolean
     get() = binding.isReleased
 
+  /**
+   * Calls [dispose], for the standard library's `use`, which can't wait. [useReleasing] waits for
+   * [release] instead.
+   */
   public override fun close() {
     dispose()
   }

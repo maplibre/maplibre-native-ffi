@@ -40,7 +40,7 @@ static void open_map(locale_map* map) {
   MLN_TEST_OK(mln_test_render_still_image(&map->fixture, map->map));
 }
 
-static void close_map(locale_map* map) {
+static void tear_down_map(locale_map* map) {
   mln_test_render_fixture_destroy(&map->fixture);
   mln_test_destroy_map(map->map);
   mln_test_destroy_runtime(map->runtime);
@@ -95,7 +95,7 @@ static void number_format_follows_locale_currency_and_fraction_limits(void) {
     &map,
     "[\"!=\",[\"number-format\",1,{\"currency\":[\"get\",\"currency\"]}],\"\"]"
   ));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static bool compares(
@@ -142,7 +142,7 @@ static void collator_follows_locale_extensions_and_sensitivity(void) {
     compares(&map, "==", "\\u00e4", "ae", "de-DE-u-co-phonebk", false, false)
   );
   TEST_ASSERT_TRUE(compares(&map, "<", "2", "10", "en-US-u-kn", false, false));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 #define RESOLVES(locale, resolved)                                   \
@@ -162,7 +162,7 @@ static void resolved_locale_reports_the_language_and_honored_extensions(void) {
   EXPECT_SELECTS(
     &map, RESOLVES("xx-ZZ", "[\"resolved-locale\",[\"collator\",{}]]")
   );
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 MLN_TEST_GROUP {

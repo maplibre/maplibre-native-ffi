@@ -101,12 +101,12 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func close() async throws {
-    guard let future = try startClose() else { return }
+  func release() async throws {
+    guard let future = try startRelease() else { return }
     try await future.value()
   }
 
-  internal func startClose() throws -> NativeFuture<Void>? {
+  internal func startRelease() throws -> NativeFuture<Void>? {
     try nativeStartClose { raw, completion, diagnostic in mln_runtime_release(
       raw,
       completion,

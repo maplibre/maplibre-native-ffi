@@ -265,7 +265,7 @@ class Host {
 
       check(mln_render_session_service_driver_work(session_, nullptr));
     }
-    check(mln_render_session_dispose(session_, nullptr, nullptr));
+    check(mln_render_session_dispose(session_, nullptr));
     for (auto* texture : textures) mln_test_graphics_texture_destroy(texture);
     mln_test_graphics_destroy(graphics);
   }

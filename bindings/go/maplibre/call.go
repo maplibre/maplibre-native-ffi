@@ -27,7 +27,7 @@ type bindingTarget struct {
 	consumes bool
 	// answers reports a call that ends the receiver whatever it returns. A
 	// call on a receiver already ended reaches native, which reports it, where
-	// a repeated close does nothing.
+	// a repeated release or dispose does nothing.
 	answers bool
 }
 
@@ -54,8 +54,8 @@ func bindingScoped(scope *bindingScope) bindingTarget {
 
 // bindingRun keeps owners reachable until outputs are copied and registrations
 // are rooted. Native leases each id for the duration of its call. A repeated
-// synchronous close returns the zero T; an async close has no zero future to
-// return, so a repeated one reaches native.
+// synchronous release or dispose returns the zero T; an async release has no
+// zero future to return, so a repeated one reaches native.
 func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw uint64) T, synchronous bool) T {
 	arena := &bindingArena{}
 	defer arena.close()

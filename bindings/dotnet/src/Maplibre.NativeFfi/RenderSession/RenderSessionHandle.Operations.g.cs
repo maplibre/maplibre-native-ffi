@@ -54,18 +54,18 @@ public sealed unsafe partial class RenderSessionHandle
         );
 
     private static mln_status Abandon(MlnRenderSession live, mln_diagnostic* diagnostic) =>
-        NativeMethods.mln_render_session_dispose(live, null, diagnostic);
+        NativeMethods.mln_render_session_dispose(live, diagnostic);
 
     NativeHandleState<MlnRenderSession> INativeOwner<MlnRenderSession>.State => state;
     internal MlnRenderSession Handle => state.Handle;
 
     /// <summary>
-    /// The native handle value. It stays readable after close.
+    /// The native handle value. It stays readable after release.
     /// </summary>
     public ulong Id => state.Handle.Value;
 
     /// <summary>
-    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// Whether a release, dispose, or discard has ended the handle.
     /// </summary>
     public bool IsClosed => state.IsClosed;
 
@@ -74,6 +74,20 @@ public sealed unsafe partial class RenderSessionHandle
     /// </summary>
     public override string ToString() => state.ToString();
 
+    /// <summary>
+    /// Releases the session in any state, and finishes in the background.
+    /// </summary>
+    /// <remarks>
+    /// <para>Use it from destructors and finalizers. Otherwise, use
+    /// <c>RenderSessionHandle.ReleaseAsync()</c>. The session retires as a
+    /// release does, except that a session whose frames you hold is abandoned,
+    /// which ends the frames. Keep servicing a session driven by
+    /// <c>RenderDriverKind.CallerGraphicsThread</c> until
+    /// <c>RenderSessionHandle.ServiceDriverWork()</c> no longer accepts
+    /// it.</para>
+    /// <para>See <c>mln_render_session_dispose</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// </remarks>
     public void Dispose()
     {
         state.Retire();
@@ -88,7 +102,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <c>Status.TargetLost</c>, and pending frame demands finish with
     /// <c>RenderResult.TargetNotReady</c>. Once the call returns, the library
     /// no longer uses your graphics objects, and you can attach another session
-    /// to the map. Dispose the session afterward.</para>
+    /// to the map. Release the session afterward.</para>
     /// <para>Only the driver thread can destroy OpenGL and WebGPU objects, so
     /// abandon keeps them until the process exits, reports how many it kept,
     /// and logs a warning. Detach the session instead to free them. A disposal
@@ -129,7 +143,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// has failed. The diagnostic carries the failure's
     /// message.</description></item>
     /// <item><description><c>Status.InvalidState</c> when you detached,
-    /// abandoned, or disposed the session.</description></item>
+    /// abandoned, released, or disposed the session.</description></item>
     /// </list>
     /// </remarks>
     public AcquiredFrameHandle? AcquireFrame()
@@ -212,8 +226,8 @@ public sealed unsafe partial class RenderSessionHandle
     /// has failed. The diagnostic carries the failure's
     /// message.</description></item>
     /// <item><description><c>Status.InvalidState</c> when you detached,
-    /// abandoned, or disposed the session, or discarded a frame from every
-    /// texture of its ring.</description></item>
+    /// abandoned, released, or disposed the session, or discarded a frame from
+    /// every texture of its ring.</description></item>
     /// </list>
     /// </remarks>
     public void DemandFrame(FrameDemand demand)
@@ -230,7 +244,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Release every acquired frame first. Pending frame demands finish
     /// with <c>RenderResult.TargetNotReady</c>. Once the detach completes, the
     /// library no longer uses your graphics objects, and you can attach another
-    /// session to the map. Dispose the session afterward.</para>
+    /// session to the map. Release the session afterward.</para>
     /// <para>See <c>mln_render_session_detach</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -249,42 +263,6 @@ public sealed unsafe partial class RenderSessionHandle
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Releases the session in any state.
-    /// </summary>
-    /// <remarks>
-    /// <para>An attached session detaches first, and frees its graphics
-    /// objects, unless you hold one of its frames. A session driven by
-    /// <c>RenderDriverKind.CallerGraphicsThread</c> detaches at your next
-    /// <c>RenderSessionHandle.ServiceDriverWork()</c>, so keep servicing it
-    /// until the disposal completes. If you release or dispose its map before
-    /// that service, the session is abandoned instead. Any other session is
-    /// abandoned as <c>RenderSessionHandle.Abandon()</c> does. Once the
-    /// disposal completes, the library no longer uses your graphics
-    /// objects.</para>
-    /// <para>See <c>mln_render_session_dispose</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public Task CloseAsync()
-    {
-        state.Close(idempotent: false);
-        return teardown;
-    }
-
-    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;
-
-    private mln_status StartRelease(MlnRenderSession handle, mln_diagnostic* _)
-    {
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_dispose(
-            handle,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        teardown = nativePending.Submitted(nativeStatus);
-        return mln_status.MLN_STATUS_OK;
     }
 
     /// <summary>
@@ -606,6 +584,49 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Releases the session, detaching it first when it is attached.
+    /// </summary>
+    /// <remarks>
+    /// <para>The completion runs once the session retires. From then on, the
+    /// library no longer uses your graphics objects, and you can attach another
+    /// session to the map. Pending frame demands finish with
+    /// <c>RenderResult.TargetNotReady</c>.</para>
+    /// <para>A session driven by <c>RenderDriverKind.CallerGraphicsThread</c>
+    /// detaches at your next <c>RenderSessionHandle.ServiceDriverWork()</c>, so
+    /// keep servicing it until the release completes. If you release or dispose
+    /// its map before that service, the session is abandoned instead. A session
+    /// that isn't attached, such as one that is still attaching or that failed,
+    /// is abandoned as <c>RenderSessionHandle.Abandon()</c> does.</para>
+    /// <para>See <c>mln_render_session_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> while you hold one of the
+    /// session's acquired frames. Release or discard them
+    /// first.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task ReleaseAsync()
+    {
+        state.Close(idempotent: false);
+        return teardown;
+    }
+
+    ValueTask IAsyncDisposable.DisposeAsync() => state.Close() ? new(teardown) : default;
+
+    private mln_status StartRelease(MlnRenderSession handle, mln_diagnostic* _)
+    {
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_release(
+            handle,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        teardown = nativePending.Submitted(nativeStatus);
+        return mln_status.MLN_STATUS_OK;
+    }
+
+    /// <summary>
     /// Lets go of the session's surface or textures, and keeps the rest of the
     /// session.
     /// </summary>
@@ -676,11 +697,11 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it with <c>RenderDriverKind.CallerGraphicsThread</c>, and call
     /// it from the same thread every time. Call it each time
     /// <c>RenderSessionAttachOptions.DriverWorkWake</c> is called, even while
-    /// you demand no frames, and until a detach or disposal completes. It
-    /// returns once no work is ready.</para>
-    /// <para>It accepts a disposed session until the session retires. The
-    /// service after the disposal detaches the session and frees its graphics
-    /// objects.</para>
+    /// you demand no frames, and until a detach or the session's retirement
+    /// completes. It returns once no work is ready.</para>
+    /// <para>It accepts a released or disposed session until the session
+    /// retires. The service after the release or disposal detaches the session
+    /// and frees its graphics objects.</para>
     /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
     /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
     /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics

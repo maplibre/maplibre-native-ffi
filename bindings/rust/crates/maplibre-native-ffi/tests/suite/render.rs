@@ -49,7 +49,7 @@ fn an_offscreen_session_renders_a_frame_the_binding_reads_back() {
             assert_eq!(*pixel, BACKGROUND_RGBA);
         }
     }
-    session.close();
+    session.detach_and_release();
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn a_drain_before_any_demand_returns_no_batch() {
     // no value.
     assert!(session.handle.drain_frame_results().unwrap().is_empty());
     assert!(session.handle.acquire_frame().unwrap().is_none());
-    session.close();
+    session.detach_and_release();
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     // Once the view's scope ends, the frame releases.
     // SAFETY: a CPU-complete sync names no graphics object.
     unsafe { frame.release(&cpu_complete) }.unwrap();
-    session.close();
+    session.detach_and_release();
 }
 
 // A released caller-driven session detaches at its next service, so a host
@@ -150,7 +150,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let (fixture, session) = offscreen_fixture();
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let (runtime, map) = fixture.into_parts();
-    // No explicit close: each drop disposes its handle, children first.
+    // No explicit release: each drop disposes its handle, children first.
     let Session { handle, wakes } = session;
     drop(handle);
     drop(map);

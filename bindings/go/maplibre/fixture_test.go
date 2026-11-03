@@ -38,7 +38,7 @@ func testTimeout() time.Duration {
 // submitted folds a submission's error into the future it returned, so that
 // one call can await what a submitting call returns:
 //
-//	await(t, submitted(m.Close()))
+//	await(t, submitted(m.Release()))
 func submitted[T any](future *Future[T], err error) *Future[T] {
 	if err == nil {
 		return future
@@ -71,7 +71,7 @@ func createMap(t *testing.T, runtime *RuntimeHandle, options MapOptions) *MapHan
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout())
 	defer cancel()
 	if _, err := ready.Await(ctx); err != nil {
-		_, _ = m.Close()
+		_, _ = m.Release()
 		t.Fatal(err)
 	}
 	return m
@@ -102,7 +102,7 @@ type fixture struct {
 }
 
 // newFixture creates a runtime with an in-memory cache and a denying resource
-// provider, and one map, and closes both when the test ends.
+// provider, and one map, and releases both when the test ends.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	return newFixtureWith(t, testMapOptions())
@@ -115,7 +115,7 @@ func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 	f.m = createMap(t, f.runtime, options)
 	// A test may already have released its fixture owner.
 	t.Cleanup(func() {
-		future, err := f.m.Close()
+		future, err := f.m.Release()
 		if !errors.Is(err, StatusInvalidState) {
 			await(t, submitted(future, err))
 		}
@@ -141,7 +141,7 @@ func newRuntimeFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		future, err := f.runtime.Close()
+		future, err := f.runtime.Release()
 		if !errors.Is(err, StatusInvalidState) {
 			await(t, submitted(future, err))
 		}

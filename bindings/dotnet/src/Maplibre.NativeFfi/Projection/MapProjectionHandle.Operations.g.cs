@@ -38,12 +38,12 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     internal MlnMapProjection Handle => state.Handle;
 
     /// <summary>
-    /// The native handle value. It stays readable after close.
+    /// The native handle value. It stays readable after release.
     /// </summary>
     public ulong Id => state.Handle.Value;
 
     /// <summary>
-    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// Whether a release, dispose, or discard has ended the handle.
     /// </summary>
     public bool IsClosed => state.IsClosed;
 
@@ -52,9 +52,9 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// </summary>
     public override string ToString() => state.ToString();
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
-        state.Retire();
+        state.Close();
     }
 
     /// <summary>
@@ -285,6 +285,18 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
             (nuint)(coordinates.Length),
             static item => CopyScreenPoint(item)
         );
+    }
+
+    /// <summary>
+    /// Releases a projection.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public void Release()
+    {
+        state.Close();
     }
 
     /// <summary>

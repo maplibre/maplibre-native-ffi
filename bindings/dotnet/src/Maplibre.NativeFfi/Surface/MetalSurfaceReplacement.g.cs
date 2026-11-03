@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// <remarks>
 /// <para>The session renders to it with the device that it attached with. It
 /// uses the layer until a replacement or release of the target completes, a
-/// detach or disposal of the session completes, or an abandon of it
+/// detach or release of the session completes, or an abandon of it
 /// returns.</para>
 /// <para>See <c>mln_metal_surface_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>

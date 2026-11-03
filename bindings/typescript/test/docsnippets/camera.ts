@@ -112,7 +112,7 @@ export async function camera(map: MapHandle): Promise<void> {
   const coordinate = projection.latLngForPixel({ x: 100, y: 200 });
   const point = projection.pixelForLatLng(coordinate);
 
-  projection.close();
+  projection.release();
   // #endregion convert
   void point;
 }

@@ -17,14 +17,14 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
   setLogCallback(LogHandler(callback: (_, _, _, _) {}));
   final runtime = RuntimeHandle.create();
   await runtime.setResourceTransform(
-    ResourceTransform(callback: (_, _, request) => request.close()),
+    ResourceTransform(callback: (_, _, request) => request.release()),
   );
   await runtime.setResourceProvider(
     ResourceProvider(
       routes: [
         ResourceRoute(kinds: ResourceKindFlag.style, url: 'liveness://style'),
       ],
-      callback: (_, request) => request.close(),
+      callback: (_, request) => request.release(),
     ),
   );
   final map = runtime.createMap(testMapOptions());
@@ -38,13 +38,13 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
 }
 
 /// Awaits completions while only callback registrations are otherwise live,
-/// then closes everything, so that the exit rests on nothing else.
+/// then releases everything, so that the exit rests on nothing else.
 Future<void> _awaitCompletions() async {
   final (runtime, map) = await _register();
   await runtime.clearResourceTransform();
   print('COMPLETIONS_RESOLVED');
-  await map.close();
-  await runtime.close();
+  await map.release();
+  await runtime.release();
   clearLogCallback();
 }
 

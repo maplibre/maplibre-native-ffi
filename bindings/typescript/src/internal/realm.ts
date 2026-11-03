@@ -173,7 +173,7 @@ function reportError(error: unknown): void {
 function reportLeak(name: string, handle: bigint): void {
   const message = `${name} 0x${handle.toString(
     16,
-  )} was collected while open, so its handle was disposed; close it explicitly`;
+  )} was collected while open, so its handle was disposed; release it explicitly`;
   try {
     if (hooks.warnLeak) {
       hooks.warnLeak(message);

@@ -18,11 +18,11 @@ declare function attachTarget(
 
 export async function createAMap(): Promise<void> {
   // #region runtime
-  const runtime = await RuntimeHandle.create();
+  await using runtime = await RuntimeHandle.create();
   // #endregion runtime
 
   // #region map
-  const map = runtime.createMap({
+  await using map = runtime.createMap({
     initialExtent: { width: 800, height: 600, scaleFactor: 2 },
     mapMode: MapMode.continuous,
   });
@@ -56,11 +56,9 @@ export async function createAMap(): Promise<void> {
   }
   // #endregion errors
 
-  const session = await attachTarget(map);
-
   // #region close
-  session.dispose();
-  map.dispose();
-  await runtime.close();
+  await using session = await attachTarget(map);
+  // Leaving the scope releases the session, the map, and the runtime, in
+  // that order, and waits for each.
   // #endregion close
 }

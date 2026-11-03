@@ -23,19 +23,24 @@ internal constructor(
       GeneratedOwnerDisposal::resourceTransformRequest,
     )
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
-  /** The native handle value. It stays readable after close. */
+  /** The native handle value. It stays readable after release. */
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release, dispose, close, or discard has ended the handle. */
+  /** Whether a release, dispose, or discard has ended the handle. */
   public val isClosed: Boolean
     get() = binding.isReleased
+
+  /** Calls [release], for the standard library's `use`. */
+  public override fun close() {
+    release()
+  }
 
   /**
    * Answers a resource transform request with the URL to load instead.
    *
    * `url` must not be empty. A failed answer fails the request with `ResourceErrorReason.OTHER`, as
-   * `ResourceTransformRequestHandle.close()` does.
+   * `ResourceTransformRequestHandle.release()` does.
    *
    * See `mln_resource_transform_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -51,7 +56,7 @@ internal constructor(
    * The library retries a request that failed for a reason it retries, such as
    * `ResourceErrorReason.CONNECTION`, and the retry calls the transform again. When this call
    * fails, the request fails with `ResourceErrorReason.OTHER`, as
-   * `ResourceTransformRequestHandle.close()` does.
+   * `ResourceTransformRequestHandle.release()` does.
    *
    * See `mln_resource_transform_request_fail` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -75,7 +80,7 @@ internal constructor(
    * See `mln_resource_transform_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public override fun close(): Unit =
+  public fun release(): Unit =
     nativeClose(this, binding) { C.mln_resource_transform_request_release(handle) }
 
   override fun toString(): String =

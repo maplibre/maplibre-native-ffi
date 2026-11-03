@@ -63,7 +63,7 @@ void dispose_with_a_readback_pending(mln_runtime runtime) {
   blocker.submitted = true;
   TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
   auto disposed = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_render_session_dispose(
+  MLN_TEST_OK(mln_render_session_release(
     fixture.session, &disposed.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   mln_test_gate_release(blocker.gate.get());
@@ -76,7 +76,7 @@ void dispose_with_a_readback_pending(mln_runtime runtime) {
 }
 
 // A worker that ended with the map still pending left the next runtime on
-// the page unable to close, so the case closes two.
+// the page unable to release, so the case releases two.
 void disposal_with_a_readback_pending_ends_the_worker() {
   for (auto round = 0; round < 2; round += 1) {
     const auto runtime = mln_test_create_runtime();

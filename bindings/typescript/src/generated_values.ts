@@ -780,7 +780,7 @@ export interface GpuSync {
  * `AcquiredFrameHandle.release()` succeeds, the session takes the one you pass.
  * A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up
  * with each frame, so the one you pass stays yours. Keep it valid until a
- * detach or disposal of the session completes.
+ * detach or release of the session completes.
  *
  * See `mln_gpu_sync_kind` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1295,7 +1295,7 @@ export interface MetalBorrowedTexture {
  * pixel format, one sample, and MTLTextureUsageRenderTarget.
  *
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_metal_borrowed_texture_descriptor` in the
@@ -1321,7 +1321,7 @@ export interface MetalBorrowedTextureDescriptor {
  * textures follow its rules. The ring keeps its depth, device, and command
  * queue, so give it as many textures as it attached with, on the same device.
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_metal_borrowed_texture_replacement` in the
@@ -1374,7 +1374,7 @@ export interface MetalSurfaceDescriptor {
  *
  * The session renders to it with the device that it attached with. It uses the
  * layer until a replacement or release of the target completes, a detach or
- * disposal of the session completes, or an abandon of it returns.
+ * release of the session completes, or an abandon of it returns.
  *
  * See `mln_metal_surface_replacement` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -1636,7 +1636,7 @@ export interface OpenGlBorrowedTexture {
  * size.
  *
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_open_gl_borrowed_texture_descriptor` in the
@@ -1662,8 +1662,8 @@ export interface OpenGlBorrowedTextureDescriptor {
  * textures follow its rules. The ring keeps its depth, context, and texture
  * target, so give it as many textures as it attached with, in the same share
  * group. The session uses the textures until a replacement or release of the
- * target completes, a detach or disposal of the session completes, or an
- * abandon of it returns.
+ * target completes, a detach or release of the session completes, or an abandon
+ * of it returns.
  *
  * See `mln_open_gl_borrowed_texture_replacement` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1755,7 +1755,7 @@ export type OpenGlContextProviderFlag = number;
  * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
  *
  * The session uses the surface until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_open_gl_surface_descriptor` in the
@@ -2051,7 +2051,8 @@ export const RenderResult = {
   superseded: 3,
   /**
    * The session failed, and `RenderSessionHandle.getFailure()` reports why.
-   * Once `RenderSessionHandle.close()` completes, you can attach a new session.
+   * Once `RenderSessionHandle.release()` completes, you can attach a new
+   * session.
    */
   failed: 4,
 } as const;
@@ -3708,7 +3709,7 @@ export interface VulkanBorrowedTexture {
  * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
  *
  * The session uses the images until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_vulkan_borrowed_texture_descriptor` in the
@@ -3739,7 +3740,7 @@ export interface VulkanBorrowedTextureDescriptor {
  * images follow its rules. The ring keeps its depth, context, `format`,
  * `final_layout`, and `owner`, so give it as many images as it attached with,
  * in that format, on the same device. The session uses the images until a
- * replacement or release of the target completes, a detach or disposal of the
+ * replacement or release of the target completes, a detach or release of the
  * session completes, or an abandon of it returns.
  *
  * See `mln_vulkan_borrowed_texture_replacement` in the
@@ -3755,7 +3756,7 @@ export interface VulkanBorrowedTextureReplacement {
 /**
  * The Vulkan device and queue that a render session uses.
  *
- * Keep these objects alive until a detach or disposal of the session completes,
+ * Keep these objects alive until a detach or release of the session completes,
  * or an abandon of it returns.
  *
  * See `mln_vulkan_context_descriptor` in the
@@ -3824,7 +3825,7 @@ export type VulkanImageOwner =
  * The device must have VK_KHR_swapchain enabled, and the queue family of
  * `graphics_queue_family_index` must support presenting to the surface. The
  * session creates the swapchain. It uses the surface until a replacement or
- * release of the target completes, a detach or disposal of the session
+ * release of the target completes, a detach or release of the session
  * completes, or an abandon of it returns.
  *
  * See `mln_vulkan_surface_descriptor` in the
@@ -3845,7 +3846,7 @@ export interface VulkanSurfaceDescriptor {
  * The session presents to it with the context that it attached with, so the
  * queue family of that context's `graphics_queue_family_index` must support
  * presenting to the surface. It uses the surface until a replacement or release
- * of the target completes, a detach or disposal of the session completes, or an
+ * of the target completes, a detach or release of the session completes, or an
  * abandon of it returns.
  *
  * See `mln_vulkan_surface_replacement` in the
@@ -4009,7 +4010,7 @@ export interface WebGpuBorrowedTexture {
  * layer, one mip level, one sample, and WGPUTextureUsage_RenderAttachment.
  *
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_web_gpu_borrowed_texture_descriptor` in the
@@ -4035,8 +4036,8 @@ export interface WebGpuBorrowedTextureDescriptor {
  * textures follow its rules. The ring keeps its depth, context, and `format`,
  * so give it as many textures as it attached with, in that format, on the same
  * device. The session uses the textures until a replacement or release of the
- * target completes, a detach or disposal of the session completes, or an
- * abandon of it returns.
+ * target completes, a detach or release of the session completes, or an abandon
+ * of it returns.
  *
  * See `mln_web_gpu_borrowed_texture_replacement` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4073,7 +4074,7 @@ export interface WebGpuContextDescriptor {
  * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()`.
  *
  * The session configures the surface. It uses the surface until a replacement
- * or release of the target completes, a detach or disposal of the session
+ * or release of the target completes, a detach or release of the session
  * completes, or an abandon of it returns.
  *
  * See `mln_web_gpu_surface_descriptor` in the
@@ -4097,7 +4098,7 @@ export interface WebGpuSurfaceDescriptor {
  *
  * The session configures it with the context and format that it attached with.
  * It uses the surface until a replacement or release of the target completes, a
- * detach or disposal of the session completes, or an abandon of it returns.
+ * detach or release of the session completes, or an abandon of it returns.
  *
  * See `mln_web_gpu_surface_replacement` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

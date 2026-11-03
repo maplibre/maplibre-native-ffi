@@ -81,7 +81,7 @@ mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
 // publishes nothing and cannot fence work that the runtime worker starts on
 // its own, such as handling a frame that a render session finished.
 mln_status mln_test_map_fence(mln_map map);
-mln_status mln_test_runtime_close(mln_runtime runtime);
+mln_status mln_test_runtime_release(mln_runtime runtime);
 // Map options with a 256 by 256 initial extent at one device pixel per UI
 // pixel, the extent the cases assume unless they set their own.
 mln_map_options mln_test_map_options(void);
@@ -97,10 +97,12 @@ mln_status mln_test_map_create_status(
 );
 // Releases the map and waits for its release completion, after which the map's
 // callbacks have released their user data.
-mln_status mln_test_map_close(mln_map map);
+mln_status mln_test_map_release(mln_map map);
 // Releases the map with `teardown`'s descriptor, without waiting for it. On
 // MLN_STATUS_OK the case settles `teardown`; otherwise it is destroyed.
-mln_status mln_test_map_start_close(mln_map map, mln_test_completion* teardown);
+mln_status mln_test_map_start_release(
+  mln_map map, mln_test_completion* teardown
+);
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask);
 mln_status mln_test_map_get_camera(mln_map map, mln_camera* out_camera);
 // Creates a projection of the view in the map's latest published snapshot.

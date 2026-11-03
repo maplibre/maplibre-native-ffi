@@ -92,11 +92,11 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 		return err
 	}
 
-	closed, err := m.Close()
+	released, err := m.Release()
 	if err != nil {
 		return err
 	}
-	if _, err := closed.Await(ctx); err != nil {
+	if _, err := released.Await(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -133,11 +133,11 @@ func imagesTile(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y ui
 	}
 	// #endregion tile
 
-	closed, err := m.Close()
+	released, err := m.Release()
 	if err != nil {
 		return err
 	}
-	_, err = closed.Await(ctx)
+	_, err = released.Await(ctx)
 	return err
 }
 

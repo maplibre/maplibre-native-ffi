@@ -16,7 +16,7 @@ static const mln_test_validation_case runtime_option_cases[] = {
    "size"},
 };
 
-// A rejected creation leaves the output null; an accepted one is closed at
+// A rejected creation leaves the output null; an accepted one is released at
 // once so that the table creates nothing it leaves behind.
 static mln_status create_runtime_from(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
@@ -26,7 +26,7 @@ static mln_status create_runtime_from(
   const mln_status status =
     mln_runtime_create(descriptor, &runtime, diagnostic);
   if (status == MLN_STATUS_OK) {
-    MLN_TEST_OK(mln_test_runtime_close(runtime));
+    MLN_TEST_OK(mln_test_runtime_release(runtime));
   } else {
     TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   }
@@ -210,7 +210,7 @@ static void style_functions_reject_null_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
+static void release_preflight_keeps_a_runtime_with_a_live_child(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const mln_completion discard = mln_test_discard_completion();
@@ -250,7 +250,7 @@ static void create_on_temporary_thread(void* argument) {
     mln_test_completion_destroy(&create_map);
   }
   if (probe->status != MLN_STATUS_OK) {
-    (void)mln_test_runtime_close(probe->runtime);
+    (void)mln_test_runtime_release(probe->runtime);
   }
 }
 
@@ -274,21 +274,22 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   const mln_status snapshot_status =
     mln_map_get_snapshot(probe.map, &snapshot, NULL);
-  const mln_status map_close_status = mln_test_map_close(probe.map);
-  const mln_status runtime_close_status = mln_test_runtime_close(probe.runtime);
+  const mln_status map_release_status = mln_test_map_release(probe.map);
+  const mln_status runtime_release_status =
+    mln_test_runtime_release(probe.runtime);
 
   MLN_TEST_OK(resize_status);
   MLN_TEST_OK(snapshot_status);
   TEST_ASSERT_EQUAL_UINT32(extent.width, snapshot.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(extent.height, snapshot.view.extent.height);
-  MLN_TEST_OK(map_close_status);
-  MLN_TEST_OK(runtime_close_status);
+  MLN_TEST_OK(map_release_status);
+  MLN_TEST_OK(runtime_release_status);
 }
 
-typedef struct close_probe {
+typedef struct release_probe {
   mln_runtime runtime;
   atomic_int status;
-} close_probe;
+} release_probe;
 
 static mln_runtime create_untracked_runtime(void) {
   const mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
@@ -297,22 +298,22 @@ static mln_runtime create_untracked_runtime(void) {
   return runtime;
 }
 
-static void close_from_foreign_thread(void* argument) {
-  close_probe* probe = argument;
+static void release_from_foreign_thread(void* argument) {
+  release_probe* probe = argument;
   const mln_completion discard = mln_test_discard_completion();
   atomic_store(
     &probe->status, mln_runtime_release(probe->runtime, &discard, NULL)
   );
 }
 
-static void accepted_close_is_any_thread_and_retires_the_handle(void) {
+static void accepted_release_is_any_thread_and_retires_the_handle(void) {
   mln_runtime runtime = create_untracked_runtime();
-  close_probe probe = {
+  release_probe probe = {
     .runtime = runtime,
   };
   atomic_init(&probe.status, MLN_STATUS_NATIVE_ERROR);
   mln_test_thread* thread =
-    mln_test_thread_start(close_from_foreign_thread, &probe);
+    mln_test_thread_start(release_from_foreign_thread, &probe);
   mln_test_thread_join(thread);
   MLN_TEST_OK(atomic_load(&probe.status));
 
@@ -410,19 +411,19 @@ static void runtime_state_release_can_wait_for_another_runtime(void) {
   };
   MLN_TEST_OK(mln_test_set_resource_provider(waiting, &provider));
   const mln_runtime other = create_untracked_runtime();
-  const mln_completion waiting_close = {
-    .size = sizeof(waiting_close),
+  const mln_completion waiting_release = {
+    .size = sizeof(waiting_release),
     .callback = record_retirement,
     .user_data = &result,
     .release_user_data = release_retirement,
   };
-  MLN_TEST_OK(mln_runtime_release(waiting, &waiting_close, NULL));
+  MLN_TEST_OK(mln_runtime_release(waiting, &waiting_release, NULL));
   const bool entered = mln_test_wait_for_flag(&wait.entered);
-  mln_completion other_close = mln_test_discard_completion();
-  other_close.user_data = &wait;
-  other_close.release_user_data = complete_other_retirement;
+  mln_completion other_release = mln_test_discard_completion();
+  other_release.user_data = &wait;
+  other_release.release_user_data = complete_other_retirement;
   const mln_status other_status =
-    mln_runtime_release(other, &other_close, NULL);
+    mln_runtime_release(other, &other_release, NULL);
   const bool other_released = mln_test_wait_for_flag(&wait.other_released);
   const bool waiting_released = mln_test_wait_for_flag(&result.released);
   TEST_ASSERT_TRUE(entered);
@@ -456,20 +457,20 @@ static void a_map_release_completion_can_release_its_runtime(void) {
   mln_map map = MLN_HANDLE_NULL;
   const mln_map_options map_options = mln_test_map_options();
   MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
-  mln_test_completion runtime_close = mln_test_completion_default(0);
+  mln_test_completion runtime_release = mln_test_completion_default(0);
   release_parent parent = {
     .runtime = runtime,
-    .completion = &runtime_close.descriptor,
+    .completion = &runtime_release.descriptor,
     .map_status = MLN_STATUS_NATIVE_ERROR,
     .submission_status = MLN_STATUS_NATIVE_ERROR,
   };
-  const mln_completion map_close = {
-    .size = sizeof(map_close),
+  const mln_completion map_release = {
+    .size = sizeof(map_release),
     .callback = release_runtime_from_map_completion,
     .user_data = &parent,
   };
-  MLN_TEST_OK(mln_map_release(map, &map_close, NULL));
-  MLN_TEST_OK(mln_test_completion_settle(&runtime_close));
+  MLN_TEST_OK(mln_map_release(map, &map_release, NULL));
+  MLN_TEST_OK(mln_test_completion_settle(&runtime_release));
   MLN_TEST_OK(atomic_load(&parent.map_status));
   MLN_TEST_OK(atomic_load(&parent.submission_status));
 }
@@ -482,8 +483,8 @@ MLN_TEST_GROUP {
   RUN_TEST(map_creation_checks_its_output);
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(disposal_waits_for_children_and_retires_callback_state);
-  RUN_TEST(close_preflight_leaves_a_runtime_with_a_live_child_open);
-  RUN_TEST(accepted_close_is_any_thread_and_retires_the_handle);
+  RUN_TEST(release_preflight_keeps_a_runtime_with_a_live_child);
+  RUN_TEST(accepted_release_is_any_thread_and_retires_the_handle);
   RUN_TEST(runtime_and_map_outlive_the_creating_host_thread);
   RUN_TEST(runtime_state_release_can_wait_for_another_runtime);
   RUN_TEST(a_map_release_completion_can_release_its_runtime);

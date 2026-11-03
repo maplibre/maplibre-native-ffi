@@ -207,22 +207,18 @@ def native_call(function, *arguments, diagnostic="diagnostic"):
 
 
 def public_dispose(handle) -> bool:
-    """Whether a handle has a C dispose besides a void release: a separate
-    dispose, or a release that disposes and also takes a completion."""
-    return bool(
-        handle.dispose
-        and (handle.dispose != handle.release or handle.dispose_completion)
-    )
+    """Whether a handle has a C dispose besides its release."""
+    return bool(handle.dispose and handle.dispose != handle.release)
 
 
 def owner_members(owner: str, event_source: bool) -> str:
     id_doc = (
         "// ID returns the native handle value, which runtime events report as their\n"
-        "// source. It stays readable after the handle closes, so events drained later\n"
-        "// still match this handle.\n"
+        "// source. It stays readable after the handle is released, so events drained\n"
+        "// later still match this handle.\n"
         if event_source
         else "// ID returns the native handle value. It stays readable after the handle\n"
-        "// closes.\n"
+        "// is released.\n"
     )
     return (
         id_doc
@@ -269,17 +265,8 @@ def _lower(api):
             raise ModelError(
                 [f"{native}: automatic ownership requires an unconditional disposer"]
             )
-        # A dispose that is also the release takes a completion, which a
-        # disposer leaves null.
         function = bound.source.functions_by_name[disposer]
-        dispose = native_call(
-            function,
-            *(
-                "nil" if p.name == handle.dispose_completion else f"C.{native}(raw)"
-                for p in function.parameters
-            ),
-            diagnostic="nil",
-        )
+        dispose = native_call(function, f"C.{native}(raw)", diagnostic="nil")
         borrow = (
             f'func borrow{owner}(raw uint64) *{owner} {{ return &{owner}{{bindingBorrow(raw, "{owner}")}} }}\n'
             if native in bound.borrowed_handles

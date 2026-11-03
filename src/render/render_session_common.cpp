@@ -3575,9 +3575,19 @@ auto render_session_acquire_frame(
   }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
+  mln::testing::hit(mln::testing::SyncPoint::RenderAcquireLeased);
   auto frame = std::shared_ptr<mln_acquired_frame_object>{};
   {
     const auto lock = std::scoped_lock{live->control_mutex};
+    // A release or dispose accepted after the lease chose, under this lock,
+    // how the session retires from the frames it held then, so the session
+    // hands out no more.
+    if (live->disposal_requested.load()) {
+      return report_handle_fault(
+        HandleTraits<mln_render_session_object>::kind, session,
+        HandleFault::Stale
+      );
+    }
     // An attaching session has rendered no frame yet, so it has none ready.
     if (
       live->state != MLN_RENDER_SESSION_STATE_ATTACHING &&
@@ -4620,8 +4630,6 @@ auto detach_disposed_session(
   {
     const auto lock = std::scoped_lock{session->control_mutex};
     session->disposal_detach = false;
-    // An acquire that leased the session before disposal can still have taken
-    // a frame, which keeps the target in the host's hands.
     detaching = session->state == MLN_RENDER_SESSION_STATE_ATTACHED &&
                 !session->views_invalidated &&
                 session->acquired_frame_count == 0 &&
@@ -4702,11 +4710,14 @@ enum class DisposalTeardown : std::uint8_t { Detach, Quarantine };
 // reaches the node parks it on the session, and the call or view that leaves
 // the session idle returns it to the lane, which abandons the target outside
 // registry locks.
+// A release refuses a session whose frames the host holds, which a disposal
+// would abandon instead of detaching.
 // Returns false, accepting nothing, when another disposal of the session came
-// first.
+// first, or when a release finds a held frame, which sets `frames_held`.
 auto dispose_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
-  DisposalTeardown teardown, const CompletionOperation& async = {}
+  DisposalTeardown teardown, const CompletionOperation& async = {},
+  bool* frames_held = nullptr
 ) noexcept -> bool {
   auto detach_on_driver = false;
   auto caller_driven = false;
@@ -4714,7 +4725,12 @@ auto dispose_render_session(
     // Declared before the lock, so the driver wake runs after it.
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
-    if (live->disposal_requested.exchange(true)) return false;
+    if (live->disposal_requested.load()) return false;
+    if (frames_held != nullptr && live->acquired_frame_count != 0) {
+      *frames_held = true;
+      return false;
+    }
+    live->disposal_requested = true;
     live->disposal_keeps_graphics = teardown == DisposalTeardown::Quarantine;
     // Accepted before the retirement is queued, so the lane delivers it.
     live->disposal_completion = async.operation;
@@ -4786,19 +4802,31 @@ auto disposal_raced(mln_render_session session) -> mln_status {
 }
 }  // namespace
 
-auto render_session_dispose(
+auto render_session_release(
   mln_render_session session, const mln_completion* completion
 ) -> mln_status {
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
   auto async = CompletionOperation{};
-  if (completion != nullptr) {
-    const auto status = create_completion_operation(
-      completion, valueless_completion<&mln_render_session_dispose>(), async
-    );
-    if (status != MLN_STATUS_OK) return status;
+  const auto status = create_completion_operation(
+    completion, valueless_completion<&mln_render_session_release>(), async
+  );
+  if (status != MLN_STATUS_OK) return status;
+  auto frames_held = false;
+  if (!dispose_render_session(
+        live, DisposalTeardown::Detach, async, &frames_held
+      )) {
+    if (!frames_held) return disposal_raced(session);
+    set_thread_error("release the session's acquired frames first");
+    return MLN_STATUS_INVALID_STATE;
   }
-  if (!dispose_render_session(live, DisposalTeardown::Detach, async))
+  return MLN_STATUS_OK;
+}
+
+auto render_session_dispose(mln_render_session session) -> mln_status {
+  const auto live = lease_render_session(session);
+  if (live == nullptr) return recorded_handle_fault_status();
+  if (!dispose_render_session(live, DisposalTeardown::Detach))
     return disposal_raced(session);
   return MLN_STATUS_OK;
 }

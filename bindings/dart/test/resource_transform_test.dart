@@ -16,7 +16,7 @@ void main() {
     final fixture = await openRuntime(
       provider: routedProvider([
         styleRoute('custom://unused.json'),
-      ], (_, handle) => handle.close()),
+      ], (_, handle) => handle.release()),
     );
     await fixture.runtime.setResourceTransform(
       ResourceTransform(
@@ -24,7 +24,7 @@ void main() {
           if (url == styleUrl) {
             handed.complete(request);
           } else {
-            request.close();
+            request.release();
           }
         },
       ),

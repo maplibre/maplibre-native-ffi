@@ -33,7 +33,7 @@ typedef struct mln_metal_borrowed_texture {
  * to MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
  *
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  */
 typedef struct mln_metal_borrowed_texture_descriptor {
@@ -59,7 +59,7 @@ typedef struct mln_metal_borrowed_texture_descriptor {
  * and the textures follow its rules. The ring keeps its depth, device, and
  * command queue, so give it as many textures as it attached with, on the same
  * device. The session uses the textures until a replacement or release of the
- * target completes, a detach or disposal of the session completes, or an
+ * target completes, a detach or release of the session completes, or an
  * abandon of it returns.
  */
 typedef struct mln_metal_borrowed_texture_replacement {
@@ -122,7 +122,7 @@ typedef enum mln_vulkan_image_owner : uint32_t {
  * ring holds up to MLN_TEXTURE_RING_MAX_DEPTH distinct images.
  *
  * The session uses the images until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
@@ -150,7 +150,7 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
  * `format`, `final_layout`, and `owner`, so give it as many images as it
  * attached with, in that format, on the same device. The session uses the
  * images until a replacement or release of the target completes, a detach or
- * disposal of the session completes, or an abandon of it returns.
+ * release of the session completes, or an abandon of it returns.
  */
 typedef struct mln_vulkan_borrowed_texture_replacement {
   uint32_t size;
@@ -200,7 +200,7 @@ typedef struct mln_open_gl_borrowed_texture {
  * MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
  *
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  */
 typedef struct mln_open_gl_borrowed_texture_descriptor {
@@ -224,7 +224,7 @@ typedef struct mln_open_gl_borrowed_texture_descriptor {
  * and the textures follow its rules. The ring keeps its depth, context, and
  * texture target, so give it as many textures as it attached with, in the same
  * share group. The session uses the textures until a replacement or release of
- * the target completes, a detach or disposal of the session completes, or an
+ * the target completes, a detach or release of the session completes, or an
  * abandon of it returns.
  */
 typedef struct mln_open_gl_borrowed_texture_replacement {
@@ -256,7 +256,7 @@ typedef struct mln_web_gpu_borrowed_texture {
  * ring holds up to MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
  *
  * The session uses the textures until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  */
 typedef struct mln_web_gpu_borrowed_texture_descriptor {
@@ -280,7 +280,7 @@ typedef struct mln_web_gpu_borrowed_texture_descriptor {
  * and the textures follow its rules. The ring keeps its depth, context, and
  * `format`, so give it as many textures as it attached with, in that format,
  * on the same device. The session uses the textures until a replacement or
- * release of the target completes, a detach or disposal of the session
+ * release of the target completes, a detach or release of the session
  * completes, or an abandon of it returns.
  */
 typedef struct mln_web_gpu_borrowed_texture_replacement {

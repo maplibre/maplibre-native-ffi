@@ -40,12 +40,12 @@ public sealed unsafe partial class OffscreenDeviceHandle
     internal MlnOffscreenDevice Handle => state.Handle;
 
     /// <summary>
-    /// The native handle value. It stays readable after close.
+    /// The native handle value. It stays readable after release.
     /// </summary>
     public ulong Id => state.Handle.Value;
 
     /// <summary>
-    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// Whether a release, dispose, or discard has ended the handle.
     /// </summary>
     public bool IsClosed => state.IsClosed;
 
@@ -54,9 +54,9 @@ public sealed unsafe partial class OffscreenDeviceHandle
     /// </summary>
     public override string ToString() => state.ToString();
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
-        state.Retire();
+        state.Close();
     }
 
     /// <summary>
@@ -96,5 +96,19 @@ public sealed unsafe partial class OffscreenDeviceHandle
             )
         );
         return OffscreenDeviceHandle.Adopt(outDevice);
+    }
+
+    /// <summary>
+    /// Releases an offscreen device.
+    /// </summary>
+    /// <remarks>
+    /// <para>Render sessions on the device keep working until they
+    /// detach.</para>
+    /// <para>See <c>mln_offscreen_device_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html">C API reference</see>.</para>
+    /// </remarks>
+    public void Release()
+    {
+        state.Close();
     }
 }

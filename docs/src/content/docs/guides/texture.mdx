@@ -63,7 +63,7 @@ again. If your reads may still run on the GPU, pass a sync point of a kind that
 [](api:mln_render_session_capabilities) lists in its consumer sync kinds
 instead, and the session waits for it on the GPU. Keep at most one frame
 acquired, or the next frame waits for a free texture, and release every acquired
-frame before you close the session.
+frame before you release the session.
 
 <Snippet page="texture" region="acquire" />
 

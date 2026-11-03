@@ -146,7 +146,7 @@ LOCALS = {"native", "handle", "registrations", "completion", "disposed", "result
 
 # Members that every owner class defines, which an operation cannot replace:
 # its handle, its state, its release, and the constructor.
-OWNER_MEMBERS = {"id", "isClosed", "close", "constructor"}
+OWNER_MEMBERS = {"id", "isClosed", "constructor"}
 
 
 @dataclass(frozen=True)

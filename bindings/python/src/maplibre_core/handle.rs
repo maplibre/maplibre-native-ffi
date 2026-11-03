@@ -19,7 +19,7 @@ pub struct NativeHandleLeak {
 pub fn report_leak(leak: NativeHandleLeak) {
     let _ = writeln!(
         std::io::stderr(),
-        "maplibre-native-ffi: Leaked {} native handle {:#x}; close it explicitly.",
+        "maplibre-native-ffi: Leaked {} native handle {:#x}; release it explicitly.",
         leak.type_name,
         leak.id
     );

@@ -36,13 +36,13 @@ public sealed unsafe partial class RuntimeHandle
 
     /// <summary>
     /// The native handle value, which runtime events report as their
-    /// source. It stays readable after close, so events drained later
+    /// source. It stays readable after release, so events drained later
     /// still match this handle.
     /// </summary>
     public ulong Id => state.Handle.Value;
 
     /// <summary>
-    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// Whether a release, dispose, or discard has ended the handle.
     /// </summary>
     public bool IsClosed => state.IsClosed;
 
@@ -51,6 +51,15 @@ public sealed unsafe partial class RuntimeHandle
     /// </summary>
     public override string ToString() => state.ToString();
 
+    /// <summary>
+    /// Releases a runtime in any state, without waiting.
+    /// </summary>
+    /// <remarks>
+    /// <para>The runtime finishes its teardown after its maps are
+    /// released.</para>
+    /// <para>See <c>mln_runtime_dispose</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
+    /// </remarks>
     public void Dispose()
     {
         state.Retire();
@@ -420,13 +429,13 @@ public sealed unsafe partial class RuntimeHandle
     /// <para>See <c>mln_runtime_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
-    public Task CloseAsync()
+    public Task ReleaseAsync()
     {
         state.Close(idempotent: false);
         return teardown;
     }
 
-    public ValueTask DisposeAsync() => state.Close() ? new(teardown) : default;
+    ValueTask IAsyncDisposable.DisposeAsync() => state.Close() ? new(teardown) : default;
 
     private mln_status StartRelease(MlnRuntime handle, mln_diagnostic* _)
     {

@@ -8,7 +8,7 @@ native_owner! {
     ///
     /// See `mln_render_session` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    pub struct RenderSessionHandle(mln_render_session) dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, std::ptr::null(), out_diagnostic) });
+    pub struct RenderSessionHandle(mln_render_session) dispose |raw| crate::error::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, out_diagnostic) });
     /// Returns the native handle value.
     fn id;
 }
@@ -20,7 +20,7 @@ impl RenderSessionHandle {
     /// can't finish first. Pending work completes with `Status::TargetLost`,
     /// and pending frame demands finish with `RenderResult::TargetNotReady`.
     /// Once the call returns, the library no longer uses your graphics objects,
-    /// and you can attach another session to the map. Dispose the session
+    /// and you can attach another session to the map. Release the session
     /// afterward.
     ///
     /// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
@@ -59,8 +59,8 @@ impl RenderSessionHandle {
     /// - `RenderSessionSnapshot::failure_status`, `Status::TargetLost` or
     ///   `Status::NativeError`, when the session has failed. The diagnostic
     ///   carries the failure's message.
-    /// - `Status::InvalidState` when you detached, abandoned, or disposed the
-    ///   session.
+    /// - `Status::InvalidState` when you detached, abandoned, released, or
+    ///   disposed the session.
     pub fn acquire_frame(&self) -> Result<Option<AcquiredFrameHandle>> {
         let mut call = self.inner.call();
         let mut out_frame = sys::mln_acquired_frame(0);
@@ -132,8 +132,9 @@ impl RenderSessionHandle {
     /// - `RenderSessionSnapshot::failure_status`, `Status::TargetLost` or
     ///   `Status::NativeError`, when the session has failed. The diagnostic
     ///   carries the failure's message.
-    /// - `Status::InvalidState` when you detached, abandoned, or disposed the
-    ///   session, or discarded a frame from every texture of its ring.
+    /// - `Status::InvalidState` when you detached, abandoned, released, or
+    ///   disposed the session, or discarded a frame from every texture of its
+    ///   ring.
     pub fn demand_frame(&self, demand: &FrameDemand) -> Result<()> {
         let mut call = self.inner.call();
         let demand = call.reference(&demand)?;
@@ -148,7 +149,7 @@ impl RenderSessionHandle {
     /// Release every acquired frame first. Pending frame demands finish with
     /// `RenderResult::TargetNotReady`. Once the detach completes, the library
     /// no longer uses your graphics objects, and you can attach another session
-    /// to the map. Dispose the session afterward.
+    /// to the map. Release the session afterward.
     ///
     /// See `mln_render_session_detach` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -167,52 +168,22 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Releases the session in any state.
+    /// Releases the session in any state, and finishes in the background.
     ///
-    /// An attached session detaches first, and frees its graphics objects,
-    /// unless you hold one of its frames. A session driven by
-    /// `RenderDriverKind::CallerGraphicsThread` detaches at your next
-    /// `RenderSessionHandle::service_driver_work()`, so keep servicing it until
-    /// the disposal completes. If you release or dispose its map before that
-    /// service, the session is abandoned instead. Any other session is
-    /// abandoned as `RenderSessionHandle::abandon()` does. Once the disposal
-    /// completes, the library no longer uses your graphics objects.
-    ///
-    /// See `mln_render_session_dispose` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(
-        self,
-    ) -> std::result::Result<(NativeFuture<()>, RetiringRenderSession), ReleaseError<Self>> {
-        self.consume(|session| {
-            let call = Call::new(session);
-            call.complete(
-                |session, completion, out_diagnostic| unsafe {
-                    sys::mln_render_session_dispose(session, completion, out_diagnostic)
-                },
-                completion::unit,
-            )
-            .map(|value| (value, RetiringRenderSession(session)))
-        })
-    }
-
-    /// Releases the session in any state.
-    ///
-    /// An attached session detaches first, and frees its graphics objects,
-    /// unless you hold one of its frames. A session driven by
-    /// `RenderDriverKind::CallerGraphicsThread` detaches at your next
-    /// `RenderSessionHandle::service_driver_work()`, so keep servicing it until
-    /// the disposal completes. If you release or dispose its map before that
-    /// service, the session is abandoned instead. Any other session is
-    /// abandoned as `RenderSessionHandle::abandon()` does. Once the disposal
-    /// completes, the library no longer uses your graphics objects.
+    /// Use it from destructors and finalizers. Otherwise, use
+    /// `RenderSessionHandle::release()`. The session retires as a release does,
+    /// except that a session whose frames you hold is abandoned, which ends the
+    /// frames. Keep servicing a session driven by
+    /// `RenderDriverKind::CallerGraphicsThread` until
+    /// `RenderSessionHandle::service_driver_work()` no longer accepts it.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(self) -> std::result::Result<RetiringRenderSession, ReleaseError<Self>> {
         self.consume(|session| {
-            let call = Call::new(session);
-            call.discard(|session, completion, out_diagnostic| unsafe {
-                sys::mln_render_session_dispose(session, completion, out_diagnostic)
+            let mut call = Call::new(session);
+            call.status(|session, out_diagnostic| unsafe {
+                sys::mln_render_session_dispose(session, out_diagnostic)
             })
             .map(|()| RetiringRenderSession(session))
         })
@@ -471,6 +442,42 @@ impl RenderSessionHandle {
         )
     }
 
+    /// Releases the session, detaching it first when it is attached.
+    ///
+    /// The completion runs once the session retires. From then on, the library
+    /// no longer uses your graphics objects, and you can attach another session
+    /// to the map. Pending frame demands finish with
+    /// `RenderResult::TargetNotReady`.
+    ///
+    /// A session driven by `RenderDriverKind::CallerGraphicsThread` detaches at
+    /// your next `RenderSessionHandle::service_driver_work()`, so keep
+    /// servicing it until the release completes. If you release or dispose its
+    /// map before that service, the session is abandoned instead. A session
+    /// that isn't attached, such as one that is still attaching or that failed,
+    /// is abandoned as `RenderSessionHandle::abandon()` does.
+    ///
+    /// See `mln_render_session_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` while you hold one of the session's acquired
+    ///   frames. Release or discard them first.
+    pub fn release(
+        self,
+    ) -> std::result::Result<(NativeFuture<()>, RetiringRenderSession), ReleaseError<Self>> {
+        self.consume(|session| {
+            let call = Call::new(session);
+            call.complete(
+                |session, completion, out_diagnostic| unsafe {
+                    sys::mln_render_session_release(session, completion, out_diagnostic)
+                },
+                completion::unit,
+            )
+            .map(|value| (value, RetiringRenderSession(session)))
+        })
+    }
+
     /// Lets go of the session's surface or textures, and keeps the rest of the
     /// session.
     ///
@@ -527,11 +534,12 @@ impl RenderSessionHandle {
     /// Use it with `RenderDriverKind::CallerGraphicsThread`, and call it from
     /// the same thread every time. Call it each time
     /// `RenderSessionAttachOptions::driver_work_wake` is called, even while you
-    /// demand no frames, and until a detach or disposal completes. It returns
-    /// once no work is ready.
+    /// demand no frames, and until a detach or the session's retirement
+    /// completes. It returns once no work is ready.
     ///
-    /// It accepts a disposed session until the session retires. The service
-    /// after the disposal detaches the session and frees its graphics objects.
+    /// It accepts a released or disposed session until the session retires. The
+    /// service after the release or disposal detaches the session and frees its
+    /// graphics objects.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -856,11 +864,12 @@ impl RetiringRenderSession {
     /// Use it with `RenderDriverKind::CallerGraphicsThread`, and call it from
     /// the same thread every time. Call it each time
     /// `RenderSessionAttachOptions::driver_work_wake` is called, even while you
-    /// demand no frames, and until a detach or disposal completes. It returns
-    /// once no work is ready.
+    /// demand no frames, and until a detach or the session's retirement
+    /// completes. It returns once no work is ready.
     ///
-    /// It accepts a disposed session until the session retires. The service
-    /// after the disposal detaches the session and frees its graphics objects.
+    /// It accepts a released or disposed session until the session retires. The
+    /// service after the release or disposal detaches the session and frees its
+    /// graphics objects.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

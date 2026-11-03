@@ -29,13 +29,13 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -79,13 +79,13 @@ public final class GeoJsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -154,13 +154,13 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
 
   /// The native handle, which no later handle in the process reuses
   /// and runtime events report as their source. It stays valid after
-  /// the handle closes.
+  /// the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -204,13 +204,13 @@ public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -254,13 +254,13 @@ public final class OffscreenDeviceHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -284,7 +284,6 @@ struct NativeRenderSessionHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
     mln_render_session_dispose(
       raw,
-      nil,
       nil
     ) == MLN_STATUS_OK
   }
@@ -319,13 +318,13 @@ public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -369,13 +368,13 @@ public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -419,13 +418,13 @@ public final class ResourceTransformRequestHandle: @unchecked Sendable,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -472,13 +471,13 @@ public final class RuntimeHandle: @unchecked Sendable, NativeReceiver,
 
   /// The native handle, which no later handle in the process reuses
   /// and runtime events report as their source. It stays valid after
-  /// the handle closes.
+  /// the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -522,13 +521,13 @@ public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle closes.
+  /// It stays valid after the handle is released.
   public var id: UInt64 {
     handle.value.raw
   }
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {
     handle.isClosed
   }

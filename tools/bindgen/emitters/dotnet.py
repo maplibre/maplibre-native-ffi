@@ -261,15 +261,11 @@ def native_call(function: Function, arguments: str, diagnostic: str) -> str:
     return f"NativeMethods.{function.name}({arguments})"
 
 
-def disposer_arguments(handle: HandlePlan, function: Function, live: str) -> str:
-    """The arguments of a handle's disposer: the handle, and a null completion
-    when the dispose is also the release."""
-    arguments = [live]
-    for parameter in function.parameters[1:]:
-        if parameter.name != handle.dispose_completion:
-            raise Unsupported(f"{function.name} disposes with more than its handle")
-        arguments.append("null")
-    return ", ".join(arguments)
+def disposer_arguments(function: Function, live: str) -> str:
+    """The arguments of a handle's disposer: the handle alone."""
+    if len(function.parameters) != 1:
+        raise Unsupported(f"{function.name} disposes with more than its handle")
+    return live
 
 
 def method(signature: str, body: list[str]) -> str:
@@ -310,14 +306,13 @@ def operation_owner(plan: OperationPlan, bound: BoundApi) -> str:
     return "MaplibreNative"
 
 
-def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str | None:
-    """The .NET name of an operation's method: `Dispose` for a release that
-    the owner's dispose runs, or None for one that no method runs. A
-    discarding command keeps the name without `Async`."""
+def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str:
+    """The .NET name of an operation's method. A discarding command keeps the
+    name without `Async`."""
     function = plan.function
     handle = bound.handles.get(receiver_native(plan))
     name = pascal(plan.member)
-    if handle and function.name == handle.discard:
+    if handle and function.name in {handle.discard, handle.dispose}:
         return name
     if (
         plan.consumes
@@ -325,14 +320,7 @@ def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str |
         and function.name == handle.release
         and handle.release_inputs
     ) or (plan.answers and handle):
-        return name if plan.answers else "Release"
-    if (
-        handle is not None
-        and function.name == handle.release
-        and plan.completion
-        and not handle.release_inputs
-    ):
-        return "CloseAsync"
+        return name
     if plan.view:
         return "With" + name.removeprefix("Get")
     # A drain, and a call that creates an owner, which awaits its readiness
@@ -340,13 +328,22 @@ def method_name(plan: OperationPlan, bound: BoundApi, *, discard=False) -> str |
     if plan.drain or plan.owned_outputs:
         return name
     if not plan.completion:
-        if handle and handle.release == function.name and len(function.parameters) == 1:
-            # Dispose already runs the release when no separate dispose exists.
-            if handle.dispose not in {None, handle.release}:
-                return "Close"
-            return "Dispose" if handle.scoped_release == function.name else None
         return name
     return name if discard else name + "Async"
+
+
+def scoped_dispose(bound: BoundApi, handle: HandlePlan) -> str:
+    """The owner's `Dispose`, which `using` calls: its dispose, or, for a
+    handle that its release frees at once, the release under the interface's
+    name alone."""
+    if handle.scoped_dispose is None:
+        return ""
+    if handle.scoped_dispose == handle.release:
+        return "    void IDisposable.Dispose() { state.Close(); }\n"
+    return (
+        doc(bound, handle.scoped_dispose, "    ")
+        + "    public void Dispose() { state.Retire(); }\n"
+    )
 
 
 def lower(api: Api | BoundApi) -> Lowered:
@@ -439,9 +436,8 @@ def lower(api: Api | BoundApi) -> Lowered:
         adopt_extra = ", Task completion" if immediate_completion else ""
         cleanup = handle.cleanup or handle.release
         cleanup_function = api.functions_by_name[cleanup]
-        # Abandon disposes a handle that no owner can close any more. A dispose
-        # that is also the release passes no completion.
-        cleanup_arguments = disposer_arguments(handle, cleanup_function, "live")
+        # Abandon disposes a handle that no owner can release any more.
+        cleanup_arguments = disposer_arguments(cleanup_function, "live")
         abandon = (
             f"=> {native_call(cleanup_function, cleanup_arguments, 'diagnostic')};"
             if cleanup_function.diagnostic
@@ -503,28 +499,24 @@ def lower(api: Api | BoundApi) -> Lowered:
             + (
                 "    /// <summary>\n"
                 "    /// The native handle value, which runtime events report as their\n"
-                "    /// source. It stays readable after close, so events drained later\n"
+                "    /// source. It stays readable after release, so events drained later\n"
                 "    /// still match this handle.\n"
                 "    /// </summary>\n"
                 if native in bound.event_sources
                 else "    /// <summary>\n"
-                "    /// The native handle value. It stays readable after close.\n"
+                "    /// The native handle value. It stays readable after release.\n"
                 "    /// </summary>\n"
             )
             + "    public ulong Id => state.Handle.Value;\n"
             "    /// <summary>\n"
-            "    /// Whether a release, dispose, close, or discard has ended the handle.\n"
+            "    /// Whether a release, dispose, or discard has ended the handle.\n"
             "    /// </summary>\n"
             "    public bool IsClosed => state.IsClosed;\n"
             "    /// <summary>\n"
             '    /// Names the handle\'s type, its <see cref="Id" />, and whether it is closed.\n'
             "    /// </summary>\n"
             "    public override string ToString() => state.ToString();\n"
-            + (
-                ""
-                if handle.scoped_release is None
-                else "    public void Dispose() { state.Retire(); }\n"
-            )
+            + scoped_dispose(bound, handle)
         )
         methods[owner].insert(0, declarations)
     used_records = set().union(*records.values()) if records else set()

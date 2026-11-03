@@ -56,7 +56,7 @@ private func images(runtime: RuntimeHandle) async throws {
   // #endregion read
 
   try session.dispose()
-  try await map.close()
+  try await map.release()
 }
 
 private func imagesTile(
@@ -87,5 +87,5 @@ private func imagesTile(
   ))
   // #endregion tile
 
-  try await map.close()
+  try await map.release()
 }

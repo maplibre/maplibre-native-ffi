@@ -26,7 +26,7 @@ internal object GeneratedOwnerDisposal {
   }
 
   fun renderSession(handle: Long) {
-    NativeDiagnostics.check { diagnostic -> C.mln_render_session_dispose(handle, 0L, diagnostic) }
+    NativeDiagnostics.check { diagnostic -> C.mln_render_session_dispose(handle, diagnostic) }
   }
 
   fun resourceRequest(handle: Long) {

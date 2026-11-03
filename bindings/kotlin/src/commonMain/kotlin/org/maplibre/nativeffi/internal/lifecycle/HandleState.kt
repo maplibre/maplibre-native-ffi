@@ -84,7 +84,7 @@ internal open class HandleState(
       }
     reportUncaught(
       IllegalStateException(
-        "Leaked $typeName native handle 0x${handle.toString(16)}; close it explicitly.",
+        "Leaked $typeName native handle 0x${handle.toString(16)}; release it explicitly.",
         failure,
       ),
     )

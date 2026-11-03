@@ -1295,11 +1295,10 @@ int32_t mln_kw_mln_render_session_detach(
 }
 
 int32_t mln_kw_mln_render_session_dispose(
-  int64_t session, uintptr_t completion, uintptr_t out_diagnostic
+  int64_t session, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_dispose(
-    (mln_render_session)session, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
+    (mln_render_session)session, (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -1401,6 +1400,15 @@ int32_t mln_kw_mln_render_session_reduce_memory_use(
   int64_t session, uintptr_t completion, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_reduce_memory_use(
+    (mln_render_session)session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_render_session_release(
+  int64_t session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_release(
     (mln_render_session)session, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );

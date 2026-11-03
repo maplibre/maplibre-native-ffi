@@ -7,8 +7,8 @@ const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
 // Every copy carries the same native id, which native validates after release.
-// The closed state belongs to the value that a release closed, so a copy stays
-// open and its own release reaches native.
+// The closed state belongs to the value that a release marked closed, so a copy
+// stays open and its own release reaches native.
 test "copied handles report native invalid state after release" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -23,35 +23,35 @@ test "copied handles report native invalid state after release" {
     // A void release reports nothing for a stale handle.
     projection_copy.release();
 
-    try fixture.closeMap();
-    try testing.expectError(error.InvalidState, support.closeMapHandle(&map_copy));
+    try fixture.releaseMap();
+    try testing.expectError(error.InvalidState, support.releaseMapHandle(&map_copy));
     try testing.expect(!map_copy.isClosed());
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, map_copy.getSnapshot(&diagnostic));
     try testing.expectEqual(.invalid_state, diagnostic.status);
     try testing.expect(diagnostic.message().len != 0);
 
-    try support.closeRuntimeHandle(&fixture.runtime);
-    try testing.expectError(error.InvalidState, support.closeRuntimeHandle(&runtime_copy));
+    try support.releaseRuntimeHandle(&fixture.runtime);
+    try testing.expectError(error.InvalidState, support.releaseRuntimeHandle(&runtime_copy));
     try testing.expectError(error.InvalidState, runtime_copy.discarding().clearResourceTransform(null));
 }
 
-// A handle's id is the source that its events carry, and a close leaves it in
+// A handle's id is the source that its events carry, and a release leaves it in
 // place, so a host can route events that it drains later.
-test "a handle's raw value names its events and outlives close" {
+test "a handle's raw value names its events and outlives its release" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     try support.expectCommitted(try fixture.map.setStyleJson(support.style_json, null));
     var loaded = try fixture.waitForEvent(.map_style_loaded);
     defer loaded.deinit();
     try testing.expectEqual(fixture.map.id(), loaded.value.source);
-    try fixture.closeMap();
+    try fixture.releaseMap();
     try testing.expect(fixture.map.isClosed());
     try testing.expectEqual(loaded.value.source, fixture.map.id());
 }
 
-// A dispose closes the value it is given. A second dispose and a later deinit
-// do nothing, while an asynchronous release still reaches native.
+// A dispose marks the value it is given closed. A second dispose and a later
+// deinit do nothing, while an asynchronous release still reaches native.
 test "a disposed handle is closed and a second dispose does nothing" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -72,7 +72,7 @@ test "a disposed handle is closed and a second dispose does nothing" {
     fixture.runtime.deinit();
 }
 
-// A handle whose dispose is its void release closes on either call.
+// A handle whose dispose is its void release is closed after either call.
 test "a released projection is closed and a second release or deinit does nothing" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -103,7 +103,7 @@ fn expectFormat(comptime template: []const u8, handle: anytype) !void {
 }
 
 // Native refuses to release a runtime with a live map, which leaves its id usable.
-test "a refused close leaves the handle usable and a later close succeeds" {
+test "a refused release leaves the handle usable and a later release succeeds" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
 
@@ -112,5 +112,5 @@ test "a refused close leaves the handle usable and a later close succeeds" {
     try testing.expect(!fixture.runtime.isClosed());
     try testing.expectEqual(.invalid_state, diagnostic.status);
     try fixture.fence();
-    try fixture.closeMap();
+    try fixture.releaseMap();
 }

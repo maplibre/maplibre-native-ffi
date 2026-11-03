@@ -158,7 +158,7 @@ internal object Upcalls {
         true
       }
     ) {
-      handleOwner.close()
+      handleOwner.release()
     }
   }
 
@@ -173,7 +173,7 @@ internal object Upcalls {
         true
       }
     ) {
-      requestOwner.close()
+      requestOwner.release()
     }
   }
 

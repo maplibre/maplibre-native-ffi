@@ -163,7 +163,7 @@ pub const FixtureOptions = struct {
 };
 
 /// One runtime and one map. The runtime's event handler signals `waitForEvent`.
-/// `destroy` closes whatever the test left open, so every path tears down.
+/// `destroy` releases whatever the test left open, so every path tears down.
 pub const Fixture = struct {
     events: Signal = .{},
     event_mutex: std.Io.Mutex = .init,
@@ -176,7 +176,7 @@ pub const Fixture = struct {
         errdefer testing.allocator.destroy(self);
         self.* = .{ .runtime = undefined, .map = undefined };
         self.runtime = try maplibre.Runtime.create(.{ .asset_path = options.asset_path }, null);
-        errdefer closeRuntimeHandle(&self.runtime) catch self.runtime.deinit();
+        errdefer releaseRuntimeHandle(&self.runtime) catch self.runtime.deinit();
         // A handler accepted before createMap receives the map's first events.
         try self.runtime.discarding().setEventHandler(.init(self, receiveEvents, null), null);
         try self.setProvider(denying_provider);
@@ -203,16 +203,16 @@ pub const Fixture = struct {
         self.events.notify();
     }
 
-    /// Closes the map and runtime if the test left them open, and frees the
-    /// fixture. A close that fails logs an error, which fails the test, and
+    /// Releases the map and runtime if the test left them open, and frees the
+    /// fixture. A release that fails logs an error, which fails the test, and
     /// falls back to disposal so the next test starts clean.
     pub fn destroy(self: *Fixture) void {
-        if (!self.map.isClosed()) self.closeMap() catch |err| {
-            std.log.err("fixture map close failed: {s}", .{@errorName(err)});
+        if (!self.map.isClosed()) self.releaseMap() catch |err| {
+            std.log.err("fixture map release failed: {s}", .{@errorName(err)});
             self.map.deinit();
         };
-        if (!self.runtime.isClosed()) self.closeRuntime() catch |err| {
-            std.log.err("fixture runtime close failed: {s}", .{@errorName(err)});
+        if (!self.runtime.isClosed()) self.releaseRuntime() catch |err| {
+            std.log.err("fixture runtime release failed: {s}", .{@errorName(err)});
             self.runtime.deinit();
         };
         for (self.pending_events.items) |*event| event.deinit();
@@ -220,12 +220,12 @@ pub const Fixture = struct {
         testing.allocator.destroy(self);
     }
 
-    pub fn closeMap(self: *Fixture) !void {
-        try closeMapHandle(&self.map);
+    pub fn releaseMap(self: *Fixture) !void {
+        try releaseMapHandle(&self.map);
     }
 
-    fn closeRuntime(self: *Fixture) !void {
-        try closeRuntimeHandle(&self.runtime);
+    fn releaseRuntime(self: *Fixture) !void {
+        try releaseRuntimeHandle(&self.runtime);
     }
 
     /// Releases the runtime once native has retired every child that the test
@@ -280,11 +280,11 @@ pub const Fixture = struct {
     }
 };
 
-pub fn closeRuntimeHandle(runtime: *maplibre.Runtime) !void {
+pub fn releaseRuntimeHandle(runtime: *maplibre.Runtime) !void {
     try (try runtime.release(null)).await(null);
 }
 
-pub fn closeMapHandle(map: *maplibre.Map) !void {
+pub fn releaseMapHandle(map: *maplibre.Map) !void {
     try (try map.release(null)).await(null);
 }
 
@@ -483,7 +483,7 @@ pub const TextureSession = struct {
     /// destroys the textures and graphics context. A failed detach logs an
     /// error, which fails the test, and the release abandons the session
     /// instead.
-    pub fn close(self: *TextureSession) void {
+    pub fn destroy(self: *TextureSession) void {
         if (!self.session.isClosed()) {
             if (self.attached) self.detach() catch |err| {
                 std.log.err("render session detach failed: {s}", .{@errorName(err)});

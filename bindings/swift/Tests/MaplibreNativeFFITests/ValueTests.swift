@@ -115,7 +115,7 @@ import Testing
     let projection = try MapProjectionHandle.create(
       view: fixture.map.getSnapshot().view
     )
-    defer { projection.close() }
+    defer { projection.release() }
     let coordinates = [
       LatLng(latitude: 0, longitude: 0),
       LatLng(latitude: 10, longitude: 20),
@@ -140,14 +140,14 @@ import Testing
     #"["interpolate", ["linear"], ["zoom"], 0, 0, 10, 100]"#)
   #expect(try zoom.evaluate(inputs: StyleExpressionInputs(zoom: 5)) ==
     "50.0")
-  zoom.close()
+  zoom.release()
 
   // The result outgrows the runtime's first storage, so the call runs again,
   // and its multibyte characters decode whole.
   let text = "\"" + String(repeating: "aé", count: 500) + "\""
   let long = try StyleExpressionHandle.create(expression: text)
   #expect(try long.evaluate() == text)
-  long.close()
+  long.release()
 }
 
 private final class PointerTarget {}

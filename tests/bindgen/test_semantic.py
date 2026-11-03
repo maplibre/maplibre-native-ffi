@@ -688,6 +688,40 @@ mln_status discard_frame(frame value, mln_diagnostic *out_diagnostic);
                 self.parse(source.replace("discard=", "dispose=discard_frame;discard="))
             )
 
+    def test_teardown_has_one_name_per_kind_and_scopes_pick_by_waiting(self):
+        source = """
+typedef unsigned long root BIND("kind=handle;release=end_root;dispose=drop_root");
+typedef unsigned long note BIND("kind=handle;release=free_note;dispose=free_note");
+BIND("execution=lifecycle") mln_status end_root(
+  root value, const mln_completion *done, mln_diagnostic *out_diagnostic);
+mln_status drop_root(root value, mln_diagnostic *out_diagnostic);
+void free_note(note value);
+"""
+        model = bind(self.parse(source), require_complete=True)
+        members = {
+            name: model.operations_by_name[name].member
+            for name in ("end_root", "drop_root", "free_note")
+        }
+        # Every binding case-converts C's verbs, whatever the C function's name.
+        self.assertEqual(
+            members,
+            {"end_root": "release", "drop_root": "dispose", "free_note": "release"},
+        )
+        root, note = (model.handles[n] for n in ("root", "note"))
+        # A scope that can wait without blocking a thread releases, and every
+        # other scope disposes.
+        self.assertEqual(
+            (root.scoped_release, root.scoped_dispose), ("end_root", "drop_root")
+        )
+        # A handle that its release frees at once releases in either scope.
+        self.assertEqual(
+            (note.release_waits, note.scoped_release, note.scoped_dispose),
+            (False, "free_note", "free_note"),
+        )
+        # A dispose never reports back, so a release that does needs its own.
+        with self.assertRaisesRegex(ModelError, "a dispose takes only its handle"):
+            bind(self.parse(source.replace("dispose=drop_root", "dispose=end_root")))
+
     def test_resource_request_protocol_uses_verified_relationships(self):
         source = """
 typedef unsigned long request BIND("kind=handle;release=release_request");

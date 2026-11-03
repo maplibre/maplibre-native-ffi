@@ -571,7 +571,7 @@ impl Session {
         .unwrap();
     }
 
-    pub fn close(self) {
+    pub fn detach_and_release(self) {
         self.drive(self.handle.detach().unwrap()).unwrap();
         self.release();
     }

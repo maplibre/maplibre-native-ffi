@@ -223,7 +223,7 @@ def descriptor(values, plan):
             if parameter.value.element and parameter.value.element.response
         ]
         # A handle the callback owns is adopted before the host runs, and
-        # closed when the host throws, so native never waits on it.
+        # released when the host throws, so native never waits on it.
         owned = [
             parameter
             for parameter in callback.arguments
@@ -263,7 +263,7 @@ def descriptor(values, plan):
         for parameter in owned:
             handle = parameter.value.handle
             release = values.bound.source.functions_by_name[handle.release]
-            arguments = disposer_arguments(handle, release, identifier(parameter.name))
+            arguments = disposer_arguments(release, identifier(parameter.name))
             if release.diagnostic:
                 arguments.append("nil")
             setup += f"  guard let owned{name(parameter.name)} = try? {owner_name(handle)}(adopting: {identifier(parameter.name)}) else {{ {handle.release}({', '.join(arguments)}); {fail or 'return'} }}\n"
@@ -282,17 +282,15 @@ def descriptor(values, plan):
         if callback.status:
             # A status callback succeeds by returning and fails by throwing.
             invoke += f"; return MLN_STATUS_OK{suffix}"
-        # The synchronous release of a handle whose release is also its
-        # dispose is the dispose.
+        # A handle that its release frees at once releases synchronously;
+        # any other disposes, which never waits.
         disposal = "".join(
-            f"try? owned{name(p.name)}.dispose(); "
-            if p.value.handle.dispose_completion
-            else f"owned{name(p.name)}.close(); "
+            f"owned{name(p.name)}.release(); "
             if values.bound.source.functions_by_name[
                 p.value.handle.release
             ].return_type.kind
             == "void"
-            else f"try? owned{name(p.name)}.close(); "
+            else f"try? owned{name(p.name)}.{'dispose' if p.value.handle.release_waits else 'release'}(); "
             for p in owned
         )
         fail = disposal + fail

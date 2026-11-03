@@ -170,7 +170,7 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// A later demand with the same flags replaced this one.
   public static let superseded: RenderResult = .init(rawValue: 3)
   /// The session failed, and `RenderSessionHandle.getFailure()` reports why.
-  /// Once `RenderSessionHandle.close()` completes, you can attach a new
+  /// Once `RenderSessionHandle.release()` completes, you can attach a new
   /// session.
   public static let failed: RenderResult = .init(rawValue: 4)
   public var description: String {

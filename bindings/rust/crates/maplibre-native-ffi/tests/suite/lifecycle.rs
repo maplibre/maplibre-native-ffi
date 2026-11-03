@@ -1,4 +1,4 @@
-//! Handle ownership: ids, a refused close, and exit with live handles.
+//! Handle ownership: ids, a refused release, and exit with live handles.
 
 use std::sync::mpsc;
 
@@ -16,7 +16,7 @@ fn a_handle_formats_its_id() {
     );
 }
 
-// A host routes events that it drains after close by the id it kept.
+// A host routes events that it drains after a release by the id it kept.
 #[test]
 fn a_handle_id_names_its_events() {
     let fixture = Fixture::new();
@@ -27,10 +27,10 @@ fn a_handle_id_names_its_events() {
 }
 
 #[test]
-fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
+fn a_refused_release_leaves_the_runtime_usable_and_a_later_release_succeeds() {
     let (runtime, map) = Fixture::new().into_parts();
 
-    // A runtime refuses to close while one of its maps is live, and hands
+    // A runtime refuses to release while one of its maps is live, and hands
     // itself back.
     let ReleaseError {
         handle: runtime,

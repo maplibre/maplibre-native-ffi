@@ -75,8 +75,8 @@ internal sealed unsafe class NativeHandleState<T>
             }
             NativeLeakReporter.Report(
                 failure is null
-                    ? $"Leaked {typeName} native handle 0x{handle.Value:x}; it was disposed when collected. Close or dispose it explicitly."
-                    : $"Leaked {typeName} native handle 0x{handle.Value:x}; {failure}, so it was not destroyed. Close or dispose it explicitly."
+                    ? $"Leaked {typeName} native handle 0x{handle.Value:x}; it was disposed when collected. Release or dispose it explicitly."
+                    : $"Leaked {typeName} native handle 0x{handle.Value:x}; {failure}, so it was not destroyed. Release or dispose it explicitly."
             );
         }
         finally

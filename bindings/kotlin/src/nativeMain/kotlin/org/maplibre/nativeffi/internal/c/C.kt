@@ -1593,10 +1593,9 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_dispose(session: Long, completion: Long, outDiagnostic: Long): Int =
+  actual fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_dispose(
       session.toULong(),
-      completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -1729,6 +1728,13 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_reduce_memory_use(
+      session.toULong(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_release(session: Long, completion: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_release(
       session.toULong(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),

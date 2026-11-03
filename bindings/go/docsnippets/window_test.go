@@ -46,7 +46,7 @@ func drainFrameResults() error {
 
 	for _, result := range results {
 		if result.Disposition == maplibre.RenderResultFailed {
-			return replaceSession() // Close the session and attach a new one.
+			return replaceSession() // Release the session and attach a new one.
 		}
 	}
 	if !paused {
@@ -165,11 +165,11 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	_ = graphicsThreadOptions
 
 	paused = true
-	closed, err := session.Close()
+	released, err := session.Release()
 	if err != nil {
 		return err
 	}
-	if _, err := closed.Await(ctx); err != nil {
+	if _, err := released.Await(ctx); err != nil {
 		return err
 	}
 

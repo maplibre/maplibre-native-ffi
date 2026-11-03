@@ -1011,8 +1011,10 @@ class Values:
                 f"            owned{pascal(parameter.name)} = {self.public_type(parameter.value)}.Adopt({member(parameter.name)});\n"
                 for parameter in owned
             )
+            # A handle that its release frees at once has only the release.
             disposals = "".join(
-                f"            owned{pascal(parameter.name)}?.Dispose();\n"
+                f"            owned{pascal(parameter.name)}?."
+                f"{'Dispose' if parameter.value.handle and parameter.value.handle.release_waits else 'Release'}();\n"
                 for parameter in owned
             )
             cleanup = " ".join(

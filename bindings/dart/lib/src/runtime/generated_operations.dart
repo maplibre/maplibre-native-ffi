@@ -2668,13 +2668,13 @@ final raw.mln_resource_provider_callback _deliverResourceProviderCallback =
               _NativeResourceRequest(handle),
             );
             if (callback == null) {
-              owner.close();
+              owner.release();
               return;
             }
             try {
               callback(_readResourceRequestInfo(request.ref), owner);
             } catch (_) {
-              owner.close();
+              owner.release();
               rethrow;
             }
           },
@@ -2746,7 +2746,7 @@ final raw.mln_resource_transform_callback _deliverResourceTransformCallback =
               _NativeResourceTransformRequest(request),
             );
             if (callback == null) {
-              owner.close();
+              owner.release();
               return;
             }
             try {
@@ -2756,7 +2756,7 @@ final raw.mln_resource_transform_callback _deliverResourceTransformCallback =
                 owner,
               );
             } catch (_) {
-              owner.close();
+              owner.release();
               rethrow;
             }
           },
@@ -3241,8 +3241,8 @@ final class AcquiredFrameHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -3448,8 +3448,8 @@ final class GeoJsonSourceDataHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -3499,7 +3499,7 @@ final class GeoJsonSourceDataHandle implements Finalizable {
   ///
   /// See `mln_geo_json_source_data_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  void close() => _state.close((handle) {
+  void release() => _state.close((handle) {
     raw.mln_geo_json_source_data_release(handle.raw);
     return nativeStatusOk;
   });
@@ -4112,12 +4112,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// The native handle id, which runtime events report as their source.
   ///
-  /// It stays readable after close, so events drained later still match
+  /// It stays readable after release, so events drained later still match
   /// this handle.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -4360,9 +4360,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4399,9 +4397,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4447,9 +4443,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4488,9 +4482,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4527,9 +4519,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4567,9 +4557,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4606,9 +4594,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
             (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
-          _check(
-            raw.mln_render_session_dispose(handle, nullptr, nativeDiagnostic),
-          );
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
         },
       ),
     );
@@ -4754,7 +4740,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Releases the map in any state, and finishes in the background.
   ///
   /// Use it from destructors and finalizers. Otherwise, use
-  /// `MapHandle.close()`.
+  /// `MapHandle.release()`.
   ///
   /// See `mln_map_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5252,7 +5238,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<void> close() => _state.closeAsync(
+  Future<void> release() => _state.closeAsync(
     (handle) => _submit(
       (arena, completion) =>
           raw.mln_map_release(handle.raw, completion, nativeDiagnostic),
@@ -6060,8 +6046,8 @@ final class MapProjectionHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -6297,7 +6283,7 @@ final class MapProjectionHandle implements Finalizable {
   ///
   /// See `mln_map_projection_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  void close() => _state.close((handle) {
+  void release() => _state.close((handle) {
     raw.mln_map_projection_release(handle.raw);
     return nativeStatusOk;
   });
@@ -6338,8 +6324,8 @@ final class OffscreenDeviceHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -6393,7 +6379,7 @@ final class OffscreenDeviceHandle implements Finalizable {
   ///
   /// See `mln_offscreen_device_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-  void close() => _state.close((handle) {
+  void release() => _state.close((handle) {
     raw.mln_offscreen_device_release(handle.raw);
     return nativeStatusOk;
   });
@@ -6439,8 +6425,8 @@ final class RenderSessionHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -6453,7 +6439,7 @@ final class RenderSessionHandle implements Finalizable {
   /// can't finish first. Pending work completes with `Status.targetLost`, and
   /// pending frame demands finish with `RenderResult.targetNotReady`. Once the
   /// call returns, the library no longer uses your graphics objects, and you
-  /// can attach another session to the map. Dispose the session afterward.
+  /// can attach another session to the map. Release the session afterward.
   ///
   /// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
   /// keeps them until the process exits, reports how many it kept, and logs a
@@ -6490,8 +6476,8 @@ final class RenderSessionHandle implements Finalizable {
   /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
   ///   `Status.nativeError`, when the session has failed. The diagnostic
   ///   carries the failure's message.
-  /// - `Status.invalidState` when you detached, abandoned, or disposed the
-  ///   session.
+  /// - `Status.invalidState` when you detached, abandoned, released, or
+  ///   disposed the session.
   AcquiredFrameHandle? acquireFrame() => withNativeArena((arena) {
     final outFrame = arena<Uint64>();
     _check(
@@ -6567,8 +6553,9 @@ final class RenderSessionHandle implements Finalizable {
   /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
   ///   `Status.nativeError`, when the session has failed. The diagnostic
   ///   carries the failure's message.
-  /// - `Status.invalidState` when you detached, abandoned, or disposed the
-  ///   session, or discarded a frame from every texture of its ring.
+  /// - `Status.invalidState` when you detached, abandoned, released, or
+  ///   disposed the session, or discarded a frame from every texture of its
+  ///   ring.
   void demandFrame(FrameDemand demand) => withNativeArena((arena) {
     _check(
       raw.mln_render_session_demand_frame(
@@ -6584,7 +6571,7 @@ final class RenderSessionHandle implements Finalizable {
   /// Release every acquired frame first. Pending frame demands finish with
   /// `RenderResult.targetNotReady`. Once the detach completes, the library no
   /// longer uses your graphics objects, and you can attach another session to
-  /// the map. Dispose the session afterward.
+  /// the map. Release the session afterward.
   ///
   /// See `mln_render_session_detach` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6601,45 +6588,19 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
-  /// Releases the session in any state.
+  /// Releases the session in any state, and finishes in the background.
   ///
-  /// An attached session detaches first, and frees its graphics objects, unless
-  /// you hold one of its frames. A session driven by
-  /// `RenderDriverKind.callerGraphicsThread` detaches at your next
-  /// `mln_render_session_service_driver_work()`, so keep servicing it until the
-  /// disposal completes. If you release or dispose its map before that service,
-  /// the session is abandoned instead. Any other session is abandoned as
-  /// `RenderSessionHandle.abandon()` does. Once the disposal completes, the
-  /// library no longer uses your graphics objects.
-  ///
-  /// See `mln_render_session_dispose` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  Future<void> close() => _state.closeAsync(
-    (handle) => _submit(
-      (arena, completion) => raw.mln_render_session_dispose(
-        handle.raw,
-        completion,
-        nativeDiagnostic,
-      ),
-    ),
-  );
-
-  /// Releases the session in any state.
-  ///
-  /// An attached session detaches first, and frees its graphics objects, unless
-  /// you hold one of its frames. A session driven by
-  /// `RenderDriverKind.callerGraphicsThread` detaches at your next
-  /// `mln_render_session_service_driver_work()`, so keep servicing it until the
-  /// disposal completes. If you release or dispose its map before that service,
-  /// the session is abandoned instead. Any other session is abandoned as
-  /// `RenderSessionHandle.abandon()` does. Once the disposal completes, the
-  /// library no longer uses your graphics objects.
+  /// Use it from destructors and finalizers. Otherwise, use
+  /// `RenderSessionHandle.release()`. The session retires as a release does,
+  /// except that a session whose frames you hold is abandoned, which ends the
+  /// frames. Keep servicing a session driven by
+  /// `RenderDriverKind.callerGraphicsThread` until
+  /// `mln_render_session_service_driver_work()` no longer accepts it.
   ///
   /// See `mln_render_session_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void dispose() => _state.close(
-    (handle) =>
-        raw.mln_render_session_dispose(handle.raw, nullptr, nativeDiagnostic),
+    (handle) => raw.mln_render_session_dispose(handle.raw, nativeDiagnostic),
   );
 
   /// Takes the frame results that the session has queued.
@@ -6862,6 +6823,36 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
+  /// Releases the session, detaching it first when it is attached.
+  ///
+  /// The completion runs once the session retires. From then on, the library no
+  /// longer uses your graphics objects, and you can attach another session to
+  /// the map. Pending frame demands finish with `RenderResult.targetNotReady`.
+  ///
+  /// A session driven by `RenderDriverKind.callerGraphicsThread` detaches at
+  /// your next `mln_render_session_service_driver_work()`, so keep servicing it
+  /// until the release completes. If you release or dispose its map before that
+  /// service, the session is abandoned instead. A session that isn't attached,
+  /// such as one that is still attaching or that failed, is abandoned as
+  /// `RenderSessionHandle.abandon()` does.
+  ///
+  /// See `mln_render_session_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` while you hold one of the session's acquired
+  ///   frames. Release or discard them first.
+  Future<void> release() => _state.closeAsync(
+    (handle) => _submit(
+      (arena, completion) => raw.mln_render_session_release(
+        handle.raw,
+        completion,
+        nativeDiagnostic,
+      ),
+    ),
+  );
+
   /// Lets go of the session's surface or textures, and keeps the rest of the
   /// session.
   ///
@@ -7071,8 +7062,8 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -7082,7 +7073,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   /// Answers a resource request.
   ///
   /// A failed answer fails the request with `ResourceErrorReason.other`, as
-  /// `ResourceRequestHandle.close()` does.
+  /// `ResourceRequestHandle.release()` does.
   ///
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -7119,7 +7110,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   /// Hands a resource request back to the library to load as usual.
   ///
   /// A failed call fails the request with `ResourceErrorReason.other`, as
-  /// `ResourceRequestHandle.close()` does.
+  /// `ResourceRequestHandle.release()` does.
   ///
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -7136,7 +7127,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void close() => _state.close((handle) {
+  void release() => _state.close((handle) {
     raw.mln_resource_request_release(handle.raw);
     return nativeStatusOk;
   });
@@ -7193,8 +7184,8 @@ final class ResourceTransformRequestHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -7204,7 +7195,7 @@ final class ResourceTransformRequestHandle implements Finalizable {
   /// Answers a resource transform request with the URL to load instead.
   ///
   /// `url` must not be empty. A failed answer fails the request with
-  /// `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.close()`
+  /// `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.release()`
   /// does.
   ///
   /// See `mln_resource_transform_request_complete` in the
@@ -7224,7 +7215,7 @@ final class ResourceTransformRequestHandle implements Finalizable {
   /// The library retries a request that failed for a reason it retries, such as
   /// `ResourceErrorReason.connection`, and the retry calls the transform again.
   /// When this call fails, the request fails with `ResourceErrorReason.other`,
-  /// as `ResourceTransformRequestHandle.close()` does.
+  /// as `ResourceTransformRequestHandle.release()` does.
   ///
   /// See `mln_resource_transform_request_fail` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -7245,7 +7236,7 @@ final class ResourceTransformRequestHandle implements Finalizable {
   ///
   /// See `mln_resource_transform_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  void close() => _state.close((handle) {
+  void release() => _state.close((handle) {
     raw.mln_resource_transform_request_release(handle.raw);
     return nativeStatusOk;
   });
@@ -7359,12 +7350,12 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
 
   /// The native handle id, which runtime events report as their source.
   ///
-  /// It stays readable after close, so events drained later still match
+  /// It stays readable after release, so events drained later still match
   /// this handle.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -7621,7 +7612,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<void> close() => _state.closeAsync(
+  Future<void> release() => _state.closeAsync(
     (handle) => _submit(
       (arena, completion) =>
           raw.mln_runtime_release(handle.raw, completion, nativeDiagnostic),
@@ -7839,8 +7830,8 @@ final class StyleExpressionHandle implements Finalizable {
   /// The native handle id.
   int get id => _state.handleId;
 
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
   bool get isClosed => _state.isClosed;
 
   @override
@@ -7934,7 +7925,7 @@ final class StyleExpressionHandle implements Finalizable {
   ///
   /// See `mln_style_expression_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-  void close() => _state.close((handle) {
+  void release() => _state.close((handle) {
     raw.mln_style_expression_release(handle.raw);
     return nativeStatusOk;
   });

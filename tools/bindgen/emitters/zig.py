@@ -288,8 +288,6 @@ def _lower(api: Api | BoundApi):
         if native := receiver_native(plan) or plan.factory:
             names = taken.setdefault(native, set(HANDLE_DECLARATIONS))
             names.add(method_name(plan))
-            if plan.completion and plan.completion.optional:
-                names.add(method_name(plan, discard=True))
     for plan in bound.operations:
         function = plan.function
         native = receiver_native(plan)
@@ -297,39 +295,25 @@ def _lower(api: Api | BoundApi):
         container = native or plan.factory
         previous = dict(value_types.used), dict(value_types.results)
         try:
-            lowered = []
-            # A dispose that takes an optional completion is also its handle's
-            # release; its dispose passes none, as every disposer does.
-            for discard in (
-                [False, True]
-                if plan.completion and plan.completion.optional
-                else [False]
-            ):
-                code = lower_operation(
+            code = lower_operation(
+                plan,
+                value_types,
+                method=native is not None,
+                taken=frozenset(taken.get(container, ())),
+            )
+            name = method_name(plan) if native else function_name(plan, value_types)
+            lowered = [
+                gated(
                     plan,
-                    value_types,
-                    discard=discard,
-                    method=native is not None,
-                    taken=frozenset(taken.get(container, ())),
+                    documented(
+                        bound,
+                        function.name,
+                        expose_parameter_names(plan, code, name),
+                        f"pub fn {name}(",
+                    ),
+                    name,
                 )
-                name = (
-                    method_name(plan, discard=discard)
-                    if native
-                    else function_name(plan, value_types, discard=discard)
-                )
-                lowered.append(
-                    gated(
-                        plan,
-                        documented(
-                            bound,
-                            function.name,
-                            expose_parameter_names(plan, code, name),
-                            f"pub fn {name}(",
-                            discard=discard,
-                        ),
-                        name,
-                    )
-                )
+            ]
             (methods.setdefault(container, []) if container else chunks).extend(lowered)
             generated.append(function.name)
         except Unsupported as error:
@@ -362,24 +346,17 @@ pub const OwnedValue = marshal.OwnedValue;
         calls = []
         for finalizer in handle.finalize:
             function = bound.operations_by_name[finalizer].function
-            # A dispose that takes a completion gets a null one.
-            arguments = [
-                "raw",
-                *(
-                    ["null"]
-                    if handle.dispose_completion and finalizer == handle.dispose
-                    else []
-                ),
-            ]
+            arguments = ["raw"]
             calls.append(
                 f"c.{finalizer}({', '.join(arguments)});"
                 if function.return_type.kind == "void"
                 else status_call(function, arguments, "null")
             )
         public = type_name(handle.native)
+        # `deinit`, as `defer` runs it, can't wait, so it disposes.
         dispose = (
             "null"
-            if handle.scoped_release is None
+            if handle.scoped_dispose is None
             else f"struct {{ fn dispose(raw: u64) status.Error!void {{ {' '.join(calls)} }} }}.dispose"
         )
         source = (
@@ -416,7 +393,7 @@ pub const OwnedValue = marshal.OwnedValue;
             "pub const id = methods.id;",
             "pub const isClosed = methods.isClosed;",
             "pub const format = methods.format;",
-            *(["pub const deinit = methods.deinit;"] if handle.scoped_release else []),
+            *(["pub const deinit = methods.deinit;"] if handle.scoped_dispose else []),
             *(
                 [
                     "/// Submits this handle's commands without a future; native logs a failed one as a warning.",
@@ -453,7 +430,7 @@ pub const OwnedValue = marshal.OwnedValue;
                 gated(
                     plan,
                     operation(plan, values, discard=True),
-                    method_name(plan, discard=True),
+                    method_name(plan),
                 )
             )
     variants = []

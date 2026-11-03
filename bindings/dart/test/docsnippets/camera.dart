@@ -118,6 +118,6 @@ Future<void> camera(MapHandle map) async {
   );
   final point = projection.pixelForLatLng(coordinate);
 
-  projection.close();
+  projection.release();
   // #endregion convert
 }

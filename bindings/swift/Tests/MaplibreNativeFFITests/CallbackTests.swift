@@ -48,7 +48,7 @@ func installProvider(
       do { try body(handle) }
       catch {
         Issue.record("provider failed: \(error)")
-        handle.close()
+        handle.release()
       }
     }
   ))
@@ -86,9 +86,9 @@ func installProvider(
   }
 }
 
-/// A refused answer still closes the request's handle, and the request fails
-/// as a close fails it.
-@Test func aRefusedAnswerClosesItsRequest() async throws {
+/// A refused answer still retires the request's handle, and the request fails
+/// as a release fails it.
+@Test func aRefusedAnswerRetiresItsRequest() async throws {
   try await withMapFixture { fixture in
     let taken = LockedBox<ResourceRequestHandle?>(nil)
     try await installProvider(
@@ -172,7 +172,7 @@ func installProvider(
     let taken = LockedBox<ResourceTransformRequestHandle?>(nil)
     try await fixture.runtime.setResourceTransform(
       ResourceTransform(callback: { _, requested, request in
-        guard requested == url else { return request.close() }
+        guard requested == url else { return request.release() }
         taken.update { $0 = request }
       })
     )
@@ -225,7 +225,7 @@ func installProvider(
             ))
         } catch {
           Issue.record("provider failed: \(error)")
-          handle.close()
+          handle.release()
         }
       },
       routes: [ResourceRoute(flags: .glob, url: "custom://routed/**")]

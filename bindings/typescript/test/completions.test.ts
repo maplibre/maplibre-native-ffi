@@ -113,13 +113,13 @@ test("a wait that is abandoned leaves its completion to arrive later", async () 
   wake.wake();
   await bounded(wake.next(), "the kept wake");
 
-  // The binding still settles the abandoned completion, once closing the map
+  // The binding still settles the abandoned completion, once releasing the map
   // cancels the request.
   const cancelled = assert.rejects(
     image,
     (error) =>
       error instanceof MaplibreError && error.status === Status.cancelled,
   );
-  await bounded(map.close(), "map close");
+  await bounded(map.release(), "map release");
   await bounded(cancelled, "the cancelled still image");
 });

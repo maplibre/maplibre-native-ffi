@@ -61,7 +61,7 @@ Future<void> images(RuntimeHandle runtime) async {
   // #endregion read
 
   session.dispose();
-  await map.close();
+  await map.release();
 }
 
 Future<void> imagesTile(
@@ -94,5 +94,5 @@ Future<void> imagesTile(
   );
   // #endregion tile
 
-  await map.close();
+  await map.release();
 }

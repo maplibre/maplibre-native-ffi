@@ -1,8 +1,9 @@
 /// The runtime and map fixture every binding test builds on.
 ///
-/// Each handle a fixture opens is closed by a teardown the fixture registers,
-/// so a failing test never leaks a runtime into the tests after it. Teardowns
-/// run in reverse, so a map closes before the runtime that owns it.
+/// Each handle a fixture opens is released by a teardown the fixture
+/// registers, so a failing test never leaks a runtime into the tests after it.
+/// Teardowns run in reverse, so a map is released before the runtime that owns
+/// it.
 library;
 
 import 'dart:async';
@@ -102,10 +103,10 @@ final class RuntimeFixture {
   Future<RuntimeEvent> awaitEventType(RuntimeEventType type) =>
       awaitEvent((event) => event.type == type, 'a $type event');
 
-  /// Creates a map that a teardown closes.
+  /// Creates a map that a teardown releases.
   Future<MapHandle> openMap([MapOptions? options]) async {
     final map = runtime.createMap(options ?? testMapOptions());
-    addTearDown(() => closeIfLive(map.close));
+    addTearDown(() => releaseIfLive(map.release));
     await within(map.ready, 'map creation');
     return map;
   }
@@ -117,7 +118,7 @@ final class RuntimeFixture {
   }
 }
 
-/// Creates a runtime that a teardown closes, with the denying provider
+/// Creates a runtime that a teardown releases, with the denying provider
 /// installed unless [provider] names another.
 Future<RuntimeFixture> openRuntime({
   RuntimeOptions? options,
@@ -131,7 +132,7 @@ Future<RuntimeFixture> openRuntime({
       cachePath: defaults.cachePath,
     ),
   );
-  addTearDown(() => closeIfLive(runtime.close));
+  addTearDown(() => releaseIfLive(runtime.release));
   final pending = <RuntimeEvent>[];
   await runtime.setEventHandler(
     RuntimeEventHandler(
@@ -164,10 +165,10 @@ ResourceResponse get emptyStyleResponse => ResourceResponse(
   bytes: jsonBytes(emptyStyle),
 );
 
-/// Closes a fixture owner that a test may already have released.
-Future<void> closeIfLive(Future<void> Function() close) async {
+/// Releases a fixture owner that a test may already have released.
+Future<void> releaseIfLive(Future<void> Function() release) async {
   try {
-    await close();
+    await release();
   } on MaplibreException catch (error) {
     if (error.status != Status.invalidState) rethrow;
   }

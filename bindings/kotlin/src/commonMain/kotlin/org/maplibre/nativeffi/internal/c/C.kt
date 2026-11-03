@@ -689,7 +689,7 @@ internal expect object C {
 
   fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_render_session_dispose(session: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_drain_frame_results(
     session: Long,
@@ -750,6 +750,8 @@ internal expect object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int
+
+  fun mln_render_session_release(session: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_release_target(session: Long, completion: Long, outDiagnostic: Long): Int
 

@@ -189,10 +189,6 @@ struct CompletionResult<&mln_render_session_detach> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_render_session_dispose> {
-  static constexpr bool has_value = false;
-};
-template <>
 struct CompletionResult<&mln_render_session_dump_debug_logs> {
   static constexpr bool has_value = false;
 };
@@ -226,6 +222,10 @@ struct CompletionResult<&mln_render_session_read_texture> {
 };
 template <>
 struct CompletionResult<&mln_render_session_reduce_memory_use> {
+  static constexpr bool has_value = false;
+};
+template <>
+struct CompletionResult<&mln_render_session_release> {
   static constexpr bool has_value = false;
 };
 template <>

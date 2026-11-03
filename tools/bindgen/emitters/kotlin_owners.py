@@ -34,10 +34,12 @@ def state_type(native, plans):
 
 
 def releases(bound, native, plans):
-    """Map the scoped release onto AutoCloseable or AsyncReleasable, when a host can call it bare.
+    """Map the scoped release and dispose onto AsyncReleasable and AutoCloseable.
 
-    An asynchronous release of a handle with a dispose maps onto both: `use`
-    disposes, and the suspending `use` awaits the release.
+    AsyncReleasable's `release`, which `useReleasing` awaits, is the release
+    that waits. AutoCloseable's `close`, which the standard library's `use`
+    calls and which can't wait, calls the scoped dispose: the dispose, or the
+    release of a handle that its release frees at once.
     """
     handle = bound.handles[native]
     plan = next(
@@ -47,19 +49,27 @@ def releases(bound, native, plans):
     if plan is None:
         return []
     extra = [p for p in plan.inputs if p.name != plan.receiver]
-    method = method_name(plan)
-    if plan.completion:
-        result = [Release(ASYNC_RELEASABLE, "release", method)]
-        if handle.dispose:
-            result.append(Release("AutoCloseable", "close", disposal_method(handle)))
-    elif not extra:
-        result = [Release("AutoCloseable", "close", method)]
-    else:
+    if extra:
         return []
-    for closes in result:
-        if extra and closes.inherited:
+    result = []
+    if plan.completion:
+        result.append(Release(ASYNC_RELEASABLE, "release", method_name(plan)))
+    disposal = next(
+        (p for p in plans if p.name == handle.scoped_dispose and receives(p, native)),
+        None,
+    )
+    if handle.scoped_dispose:
+        result.append(
+            Release(
+                "AutoCloseable",
+                "close",
+                method_name(disposal) if disposal else disposal_method(handle),
+            )
+        )
+    for scoped in result:
+        if extra and scoped.inherited:
             raise ValueError(
-                f"{plan.name}: a release with parameters cannot implement {closes.member}()"
+                f"{plan.name}: a release with parameters cannot implement {scoped.member}()"
             )
     return result
 
@@ -80,10 +90,10 @@ def owner(bound, native, plans, factories, members, imports):
     handle = bound.handles[native]
     family = name(native)
     owner_class = owner_name(handle)
-    closes = releases(bound, native, plans)
-    supertypes = [release.interface for release in closes]
+    scoped = releases(bound, native, plans)
+    supertypes = [release.interface for release in scoped]
     operations, trailer = members
-    for release in closes:
+    for release in scoped:
         if release.inherited:
             # The release operation itself implements the interface's member.
             head = f"  public fun {release.member}("
@@ -124,25 +134,32 @@ def owner(bound, native, plans, factories, members, imports):
         "  /**\n"
         + (
             "   * The native handle value, which runtime events report as their source. It stays readable\n"
-            "   * after close, so events drained later still match this handle.\n"
+            "   * after release, so events drained later still match this handle.\n"
             if native in bound.event_sources
-            else "   * The native handle value. It stays readable after close.\n"
+            else "   * The native handle value. It stays readable after release.\n"
         )
         + "   */\n"
         "  public val id: ULong get() = binding.handle.toULong()",
-        "  /** Whether a release, dispose, close, or discard has ended the handle. */\n"
+        "  /** Whether a release, dispose, or discard has ended the handle. */\n"
         + (
             "  public override val isClosed: Boolean"
-            if any(release.interface == ASYNC_RELEASABLE for release in closes)
+            if any(release.interface == ASYNC_RELEASABLE for release in scoped)
             else "  public val isClosed: Boolean"
         )
         + " get() = binding.isReleased",
     ]
-    for release in closes:
+    for release in scoped:
         if release.inherited:
             continue
+        waits = any(other.interface == ASYNC_RELEASABLE for other in scoped)
         body.append(
-            f"  public override fun close() {{ {release.method}() }}"
+            f"  /**\n   * Calls [{release.method}], for the standard library's `use`"
+            + (
+                ", which can't wait. [useReleasing] waits for [release] instead.\n"
+                if waits
+                else ".\n"
+            )
+            + f"   */\n  public override fun close() {{ {release.method}() }}"
             if release.member == "close"
             else f"  public override fun release(): Deferred<Unit> = {release.method}()"
         )

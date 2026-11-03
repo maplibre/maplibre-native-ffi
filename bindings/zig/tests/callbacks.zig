@@ -98,9 +98,9 @@ fn completeOnThread(handle: *maplibre.ResourceRequest, result: *?anyerror) void 
     result.* = null;
 }
 
-// A refused answer still closes the handle, and its request fails as a
+// A refused answer still consumes the handle, and its request fails as a
 // release fails it.
-test "a refused answer closes its request handle and fails the request" {
+test "a refused answer consumes its request handle and fails the request" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     var provider = DeferringProvider{ .url = "custom://refused.json" };
@@ -117,8 +117,8 @@ test "a refused answer closes its request handle and fails the request" {
 }
 
 // A provider can keep its request and answer it later from any thread. An
-// accepted answer closes the handle. Native refuses a second completion,
-// through the closed handle or a copy made before it closed.
+// accepted answer consumes the handle. Native refuses a second completion,
+// through the consumed handle or a copy made before the answer.
 test "a kept request handle answers its request later from another thread" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();

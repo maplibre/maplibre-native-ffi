@@ -53,7 +53,7 @@ private fun drainFrameResults() {
   if (results.isEmpty()) return
 
   if (results.any { it.disposition == RenderResult.FAILED }) {
-    replaceSession() // Close the session and attach a new one.
+    replaceSession() // Release the session and attach a new one.
   } else if (!paused) {
     runAtNextRefresh(::demandFrame)
   }

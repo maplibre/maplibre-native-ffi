@@ -18,12 +18,15 @@ public interface AsyncReleasable {
 }
 
 /**
- * Runs [block] and suspends until this owner's native release has finished. An owner that [block]
- * already closed is left as it is. When [block] throws, its throwable propagates with any release
- * failure added as suppressed, as the standard library's `use` does. When [block] returns, a
- * release failure propagates.
+ * Runs [block], then releases this owner and suspends until its native release has finished. An
+ * owner that [block] already released or disposed is left as it is. When [block] throws, its
+ * throwable propagates with any release failure added as suppressed, as the standard library's
+ * `use` does. When [block] returns, a release failure propagates.
+ *
+ * The standard library's `use`, which can't suspend, calls `close`, which disposes the owner
+ * without waiting.
  */
-public suspend inline fun <T : AsyncReleasable, R> T.use(block: suspend (T) -> R): R {
+public suspend inline fun <T : AsyncReleasable, R> T.useReleasing(block: suspend (T) -> R): R {
   var failure: Throwable? = null
   try {
     return block(this)

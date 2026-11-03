@@ -4183,16 +4183,9 @@ external int mln_render_session_detach(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
+@Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
 external int mln_render_session_dispose(
   int session,
-  Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4345,6 +4338,19 @@ external int mln_render_session_read_texture(
   )
 >()
 external int mln_render_session_reduce_memory_use(
+  int session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_release(
   int session,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,

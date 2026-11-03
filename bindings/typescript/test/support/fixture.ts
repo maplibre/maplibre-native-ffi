@@ -1,6 +1,6 @@
 // The runtime and map fixture that most cases build on.
 //
-// Each handle a fixture opens is closed by a teardown, so a failing case never
+// Each handle a fixture opens is released by a teardown, so a failing case never
 // leaks a runtime into the cases after it.
 
 import assert from "node:assert/strict";
@@ -22,7 +22,7 @@ import {
   RuntimeHandle,
   Status,
 } from "../../src/index.ts";
-import { bounded, closeIfLive, nextWake, teardown } from "./harness.ts";
+import { bounded, nextWake, releaseIfLive, teardown } from "./harness.ts";
 import { capabilities } from "./host-capabilities.ts";
 import { emptyStyle } from "./styles.ts";
 
@@ -148,7 +148,7 @@ export interface RuntimeFixture {
     type: RuntimeEventType,
     source?: bigint,
   ): Promise<RuntimeEvent>;
-  /** Creates a map that a teardown closes. */
+  /** Creates a map that a teardown releases. */
   openMap(options?: MapOptions): Promise<MapHandle>;
   /** Creates a map and commits `style` to it. */
   openStyledMap(style?: unknown, options?: MapOptions): Promise<MapHandle>;
@@ -159,14 +159,14 @@ export const mapOptions: MapOptions = {
 };
 
 /**
- * Creates a runtime that a teardown closes, with its events on an event
+ * Creates a runtime that a teardown releases, with its events on an event
  * stream and the denying provider unless `provider` names another.
  */
 export async function openRuntime(
   options: { runtime?: RuntimeOptions; provider?: ResourceProvider } = {},
 ): Promise<RuntimeFixture> {
   const runtime = await RuntimeHandle.create(options.runtime);
-  teardown(() => closeIfLive(() => runtime.close()));
+  teardown(() => releaseIfLive(() => runtime.release()));
   const events = await listen(runtime);
   await bounded(
     runtime.setResourceProvider(options.provider ?? denyingProvider),
@@ -179,7 +179,7 @@ export async function openRuntime(
     awaitEventType: (type, source) => events.awaitEventType(type, source),
     async openMap(options = mapOptions) {
       const map = runtime.createMap(options);
-      teardown(() => closeIfLive(() => map.close()));
+      teardown(() => releaseIfLive(() => map.release()));
       await bounded(map.ready, "map creation");
       return map;
     },

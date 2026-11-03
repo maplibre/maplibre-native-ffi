@@ -57,7 +57,7 @@ fn a_webgl_session_renders_into_a_host_texture() {
 
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     assert_background(&texture.read_rgba().unwrap());
-    session.close();
+    session.detach_and_release();
 }
 
 #[cfg(mln_render_backend = "webgpu")]
@@ -78,7 +78,7 @@ fn a_webgpu_session_renders_into_a_host_texture() {
 
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     assert_background(&texture.read_rgba(&context).unwrap());
-    session.close();
+    session.detach_and_release();
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let session = Session::offscreen(fixture.map(), SIZE);
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let (runtime, map) = fixture.into_parts();
-    // No explicit close: each drop disposes its handle, children first.
+    // No explicit release: each drop disposes its handle, children first.
     drop(session);
     drop(map);
     drop(runtime);

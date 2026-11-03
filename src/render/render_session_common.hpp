@@ -1228,9 +1228,10 @@ auto enqueue_surface_retarget(
   RenderTargetIdentity identity, RenderTargetReplacer replace,
   std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status;
-auto render_session_dispose(
+auto render_session_release(
   mln_render_session session, const mln_completion* completion
 ) -> mln_status;
+auto render_session_dispose(mln_render_session session) -> mln_status;
 // Disposes a session as render_session_dispose does, except that retirement
 // quarantines its graphics resources instead of detaching it, so it makes no
 // graphics call after the one in flight. A finalizer that can run while the

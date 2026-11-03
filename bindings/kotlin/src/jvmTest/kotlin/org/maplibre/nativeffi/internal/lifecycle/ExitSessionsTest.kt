@@ -13,7 +13,7 @@ class ExitSessionsTest {
     val sessions = ExitSessions()
     val destroyed = withOffscreenSession {
       complete(session.detach(), "the detach")
-      session.close()
+      session.dispose()
       session
     }
     withOffscreenSession {

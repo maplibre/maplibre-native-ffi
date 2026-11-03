@@ -81,7 +81,7 @@ public extension StyleExpressionHandle {
   ///
   /// See `mln_style_expression_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-  func close() {
+  func release() {
     nativeClose { raw in mln_style_expression_release(raw) }
   }
 }

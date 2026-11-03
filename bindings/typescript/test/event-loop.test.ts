@@ -4,13 +4,13 @@ import { test } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
 
 test(
-  "a script that awaits a style-loaded event and closes its runtimes exits on its own",
+  "a script that awaits a style-loaded event and releases its runtimes exits on its own",
   async () => {
     const result = await capabilities.childProcess!(
       new URL("./fixtures/clean-exit.ts", import.meta.url),
     );
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /style loaded and runtime closed/);
+    assert.match(result.stdout, /style loaded and runtime released/);
   },
   { needs: ["childProcess"] },
 );

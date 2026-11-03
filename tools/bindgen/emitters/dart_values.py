@@ -673,9 +673,9 @@ class Values:
         holds, in the zone that registered it. Native code already has its
         answer, so the pointer returns a placeholder, and a callback error
         reaches that zone instead of native code. An owner adopts an owned
-        handle before the callback runs; closing it after a failure, or when
-        the registration's owner is gone, releases the unanswered request,
-        which native then fails.
+        handle before the callback runs; its release after a failure, or when
+        the registration's owner is gone, ends the unanswered request, which
+        native then fails.
         """
         public = public_name(callback.native)
         parameters, result = self.native_signature(callback)
@@ -702,13 +702,13 @@ class Values:
             body = [
                 f"final owner = {owner}._({native}({identifier(owned[0].name)}));",
                 "if (callback == null) {",
-                "  owner.close();",
+                "  owner.release();",
                 "  return;",
                 "}",
                 "try {",
                 f"  {call}",
                 "} catch (_) {",
-                "  owner.close();",
+                "  owner.release();",
                 "  rethrow;",
                 "}",
             ]

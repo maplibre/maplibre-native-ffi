@@ -330,10 +330,6 @@ def lower(api: Api | BoundApi) -> Lowered:
                 module = f"view:{plan.view.owner.native}"
             if code:
                 chunks[module].append(gated(plan, code))
-            if plan.completion and plan.completion.optional:
-                chunks[module].append(
-                    gated(plan, operation(plan, value_types, discard=True)[1])
-                )
             generated.append(function.name)
         except Unsupported as error:
             value_types.used = previous_values
