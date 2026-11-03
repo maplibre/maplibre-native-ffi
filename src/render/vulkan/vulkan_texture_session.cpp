@@ -362,11 +362,9 @@ class VulkanTextureSessionBackend final
     }
     out_metadata = mln_vulkan_texture_frame{
       .size = sizeof(mln_vulkan_texture_frame),
-      .generation = frame.generation,
       .width = frame.physical_width,
       .height = frame.physical_height,
       .scale_factor = frame.scale_factor,
-      .frame_id = frame.frame_id,
       .slot = frame.slot,
       .image = mln::core::vulkan_handle_to_abi(resources.image),
       .image_view = mln::core::vulkan_handle_to_abi(resources.image_view),

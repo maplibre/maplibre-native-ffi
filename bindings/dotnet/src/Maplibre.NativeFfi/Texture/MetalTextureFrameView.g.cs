@@ -13,11 +13,9 @@ public sealed class MetalTextureFrameView
         this.scope = scope;
     }
 
-    public ulong Generation => value.Generation;
     public uint Width => value.Width;
     public uint Height => value.Height;
     public double ScaleFactor => value.ScaleFactor;
-    public ulong FrameId => value.FrameId;
     public uint Slot => value.Slot;
     public NativePointer Texture => scope.Active(value).Texture;
     public NativePointer Device => scope.Active(value).Device;

@@ -1245,11 +1245,9 @@ class WebGPUTextureSessionBackend final
     }
     out_metadata = mln_web_gpu_texture_frame{
       .size = sizeof(mln_web_gpu_texture_frame),
-      .generation = frame.generation,
       .width = frame.physical_width,
       .height = frame.physical_height,
       .scale_factor = frame.scale_factor,
-      .frame_id = frame.frame_id,
       .slot = frame.slot,
       .texture = texture,
       .texture_view = backend_.rendered_texture_view(),

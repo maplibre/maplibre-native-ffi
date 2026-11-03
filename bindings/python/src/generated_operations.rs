@@ -558,11 +558,9 @@ fn generated_copy_mln_metal_texture_frame(
     value: &sys::mln_metal_texture_frame,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("width", generated_value(py, value.width)?)?;
     dict.set_item("height", generated_value(py, value.height)?)?;
     dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
     dict.set_item("slot", generated_value(py, value.slot)?)?;
     dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
     dict.set_item("device", generated_value(py, value.device as usize)?)?;
@@ -691,11 +689,9 @@ fn generated_copy_mln_open_gl_texture_frame(
     value: &sys::mln_open_gl_texture_frame,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("width", generated_value(py, value.width)?)?;
     dict.set_item("height", generated_value(py, value.height)?)?;
     dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
     dict.set_item("slot", generated_value(py, value.slot)?)?;
     dict.set_item("texture", generated_value(py, value.texture)?)?;
     dict.set_item("target", generated_value(py, value.target)?)?;
@@ -824,14 +820,6 @@ fn generated_copy_mln_render_session_snapshot(
         generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item(
-        "map_update_generation",
-        generated_value(py, value.map_update_generation)?,
-    )?;
-    dict.set_item(
-        "rendered_update_generation",
-        generated_value(py, value.rendered_update_generation)?,
-    )?;
     dict.set_item(
         "frame_generation",
         generated_value(py, value.frame_generation)?,
@@ -1490,11 +1478,9 @@ fn generated_copy_mln_vulkan_texture_frame(
     value: &sys::mln_vulkan_texture_frame,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("width", generated_value(py, value.width)?)?;
     dict.set_item("height", generated_value(py, value.height)?)?;
     dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
     dict.set_item("slot", generated_value(py, value.slot)?)?;
     dict.set_item("image", generated_value(py, value.image)?)?;
     dict.set_item("image_view", generated_value(py, value.image_view)?)?;

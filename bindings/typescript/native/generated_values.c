@@ -1205,11 +1205,6 @@ napi_value mln_ts_read_metal_texture_frame(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "generation",
-        mln_ts_u64(env, (uint64_t)(source->generation))
-      ))
-    return NULL;
-  if (!mln_ts_set(
         env, result, "width", mln_ts_number(env, (double)(source->width))
       ))
     return NULL;
@@ -1220,10 +1215,6 @@ napi_value mln_ts_read_metal_texture_frame(
   if (!mln_ts_set(
         env, result, "scaleFactor",
         mln_ts_number(env, (double)(source->scale_factor))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "frameId", mln_ts_u64(env, (uint64_t)(source->frame_id))
       ))
     return NULL;
   if (!mln_ts_set(
@@ -1456,11 +1447,6 @@ napi_value mln_ts_read_open_gl_texture_frame(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "generation",
-        mln_ts_u64(env, (uint64_t)(source->generation))
-      ))
-    return NULL;
-  if (!mln_ts_set(
         env, result, "width", mln_ts_number(env, (double)(source->width))
       ))
     return NULL;
@@ -1471,10 +1457,6 @@ napi_value mln_ts_read_open_gl_texture_frame(
   if (!mln_ts_set(
         env, result, "scaleFactor",
         mln_ts_number(env, (double)(source->scale_factor))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "frameId", mln_ts_u64(env, (uint64_t)(source->frame_id))
       ))
     return NULL;
   if (!mln_ts_set(
@@ -1699,16 +1681,6 @@ napi_value mln_ts_read_render_session_snapshot(
   if (!mln_ts_set(
         env, result, "generation",
         mln_ts_u64(env, (uint64_t)(source->generation))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "mapUpdateGeneration",
-        mln_ts_u64(env, (uint64_t)(source->map_update_generation))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "renderedUpdateGeneration",
-        mln_ts_u64(env, (uint64_t)(source->rendered_update_generation))
       ))
     return NULL;
   if (!mln_ts_set(
@@ -2699,11 +2671,6 @@ napi_value mln_ts_read_vulkan_texture_frame(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "generation",
-        mln_ts_u64(env, (uint64_t)(source->generation))
-      ))
-    return NULL;
-  if (!mln_ts_set(
         env, result, "width", mln_ts_number(env, (double)(source->width))
       ))
     return NULL;
@@ -2714,10 +2681,6 @@ napi_value mln_ts_read_vulkan_texture_frame(
   if (!mln_ts_set(
         env, result, "scaleFactor",
         mln_ts_number(env, (double)(source->scale_factor))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "frameId", mln_ts_u64(env, (uint64_t)(source->frame_id))
       ))
     return NULL;
   if (!mln_ts_set(
@@ -2756,11 +2719,6 @@ napi_value mln_ts_read_web_gpu_texture_frame(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "generation",
-        mln_ts_u64(env, (uint64_t)(source->generation))
-      ))
-    return NULL;
-  if (!mln_ts_set(
         env, result, "width", mln_ts_number(env, (double)(source->width))
       ))
     return NULL;
@@ -2771,10 +2729,6 @@ napi_value mln_ts_read_web_gpu_texture_frame(
   if (!mln_ts_set(
         env, result, "scaleFactor",
         mln_ts_number(env, (double)(source->scale_factor))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "frameId", mln_ts_u64(env, (uint64_t)(source->frame_id))
       ))
     return NULL;
   if (!mln_ts_set(

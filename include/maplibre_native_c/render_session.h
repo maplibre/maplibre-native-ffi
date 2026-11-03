@@ -117,8 +117,6 @@ typedef struct mln_render_session_snapshot {
   mln_render_session_state state;
   mln_logical_extent extent;
   uint64_t generation;
-  uint64_t map_update_generation;
-  uint64_t rendered_update_generation;
   uint64_t frame_generation;
   uint32_t acquired_frame_count;
   /**

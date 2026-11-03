@@ -638,16 +638,12 @@ final class mln_metal_surface_descriptor extends Struct {
 final class mln_metal_texture_frame extends Struct {
   @Uint32()
   external int size;
-  @Uint64()
-  external int generation;
   @Uint32()
   external int width;
   @Uint32()
   external int height;
   @Double()
   external double scale_factor;
-  @Uint64()
-  external int frame_id;
   @Uint32()
   external int slot;
   external Pointer<Void> texture;
@@ -790,16 +786,12 @@ final class mln_open_gl_surface_descriptor extends Struct {
 final class mln_open_gl_texture_frame extends Struct {
   @Uint32()
   external int size;
-  @Uint64()
-  external int generation;
   @Uint32()
   external int width;
   @Uint32()
   external int height;
   @Double()
   external double scale_factor;
-  @Uint64()
-  external int frame_id;
   @Uint32()
   external int slot;
   @Uint32()
@@ -936,10 +928,6 @@ final class mln_render_session_snapshot extends Struct {
   external mln_logical_extent extent;
   @Uint64()
   external int generation;
-  @Uint64()
-  external int map_update_generation;
-  @Uint64()
-  external int rendered_update_generation;
   @Uint64()
   external int frame_generation;
   @Uint32()
@@ -1489,16 +1477,12 @@ final class mln_vulkan_surface_descriptor extends Struct {
 final class mln_vulkan_texture_frame extends Struct {
   @Uint32()
   external int size;
-  @Uint64()
-  external int generation;
   @Uint32()
   external int width;
   @Uint32()
   external int height;
   @Double()
   external double scale_factor;
-  @Uint64()
-  external int frame_id;
   @Uint32()
   external int slot;
   @Uint64()
@@ -1568,16 +1552,12 @@ final class mln_web_gpu_surface_descriptor extends Struct {
 final class mln_web_gpu_texture_frame extends Struct {
   @Uint32()
   external int size;
-  @Uint64()
-  external int generation;
   @Uint32()
   external int width;
   @Uint32()
   external int height;
   @Double()
   external double scale_factor;
-  @Uint64()
-  external int frame_id;
   @Uint32()
   external int slot;
   external Pointer<Void> texture;

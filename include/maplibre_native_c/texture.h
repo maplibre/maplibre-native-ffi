@@ -56,11 +56,9 @@ typedef struct mln_metal_borrowed_texture_descriptor {
 /** The Metal texture of an acquired frame. */
 typedef struct mln_metal_texture_frame {
   uint32_t size;
-  uint64_t generation;
   uint32_t width;
   uint32_t height;
   double scale_factor;
-  uint64_t frame_id;
   /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
   /** The MTLTexture. */
@@ -128,11 +126,9 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
 /** The Vulkan image of an acquired frame. */
 typedef struct mln_vulkan_texture_frame {
   uint32_t size;
-  uint64_t generation;
   uint32_t width;
   uint32_t height;
   double scale_factor;
-  uint64_t frame_id;
   /** The image's index in the descriptor's `textures`. */
   uint32_t slot;
   /** The VkImage. */
@@ -220,11 +216,9 @@ typedef struct mln_web_gpu_borrowed_texture_descriptor {
 /** The WebGPU texture of an acquired frame. */
 typedef struct mln_web_gpu_texture_frame {
   uint32_t size;
-  uint64_t generation;
   uint32_t width;
   uint32_t height;
   double scale_factor;
-  uint64_t frame_id;
   /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
   /** The WGPUTexture. */
@@ -240,11 +234,9 @@ typedef struct mln_web_gpu_texture_frame {
 /** The OpenGL texture of an acquired frame. */
 typedef struct mln_open_gl_texture_frame {
   uint32_t size;
-  uint64_t generation;
   uint32_t width;
   uint32_t height;
   double scale_factor;
-  uint64_t frame_id;
   /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
   uint32_t texture MLN_BINDING("lifetime=owner");

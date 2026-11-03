@@ -901,11 +901,9 @@ pub struct mln_metal_surface_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_texture_frame {
     pub size: u32,
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     pub slot: u32,
     pub texture: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
@@ -1023,11 +1021,9 @@ pub struct mln_open_gl_surface_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_open_gl_texture_frame {
     pub size: u32,
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     pub slot: u32,
     pub texture: u32,
     pub target: u32,
@@ -1129,8 +1125,6 @@ pub struct mln_render_session_snapshot {
     pub state: mln_render_session_state,
     pub extent: mln_logical_extent,
     pub generation: u64,
-    pub map_update_generation: u64,
-    pub rendered_update_generation: u64,
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
     pub failure_status: mln_status,
@@ -1574,11 +1568,9 @@ pub struct mln_vulkan_surface_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_texture_frame {
     pub size: u32,
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     pub slot: u32,
     pub image: mln_vulkan_non_dispatchable_handle,
     pub image_view: mln_vulkan_non_dispatchable_handle,
@@ -1639,11 +1631,9 @@ pub struct mln_web_gpu_surface_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gpu_texture_frame {
     pub size: u32,
-    pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub frame_id: u64,
     pub slot: u32,
     pub texture: *mut std::ffi::c_void,
     pub texture_view: *mut std::ffi::c_void,

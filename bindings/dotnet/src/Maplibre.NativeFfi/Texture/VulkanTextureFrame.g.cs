@@ -28,11 +28,9 @@ namespace Maplibre.NativeFfi;
 /// The VkImageLayout that the frame left the image in.
 /// </param>
 public readonly partial record struct VulkanTextureFrame(
-    ulong Generation,
     uint Width,
     uint Height,
     double ScaleFactor,
-    ulong FrameId,
     uint Slot,
     ulong Image,
     ulong ImageView,

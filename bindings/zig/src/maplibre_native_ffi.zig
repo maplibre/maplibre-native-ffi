@@ -4101,11 +4101,9 @@ pub const MetalSurfaceDescriptor = struct {
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalTextureFrame = struct {
-    generation: u64 = 0,
     width: u32 = 0,
     height: u32 = 0,
     scale_factor: f64 = 0,
-    frame_id: u64 = 0,
     /// The texture's index in the descriptor's `textures`.
     slot: u32 = 0,
     /// The MTLTexture.
@@ -4116,11 +4114,9 @@ pub const MetalTextureFrame = struct {
     pixel_format: u64 = 0,
     pub fn fromNative(raw: c.mln_metal_texture_frame) MetalTextureFrame {
         return .{
-            .generation = raw.generation,
             .width = raw.width,
             .height = raw.height,
             .scale_factor = raw.scale_factor,
-            .frame_id = raw.frame_id,
             .slot = raw.slot,
             .texture = raw.texture,
             .device = raw.device,
@@ -4592,22 +4588,18 @@ pub const OpenGlSurfaceDescriptor = struct {
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenGlTextureFrame = struct {
-    generation: u64 = 0,
     width: u32 = 0,
     height: u32 = 0,
     scale_factor: f64 = 0,
-    frame_id: u64 = 0,
     /// The texture's index in the descriptor's `textures`.
     slot: u32 = 0,
     texture: u32 = 0,
     target: u32 = 0,
     pub fn fromNative(raw: c.mln_open_gl_texture_frame) OpenGlTextureFrame {
         return .{
-            .generation = raw.generation,
             .width = raw.width,
             .height = raw.height,
             .scale_factor = raw.scale_factor,
-            .frame_id = raw.frame_id,
             .slot = raw.slot,
             .texture = raw.texture,
             .target = raw.target,
@@ -5027,8 +5019,6 @@ pub const RenderSessionSnapshot = struct {
     state: RenderSessionState = @fromBackingInt(@intCast(0)),
     extent: LogicalExtent = .{},
     generation: u64 = 0,
-    map_update_generation: u64 = 0,
-    rendered_update_generation: u64 = 0,
     frame_generation: u64 = 0,
     acquired_frame_count: u32 = 0,
     /// `Status.ok` until the session fails. Then `error.TargetLost` when it
@@ -5040,8 +5030,6 @@ pub const RenderSessionSnapshot = struct {
             .state = RenderSessionState.fromNative(raw.state),
             .extent = LogicalExtent.fromNative(raw.extent),
             .generation = raw.generation,
-            .map_update_generation = raw.map_update_generation,
-            .rendered_update_generation = raw.rendered_update_generation,
             .frame_generation = raw.frame_generation,
             .acquired_frame_count = raw.acquired_frame_count,
             .failure_status = Status.fromNative(raw.failure_status),
@@ -7045,11 +7033,9 @@ pub const VulkanSurfaceDescriptor = struct {
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanTextureFrame = struct {
-    generation: u64 = 0,
     width: u32 = 0,
     height: u32 = 0,
     scale_factor: f64 = 0,
-    frame_id: u64 = 0,
     /// The image's index in the descriptor's `textures`.
     slot: u32 = 0,
     /// The VkImage.
@@ -7064,11 +7050,9 @@ pub const VulkanTextureFrame = struct {
     layout: u32 = 0,
     pub fn fromNative(raw: c.mln_vulkan_texture_frame) VulkanTextureFrame {
         return .{
-            .generation = raw.generation,
             .width = raw.width,
             .height = raw.height,
             .scale_factor = raw.scale_factor,
-            .frame_id = raw.frame_id,
             .slot = raw.slot,
             .image = raw.image,
             .image_view = raw.image_view,

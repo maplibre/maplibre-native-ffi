@@ -459,11 +459,9 @@ internal unsafe struct mln_metal_surface_descriptor
 internal unsafe struct mln_metal_texture_frame
 {
     public uint size;
-    public ulong generation;
     public uint width;
     public uint height;
     public double scale_factor;
-    public ulong frame_id;
     public uint slot;
     public void* texture;
     public void* device;
@@ -591,11 +589,9 @@ internal unsafe struct mln_open_gl_surface_descriptor
 internal unsafe struct mln_open_gl_texture_frame
 {
     public uint size;
-    public ulong generation;
     public uint width;
     public uint height;
     public double scale_factor;
-    public ulong frame_id;
     public uint slot;
     public uint texture;
     public uint target;
@@ -697,8 +693,6 @@ internal unsafe struct mln_render_session_snapshot
     public mln_render_session_state state;
     public mln_logical_extent extent;
     public ulong generation;
-    public ulong map_update_generation;
-    public ulong rendered_update_generation;
     public ulong frame_generation;
     public uint acquired_frame_count;
     public mln_status failure_status;
@@ -1173,11 +1167,9 @@ internal unsafe struct mln_vulkan_surface_descriptor
 internal unsafe struct mln_vulkan_texture_frame
 {
     public uint size;
-    public ulong generation;
     public uint width;
     public uint height;
     public double scale_factor;
-    public ulong frame_id;
     public uint slot;
     public ulong image;
     public ulong image_view;
@@ -1238,11 +1230,9 @@ internal unsafe struct mln_web_gpu_surface_descriptor
 internal unsafe struct mln_web_gpu_texture_frame
 {
     public uint size;
-    public ulong generation;
     public uint width;
     public uint height;
     public double scale_factor;
-    public ulong frame_id;
     public uint slot;
     public void* texture;
     public void* texture_view;

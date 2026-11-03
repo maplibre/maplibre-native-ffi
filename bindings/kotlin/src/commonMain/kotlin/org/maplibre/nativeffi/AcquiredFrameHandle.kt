@@ -56,7 +56,7 @@ internal constructor(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(w(56, 56, 48), w(8, 8, 4))
+        val out = sized(w(40, 40, 32), w(8, 8, 4))
         check(C.mln_acquired_frame_get_open_gl_texture(handle, out, diagnostic))
         block(readOpenGlTextureFrame(out, scope))
       }

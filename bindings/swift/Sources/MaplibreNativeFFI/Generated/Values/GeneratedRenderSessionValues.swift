@@ -191,8 +191,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   public var state: RenderSessionState
   public var extent: LogicalExtent
   public var generation: UInt64
-  public var mapUpdateGeneration: UInt64
-  public var renderedUpdateGeneration: UInt64
   public var frameGeneration: UInt64
   public var acquiredFrameCount: UInt32
   /// `Status.ok` until the session fails. Then `Status.targetLost` when it
@@ -203,8 +201,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     state: RenderSessionState = .init(rawValue: 0),
     extent: LogicalExtent = .init(),
     generation: UInt64 = 0,
-    mapUpdateGeneration: UInt64 = 0,
-    renderedUpdateGeneration: UInt64 = 0,
     frameGeneration: UInt64 = 0,
     acquiredFrameCount: UInt32 = 0,
     failureStatus: Status = .init(rawValue: 0)
@@ -212,8 +208,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     self.state = state
     self.extent = extent
     self.generation = generation
-    self.mapUpdateGeneration = mapUpdateGeneration
-    self.renderedUpdateGeneration = renderedUpdateGeneration
     self.frameGeneration = frameGeneration
     self.acquiredFrameCount = acquiredFrameCount
     self.failureStatus = failureStatus
@@ -223,8 +217,6 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     state = RenderSessionState(rawValue: raw.state.rawValue)
     extent = LogicalExtent(raw: raw.extent)
     generation = raw.generation
-    mapUpdateGeneration = raw.map_update_generation
-    renderedUpdateGeneration = raw.rendered_update_generation
     frameGeneration = raw.frame_generation
     acquiredFrameCount = raw.acquired_frame_count
     failureStatus = Status(rawValue: raw.failure_status.rawValue)

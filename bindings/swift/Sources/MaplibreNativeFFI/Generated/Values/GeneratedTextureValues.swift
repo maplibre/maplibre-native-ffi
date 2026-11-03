@@ -101,11 +101,9 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalTextureFrame: Equatable, Hashable, Sendable {
-  public var generation: UInt64
   public var width: UInt32
   public var height: UInt32
   public var scaleFactor: Double
-  public var frameId: UInt64
   /// The texture's index in the descriptor's `textures`.
   public var slot: UInt32
   /// The MTLTexture.
@@ -115,21 +113,17 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   /// The texture's MTLPixelFormat.
   public var pixelFormat: UInt64
   public init(
-    generation: UInt64 = 0,
     width: UInt32 = 0,
     height: UInt32 = 0,
     scaleFactor: Double = 0,
-    frameId: UInt64 = 0,
     slot: UInt32 = 0,
     texture: NativePointer = .null,
     device: NativePointer = .null,
     pixelFormat: UInt64 = 0
   ) {
-    self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
-    self.frameId = frameId
     self.slot = slot
     self.texture = texture
     self.device = device
@@ -137,11 +131,9 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_metal_texture_frame) {
-    generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
-    frameId = raw.frame_id
     slot = raw.slot
     texture = NativePointer(bitPattern: unsafeBitCast(
       raw.texture,
@@ -251,41 +243,33 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
-  public var generation: UInt64
   public var width: UInt32
   public var height: UInt32
   public var scaleFactor: Double
-  public var frameId: UInt64
   /// The texture's index in the descriptor's `textures`.
   public var slot: UInt32
   public var texture: UInt32
   public var target: UInt32
   public init(
-    generation: UInt64 = 0,
     width: UInt32 = 0,
     height: UInt32 = 0,
     scaleFactor: Double = 0,
-    frameId: UInt64 = 0,
     slot: UInt32 = 0,
     texture: UInt32 = 0,
     target: UInt32 = 0
   ) {
-    self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
-    self.frameId = frameId
     self.slot = slot
     self.texture = texture
     self.target = target
   }
 
   init(raw: mln_open_gl_texture_frame) {
-    generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
-    frameId = raw.frame_id
     slot = raw.slot
     texture = raw.texture
     target = raw.target
@@ -488,11 +472,9 @@ public struct VulkanImageOwner: RawRepresentable, CustomStringConvertible,
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
-  public var generation: UInt64
   public var width: UInt32
   public var height: UInt32
   public var scaleFactor: Double
-  public var frameId: UInt64
   /// The image's index in the descriptor's `textures`.
   public var slot: UInt32
   /// The VkImage.
@@ -506,11 +488,9 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   /// The VkImageLayout that the frame left the image in.
   public var layout: UInt32
   public init(
-    generation: UInt64 = 0,
     width: UInt32 = 0,
     height: UInt32 = 0,
     scaleFactor: Double = 0,
-    frameId: UInt64 = 0,
     slot: UInt32 = 0,
     image: UInt64 = 0,
     imageView: UInt64 = 0,
@@ -518,11 +498,9 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
     format: UInt32 = 0,
     layout: UInt32 = 0
   ) {
-    self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
-    self.frameId = frameId
     self.slot = slot
     self.image = image
     self.imageView = imageView
@@ -532,11 +510,9 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_vulkan_texture_frame) {
-    generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
-    frameId = raw.frame_id
     slot = raw.slot
     image = raw.image
     imageView = raw.image_view

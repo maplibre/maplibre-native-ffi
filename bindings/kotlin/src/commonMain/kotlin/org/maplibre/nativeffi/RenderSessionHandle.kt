@@ -251,7 +251,7 @@ internal constructor(
    */
   public fun getSnapshot(): RenderSessionSnapshot =
     nativeCall(this, binding) {
-      val out = sized(64, w(8, 8, 4))
+      val out = sized(48, w(8, 8, 4))
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
     }

@@ -2076,15 +2076,11 @@ class MetalTextureFrame:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    generation: int
-
     width: int
 
     height: int
 
     scale_factor: float
-
-    frame_id: int
 
     slot: int
     """The texture's index in the descriptor's `textures`."""
@@ -2101,11 +2097,9 @@ class MetalTextureFrame:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            generation=raw["generation"],
             width=raw["width"],
             height=raw["height"],
             scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
             slot=raw["slot"],
             texture=raw["texture"],
             device=raw["device"],
@@ -2464,15 +2458,11 @@ class OpenGlTextureFrame:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    generation: int
-
     width: int
 
     height: int
 
     scale_factor: float
-
-    frame_id: int
 
     slot: int
     """The texture's index in the descriptor's `textures`."""
@@ -2484,11 +2474,9 @@ class OpenGlTextureFrame:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            generation=raw["generation"],
             width=raw["width"],
             height=raw["height"],
             scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
             slot=raw["slot"],
             texture=raw["texture"],
             target=raw["target"],
@@ -2799,10 +2787,6 @@ class RenderSessionSnapshot:
 
     generation: int
 
-    map_update_generation: int
-
-    rendered_update_generation: int
-
     frame_generation: int
 
     acquired_frame_count: int
@@ -2819,8 +2803,6 @@ class RenderSessionSnapshot:
             state=RenderSessionState(raw["state"]),
             extent=LogicalExtent._from_native(raw["extent"]),
             generation=raw["generation"],
-            map_update_generation=raw["map_update_generation"],
-            rendered_update_generation=raw["rendered_update_generation"],
             frame_generation=raw["frame_generation"],
             acquired_frame_count=raw["acquired_frame_count"],
             failure_status=Status(raw["failure_status"]),
@@ -4191,15 +4173,11 @@ class VulkanTextureFrame:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    generation: int
-
     width: int
 
     height: int
 
     scale_factor: float
-
-    frame_id: int
 
     slot: int
     """The image's index in the descriptor's `textures`."""
@@ -4222,11 +4200,9 @@ class VulkanTextureFrame:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            generation=raw["generation"],
             width=raw["width"],
             height=raw["height"],
             scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
             slot=raw["slot"],
             image=raw["image"],
             image_view=raw["image_view"],

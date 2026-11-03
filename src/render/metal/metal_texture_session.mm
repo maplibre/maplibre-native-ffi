@@ -222,11 +222,9 @@ class MetalTextureSessionBackend final
     }
     out_metadata = mln_metal_texture_frame{
       .size = sizeof(mln_metal_texture_frame),
-      .generation = frame.generation,
       .width = static_cast<uint32_t>(metal_texture->width()),
       .height = static_cast<uint32_t>(metal_texture->height()),
       .scale_factor = frame.scale_factor,
-      .frame_id = frame.frame_id,
       .slot = frame.slot,
       .texture = metal_texture,
       .device = metal_texture->device(),

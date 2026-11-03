@@ -1089,11 +1089,9 @@ export interface MetalSurfaceDescriptor {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface MetalTextureFrame {
-  readonly generation: bigint;
   readonly width: number;
   readonly height: number;
   readonly scaleFactor: number;
-  readonly frameId: bigint;
   /**
    * The texture's index in the descriptor's `textures`.
    */
@@ -1452,11 +1450,9 @@ export interface OpenGlSurfaceDescriptor {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface OpenGlTextureFrame {
-  readonly generation: bigint;
   readonly width: number;
   readonly height: number;
   readonly scaleFactor: number;
-  readonly frameId: bigint;
   /**
    * The texture's index in the descriptor's `textures`.
    */
@@ -1796,8 +1792,6 @@ export interface RenderSessionSnapshot {
   readonly state: RenderSessionState;
   readonly extent: LogicalExtent;
   readonly generation: bigint;
-  readonly mapUpdateGeneration: bigint;
-  readonly renderedUpdateGeneration: bigint;
   readonly frameGeneration: bigint;
   readonly acquiredFrameCount: number;
   /**
@@ -3290,11 +3284,9 @@ export interface VulkanSurfaceDescriptor {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface VulkanTextureFrame {
-  readonly generation: bigint;
   readonly width: number;
   readonly height: number;
   readonly scaleFactor: number;
-  readonly frameId: bigint;
   /**
    * The image's index in the descriptor's `textures`.
    */
@@ -3498,11 +3490,9 @@ export interface WebGpuSurfaceDescriptor {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface WebGpuTextureFrame {
-  readonly generation: bigint;
   readonly width: number;
   readonly height: number;
   readonly scaleFactor: number;
-  readonly frameId: bigint;
   /**
    * The texture's index in the descriptor's `textures`.
    */

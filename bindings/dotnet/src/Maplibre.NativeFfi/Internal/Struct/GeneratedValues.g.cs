@@ -1012,11 +1012,9 @@ internal static unsafe class GeneratedValues
 
     internal static MetalTextureFrame CopyMetalTextureFrame(mln_metal_texture_frame value) =>
         new(
-            value.generation,
             value.width,
             value.height,
             value.scale_factor,
-            value.frame_id,
             value.slot,
             NativePointer.FromNativeAddress((nint)value.texture),
             NativePointer.FromNativeAddress((nint)value.device),
@@ -1256,16 +1254,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static OpenGlTextureFrame CopyOpenGlTextureFrame(mln_open_gl_texture_frame value) =>
-        new(
-            value.generation,
-            value.width,
-            value.height,
-            value.scale_factor,
-            value.frame_id,
-            value.slot,
-            value.texture,
-            value.target
-        );
+        new(value.width, value.height, value.scale_factor, value.slot, value.texture, value.target);
 
     internal static mln_premultiplied_rgba8_image NativePremultipliedRgba8Image(
         PremultipliedRgba8Image value,
@@ -1461,8 +1450,6 @@ internal static unsafe class GeneratedValues
             (global::Maplibre.NativeFfi.RenderSessionState)value.state,
             CopyLogicalExtent(value.extent),
             value.generation,
-            value.map_update_generation,
-            value.rendered_update_generation,
             value.frame_generation,
             value.acquired_frame_count,
             (global::Maplibre.NativeFfi.Status)value.failure_status
@@ -2339,11 +2326,9 @@ internal static unsafe class GeneratedValues
 
     internal static VulkanTextureFrame CopyVulkanTextureFrame(mln_vulkan_texture_frame value) =>
         new(
-            value.generation,
             value.width,
             value.height,
             value.scale_factor,
-            value.frame_id,
             value.slot,
             value.image,
             value.image_view,

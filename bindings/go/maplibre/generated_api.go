@@ -2987,11 +2987,9 @@ func nativeMetalSurfaceDescriptor(input MetalSurfaceDescriptor, arena *bindingAr
 // See mln_metal_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type MetalTextureFrame struct {
-	Generation  uint64
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	FrameId     uint64
 	// The texture's index in the descriptor's textures.
 	Slot uint32
 	// The MTLTexture.
@@ -3004,11 +3002,9 @@ type MetalTextureFrame struct {
 
 func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 	var result MetalTextureFrame
-	result.Generation = uint64(raw.generation)
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
 	result.Slot = uint32(raw.slot)
 	result.Texture = uintptr(unsafe.Pointer(raw.texture))
 	result.Device = uintptr(unsafe.Pointer(raw.device))
@@ -3350,11 +3346,9 @@ func nativeOpenGlSurfaceDescriptor(input OpenGlSurfaceDescriptor, arena *binding
 // See mln_open_gl_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type OpenGlTextureFrame struct {
-	Generation  uint64
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	FrameId     uint64
 	// The texture's index in the descriptor's textures.
 	Slot    uint32
 	Texture uint32
@@ -3363,11 +3357,9 @@ type OpenGlTextureFrame struct {
 
 func copyOpenGlTextureFrame(raw C.mln_open_gl_texture_frame) OpenGlTextureFrame {
 	var result OpenGlTextureFrame
-	result.Generation = uint64(raw.generation)
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
 	result.Slot = uint32(raw.slot)
 	result.Texture = uint32(raw.texture)
 	result.Target = uint32(raw.target)
@@ -3653,13 +3645,11 @@ func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) Render
 // See mln_render_session_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderSessionSnapshot struct {
-	State                    RenderSessionState
-	Extent                   LogicalExtent
-	Generation               uint64
-	MapUpdateGeneration      uint64
-	RenderedUpdateGeneration uint64
-	FrameGeneration          uint64
-	AcquiredFrameCount       uint32
+	State              RenderSessionState
+	Extent             LogicalExtent
+	Generation         uint64
+	FrameGeneration    uint64
+	AcquiredFrameCount uint32
 	// StatusOk until the session fails. Then StatusTargetLost when it failed
 	// because it lost its target, or StatusNativeError when it failed for another
 	// reason.
@@ -3671,8 +3661,6 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.State = RenderSessionState(raw.state)
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.Generation = uint64(raw.generation)
-	result.MapUpdateGeneration = uint64(raw.map_update_generation)
-	result.RenderedUpdateGeneration = uint64(raw.rendered_update_generation)
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.AcquiredFrameCount = uint32(raw.acquired_frame_count)
 	result.FailureStatus = Status(raw.failure_status)
@@ -4954,11 +4942,9 @@ func nativeVulkanSurfaceDescriptor(input VulkanSurfaceDescriptor, arena *binding
 // See mln_vulkan_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type VulkanTextureFrame struct {
-	Generation  uint64
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	FrameId     uint64
 	// The image's index in the descriptor's textures.
 	Slot uint32
 	// The VkImage.
@@ -4975,11 +4961,9 @@ type VulkanTextureFrame struct {
 
 func copyVulkanTextureFrame(raw C.mln_vulkan_texture_frame) VulkanTextureFrame {
 	var result VulkanTextureFrame
-	result.Generation = uint64(raw.generation)
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
 	result.Slot = uint32(raw.slot)
 	result.Image = uint64(raw.image)
 	result.ImageView = uint64(raw.image_view)
@@ -5081,15 +5065,11 @@ type MetalTextureFrameView struct {
 	scope *bindingScope
 }
 
-func (view MetalTextureFrameView) Generation() uint64 { return view.value.Generation }
-
 func (view MetalTextureFrameView) Width() uint32 { return view.value.Width }
 
 func (view MetalTextureFrameView) Height() uint32 { return view.value.Height }
 
 func (view MetalTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
-
-func (view MetalTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
 func (view MetalTextureFrameView) Slot() uint32 { return view.value.Slot }
 
@@ -5118,15 +5098,11 @@ type OpenGlTextureFrameView struct {
 	scope *bindingScope
 }
 
-func (view OpenGlTextureFrameView) Generation() uint64 { return view.value.Generation }
-
 func (view OpenGlTextureFrameView) Width() uint32 { return view.value.Width }
 
 func (view OpenGlTextureFrameView) Height() uint32 { return view.value.Height }
 
 func (view OpenGlTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
-
-func (view OpenGlTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
 func (view OpenGlTextureFrameView) Slot() uint32 { return view.value.Slot }
 
@@ -5164,15 +5140,11 @@ type VulkanTextureFrameView struct {
 	scope *bindingScope
 }
 
-func (view VulkanTextureFrameView) Generation() uint64 { return view.value.Generation }
-
 func (view VulkanTextureFrameView) Width() uint32 { return view.value.Width }
 
 func (view VulkanTextureFrameView) Height() uint32 { return view.value.Height }
 
 func (view VulkanTextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
-
-func (view VulkanTextureFrameView) FrameId() uint64 { return view.value.FrameId }
 
 func (view VulkanTextureFrameView) Slot() uint32 { return view.value.Slot }
 

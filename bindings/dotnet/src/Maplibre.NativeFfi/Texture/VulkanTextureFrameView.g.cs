@@ -13,11 +13,9 @@ public sealed class VulkanTextureFrameView
         this.scope = scope;
     }
 
-    public ulong Generation => value.Generation;
     public uint Width => value.Width;
     public uint Height => value.Height;
     public double ScaleFactor => value.ScaleFactor;
-    public ulong FrameId => value.FrameId;
     public uint Slot => value.Slot;
     public ulong Image => scope.Active(value).Image;
     public ulong ImageView => scope.Active(value).ImageView;

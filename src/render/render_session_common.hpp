@@ -198,8 +198,6 @@ class SurfaceSessionBackend : public RenderSessionBackend {
 // the graphics resource. Captured under the session lock and handed to the
 // driver thread, so a backend never reads session state without it.
 struct RenderFrameMetadata {
-  uint64_t generation = 0;
-  uint64_t frame_id = 0;
   uint32_t slot = 0;
   uint32_t physical_width = 0;
   uint32_t physical_height = 0;

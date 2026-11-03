@@ -974,34 +974,30 @@ internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
-      generation = readU64(source + w(8, 8, 4)),
-      width = readU32(source + w(16, 16, 12)),
-      height = readU32(source + w(20, 20, 16)),
-      scaleFactor = readF64(source + w(24, 24, 20)),
-      frameId = readU64(source + w(32, 32, 28)),
-      slot = readU32(source + w(40, 40, 36)),
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
       texture =
-        readAddress(source + w(44, 48, 40)).let {
+        readAddress(source + w(28, 32, 24)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
       device =
-        readAddress(source + w(48, 56, 44)).let {
+        readAddress(source + w(32, 40, 28)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      pixelFormat = readU64(source + w(56, 64, 48)),
+      pixelFormat = readU64(source + w(40, 48, 32)),
     )
     .also { it.bindingScope = scope }
 
 internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): OpenGlTextureFrame =
   OpenGlTextureFrame(
-      generation = readU64(source + w(8, 8, 4)),
-      width = readU32(source + w(16, 16, 12)),
-      height = readU32(source + w(20, 20, 16)),
-      scaleFactor = readF64(source + w(24, 24, 20)),
-      frameId = readU64(source + w(32, 32, 28)),
-      slot = readU32(source + w(40, 40, 36)),
-      texture = readU32(source + w(44, 44, 40)),
-      target = readU32(source + w(48, 48, 44)),
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      texture = readU32(source + w(28, 28, 24)),
+      target = readU32(source + w(32, 32, 28)),
     )
     .also { it.bindingScope = scope }
 
@@ -1027,44 +1023,40 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
 
 internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame =
   VulkanTextureFrame(
-      generation = readU64(source + w(8, 8, 4)),
-      width = readU32(source + w(16, 16, 12)),
-      height = readU32(source + w(20, 20, 16)),
-      scaleFactor = readF64(source + w(24, 24, 20)),
-      frameId = readU64(source + w(32, 32, 28)),
-      slot = readU32(source + w(40, 40, 36)),
-      image = readU64(source + w(48, 48, 40)),
-      imageView = readU64(source + w(56, 56, 48)),
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      image = readU64(source + w(32, 32, 24)),
+      imageView = readU64(source + w(40, 40, 32)),
       device =
-        readAddress(source + w(64, 64, 56)).let {
+        readAddress(source + w(48, 48, 40)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      format = readU32(source + w(68, 72, 60)),
-      layout = readU32(source + w(72, 76, 64)),
+      format = readU32(source + w(52, 56, 44)),
+      layout = readU32(source + w(56, 60, 48)),
     )
     .also { it.bindingScope = scope }
 
 internal fun readWebGpuTextureFrame(source: Long, scope: ViewScope? = null): WebGpuTextureFrame =
   WebGpuTextureFrame(
-      generation = readU64(source + w(8, 8, 4)),
-      width = readU32(source + w(16, 16, 12)),
-      height = readU32(source + w(20, 20, 16)),
-      scaleFactor = readF64(source + w(24, 24, 20)),
-      frameId = readU64(source + w(32, 32, 28)),
-      slot = readU32(source + w(40, 40, 36)),
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
       texture =
-        readAddress(source + w(44, 48, 40)).let {
+        readAddress(source + w(28, 32, 24)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
       textureView =
-        readAddress(source + w(48, 56, 44)).let {
+        readAddress(source + w(32, 40, 28)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
       device =
-        readAddress(source + w(52, 64, 48)).let {
+        readAddress(source + w(36, 48, 32)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      format = readU32(source + w(56, 72, 52)),
+      format = readU32(source + w(40, 56, 36)),
     )
     .also { it.bindingScope = scope }
 
@@ -1209,11 +1201,9 @@ internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
     state = RenderSessionState(readU32(source + 4)),
     extent = readLogicalExtent(source + 8),
     generation = readU64(source + 24),
-    mapUpdateGeneration = readU64(source + 32),
-    renderedUpdateGeneration = readU64(source + 40),
-    frameGeneration = readU64(source + 48),
-    acquiredFrameCount = readU32(source + 56),
-    failureStatus = Status(readI32(source + 60)),
+    frameGeneration = readU64(source + 32),
+    acquiredFrameCount = readU32(source + 40),
+    failureStatus = Status(readI32(source + 44)),
   )
 
 internal fun readRenderedFeature(source: Long): RenderedFeature =
