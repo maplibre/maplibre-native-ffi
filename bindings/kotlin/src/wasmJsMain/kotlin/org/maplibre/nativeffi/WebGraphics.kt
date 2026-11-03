@@ -41,7 +41,8 @@ public object WebGraphics {
 
   /**
    * Imports a `GPUCanvasContext`, the `getContext("webgpu")` of a canvas element or an
-   * `OffscreenCanvas`, as the `WGPUSurface` of a `WebGpuSurfaceDescriptor`.
+   * `OffscreenCanvas`, as the `WGPUSurface` of a `WebGpuSurfaceDescriptor` or a
+   * `WebGpuSurfaceReplacement`.
    *
    * Throws an `IllegalArgumentException` when [canvasContext] is not a `GPUCanvasContext` of this
    * realm.

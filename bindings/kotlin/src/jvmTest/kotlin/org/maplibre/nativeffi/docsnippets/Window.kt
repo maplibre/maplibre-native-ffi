@@ -5,7 +5,7 @@ package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderResult
@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.VulkanContextDescriptor
 import org.maplibre.nativeffi.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.VulkanSurfaceReplacement
 import org.maplibre.nativeffi.Wake
 import org.maplibre.nativeffi.attachVulkanSurface
 import org.maplibre.nativeffi.setVulkanSurfaceTarget
@@ -70,9 +71,9 @@ private fun onFrameWake() {
 
 // #region resize
 private fun onWindowResized(width: UInt, height: UInt) {
-  // The scale factor the session has now.
+  // The window's new size in logical pixels.
   session.discarding.resize(
-    LogicalExtent(width = width, height = height, scaleFactor = 2.0),
+    LogicalSize(width = width, height = height),
   )
 }
 
@@ -98,21 +99,12 @@ private suspend fun surfaceLost() {
   // #endregion lost-surface
 }
 
-private suspend fun surfaceRestored(
-  vulkan: VulkanContextDescriptor,
-  newSurface: ULong,
-) {
+private suspend fun surfaceRestored(newSurface: ULong) {
   // #region lost-surface
   session
     .setVulkanSurfaceTarget(
-      VulkanSurfaceDescriptor(
-        extent =
-          LogicalExtent(
-            width = 800u,
-            height = 600u,
-            scaleFactor = 2.0,
-          ),
-        context = vulkan,
+      VulkanSurfaceReplacement(
+        logicalSize = LogicalSize(width = 800u, height = 600u),
         surface = newSurface,
       ),
     )
@@ -131,13 +123,9 @@ private suspend fun renderToWindow(
   val attachment =
     map.attachVulkanSurface(
       VulkanSurfaceDescriptor(
-        // The window's size in logical pixels, and its scale factor.
-        extent =
-          LogicalExtent(
-            width = 800u,
-            height = 600u,
-            scaleFactor = 2.0,
-          ),
+        // The window's size in logical pixels. The map's scale factor
+        // turns it into pixels.
+        logicalSize = LogicalSize(width = 800u, height = 600u),
         // Your VkInstance, VkPhysicalDevice,
         // VkDevice, and graphics VkQueue.
         context = vulkan,

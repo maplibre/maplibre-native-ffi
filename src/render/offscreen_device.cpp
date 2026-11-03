@@ -88,16 +88,7 @@ auto validate_offscreen_descriptor(const mln_offscreen_descriptor* descriptor)
     set_thread_error("mln_offscreen_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  return validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-  );
+  return MLN_STATUS_OK;
 }
 
 }  // namespace
@@ -172,6 +163,12 @@ auto offscreen_attach_start(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  const auto size_status = size_new_session(*session, descriptor->logical_size);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
   const auto request_status =
     validate_render_session_attach_request(options, out_session, completion);
   if (request_status != MLN_STATUS_OK) {
@@ -184,9 +181,6 @@ auto offscreen_attach_start(
   if (driver_status != MLN_STATUS_OK) {
     return driver_status;
   }
-  auto session = std::make_shared<mln_render_session_object>();
-  session->map = map;
-  set_session_extent(*session, descriptor->extent);
   session->texture.mode = TextureSessionMode::Offscreen;
   session->initialize_backend =
     [shared =

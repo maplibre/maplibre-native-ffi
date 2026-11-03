@@ -190,6 +190,12 @@ typedef struct mln_logical_extent {
   double scale_factor;
 } mln_logical_extent;
 
+/** A size in logical pixels, which the map's scale factor turns into pixels. */
+typedef struct mln_logical_size {
+  uint32_t width;
+  uint32_t height;
+} mln_logical_size;
+
 /** The fields that mln_map_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
   MLN_MAP_OPTION_EVENT_MASK = 1U << 0U,
@@ -203,7 +209,11 @@ typedef uint32_t mln_map_option_fields;
 typedef struct mln_map_options {
   uint32_t size;
   mln_map_option_fields fields;
-  /** The map's first size. Its scale factor stays fixed for the map's life. */
+  /**
+   * The map's first size, and its scale factor. The scale factor stays fixed
+   * for the map's life, and every render session of the map renders at it. To
+   * render at another density, create a new map and attach a new session.
+   */
   mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;
   /**
@@ -858,13 +868,19 @@ MLN_API mln_status mln_map_get_snapshot(
 /**
  * Sets the map's size.
  *
- * `extent` must keep the scale factor that the map was created with. A map
- * with a render session takes its size from the session, so resize the
+ * A map with a render session takes its size from the session, so resize the
  * session with mln_render_session_resize() instead.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE when the map has a render session.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when a render session attached to the map before
+ *   the resize applied.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_resize(
-  mln_map map, mln_logical_extent extent, const mln_completion* completion,
+  mln_map map, mln_logical_size logical_size, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

@@ -1,7 +1,6 @@
 # Snippets for the docs site's Render to a texture page. They are type-checked
 # with the tests, which never run them.
 
-import dataclasses
 
 import maplibre_native_ffi as mln
 
@@ -63,9 +62,8 @@ def render_to_texture(
 
     # #region attach-borrowed
     ring = mln.VulkanBorrowedTextureDescriptor(
-        extent=mln.LogicalExtent(
-            width=800, height=600, scale_factor=2.0
-        ),
+        # The map's size in logical pixels.
+        logical_size=mln.LogicalSize(width=800, height=600),
         # The size of your textures in device pixels.
         physical_width=1600,
         physical_height=1200,
@@ -90,11 +88,8 @@ def render_to_texture(
     # #endregion attach-borrowed
 
     # #region resize-borrowed
-    ring = dataclasses.replace(
-        ring,
-        extent=mln.LogicalExtent(
-            width=1024, height=768, scale_factor=2.0
-        ),
+    resized = mln.VulkanBorrowedTextureReplacement(
+        logical_size=mln.LogicalSize(width=1024, height=768),
         physical_width=2048,
         physical_height=1536,
         # Your new textures, at the new size.
@@ -108,7 +103,7 @@ def render_to_texture(
         ],
     )
 
-    session.set_vulkan_borrowed_texture_target(ring).result()
+    session.set_vulkan_borrowed_texture_target(resized).result()
     # vkDestroyImageView and vkDestroyImage
     destroy_textures(images, views)
     # #endregion resize-borrowed

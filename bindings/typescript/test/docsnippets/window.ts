@@ -59,8 +59,8 @@ function onFrameWake(): void {
 
 // #region resize
 function onWindowResized(width: number, height: number): void {
-  // The scale factor the session has now.
-  session.discarding.resize({ width, height, scaleFactor: 2 });
+  // The window's new size in logical pixels.
+  session.discarding.resize({ width, height });
 }
 // #endregion resize
 
@@ -80,13 +80,11 @@ export async function surfaceLost(): Promise<void> {
 }
 
 export async function surfaceRestored(
-  vulkan: VulkanContextDescriptor,
   newSurface: bigint,
 ): Promise<void> {
   // #region lost-surface
   await session.setVulkanSurfaceTarget({
-    extent: { width: 800, height: 600, scaleFactor: 2 },
-    context: vulkan,
+    logicalSize: { width: 800, height: 600 },
     surface: newSurface,
   });
   paused = false;
@@ -102,8 +100,9 @@ export async function renderToWindow(
   // #region attach
   const attachment = map.attachVulkanSurface(
     {
-      // The window's size in logical pixels, and its scale factor.
-      extent: { width: 800, height: 600, scaleFactor: 2 },
+      // The window's size in logical pixels. The map's scale factor turns
+      // it into pixels.
+      logicalSize: { width: 800, height: 600 },
       // Your VkInstance, VkPhysicalDevice,
       // VkDevice, and graphics VkQueue.
       context: vulkan,

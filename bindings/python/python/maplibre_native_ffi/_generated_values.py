@@ -1775,6 +1775,23 @@ class LogicalExtent:
 
 
 @dataclass(frozen=True, slots=True)
+class LogicalSize:
+    """A size in logical pixels, which the map's scale factor turns into pixels.
+
+    See `mln_logical_size` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    width: int = 0
+
+    height: int = 0
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(width=raw["width"], height=raw["height"])
+
+
+@dataclass(frozen=True, slots=True)
 class MapOptions:
     """Options for `RuntimeHandle.create_map()`.
 
@@ -1783,7 +1800,10 @@ class MapOptions:
     """
 
     initial_extent: LogicalExtent
-    """The map's first size. Its scale factor stays fixed for the map's life."""
+    """The map's first size, and its scale factor. The scale factor stays fixed
+    for the map's life, and every render session of the map renders at it. To
+    render at another density, create a new map and attach a new session.
+    """
 
     map_mode: MapMode = MapMode.CONTINUOUS
 
@@ -1978,13 +1998,13 @@ class MetalBorrowedTexture:
 @dataclass(frozen=True, slots=True)
 class MetalBorrowedTextureDescriptor:
     """A ring of your Metal textures, for
-    `MapHandle.attach_metal_borrowed_texture()` and
-    `RenderSessionHandle.set_metal_borrowed_texture_target()`.
+    `MapHandle.attach_metal_borrowed_texture()`.
 
-    `extent` sets the map's size and the session's scale factor, so give it
-    the map's scale factor. `physical_width` and `physical_height` give the
-    textures' size in pixels. The textures must all have that size, one
-    device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
+    `logical_size` sets the map's size. `physical_width` and
+    `physical_height` give the textures' size in pixels, which is usually
+    `logical_size` times the map's scale factor. The textures must all have
+    that size, one device, one pixel format, one sample, and
+    MTLTextureUsageRenderTarget.
 
     The session uses the textures until a replacement or release of the
     target completes, a detach or disposal of the session completes, or an
@@ -1994,7 +2014,7 @@ class MetalBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     physical_width: int
 
@@ -2013,13 +2033,52 @@ class MetalBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             textures=tuple(
                 MetalBorrowedTexture._from_native(item) for item in raw["textures"]
             ),
             command_queue=raw["command_queue"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MetalBorrowedTextureReplacement:
+    """New Metal textures for a borrowed ring, for
+    `RenderSessionHandle.set_metal_borrowed_texture_target()`.
+
+    The members mean what they mean in `MetalBorrowedTextureDescriptor`, and
+    the textures follow its rules. The ring keeps its depth, device, and
+    command queue, so give it as many textures as it attached with, on the
+    same device. The session uses the textures until a replacement or release
+    of the target completes, a detach or disposal of the session completes,
+    or an abandon of it returns.
+
+    See `mln_metal_borrowed_texture_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    physical_width: int
+
+    physical_height: int
+
+    textures: Sequence[MetalBorrowedTexture]
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            physical_width=raw["physical_width"],
+            physical_height=raw["physical_height"],
+            textures=tuple(
+                MetalBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
         )
 
 
@@ -2041,8 +2100,7 @@ class MetalContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class MetalSurfaceDescriptor:
-    """A Metal layer to render to, for `MapHandle.attach_metal_surface()` and
-    `RenderSessionHandle.set_metal_surface_target()`.
+    """A Metal layer to render to, for `MapHandle.attach_metal_surface()`.
 
     The session sets the layer's device, pixel format, and drawable size. It
     uses the layer until a replacement or release of the target completes, a
@@ -2052,7 +2110,7 @@ class MetalSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     layer: int
     """Your CAMetalLayer."""
@@ -2065,8 +2123,33 @@ class MetalSurfaceDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             context=MetalContextDescriptor._from_native(raw["context"]),
+            layer=raw["layer"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MetalSurfaceReplacement:
+    """A new Metal layer for `RenderSessionHandle.set_metal_surface_target()`.
+
+    The session renders to it with the device that it attached with. It uses
+    the layer until a replacement or release of the target completes, a
+    detach or disposal of the session completes, or an abandon of it returns.
+
+    See `mln_metal_surface_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    layer: int
+    """Your CAMetalLayer."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             layer=raw["layer"],
         )
 
@@ -2277,17 +2360,18 @@ class OfflineTilePyramidRegionDefinition:
 
 @dataclass(frozen=True, slots=True)
 class OffscreenDescriptor:
-    """The image that `MapHandle.attach_offscreen()` renders.
+    """The image that `MapHandle.attach_offscreen()` renders. The session
+    renders it at the map's scale factor.
 
     See `mln_offscreen_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(extent=LogicalExtent._from_native(raw["extent"]))
+        return cls(logical_size=LogicalSize._from_native(raw["logical_size"]))
 
 
 @dataclass(frozen=True, slots=True)
@@ -2342,12 +2426,11 @@ class OpenGlBorrowedTexture:
 @dataclass(frozen=True, slots=True)
 class OpenGlBorrowedTextureDescriptor:
     """A ring of your OpenGL textures, for
-    `MapHandle.attach_open_gl_borrowed_texture()` and
-    `RenderSessionHandle.set_open_gl_borrowed_texture_target()`.
+    `MapHandle.attach_open_gl_borrowed_texture()`.
 
-    `extent` sets the map's size and the session's scale factor, so give it
-    the map's scale factor. `physical_width` and `physical_height` give the
-    textures' size in pixels. The context must use
+    `logical_size` sets the map's size. `physical_width` and
+    `physical_height` give the textures' size in pixels, which is usually
+    `logical_size` times the map's scale factor. The context must use
     `OpenGlContextOwnership.SHARED`. Each texture must be in your context's
     share group, with storage of that size.
 
@@ -2359,7 +2442,7 @@ class OpenGlBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     physical_width: int
 
@@ -2378,7 +2461,7 @@ class OpenGlBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=OpenGlContextDescriptor._from_native(raw["context"]),
@@ -2386,6 +2469,45 @@ class OpenGlBorrowedTextureDescriptor:
                 OpenGlBorrowedTexture._from_native(item) for item in raw["textures"]
             ),
             target=raw["target"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OpenGlBorrowedTextureReplacement:
+    """New OpenGL textures for a borrowed ring, for
+    `RenderSessionHandle.set_open_gl_borrowed_texture_target()`.
+
+    The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
+    the textures follow its rules. The ring keeps its depth, context, and
+    texture target, so give it as many textures as it attached with, in the
+    same share group. The session uses the textures until a replacement or
+    release of the target completes, a detach or disposal of the session
+    completes, or an abandon of it returns.
+
+    See `mln_open_gl_borrowed_texture_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    physical_width: int
+
+    physical_height: int
+
+    textures: Sequence[OpenGlBorrowedTexture]
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            physical_width=raw["physical_width"],
+            physical_height=raw["physical_height"],
+            textures=tuple(
+                OpenGlBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
         )
 
 
@@ -2426,8 +2548,8 @@ class OpenGlContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class OpenGlSurfaceDescriptor:
-    """An OpenGL surface to present to, for `MapHandle.attach_open_gl_surface()`
-    and `RenderSessionHandle.set_open_gl_surface_target()`.
+    """An OpenGL surface to present to, for
+    `MapHandle.attach_open_gl_surface()`.
 
     The session uses the surface until a replacement or release of the target
     completes, a detach or disposal of the session completes, or an abandon
@@ -2437,7 +2559,7 @@ class OpenGlSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     context: OpenGlContextDescriptor
 
@@ -2447,8 +2569,37 @@ class OpenGlSurfaceDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             context=OpenGlContextDescriptor._from_native(raw["context"]),
+            surface=raw["surface"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OpenGlSurfaceReplacement:
+    """A new OpenGL surface for
+    `RenderSessionHandle.set_open_gl_surface_target()`.
+
+    The session presents to it with the context that it attached with. It
+    uses the surface until a replacement or release of the target completes,
+    a detach or disposal of the session completes, or an abandon of it
+    returns.
+
+    See `mln_open_gl_surface_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    surface: int = 0
+    """Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
+    leave it null.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             surface=raw["surface"],
         )
 
@@ -2787,6 +2938,7 @@ class RenderSessionSnapshot:
     state: RenderSessionState
 
     extent: LogicalExtent
+    """The target's logical size, and the map's scale factor."""
 
     generation: int
 
@@ -4038,13 +4190,13 @@ class VulkanBorrowedTexture:
 @dataclass(frozen=True, slots=True)
 class VulkanBorrowedTextureDescriptor:
     """A ring of your Vulkan images, for
-    `MapHandle.attach_vulkan_borrowed_texture()` and
-    `RenderSessionHandle.set_vulkan_borrowed_texture_target()`.
+    `MapHandle.attach_vulkan_borrowed_texture()`.
 
-    `extent` sets the map's size and the session's scale factor, so give it
-    the map's scale factor. `physical_width` and `physical_height` give the
-    images' size in pixels. Each image must have that size, `format`, and
-    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
+    `logical_size` sets the map's size. `physical_width` and
+    `physical_height` give the images' size in pixels, which is usually
+    `logical_size` times the map's scale factor. Each image must have that
+    size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to
+    the context's device.
 
     The session uses the images until a replacement or release of the target
     completes, a detach or disposal of the session completes, or an abandon
@@ -4054,7 +4206,7 @@ class VulkanBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     physical_width: int
 
@@ -4078,7 +4230,7 @@ class VulkanBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=VulkanContextDescriptor._from_native(raw["context"]),
@@ -4088,6 +4240,45 @@ class VulkanBorrowedTextureDescriptor:
             format=raw["format"],
             final_layout=raw["final_layout"],
             owner=VulkanImageOwner(raw["owner"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class VulkanBorrowedTextureReplacement:
+    """New Vulkan images for a borrowed ring, for
+    `RenderSessionHandle.set_vulkan_borrowed_texture_target()`.
+
+    The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
+    the images follow its rules. The ring keeps its depth, context, `format`,
+    `final_layout`, and `owner`, so give it as many images as it attached
+    with, in that format, on the same device. The session uses the images
+    until a replacement or release of the target completes, a detach or
+    disposal of the session completes, or an abandon of it returns.
+
+    See `mln_vulkan_borrowed_texture_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    physical_width: int
+
+    physical_height: int
+
+    textures: Sequence[VulkanBorrowedTexture]
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            physical_width=raw["physical_width"],
+            physical_height=raw["physical_height"],
+            textures=tuple(
+                VulkanBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
         )
 
 
@@ -4139,8 +4330,7 @@ class VulkanContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class VulkanSurfaceDescriptor:
-    """A Vulkan surface to present to, for `MapHandle.attach_vulkan_surface()`
-    and `RenderSessionHandle.set_vulkan_surface_target()`.
+    """A Vulkan surface to present to, for `MapHandle.attach_vulkan_surface()`.
 
     The device must have VK_KHR_swapchain enabled, and the queue family of
     `graphics_queue_family_index` must support presenting to the surface. The
@@ -4152,7 +4342,7 @@ class VulkanSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: LogicalExtent
+    logical_size: LogicalSize
 
     context: VulkanContextDescriptor
 
@@ -4162,8 +4352,36 @@ class VulkanSurfaceDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=LogicalExtent._from_native(raw["extent"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             context=VulkanContextDescriptor._from_native(raw["context"]),
+            surface=raw["surface"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class VulkanSurfaceReplacement:
+    """A new Vulkan surface for
+    `RenderSessionHandle.set_vulkan_surface_target()`.
+
+    The session presents to it with the context that it attached with, so the
+    queue family of that context's `graphics_queue_family_index` must support
+    presenting to the surface. It uses the surface until a replacement or
+    release of the target completes, a detach or disposal of the session
+    completes, or an abandon of it returns.
+
+    See `mln_vulkan_surface_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    surface: int
+    """Your VkSurfaceKHR."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
             surface=raw["surface"],
         )
 

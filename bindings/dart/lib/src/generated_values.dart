@@ -2402,6 +2402,25 @@ final class CameraDelta extends _Value {
   ]);
 }
 
+/// A size in logical pixels, which the map's scale factor turns into pixels.
+///
+/// See `mln_logical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class LogicalSize extends _Value {
+  const LogicalSize({this.width = 0, this.height = 0});
+  final int width;
+  final int height;
+
+  /// A copy of this value with the given members replaced.
+  LogicalSize copyWith({int? width, int? height}) =>
+      LogicalSize(width: width ?? this.width, height: height ?? this.height);
+
+  @override
+  List<Object?> get _members => [width, height];
+  @override
+  String toString() => _describe('LogicalSize', const ['width', 'height']);
+}
+
 /// A Metal texture of a borrowed ring.
 ///
 /// See `mln_metal_borrowed_texture` in the
@@ -2422,13 +2441,12 @@ final class MetalBorrowedTexture extends _Value {
   String toString() => _describe('MetalBorrowedTexture', const ['texture']);
 }
 
-/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`
-/// and `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The textures must all have that size, one device,
-/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The textures must all have that size, one device, one
+/// pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2438,13 +2456,13 @@ final class MetalBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTextureDescriptor extends _Value {
   MetalBorrowedTextureDescriptor({
-    required this.extent,
+    required this.logicalSize,
     required this.physicalWidth,
     required this.physicalHeight,
     required List<MetalBorrowedTexture> textures,
     this.commandQueue = NativePointer.nullPointer,
   }) : textures = List.unmodifiable(textures);
-  final LogicalExtent extent;
+  final LogicalSize logicalSize;
   final int physicalWidth;
   final int physicalHeight;
   final List<MetalBorrowedTexture> textures;
@@ -2455,13 +2473,13 @@ final class MetalBorrowedTextureDescriptor extends _Value {
 
   /// A copy of this value with the given members replaced.
   MetalBorrowedTextureDescriptor copyWith({
-    LogicalExtent? extent,
+    LogicalSize? logicalSize,
     int? physicalWidth,
     int? physicalHeight,
     List<MetalBorrowedTexture>? textures,
     NativePointer? commandQueue,
   }) => MetalBorrowedTextureDescriptor(
-    extent: extent ?? this.extent,
+    logicalSize: logicalSize ?? this.logicalSize,
     physicalWidth: physicalWidth ?? this.physicalWidth,
     physicalHeight: physicalHeight ?? this.physicalHeight,
     textures: textures ?? this.textures,
@@ -2470,7 +2488,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
 
   @override
   List<Object?> get _members => [
-    extent,
+    logicalSize,
     physicalWidth,
     physicalHeight,
     textures,
@@ -2478,7 +2496,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   ];
   @override
   String toString() => _describe('MetalBorrowedTextureDescriptor', const [
-    'extent',
+    'logicalSize',
     'physicalWidth',
     'physicalHeight',
     'textures',
@@ -2650,8 +2668,7 @@ final class MetalContextDescriptor extends _Value {
   String toString() => _describe('MetalContextDescriptor', const ['device']);
 }
 
-/// A Metal layer to render to, for `MapHandle.attachMetalSurface()` and
-/// `RenderSessionHandle.setMetalSurfaceTarget()`.
+/// A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
@@ -2661,11 +2678,11 @@ final class MetalContextDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class MetalSurfaceDescriptor extends _Value {
   const MetalSurfaceDescriptor({
-    required this.extent,
+    required this.logicalSize,
     this.context = const MetalContextDescriptor(),
     required this.layer,
   });
-  final LogicalExtent extent;
+  final LogicalSize logicalSize;
 
   /// The MTLDevice to render with. A null device picks the system's default.
   final MetalContextDescriptor context;
@@ -2675,38 +2692,42 @@ final class MetalSurfaceDescriptor extends _Value {
 
   /// A copy of this value with the given members replaced.
   MetalSurfaceDescriptor copyWith({
-    LogicalExtent? extent,
+    LogicalSize? logicalSize,
     MetalContextDescriptor? context,
     NativePointer? layer,
   }) => MetalSurfaceDescriptor(
-    extent: extent ?? this.extent,
+    logicalSize: logicalSize ?? this.logicalSize,
     context: context ?? this.context,
     layer: layer ?? this.layer,
   );
 
   @override
-  List<Object?> get _members => [extent, context, layer];
+  List<Object?> get _members => [logicalSize, context, layer];
   @override
-  String toString() =>
-      _describe('MetalSurfaceDescriptor', const ['extent', 'context', 'layer']);
+  String toString() => _describe('MetalSurfaceDescriptor', const [
+    'logicalSize',
+    'context',
+    'layer',
+  ]);
 }
 
-/// The image that `MapHandle.attachOffscreen()` renders.
+/// The image that `MapHandle.attachOffscreen()` renders. The session renders it
+/// at the map's scale factor.
 ///
 /// See `mln_offscreen_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
 final class OffscreenDescriptor extends _Value {
-  const OffscreenDescriptor({required this.extent});
-  final LogicalExtent extent;
+  const OffscreenDescriptor({required this.logicalSize});
+  final LogicalSize logicalSize;
 
   /// A copy of this value with the given members replaced.
-  OffscreenDescriptor copyWith({LogicalExtent? extent}) =>
-      OffscreenDescriptor(extent: extent ?? this.extent);
+  OffscreenDescriptor copyWith({LogicalSize? logicalSize}) =>
+      OffscreenDescriptor(logicalSize: logicalSize ?? this.logicalSize);
 
   @override
-  List<Object?> get _members => [extent];
+  List<Object?> get _members => [logicalSize];
   @override
-  String toString() => _describe('OffscreenDescriptor', const ['extent']);
+  String toString() => _describe('OffscreenDescriptor', const ['logicalSize']);
 }
 
 /// The WGL objects that a render session makes its OpenGL context from.
@@ -2907,14 +2928,13 @@ final class OpenGlBorrowedTexture extends _Value {
 }
 
 /// A ring of your OpenGL textures, for
-/// `MapHandle.attachOpenGlBorrowedTexture()` and
-/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+/// `MapHandle.attachOpenGlBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The context must use
-/// `OpenGlContextOwnership.shared`. Each texture must be in your context's
-/// share group, with storage of that size.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
+/// Each texture must be in your context's share group, with storage of that
+/// size.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2924,14 +2944,14 @@ final class OpenGlBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenGlBorrowedTextureDescriptor extends _Value {
   OpenGlBorrowedTextureDescriptor({
-    required this.extent,
+    required this.logicalSize,
     required this.physicalWidth,
     required this.physicalHeight,
     required this.context,
     required List<OpenGlBorrowedTexture> textures,
     required this.target,
   }) : textures = List.unmodifiable(textures);
-  final LogicalExtent extent;
+  final LogicalSize logicalSize;
   final int physicalWidth;
   final int physicalHeight;
   final OpenGlContextDescriptor context;
@@ -2942,14 +2962,14 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
 
   /// A copy of this value with the given members replaced.
   OpenGlBorrowedTextureDescriptor copyWith({
-    LogicalExtent? extent,
+    LogicalSize? logicalSize,
     int? physicalWidth,
     int? physicalHeight,
     OpenGlContextDescriptor? context,
     List<OpenGlBorrowedTexture>? textures,
     int? target,
   }) => OpenGlBorrowedTextureDescriptor(
-    extent: extent ?? this.extent,
+    logicalSize: logicalSize ?? this.logicalSize,
     physicalWidth: physicalWidth ?? this.physicalWidth,
     physicalHeight: physicalHeight ?? this.physicalHeight,
     context: context ?? this.context,
@@ -2959,7 +2979,7 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
 
   @override
   List<Object?> get _members => [
-    extent,
+    logicalSize,
     physicalWidth,
     physicalHeight,
     context,
@@ -2968,7 +2988,7 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
   ];
   @override
   String toString() => _describe('OpenGlBorrowedTextureDescriptor', const [
-    'extent',
+    'logicalSize',
     'physicalWidth',
     'physicalHeight',
     'context',
@@ -2977,8 +2997,7 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
   ]);
 }
 
-/// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
-/// `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+/// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
 ///
 /// The session uses the surface until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2988,11 +3007,11 @@ final class OpenGlBorrowedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class OpenGlSurfaceDescriptor extends _Value {
   const OpenGlSurfaceDescriptor({
-    required this.extent,
+    required this.logicalSize,
     required this.context,
     this.surface = NativePointer.nullPointer,
   });
-  final LogicalExtent extent;
+  final LogicalSize logicalSize;
   final OpenGlContextDescriptor context;
 
   /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
@@ -3000,20 +3019,20 @@ final class OpenGlSurfaceDescriptor extends _Value {
 
   /// A copy of this value with the given members replaced.
   OpenGlSurfaceDescriptor copyWith({
-    LogicalExtent? extent,
+    LogicalSize? logicalSize,
     OpenGlContextDescriptor? context,
     NativePointer? surface,
   }) => OpenGlSurfaceDescriptor(
-    extent: extent ?? this.extent,
+    logicalSize: logicalSize ?? this.logicalSize,
     context: context ?? this.context,
     surface: surface ?? this.surface,
   );
 
   @override
-  List<Object?> get _members => [extent, context, surface];
+  List<Object?> get _members => [logicalSize, context, surface];
   @override
   String toString() => _describe('OpenGlSurfaceDescriptor', const [
-    'extent',
+    'logicalSize',
     'context',
     'surface',
   ]);
@@ -3126,12 +3145,11 @@ final class VulkanBorrowedTexture extends _Value {
       _describe('VulkanBorrowedTexture', const ['image', 'imageView']);
 }
 
-/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`
-/// and `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the images'
-/// size in pixels. Each image must have that size, `format`, and
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the images' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. Each image must have that size, `format`, and
 /// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
@@ -3142,7 +3160,7 @@ final class VulkanBorrowedTexture extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTextureDescriptor extends _Value {
   VulkanBorrowedTextureDescriptor({
-    required this.extent,
+    required this.logicalSize,
     required this.physicalWidth,
     required this.physicalHeight,
     required this.context,
@@ -3151,7 +3169,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     required this.finalLayout,
     this.owner = const VulkanImageOwner.fromRawValue(0),
   }) : textures = List.unmodifiable(textures);
-  final LogicalExtent extent;
+  final LogicalSize logicalSize;
   final int physicalWidth;
   final int physicalHeight;
   final VulkanContextDescriptor context;
@@ -3166,7 +3184,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 
   /// A copy of this value with the given members replaced.
   VulkanBorrowedTextureDescriptor copyWith({
-    LogicalExtent? extent,
+    LogicalSize? logicalSize,
     int? physicalWidth,
     int? physicalHeight,
     VulkanContextDescriptor? context,
@@ -3175,7 +3193,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     int? finalLayout,
     VulkanImageOwner? owner,
   }) => VulkanBorrowedTextureDescriptor(
-    extent: extent ?? this.extent,
+    logicalSize: logicalSize ?? this.logicalSize,
     physicalWidth: physicalWidth ?? this.physicalWidth,
     physicalHeight: physicalHeight ?? this.physicalHeight,
     context: context ?? this.context,
@@ -3187,7 +3205,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 
   @override
   List<Object?> get _members => [
-    extent,
+    logicalSize,
     physicalWidth,
     physicalHeight,
     context,
@@ -3198,7 +3216,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   ];
   @override
   String toString() => _describe('VulkanBorrowedTextureDescriptor', const [
-    'extent',
+    'logicalSize',
     'physicalWidth',
     'physicalHeight',
     'context',
@@ -3209,8 +3227,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   ]);
 }
 
-/// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()` and
-/// `RenderSessionHandle.setVulkanSurfaceTarget()`.
+/// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
 ///
 /// The device must have VK_KHR_swapchain enabled, and the queue family of
 /// `graphics_queue_family_index` must support presenting to the surface. The
@@ -3222,11 +3239,11 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class VulkanSurfaceDescriptor extends _Value {
   const VulkanSurfaceDescriptor({
-    required this.extent,
+    required this.logicalSize,
     required this.context,
     required this.surface,
   });
-  final LogicalExtent extent;
+  final LogicalSize logicalSize;
   final VulkanContextDescriptor context;
 
   /// Your VkSurfaceKHR.
@@ -3234,20 +3251,20 @@ final class VulkanSurfaceDescriptor extends _Value {
 
   /// A copy of this value with the given members replaced.
   VulkanSurfaceDescriptor copyWith({
-    LogicalExtent? extent,
+    LogicalSize? logicalSize,
     VulkanContextDescriptor? context,
     int? surface,
   }) => VulkanSurfaceDescriptor(
-    extent: extent ?? this.extent,
+    logicalSize: logicalSize ?? this.logicalSize,
     context: context ?? this.context,
     surface: surface ?? this.surface,
   );
 
   @override
-  List<Object?> get _members => [extent, context, surface];
+  List<Object?> get _members => [logicalSize, context, surface];
   @override
   String toString() => _describe('VulkanSurfaceDescriptor', const [
-    'extent',
+    'logicalSize',
     'context',
     'surface',
   ]);
@@ -4319,6 +4336,8 @@ final class RenderSessionSnapshot extends _Value {
     this.failureStatus = const Status.fromRawValue(0),
   });
   final RenderSessionState state;
+
+  /// The target's logical size, and the map's scale factor.
   final LogicalExtent extent;
   final int generation;
   final int frameGeneration;
@@ -4614,6 +4633,268 @@ final class TextureReadbackResult extends _Value {
       _describe('TextureReadbackResult', const ['data', 'info']);
 }
 
+/// New Metal textures for a borrowed ring, for
+/// `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
+/// textures follow its rules. The ring keeps its depth, device, and command
+/// queue, so give it as many textures as it attached with, on the same device.
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
+///
+/// See `mln_metal_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTextureReplacement extends _Value {
+  MetalBorrowedTextureReplacement({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<MetalBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<MetalBorrowedTexture> textures;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTextureReplacement copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+  }) => MetalBorrowedTextureReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+  ];
+  @override
+  String toString() => _describe('MetalBorrowedTextureReplacement', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+  ]);
+}
+
+/// A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
+///
+/// The session renders to it with the device that it attached with. It uses the
+/// layer until a replacement or release of the target completes, a detach or
+/// disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_metal_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+final class MetalSurfaceReplacement extends _Value {
+  const MetalSurfaceReplacement({
+    required this.logicalSize,
+    required this.layer,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your CAMetalLayer.
+  final NativePointer layer;
+
+  /// A copy of this value with the given members replaced.
+  MetalSurfaceReplacement copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? layer,
+  }) => MetalSurfaceReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    layer: layer ?? this.layer,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, layer];
+  @override
+  String toString() =>
+      _describe('MetalSurfaceReplacement', const ['logicalSize', 'layer']);
+}
+
+/// New OpenGL textures for a borrowed ring, for
+/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
+/// the textures follow its rules. The ring keeps its depth, context, and
+/// texture target, so give it as many textures as it attached with, in the same
+/// share group. The session uses the textures until a replacement or release of
+/// the target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_open_gl_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class OpenGlBorrowedTextureReplacement extends _Value {
+  OpenGlBorrowedTextureReplacement({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<OpenGlBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<OpenGlBorrowedTexture> textures;
+
+  /// A copy of this value with the given members replaced.
+  OpenGlBorrowedTextureReplacement copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<OpenGlBorrowedTexture>? textures,
+  }) => OpenGlBorrowedTextureReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+  ];
+  @override
+  String toString() => _describe('OpenGlBorrowedTextureReplacement', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+  ]);
+}
+
+/// A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+///
+/// The session presents to it with the context that it attached with. It uses
+/// the surface until a replacement or release of the target completes, a detach
+/// or disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_open_gl_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+final class OpenGlSurfaceReplacement extends _Value {
+  const OpenGlSurfaceReplacement({
+    required this.logicalSize,
+    this.surface = NativePointer.nullPointer,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
+  /// leave it null.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  OpenGlSurfaceReplacement copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? surface,
+  }) => OpenGlSurfaceReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, surface];
+  @override
+  String toString() =>
+      _describe('OpenGlSurfaceReplacement', const ['logicalSize', 'surface']);
+}
+
+/// New Vulkan images for a borrowed ring, for
+/// `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+///
+/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
+/// the images follow its rules. The ring keeps its depth, context, `format`,
+/// `final_layout`, and `owner`, so give it as many images as it attached with,
+/// in that format, on the same device. The session uses the images until a
+/// replacement or release of the target completes, a detach or disposal of the
+/// session completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class VulkanBorrowedTextureReplacement extends _Value {
+  VulkanBorrowedTextureReplacement({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<VulkanBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<VulkanBorrowedTexture> textures;
+
+  /// A copy of this value with the given members replaced.
+  VulkanBorrowedTextureReplacement copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<VulkanBorrowedTexture>? textures,
+  }) => VulkanBorrowedTextureReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+  ];
+  @override
+  String toString() => _describe('VulkanBorrowedTextureReplacement', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+  ]);
+}
+
+/// A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
+///
+/// The session presents to it with the context that it attached with, so the
+/// queue family of that context's `graphics_queue_family_index` must support
+/// presenting to the surface. It uses the surface until a replacement or
+/// release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+final class VulkanSurfaceReplacement extends _Value {
+  const VulkanSurfaceReplacement({
+    required this.logicalSize,
+    required this.surface,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your VkSurfaceKHR.
+  final int surface;
+
+  /// A copy of this value with the given members replaced.
+  VulkanSurfaceReplacement copyWith({LogicalSize? logicalSize, int? surface}) =>
+      VulkanSurfaceReplacement(
+        logicalSize: logicalSize ?? this.logicalSize,
+        surface: surface ?? this.surface,
+      );
+
+  @override
+  List<Object?> get _members => [logicalSize, surface];
+  @override
+  String toString() =>
+      _describe('VulkanSurfaceReplacement', const ['logicalSize', 'surface']);
+}
+
 /// The answer to a resource request.
 ///
 /// See `mln_resource_response` in the
@@ -4753,7 +5034,9 @@ final class MapOptions extends _Value {
     this.tileCacheEnabled,
   });
 
-  /// The map's first size. Its scale factor stays fixed for the map's life.
+  /// The map's first size, and its scale factor. The scale factor stays fixed
+  /// for the map's life, and every render session of the map renders at it. To
+  /// render at another density, create a new map and attach a new session.
   final LogicalExtent initialExtent;
   final MapMode mapMode;
 

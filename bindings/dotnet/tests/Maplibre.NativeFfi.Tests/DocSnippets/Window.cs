@@ -65,10 +65,8 @@ internal static class Window
     // #region resize
     private static void OnWindowResized(uint width, uint height)
     {
-        // The scale factor the session has now.
-        session.Discarding.Resize(
-            new LogicalExtent(width, height, 2)
-        );
+        // The window's new size in logical pixels.
+        session.Discarding.Resize(new LogicalSize(width, height));
     }
 
     // #endregion resize
@@ -92,17 +90,13 @@ internal static class Window
         // #endregion lost-surface
     }
 
-    internal static async Task SurfaceRestored(
-        VulkanContextDescriptor vulkan,
-        ulong newSurface
-    )
+    internal static async Task SurfaceRestored(ulong newSurface)
     {
         // #region lost-surface
         await session.SetVulkanSurfaceTargetAsync(
-            new VulkanSurfaceDescriptor
+            new VulkanSurfaceReplacement
             {
-                Extent = new LogicalExtent(800, 600, 2),
-                Context = vulkan,
+                LogicalSize = new LogicalSize(800, 600),
                 Surface = newSurface,
             }
         );
@@ -122,8 +116,9 @@ internal static class Window
             new VulkanSurfaceDescriptor
             {
                 // The window's size in logical
-                // pixels, and its scale factor.
-                Extent = new LogicalExtent(800, 600, 2),
+                // pixels. The map's scale factor
+                // turns it into pixels.
+                LogicalSize = new LogicalSize(800, 600),
                 // Your VkInstance, VkPhysicalDevice,
                 // VkDevice, and graphics VkQueue.
                 Context = vulkan,

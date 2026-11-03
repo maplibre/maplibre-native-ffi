@@ -810,6 +810,12 @@ pub struct mln_logical_extent {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_logical_size {
+    pub width: u32,
+    pub height: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_map_options {
     pub size: u32,
     pub fields: mln_map_option_fields,
@@ -876,12 +882,22 @@ pub struct mln_metal_borrowed_texture {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
     pub textures: *const mln_metal_borrowed_texture,
     pub texture_count: usize,
     pub command_queue: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_metal_borrowed_texture_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: *const mln_metal_borrowed_texture,
+    pub texture_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -892,8 +908,15 @@ pub struct mln_metal_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_surface_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub context: mln_metal_context_descriptor,
+    pub layer: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_metal_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
     pub layer: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -966,7 +989,7 @@ pub struct mln_offline_tile_pyramid_region_definition {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offscreen_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -986,13 +1009,23 @@ pub struct mln_open_gl_borrowed_texture {
 #[derive(Clone, Copy)]
 pub struct mln_open_gl_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_open_gl_context_descriptor,
     pub textures: *const mln_open_gl_borrowed_texture,
     pub texture_count: usize,
     pub target: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_open_gl_borrowed_texture_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: *const mln_open_gl_borrowed_texture,
+    pub texture_count: usize,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1012,8 +1045,15 @@ pub union mln_open_gl_context_descriptor_data {
 #[derive(Clone, Copy)]
 pub struct mln_open_gl_surface_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub context: mln_open_gl_context_descriptor,
+    pub surface: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_open_gl_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
     pub surface: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -1534,7 +1574,7 @@ pub struct mln_vulkan_borrowed_texture {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_vulkan_context_descriptor,
@@ -1543,6 +1583,16 @@ pub struct mln_vulkan_borrowed_texture_descriptor {
     pub format: u32,
     pub final_layout: u32,
     pub owner: mln_vulkan_image_owner,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_borrowed_texture_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: *const mln_vulkan_borrowed_texture,
+    pub texture_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1559,8 +1609,15 @@ pub struct mln_vulkan_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_surface_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub context: mln_vulkan_context_descriptor,
+    pub surface: mln_vulkan_non_dispatchable_handle,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
     pub surface: mln_vulkan_non_dispatchable_handle,
 }
 #[repr(C)]
@@ -1602,13 +1659,23 @@ pub struct mln_web_gpu_borrowed_texture {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gpu_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_web_gpu_context_descriptor,
     pub textures: *const mln_web_gpu_borrowed_texture,
     pub texture_count: usize,
     pub format: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_web_gpu_borrowed_texture_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: *const mln_web_gpu_borrowed_texture,
+    pub texture_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1621,10 +1688,17 @@ pub struct mln_web_gpu_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gpu_surface_descriptor {
     pub size: u32,
-    pub extent: mln_logical_extent,
+    pub logical_size: mln_logical_size,
     pub context: mln_web_gpu_context_descriptor,
     pub surface: *mut std::ffi::c_void,
     pub format: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_web_gpu_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub surface: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2313,7 +2387,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_resize(
         map: mln_map,
-        extent: mln_logical_extent,
+        logical_size: mln_logical_size,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2641,7 +2715,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_resize(
         session: mln_render_session,
-        extent: mln_logical_extent,
+        logical_size: mln_logical_size,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2651,49 +2725,49 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_set_metal_borrowed_texture_target(
         session: mln_render_session,
-        descriptor: *const mln_metal_borrowed_texture_descriptor,
+        replacement: *const mln_metal_borrowed_texture_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_metal_surface_target(
         session: mln_render_session,
-        descriptor: *const mln_metal_surface_descriptor,
+        replacement: *const mln_metal_surface_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_open_gl_borrowed_texture_target(
         session: mln_render_session,
-        descriptor: *const mln_open_gl_borrowed_texture_descriptor,
+        replacement: *const mln_open_gl_borrowed_texture_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_open_gl_surface_target(
         session: mln_render_session,
-        descriptor: *const mln_open_gl_surface_descriptor,
+        replacement: *const mln_open_gl_surface_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_vulkan_borrowed_texture_target(
         session: mln_render_session,
-        descriptor: *const mln_vulkan_borrowed_texture_descriptor,
+        replacement: *const mln_vulkan_borrowed_texture_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_vulkan_surface_target(
         session: mln_render_session,
-        descriptor: *const mln_vulkan_surface_descriptor,
+        replacement: *const mln_vulkan_surface_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_web_gpu_borrowed_texture_target(
         session: mln_render_session,
-        descriptor: *const mln_web_gpu_borrowed_texture_descriptor,
+        replacement: *const mln_web_gpu_borrowed_texture_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_web_gpu_surface_target(
         session: mln_render_session,
-        descriptor: *const mln_web_gpu_surface_descriptor,
+        replacement: *const mln_web_gpu_surface_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

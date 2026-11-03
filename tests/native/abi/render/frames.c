@@ -615,11 +615,7 @@ static void a_resize_renders_and_reads_back_at_the_new_size(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   render_forced(&fixture, 301);
 
-  const mln_logical_extent resized = {
-    .width = 48,
-    .height = 24,
-    .scale_factor = 1.0,
-  };
+  const mln_logical_size resized = {.width = 48, .height = 24};
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(

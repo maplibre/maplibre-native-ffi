@@ -11,7 +11,7 @@ test "discarded commands are fenced and synchronous rejection returns an error" 
     _ = try support.resolve(try fixture.map.requestRepaint(null));
     const snapshot = try fixture.map.getSnapshot(null);
     try testing.expect(snapshot.debug_options.tile_borders);
-    try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8, .scale_factor = 1 }, null));
+    try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8 }, null));
 }
 
 const ProviderProbe = struct {

@@ -72,7 +72,7 @@ static mln_status attach(
   mln_vulkan_borrowed_texture_descriptor descriptor = {
     .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
   };
-  descriptor.extent = probe_extent;
+  descriptor.logical_size = probe_size;
   descriptor.physical_width = texture->width;
   descriptor.physical_height = texture->height;
   descriptor.context.instance = context->vulkan_instance;

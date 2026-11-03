@@ -50,8 +50,8 @@ func TestIntegerCarriersKeepTheirValues(t *testing.T) {
 	arena := &bindingArena{}
 	defer arena.close()
 	descriptor := nativeVulkanBorrowedTextureDescriptor(VulkanBorrowedTextureDescriptor{
-		Extent:   LogicalExtent{Width: 64, Height: 32, ScaleFactor: 2},
-		Textures: []VulkanBorrowedTexture{{Image: image, ImageView: imageView}},
+		LogicalSize: LogicalSize{Width: 64, Height: 32},
+		Textures:    []VulkanBorrowedTexture{{Image: image, ImageView: imageView}},
 	}, arena)
 	texture := unsafe.Slice(descriptor.textures, 1)[0]
 	if uint64(texture.image) != image || uint64(texture.image_view) != imageView {

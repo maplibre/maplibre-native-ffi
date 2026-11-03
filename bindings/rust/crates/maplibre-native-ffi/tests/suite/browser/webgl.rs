@@ -203,9 +203,12 @@ impl WebGlHostTexture {
         })
     }
 
-    pub(super) fn descriptor(&self, extent: LogicalExtent) -> OpenGlBorrowedTextureDescriptor<'_> {
+    pub(super) fn descriptor(
+        &self,
+        logical_size: LogicalSize,
+    ) -> OpenGlBorrowedTextureDescriptor<'_> {
         OpenGlBorrowedTextureDescriptor {
-            extent,
+            logical_size,
             physical_width: self.width,
             physical_height: self.height,
             context: self.context.descriptor(),

@@ -3,8 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// A Metal layer to render to, for <c>MapHandle.AttachMetalSurface()</c> and
-/// <c>RenderSessionHandle.SetMetalSurfaceTargetAsync()</c>.
+/// A Metal layer to render to, for <c>MapHandle.AttachMetalSurface()</c>.
 /// </summary>
 /// <remarks>
 /// <para>The session sets the layer's device, pixel format, and drawable size.
@@ -18,17 +17,17 @@ public readonly partial record struct MetalSurfaceDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public MetalSurfaceDescriptor(
-        LogicalExtent Extent,
+        LogicalSize LogicalSize,
         MetalContextDescriptor Context,
         NativePointer Layer
     )
     {
-        this.Extent = Extent;
+        this.LogicalSize = LogicalSize;
         this.Context = Context;
         this.Layer = Layer;
     }
 
-    public required LogicalExtent Extent { get; init; }
+    public required LogicalSize LogicalSize { get; init; }
 
     /// <summary>
     /// The MTLDevice to render with. A null device picks the system's default.

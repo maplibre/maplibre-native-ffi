@@ -106,26 +106,21 @@ public fun MapHandle.attachWebGpuSurface(
  * Replaces the WebGPU textures that a borrowed ring renders into.
  *
  * Use it to resize the ring, or to give the session textures again after
- * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. The new ring must have
- * as many textures as the old one, and the same context. Once the replacement completes, the
- * session no longer uses the old textures.
+ * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
+ * completes, the session no longer uses the old textures. A replacement with the textures and sizes
+ * that the ring renders into already changes nothing.
  *
  * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when the new ring has a different `format` than the old one. Attach a new
- *   session to change it.
  */
 public fun RenderSessionHandle.setWebGpuBorrowedTextureTarget(
-  descriptor: WebGpuBorrowedTextureDescriptor,
+  replacement: WebGpuBorrowedTextureReplacement,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_web_gpu_borrowed_texture_target(
         handle,
-        writeWebGpuBorrowedTextureDescriptor(descriptor),
+        writeWebGpuBorrowedTextureReplacement(replacement),
         completion,
         diagnostic,
       ),
@@ -135,26 +130,22 @@ public fun RenderSessionHandle.setWebGpuBorrowedTextureTarget(
 /**
  * Replaces the WebGPU surface that the session presents to.
  *
- * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, or to
- * move it to another surface. The new surface must use the same context. Once the replacement
- * completes, the session no longer uses the old surface.
+ * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
+ * it to another surface, or to resize it. Once the replacement completes, the session no longer
+ * uses the old surface. A replacement with the surface and logical size that the session presents
+ * to already changes nothing.
  *
  * See `mln_render_session_set_web_gpu_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when the new `format` differs from the old one. Attach a new session to
- *   change it.
  */
 public fun RenderSessionHandle.setWebGpuSurfaceTarget(
-  descriptor: WebGpuSurfaceDescriptor,
+  replacement: WebGpuSurfaceReplacement,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_web_gpu_surface_target(
         handle,
-        writeWebGpuSurfaceDescriptor(descriptor),
+        writeWebGpuSurfaceReplacement(replacement),
         completion,
         diagnostic,
       ),

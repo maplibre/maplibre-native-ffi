@@ -69,11 +69,9 @@ def on_frame_wake() -> None:
 
 # #region resize
 def on_window_resized(width: int, height: int) -> None:
-    # The scale factor the session has now.
+    # The window's new size in logical pixels.
     session.discarding.resize(
-        mln.LogicalExtent(
-            width=width, height=height, scale_factor=2.0
-        )
+        mln.LogicalSize(width=width, height=height)
     )
 
 
@@ -102,17 +100,12 @@ def surface_lost() -> None:
     # #endregion lost-surface
 
 
-def surface_restored(
-    vulkan: mln.VulkanContextDescriptor, new_surface: int
-) -> None:
+def surface_restored(new_surface: int) -> None:
     global paused
     # #region lost-surface
     session.set_vulkan_surface_target(
-        mln.VulkanSurfaceDescriptor(
-            extent=mln.LogicalExtent(
-                width=800, height=600, scale_factor=2.0
-            ),
-            context=vulkan,
+        mln.VulkanSurfaceReplacement(
+            logical_size=mln.LogicalSize(width=800, height=600),
             surface=new_surface,
         )
     ).result()
@@ -130,11 +123,9 @@ def render_to_window(
     # #region attach
     session, ready = map_handle.attach_vulkan_surface(
         mln.VulkanSurfaceDescriptor(
-            # The window's size in logical
-            # pixels, and its scale factor.
-            extent=mln.LogicalExtent(
-                width=800, height=600, scale_factor=2.0
-            ),
+            # The window's size in logical pixels. The map's
+            # scale factor turns it into pixels.
+            logical_size=mln.LogicalSize(width=800, height=600),
             # Your VkInstance, VkPhysicalDevice,
             # VkDevice, and graphics VkQueue.
             context=vulkan,

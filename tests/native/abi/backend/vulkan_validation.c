@@ -20,9 +20,20 @@ MLN_TEST_DESCRIPTOR_EDITS(
   vulkan_borrowed, mln_vulkan_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(vulkan_borrowed, vulkan)
+MLN_TEST_DESCRIPTOR_EDITS(
+  vulkan_surface_replacement, mln_vulkan_surface_replacement
+)
+MLN_TEST_DESCRIPTOR_EDITS(
+  vulkan_borrowed_replacement, mln_vulkan_borrowed_texture_replacement
+)
+MLN_TEST_BORROWED_EDITS(vulkan_borrowed_replacement, vulkan)
 
 static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_surface.surface =
+    MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+}
+static void replacement_without_surface(void* call) {
+  ((mln_test_target_call*)call)->descriptor.vulkan_surface_replacement.surface =
     MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
 }
 static void borrowed_without_device(void* call) {
@@ -40,20 +51,38 @@ static void borrowed_without_image_view(void* call) {
     MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
   edited->descriptor.vulkan_borrowed.textures = edited->textures.vulkan;
 }
+static void replacement_without_image(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.vulkan[0].image = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+  edited->descriptor.vulkan_borrowed_replacement.textures =
+    edited->textures.vulkan;
+}
+static void replacement_without_image_view(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.vulkan[0].image_view =
+    MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+  edited->descriptor.vulkan_borrowed_replacement.textures =
+    edited->textures.vulkan;
+}
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 // A replacement that names two images for a session's ring of one.
-static void borrowed_with_another_depth(void* call) {
+static void replacement_with_another_depth(void* call) {
   mln_test_target_call* edited = call;
   edited->textures.vulkan[1] = (mln_vulkan_borrowed_texture){
     .image = high_view_handle,
     .image_view = high_handle,
   };
-  edited->descriptor.vulkan_borrowed.textures = edited->textures.vulkan;
-  edited->descriptor.vulkan_borrowed.texture_count = 2;
+  edited->descriptor.vulkan_borrowed_replacement.textures =
+    edited->textures.vulkan;
+  edited->descriptor.vulkan_borrowed_replacement.texture_count = 2;
 }
 #endif
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.physical_width = 0;
+}
+static void replacement_without_physical_width(void* call) {
+  ((mln_test_target_call*)call)
+    ->descriptor.vulkan_borrowed_replacement.physical_width = 0;
 }
 static void borrowed_without_format(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.format = 0;
@@ -91,10 +120,18 @@ static mln_vulkan_surface_descriptor surface_descriptor(void) {
   mln_vulkan_surface_descriptor descriptor = {
     .size = sizeof(mln_vulkan_surface_descriptor)
   };
-  descriptor.extent = mln_test_target_extent();
+  descriptor.logical_size = mln_test_target_size();
   descriptor.context = fake_context();
   descriptor.surface = high_handle;
   return descriptor;
+}
+
+static mln_vulkan_surface_replacement surface_replacement(void) {
+  return (mln_vulkan_surface_replacement){
+    .size = sizeof(mln_vulkan_surface_replacement),
+    .logical_size = mln_test_target_size(),
+    .surface = high_handle,
+  };
 }
 
 // A ring of one image, whose entry is in the call's storage.
@@ -108,7 +145,7 @@ static void describe_borrowed(mln_test_target_call* call) {
   *descriptor = (mln_vulkan_borrowed_texture_descriptor){
     .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
   };
-  descriptor->extent = mln_test_target_extent();
+  descriptor->logical_size = mln_test_target_size();
   descriptor->context = fake_context();
   descriptor->textures = call->textures.vulkan;
   descriptor->texture_count = 1;
@@ -119,12 +156,29 @@ static void describe_borrowed(mln_test_target_call* call) {
   descriptor->physical_height = 64;
 }
 
+// A replacement ring of one image, whose entry is in the call's storage.
+static void describe_borrowed_replacement(mln_test_target_call* call) {
+  call->textures.vulkan[0] = (mln_vulkan_borrowed_texture){
+    .image = high_handle,
+    .image_view = high_view_handle,
+  };
+  call->descriptor.vulkan_borrowed_replacement =
+    (mln_vulkan_borrowed_texture_replacement){
+      .size = sizeof(mln_vulkan_borrowed_texture_replacement),
+      .logical_size = mln_test_target_size(),
+      .physical_width = 64,
+      .physical_height = 64,
+      .textures = call->textures.vulkan,
+      .texture_count = 1,
+  };
+}
+
 // A Vulkan build accepts a well-formed descriptor and leaves the handles to
 // its driver, so only the other builds submit one. There the well-formed row,
 // whose handles live in the high bits, proves they arrive whole.
 static void vulkan_attach_rejects_malformed_calls(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_target_map(runtime);
 
   mln_test_target_call call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
@@ -177,12 +231,12 @@ static void vulkan_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// set_target runs its attach's descriptor check, so beyond a row for each
-// pointer and handle it reads, these rows cover only its own steps. It checks
-// the session before the descriptor, and a build without Vulkan reports the
-// missing backend last, so there the rows name no session. A Vulkan build
-// submits them for a live session of the replacement's kind.
-static void vulkan_set_target_rejects_malformed_descriptors(void) {
+// set_target checks its replacement, so these rows cover a row for each
+// pointer and handle it reads, and its own steps. It checks the session before
+// the replacement, and a build without Vulkan reports the missing backend
+// last, so there the rows name no session. A Vulkan build submits them for a
+// live session of the replacement's kind.
+static void vulkan_set_target_rejects_malformed_replacements(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
   );
@@ -196,16 +250,15 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  call.descriptor.vulkan_surface = surface_descriptor();
+  call.descriptor.vulkan_surface_replacement = surface_replacement();
   static const mln_test_validation_case surface_rows[] = {
-    {"null descriptor", mln_test_call_without_descriptor,
+    {"null replacement", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_UNDERSIZED_CASE(vulkan_surface),
-    MLN_TEST_OVERFLOW_CASE(vulkan_surface),
-    {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
+    MLN_TEST_DESCRIPTOR_CASES(vulkan_surface_replacement),
+    {"null surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
+    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif
   };
@@ -224,24 +277,24 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  describe_borrowed(&call);
+  describe_borrowed_replacement(&call);
   static const mln_test_validation_case borrowed_rows[] = {
-    {"null descriptor", mln_test_call_without_descriptor,
+    {"null replacement", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_UNDERSIZED_CASE(vulkan_borrowed),
-    {"null textures array", vulkan_borrowed_without_textures,
+    MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed_replacement),
+    MLN_TEST_BORROWED_CASES(vulkan_borrowed_replacement),
+    {"null image", replacement_without_image, MLN_STATUS_INVALID_ARGUMENT,
+     NULL},
+    {"null image view", replacement_without_image_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"null image", borrowed_without_image, MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"null image view", borrowed_without_image_view,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"zero physical width", borrowed_without_physical_width,
+    {"zero physical width", replacement_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
     {"more images than the session's ring has slots",
-     borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
+     replacement_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
 #else
-    {"a well-formed descriptor with high handles", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
+    {"a well-formed replacement with high handles", NULL,
+     MLN_STATUS_UNSUPPORTED, "not supported by this build"},
 #endif
   };
   mln_test_run_validation_table(
@@ -257,5 +310,5 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(vulkan_attach_rejects_malformed_calls);
-  RUN_TEST(vulkan_set_target_rejects_malformed_descriptors);
+  RUN_TEST(vulkan_set_target_rejects_malformed_replacements);
 }

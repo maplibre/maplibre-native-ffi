@@ -915,6 +915,31 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   }
 }
 
+/// A size in logical pixels, which the map's scale factor turns into pixels.
+///
+/// See `mln_logical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct LogicalSize: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public init(width: UInt32 = 0, height: UInt32 = 0) {
+    self.width = width
+    self.height = height
+  }
+
+  init(raw: mln_logical_size) {
+    width = raw.width
+    height = raw.height
+  }
+
+  func nativeValue() -> mln_logical_size {
+    var raw = mln_logical_size()
+    raw.width = width
+    raw.height = height
+    return raw
+  }
+}
+
 /// A debug overlay that the map draws.
 ///
 /// See `mln_map_debug_flag` in the
@@ -969,7 +994,9 @@ public struct MapMode: RawRepresentable, CustomStringConvertible,
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapOptions: Equatable, Hashable, Sendable {
-  /// The map's first size. Its scale factor stays fixed for the map's life.
+  /// The map's first size, and its scale factor. The scale factor stays fixed
+  /// for the map's life, and every render session of the map renders at it. To
+  /// render at another density, create a new map and attach a new session.
   public var initialExtent: LogicalExtent
   public var mapMode: MapMode
   /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer

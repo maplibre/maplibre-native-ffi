@@ -1723,6 +1723,29 @@ impl FromNative<sys::mln_logical_extent> for LogicalExtent {
     }
 }
 
+/// A size in logical pixels, which the map's scale factor turns into pixels.
+///
+/// See `mln_logical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct LogicalSize {
+    pub width: u32,
+    pub height: u32,
+}
+impl LogicalSize {
+    pub const fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+}
+impl ToNative<sys::mln_logical_size> for LogicalSize {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_logical_size> {
+        let mut raw: sys::mln_logical_size = unsafe { std::mem::zeroed() };
+        raw.width = self.width;
+        raw.height = self.height;
+        Ok(raw)
+    }
+}
+
 native_flags! {
 /// A debug overlay that the map draws.
 ///
@@ -1765,7 +1788,9 @@ impl Default for MapMode {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapOptions {
-    /// The map's first size. Its scale factor stays fixed for the map's life.
+    /// The map's first size, and its scale factor. The scale factor stays fixed
+    /// for the map's life, and every render session of the map renders at it.
+    /// To render at another density, create a new map and attach a new session.
     pub initial_extent: LogicalExtent,
     pub map_mode: MapMode,
     /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -2047,13 +2072,12 @@ impl ToNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
 }
 
 /// A ring of your Metal textures, for
-/// `MapHandle::attach_metal_borrowed_texture()` and
-/// `RenderSessionHandle::set_metal_borrowed_texture_target()`.
+/// `MapHandle::attach_metal_borrowed_texture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The textures must all have that size, one device,
-/// one pixel format, one sample, and MTLTextureUsageRenderTarget.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The textures must all have that size, one device, one
+/// pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2063,7 +2087,7 @@ impl ToNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetalBorrowedTextureDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub physical_width: u32,
     pub physical_height: u32,
     pub textures: Vec<MetalBorrowedTexture>,
@@ -2074,13 +2098,13 @@ pub struct MetalBorrowedTextureDescriptor {
 }
 impl MetalBorrowedTextureDescriptor {
     pub fn new(
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         physical_width: u32,
         physical_height: u32,
         textures: Vec<MetalBorrowedTexture>,
     ) -> Self {
         Self {
-            extent,
+            logical_size,
             physical_width,
             physical_height,
             textures,
@@ -2095,12 +2119,62 @@ impl ToNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTextu
     ) -> Result<sys::mln_metal_borrowed_texture_descriptor> {
         let mut raw: sys::mln_metal_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.textures = convert::array(&self.textures, arena)?;
         raw.texture_count = convert::count(self.textures.len())?;
         raw.command_queue = self.command_queue;
+        Ok(raw)
+    }
+}
+
+/// New Metal textures for a borrowed ring, for
+/// `RenderSessionHandle::set_metal_borrowed_texture_target()`.
+///
+/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
+/// textures follow its rules. The ring keeps its depth, device, and command
+/// queue, so give it as many textures as it attached with, on the same device.
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or disposal of the session completes, or an abandon of
+/// it returns.
+///
+/// See `mln_metal_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetalBorrowedTextureReplacement {
+    pub logical_size: LogicalSize,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: Vec<MetalBorrowedTexture>,
+}
+impl MetalBorrowedTextureReplacement {
+    pub fn new(
+        logical_size: LogicalSize,
+        physical_width: u32,
+        physical_height: u32,
+        textures: Vec<MetalBorrowedTexture>,
+    ) -> Self {
+        Self {
+            logical_size,
+            physical_width,
+            physical_height,
+            textures,
+        }
+    }
+}
+impl ToNative<sys::mln_metal_borrowed_texture_replacement> for MetalBorrowedTextureReplacement {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_metal_borrowed_texture_replacement> {
+        let mut raw: sys::mln_metal_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         Ok(raw)
     }
 }
@@ -2122,8 +2196,7 @@ impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
     }
 }
 
-/// A Metal layer to render to, for `MapHandle::attach_metal_surface()` and
-/// `RenderSessionHandle::set_metal_surface_target()`.
+/// A Metal layer to render to, for `MapHandle::attach_metal_surface()`.
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
@@ -2133,16 +2206,16 @@ impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalSurfaceDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     /// The MTLDevice to render with. A null device picks the system's default.
     pub context: MetalContextDescriptor,
     /// Your CAMetalLayer.
     pub layer: *mut std::ffi::c_void,
 }
 impl MetalSurfaceDescriptor {
-    pub fn new(extent: LogicalExtent, layer: *mut std::ffi::c_void) -> Self {
+    pub fn new(logical_size: LogicalSize, layer: *mut std::ffi::c_void) -> Self {
         Self {
-            extent,
+            logical_size,
             context: Default::default(),
             layer,
         }
@@ -2152,8 +2225,40 @@ impl ToNative<sys::mln_metal_surface_descriptor> for MetalSurfaceDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_metal_surface_descriptor> {
         let mut raw: sys::mln_metal_surface_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_metal_surface_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.context = to_native(&self.context, arena)?;
+        raw.layer = self.layer;
+        Ok(raw)
+    }
+}
+
+/// A new Metal layer for `RenderSessionHandle::set_metal_surface_target()`.
+///
+/// The session renders to it with the device that it attached with. It uses the
+/// layer until a replacement or release of the target completes, a detach or
+/// disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_metal_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MetalSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your CAMetalLayer.
+    pub layer: *mut std::ffi::c_void,
+}
+impl MetalSurfaceReplacement {
+    pub fn new(logical_size: LogicalSize, layer: *mut std::ffi::c_void) -> Self {
+        Self {
+            logical_size,
+            layer,
+        }
+    }
+}
+impl ToNative<sys::mln_metal_surface_replacement> for MetalSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_metal_surface_replacement> {
+        let mut raw: sys::mln_metal_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_metal_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.layer = self.layer;
         Ok(raw)
     }
@@ -2453,24 +2558,25 @@ impl FromNative<sys::mln_offline_tile_pyramid_region_definition>
     }
 }
 
-/// The image that `MapHandle::attach_offscreen()` renders.
+/// The image that `MapHandle::attach_offscreen()` renders. The session renders
+/// it at the map's scale factor.
 ///
 /// See `mln_offscreen_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OffscreenDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
 }
 impl OffscreenDescriptor {
-    pub const fn new(extent: LogicalExtent) -> Self {
-        Self { extent }
+    pub const fn new(logical_size: LogicalSize) -> Self {
+        Self { logical_size }
     }
 }
 impl ToNative<sys::mln_offscreen_descriptor> for OffscreenDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_offscreen_descriptor> {
         let mut raw: sys::mln_offscreen_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_offscreen_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         Ok(raw)
     }
 }
@@ -2537,14 +2643,13 @@ impl ToNative<sys::mln_open_gl_borrowed_texture> for OpenGlBorrowedTexture {
 }
 
 /// A ring of your OpenGL textures, for
-/// `MapHandle::attach_open_gl_borrowed_texture()` and
-/// `RenderSessionHandle::set_open_gl_borrowed_texture_target()`.
+/// `MapHandle::attach_open_gl_borrowed_texture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. The context must use
-/// `OpenGlContextOwnership::Shared`. Each texture must be in your context's
-/// share group, with storage of that size.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The context must use `OpenGlContextOwnership::Shared`.
+/// Each texture must be in your context's share group, with storage of that
+/// size.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2554,7 +2659,7 @@ impl ToNative<sys::mln_open_gl_borrowed_texture> for OpenGlBorrowedTexture {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenGlBorrowedTextureDescriptor<'a> {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: OpenGlContextDescriptor<'a>,
@@ -2564,7 +2669,7 @@ pub struct OpenGlBorrowedTextureDescriptor<'a> {
 }
 impl<'a> OpenGlBorrowedTextureDescriptor<'a> {
     pub fn new(
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         physical_width: u32,
         physical_height: u32,
         context: OpenGlContextDescriptor<'a>,
@@ -2572,7 +2677,7 @@ impl<'a> OpenGlBorrowedTextureDescriptor<'a> {
         target: u32,
     ) -> Self {
         Self {
-            extent,
+            logical_size,
             physical_width,
             physical_height,
             context,
@@ -2590,13 +2695,63 @@ impl<'a> ToNative<sys::mln_open_gl_borrowed_texture_descriptor>
     ) -> Result<sys::mln_open_gl_borrowed_texture_descriptor> {
         let mut raw: sys::mln_open_gl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = to_native(&self.context, arena)?;
         raw.textures = convert::array(&self.textures, arena)?;
         raw.texture_count = convert::count(self.textures.len())?;
         raw.target = self.target;
+        Ok(raw)
+    }
+}
+
+/// New OpenGL textures for a borrowed ring, for
+/// `RenderSessionHandle::set_open_gl_borrowed_texture_target()`.
+///
+/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
+/// the textures follow its rules. The ring keeps its depth, context, and
+/// texture target, so give it as many textures as it attached with, in the same
+/// share group. The session uses the textures until a replacement or release of
+/// the target completes, a detach or disposal of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_open_gl_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenGlBorrowedTextureReplacement {
+    pub logical_size: LogicalSize,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: Vec<OpenGlBorrowedTexture>,
+}
+impl OpenGlBorrowedTextureReplacement {
+    pub fn new(
+        logical_size: LogicalSize,
+        physical_width: u32,
+        physical_height: u32,
+        textures: Vec<OpenGlBorrowedTexture>,
+    ) -> Self {
+        Self {
+            logical_size,
+            physical_width,
+            physical_height,
+            textures,
+        }
+    }
+}
+impl ToNative<sys::mln_open_gl_borrowed_texture_replacement> for OpenGlBorrowedTextureReplacement {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_open_gl_borrowed_texture_replacement> {
+        let mut raw: sys::mln_open_gl_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         Ok(raw)
     }
 }
@@ -2701,8 +2856,7 @@ pub struct OpenGlContextProviderFlag: u32 {
 }
 }
 
-/// An OpenGL surface to present to, for `MapHandle::attach_open_gl_surface()`
-/// and `RenderSessionHandle::set_open_gl_surface_target()`.
+/// An OpenGL surface to present to, for `MapHandle::attach_open_gl_surface()`.
 ///
 /// The session uses the surface until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -2712,15 +2866,15 @@ pub struct OpenGlContextProviderFlag: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenGlSurfaceDescriptor<'a> {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub context: OpenGlContextDescriptor<'a>,
     /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
     pub surface: *mut std::ffi::c_void,
 }
 impl<'a> OpenGlSurfaceDescriptor<'a> {
-    pub fn new(extent: LogicalExtent, context: OpenGlContextDescriptor<'a>) -> Self {
+    pub fn new(logical_size: LogicalSize, context: OpenGlContextDescriptor<'a>) -> Self {
         Self {
-            extent,
+            logical_size,
             context,
             surface: Default::default(),
         }
@@ -2730,8 +2884,42 @@ impl<'a> ToNative<sys::mln_open_gl_surface_descriptor> for OpenGlSurfaceDescript
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_open_gl_surface_descriptor> {
         let mut raw: sys::mln_open_gl_surface_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_open_gl_surface_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.context = to_native(&self.context, arena)?;
+        raw.surface = self.surface;
+        Ok(raw)
+    }
+}
+
+/// A new OpenGL surface for
+/// `RenderSessionHandle::set_open_gl_surface_target()`.
+///
+/// The session presents to it with the context that it attached with. It uses
+/// the surface until a replacement or release of the target completes, a detach
+/// or disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_open_gl_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OpenGlSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
+    /// leave it null.
+    pub surface: *mut std::ffi::c_void,
+}
+impl OpenGlSurfaceReplacement {
+    pub fn new(logical_size: LogicalSize) -> Self {
+        Self {
+            logical_size,
+            surface: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_open_gl_surface_replacement> for OpenGlSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_open_gl_surface_replacement> {
+        let mut raw: sys::mln_open_gl_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_open_gl_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.surface = self.surface;
         Ok(raw)
     }
@@ -3224,6 +3412,7 @@ pub struct RenderSessionCapabilityFlag: u32 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RenderSessionSnapshot {
     pub state: RenderSessionState,
+    /// The target's logical size, and the map's scale factor.
     pub extent: LogicalExtent,
     pub generation: u64,
     pub frame_generation: u64,
@@ -5180,12 +5369,11 @@ impl ToNative<sys::mln_vulkan_borrowed_texture> for VulkanBorrowedTexture {
 }
 
 /// A ring of your Vulkan images, for
-/// `MapHandle::attach_vulkan_borrowed_texture()` and
-/// `RenderSessionHandle::set_vulkan_borrowed_texture_target()`.
+/// `MapHandle::attach_vulkan_borrowed_texture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the images'
-/// size in pixels. Each image must have that size, `format`, and
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the images' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. Each image must have that size, `format`, and
 /// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
@@ -5196,7 +5384,7 @@ impl ToNative<sys::mln_vulkan_borrowed_texture> for VulkanBorrowedTexture {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct VulkanBorrowedTextureDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: VulkanContextDescriptor,
@@ -5209,7 +5397,7 @@ pub struct VulkanBorrowedTextureDescriptor {
 }
 impl VulkanBorrowedTextureDescriptor {
     pub fn new(
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         physical_width: u32,
         physical_height: u32,
         context: VulkanContextDescriptor,
@@ -5218,7 +5406,7 @@ impl VulkanBorrowedTextureDescriptor {
         final_layout: u32,
     ) -> Self {
         Self {
-            extent,
+            logical_size,
             physical_width,
             physical_height,
             context,
@@ -5236,7 +5424,7 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
     ) -> Result<sys::mln_vulkan_borrowed_texture_descriptor> {
         let mut raw: sys::mln_vulkan_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = to_native(&self.context, arena)?;
@@ -5245,6 +5433,56 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
         raw.format = self.format;
         raw.final_layout = self.final_layout;
         raw.owner = to_native(&self.owner, arena)?;
+        Ok(raw)
+    }
+}
+
+/// New Vulkan images for a borrowed ring, for
+/// `RenderSessionHandle::set_vulkan_borrowed_texture_target()`.
+///
+/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
+/// the images follow its rules. The ring keeps its depth, context, `format`,
+/// `final_layout`, and `owner`, so give it as many images as it attached with,
+/// in that format, on the same device. The session uses the images until a
+/// replacement or release of the target completes, a detach or disposal of the
+/// session completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct VulkanBorrowedTextureReplacement {
+    pub logical_size: LogicalSize,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: Vec<VulkanBorrowedTexture>,
+}
+impl VulkanBorrowedTextureReplacement {
+    pub fn new(
+        logical_size: LogicalSize,
+        physical_width: u32,
+        physical_height: u32,
+        textures: Vec<VulkanBorrowedTexture>,
+    ) -> Self {
+        Self {
+            logical_size,
+            physical_width,
+            physical_height,
+            textures,
+        }
+    }
+}
+impl ToNative<sys::mln_vulkan_borrowed_texture_replacement> for VulkanBorrowedTextureReplacement {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_vulkan_borrowed_texture_replacement> {
+        let mut raw: sys::mln_vulkan_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         Ok(raw)
     }
 }
@@ -5329,8 +5567,7 @@ impl Default for VulkanImageOwner {
     }
 }
 
-/// A Vulkan surface to present to, for `MapHandle::attach_vulkan_surface()` and
-/// `RenderSessionHandle::set_vulkan_surface_target()`.
+/// A Vulkan surface to present to, for `MapHandle::attach_vulkan_surface()`.
 ///
 /// The device must have VK_KHR_swapchain enabled, and the queue family of
 /// `graphics_queue_family_index` must support presenting to the surface. The
@@ -5342,15 +5579,15 @@ impl Default for VulkanImageOwner {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanSurfaceDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub context: VulkanContextDescriptor,
     /// Your VkSurfaceKHR.
     pub surface: u64,
 }
 impl VulkanSurfaceDescriptor {
-    pub fn new(extent: LogicalExtent, context: VulkanContextDescriptor, surface: u64) -> Self {
+    pub fn new(logical_size: LogicalSize, context: VulkanContextDescriptor, surface: u64) -> Self {
         Self {
-            extent,
+            logical_size,
             context,
             surface,
         }
@@ -5360,8 +5597,42 @@ impl ToNative<sys::mln_vulkan_surface_descriptor> for VulkanSurfaceDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_vulkan_surface_descriptor> {
         let mut raw: sys::mln_vulkan_surface_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_vulkan_surface_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.context = to_native(&self.context, arena)?;
+        raw.surface = self.surface;
+        Ok(raw)
+    }
+}
+
+/// A new Vulkan surface for `RenderSessionHandle::set_vulkan_surface_target()`.
+///
+/// The session presents to it with the context that it attached with, so the
+/// queue family of that context's `graphics_queue_family_index` must support
+/// presenting to the surface. It uses the surface until a replacement or
+/// release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.
+///
+/// See `mln_vulkan_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VulkanSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your VkSurfaceKHR.
+    pub surface: u64,
+}
+impl VulkanSurfaceReplacement {
+    pub const fn new(logical_size: LogicalSize, surface: u64) -> Self {
+        Self {
+            logical_size,
+            surface,
+        }
+    }
+}
+impl ToNative<sys::mln_vulkan_surface_replacement> for VulkanSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_vulkan_surface_replacement> {
+        let mut raw: sys::mln_vulkan_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_vulkan_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.surface = self.surface;
         Ok(raw)
     }
@@ -5533,13 +5804,12 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture> for WebGpuBorrowedTexture {
 }
 
 /// A ring of your WebGPU textures, for
-/// `MapHandle::attach_web_gpu_borrowed_texture()` and
-/// `RenderSessionHandle::set_web_gpu_borrowed_texture_target()`.
+/// `MapHandle::attach_web_gpu_borrowed_texture()`.
 ///
-/// `extent` sets the map's size and the session's scale factor, so give it the
-/// map's scale factor. `physical_width` and `physical_height` give the
-/// textures' size in pixels. Each texture must be 2D with that size, `format`,
-/// one layer, one mip level, one sample, and WGPUTextureUsage_RenderAttachment.
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. Each texture must be 2D with that size, `format`, one
+/// layer, one mip level, one sample, and WGPUTextureUsage_RenderAttachment.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or disposal of the session completes, or an abandon of
@@ -5549,7 +5819,7 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture> for WebGpuBorrowedTexture {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct WebGpuBorrowedTextureDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: WebGpuContextDescriptor,
@@ -5559,7 +5829,7 @@ pub struct WebGpuBorrowedTextureDescriptor {
 }
 impl WebGpuBorrowedTextureDescriptor {
     pub fn new(
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         physical_width: u32,
         physical_height: u32,
         context: WebGpuContextDescriptor,
@@ -5567,7 +5837,7 @@ impl WebGpuBorrowedTextureDescriptor {
         format: u32,
     ) -> Self {
         Self {
-            extent,
+            logical_size,
             physical_width,
             physical_height,
             context,
@@ -5583,13 +5853,63 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture_descriptor> for WebGpuBorrowedTe
     ) -> Result<sys::mln_web_gpu_borrowed_texture_descriptor> {
         let mut raw: sys::mln_web_gpu_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_web_gpu_borrowed_texture_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = to_native(&self.context, arena)?;
         raw.textures = convert::array(&self.textures, arena)?;
         raw.texture_count = convert::count(self.textures.len())?;
         raw.format = self.format;
+        Ok(raw)
+    }
+}
+
+/// New WebGPU textures for a borrowed ring, for
+/// `RenderSessionHandle::set_web_gpu_borrowed_texture_target()`.
+///
+/// The members mean what they mean in `WebGpuBorrowedTextureDescriptor`, and
+/// the textures follow its rules. The ring keeps its depth, context, and
+/// `format`, so give it as many textures as it attached with, in that format,
+/// on the same device. The session uses the textures until a replacement or
+/// release of the target completes, a detach or disposal of the session
+/// completes, or an abandon of it returns.
+///
+/// See `mln_web_gpu_borrowed_texture_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct WebGpuBorrowedTextureReplacement {
+    pub logical_size: LogicalSize,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: Vec<WebGpuBorrowedTexture>,
+}
+impl WebGpuBorrowedTextureReplacement {
+    pub fn new(
+        logical_size: LogicalSize,
+        physical_width: u32,
+        physical_height: u32,
+        textures: Vec<WebGpuBorrowedTexture>,
+    ) -> Self {
+        Self {
+            logical_size,
+            physical_width,
+            physical_height,
+            textures,
+        }
+    }
+}
+impl ToNative<sys::mln_web_gpu_borrowed_texture_replacement> for WebGpuBorrowedTextureReplacement {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_web_gpu_borrowed_texture_replacement> {
+        let mut raw: sys::mln_web_gpu_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_web_gpu_borrowed_texture_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         Ok(raw)
     }
 }
@@ -5626,8 +5946,7 @@ impl ToNative<sys::mln_web_gpu_context_descriptor> for WebGpuContextDescriptor {
     }
 }
 
-/// A WebGPU surface to present to, for `MapHandle::attach_web_gpu_surface()`
-/// and `RenderSessionHandle::set_web_gpu_surface_target()`.
+/// A WebGPU surface to present to, for `MapHandle::attach_web_gpu_surface()`.
 ///
 /// The session configures the surface. It uses the surface until a replacement
 /// or release of the target completes, a detach or disposal of the session
@@ -5637,7 +5956,7 @@ impl ToNative<sys::mln_web_gpu_context_descriptor> for WebGpuContextDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebGpuSurfaceDescriptor {
-    pub extent: LogicalExtent,
+    pub logical_size: LogicalSize,
     pub context: WebGpuContextDescriptor,
     /// Your WGPUSurface.
     pub surface: *mut std::ffi::c_void,
@@ -5646,13 +5965,13 @@ pub struct WebGpuSurfaceDescriptor {
 }
 impl WebGpuSurfaceDescriptor {
     pub fn new(
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         context: WebGpuContextDescriptor,
         surface: *mut std::ffi::c_void,
         format: u32,
     ) -> Self {
         Self {
-            extent,
+            logical_size,
             context,
             surface,
             format,
@@ -5663,10 +5982,43 @@ impl ToNative<sys::mln_web_gpu_surface_descriptor> for WebGpuSurfaceDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_web_gpu_surface_descriptor> {
         let mut raw: sys::mln_web_gpu_surface_descriptor = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_web_gpu_surface_descriptor>() as _;
-        raw.extent = to_native(&self.extent, arena)?;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
         raw.context = to_native(&self.context, arena)?;
         raw.surface = self.surface;
         raw.format = self.format;
+        Ok(raw)
+    }
+}
+
+/// A new WebGPU surface for
+/// `RenderSessionHandle::set_web_gpu_surface_target()`.
+///
+/// The session configures it with the context and format that it attached with.
+/// It uses the surface until a replacement or release of the target completes,
+/// a detach or disposal of the session completes, or an abandon of it returns.
+///
+/// See `mln_web_gpu_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGpuSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your WGPUSurface.
+    pub surface: *mut std::ffi::c_void,
+}
+impl WebGpuSurfaceReplacement {
+    pub fn new(logical_size: LogicalSize, surface: *mut std::ffi::c_void) -> Self {
+        Self {
+            logical_size,
+            surface,
+        }
+    }
+}
+impl ToNative<sys::mln_web_gpu_surface_replacement> for WebGpuSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_web_gpu_surface_replacement> {
+        let mut raw: sys::mln_web_gpu_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_web_gpu_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.surface = self.surface;
         Ok(raw)
     }
 }

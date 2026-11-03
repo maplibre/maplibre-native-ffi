@@ -9,6 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_render_session_snapshot</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Extent">
+/// The target's logical size, and the map's scale factor.
+/// </param>
 /// <param name="FailureStatus">
 /// <c>Status.Ok</c> until the session fails. Then <c>Status.TargetLost</c> when
 /// it failed because it lost its target, or <c>Status.NativeError</c> when it

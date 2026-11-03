@@ -655,7 +655,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_map_resize(
     map: Long,
-    extent: Long,
+    logicalSize: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1085,7 +1085,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_resize(
     session: Long,
-    extent: Long,
+    logicalSize: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1099,7 +1099,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1107,7 +1107,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_metal_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1115,7 +1115,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1123,7 +1123,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_open_gl_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1131,7 +1131,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_vulkan_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1139,7 +1139,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_vulkan_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1147,7 +1147,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1155,7 +1155,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

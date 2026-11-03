@@ -3,7 +3,7 @@
 //
 // The validation order is part of what a host sees, so it matches the
 // backend-native attach paths step for step: the map, the descriptor, then the
-// extent, and finally the attachment request. Only once all of those pass does
+// size, and finally the attachment request. Only once all of those pass does
 // the caller hear that the backend is missing.
 
 #include "diagnostics/diagnostics.hpp"
@@ -21,10 +21,12 @@ auto validate_attach_map(mln_map map) -> mln_status {
   return validate_map_live(map, live_map);
 }
 
-auto validate_surface_extent(const mln_logical_extent& extent) -> mln_status {
+// A surface renders at its map's scale factor.
+auto validate_surface_size(mln_map map, const mln_logical_size& size)
+  -> mln_status {
   return validate_physical_size(
-    extent.width, extent.height, extent.scale_factor,
-    "scaled surface dimensions are too large"
+    size.width, size.height, map_scale_factor(map),
+    "scaled target dimensions are too large"
   );
 }
 
@@ -49,7 +51,7 @@ auto metal_surface_attach_start(
   )
     return status;
   if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_surface_size(map, descriptor->logical_size);
     status != MLN_STATUS_OK
   )
     return status;
@@ -89,17 +91,18 @@ auto metal_borrowed_texture_attach_start(
   return unsupported("Metal texture sessions are not supported by this build");
 }
 auto metal_borrowed_texture_set_target_start(
-  mln_render_session, const mln_metal_borrowed_texture_descriptor* descriptor,
+  mln_render_session, const mln_metal_borrowed_texture_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_metal_borrowed_texture_descriptor(descriptor);
+    const auto status =
+      validate_metal_borrowed_texture_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status = validate_borrowed_physical_size(
-      descriptor->physical_width, descriptor->physical_height
+      replacement->physical_width, replacement->physical_height
     );
     status != MLN_STATUS_OK
   )
@@ -107,16 +110,11 @@ auto metal_borrowed_texture_set_target_start(
   return unsupported("Metal texture sessions are not supported by this build");
 }
 auto metal_surface_set_target_start(
-  mln_render_session, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session, const mln_metal_surface_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_metal_surface_descriptor(descriptor);
-    status != MLN_STATUS_OK
-  )
-    return status;
-  if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_metal_surface_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
@@ -138,7 +136,7 @@ auto vulkan_surface_attach_start(
   )
     return status;
   if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_surface_size(map, descriptor->logical_size);
     status != MLN_STATUS_OK
   )
     return status;
@@ -178,17 +176,19 @@ auto vulkan_borrowed_texture_attach_start(
   return unsupported("Vulkan texture sessions are not supported by this build");
 }
 auto vulkan_borrowed_texture_set_target_start(
-  mln_render_session, const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  mln_render_session,
+  const mln_vulkan_borrowed_texture_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
+    const auto status =
+      validate_vulkan_borrowed_texture_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status = validate_borrowed_physical_size(
-      descriptor->physical_width, descriptor->physical_height
+      replacement->physical_width, replacement->physical_height
     );
     status != MLN_STATUS_OK
   )
@@ -196,16 +196,11 @@ auto vulkan_borrowed_texture_set_target_start(
   return unsupported("Vulkan texture sessions are not supported by this build");
 }
 auto vulkan_surface_set_target_start(
-  mln_render_session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session, const mln_vulkan_surface_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_vulkan_surface_descriptor(descriptor);
-    status != MLN_STATUS_OK
-  )
-    return status;
-  if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_vulkan_surface_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
@@ -227,7 +222,7 @@ auto opengl_surface_attach_start(
   )
     return status;
   if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_surface_size(map, descriptor->logical_size);
     status != MLN_STATUS_OK
   )
     return status;
@@ -268,34 +263,30 @@ auto opengl_borrowed_texture_attach_start(
   return unsupported("OpenGL texture sessions are not supported by this build");
 }
 auto opengl_surface_set_target_start(
-  mln_render_session, const mln_open_gl_surface_descriptor* descriptor,
+  mln_render_session, const mln_open_gl_surface_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_opengl_surface_descriptor(descriptor, false);
-    status != MLN_STATUS_OK
-  )
-    return status;
-  if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_opengl_surface_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
   return unsupported("OpenGL surface sessions are not supported by this build");
 }
 auto opengl_borrowed_texture_set_target_start(
-  mln_render_session, const mln_open_gl_borrowed_texture_descriptor* descriptor,
+  mln_render_session,
+  const mln_open_gl_borrowed_texture_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
     const auto status =
-      validate_opengl_borrowed_texture_descriptor(descriptor, false);
+      validate_opengl_borrowed_texture_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status = validate_borrowed_physical_size(
-      descriptor->physical_width, descriptor->physical_height
+      replacement->physical_width, replacement->physical_height
     );
     status != MLN_STATUS_OK
   )
@@ -333,17 +324,19 @@ auto webgpu_borrowed_texture_attach_start(
   return unsupported("WebGPU texture sessions are not supported by this build");
 }
 auto webgpu_borrowed_texture_set_target_start(
-  mln_render_session, const mln_web_gpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session,
+  const mln_web_gpu_borrowed_texture_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
+    const auto status =
+      validate_webgpu_borrowed_texture_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status = validate_borrowed_physical_size(
-      descriptor->physical_width, descriptor->physical_height
+      replacement->physical_width, replacement->physical_height
     );
     status != MLN_STATUS_OK
   )
@@ -363,7 +356,7 @@ auto webgpu_surface_attach_start(
   )
     return status;
   if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_surface_size(map, descriptor->logical_size);
     status != MLN_STATUS_OK
   )
     return status;
@@ -376,16 +369,11 @@ auto webgpu_surface_attach_start(
   return unsupported("WebGPU surface sessions are not supported by this build");
 }
 auto webgpu_surface_set_target_start(
-  mln_render_session, const mln_web_gpu_surface_descriptor* descriptor,
+  mln_render_session, const mln_web_gpu_surface_replacement* replacement,
   const mln_completion*
 ) -> mln_status {
   if (
-    const auto status = validate_webgpu_surface_descriptor(descriptor);
-    status != MLN_STATUS_OK
-  )
-    return status;
-  if (
-    const auto status = validate_surface_extent(descriptor->extent);
+    const auto status = validate_webgpu_surface_replacement(replacement);
     status != MLN_STATUS_OK
   )
     return status;

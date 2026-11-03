@@ -52,8 +52,9 @@
     // #endregion attach-options
 
     // #region attach-borrowed
-    var ring = VulkanBorrowedTextureDescriptor(
-      extent: LogicalExtent(width: 800, height: 600, scaleFactor: 2),
+    let ring = VulkanBorrowedTextureDescriptor(
+      // The map's size in logical pixels.
+      logicalSize: LogicalSize(width: 800, height: 600),
       // The size of your textures in device pixels.
       physicalWidth: 1600,
       physicalHeight: 1200,
@@ -78,26 +79,26 @@
     try drawFrame()
 
     // #region resize-borrowed
-    ring.extent = LogicalExtent(
-      width: 1024,
-      height: 768,
-      scaleFactor: 2
+    let resized = VulkanBorrowedTextureReplacement(
+      logicalSize: LogicalSize(width: 1024, height: 768),
+      physicalWidth: 2048,
+      physicalHeight: 1536,
+      // Your new textures, at the new size.
+      textures: [
+        VulkanBorrowedTexture(
+          image: newImages[0],
+          imageView: newViews[0]
+        ),
+        VulkanBorrowedTexture(
+          image: newImages[1],
+          imageView: newViews[1]
+        ),
+      ]
     )
-    ring.physicalWidth = 2048
-    ring.physicalHeight = 1536
-    // Your new textures, at the new size.
-    ring.textures = [
-      VulkanBorrowedTexture(
-        image: newImages[0],
-        imageView: newViews[0]
-      ),
-      VulkanBorrowedTexture(
-        image: newImages[1],
-        imageView: newViews[1]
-      ),
-    ]
 
-    try await session.setVulkanBorrowedTextureTarget(descriptor: ring)
+    try await session.setVulkanBorrowedTextureTarget(
+      replacement: resized
+    )
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views)
     // #endregion resize-borrowed

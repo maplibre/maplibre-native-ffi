@@ -697,6 +697,17 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   return result;
 }
 
+Pointer<raw.mln_logical_size> _writeLogicalSize(
+  LogicalSize value,
+  Allocator arena, {
+  Pointer<raw.mln_logical_size>? into,
+}) {
+  final result = into ?? arena<raw.mln_logical_size>();
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
+  return result;
+}
+
 Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
   MetalBorrowedTexture value,
   Allocator arena, {
@@ -715,7 +726,7 @@ _writeMetalBorrowedTextureDescriptor(
 }) {
   final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
   result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -851,7 +862,7 @@ Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
 }) {
   final result = into ?? arena<raw.mln_metal_surface_descriptor>();
   result.ref.size = sizeOf<raw.mln_metal_surface_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
   result.ref.layer = Pointer<Void>.fromAddress(value.layer.address).cast();
   return result;
@@ -864,7 +875,7 @@ Pointer<raw.mln_offscreen_descriptor> _writeOffscreenDescriptor(
 }) {
   final result = into ?? arena<raw.mln_offscreen_descriptor>();
   result.ref.size = sizeOf<raw.mln_offscreen_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   return result;
 }
 
@@ -959,7 +970,7 @@ _writeOpenGlBorrowedTextureDescriptor(
 }) {
   final result = into ?? arena<raw.mln_open_gl_borrowed_texture_descriptor>();
   result.ref.size = sizeOf<raw.mln_open_gl_borrowed_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -993,7 +1004,7 @@ Pointer<raw.mln_open_gl_surface_descriptor> _writeOpenGlSurfaceDescriptor(
 }) {
   final result = into ?? arena<raw.mln_open_gl_surface_descriptor>();
   result.ref.size = sizeOf<raw.mln_open_gl_surface_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.context = _writeOpenGlContextDescriptor(value.context, arena).ref;
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   return result;
@@ -1048,7 +1059,7 @@ _writeVulkanBorrowedTextureDescriptor(
 }) {
   final result = into ?? arena<raw.mln_vulkan_borrowed_texture_descriptor>();
   result.ref.size = sizeOf<raw.mln_vulkan_borrowed_texture_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -1084,7 +1095,7 @@ Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
 }) {
   final result = into ?? arena<raw.mln_vulkan_surface_descriptor>();
   result.ref.size = sizeOf<raw.mln_vulkan_surface_descriptor>();
-  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
   result.ref.surface = value.surface;
   return result;
@@ -1872,6 +1883,141 @@ TextureReadbackResult _readTextureReadbackResult(
   data: _copyBufferView(source.data),
   info: _readTextureImageInfo(source.info),
 );
+
+Pointer<raw.mln_metal_borrowed_texture_replacement>
+_writeMetalBorrowedTextureReplacement(
+  MetalBorrowedTextureReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture_replacement>();
+  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeMetalBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  return result;
+}
+
+Pointer<raw.mln_metal_surface_replacement> _writeMetalSurfaceReplacement(
+  MetalSurfaceReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_surface_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_surface_replacement>();
+  result.ref.size = sizeOf<raw.mln_metal_surface_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.layer = Pointer<Void>.fromAddress(value.layer.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_open_gl_borrowed_texture_replacement>
+_writeOpenGlBorrowedTextureReplacement(
+  OpenGlBorrowedTextureReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_open_gl_borrowed_texture_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_open_gl_borrowed_texture_replacement>();
+  result.ref.size = sizeOf<raw.mln_open_gl_borrowed_texture_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_open_gl_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeOpenGlBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  return result;
+}
+
+Pointer<raw.mln_open_gl_surface_replacement> _writeOpenGlSurfaceReplacement(
+  OpenGlSurfaceReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_open_gl_surface_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_open_gl_surface_replacement>();
+  result.ref.size = sizeOf<raw.mln_open_gl_surface_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_vulkan_borrowed_texture_replacement>
+_writeVulkanBorrowedTextureReplacement(
+  VulkanBorrowedTextureReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_borrowed_texture_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_borrowed_texture_replacement>();
+  result.ref.size = sizeOf<raw.mln_vulkan_borrowed_texture_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_vulkan_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeVulkanBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  return result;
+}
+
+Pointer<raw.mln_vulkan_surface_replacement> _writeVulkanSurfaceReplacement(
+  VulkanSurfaceReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_surface_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_surface_replacement>();
+  result.ref.size = sizeOf<raw.mln_vulkan_surface_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.surface = value.surface;
+  return result;
+}
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
   ResourceResponse value,
@@ -3413,10 +3559,10 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
     (arena, completion) =>
         raw.mln_map_request_repaint(_handle.raw, completion, nativeDiagnostic),
   );
-  void resize(LogicalExtent extent) => _discard(
+  void resize(LogicalSize logicalSize) => _discard(
     (arena, completion) => raw.mln_map_resize(
       _handle.raw,
-      _writeLogicalExtent(extent, arena).ref,
+      _writeLogicalSize(logicalSize, arena).ref,
       completion,
       nativeDiagnostic,
     ),
@@ -4938,16 +5084,21 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Sets the map's size.
   ///
-  /// `extent` must keep the scale factor that the map was created with. A map
-  /// with a render session takes its size from the session, so resize the
+  /// A map with a render session takes its size from the session, so resize the
   /// session with `RenderSessionHandle.resize()` instead.
   ///
   /// See `mln_map_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<CommandCompletion> resize(LogicalExtent extent) => _command(
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the map has a render session.
+  /// - `Status.invalidState` when a render session attached to the map before
+  ///   the resize applied.
+  Future<CommandCompletion> resize(LogicalSize logicalSize) => _command(
     (arena, completion) => raw.mln_map_resize(
       _handle.raw,
-      _writeLogicalExtent(extent, arena).ref,
+      _writeLogicalSize(logicalSize, arena).ref,
       completion,
       nativeDiagnostic,
     ),
@@ -5915,10 +6066,10 @@ final class OffscreenDeviceHandle implements Finalizable {
 
 extension type RenderSessionHandleDiscarding._(RenderSessionHandle _owner) {
   _NativeRenderSession get _handle => _owner._handle;
-  void resize(LogicalExtent extent) => _discard(
+  void resize(LogicalSize logicalSize) => _discard(
     (arena, completion) => raw.mln_render_session_resize(
       _handle.raw,
-      _writeLogicalExtent(extent, arena).ref,
+      _writeLogicalSize(logicalSize, arena).ref,
       completion,
       nativeDiagnostic,
     ),
@@ -6386,9 +6537,8 @@ final class RenderSessionHandle implements Finalizable {
 
   /// Resizes the session's target and its map.
   ///
-  /// `extent` must keep the session's scale factor. To change the scale factor,
-  /// give the session a new target or attach a new session. Release every
-  /// acquired frame first.
+  /// The session renders at the map's scale factor. Release every acquired
+  /// frame first.
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6399,10 +6549,10 @@ final class RenderSessionHandle implements Finalizable {
   ///   it new textures of the new size instead.
   /// - `Status.targetLost` when the session loses its target before the resize
   ///   applies.
-  Future<CommandCompletion> resize(LogicalExtent extent) => _command(
+  Future<CommandCompletion> resize(LogicalSize logicalSize) => _command(
     (arena, completion) => raw.mln_render_session_resize(
       _handle.raw,
-      _writeLogicalExtent(extent, arena).ref,
+      _writeLogicalSize(logicalSize, arena).ref,
       completion,
       nativeDiagnostic,
     ),
@@ -6431,9 +6581,9 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Use it to resize the ring, or to give the session textures again after
   /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-  /// The new ring must have as many textures as the old one, and the same
-  /// device and command queue. Once the replacement completes, the session no
-  /// longer uses the old textures.
+  /// Once the replacement completes, the session no longer uses the old
+  /// textures. A replacement with the textures and sizes that the ring renders
+  /// into already changes nothing.
   ///
   /// See `mln_render_session_set_metal_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6443,12 +6593,12 @@ final class RenderSessionHandle implements Finalizable {
   /// - `Status.unsupported` when the new textures have a different pixel format
   ///   than the old ones. Attach a new session to change it.
   Future<void> setMetalBorrowedTextureTarget(
-    MetalBorrowedTextureDescriptor descriptor,
+    MetalBorrowedTextureReplacement replacement,
   ) => _run(
     (arena, completion) =>
         raw.mln_render_session_set_metal_borrowed_texture_target(
           _handle.raw,
-          _writeMetalBorrowedTextureDescriptor(descriptor, arena),
+          _writeMetalBorrowedTextureReplacement(replacement, arena),
           completion,
           nativeDiagnostic,
         ),
@@ -6457,38 +6607,40 @@ final class RenderSessionHandle implements Finalizable {
   /// Replaces the Metal layer that the session renders to.
   ///
   /// Use it to give the session a layer again after
-  /// `RenderSessionHandle.releaseTarget()`, or to move it to another layer. The
-  /// new layer must use the same device. Once the replacement completes, the
-  /// session no longer uses the old layer.
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another layer, or to
+  /// resize it. Once the replacement completes, the session no longer uses the
+  /// old layer. A replacement with the layer and logical size that the session
+  /// renders to already changes nothing.
   ///
   /// See `mln_render_session_set_metal_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) => _run(
-    (arena, completion) => raw.mln_render_session_set_metal_surface_target(
-      _handle.raw,
-      _writeMetalSurfaceDescriptor(descriptor, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
+  Future<void> setMetalSurfaceTarget(MetalSurfaceReplacement replacement) =>
+      _run(
+        (arena, completion) => raw.mln_render_session_set_metal_surface_target(
+          _handle.raw,
+          _writeMetalSurfaceReplacement(replacement, arena),
+          completion,
+          nativeDiagnostic,
+        ),
+      );
 
   /// Replaces the OpenGL textures that a borrowed ring renders into.
   ///
   /// Use it to resize the ring, or to give the session textures again after
   /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-  /// The new ring must have as many textures as the old one, and the same
-  /// context. Once the replacement completes, the session no longer uses the
-  /// old textures.
+  /// Once the replacement completes, the session no longer uses the old
+  /// textures. A replacement with the textures and sizes that the ring renders
+  /// into already changes nothing.
   ///
   /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   Future<void> setOpenGlBorrowedTextureTarget(
-    OpenGlBorrowedTextureDescriptor descriptor,
+    OpenGlBorrowedTextureReplacement replacement,
   ) => _run(
     (arena, completion) =>
         raw.mln_render_session_set_open_gl_borrowed_texture_target(
           _handle.raw,
-          _writeOpenGlBorrowedTextureDescriptor(descriptor, arena),
+          _writeOpenGlBorrowedTextureReplacement(replacement, arena),
           completion,
           nativeDiagnostic,
         ),
@@ -6497,18 +6649,19 @@ final class RenderSessionHandle implements Finalizable {
   /// Replaces the OpenGL surface that the session presents to.
   ///
   /// Use it to give the session a surface again after
-  /// `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-  /// The new surface must use the same context. Once the replacement completes,
-  /// the session no longer uses the old surface.
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another surface, or
+  /// to resize it. Once the replacement completes, the session no longer uses
+  /// the old surface. A replacement with the surface and logical size that the
+  /// session presents to already changes nothing.
   ///
   /// See `mln_render_session_set_open_gl_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> setOpenGlSurfaceTarget(OpenGlSurfaceDescriptor descriptor) =>
+  Future<void> setOpenGlSurfaceTarget(OpenGlSurfaceReplacement replacement) =>
       _run(
         (arena, completion) =>
             raw.mln_render_session_set_open_gl_surface_target(
               _handle.raw,
-              _writeOpenGlSurfaceDescriptor(descriptor, arena),
+              _writeOpenGlSurfaceReplacement(replacement, arena),
               completion,
               nativeDiagnostic,
             ),
@@ -6518,25 +6671,19 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Use it to resize the ring, or to give the session images again after
   /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-  /// The new ring must have as many images as the old one, and the same
-  /// context. Once the replacement completes, the session no longer uses the
-  /// old images.
+  /// Once the replacement completes, the session no longer uses the old images.
+  /// A replacement with the images and sizes that the ring renders into already
+  /// changes nothing.
   ///
   /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when the new ring has a different `format`,
-  ///   `final_layout`, or `owner` than the old one. Attach a new session to
-  ///   change them.
   Future<void> setVulkanBorrowedTextureTarget(
-    VulkanBorrowedTextureDescriptor descriptor,
+    VulkanBorrowedTextureReplacement replacement,
   ) => _run(
     (arena, completion) =>
         raw.mln_render_session_set_vulkan_borrowed_texture_target(
           _handle.raw,
-          _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
+          _writeVulkanBorrowedTextureReplacement(replacement, arena),
           completion,
           nativeDiagnostic,
         ),
@@ -6545,9 +6692,10 @@ final class RenderSessionHandle implements Finalizable {
   /// Replaces the Vulkan surface that the session presents to.
   ///
   /// Use it to give the session a surface again after
-  /// `RenderSessionHandle.releaseTarget()`, or to move it to another surface.
-  /// The new surface must use the same context. Once the replacement completes,
-  /// the session no longer uses the old surface.
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another surface, or
+  /// to resize it. Once the replacement completes, the session no longer uses
+  /// the old surface. A replacement with the surface and logical size that the
+  /// session presents to already changes nothing.
   ///
   /// See `mln_render_session_set_vulkan_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -6556,11 +6704,11 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// - `Status.unsupported` when the new surface needs a different color format
   ///   or pre-rotation support than the old one. Attach a new session instead.
-  Future<void> setVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor) =>
+  Future<void> setVulkanSurfaceTarget(VulkanSurfaceReplacement replacement) =>
       _run(
         (arena, completion) => raw.mln_render_session_set_vulkan_surface_target(
           _handle.raw,
-          _writeVulkanSurfaceDescriptor(descriptor, arena),
+          _writeVulkanSurfaceReplacement(replacement, arena),
           completion,
           nativeDiagnostic,
         ),

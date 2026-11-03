@@ -1125,16 +1125,20 @@ internal constructor(
   /**
    * Sets the map's size.
    *
-   * `extent` must keep the scale factor that the map was created with. A map with a render session
-   * takes its size from the session, so resize the session with `RenderSessionHandle.resize()`
-   * instead.
+   * A map with a render session takes its size from the session, so resize the session with
+   * `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` when the map has a render session.
+   * - `Status.INVALID_STATE` when a render session attached to the map before the resize applied.
    */
-  public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
+  public fun resize(logicalSize: LogicalSize): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
-      check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
+      check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
     }
 
   /**
@@ -2058,9 +2062,9 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
     }
 
   /** [MapHandle.resize] without its completion. */
-  public fun resize(extent: LogicalExtent): Unit =
+  public fun resize(logicalSize: LogicalSize): Unit =
     nativeDiscard(owner, binding) {
-      check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
+      check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
     }
 
   /** [MapHandle.setBounds] without its completion. */

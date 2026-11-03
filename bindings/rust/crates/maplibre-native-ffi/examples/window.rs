@@ -71,9 +71,9 @@ impl MapWindow {
         width: u32,
         height: u32,
     ) -> Result<()> {
-        // The scale factor the session has now.
-        let extent = LogicalExtent::new(width, height, 2.0);
-        self.session.discarding().resize(extent)
+        // The window's new size in logical pixels.
+        let size = LogicalSize::new(width, height);
+        self.session.discarding().resize(size)
     }
 }
 // #endregion resize
@@ -110,16 +110,18 @@ async fn surface_lost(window: &mut MapWindow) -> Result<()> {
 ))]
 async fn surface_restored(
     window: &mut MapWindow,
-    vulkan: VulkanContextDescriptor,
     new_surface: u64,
 ) -> Result<()> {
     // #region lost-surface
-    let extent = LogicalExtent::new(800, 600, 2.0);
-    let surface =
-        VulkanSurfaceDescriptor::new(extent, vulkan, new_surface);
-    // SAFETY: the surface and the Vulkan objects outlive the session.
-    unsafe { window.session.set_vulkan_surface_target(&surface)? }
-        .await?;
+    let replacement = VulkanSurfaceReplacement::new(
+        LogicalSize::new(800, 600),
+        new_surface,
+    );
+    // SAFETY: the surface outlives the session.
+    unsafe {
+        window.session.set_vulkan_surface_target(&replacement)?
+    }
+    .await?;
 
     window.paused = false;
     window.demand_frame()?;
@@ -142,8 +144,9 @@ async fn render_to_window(
 ) -> Result<()> {
     // #region attach
     let surface = VulkanSurfaceDescriptor {
-        // The window's size in logical pixels, and its scale factor.
-        extent: LogicalExtent::new(800, 600, 2.0),
+        // The window's size in logical pixels. The map's scale factor
+        // turns it into pixels.
+        logical_size: LogicalSize::new(800, 600),
         // Your VkInstance, VkPhysicalDevice,
         // VkDevice, and graphics VkQueue.
         context: vulkan,

@@ -209,7 +209,7 @@ impl Graphics {
     pub fn attach_borrowed_texture(
         &self,
         map: &MapHandle,
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         ring: &[Texture<'_>],
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
@@ -223,7 +223,7 @@ impl Graphics {
                 #[cfg(mln_render_backend = "metal")]
                 BACKEND_METAL => map.attach_metal_borrowed_texture(
                     &MetalBorrowedTextureDescriptor::new(
-                        extent,
+                        logical_size,
                         physical_width,
                         physical_height,
                         ring.iter()
@@ -235,7 +235,7 @@ impl Graphics {
                 #[cfg(mln_render_backend = "vulkan")]
                 BACKEND_VULKAN => map.attach_vulkan_borrowed_texture(
                     &VulkanBorrowedTextureDescriptor::new(
-                        extent,
+                        logical_size,
                         physical_width,
                         physical_height,
                         VulkanContextDescriptor {
@@ -262,7 +262,7 @@ impl Graphics {
                 ),
                 _ => map.attach_open_gl_borrowed_texture(
                     &OpenGlBorrowedTextureDescriptor::new(
-                        extent,
+                        logical_size,
                         physical_width,
                         physical_height,
                         OpenGlContextDescriptor {
@@ -299,12 +299,12 @@ impl Graphics {
     pub fn borrowed_texture_session(
         &self,
         map: &MapHandle,
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         ring: &[Texture<'_>],
     ) -> Session {
         let (options, wakes) = Session::attach_options(Self::default_driver());
         Session::finish_attach(
-            self.attach_borrowed_texture(map, extent, ring, &options)
+            self.attach_borrowed_texture(map, logical_size, ring, &options)
                 .unwrap(),
             wakes,
         )

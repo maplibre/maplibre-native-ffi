@@ -283,11 +283,11 @@ impl WebGpuHostTexture {
 
     pub(super) fn descriptor(
         &self,
-        extent: LogicalExtent,
+        logical_size: LogicalSize,
         context: &WebGpuTestContext,
     ) -> WebGpuBorrowedTextureDescriptor {
         WebGpuBorrowedTextureDescriptor {
-            extent,
+            logical_size,
             physical_width: self.width,
             physical_height: self.height,
             context: context.descriptor(),

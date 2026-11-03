@@ -68,7 +68,8 @@ internal static class Texture
         // #region attach-borrowed
         var ring = new VulkanBorrowedTextureDescriptor
         {
-            Extent = new LogicalExtent(800, 600, 2),
+            // The map's size in logical pixels.
+            LogicalSize = new LogicalSize(800, 600),
             // The size of your textures in device pixels.
             PhysicalWidth = 1600,
             PhysicalHeight = 1200,
@@ -91,9 +92,9 @@ internal static class Texture
         // #endregion attach-borrowed
 
         // #region resize-borrowed
-        ring = ring with
+        var resized = new VulkanBorrowedTextureReplacement
         {
-            Extent = new LogicalExtent(1024, 768, 2),
+            LogicalSize = new LogicalSize(1024, 768),
             PhysicalWidth = 2048,
             PhysicalHeight = 1536,
             // Your new textures, at the new size.
@@ -104,7 +105,7 @@ internal static class Texture
             ],
         };
 
-        await session.SetVulkanBorrowedTextureTargetAsync(ring);
+        await session.SetVulkanBorrowedTextureTargetAsync(resized);
         // vkDestroyImageView and vkDestroyImage
         DestroyTextures(images, views);
         // #endregion resize-borrowed

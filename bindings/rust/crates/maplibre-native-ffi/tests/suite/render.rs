@@ -6,13 +6,13 @@ use maplibre_native_ffi::*;
 use crate::support::graphics::{Graphics, Texture, with_frame_view};
 use crate::support::*;
 
-const EXTENT: LogicalExtent = LogicalExtent::new(32, 16, 1.0);
+const SIZE: LogicalSize = LogicalSize::new(32, 16);
 
 fn styled_fixture() -> Fixture {
     let fixture = Fixture::with_map_options(MapOptions::new(LogicalExtent::new(
-        EXTENT.width,
-        EXTENT.height,
-        EXTENT.scale_factor,
+        SIZE.width,
+        SIZE.height,
+        1.0,
     )));
     fixture.load_style(BACKGROUND_STYLE_JSON);
     // The first frame renders the update that this publishes.
@@ -23,13 +23,13 @@ fn styled_fixture() -> Fixture {
 /// A styled fixture with an offscreen session attached.
 fn offscreen_fixture() -> (Fixture, Session) {
     let fixture = styled_fixture();
-    let session = Session::offscreen(fixture.map(), EXTENT);
+    let session = Session::offscreen(fixture.map(), SIZE);
     (fixture, session)
 }
 
-/// A host texture of EXTENT's size, for one slot of a borrowed ring.
+/// A host texture of SIZE, for one slot of a borrowed ring.
 fn host_texture(graphics: &Graphics) -> Texture<'_> {
-    graphics.texture(EXTENT.width, EXTENT.height)
+    graphics.texture(SIZE.width, SIZE.height)
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn a_drain_before_any_demand_returns_no_batch() {
     let graphics = Graphics::new();
     let ring = [host_texture(&graphics)];
     let fixture = styled_fixture();
-    let session = graphics.borrowed_texture_session(fixture.map(), EXTENT, &ring);
+    let session = graphics.borrowed_texture_session(fixture.map(), SIZE, &ring);
     // Native writes a null batch and a null frame, which read as empty and as
     // no value.
     assert!(session.handle.drain_frame_results().unwrap().is_empty());
@@ -71,7 +71,7 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     // The test holds two frames at once, one in each texture.
     let ring = [host_texture(&graphics), host_texture(&graphics)];
     let fixture = styled_fixture();
-    let session = graphics.borrowed_texture_session(fixture.map(), EXTENT, &ring);
+    let session = graphics.borrowed_texture_session(fixture.map(), SIZE, &ring);
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let frame = session
         .handle
@@ -93,7 +93,8 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     };
     let (size, session_abandon) = with_frame_view(&frame, || {
         // Releasing a sibling frame leaves this view's texture alone.
-        sibling.release(&cpu_complete).unwrap();
+        // SAFETY: a CPU-complete sync names no graphics object.
+        unsafe { sibling.release(&cpu_complete) }.unwrap();
         session.handle.abandon().unwrap_err().status()
     })
     .unwrap();
@@ -102,7 +103,8 @@ fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     assert_eq!(session_abandon, Status::Busy);
 
     // Once the view's scope ends, the frame releases.
-    frame.release(&cpu_complete).unwrap();
+    // SAFETY: a CPU-complete sync names no graphics object.
+    unsafe { frame.release(&cpu_complete) }.unwrap();
     session.close();
 }
 
@@ -138,7 +140,7 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     let (options, wakes) = Session::attach_options(RenderDriverKind::CoreWorker);
     let (session, attached) = fixture
         .map()
-        .attach_offscreen(&OffscreenDescriptor::new(EXTENT), &options, None)
+        .attach_offscreen(&OffscreenDescriptor::new(SIZE), &options, None)
         .unwrap();
     // The drop races the attachment. Native owns the session either way, so
     // the completion still resolves and nothing leaks.

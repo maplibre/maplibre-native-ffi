@@ -191,6 +191,7 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   public var state: RenderSessionState
+  /// The target's logical size, and the map's scale factor.
   public var extent: LogicalExtent
   public var generation: UInt64
   public var frameGeneration: UInt64

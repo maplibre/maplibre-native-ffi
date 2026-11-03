@@ -84,7 +84,7 @@ void a_resize_queued_before_detach_completes_as_failed() {
   auto blocker = DriverBlocker{};
   block_driver(fixture, blocker);
   auto resize = mln_test_completion_default(0);
-  const auto extent = mln_logical_extent{32, 48, 1.0};
+  const auto extent = mln_logical_size{32, 48};
   MLN_TEST_OK(mln_render_session_resize(
     fixture.render.session, extent, &resize.descriptor, nullptr
   ));
@@ -519,8 +519,8 @@ void resize_and_driver_exceptions_use_the_session_failure_path() {
     auto failed = mln_test_completion_default(0);
     if (resize_failure) {
       MLN_TEST_OK(mln_render_session_resize(
-        fixture.render.session, mln_logical_extent{32, 48, 1.0},
-        &failed.descriptor, nullptr
+        fixture.render.session, mln_logical_size{32, 48}, &failed.descriptor,
+        nullptr
       ));
     } else {
       MLN_TEST_OK(
@@ -806,7 +806,7 @@ void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
   mln_test_render_demand_forced(&fixture.render, 9002);
   auto resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.render.session, mln_logical_extent{64, 64, 1.0}, &resize.descriptor,
+    fixture.render.session, mln_logical_size{64, 64}, &resize.descriptor,
     nullptr
   ));
   MLN_TEST_OK(mln_test_map_fence(fixture.map));
@@ -978,7 +978,7 @@ void supersession_preserves_a_forced_demand_after_a_resize() {
   MLN_TEST_OK(demand_frame(fixture, demand));
   auto resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.render.session, mln_logical_extent{32, 48, 1.0}, &resize.descriptor,
+    fixture.render.session, mln_logical_size{32, 48}, &resize.descriptor,
     nullptr
   ));
   mln_test_render_demand_forced(&fixture.render, 102);
@@ -1012,7 +1012,7 @@ void scheduler_service_preserves_a_forced_demand_after_a_resize() {
   live->scheduler.schedule([] {});
   auto resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.render.session, mln_logical_extent{32, 48, 1.0}, &resize.descriptor,
+    fixture.render.session, mln_logical_size{32, 48}, &resize.descriptor,
     nullptr
   ));
   mln_test_render_demand_forced(&fixture.render, 201);
@@ -1033,7 +1033,7 @@ void scheduler_service_preserves_a_forced_demand_after_a_resize() {
 
 struct ConcurrentResize {
   mln_render_session session;
-  mln_logical_extent extent;
+  mln_logical_size extent;
   mln_test_completion* completion;
   mln_status status = MLN_STATUS_NATIVE_ERROR;
 };
@@ -1052,8 +1052,8 @@ void concurrent_resizes_publish_matching_map_and_driver_extents() {
   create_offscreen_fixture(fixture);
   auto first = mln_test_completion_default(0);
   auto second = mln_test_completion_default(0);
-  auto a = ConcurrentResize{fixture.render.session, {32, 48, 1.0}, &first};
-  auto b = ConcurrentResize{fixture.render.session, {48, 32, 1.0}, &second};
+  auto a = ConcurrentResize{fixture.render.session, {32, 48}, &first};
+  auto b = ConcurrentResize{fixture.render.session, {48, 32}, &second};
   points.hold(SyncPoint::RenderExtentPublished);
   auto* submitting_a = mln_test_thread_start(submit_concurrent_resize, &a);
   TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::RenderExtentPublished, 1));

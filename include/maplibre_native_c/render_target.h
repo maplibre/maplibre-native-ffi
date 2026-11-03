@@ -18,7 +18,8 @@ extern "C" {
 #endif
 
 /** A Vulkan non-dispatchable handle, such as a `VkImage`, as an integer. */
-typedef uint64_t mln_vulkan_non_dispatchable_handle;
+typedef uint64_t mln_vulkan_non_dispatchable_handle
+  MLN_BINDING("native_object=true");
 
 /** The null Vulkan non-dispatchable handle. */
 #define MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL UINT64_C(0)
@@ -172,7 +173,7 @@ typedef struct mln_gpu_sync {
   uint32_t size;
   mln_gpu_sync_kind kind;
   /** The object to wait on, for the kinds that name one. */
-  uint64_t handle MLN_BINDING("lifetime=owner");
+  uint64_t handle MLN_BINDING("lifetime=owner;native_object=true");
   uint64_t value;
 } mln_gpu_sync;
 
@@ -294,7 +295,7 @@ typedef enum mln_web_gl_context_kind : uint32_t {
 typedef struct mln_web_gl_context_descriptor {
   mln_web_gl_context_kind kind;
   /** Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context. */
-  int32_t context;
+  int32_t context MLN_BINDING("native_object=true");
   /** The canvas's CSS selector, for a transferred canvas. */
   mln_buffer_view canvas_selector;
 } mln_web_gl_context_descriptor;

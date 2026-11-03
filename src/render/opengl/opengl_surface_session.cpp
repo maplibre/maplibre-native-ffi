@@ -147,22 +147,13 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 
   // The outgoing surface is never touched, which a host may already have
   // destroyed; activate() makes the new one current on the next render.
-  void set_surface(const mln_open_gl_surface_descriptor& descriptor) {
+  void set_surface(void* surface, mln::Size size) {
     // The surface alone. The context descriptor stays as it was at attach: this
     // session's GL context was created from it, and WGL context creation still
     // reads its device_context.
-    descriptor_.surface = descriptor.surface;
+    descriptor_.surface = surface;
     fallback_drawable_ = false;
-    setRenderableSize(
-      mln::Size{
-        mln::core::physical_dimension(
-          descriptor.extent.width, descriptor.extent.scale_factor
-        ),
-        mln::core::physical_dimension(
-          descriptor.extent.height, descriptor.extent.scale_factor
-        )
-      }
-    );
+    setRenderableSize(size);
   }
 
   // Stops presenting through the host surface, so the host may destroy it.
@@ -181,11 +172,6 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     }
     return true;
 #endif
-  }
-
-  [[nodiscard]] auto context_descriptor() const
-    -> const mln_open_gl_context_descriptor& {
-    return descriptor_.context;
   }
 
   void updateAssumedState() override {
@@ -470,18 +456,10 @@ class OpenGLSurfaceSessionBackend final
     backend_.resize(mln::Size{physical_width, physical_height});
   }
 
-  auto set_opengl_target(const mln_open_gl_surface_descriptor& descriptor)
-    -> mln_status override {
-    if (!mln::core::opengl_context_matches(
-          backend_.context_descriptor(), descriptor.context,
-          mln::core::OpenGLContextMatch::ShareGroup
-        )) {
-      mln::core::set_thread_error(
-        "OpenGL surface target must name the context this session attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    backend_.set_surface(descriptor);
+  auto set_opengl_target(
+    const mln_open_gl_surface_replacement& replacement, mln::Size physical_size
+  ) -> mln_status override {
+    backend_.set_surface(replacement.surface, physical_size);
     return MLN_STATUS_OK;
   }
 
@@ -517,17 +495,14 @@ auto opengl_surface_attach_start(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_session_extent(*session, descriptor->extent);
+  const auto size_status = size_new_session(*session, descriptor->logical_size);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
+  session->target_identity = {render_target_handle(descriptor->surface)};
   auto copied = *descriptor;
   const auto transferred = opengl::is_transferred_webgl_canvas(copied.context);
   auto selector =
@@ -575,7 +550,8 @@ auto opengl_surface_attach_start(
 }
 
 auto opengl_surface_set_target_start(
-  mln_render_session session, const mln_open_gl_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_open_gl_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -585,23 +561,31 @@ auto opengl_surface_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status =
-    validate_opengl_surface_descriptor(descriptor, true);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status =
+    validate_opengl_surface_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
+  // The session's context comes from this build's only provider. WGL and EGL
+  // make it current on the surface; a WebGL context names its canvas instead.
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  if (replacement->surface != nullptr) {
+    set_thread_error(
+      "WebGL surface must be null; the context names its canvas"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto copied = *descriptor;
+#else
+  if (replacement->surface == nullptr) {
+    set_thread_error("OpenGL surface must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+#endif
+  const auto copied = *replacement;
   return enqueue_surface_retarget(
-    session, copied.extent,
-    [copied](mln_render_session_object& live) {
-      return live.surface.backend->set_opengl_target(copied);
+    session, copied.logical_size, {render_target_handle(copied.surface)},
+    [copied](mln_render_session_object& live, mln::Size physical_size) {
+      return live.surface.backend->set_opengl_target(copied, physical_size);
     },
     std::move(checked_completion),
     valueless_completion<&mln_render_session_set_open_gl_surface_target>()

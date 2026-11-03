@@ -30,9 +30,10 @@ public extension RenderSessionHandle {
     /// Use it to resize the ring, or to give the session textures again after
     /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame
     /// first.
-    /// The new ring must have as many textures as the old one, and the same
-    /// device and command queue. Once the replacement completes, the session no
-    /// longer uses the old textures.
+    /// Once the replacement completes, the session no longer uses the old
+    /// textures. A replacement with the textures and sizes that the ring
+    /// renders
+    /// into already changes nothing.
     ///
     /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -43,7 +44,7 @@ public extension RenderSessionHandle {
     /// format
     ///   than the old ones. Attach a new session to change it.
     func setMetalBorrowedTextureTarget(
-      descriptor bindingArg0: MetalBorrowedTextureDescriptor
+      replacement bindingArg0: MetalBorrowedTextureReplacement
     ) async throws {
       try await nativeUnit { raw, arena, completion, diagnostic in
         try mln_render_session_set_metal_borrowed_texture_target(
@@ -60,14 +61,14 @@ public extension RenderSessionHandle {
   ///
   /// Use it to resize the ring, or to give the session textures again after
   /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-  /// The new ring must have as many textures as the old one, and the same
-  /// context. Once the replacement completes, the session no longer uses the
-  /// old textures.
+  /// Once the replacement completes, the session no longer uses the old
+  /// textures. A replacement with the textures and sizes that the ring renders
+  /// into already changes nothing.
   ///
   /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func setOpenGlBorrowedTextureTarget(
-    descriptor bindingArg0: OpenGlBorrowedTextureDescriptor
+    replacement bindingArg0: OpenGlBorrowedTextureReplacement
   ) async throws {
     try await nativeUnit { raw, arena, completion, diagnostic in
       try mln_render_session_set_open_gl_borrowed_texture_target(
@@ -85,20 +86,16 @@ public extension RenderSessionHandle {
     /// Use it to resize the ring, or to give the session images again after
     /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame
     /// first.
-    /// The new ring must have as many images as the old one, and the same
-    /// context. Once the replacement completes, the session no longer uses the
-    /// old images.
+    /// Once the replacement completes, the session no longer uses the old
+    /// images.
+    /// A replacement with the images and sizes that the ring renders into
+    /// already
+    /// changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `Status.unsupported` when the new ring has a different `format`,
-    ///   `final_layout`, or `owner` than the old one. Attach a new session to
-    ///   change them.
     func setVulkanBorrowedTextureTarget(
-      descriptor bindingArg0: VulkanBorrowedTextureDescriptor
+      replacement bindingArg0: VulkanBorrowedTextureReplacement
     ) async throws {
       try await nativeUnit { raw, arena, completion, diagnostic in
         try mln_render_session_set_vulkan_borrowed_texture_target(

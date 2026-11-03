@@ -293,12 +293,6 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     return getResource<MetalSurfaceRenderableResource>().try_bind();
   }
 
-  // A null device in a descriptor names no device at all, which every session
-  // satisfies; the session keeps the one it attached with either way.
-  [[nodiscard]] auto has_device(MTL::Device* other) const -> bool {
-    return other == nullptr || other == device.get();
-  }
-
   void activate() override {}
   void deactivate() override {}
 };
@@ -331,26 +325,11 @@ class MetalSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
-  auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
-    -> mln_status override {
-    if (!backend_.has_device(
-          static_cast<MTL::Device*>(descriptor.context.device)
-        )) {
-      mln::core::set_thread_error(
-        "Metal surface target must name the device this session attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
+  auto set_metal_target(
+    const mln_metal_surface_replacement& replacement, mln::Size physical_size
+  ) -> mln_status override {
     backend_.set_layer(
-      static_cast<CA::MetalLayer*>(descriptor.layer),
-      mln::Size{
-        mln::core::physical_dimension(
-          descriptor.extent.width, descriptor.extent.scale_factor
-        ),
-        mln::core::physical_dimension(
-          descriptor.extent.height, descriptor.extent.scale_factor
-        )
-      }
+      static_cast<CA::MetalLayer*>(replacement.layer), physical_size
     );
     return MLN_STATUS_OK;
   }
@@ -382,12 +361,11 @@ auto metal_surface_attach_start(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  const auto size_status = size_new_session(*session, descriptor->logical_size);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   // The retains below send messages to the descriptor's layer and device, so
   // this session validates the request before start_attach_render_session does.
@@ -397,9 +375,7 @@ auto metal_surface_attach_start(
     return request_status;
   }
 
-  auto session = std::make_shared<mln_render_session_object>();
-  session->map = map;
-  set_session_extent(*session, descriptor->extent);
+  session->target_identity = {render_target_handle(descriptor->layer)};
   auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
   auto device =
     NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
@@ -428,7 +404,7 @@ auto metal_surface_attach_start(
 }
 
 auto metal_surface_set_target_start(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session session, const mln_metal_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -438,29 +414,21 @@ auto metal_surface_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status =
+    validate_metal_surface_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  const auto copied = *descriptor;
-  auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
-  auto device =
-    NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
+  const auto copied = *replacement;
+  auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(replacement->layer));
   return enqueue_surface_retarget(
-    session, copied.extent,
-    [copied, layer = std::move(layer),
-     device = std::move(device)](mln_render_session_object& live) {
+    session, copied.logical_size, {render_target_handle(copied.layer)},
+    [copied, layer = std::move(layer)](
+      mln_render_session_object& live, mln::Size physical_size
+    ) {
       auto retained = copied;
       retained.layer = layer.get();
-      retained.context.device = device.get();
-      return live.surface.backend->set_metal_target(retained);
+      return live.surface.backend->set_metal_target(retained, physical_size);
     },
     std::move(checked_completion),
     valueless_completion<&mln_render_session_set_metal_surface_target>()

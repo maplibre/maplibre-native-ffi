@@ -870,10 +870,11 @@ int32_t mln_kw_mln_map_request_still_image(
 }
 
 int32_t mln_kw_mln_map_resize(
-  int64_t map, uintptr_t extent, uintptr_t completion, uintptr_t out_diagnostic
+  int64_t map, uintptr_t logical_size, uintptr_t completion,
+  uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_resize(
-    (mln_map)map, *(const mln_logical_extent*)(uintptr_t)extent,
+    (mln_map)map, *(const mln_logical_size*)(uintptr_t)logical_size,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
@@ -1404,11 +1405,12 @@ int32_t mln_kw_mln_render_session_release_target(
 }
 
 int32_t mln_kw_mln_render_session_resize(
-  int64_t session, uintptr_t extent, uintptr_t completion,
+  int64_t session, uintptr_t logical_size, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_resize(
-    (mln_render_session)session, *(const mln_logical_extent*)(uintptr_t)extent,
+    (mln_render_session)session,
+    *(const mln_logical_size*)(uintptr_t)logical_size,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
@@ -1422,89 +1424,89 @@ int32_t mln_kw_mln_render_session_service_driver_work(
 }
 
 int32_t mln_kw_mln_render_session_set_metal_borrowed_texture_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_metal_borrowed_texture_target(
     (mln_render_session)session,
-    (const mln_metal_borrowed_texture_descriptor*)descriptor,
+    (const mln_metal_borrowed_texture_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_metal_surface_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_metal_surface_target(
     (mln_render_session)session,
-    (const mln_metal_surface_descriptor*)descriptor,
+    (const mln_metal_surface_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_open_gl_borrowed_texture_target(
     (mln_render_session)session,
-    (const mln_open_gl_borrowed_texture_descriptor*)descriptor,
+    (const mln_open_gl_borrowed_texture_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_open_gl_surface_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_open_gl_surface_target(
     (mln_render_session)session,
-    (const mln_open_gl_surface_descriptor*)descriptor,
+    (const mln_open_gl_surface_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_vulkan_borrowed_texture_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_vulkan_borrowed_texture_target(
     (mln_render_session)session,
-    (const mln_vulkan_borrowed_texture_descriptor*)descriptor,
+    (const mln_vulkan_borrowed_texture_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_vulkan_surface_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_vulkan_surface_target(
     (mln_render_session)session,
-    (const mln_vulkan_surface_descriptor*)descriptor,
+    (const mln_vulkan_surface_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_web_gpu_borrowed_texture_target(
     (mln_render_session)session,
-    (const mln_web_gpu_borrowed_texture_descriptor*)descriptor,
+    (const mln_web_gpu_borrowed_texture_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 
 int32_t mln_kw_mln_render_session_set_web_gpu_surface_target(
-  int64_t session, uintptr_t descriptor, uintptr_t completion,
+  int64_t session, uintptr_t replacement, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_set_web_gpu_surface_target(
     (mln_render_session)session,
-    (const mln_web_gpu_surface_descriptor*)descriptor,
+    (const mln_web_gpu_surface_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }

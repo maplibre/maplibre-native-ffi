@@ -79,7 +79,7 @@ auto retarget_retains_submission(mln_map map) -> const char* {
 
     auto descriptor = mln_metal_surface_descriptor{};
     descriptor.size = sizeof(mln_metal_surface_descriptor);
-    descriptor.extent = {.width = 256, .height = 256, .scale_factor = 1.0};
+    descriptor.logical_size = {.width = 256, .height = 256};
     descriptor.context.device = (__bridge void*)device;
     descriptor.layer = (__bridge void*)initial_layer;
     auto options = mln_render_session_attach_options{};
@@ -124,10 +124,13 @@ auto retarget_retains_submission(mln_map map) -> const char* {
       OBJC_ASSOCIATION_RETAIN_NONATOMIC
     );
     probe = nil;
-    descriptor.layer = (__bridge void*)replacement_layer;
+    auto target = mln_metal_surface_replacement{};
+    target.size = sizeof(mln_metal_surface_replacement);
+    target.logical_size = descriptor.logical_size;
+    target.layer = (__bridge void*)replacement_layer;
     auto replacement = mln_test_completion_default(0);
     const auto replacement_status = mln_render_session_set_metal_surface_target(
-      session, &descriptor, &replacement.descriptor, nullptr
+      session, &target, &replacement.descriptor, nullptr
     );
     replacement_layer = nil;
     if (replacement_deallocated.load()) {

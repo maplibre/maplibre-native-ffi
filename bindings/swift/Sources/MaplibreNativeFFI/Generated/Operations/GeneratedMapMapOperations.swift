@@ -195,14 +195,19 @@ public extension MapHandle {
 
   /// Sets the map's size.
   ///
-  /// `extent` must keep the scale factor that the map was created with. A map
-  /// with a render session takes its size from the session, so resize the
+  /// A map with a render session takes its size from the session, so resize the
   /// session with `RenderSessionHandle.resize()` instead.
   ///
   /// See `mln_map_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` when the map has a render session.
+  /// - `Status.invalidState` when a render session attached to the map before
+  ///   the resize applied.
   @discardableResult
-  func resize(extent bindingArg0: LogicalExtent) async throws
+  func resize(logicalSize bindingArg0: LogicalSize) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in mln_map_resize(
@@ -334,7 +339,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func resize(extent bindingArg0: LogicalExtent) throws {
+  func resize(logicalSize bindingArg0: LogicalSize) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_map_resize(
       raw,
       bindingArg0.nativeValue(),

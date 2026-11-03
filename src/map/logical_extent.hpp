@@ -23,4 +23,16 @@ inline auto validate_logical_extent(
   return MLN_STATUS_OK;
 }
 
+// The rule for a logical size without a scale factor, which a render session
+// takes from its map: a nonzero width and height.
+inline auto validate_logical_size(
+  const mln_logical_size& size, const char* message
+) -> mln_status {
+  if (size.width == 0 || size.height == 0) {
+    set_thread_error(message);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 }  // namespace mln::core

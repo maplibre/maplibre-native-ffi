@@ -51,7 +51,133 @@ auto validate_borrowed_textures(
   return MLN_STATUS_OK;
 }
 
+auto validate_metal_textures(
+  const mln_metal_borrowed_texture* textures, size_t count
+) -> mln_status {
+  return validate_borrowed_textures(
+    textures, count,
+    [](const mln_metal_borrowed_texture& entry) { return entry.texture; },
+    "Metal texture must not be null"
+  );
+}
+
+auto validate_vulkan_textures(
+  const mln_vulkan_borrowed_texture* textures, size_t count
+) -> mln_status {
+  const auto status = validate_borrowed_textures(
+    textures, count,
+    [](const mln_vulkan_borrowed_texture& entry) { return entry.image; },
+    "Vulkan handles must not be null"
+  );
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  for (size_t index = 0; index < count; ++index) {
+    if (textures[index].image_view == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL) {
+      set_thread_error("Vulkan handles must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_opengl_textures(
+  const mln_open_gl_borrowed_texture* textures, size_t count
+) -> mln_status {
+  return validate_borrowed_textures(
+    textures, count,
+    [](const mln_open_gl_borrowed_texture& entry) { return entry.texture; },
+    "OpenGL texture must be specified"
+  );
+}
+
+auto validate_webgpu_textures(
+  const mln_web_gpu_borrowed_texture* textures, size_t count
+) -> mln_status {
+  const auto status = validate_borrowed_textures(
+    textures, count,
+    [](const mln_web_gpu_borrowed_texture& entry) { return entry.texture; },
+    "WebGPU texture and texture_view must not be null"
+  );
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  for (size_t index = 0; index < count; ++index) {
+    if (textures[index].texture_view == nullptr) {
+      set_thread_error("WebGPU texture and texture_view must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
+// The checks every borrowed-ring replacement shares, ahead of its textures.
+template <typename Replacement>
+auto validate_borrowed_replacement(
+  const Replacement* replacement, const char* size_message
+) -> mln_status {
+  if (replacement == nullptr) {
+    set_thread_error("texture replacement must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (replacement->size < sizeof(Replacement)) {
+    set_thread_error(size_message);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return validate_logical_size(
+    replacement->logical_size, "texture dimensions must be positive"
+  );
+}
+
 }  // namespace
+
+auto validate_metal_borrowed_texture_replacement(
+  const mln_metal_borrowed_texture_replacement* replacement
+) -> mln_status {
+  const auto status = validate_borrowed_replacement(
+    replacement, "mln_metal_borrowed_texture_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  return validate_metal_textures(
+    replacement->textures, replacement->texture_count
+  );
+}
+
+auto validate_vulkan_borrowed_texture_replacement(
+  const mln_vulkan_borrowed_texture_replacement* replacement
+) -> mln_status {
+  const auto status = validate_borrowed_replacement(
+    replacement, "mln_vulkan_borrowed_texture_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  return validate_vulkan_textures(
+    replacement->textures, replacement->texture_count
+  );
+}
+
+auto validate_opengl_borrowed_texture_replacement(
+  const mln_open_gl_borrowed_texture_replacement* replacement
+) -> mln_status {
+  const auto status = validate_borrowed_replacement(
+    replacement, "mln_open_gl_borrowed_texture_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  return validate_opengl_textures(
+    replacement->textures, replacement->texture_count
+  );
+}
+
+auto validate_webgpu_borrowed_texture_replacement(
+  const mln_web_gpu_borrowed_texture_replacement* replacement
+) -> mln_status {
+  const auto status = validate_borrowed_replacement(
+    replacement, "mln_web_gpu_borrowed_texture_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  return validate_webgpu_textures(
+    replacement->textures, replacement->texture_count
+  );
+}
 
 auto validate_webgpu_borrowed_texture_descriptor(
   const mln_web_gpu_borrowed_texture_descriptor* descriptor
@@ -66,29 +192,20 @@ auto validate_webgpu_borrowed_texture_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "texture dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   const auto context_status = validate_webgpu_context(descriptor->context);
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  const auto textures_status = validate_borrowed_textures(
-    descriptor->textures, descriptor->texture_count,
-    [](const mln_web_gpu_borrowed_texture& entry) { return entry.texture; },
-    "WebGPU texture and texture_view must not be null"
-  );
+  const auto textures_status =
+    validate_webgpu_textures(descriptor->textures, descriptor->texture_count);
   if (textures_status != MLN_STATUS_OK) {
     return textures_status;
-  }
-  for (size_t index = 0; index < descriptor->texture_count; ++index) {
-    if (descriptor->textures[index].texture_view == nullptr) {
-      set_thread_error("WebGPU texture and texture_view must not be null");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
   }
   // WGPUTextureFormat_Undefined is zero; the WebGPU build asserts that.
   if (descriptor->format == 0) {
@@ -109,16 +226,14 @@ auto validate_metal_borrowed_texture_descriptor(
     set_thread_error("mln_metal_borrowed_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "texture dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
-  return validate_borrowed_textures(
-    descriptor->textures, descriptor->texture_count,
-    [](const mln_metal_borrowed_texture& entry) { return entry.texture; },
-    "Metal texture must not be null"
+  return validate_metal_textures(
+    descriptor->textures, descriptor->texture_count
   );
 }
 
@@ -135,11 +250,11 @@ auto validate_vulkan_borrowed_texture_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "texture dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   const auto context_status = validate_vulkan_context(
     descriptor->context, "Vulkan handles must not be null"
@@ -147,22 +262,10 @@ auto validate_vulkan_borrowed_texture_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  const auto textures_status = validate_borrowed_textures(
-    descriptor->textures, descriptor->texture_count,
-    [](const mln_vulkan_borrowed_texture& entry) { return entry.image; },
-    "Vulkan handles must not be null"
-  );
+  const auto textures_status =
+    validate_vulkan_textures(descriptor->textures, descriptor->texture_count);
   if (textures_status != MLN_STATUS_OK) {
     return textures_status;
-  }
-  for (size_t index = 0; index < descriptor->texture_count; ++index) {
-    if (
-      descriptor->textures[index].image_view ==
-      MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL
-    ) {
-      set_thread_error("Vulkan handles must not be null");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
   }
   // VK_FORMAT_UNDEFINED and VK_IMAGE_LAYOUT_UNDEFINED are both zero; the Vulkan
   // build asserts that, since this file is built without the Vulkan headers.
@@ -205,11 +308,11 @@ auto validate_opengl_borrowed_texture_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_logical_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "texture dimensions must be positive"
   );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
   }
   const auto context_status =
     validate_opengl_context(descriptor->context, require_supported_provider);
@@ -225,10 +328,8 @@ auto validate_opengl_borrowed_texture_descriptor(
     set_thread_error("OpenGL texture and target must be specified");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return validate_borrowed_textures(
-    descriptor->textures, descriptor->texture_count,
-    [](const mln_open_gl_borrowed_texture& entry) { return entry.texture; },
-    "OpenGL texture and target must be specified"
+  return validate_opengl_textures(
+    descriptor->textures, descriptor->texture_count
   );
 }
 

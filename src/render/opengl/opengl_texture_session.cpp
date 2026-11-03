@@ -65,6 +65,7 @@ namespace {
 constexpr auto opengl_texture_target = uint32_t{GL_TEXTURE_2D};
 
 using mln::core::OpenGLBorrowedTarget;
+using mln::core::OpenGLBorrowedTextures;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 auto egl_has_extension(EGLDisplay display, std::string_view name) -> bool {
@@ -671,7 +672,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
       : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mln::gfx::HeadlessBackend(size),
         context_(target.descriptor.context),
-        borrowed_textures_(borrowed_texture_names(target)),
+        borrowed_textures_(borrowed_texture_names(target.textures)),
         ring_(target.textures.size()) {}
 
   OpenGLTextureBackend(const OpenGLTextureBackend&) = delete;
@@ -769,18 +770,14 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
-  void set_borrowed_textures(const OpenGLBorrowedTarget& target) {
-    borrowed_textures_ = borrowed_texture_names(target);
+  void set_borrowed_textures(const OpenGLBorrowedTextures& target) {
+    borrowed_textures_ = borrowed_texture_names(target.textures);
     // setSize() drops the selected renderable unconditionally, and the reset
     // drops the parked ones, so every slot rebuilds its framebuffer against
     // its new texture even when the size is unchanged. No context is made
     // current: the framebuffer and renderbuffer names go to the context's
     // abandoned lists and are deleted on the next render.
-    setSize(
-      mln::Size{
-        target.descriptor.physical_width, target.descriptor.physical_height
-      }
-    );
+    setSize(target.physical_size);
     ring_.reset(borrowed_textures_.size());
     resource_size_ = {};
   }
@@ -995,11 +992,12 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   void destroy_native_context() {}
 #endif
 
-  static auto borrowed_texture_names(const OpenGLBorrowedTarget& target)
-    -> std::vector<uint32_t> {
+  static auto borrowed_texture_names(
+    const std::vector<mln_open_gl_borrowed_texture>& textures
+  ) -> std::vector<uint32_t> {
     auto names = std::vector<uint32_t>{};
-    names.reserve(target.textures.size());
-    for (const auto& entry : target.textures) names.push_back(entry.texture);
+    names.reserve(textures.size());
+    for (const auto& entry : textures) names.push_back(entry.texture);
     return names;
   }
 
@@ -1149,17 +1147,8 @@ class OpenGLTextureSessionBackend final
   }
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
-  auto set_opengl_borrowed_target(const OpenGLBorrowedTarget& target)
+  auto set_opengl_borrowed_target(const OpenGLBorrowedTextures& target)
     -> mln_status override {
-    if (!mln::core::opengl_context_matches(
-          backend_.context_descriptor(), target.descriptor.context,
-          mln::core::OpenGLContextMatch::Exact
-        )) {
-      mln::core::set_thread_error(
-        "OpenGL texture target must name the context this session attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
     backend_.set_borrowed_textures(target);
     return MLN_STATUS_OK;
   }
@@ -1432,9 +1421,12 @@ auto opengl_borrowed_texture_attach_start(
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_borrowed_session_extent(
-    *session, descriptor->extent, descriptor->physical_width,
+  size_new_borrowed_session(
+    *session, descriptor->logical_size, descriptor->physical_width,
     descriptor->physical_height
+  );
+  session->target_identity = render_target_identity(
+    std::span{descriptor->textures, descriptor->texture_count}
   );
   session->texture.mode = TextureSessionMode::Borrowed;
   const auto fences =
@@ -1484,7 +1476,7 @@ auto opengl_borrowed_texture_attach_start(
 
 auto opengl_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_open_gl_borrowed_texture_descriptor* descriptor,
+  const mln_open_gl_borrowed_texture_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -1494,26 +1486,23 @@ auto opengl_borrowed_texture_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status =
-    validate_opengl_borrowed_texture_descriptor(descriptor, true);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  if (descriptor->target != opengl_texture_target) {
-    set_thread_error("OpenGL texture target must be GL_TEXTURE_2D");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto replacement_status =
+    validate_opengl_borrowed_texture_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
   const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
+    replacement->physical_width, replacement->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+  auto target = OpenGLBorrowedTextures{*replacement};
+  auto identity = render_target_identity(std::span{target.textures});
   return enqueue_borrowed_texture_retarget(
-    session, descriptor->texture_count, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [target =
-       OpenGLBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+    session, replacement->texture_count, replacement->logical_size,
+    target.physical_size, std::move(identity),
+    [target = std::move(target)](mln_render_session_object& live, mln::Size) {
       return live.texture.backend->set_opengl_borrowed_target(target);
     },
     std::move(checked_completion),

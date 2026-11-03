@@ -971,11 +971,11 @@ static jint mln_map_request_still_image_jni(
 }
 
 static jint mln_map_resize_jni(
-  JNIEnv* env, jclass type, jlong map, jlong extent, jlong completion,
+  JNIEnv* env, jclass type, jlong map, jlong logical_size, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_map_resize(
-    (mln_map)map, MLN_JNI_RECORD(mln_logical_extent, extent),
+    (mln_map)map, MLN_JNI_RECORD(mln_logical_size, logical_size),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -1604,11 +1604,11 @@ static jint mln_render_session_release_target_jni(
 }
 
 static jint mln_render_session_resize_jni(
-  JNIEnv* env, jclass type, jlong session, jlong extent, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong logical_size, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_resize(
-    (mln_render_session)session, MLN_JNI_RECORD(mln_logical_extent, extent),
+    (mln_render_session)session, MLN_JNI_RECORD(mln_logical_size, logical_size),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -1624,96 +1624,102 @@ static jint mln_render_session_service_driver_work_jni(
 }
 
 static jint mln_render_session_set_metal_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_metal_borrowed_texture_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_metal_borrowed_texture_descriptor*, descriptor),
+    MLN_JNI_POINTER(const mln_metal_borrowed_texture_replacement*, replacement),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_metal_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_metal_surface_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_metal_surface_descriptor*, descriptor),
+    MLN_JNI_POINTER(const mln_metal_surface_replacement*, replacement),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_open_gl_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_open_gl_borrowed_texture_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_open_gl_borrowed_texture_descriptor*, descriptor),
+    MLN_JNI_POINTER(
+      const mln_open_gl_borrowed_texture_replacement*, replacement
+    ),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_open_gl_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_open_gl_surface_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_open_gl_surface_descriptor*, descriptor),
+    MLN_JNI_POINTER(const mln_open_gl_surface_replacement*, replacement),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_vulkan_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_vulkan_borrowed_texture_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_vulkan_borrowed_texture_descriptor*, descriptor),
+    MLN_JNI_POINTER(
+      const mln_vulkan_borrowed_texture_replacement*, replacement
+    ),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_vulkan_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_vulkan_surface_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_vulkan_surface_descriptor*, descriptor),
+    MLN_JNI_POINTER(const mln_vulkan_surface_replacement*, replacement),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_web_gpu_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_web_gpu_borrowed_texture_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_web_gpu_borrowed_texture_descriptor*, descriptor),
+    MLN_JNI_POINTER(
+      const mln_web_gpu_borrowed_texture_replacement*, replacement
+    ),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
 static jint mln_render_session_set_web_gpu_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong descriptor, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_set_web_gpu_surface_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_web_gpu_surface_descriptor*, descriptor),
+    MLN_JNI_POINTER(const mln_web_gpu_surface_replacement*, replacement),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );

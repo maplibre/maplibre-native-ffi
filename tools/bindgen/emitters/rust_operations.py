@@ -706,11 +706,14 @@ def method_code(
             else "crate::abi::require_abi_version();",
         )
 
+    # A host graphics object, named by a pointer or by an integer, is one that
+    # native code uses without a check that safe Rust could rely on.
     def has_pointer(value):
         return (
             False
             if value.registration
             else value.kind == "native_pointer"
+            or value.native_object
             or bool(value.element and has_pointer(value.element))
             or any(has_pointer(field.value) for field in value.fields if field.public)
         )

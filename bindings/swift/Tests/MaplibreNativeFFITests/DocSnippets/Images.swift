@@ -15,9 +15,15 @@ private func copyPixels(_: Data, stride _: UInt32) {}
 
 private func images(runtime: RuntimeHandle) async throws {
   // #region map
-  let extent = LogicalExtent(width: 800, height: 600, scaleFactor: 2)
   let created = try runtime.createMap(
-    options: MapOptions(initialExtent: extent, mapMode: .static)
+    options: MapOptions(
+      initialExtent: LogicalExtent(
+        width: 800,
+        height: 600,
+        scaleFactor: 2
+      ),
+      mapMode: .static
+    )
   )
   let map = created.map
   try await created.ready.value
@@ -30,7 +36,9 @@ private func images(runtime: RuntimeHandle) async throws {
 
   // #region attach
   let attached = try map.attachOffscreen(
-    descriptor: OffscreenDescriptor(extent: extent),
+    descriptor: OffscreenDescriptor(
+      logicalSize: LogicalSize(width: 800, height: 600)
+    ),
     // The library renders on its own thread.
     options: RenderSessionAttachOptions(driver: .coreWorker)
   )

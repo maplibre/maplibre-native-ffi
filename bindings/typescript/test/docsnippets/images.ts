@@ -18,9 +18,8 @@ function copyPixels(_data: Uint8Array, _stride: number): void {}
 
 export async function images(runtime: RuntimeHandle): Promise<void> {
   // #region map
-  const extent = { width: 800, height: 600, scaleFactor: 2 };
   const { map, ready: mapReady } = runtime.createMap({
-    initialExtent: extent,
+    initialExtent: { width: 800, height: 600, scaleFactor: 2 },
     mapMode: MapMode.static,
   });
   await mapReady;
@@ -34,7 +33,7 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
 
   // #region attach
   const { session, ready: sessionReady } = map.attachOffscreen(
-    { extent },
+    { logicalSize: { width: 800, height: 600 } },
     // The library renders on its own thread.
     { driver: RenderDriverKind.coreWorker },
   );

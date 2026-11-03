@@ -1042,10 +1042,15 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_resize(map: Long, extent: Long, completion: Long, outDiagnostic: Long): Int =
+  actual fun mln_map_resize(
+    map: Long,
+    logicalSize: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_resize(
       map.toULong(),
-      extent.toCPointer<mln_logical_extent>()!!.pointed.readValue(),
+      logicalSize.toCPointer<mln_logical_size>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -1727,13 +1732,13 @@ internal actual object C {
 
   actual fun mln_render_session_resize(
     session: Long,
-    extent: Long,
+    logicalSize: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_resize(
       session.toULong(),
-      extent.toCPointer<mln_logical_extent>()!!.pointed.readValue(),
+      logicalSize.toCPointer<mln_logical_size>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -1746,104 +1751,104 @@ internal actual object C {
 
   actual fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_metal_borrowed_texture_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_metal_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_metal_surface_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_open_gl_borrowed_texture_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_open_gl_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_open_gl_surface_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_vulkan_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_vulkan_borrowed_texture_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_vulkan_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_vulkan_surface_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_borrowed_texture_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
   actual fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_surface_target(
       session.toULong(),
-      descriptor.toCPointer(),
+      replacement.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

@@ -1708,20 +1708,26 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Sets the map's size.
     /// </summary>
     /// <remarks>
-    /// <para><c>extent</c> must keep the scale factor that the map was created
-    /// with. A map with a render session takes its size from the session, so
+    /// <para>A map with a render session takes its size from the session, so
     /// resize the session with <c>RenderSessionHandle.ResizeAsync()</c>
     /// instead.</para>
     /// <para>See <c>mln_map_resize</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> when the map has a render
+    /// session.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when a render session
+    /// attached to the map before the resize applied.</description></item>
+    /// </list>
     /// </remarks>
-    public Task<CommandCompletion> ResizeAsync(LogicalExtent extent)
+    public Task<CommandCompletion> ResizeAsync(LogicalSize logicalSize)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_resize(
             Handle,
-            NativeLogicalExtent(extent),
+            NativeLogicalSize(logicalSize),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2900,14 +2906,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void Resize(LogicalExtent extent)
+        public void Resize(LogicalSize logicalSize)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_resize(
                     receiverHandle,
-                    NativeLogicalExtent(extent),
+                    NativeLogicalSize(logicalSize),
                     null,
                     Diagnostic
                 )

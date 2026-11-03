@@ -177,6 +177,9 @@ class ValuePlan:
     response: CallbackResponsePlan | None = None
     # Set only for kind="buffer".
     buffer_form: BufferForm | None = None
+    # An integer that names a host graphics object, which native code uses as
+    # it would a pointer.
+    native_object: bool = False
 
     @property
     def unwrapped(self) -> ValuePlan:
@@ -807,6 +810,7 @@ class ValueAttributes(TypedDict):
     nullable: bool
     length: str | None
     stride: str | None
+    native_object: bool
 
 
 class Binder:
@@ -923,6 +927,7 @@ class Binder:
             "nullable": metadata.get("nullable") == "true",
             "length": metadata.get("length"),
             "stride": metadata.get("stride"),
+            "native_object": metadata.get("native_object") == "true",
         }
         if metadata.get("kind") == "native_pointer":
             return ValuePlan(kind="native_pointer", **common)

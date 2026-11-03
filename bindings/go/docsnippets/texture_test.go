@@ -64,9 +64,8 @@ func renderToTexture(
 
 	// #region attach-borrowed
 	ring := maplibre.VulkanBorrowedTextureDescriptor{
-		Extent: maplibre.LogicalExtent{
-			Width: 800, Height: 600, ScaleFactor: 2,
-		},
+		// The map's size in logical pixels.
+		LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
 		// The size of your textures in device pixels.
 		PhysicalWidth:  1600,
 		PhysicalHeight: 1200,
@@ -95,18 +94,18 @@ func renderToTexture(
 	}
 
 	// #region resize-borrowed
-	ring.Extent = maplibre.LogicalExtent{
-		Width: 1024, Height: 768, ScaleFactor: 2,
-	}
-	ring.PhysicalWidth = 2048
-	ring.PhysicalHeight = 1536
-	// Your new textures, at the new size.
-	ring.Textures = []maplibre.VulkanBorrowedTexture{
-		{Image: newImages[0], ImageView: newViews[0]},
-		{Image: newImages[1], ImageView: newViews[1]},
+	resized := maplibre.VulkanBorrowedTextureReplacement{
+		LogicalSize:    maplibre.LogicalSize{Width: 1024, Height: 768},
+		PhysicalWidth:  2048,
+		PhysicalHeight: 1536,
+		// Your new textures, at the new size.
+		Textures: []maplibre.VulkanBorrowedTexture{
+			{Image: newImages[0], ImageView: newViews[0]},
+			{Image: newImages[1], ImageView: newViews[1]},
+		},
 	}
 
-	retargeted, err := session.SetVulkanBorrowedTextureTarget(ring)
+	retargeted, err := session.SetVulkanBorrowedTextureTarget(resized)
 	if err != nil {
 		return err
 	}

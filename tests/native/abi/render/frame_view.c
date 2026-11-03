@@ -314,11 +314,7 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, unchanged.disposition);
   TEST_ASSERT_EQUAL_UINT32(0, unchanged.view.size);
 
-  const mln_logical_extent resized = {
-    .width = 48,
-    .height = 32,
-    .scale_factor = 1.0,
-  };
+  const mln_logical_size resized = {.width = 48, .height = 32};
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
@@ -456,11 +452,7 @@ static void a_session_resize_reports_the_render_update_of_its_extent(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   render_frame(&fixture, 1);
 
-  const mln_logical_extent resized = {
-    .width = 48,
-    .height = 32,
-    .scale_factor = 1.0,
-  };
+  const mln_logical_size resized = {.width = 48, .height = 32};
   mln_test_completion resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
     fixture.session, resized, &resize.descriptor, NULL

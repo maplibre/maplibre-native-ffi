@@ -67,13 +67,9 @@
     width: UInt32,
     height: UInt32
   ) throws {
-    // The scale factor the session has now.
+    // The window's new size in logical pixels.
     try session.discarding.resize(
-      extent: LogicalExtent(
-        width: width,
-        height: height,
-        scaleFactor: 2
-      )
+      logicalSize: LogicalSize(width: width, height: height)
     )
   }
 
@@ -103,18 +99,12 @@
   }
 
   @MainActor private func surfaceRestored(
-    vulkan: VulkanContextDescriptor,
     newSurface: UInt64
   ) async throws {
     // #region lost-surface
     try await session.setVulkanSurfaceTarget(
-      descriptor: VulkanSurfaceDescriptor(
-        extent: LogicalExtent(
-          width: 800,
-          height: 600,
-          scaleFactor: 2
-        ),
-        context: vulkan,
+      replacement: VulkanSurfaceReplacement(
+        logicalSize: LogicalSize(width: 800, height: 600),
         surface: newSurface
       )
     )
@@ -131,12 +121,9 @@
     // #region attach
     let attached = try map.attachVulkanSurface(
       descriptor: VulkanSurfaceDescriptor(
-        // The window's size in logical pixels, and its scale factor.
-        extent: LogicalExtent(
-          width: 800,
-          height: 600,
-          scaleFactor: 2
-        ),
+        // The window's size in logical pixels. The map's scale factor
+        // turns it into pixels.
+        logicalSize: LogicalSize(width: 800, height: 600),
         // Your VkInstance, VkPhysicalDevice,
         // VkDevice, and graphics VkQueue.
         context: vulkan,

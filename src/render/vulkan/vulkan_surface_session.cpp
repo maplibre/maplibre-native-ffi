@@ -392,42 +392,33 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
   }
 
   [[nodiscard]] auto matches_surface(
-    const mln_vulkan_surface_descriptor& descriptor
+    mln_vulkan_non_dispatchable_handle surface
   ) const -> bool {
     // Nothing has been built yet, so there is nothing to be incompatible with.
     if (!resource) {
       return true;
     }
     return getResource<VulkanSurfaceRenderableResource>().matches_surface(
-      mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor.surface)
+      mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(surface)
     );
   }
 
-  void set_surface(const mln_vulkan_surface_descriptor& descriptor) {
-    const auto new_size = mln::Size{
-      mln::core::physical_dimension(
-        descriptor.extent.width, descriptor.extent.scale_factor
-      ),
-      mln::core::physical_dimension(
-        descriptor.extent.height, descriptor.extent.scale_factor
-      )
-    };
+  void set_surface(mln_vulkan_non_dispatchable_handle surface, mln::Size size) {
     // Nothing has been built yet, so the lazy path already takes the new
     // surface: the wrapper is created against descriptor_ on first use.
     if (!resource) {
-      descriptor_.surface = descriptor.surface;
-      mln::vulkan::Renderable::setSize(new_size);
+      descriptor_.surface = surface;
+      mln::vulkan::Renderable::setSize(size);
       return;
     }
     // The resource first, then this backend's own view of the target. Building
     // a swapchain can throw, and recording the surface before that would leave
     // the backend naming a target it does not have.
     getResource<VulkanSurfaceRenderableResource>().set_surface(
-      mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor.surface),
-      new_size
+      mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(surface), size
     );
-    descriptor_.surface = descriptor.surface;
-    mln::vulkan::Renderable::setSize(new_size);
+    descriptor_.surface = surface;
+    mln::vulkan::Renderable::setSize(size);
     adopt_swapchain_extent();
   }
 
@@ -436,9 +427,14 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
     descriptor_.surface = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
   }
 
-  [[nodiscard]] auto context_descriptor() const
-    -> const mln_vulkan_context_descriptor& {
-    return descriptor_.context;
+  // The attach descriptor with `surface` in place of its own, to check the new
+  // surface against the context the session renders with.
+  [[nodiscard]] auto descriptor_for(
+    mln_vulkan_non_dispatchable_handle surface
+  ) const -> mln_vulkan_surface_descriptor {
+    auto descriptor = descriptor_;
+    descriptor.surface = surface;
+    return descriptor;
   }
 
   void activate() override {}
@@ -558,24 +554,17 @@ class VulkanSurfaceSessionBackend final
 
   void quarantine() noexcept override { backend_.release_queue_access(); }
 
-  auto set_vulkan_target(const mln_vulkan_surface_descriptor& descriptor)
-    -> mln_status override {
-    if (!mln::core::vulkan_context_matches(
-          backend_.context_descriptor(), descriptor.context
-        )) {
-      mln::core::set_thread_error(
-        "Vulkan surface target must name the instance, physical device, "
-        "device, and graphics queue this session attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    const auto handles_status = validate_vulkan_handles(descriptor);
+  auto set_vulkan_target(
+    const mln_vulkan_surface_replacement& replacement, mln::Size physical_size
+  ) -> mln_status override {
+    const auto handles_status =
+      validate_vulkan_handles(backend_.descriptor_for(replacement.surface));
     if (handles_status != MLN_STATUS_OK) {
       return handles_status;
     }
     auto matches = false;
     try {
-      matches = backend_.matches_surface(descriptor);
+      matches = backend_.matches_surface(replacement.surface);
     } catch (const std::exception& exception) {
       // Reported rather than thrown: nothing has been touched yet, and an
       // escaping exception would take the session through the mid-swap recovery
@@ -590,7 +579,7 @@ class VulkanSurfaceSessionBackend final
         "for; destroy the session and attach again to change them"
       );
     }
-    backend_.set_surface(descriptor);
+    backend_.set_surface(replacement.surface, physical_size);
     return MLN_STATUS_OK;
   }
 
@@ -621,17 +610,14 @@ auto vulkan_surface_attach_start(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_session_extent(*session, descriptor->extent);
+  const auto size_status = size_new_session(*session, descriptor->logical_size);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
+  session->target_identity = {descriptor->surface};
   session->accepts_queue_lock = true;
   const auto copied = *descriptor;
   session->initialize_backend = [copied](mln_render_session_object& target) {
@@ -661,7 +647,7 @@ auto vulkan_surface_attach_start(
 }
 
 auto vulkan_surface_set_target_start(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session session, const mln_vulkan_surface_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -671,22 +657,16 @@ auto vulkan_surface_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status =
+    validate_vulkan_surface_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  const auto copied = *descriptor;
+  const auto copied = *replacement;
   return enqueue_surface_retarget(
-    session, copied.extent,
-    [copied](mln_render_session_object& live) {
-      return live.surface.backend->set_vulkan_target(copied);
+    session, copied.logical_size, {copied.surface},
+    [copied](mln_render_session_object& live, mln::Size physical_size) {
+      return live.surface.backend->set_vulkan_target(copied, physical_size);
     },
     std::move(checked_completion),
     valueless_completion<&mln_render_session_set_vulkan_surface_target>()

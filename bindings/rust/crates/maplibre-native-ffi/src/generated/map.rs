@@ -1431,17 +1431,22 @@ impl MapHandle {
 
     /// Sets the map's size.
     ///
-    /// `extent` must keep the scale factor that the map was created with. A map
-    /// with a render session takes its size from the session, so resize the
-    /// session with `RenderSessionHandle::resize()` instead.
+    /// A map with a render session takes its size from the session, so resize
+    /// the session with `RenderSessionHandle::resize()` instead.
     ///
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<CommandCompletion>> {
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the map has a render session.
+    /// - `Status::InvalidState` when a render session attached to the map
+    ///   before the resize applied.
+    pub fn resize(&self, logical_size: LogicalSize) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
-        let extent = call.input(&extent)?;
+        let logical_size = call.input(&logical_size)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_resize(map, extent, completion, out_diagnostic)
+            sys::mln_map_resize(map, logical_size, completion, out_diagnostic)
         })
     }
 
@@ -2558,17 +2563,20 @@ impl MapHandleDiscarding<'_> {
 
     /// Sets the map's size.
     ///
-    /// `extent` must keep the scale factor that the map was created with. A map
-    /// with a render session takes its size from the session, so resize the
-    /// session with `RenderSessionHandle::resize()` instead.
+    /// A map with a render session takes its size from the session, so resize
+    /// the session with `RenderSessionHandle::resize()` instead.
     ///
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn resize(&self, extent: LogicalExtent) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` when the map has a render session.
+    pub fn resize(&self, logical_size: LogicalSize) -> Result<()> {
         let mut call = self.0.inner.call();
-        let extent = call.input(&extent)?;
+        let logical_size = call.input(&logical_size)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_resize(map, extent, completion, out_diagnostic)
+            sys::mln_map_resize(map, logical_size, completion, out_diagnostic)
         })
     }
 

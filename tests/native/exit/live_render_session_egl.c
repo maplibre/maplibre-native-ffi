@@ -17,7 +17,7 @@ static mln_status attach(
   if (options->driver == MLN_RENDER_DRIVER_CORE_WORKER) {
     const mln_offscreen_descriptor descriptor = {
       .size = sizeof(mln_offscreen_descriptor),
-      .extent = probe_extent,
+      .logical_size = probe_size,
     };
     return mln_map_attach_offscreen(
       map, &descriptor, options, MLN_HANDLE_NULL, out_session, completion, NULL
@@ -29,7 +29,7 @@ static mln_status attach(
   mln_open_gl_borrowed_texture_descriptor descriptor = {
     .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
-  descriptor.extent = probe_extent;
+  descriptor.logical_size = probe_size;
   descriptor.physical_width = texture->width;
   descriptor.physical_height = texture->height;
   descriptor.context = (mln_open_gl_context_descriptor){

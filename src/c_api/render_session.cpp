@@ -96,11 +96,13 @@ auto mln_acquired_frame_release(
 }
 
 auto mln_render_session_resize(
-  mln_render_session session, mln_logical_extent extent,
+  mln_render_session session, mln_logical_size logical_size,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_resize_start(session, extent, completion);
+    return mln::core::render_session_resize_start(
+      session, logical_size, completion
+    );
   });
 }
 

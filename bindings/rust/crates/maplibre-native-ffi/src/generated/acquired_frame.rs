@@ -66,7 +66,13 @@ impl AcquiredFrameHandle {
     /// - `Status::Unsupported` when
     ///   `RenderSessionCapabilities::consumer_sync_kinds` lacks the kind of
     ///   `consumer_completion`.
-    pub fn release(self, consumer_completion: &GpuSync) -> std::result::Result<(), (Self, Error)> {
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn release(
+        self,
+        consumer_completion: &GpuSync,
+    ) -> std::result::Result<(), (Self, Error)> {
         self.consume(|frame| {
             let mut call = Call::new(frame);
             let consumer_completion = call.reference(&consumer_completion)?;

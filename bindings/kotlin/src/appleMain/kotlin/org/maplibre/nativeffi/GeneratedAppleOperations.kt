@@ -102,9 +102,9 @@ public fun MapHandle.attachMetalSurface(
  * Replaces the Metal textures that a borrowed ring renders into.
  *
  * Use it to resize the ring, or to give the session textures again after
- * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. The new ring must have
- * as many textures as the old one, and the same device and command queue. Once the replacement
- * completes, the session no longer uses the old textures.
+ * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
+ * completes, the session no longer uses the old textures. A replacement with the textures and sizes
+ * that the ring renders into already changes nothing.
  *
  * See `mln_render_session_set_metal_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -115,13 +115,13 @@ public fun MapHandle.attachMetalSurface(
  *   Attach a new session to change it.
  */
 public fun RenderSessionHandle.setMetalBorrowedTextureTarget(
-  descriptor: MetalBorrowedTextureDescriptor,
+  replacement: MetalBorrowedTextureReplacement,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_metal_borrowed_texture_target(
         handle,
-        writeMetalBorrowedTextureDescriptor(descriptor),
+        writeMetalBorrowedTextureReplacement(replacement),
         completion,
         diagnostic,
       ),
@@ -131,21 +131,22 @@ public fun RenderSessionHandle.setMetalBorrowedTextureTarget(
 /**
  * Replaces the Metal layer that the session renders to.
  *
- * Use it to give the session a layer again after `RenderSessionHandle.releaseTarget()`, or to move
- * it to another layer. The new layer must use the same device. Once the replacement completes, the
- * session no longer uses the old layer.
+ * Use it to give the session a layer again after `RenderSessionHandle.releaseTarget()`, to move it
+ * to another layer, or to resize it. Once the replacement completes, the session no longer uses the
+ * old layer. A replacement with the layer and logical size that the session renders to already
+ * changes nothing.
  *
  * See `mln_render_session_set_metal_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public fun RenderSessionHandle.setMetalSurfaceTarget(
-  descriptor: MetalSurfaceDescriptor,
+  replacement: MetalSurfaceReplacement,
 ): Deferred<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_metal_surface_target(
         handle,
-        writeMetalSurfaceDescriptor(descriptor),
+        writeMetalSurfaceReplacement(replacement),
         completion,
         diagnostic,
       ),

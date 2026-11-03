@@ -368,6 +368,12 @@ internal unsafe struct mln_logical_extent
     public double scale_factor;
 }
 
+internal unsafe struct mln_logical_size
+{
+    public uint width;
+    public uint height;
+}
+
 internal unsafe struct mln_map_options
 {
     public uint size;
@@ -435,12 +441,22 @@ internal unsafe struct mln_metal_borrowed_texture
 internal unsafe struct mln_metal_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
     public mln_metal_borrowed_texture* textures;
     public nuint texture_count;
     public void* command_queue;
+}
+
+internal unsafe struct mln_metal_borrowed_texture_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint physical_width;
+    public uint physical_height;
+    public mln_metal_borrowed_texture* textures;
+    public nuint texture_count;
 }
 
 internal unsafe struct mln_metal_context_descriptor
@@ -451,8 +467,15 @@ internal unsafe struct mln_metal_context_descriptor
 internal unsafe struct mln_metal_surface_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public mln_metal_context_descriptor context;
+    public void* layer;
+}
+
+internal unsafe struct mln_metal_surface_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
     public void* layer;
 }
 
@@ -529,7 +552,7 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
 internal unsafe struct mln_offscreen_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
 }
 
 internal unsafe struct mln_offscreen_device_options
@@ -549,13 +572,23 @@ internal unsafe struct mln_open_gl_borrowed_texture
 internal unsafe struct mln_open_gl_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
     public mln_open_gl_context_descriptor context;
     public mln_open_gl_borrowed_texture* textures;
     public nuint texture_count;
     public uint target;
+}
+
+internal unsafe struct mln_open_gl_borrowed_texture_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint physical_width;
+    public uint physical_height;
+    public mln_open_gl_borrowed_texture* textures;
+    public nuint texture_count;
 }
 
 internal unsafe struct mln_open_gl_context_descriptor
@@ -581,8 +614,15 @@ internal unsafe struct mln_open_gl_context_descriptor_data
 internal unsafe struct mln_open_gl_surface_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public mln_open_gl_context_descriptor context;
+    public void* surface;
+}
+
+internal unsafe struct mln_open_gl_surface_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
     public void* surface;
 }
 
@@ -1134,7 +1174,7 @@ internal unsafe struct mln_vulkan_borrowed_texture
 internal unsafe struct mln_vulkan_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
     public mln_vulkan_context_descriptor context;
@@ -1143,6 +1183,16 @@ internal unsafe struct mln_vulkan_borrowed_texture_descriptor
     public uint format;
     public uint final_layout;
     public mln_vulkan_image_owner owner;
+}
+
+internal unsafe struct mln_vulkan_borrowed_texture_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint physical_width;
+    public uint physical_height;
+    public mln_vulkan_borrowed_texture* textures;
+    public nuint texture_count;
 }
 
 internal unsafe struct mln_vulkan_context_descriptor
@@ -1159,8 +1209,15 @@ internal unsafe struct mln_vulkan_context_descriptor
 internal unsafe struct mln_vulkan_surface_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public mln_vulkan_context_descriptor context;
+    public ulong surface;
+}
+
+internal unsafe struct mln_vulkan_surface_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
     public ulong surface;
 }
 
@@ -1202,13 +1259,23 @@ internal unsafe struct mln_web_gpu_borrowed_texture
 internal unsafe struct mln_web_gpu_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
     public mln_web_gpu_context_descriptor context;
     public mln_web_gpu_borrowed_texture* textures;
     public nuint texture_count;
     public uint format;
+}
+
+internal unsafe struct mln_web_gpu_borrowed_texture_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint physical_width;
+    public uint physical_height;
+    public mln_web_gpu_borrowed_texture* textures;
+    public nuint texture_count;
 }
 
 internal unsafe struct mln_web_gpu_context_descriptor
@@ -1221,10 +1288,17 @@ internal unsafe struct mln_web_gpu_context_descriptor
 internal unsafe struct mln_web_gpu_surface_descriptor
 {
     public uint size;
-    public mln_logical_extent extent;
+    public mln_logical_size logical_size;
     public mln_web_gpu_context_descriptor context;
     public void* surface;
     public uint format;
+}
+
+internal unsafe struct mln_web_gpu_surface_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* surface;
 }
 
 internal unsafe struct mln_web_gpu_texture_frame

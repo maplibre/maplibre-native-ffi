@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -95,6 +96,73 @@ using OpenGLBorrowedTarget = BorrowedTarget<
 using WebGPUBorrowedTarget = BorrowedTarget<
   mln_web_gpu_borrowed_texture_descriptor, mln_web_gpu_borrowed_texture>;
 
+// The textures of a borrowed-ring replacement and their size, copied out as
+// BorrowedTarget copies an attach descriptor's. The ring keeps every other
+// input from its attach.
+template <typename Texture>
+struct BorrowedTextures {
+  template <typename Replacement>
+  explicit BorrowedTextures(const Replacement& source)
+      : physical_size(source.physical_width, source.physical_height),
+        textures(source.textures, source.textures + source.texture_count) {}
+
+  mln::Size physical_size;
+  std::vector<Texture> textures;
+};
+
+using MetalBorrowedTextures = BorrowedTextures<mln_metal_borrowed_texture>;
+using VulkanBorrowedTextures = BorrowedTextures<mln_vulkan_borrowed_texture>;
+using OpenGLBorrowedTextures = BorrowedTextures<mln_open_gl_borrowed_texture>;
+using WebGPUBorrowedTextures = BorrowedTextures<mln_web_gpu_borrowed_texture>;
+
+// The host objects that a session's target names: a surface handle, or each
+// texture of a borrowed ring in slot order. A replacement that names the same
+// objects at the same size leaves the session as it is.
+using RenderTargetIdentity = std::vector<std::uint64_t>;
+
+inline auto render_target_handle(const void* handle) -> std::uint64_t {
+  return reinterpret_cast<std::uintptr_t>(handle);
+}
+
+inline auto render_target_identity(
+  std::span<const mln_metal_borrowed_texture> textures
+) -> RenderTargetIdentity {
+  auto identity = RenderTargetIdentity{};
+  for (const auto& entry : textures)
+    identity.push_back(render_target_handle(entry.texture));
+  return identity;
+}
+
+inline auto render_target_identity(
+  std::span<const mln_vulkan_borrowed_texture> textures
+) -> RenderTargetIdentity {
+  auto identity = RenderTargetIdentity{};
+  for (const auto& entry : textures) {
+    identity.push_back(entry.image);
+    identity.push_back(entry.image_view);
+  }
+  return identity;
+}
+
+inline auto render_target_identity(
+  std::span<const mln_open_gl_borrowed_texture> textures
+) -> RenderTargetIdentity {
+  auto identity = RenderTargetIdentity{};
+  for (const auto& entry : textures) identity.push_back(entry.texture);
+  return identity;
+}
+
+inline auto render_target_identity(
+  std::span<const mln_web_gpu_borrowed_texture> textures
+) -> RenderTargetIdentity {
+  auto identity = RenderTargetIdentity{};
+  for (const auto& entry : textures) {
+    identity.push_back(render_target_handle(entry.texture));
+    identity.push_back(render_target_handle(entry.texture_view));
+  }
+  return identity;
+}
+
 // Thrown while a frame renders when the target can't take it this time. The
 // frame finishes with MLN_RENDER_RESULT_TARGET_NOT_READY, and a later demand
 // renders its update.
@@ -149,36 +217,40 @@ class SurfaceSessionBackend : public RenderSessionBackend {
     return MLN_STATUS_OK;
   }
 
-  // Presents through a new host surface, keeping the graphics context and every
-  // resource the renderer holds against it. The descriptor must name the
-  // context this session attached with; a backend rejects anything else.
-  virtual auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
-    -> mln_status {
-    (void)descriptor;
+  // Presents through a new host surface of `physical_size` pixels, keeping the
+  // graphics context and every resource the renderer holds against it.
+  virtual auto set_metal_target(
+    const mln_metal_surface_replacement& replacement, mln::Size physical_size
+  ) -> mln_status {
+    (void)replacement;
+    (void)physical_size;
     return unsupported_retarget(
       "session does not render through a Metal surface"
     );
   }
   virtual auto set_vulkan_target(
-    const mln_vulkan_surface_descriptor& descriptor
+    const mln_vulkan_surface_replacement& replacement, mln::Size physical_size
   ) -> mln_status {
-    (void)descriptor;
+    (void)replacement;
+    (void)physical_size;
     return unsupported_retarget(
       "session does not render through a Vulkan surface"
     );
   }
   virtual auto set_opengl_target(
-    const mln_open_gl_surface_descriptor& descriptor
+    const mln_open_gl_surface_replacement& replacement, mln::Size physical_size
   ) -> mln_status {
-    (void)descriptor;
+    (void)replacement;
+    (void)physical_size;
     return unsupported_retarget(
       "session does not render through an OpenGL surface"
     );
   }
   virtual auto set_webgpu_target(
-    const mln_web_gpu_surface_descriptor& descriptor
+    const mln_web_gpu_surface_replacement& replacement, mln::Size physical_size
   ) -> mln_status {
-    (void)descriptor;
+    (void)replacement;
+    (void)physical_size;
     return unsupported_retarget(
       "session does not render through a WebGPU surface"
     );
@@ -239,33 +311,32 @@ class TextureSessionBackend : public RenderSessionBackend {
   virtual void resize(mln::Size size) { headless_backend().setSize(size); }
 
   // Renders into a new ring of caller-owned textures, keeping the graphics
-  // context and every resource the renderer holds against it. The target names
-  // one texture per slot and the context this session attached with; a backend
-  // rejects any other context. On success the backend renders each slot into
-  // the texture at the slot's index, and no longer touches the textures it
-  // replaced.
-  virtual auto set_metal_borrowed_target(const MetalBorrowedTarget& target)
+  // context, every other input of the attach, and every resource the renderer
+  // holds against them. The replacement names one texture per slot. On success
+  // the backend renders each slot into the texture at the slot's index, and no
+  // longer touches the textures it replaced.
+  virtual auto set_metal_borrowed_target(const MetalBorrowedTextures& target)
     -> mln_status {
     (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned Metal texture"
     );
   }
-  virtual auto set_vulkan_borrowed_target(const VulkanBorrowedTarget& target)
+  virtual auto set_vulkan_borrowed_target(const VulkanBorrowedTextures& target)
     -> mln_status {
     (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned Vulkan image"
     );
   }
-  virtual auto set_opengl_borrowed_target(const OpenGLBorrowedTarget& target)
+  virtual auto set_opengl_borrowed_target(const OpenGLBorrowedTextures& target)
     -> mln_status {
     (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned OpenGL texture"
     );
   }
-  virtual auto set_webgpu_borrowed_target(const WebGPUBorrowedTarget& target)
+  virtual auto set_webgpu_borrowed_target(const WebGPUBorrowedTextures& target)
     -> mln_status {
     (void)target;
     return unsupported_retarget(
@@ -757,9 +828,9 @@ struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
   TextureSessionMode mode = TextureSessionMode::Offscreen;
   std::vector<RenderTextureSlot> slots;
-  // Borrowed-ring replacements accepted but not yet run. Acquisition waits for
-  // them, because every frame published before one runs names a texture that
-  // it replaces.
+  // Borrowed-ring replacements and releases accepted but not yet run.
+  // Acquisition waits for them, because every frame published before one runs
+  // may name a texture that it replaces.
   std::uint32_t pending_retargets = 0;
   // Rendered frames whose GPU work the backend has yet to report finished, and
   // whether the driver asked for that report.
@@ -822,6 +893,7 @@ struct mln_render_session_object
   uint32_t height = 0;
   uint32_t physical_width = 0;
   uint32_t physical_height = 0;
+  // The map's, which attach copies and nothing changes after.
   double scale_factor = 1.0;
 
   mutable std::mutex control_mutex;
@@ -867,6 +939,10 @@ struct mln_render_session_object
   // Set by a target release and cleared by the next target replacement. Read
   // and written only by driver work, which runs one item at a time.
   bool target_released = false;
+  // The host objects of the target that the session renders to, set by attach
+  // and by each target replacement. Only driver work reads or writes it after
+  // attach.
+  mln::core::RenderTargetIdentity target_identity;
   std::vector<mln_render_frame_result> frame_results;
   // Every accepted demand reserves its result before it can reach the driver.
   std::size_t unfinished_demands = 0;
@@ -1041,56 +1117,27 @@ auto logical_extent_physical_size(
   mln_logical_extent extent, uint32_t* out_width, uint32_t* out_height
 ) -> mln_status;
 
+// Sizes a session that is not attached yet at its map's scale factor, which
+// every session of the map renders at. `session.map` must be set. Fails when
+// the size is empty or its pixels overflow.
+auto size_new_session(
+  mln_render_session_object& session, mln_logical_size logical_size
+) -> mln_status;
+
+// Sizes a borrowed session that is not attached yet. Its owner sizes the
+// textures, so the caller states the physical size instead of deriving it.
+// `session.map` must be set.
+auto size_new_borrowed_session(
+  mln_render_session_object& session, mln_logical_size logical_size,
+  uint32_t physical_width, uint32_t physical_height
+) -> void;
+
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
 auto validate_opengl_context(
   const mln_open_gl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status;
 auto validate_webgpu_context(const mln_web_gpu_context_descriptor& context)
   -> mln_status;
-
-auto vulkan_context_matches(
-  const mln_vulkan_context_descriptor& lhs,
-  const mln_vulkan_context_descriptor& rhs
-) -> bool;
-
-// How strictly two OpenGL context descriptors have to agree across a target
-// replacement. A surface target carries its own drawable, so only the share
-// group has to match; a texture target keeps making the session's context
-// current against the handles it attached with, so those must be identical.
-enum class OpenGLContextMatch : uint8_t { ShareGroup, Exact };
-
-// Whether two OpenGL context descriptors name the same host context. The
-// proc-address loader is excluded: it is a way to reach a context, not part of
-// its identity.
-auto opengl_context_matches(
-  const mln_open_gl_context_descriptor& lhs,
-  const mln_open_gl_context_descriptor& rhs, OpenGLContextMatch strictness
-) -> bool;
-
-inline auto set_session_extent(
-  mln_render_session_object& session, const mln_logical_extent& extent
-) -> void {
-  session.width = extent.width;
-  session.height = extent.height;
-  session.scale_factor = extent.scale_factor;
-  session.physical_width =
-    physical_dimension(extent.width, extent.scale_factor);
-  session.physical_height =
-    physical_dimension(extent.height, extent.scale_factor);
-}
-
-// Borrowed targets are sized by their owner, so the caller states the physical
-// size instead of deriving it from the logical extent and scale factor.
-inline auto set_borrowed_session_extent(
-  mln_render_session_object& session, const mln_logical_extent& extent,
-  uint32_t physical_width, uint32_t physical_height
-) -> void {
-  session.width = extent.width;
-  session.height = extent.height;
-  session.scale_factor = extent.scale_factor;
-  session.physical_width = physical_width;
-  session.physical_height = physical_height;
-}
 
 inline auto validate_borrowed_physical_size(
   uint32_t physical_width, uint32_t physical_height
@@ -1135,44 +1182,47 @@ auto validate_render_session_retarget(
   mln_render_session_object*& out_session
 ) -> mln_status;
 
+// Swaps the backend's target for one of `physical_size` pixels.
 using RenderTargetReplacer =
-  std::function<mln_status(mln_render_session_object&)>;
+  std::function<mln_status(mln_render_session_object&, mln::Size)>;
 
 // Shared body behind every set-target entry point. Checks that the session is
-// live, attached, owned by this thread, and of the kind the descriptor targets,
-// then calls `replace`. On success the session takes the new extent and the
-// renderer is kept unless the scale factor changed. The per-backend entry point
-// validates its own descriptor first. The submissions below queue it, and size
-// the map to the new extent as they do.
+// live, attached, owned by this thread, and of the kind the replacement
+// targets. A replacement whose identity and size match the target the session
+// renders to returns at once, leaving the renderer and every published frame
+// as they are. Otherwise it calls `replace`, and on success the session takes
+// the new size and identity and keeps its renderer. The per-backend entry
+// point validates its own replacement first. The submissions below queue it,
+// and size the map to the new logical size as they do.
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
-  const mln_logical_extent& extent, uint32_t physical_width,
-  uint32_t physical_height, const RenderTargetReplacer& replace
+  mln_logical_size logical_size, mln::Size physical_size,
+  const RenderTargetIdentity& identity, const RenderTargetReplacer& replace
 ) -> mln_status;
 
 // Queues the replacement of a borrowed ring for render_session_set_target().
 // In the section that queues it, this checks that the session is attached,
 // that no frame is acquired, and that the replacement names one texture per
-// slot, and it retires every published frame. Acquisition then waits until the
-// replacement has run, because a frame published before it names a texture
-// that it replaces. The per-backend entry point validates its own descriptor
-// first, and `replace` owns a copy of it.
+// slot. Acquisition then waits until the replacement has run, because a frame
+// published before it names a texture that it may replace; a replacement that
+// runs drops every such frame. The per-backend entry point validates its own
+// replacement first, and `replace` owns a copy of it.
 auto enqueue_borrowed_texture_retarget(
   mln_render_session session, std::size_t texture_count,
-  const mln_logical_extent& extent, uint32_t physical_width,
-  uint32_t physical_height, RenderTargetReplacer replace,
+  mln_logical_size logical_size, mln::Size physical_size,
+  RenderTargetIdentity identity, RenderTargetReplacer replace,
   std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status;
 
 // Queues the replacement of a surface for render_session_set_target(). A
-// surface's physical size follows from its logical extent rather than being
-// stated by the caller. The per-backend entry point validates its own
-// descriptor and that physical size first, since the submission resizes the
-// map, and `replace` owns a copy of the descriptor.
+// surface's physical size follows from its logical size at the session's
+// scale factor rather than being stated by the caller, so this fails at once
+// when it overflows. The per-backend entry point validates its own replacement
+// first, and `replace` owns a copy of it.
 auto enqueue_surface_retarget(
-  mln_render_session session, const mln_logical_extent& extent,
-  RenderTargetReplacer replace, std::shared_ptr<Completion> completion,
-  ValuelessCompletion valueless
+  mln_render_session session, mln_logical_size logical_size,
+  RenderTargetIdentity identity, RenderTargetReplacer replace,
+  std::shared_ptr<Completion> completion, ValuelessCompletion valueless
 ) -> mln_status;
 auto render_session_dispose(
   mln_render_session session, const mln_completion* completion
@@ -1290,7 +1340,7 @@ auto acquired_frame_release(
   mln_acquired_frame frame, const mln_gpu_sync* consumer_completion
 ) -> mln_status;
 auto render_session_resize_start(
-  mln_render_session session, mln_logical_extent extent,
+  mln_render_session session, mln_logical_size logical_size,
   const mln_completion* completion
 ) -> mln_status;
 auto render_session_release_target_start(

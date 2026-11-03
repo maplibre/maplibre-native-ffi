@@ -2118,6 +2118,17 @@ fn generated_input_mln_logical_extent<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_logical_size<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_logical_size> {
+    let _ = storage;
+    let mut raw: sys::mln_logical_size = unsafe { std::mem::zeroed() };
+    raw.width = value.getattr("width")?.extract::<u32>()?;
+    raw.height = value.getattr("height")?.extract::<u32>()?;
+    Ok(raw)
+}
+
 fn generated_input_mln_map_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2237,7 +2248,7 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
 ) -> PyResult<sys::mln_metal_borrowed_texture_descriptor> {
     let mut raw: sys::mln_metal_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.textures = {
@@ -2248,6 +2259,25 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
         storage.keep_array(items)
     };
     raw.command_queue = value.getattr("command_queue")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_metal_borrowed_texture_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_metal_borrowed_texture_replacement> {
+    let mut raw: sys::mln_metal_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
+    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_metal_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     Ok(raw)
 }
 
@@ -2267,9 +2297,20 @@ fn generated_input_mln_metal_surface_descriptor<'py>(
 ) -> PyResult<sys::mln_metal_surface_descriptor> {
     let mut raw: sys::mln_metal_surface_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_metal_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.context =
         generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
+    raw.layer = value.getattr("layer")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_metal_surface_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_metal_surface_replacement> {
+    let mut raw: sys::mln_metal_surface_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_metal_surface_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.layer = value.getattr("layer")?.extract::<usize>()? as _;
     Ok(raw)
 }
@@ -2335,7 +2376,7 @@ fn generated_input_mln_offscreen_descriptor<'py>(
 ) -> PyResult<sys::mln_offscreen_descriptor> {
     let mut raw: sys::mln_offscreen_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_offscreen_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     Ok(raw)
 }
 
@@ -2381,7 +2422,7 @@ fn generated_input_mln_open_gl_borrowed_texture_descriptor<'py>(
 ) -> PyResult<sys::mln_open_gl_borrowed_texture_descriptor> {
     let mut raw: sys::mln_open_gl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
@@ -2394,6 +2435,25 @@ fn generated_input_mln_open_gl_borrowed_texture_descriptor<'py>(
         storage.keep_array(items)
     };
     raw.target = value.getattr("target")?.extract::<u32>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_open_gl_borrowed_texture_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_open_gl_borrowed_texture_replacement> {
+    let mut raw: sys::mln_open_gl_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
+    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_open_gl_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     Ok(raw)
 }
 
@@ -2432,9 +2492,20 @@ fn generated_input_mln_open_gl_surface_descriptor<'py>(
 ) -> PyResult<sys::mln_open_gl_surface_descriptor> {
     let mut raw: sys::mln_open_gl_surface_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_open_gl_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.context =
         generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
+    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_open_gl_surface_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_open_gl_surface_replacement> {
+    let mut raw: sys::mln_open_gl_surface_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_open_gl_surface_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
     Ok(raw)
 }
@@ -2992,7 +3063,7 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
 ) -> PyResult<sys::mln_vulkan_borrowed_texture_descriptor> {
     let mut raw: sys::mln_vulkan_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
@@ -3009,6 +3080,25 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
     raw.owner = value
         .getattr("owner")?
         .extract::<sys::mln_vulkan_image_owner>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_vulkan_borrowed_texture_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_vulkan_borrowed_texture_replacement> {
+    let mut raw: sys::mln_vulkan_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
+    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_vulkan_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     Ok(raw)
 }
 
@@ -3038,9 +3128,20 @@ fn generated_input_mln_vulkan_surface_descriptor<'py>(
 ) -> PyResult<sys::mln_vulkan_surface_descriptor> {
     let mut raw: sys::mln_vulkan_surface_descriptor = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.context =
         generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
+    raw.surface = value.getattr("surface")?.extract::<u64>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_vulkan_surface_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_vulkan_surface_replacement> {
+    let mut raw: sys::mln_vulkan_surface_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_vulkan_surface_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<u64>()?;
     Ok(raw)
 }
@@ -5091,27 +5192,31 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (extent))]
-    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (logical_size))]
+    fn resize(&self, py: Python<'_>, logical_size: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
+        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_resize(handle, extent_value, completion, diagnostic)
+                sys::mln_map_resize(handle, logical_size_value, completion, diagnostic)
             })
         }
     }
-    #[pyo3(signature = (extent))]
-    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (logical_size))]
+    fn _discard_resize(
+        &self,
+        py: Python<'_>,
+        logical_size: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
+        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_resize(handle, extent_value, completion, diagnostic)
+                sys::mln_map_resize(handle, logical_size_value, completion, diagnostic)
             })
         }
     }
@@ -7023,27 +7128,31 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (extent))]
-    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (logical_size))]
+    fn resize(&self, py: Python<'_>, logical_size: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
+        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
+                sys::mln_render_session_resize(handle, logical_size_value, completion, diagnostic)
             })
         }
     }
-    #[pyo3(signature = (extent))]
-    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (logical_size))]
+    fn _discard_resize(
+        &self,
+        py: Python<'_>,
+        logical_size: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
+        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
+                sys::mln_render_session_resize(handle, logical_size_value, completion, diagnostic)
             })
         }
     }
@@ -7058,16 +7167,16 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
-    #[pyo3(signature = (descriptor))]
+    #[pyo3(signature = (replacement))]
     fn set_metal_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
+        replacement: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_metal_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
+        let replacement_value =
+            generated_input_mln_metal_borrowed_texture_replacement(&replacement.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
@@ -7075,7 +7184,7 @@ impl RenderSessionHandle {
                 |completion, diagnostic| {
                     sys::mln_render_session_set_metal_borrowed_texture_target(
                         handle,
-                        &descriptor_value,
+                        &replacement_value,
                         completion,
                         diagnostic,
                     )
@@ -7084,16 +7193,16 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor))]
+    #[pyo3(signature = (replacement))]
     fn set_metal_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
+        replacement: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_metal_surface_descriptor(&descriptor.clone(), storage)?;
+        let replacement_value =
+            generated_input_mln_metal_surface_replacement(&replacement.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
@@ -7101,7 +7210,7 @@ impl RenderSessionHandle {
                 |completion, diagnostic| {
                     sys::mln_render_session_set_metal_surface_target(
                         handle,
-                        &descriptor_value,
+                        &replacement_value,
                         completion,
                         diagnostic,
                     )
@@ -7110,16 +7219,18 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor))]
+    #[pyo3(signature = (replacement))]
     fn set_open_gl_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
+        replacement: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_open_gl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
+        let replacement_value = generated_input_mln_open_gl_borrowed_texture_replacement(
+            &replacement.clone(),
+            storage,
+        )?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
@@ -7127,7 +7238,7 @@ impl RenderSessionHandle {
                 |completion, diagnostic| {
                     sys::mln_render_session_set_open_gl_borrowed_texture_target(
                         handle,
-                        &descriptor_value,
+                        &replacement_value,
                         completion,
                         diagnostic,
                     )
@@ -7136,16 +7247,16 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor))]
+    #[pyo3(signature = (replacement))]
     fn set_open_gl_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
+        replacement: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_open_gl_surface_descriptor(&descriptor.clone(), storage)?;
+        let replacement_value =
+            generated_input_mln_open_gl_surface_replacement(&replacement.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
@@ -7153,7 +7264,7 @@ impl RenderSessionHandle {
                 |completion, diagnostic| {
                     sys::mln_render_session_set_open_gl_surface_target(
                         handle,
-                        &descriptor_value,
+                        &replacement_value,
                         completion,
                         diagnostic,
                     )
@@ -7162,16 +7273,16 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor))]
+    #[pyo3(signature = (replacement))]
     fn set_vulkan_borrowed_texture_target(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
+        replacement: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_vulkan_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
+        let replacement_value =
+            generated_input_mln_vulkan_borrowed_texture_replacement(&replacement.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
@@ -7179,7 +7290,7 @@ impl RenderSessionHandle {
                 |completion, diagnostic| {
                     sys::mln_render_session_set_vulkan_borrowed_texture_target(
                         handle,
-                        &descriptor_value,
+                        &replacement_value,
                         completion,
                         diagnostic,
                     )
@@ -7188,16 +7299,16 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (descriptor))]
+    #[pyo3(signature = (replacement))]
     fn set_vulkan_surface_target(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
+        replacement: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_vulkan_surface_descriptor(&descriptor.clone(), storage)?;
+        let replacement_value =
+            generated_input_mln_vulkan_surface_replacement(&replacement.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
@@ -7205,7 +7316,7 @@ impl RenderSessionHandle {
                 |completion, diagnostic| {
                     sys::mln_render_session_set_vulkan_surface_target(
                         handle,
-                        &descriptor_value,
+                        &replacement_value,
                         completion,
                         diagnostic,
                     )

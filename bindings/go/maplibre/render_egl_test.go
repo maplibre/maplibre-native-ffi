@@ -14,7 +14,7 @@ const (
 // A shared EGL context takes the caller driver, which runs on the thread the
 // fixture made that context current on.
 func attachBorrowedTexture(
-	m *MapHandle, context testsupport.Context, extent LogicalExtent, textures []*testsupport.Texture,
+	m *MapHandle, context testsupport.Context, size LogicalSize, textures []*testsupport.Texture,
 	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
 	ring := make([]OpenGlBorrowedTexture, len(textures))
@@ -23,7 +23,7 @@ func attachBorrowedTexture(
 	}
 	info := textures[0].Info
 	return m.AttachOpenGlBorrowedTexture(OpenGlBorrowedTextureDescriptor{
-		Extent:         extent,
+		LogicalSize:    size,
 		PhysicalWidth:  info.Width,
 		PhysicalHeight: info.Height,
 		Textures:       ring,

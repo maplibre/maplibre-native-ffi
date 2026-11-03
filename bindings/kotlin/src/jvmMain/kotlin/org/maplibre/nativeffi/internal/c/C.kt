@@ -582,7 +582,7 @@ internal actual object C {
   private val mln_map_request_still_image =
     Ffm.downcall("mln_map_request_still_image", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_resize =
-    Ffm.downcall("mln_map_resize", JAVA_INT, JAVA_LONG, mln_logical_extent, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_map_resize", JAVA_INT, JAVA_LONG, mln_logical_size, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_bounds =
     Ffm.downcall("mln_map_set_bounds", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_custom_geometry_source_tile_data =
@@ -932,7 +932,7 @@ internal actual object C {
       "mln_render_session_resize",
       JAVA_INT,
       JAVA_LONG,
-      mln_logical_extent,
+      mln_logical_size,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -2106,10 +2106,15 @@ internal actual object C {
   actual fun mln_map_request_still_image(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_request_still_image.invokeExact(map, completion, outDiagnostic) as Int
 
-  actual fun mln_map_resize(map: Long, extent: Long, completion: Long, outDiagnostic: Long): Int =
+  actual fun mln_map_resize(
+    map: Long,
+    logicalSize: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
     mln_map_resize.invokeExact(
       map,
-      Ffm.value(extent, mln_logical_extent),
+      Ffm.value(logicalSize, mln_logical_size),
       completion,
       outDiagnostic,
     ) as Int
@@ -2662,13 +2667,13 @@ internal actual object C {
 
   actual fun mln_render_session_resize(
     session: Long,
-    extent: Long,
+    logicalSize: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_resize.invokeExact(
       session,
-      Ffm.value(extent, mln_logical_extent),
+      Ffm.value(logicalSize, mln_logical_size),
       completion,
       outDiagnostic,
     ) as Int
@@ -2678,104 +2683,104 @@ internal actual object C {
 
   actual fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_metal_borrowed_texture_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_metal_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_metal_surface_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_open_gl_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_open_gl_borrowed_texture_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_open_gl_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_open_gl_surface_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_vulkan_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_vulkan_borrowed_texture_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_vulkan_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_vulkan_surface_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_web_gpu_borrowed_texture_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
 
   actual fun mln_render_session_set_web_gpu_surface_target(
     session: Long,
-    descriptor: Long,
+    replacement: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_web_gpu_surface_target.invokeExact(
       session,
-      descriptor,
+      replacement,
       completion,
       outDiagnostic,
     ) as Int
@@ -3113,3 +3118,5 @@ internal val mln_canonical_tile_id: GroupLayout =
   Ffm.struct(JAVA_INT.withName("z"), JAVA_INT.withName("x"), JAVA_INT.withName("y"))
 internal val mln_screen_point: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("x"), JAVA_DOUBLE.withName("y"))
+internal val mln_logical_size: GroupLayout =
+  Ffm.struct(JAVA_INT.withName("width"), JAVA_INT.withName("height"))

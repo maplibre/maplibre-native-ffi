@@ -26,6 +26,7 @@
 namespace {
 
 using mln::core::VulkanBorrowedTarget;
+using mln::core::VulkanBorrowedTextures;
 
 // The shared descriptor defaults and validator are built without the Vulkan
 // headers, so they spell these as plain zeros.
@@ -312,25 +313,8 @@ class VulkanTextureSessionBackend final
     backend_.close_sync_files();
   }
 
-  auto set_vulkan_borrowed_target(const VulkanBorrowedTarget& target)
+  auto set_vulkan_borrowed_target(const VulkanBorrowedTextures& target)
     -> mln_status override {
-    if (!mln::core::vulkan_context_matches(
-          backend_.context_descriptor(), target.descriptor.context
-        )) {
-      mln::core::set_thread_error(
-        "Vulkan texture target must name the instance, physical device, "
-        "device, and graphics queue this session attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (!backend_.matches_borrowed_target(target.descriptor)) {
-      return mln::core::unsupported_retarget(
-        "Vulkan image target must have the format, final layout, and owner "
-        "this "
-        "session's render pass was built for; destroy the session and attach "
-        "again to change them"
-      );
-    }
     backend_.set_borrowed_target(target);
     return MLN_STATUS_OK;
   }
@@ -417,9 +401,12 @@ auto vulkan_borrowed_texture_attach_start(
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_borrowed_session_extent(
-    *session, descriptor->extent, descriptor->physical_width,
+  size_new_borrowed_session(
+    *session, descriptor->logical_size, descriptor->physical_width,
     descriptor->physical_height
+  );
+  session->target_identity = render_target_identity(
+    std::span{descriptor->textures, descriptor->texture_count}
   );
   session->texture.mode = TextureSessionMode::Borrowed;
   session->accepts_queue_lock = true;
@@ -461,7 +448,7 @@ auto vulkan_borrowed_texture_attach_start(
 
 auto vulkan_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  const mln_vulkan_borrowed_texture_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -471,22 +458,23 @@ auto vulkan_borrowed_texture_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status =
-    validate_vulkan_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status =
+    validate_vulkan_borrowed_texture_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
   const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
+    replacement->physical_width, replacement->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+  auto target = VulkanBorrowedTextures{*replacement};
+  auto identity = render_target_identity(std::span{target.textures});
   return enqueue_borrowed_texture_retarget(
-    session, descriptor->texture_count, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [target =
-       VulkanBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+    session, replacement->texture_count, replacement->logical_size,
+    target.physical_size, std::move(identity),
+    [target = std::move(target)](mln_render_session_object& live, mln::Size) {
       return live.texture.backend->set_vulkan_borrowed_target(target);
     },
     std::move(checked_completion),

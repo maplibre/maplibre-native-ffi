@@ -13,7 +13,7 @@ import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
-import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MapMode
@@ -243,7 +243,7 @@ internal fun attachOffscreenSession(
   options: RenderSessionAttachOptions,
 ): NewRenderSession =
   map.attachOffscreen(
-    OffscreenDescriptor(LogicalExtent(width.toUInt(), height.toUInt(), 1.0)),
+    OffscreenDescriptor(LogicalSize(width.toUInt(), height.toUInt())),
     options,
   )
 

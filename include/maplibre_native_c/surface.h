@@ -17,8 +17,7 @@ extern "C" {
 #endif
 
 /**
- * A Metal layer to render to, for mln_map_attach_metal_surface() and
- * mln_render_session_set_metal_surface_target().
+ * A Metal layer to render to, for mln_map_attach_metal_surface().
  *
  * The session sets the layer's device, pixel format, and drawable size. It uses
  * the layer until a replacement or release of the target completes, a detach
@@ -26,7 +25,7 @@ extern "C" {
  */
 typedef struct mln_metal_surface_descriptor {
   uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
+  mln_logical_size logical_size MLN_BINDING("required=true");
   /** The MTLDevice to render with. A null device picks the system's default. */
   mln_metal_context_descriptor context;
   /** Your CAMetalLayer. */
@@ -34,8 +33,21 @@ typedef struct mln_metal_surface_descriptor {
 } mln_metal_surface_descriptor;
 
 /**
- * A Vulkan surface to present to, for mln_map_attach_vulkan_surface() and
- * mln_render_session_set_vulkan_surface_target().
+ * A new Metal layer for mln_render_session_set_metal_surface_target().
+ *
+ * The session renders to it with the device that it attached with. It uses the
+ * layer until a replacement or release of the target completes, a detach or
+ * disposal of the session completes, or an abandon of it returns.
+ */
+typedef struct mln_metal_surface_replacement {
+  uint32_t size;
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your CAMetalLayer. */
+  void* layer MLN_BINDING("required=true");
+} mln_metal_surface_replacement;
+
+/**
+ * A Vulkan surface to present to, for mln_map_attach_vulkan_surface().
  *
  * The device must have VK_KHR_swapchain enabled, and the queue family of
  * `graphics_queue_family_index` must support presenting to the surface. The
@@ -45,15 +57,30 @@ typedef struct mln_metal_surface_descriptor {
  */
 typedef struct mln_vulkan_surface_descriptor {
   uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
+  mln_logical_size logical_size MLN_BINDING("required=true");
   mln_vulkan_context_descriptor context;
   /** Your VkSurfaceKHR. */
   mln_vulkan_non_dispatchable_handle surface MLN_BINDING("required=true");
 } mln_vulkan_surface_descriptor;
 
 /**
- * A WebGPU surface to present to, for mln_map_attach_web_gpu_surface() and
- * mln_render_session_set_web_gpu_surface_target().
+ * A new Vulkan surface for mln_render_session_set_vulkan_surface_target().
+ *
+ * The session presents to it with the context that it attached with, so the
+ * queue family of that context's `graphics_queue_family_index` must support
+ * presenting to the surface. It uses the surface until a replacement or
+ * release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
+ */
+typedef struct mln_vulkan_surface_replacement {
+  uint32_t size;
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your VkSurfaceKHR. */
+  mln_vulkan_non_dispatchable_handle surface MLN_BINDING("required=true");
+} mln_vulkan_surface_replacement;
+
+/**
+ * A WebGPU surface to present to, for mln_map_attach_web_gpu_surface().
  *
  * The session configures the surface. It uses the surface until a replacement
  * or release of the target completes, a detach or disposal of the session
@@ -61,7 +88,7 @@ typedef struct mln_vulkan_surface_descriptor {
  */
 typedef struct mln_web_gpu_surface_descriptor {
   uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
+  mln_logical_size logical_size MLN_BINDING("required=true");
   mln_web_gpu_context_descriptor context;
   /** Your WGPUSurface. */
   void* surface MLN_BINDING("required=true");
@@ -70,8 +97,21 @@ typedef struct mln_web_gpu_surface_descriptor {
 } mln_web_gpu_surface_descriptor;
 
 /**
- * An OpenGL surface to present to, for mln_map_attach_open_gl_surface() and
- * mln_render_session_set_open_gl_surface_target().
+ * A new WebGPU surface for mln_render_session_set_web_gpu_surface_target().
+ *
+ * The session configures it with the context and format that it attached with.
+ * It uses the surface until a replacement or release of the target completes,
+ * a detach or disposal of the session completes, or an abandon of it returns.
+ */
+typedef struct mln_web_gpu_surface_replacement {
+  uint32_t size;
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your WGPUSurface. */
+  void* surface MLN_BINDING("required=true");
+} mln_web_gpu_surface_replacement;
+
+/**
+ * An OpenGL surface to present to, for mln_map_attach_open_gl_surface().
  *
  * The session uses the surface until a replacement or release of the target
  * completes, a detach or disposal of the session completes, or an abandon of it
@@ -79,11 +119,28 @@ typedef struct mln_web_gpu_surface_descriptor {
  */
 typedef struct mln_open_gl_surface_descriptor {
   uint32_t size;
-  mln_logical_extent extent MLN_BINDING("required=true");
+  mln_logical_size logical_size MLN_BINDING("required=true");
   mln_open_gl_context_descriptor context;
   /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it. */
   void* surface;
 } mln_open_gl_surface_descriptor;
+
+/**
+ * A new OpenGL surface for mln_render_session_set_open_gl_surface_target().
+ *
+ * The session presents to it with the context that it attached with. It uses
+ * the surface until a replacement or release of the target completes, a detach
+ * or disposal of the session completes, or an abandon of it returns.
+ */
+typedef struct mln_open_gl_surface_replacement {
+  uint32_t size;
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /**
+   * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
+   * leave it null.
+   */
+  void* surface;
+} mln_open_gl_surface_replacement;
 
 /**
  * Creates a session that renders the map to a Metal layer.
@@ -156,13 +213,14 @@ MLN_API mln_status mln_map_attach_web_gpu_surface(
  * Replaces the Metal layer that the session renders to.
  *
  * Use it to give the session a layer again after
- * mln_render_session_release_target(), or to move it to another layer. The
- * new layer must use the same device. Once the replacement completes, the
- * session no longer uses the old layer.
+ * mln_render_session_release_target(), to move it to another layer, or to
+ * resize it. Once the replacement completes, the session no longer uses the
+ * old layer. A replacement with the layer and logical size that the session
+ * renders to already changes nothing.
  */
 MLN_BINDING("execution=operation;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_render_session_set_metal_surface_target(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session session, const mln_metal_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -170,9 +228,10 @@ MLN_API mln_status mln_render_session_set_metal_surface_target(
  * Replaces the Vulkan surface that the session presents to.
  *
  * Use it to give the session a surface again after
- * mln_render_session_release_target(), or to move it to another surface. The
- * new surface must use the same context. Once the replacement completes, the
- * session no longer uses the old surface.
+ * mln_render_session_release_target(), to move it to another surface, or to
+ * resize it. Once the replacement completes, the session no longer uses the
+ * old surface. A replacement with the surface and logical size that the
+ * session presents to already changes nothing.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the new surface needs a different color format
@@ -182,7 +241,7 @@ MLN_BINDING(
   "execution=operation;platforms=android,freebsd,linux,macos,ohos,windows"
 )
 MLN_API mln_status mln_render_session_set_vulkan_surface_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session session, const mln_vulkan_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -190,13 +249,15 @@ MLN_API mln_status mln_render_session_set_vulkan_surface_target(
  * Replaces the OpenGL surface that the session presents to.
  *
  * Use it to give the session a surface again after
- * mln_render_session_release_target(), or to move it to another surface. The
- * new surface must use the same context. Once the replacement completes, the
- * session no longer uses the old surface.
+ * mln_render_session_release_target(), to move it to another surface, or to
+ * resize it. Once the replacement completes, the session no longer uses the
+ * old surface. A replacement with the surface and logical size that the
+ * session presents to already changes nothing.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_set_open_gl_surface_target(
-  mln_render_session session, const mln_open_gl_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_open_gl_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -204,17 +265,15 @@ MLN_API mln_status mln_render_session_set_open_gl_surface_target(
  * Replaces the WebGPU surface that the session presents to.
  *
  * Use it to give the session a surface again after
- * mln_render_session_release_target(), or to move it to another surface. The
- * new surface must use the same context. Once the replacement completes, the
- * session no longer uses the old surface.
- *
- * Completes with:
- * - MLN_STATUS_UNSUPPORTED when the new `format` differs from the old one.
- *   Attach a new session to change it.
+ * mln_render_session_release_target(), to move it to another surface, or to
+ * resize it. Once the replacement completes, the session no longer uses the
+ * old surface. A replacement with the surface and logical size that the
+ * session presents to already changes nothing.
  */
 MLN_BINDING("execution=operation;platforms=web")
 MLN_API mln_status mln_render_session_set_web_gpu_surface_target(
-  mln_render_session session, const mln_web_gpu_surface_descriptor* descriptor,
+  mln_render_session session,
+  const mln_web_gpu_surface_replacement* replacement,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

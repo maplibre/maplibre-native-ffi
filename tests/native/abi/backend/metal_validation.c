@@ -15,6 +15,13 @@ MLN_TEST_DESCRIPTOR_EDITS(metal_surface, mln_metal_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(metal_surface)
 MLN_TEST_DESCRIPTOR_EDITS(metal_borrowed, mln_metal_borrowed_texture_descriptor)
 MLN_TEST_BORROWED_EDITS(metal_borrowed, metal)
+MLN_TEST_DESCRIPTOR_EDITS(
+  metal_surface_replacement, mln_metal_surface_replacement
+)
+MLN_TEST_DESCRIPTOR_EDITS(
+  metal_borrowed_replacement, mln_metal_borrowed_texture_replacement
+)
+MLN_TEST_BORROWED_EDITS(metal_borrowed_replacement, metal)
 
 static void surface_without_layer(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_surface.layer = NULL;
@@ -26,6 +33,20 @@ static void borrowed_without_texture(void* call) {
 }
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_borrowed.physical_width = 0;
+}
+static void replacement_without_layer(void* call) {
+  ((mln_test_target_call*)call)->descriptor.metal_surface_replacement.layer =
+    NULL;
+}
+static void replacement_without_texture(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.metal[0].texture = NULL;
+  edited->descriptor.metal_borrowed_replacement.textures =
+    edited->textures.metal;
+}
+static void replacement_without_physical_width(void* call) {
+  ((mln_test_target_call*)call)
+    ->descriptor.metal_borrowed_replacement.physical_width = 0;
 }
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 static void borrowed_with_another_physical_size(void* call) {
@@ -75,11 +96,12 @@ static void release_object(void* object) {
 // the session's ring names second.
 static void* second_texture = NULL;
 
-static void borrowed_with_another_depth(void* call) {
+static void replacement_with_another_depth(void* call) {
   mln_test_target_call* edited = call;
   edited->textures.metal[1].texture = second_texture;
-  edited->descriptor.metal_borrowed.textures = edited->textures.metal;
-  edited->descriptor.metal_borrowed.texture_count = 2;
+  edited->descriptor.metal_borrowed_replacement.textures =
+    edited->textures.metal;
+  edited->descriptor.metal_borrowed_replacement.texture_count = 2;
 }
 #endif
 
@@ -99,7 +121,7 @@ static mln_metal_surface_descriptor surface_descriptor(void) {
   mln_metal_surface_descriptor descriptor = {
     .size = sizeof(mln_metal_surface_descriptor)
   };
-  descriptor.extent = mln_test_target_extent();
+  descriptor.logical_size = mln_test_target_size();
   descriptor.layer = MLN_TEST_FAKE_HANDLE;
   return descriptor;
 }
@@ -114,16 +136,32 @@ static void describe_borrowed(mln_test_target_call* call, void* texture) {
   *descriptor = (mln_metal_borrowed_texture_descriptor){
     .size = sizeof(mln_metal_borrowed_texture_descriptor)
   };
-  descriptor->extent = mln_test_target_extent();
+  descriptor->logical_size = mln_test_target_size();
   descriptor->textures = call->textures.metal;
   descriptor->texture_count = 1;
   descriptor->physical_width = 64;
   descriptor->physical_height = 64;
 }
 
+// The replacement form of describe_borrowed().
+static void describe_borrowed_replacement(
+  mln_test_target_call* call, void* texture
+) {
+  call->textures.metal[0] = (mln_metal_borrowed_texture){.texture = texture};
+  call->descriptor.metal_borrowed_replacement =
+    (mln_metal_borrowed_texture_replacement){
+      .size = sizeof(mln_metal_borrowed_texture_replacement),
+      .logical_size = mln_test_target_size(),
+      .physical_width = 64,
+      .physical_height = 64,
+      .textures = call->textures.metal,
+      .texture_count = 1,
+  };
+}
+
 static void metal_attach_rejects_malformed_calls(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_target_map(runtime);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   mln_test_graphics* graphics =
     mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_METAL);
@@ -199,12 +237,12 @@ static void metal_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// set_target runs its attach's descriptor check, so beyond a row for each
-// pointer and handle it reads, these rows cover only its own steps. It checks
-// the session before the descriptor, and a build without Metal reports the
-// missing backend last, so there the rows name no session. A Metal build
-// submits them for a live session of the replacement's kind.
-static void metal_set_target_rejects_malformed_descriptors(void) {
+// set_target checks its replacement, so these rows cover a row for each
+// pointer and handle it reads, and its own steps. It checks the session before
+// the replacement, and a build without Metal reports the missing backend last,
+// so there the rows name no session. A Metal build submits them for a live
+// session of the replacement's kind.
+static void metal_set_target_rejects_malformed_replacements(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
   );
@@ -218,15 +256,19 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  call.descriptor.metal_surface = surface_descriptor();
+  call.descriptor.metal_surface_replacement = (mln_metal_surface_replacement){
+    .size = sizeof(mln_metal_surface_replacement),
+    .logical_size = mln_test_target_size(),
+    .layer = MLN_TEST_FAKE_HANDLE,
+  };
   static const mln_test_validation_case surface_rows[] = {
-    {"null descriptor", mln_test_call_without_descriptor,
+    {"null replacement", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_UNDERSIZED_CASE(metal_surface),
-    MLN_TEST_OVERFLOW_CASE(metal_surface),
-    {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
+    MLN_TEST_DESCRIPTOR_CASES(metal_surface_replacement),
+    {"null layer", replacement_without_layer, MLN_STATUS_INVALID_ARGUMENT,
+     NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
+    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif
   };
@@ -251,7 +293,7 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
   TEST_ASSERT_TRUE(
     mln_test_graphics_texture_get_info(replacement, &replacement_info)
   );
-  describe_borrowed(&call, replacement_info.metal_texture);
+  describe_borrowed_replacement(&call, replacement_info.metal_texture);
   // A second texture of the same format, for a replacement deeper than the
   // session's ring of one.
   mln_test_graphics_texture* second =
@@ -261,23 +303,22 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
   TEST_ASSERT_TRUE(mln_test_graphics_texture_get_info(second, &second_info));
   second_texture = second_info.metal_texture;
 #else
-  describe_borrowed(&call, MLN_TEST_FAKE_HANDLE);
+  describe_borrowed_replacement(&call, MLN_TEST_FAKE_HANDLE);
 #endif
   static const mln_test_validation_case borrowed_rows[] = {
-    {"null descriptor", mln_test_call_without_descriptor,
+    {"null replacement", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_UNDERSIZED_CASE(metal_borrowed),
-    {"null textures array", metal_borrowed_without_textures,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"null texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT,
+    MLN_TEST_DESCRIPTOR_CASES(metal_borrowed_replacement),
+    MLN_TEST_BORROWED_CASES(metal_borrowed_replacement),
+    {"null texture", replacement_without_texture, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
-    {"zero physical width", borrowed_without_physical_width,
+    {"zero physical width", replacement_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
     {"more textures than the session's ring has slots",
-     borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
+     replacement_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
 #else
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
+    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif
   };
@@ -295,5 +336,5 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(metal_attach_rejects_malformed_calls);
-  RUN_TEST(metal_set_target_rejects_malformed_descriptors);
+  RUN_TEST(metal_set_target_rejects_malformed_replacements);
 }

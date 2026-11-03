@@ -659,7 +659,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_resize(
         MlnMap map,
-        mln_logical_extent extent,
+        mln_logical_size logical_size,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1099,7 +1099,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_resize(
         MlnRenderSession session,
-        mln_logical_extent extent,
+        mln_logical_size logical_size,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1113,7 +1113,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_metal_borrowed_texture_target(
         MlnRenderSession session,
-        mln_metal_borrowed_texture_descriptor* descriptor,
+        mln_metal_borrowed_texture_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1121,7 +1121,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_metal_surface_target(
         MlnRenderSession session,
-        mln_metal_surface_descriptor* descriptor,
+        mln_metal_surface_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1129,7 +1129,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_open_gl_borrowed_texture_target(
         MlnRenderSession session,
-        mln_open_gl_borrowed_texture_descriptor* descriptor,
+        mln_open_gl_borrowed_texture_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1137,7 +1137,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_open_gl_surface_target(
         MlnRenderSession session,
-        mln_open_gl_surface_descriptor* descriptor,
+        mln_open_gl_surface_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1145,7 +1145,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_vulkan_borrowed_texture_target(
         MlnRenderSession session,
-        mln_vulkan_borrowed_texture_descriptor* descriptor,
+        mln_vulkan_borrowed_texture_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1153,7 +1153,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_vulkan_surface_target(
         MlnRenderSession session,
-        mln_vulkan_surface_descriptor* descriptor,
+        mln_vulkan_surface_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

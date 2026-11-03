@@ -406,17 +406,20 @@ pub const TextureSession = struct {
     /// the caller driver.
     pub const borrowed_driver: maplibre.RenderDriverKind = if (build_options.supports_opengl) .caller_graphics_thread else .core_worker;
 
+    /// Attaches a session at the logical size of `extent`, the map's extent.
     pub fn attachOffscreen(map: maplibre.Map, extent: maplibre.LogicalExtent) !*TextureSession {
         const self = try testing.allocator.create(TextureSession);
         errdefer testing.allocator.destroy(self);
         self.* = .{};
-        const attachment = try map.attachOffscreen(.{ .extent = extent }, self.attachOptions(.core_worker), null, null);
+        const attachment = try map.attachOffscreen(.{ .logical_size = logicalSize(extent) }, self.attachOptions(.core_worker), null, null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);
         return self;
     }
 
+    /// Attaches a session at the logical size of `extent`, the map's extent,
+    /// into textures of its physical size.
     pub fn attachBorrowed(map: maplibre.Map, extent: maplibre.LogicalExtent, driver: maplibre.RenderDriverKind) !*TextureSession {
         const self = try testing.allocator.create(TextureSession);
         errdefer testing.allocator.destroy(self);
@@ -441,14 +444,14 @@ pub const TextureSession = struct {
         const options = self.attachOptions(driver);
         const attachment = if (build_options.supports_metal)
             try map.attachMetalBorrowedTexture(testing.allocator, .{
-                .extent = extent,
+                .logical_size = logicalSize(extent),
                 .physical_width = info.width,
                 .physical_height = info.height,
                 .textures = &entries,
             }, options, null)
         else if (build_options.supports_vulkan)
             try map.attachVulkanBorrowedTexture(testing.allocator, .{
-                .extent = extent,
+                .logical_size = logicalSize(extent),
                 .physical_width = info.width,
                 .physical_height = info.height,
                 .context = graphics.vulkanContext(),
@@ -458,7 +461,7 @@ pub const TextureSession = struct {
             }, options, null)
         else
             try map.attachOpenGlBorrowedTexture(testing.allocator, .{
-                .extent = extent,
+                .logical_size = logicalSize(extent),
                 .physical_width = info.width,
                 .physical_height = info.height,
                 .context = graphics.openGlContext(),
@@ -469,6 +472,10 @@ pub const TextureSession = struct {
         errdefer self.release();
         try self.resolve(attachment.ready);
         return self;
+    }
+
+    fn logicalSize(extent: maplibre.LogicalExtent) maplibre.LogicalSize {
+        return .{ .width = extent.width, .height = extent.height };
     }
 
     fn attachOptions(self: *TextureSession, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {

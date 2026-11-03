@@ -203,7 +203,7 @@ class Host {
     }
     auto target = mln_vulkan_borrowed_texture_descriptor{};
     target.size = sizeof(mln_vulkan_borrowed_texture_descriptor);
-    target.extent = {.width = 64, .height = 64, .scale_factor = 1};
+    target.logical_size = {.width = 64, .height = 64};
     target.physical_width = info.width;
     target.physical_height = info.height;
     target.context = {

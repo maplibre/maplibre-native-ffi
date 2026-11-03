@@ -212,10 +212,9 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_test_render_release_frame(&third);
 
   MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
-  const mln_logical_extent smaller = {
+  const mln_logical_size smaller = {
     .width = MLN_TEST_HOST_TARGET_SIZE / 2,
     .height = MLN_TEST_HOST_TARGET_SIZE / 2,
-    .scale_factor = 1.0,
   };
   mln_test_completion resize = mln_test_completion_default(0);
   MLN_TEST_STATUS(
@@ -332,8 +331,7 @@ static void a_queue_ordered_ring_takes_new_textures_after_the_hosts_reads(
       MLN_TEST_RENDER_AWAIT(
         MLN_STATUS_OK, &fixture,
         mln_test_render_fixture_set_textures(
-          &fixture, mln_test_render_fixture_graphics(&fixture), &smaller, 1,
-          &completion.descriptor
+          &fixture, &smaller, 1, &completion.descriptor
         )
       );
       // A later query completes after the resize that the replacement made.
@@ -985,15 +983,11 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   );
   MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
 
-  const mln_logical_extent extent = {
-    .width = 48,
-    .height = 32,
-    .scale_factor = 1.0,
-  };
+  const mln_logical_size size = {.width = 48, .height = 32};
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, extent, &completion.descriptor, NULL
+      fixture.session, size, &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT32(
@@ -1008,56 +1002,6 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-// The renderer bakes the pixel ratio into its shaders, so a new scale factor
-// makes the session rebuild it.
-static void a_surface_replacement_can_change_the_scale_factor(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_surface(map, &fixture),
-    mln_test_graphics_last_error()
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1)
-  );
-
-  mln_test_graphics* graphics = mln_test_render_fixture_graphics(&fixture);
-  mln_test_graphics_surface* replacement =
-    mln_test_render_fixture_new_surface(&fixture);
-  TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
-  mln_test_graphics_context context = {0};
-  TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
-  mln_test_graphics_surface_info info = {0};
-  TEST_ASSERT_TRUE(mln_test_graphics_surface_get_info(replacement, &info));
-  mln_metal_surface_descriptor descriptor = {
-    .size = sizeof(mln_metal_surface_descriptor)
-  };
-  descriptor.extent = (mln_logical_extent){
-    .width = MLN_TEST_HOST_TARGET_SIZE,
-    .height = MLN_TEST_HOST_TARGET_SIZE,
-    .scale_factor = 2.0,
-  };
-  descriptor.context.device = context.metal_device;
-  descriptor.layer = info.metal_layer;
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, &fixture,
-    mln_render_session_set_metal_surface_target(
-      fixture.session, &descriptor, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2)
-  );
-  TEST_ASSERT_EQUAL_DOUBLE(2.0, read_snapshot(&fixture).extent.scale_factor);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-#endif
 #endif
 
 MLN_TEST_GROUP {
@@ -1085,8 +1029,5 @@ MLN_TEST_GROUP {
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
 #endif
   RUN_TEST(a_surface_presents_frames_and_takes_a_resize);
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  RUN_TEST(a_surface_replacement_can_change_the_scale_factor);
-#endif
 #endif
 }

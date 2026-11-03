@@ -23,7 +23,7 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	if snapshot.DebugOptions != MapDebugFlagTileBorders {
 		t.Fatalf("debug options = %v", snapshot.DebugOptions)
 	}
-	if err := f.m.Discarding().Resize(LogicalExtent{Width: 0, Height: 8, ScaleFactor: 1}); !errors.Is(err, StatusInvalidArgument) {
+	if err := f.m.Discarding().Resize(LogicalSize{Width: 0, Height: 8}); !errors.Is(err, StatusInvalidArgument) {
 		t.Fatalf("Resize = %v, want StatusInvalidArgument", err)
 	}
 }

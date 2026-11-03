@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The image that <c>MapHandle.AttachOffscreen()</c> renders.
+/// The image that <c>MapHandle.AttachOffscreen()</c> renders. The session
+/// renders it at the map's scale factor.
 /// </summary>
 /// <remarks>
 /// See <c>mln_offscreen_descriptor</c> in the <see
@@ -12,10 +13,10 @@ namespace Maplibre.NativeFfi;
 public readonly partial record struct OffscreenDescriptor
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public OffscreenDescriptor(LogicalExtent Extent)
+    public OffscreenDescriptor(LogicalSize LogicalSize)
     {
-        this.Extent = Extent;
+        this.LogicalSize = LogicalSize;
     }
 
-    public required LogicalExtent Extent { get; init; }
+    public required LogicalSize LogicalSize { get; init; }
 }

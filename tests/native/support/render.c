@@ -175,11 +175,7 @@ static bool attach_offscreen(
   mln_offscreen_descriptor descriptor = {
     .size = sizeof(mln_offscreen_descriptor)
   };
-  descriptor.extent = (mln_logical_extent){
-    .width = 64,
-    .height = 64,
-    .scale_factor = 1.0,
-  };
+  descriptor.logical_size = (mln_logical_size){.width = 64, .height = 64};
   *out_state = NULL;
   *out_status = mln_map_attach_offscreen(
     map, &descriptor, options, MLN_HANDLE_NULL, out_session, completion,

@@ -2267,6 +2267,17 @@ public data class CameraDelta(
 )
 
 /**
+ * A size in logical pixels, which the map's scale factor turns into pixels.
+ *
+ * See `mln_logical_size` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class LogicalSize(
+  public val width: UInt = 0u,
+  public val height: UInt = 0u,
+)
+
+/**
  * A Metal texture of a borrowed ring.
  *
  * See `mln_metal_borrowed_texture` in the
@@ -2278,12 +2289,11 @@ public data class MetalBorrowedTexture(
 )
 
 /**
- * A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()` and
- * `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+ * A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
  *
- * `extent` sets the map's size and the session's scale factor, so give it the map's scale factor.
- * `physical_width` and `physical_height` give the textures' size in pixels. The textures must all
- * have that size, one device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
+ * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
+ * size in pixels, which is usually `logical_size` times the map's scale factor. The textures must
+ * all have that size, one device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
  *
  * The session uses the textures until a replacement or release of the target completes, a detach or
  * disposal of the session completes, or an abandon of it returns.
@@ -2292,7 +2302,7 @@ public data class MetalBorrowedTexture(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class MetalBorrowedTextureDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val physicalWidth: UInt,
   public val physicalHeight: UInt,
   public val textures: List<MetalBorrowedTexture>,
@@ -2343,8 +2353,7 @@ public data class MetalContextDescriptor(
 )
 
 /**
- * A Metal layer to render to, for `MapHandle.attachMetalSurface()` and
- * `RenderSessionHandle.setMetalSurfaceTarget()`.
+ * A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
  *
  * The session sets the layer's device, pixel format, and drawable size. It uses the layer until a
  * replacement or release of the target completes, a detach or disposal of the session completes, or
@@ -2354,7 +2363,7 @@ public data class MetalContextDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class MetalSurfaceDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   /** The MTLDevice to render with. A null device picks the system's default. */
   public val context: MetalContextDescriptor,
   /** Your CAMetalLayer. */
@@ -2362,13 +2371,14 @@ public data class MetalSurfaceDescriptor(
 )
 
 /**
- * The image that `MapHandle.attachOffscreen()` renders.
+ * The image that `MapHandle.attachOffscreen()` renders. The session renders it at the map's scale
+ * factor.
  *
  * See `mln_offscreen_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
  */
 public data class OffscreenDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
 )
 
 /**
@@ -2459,13 +2469,12 @@ public data class OpenGlBorrowedTexture(
 )
 
 /**
- * A ring of your OpenGL textures, for `MapHandle.attachOpenGlBorrowedTexture()` and
- * `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+ * A ring of your OpenGL textures, for `MapHandle.attachOpenGlBorrowedTexture()`.
  *
- * `extent` sets the map's size and the session's scale factor, so give it the map's scale factor.
- * `physical_width` and `physical_height` give the textures' size in pixels. The context must use
- * `OpenGlContextOwnership.SHARED`. Each texture must be in your context's share group, with storage
- * of that size.
+ * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
+ * size in pixels, which is usually `logical_size` times the map's scale factor. The context must
+ * use `OpenGlContextOwnership.SHARED`. Each texture must be in your context's share group, with
+ * storage of that size.
  *
  * The session uses the textures until a replacement or release of the target completes, a detach or
  * disposal of the session completes, or an abandon of it returns.
@@ -2474,7 +2483,7 @@ public data class OpenGlBorrowedTexture(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class OpenGlBorrowedTextureDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val physicalWidth: UInt,
   public val physicalHeight: UInt,
   public val context: OpenGlContextDescriptor,
@@ -2484,8 +2493,7 @@ public data class OpenGlBorrowedTextureDescriptor(
 )
 
 /**
- * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()` and
- * `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+ * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
  *
  * The session uses the surface until a replacement or release of the target completes, a detach or
  * disposal of the session completes, or an abandon of it returns.
@@ -2494,7 +2502,7 @@ public data class OpenGlBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class OpenGlSurfaceDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val context: OpenGlContextDescriptor,
   /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it. */
   public val surface: NativePointer,
@@ -2542,12 +2550,11 @@ public data class VulkanBorrowedTexture(
 )
 
 /**
- * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()` and
- * `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+ * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
  *
- * `extent` sets the map's size and the session's scale factor, so give it the map's scale factor.
- * `physical_width` and `physical_height` give the images' size in pixels. Each image must have that
- * size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
+ * `logical_size` sets the map's size. `physical_width` and `physical_height` give the images' size
+ * in pixels, which is usually `logical_size` times the map's scale factor. Each image must have
+ * that size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
  *
  * The session uses the images until a replacement or release of the target completes, a detach or
  * disposal of the session completes, or an abandon of it returns.
@@ -2556,7 +2563,7 @@ public data class VulkanBorrowedTexture(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class VulkanBorrowedTextureDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val physicalWidth: UInt,
   public val physicalHeight: UInt,
   public val context: VulkanContextDescriptor,
@@ -2569,8 +2576,7 @@ public data class VulkanBorrowedTextureDescriptor(
 )
 
 /**
- * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()` and
- * `RenderSessionHandle.setVulkanSurfaceTarget()`.
+ * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
  *
  * The device must have VK_KHR_swapchain enabled, and the queue family of
  * `graphics_queue_family_index` must support presenting to the surface. The session creates the
@@ -2581,7 +2587,7 @@ public data class VulkanBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class VulkanSurfaceDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val context: VulkanContextDescriptor,
   /** Your VkSurfaceKHR. */
   public val surface: ULong,
@@ -2616,12 +2622,11 @@ public data class WebGpuBorrowedTexture(
 )
 
 /**
- * A ring of your WebGPU textures, for `MapHandle.attachWebGpuBorrowedTexture()` and
- * `RenderSessionHandle.setWebGpuBorrowedTextureTarget()`.
+ * A ring of your WebGPU textures, for `MapHandle.attachWebGpuBorrowedTexture()`.
  *
- * `extent` sets the map's size and the session's scale factor, so give it the map's scale factor.
- * `physical_width` and `physical_height` give the textures' size in pixels. Each texture must be 2D
- * with that size, `format`, one layer, one mip level, one sample, and
+ * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
+ * size in pixels, which is usually `logical_size` times the map's scale factor. Each texture must
+ * be 2D with that size, `format`, one layer, one mip level, one sample, and
  * WGPUTextureUsage_RenderAttachment.
  *
  * The session uses the textures until a replacement or release of the target completes, a detach or
@@ -2631,7 +2636,7 @@ public data class WebGpuBorrowedTexture(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebGpuBorrowedTextureDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val physicalWidth: UInt,
   public val physicalHeight: UInt,
   public val context: WebGpuContextDescriptor,
@@ -2641,8 +2646,7 @@ public data class WebGpuBorrowedTextureDescriptor(
 )
 
 /**
- * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()` and
- * `RenderSessionHandle.setWebGpuSurfaceTarget()`.
+ * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()`.
  *
  * The session configures the surface. It uses the surface until a replacement or release of the
  * target completes, a detach or disposal of the session completes, or an abandon of it returns.
@@ -2651,7 +2655,7 @@ public data class WebGpuBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class WebGpuSurfaceDescriptor(
-  public val extent: LogicalExtent,
+  public val logicalSize: LogicalSize,
   public val context: WebGpuContextDescriptor,
   /** Your WGPUSurface. */
   public val surface: NativePointer,
@@ -3085,6 +3089,7 @@ public data class RenderSessionCapabilities(
  */
 public data class RenderSessionSnapshot(
   public val state: RenderSessionState,
+  /** The target's logical size, and the map's scale factor. */
   public val extent: LogicalExtent,
   public val generation: ULong,
   public val frameGeneration: ULong,
@@ -3232,6 +3237,151 @@ public data class TextureReadbackResult(
 }
 
 /**
+ * New Metal textures for a borrowed ring, for
+ * `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+ *
+ * The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the textures follow its
+ * rules. The ring keeps its depth, device, and command queue, so give it as many textures as it
+ * attached with, on the same device. The session uses the textures until a replacement or release
+ * of the target completes, a detach or disposal of the session completes, or an abandon of it
+ * returns.
+ *
+ * See `mln_metal_borrowed_texture_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class MetalBorrowedTextureReplacement(
+  public val logicalSize: LogicalSize,
+  public val physicalWidth: UInt,
+  public val physicalHeight: UInt,
+  public val textures: List<MetalBorrowedTexture>,
+)
+
+/**
+ * A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
+ *
+ * The session renders to it with the device that it attached with. It uses the layer until a
+ * replacement or release of the target completes, a detach or disposal of the session completes, or
+ * an abandon of it returns.
+ *
+ * See `mln_metal_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
+public data class MetalSurfaceReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your CAMetalLayer. */
+  public val layer: NativePointer,
+)
+
+/**
+ * New OpenGL textures for a borrowed ring, for
+ * `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
+ *
+ * The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and the textures follow its
+ * rules. The ring keeps its depth, context, and texture target, so give it as many textures as it
+ * attached with, in the same share group. The session uses the textures until a replacement or
+ * release of the target completes, a detach or disposal of the session completes, or an abandon of
+ * it returns.
+ *
+ * See `mln_open_gl_borrowed_texture_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class OpenGlBorrowedTextureReplacement(
+  public val logicalSize: LogicalSize,
+  public val physicalWidth: UInt,
+  public val physicalHeight: UInt,
+  public val textures: List<OpenGlBorrowedTexture>,
+)
+
+/**
+ * A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
+ *
+ * The session presents to it with the context that it attached with. It uses the surface until a
+ * replacement or release of the target completes, a detach or disposal of the session completes, or
+ * an abandon of it returns.
+ *
+ * See `mln_open_gl_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
+public data class OpenGlSurfaceReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so leave it null. */
+  public val surface: NativePointer,
+)
+
+/**
+ * New Vulkan images for a borrowed ring, for
+ * `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
+ *
+ * The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and the images follow its
+ * rules. The ring keeps its depth, context, `format`, `final_layout`, and `owner`, so give it as
+ * many images as it attached with, in that format, on the same device. The session uses the images
+ * until a replacement or release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
+ *
+ * See `mln_vulkan_borrowed_texture_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class VulkanBorrowedTextureReplacement(
+  public val logicalSize: LogicalSize,
+  public val physicalWidth: UInt,
+  public val physicalHeight: UInt,
+  public val textures: List<VulkanBorrowedTexture>,
+)
+
+/**
+ * A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
+ *
+ * The session presents to it with the context that it attached with, so the queue family of that
+ * context's `graphics_queue_family_index` must support presenting to the surface. It uses the
+ * surface until a replacement or release of the target completes, a detach or disposal of the
+ * session completes, or an abandon of it returns.
+ *
+ * See `mln_vulkan_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
+public data class VulkanSurfaceReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your VkSurfaceKHR. */
+  public val surface: ULong,
+)
+
+/**
+ * New WebGPU textures for a borrowed ring, for
+ * `RenderSessionHandle.setWebGpuBorrowedTextureTarget()`.
+ *
+ * The members mean what they mean in `WebGpuBorrowedTextureDescriptor`, and the textures follow its
+ * rules. The ring keeps its depth, context, and `format`, so give it as many textures as it
+ * attached with, in that format, on the same device. The session uses the textures until a
+ * replacement or release of the target completes, a detach or disposal of the session completes, or
+ * an abandon of it returns.
+ *
+ * See `mln_web_gpu_borrowed_texture_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class WebGpuBorrowedTextureReplacement(
+  public val logicalSize: LogicalSize,
+  public val physicalWidth: UInt,
+  public val physicalHeight: UInt,
+  public val textures: List<WebGpuBorrowedTexture>,
+)
+
+/**
+ * A new WebGPU surface for `RenderSessionHandle.setWebGpuSurfaceTarget()`.
+ *
+ * The session configures it with the context and format that it attached with. It uses the surface
+ * until a replacement or release of the target completes, a detach or disposal of the session
+ * completes, or an abandon of it returns.
+ *
+ * See `mln_web_gpu_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
+public data class WebGpuSurfaceReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your WGPUSurface. */
+  public val surface: NativePointer,
+)
+
+/**
  * The answer to a resource request.
  *
  * See `mln_resource_response` in the
@@ -3281,7 +3431,11 @@ public data class ResourceResponse(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MapOptions(
-  /** The map's first size. Its scale factor stays fixed for the map's life. */
+  /**
+   * The map's first size, and its scale factor. The scale factor stays fixed for the map's life,
+   * and every render session of the map renders at it. To render at another density, create a new
+   * map and attach a new session.
+   */
   public val initialExtent: LogicalExtent,
   public val mapMode: MapMode = MapMode.CONTINUOUS,
   /**

@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogicalExtent
+import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.MapOptions
 import org.maplibre.nativeffi.OffscreenDescriptor
@@ -23,11 +24,17 @@ private fun copyPixels(data: ByteArray, stride: UInt) {}
 
 private suspend fun images(runtime: RuntimeHandle) {
   // #region map
-  val extent =
-    LogicalExtent(width = 800u, height = 600u, scaleFactor = 2.0)
   val (map, mapReady) =
     runtime.createMap(
-      MapOptions(initialExtent = extent, mapMode = MapMode.STATIC),
+      MapOptions(
+        initialExtent =
+          LogicalExtent(
+            width = 800u,
+            height = 600u,
+            scaleFactor = 2.0,
+          ),
+        mapMode = MapMode.STATIC,
+      ),
     )
   mapReady.await()
   // #endregion map
@@ -41,7 +48,7 @@ private suspend fun images(runtime: RuntimeHandle) {
   // #region attach
   val (session, sessionReady) =
     map.attachOffscreen(
-      OffscreenDescriptor(extent),
+      OffscreenDescriptor(LogicalSize(width = 800u, height = 600u)),
       // The library renders on its own thread.
       RenderSessionAttachOptions(
         driver = RenderDriverKind.CORE_WORKER,

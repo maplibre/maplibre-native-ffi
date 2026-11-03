@@ -64,6 +64,15 @@ MLN_TEST_DESCRIPTOR_EDITS(
   opengl_borrowed, mln_open_gl_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(opengl_borrowed, opengl)
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+MLN_TEST_DESCRIPTOR_EDITS(
+  opengl_surface_replacement, mln_open_gl_surface_replacement
+)
+MLN_TEST_DESCRIPTOR_EDITS(
+  opengl_borrowed_replacement, mln_open_gl_borrowed_texture_replacement
+)
+MLN_TEST_BORROWED_EDITS(opengl_borrowed_replacement, opengl)
+#endif
 
 static mln_open_gl_surface_descriptor* surface_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_surface;
@@ -122,18 +131,37 @@ static void borrowed_without_texture(void* call) {
   edited->textures.opengl[0].texture = 0;
   borrowed_of(call)->textures = edited->textures.opengl;
 }
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-// A replacement that names two textures for a session's ring of one.
-static void borrowed_with_another_depth(void* call) {
-  mln_test_target_call* edited = call;
-  edited->textures.opengl[1].texture = 2;
-  borrowed_of(call)->textures = edited->textures.opengl;
-  borrowed_of(call)->texture_count = 2;
-}
-#endif
 static void borrowed_without_physical_width(void* call) {
   borrowed_of(call)->physical_width = 0;
 }
+
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+static mln_open_gl_borrowed_texture_replacement* replacement_of(void* call) {
+  return &((mln_test_target_call*)call)->descriptor.opengl_borrowed_replacement;
+}
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+// WGL and EGL present to a surface, which the replacement names.
+static void replacement_without_surface(void* call) {
+  ((mln_test_target_call*)call)->descriptor.opengl_surface_replacement.surface =
+    NULL;
+}
+// A replacement that names two textures for a session's ring of one.
+static void replacement_with_another_depth(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.opengl[1].texture = 2;
+  replacement_of(call)->textures = edited->textures.opengl;
+  replacement_of(call)->texture_count = 2;
+}
+#endif
+static void replacement_without_texture(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.opengl[0].texture = 0;
+  replacement_of(call)->textures = edited->textures.opengl;
+}
+static void replacement_without_physical_width(void* call) {
+  replacement_of(call)->physical_width = 0;
+}
+#endif
 
 MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_open_gl_surface)
 MLN_TEST_ATTACH_SUBMITTER(
@@ -153,7 +181,7 @@ static mln_open_gl_surface_descriptor surface_descriptor(void) {
   mln_open_gl_surface_descriptor descriptor = {
     .size = sizeof(mln_open_gl_surface_descriptor)
   };
-  descriptor.extent = mln_test_target_extent();
+  descriptor.logical_size = mln_test_target_size();
   descriptor.context = fake_context(PRESET_PLATFORM);
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
   descriptor.surface = MLN_TEST_FAKE_HANDLE;
@@ -169,7 +197,7 @@ static void describe_borrowed(mln_test_target_call* call) {
   *descriptor = (mln_open_gl_borrowed_texture_descriptor){
     .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
   };
-  descriptor->extent = mln_test_target_extent();
+  descriptor->logical_size = mln_test_target_size();
   descriptor->context = fake_context(PRESET_PLATFORM);
   descriptor->textures = call->textures.opengl;
   descriptor->texture_count = 1;
@@ -181,7 +209,7 @@ static void describe_borrowed(mln_test_target_call* call) {
 
 static void opengl_attach_rejects_malformed_calls(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_target_map(runtime);
 
   mln_test_target_call call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
@@ -283,13 +311,26 @@ static void only_the_builds_providers_attach(void) {
 }
 
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-// set_target runs its attach's descriptor check, so beyond a row for each
-// pointer and handle it reads, these rows cover only its own steps. It checks
-// the session before the descriptor, and a build without OpenGL reports the
-// missing backend last, so there the rows name no session. An OpenGL build
-// submits them for a live session of the replacement's kind; a WebGL build has
-// no host graphics for one.
-static void opengl_set_target_rejects_malformed_descriptors(void) {
+// A ring of one replacement texture, whose entry is in the call's storage.
+static void describe_borrowed_replacement(mln_test_target_call* call) {
+  call->textures.opengl[0] = (mln_open_gl_borrowed_texture){.texture = 1};
+  *replacement_of(call) = (mln_open_gl_borrowed_texture_replacement){
+    .size = sizeof(mln_open_gl_borrowed_texture_replacement),
+    .logical_size = mln_test_target_size(),
+    .physical_width = 64,
+    .physical_height = 64,
+    .textures = call->textures.opengl,
+    .texture_count = 1,
+  };
+}
+
+// set_target checks its replacement, so these rows cover a row for each
+// pointer and handle it reads, and its own steps. It checks the session before
+// the replacement, and a build without OpenGL reports the missing backend
+// last, so there the rows name no session. An OpenGL build submits them for a
+// live session of the replacement's kind; a WebGL build has no host graphics
+// for one.
+static void opengl_set_target_rejects_malformed_replacements(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
   );
@@ -303,16 +344,21 @@ static void opengl_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  call.descriptor.opengl_surface = surface_descriptor();
+  call.descriptor.opengl_surface_replacement =
+    (mln_open_gl_surface_replacement){
+      .size = sizeof(mln_open_gl_surface_replacement),
+      .logical_size = mln_test_target_size(),
+      .surface = MLN_TEST_FAKE_HANDLE,
+  };
   static const mln_test_validation_case surface_rows[] = {
-    {"null descriptor", mln_test_call_without_descriptor,
+    {"null replacement", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_UNDERSIZED_CASE(opengl_surface),
-    MLN_TEST_OVERFLOW_CASE(opengl_surface),
-    {"no drawable", surface_without_its_drawable, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
+    MLN_TEST_DESCRIPTOR_CASES(opengl_surface_replacement),
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+    {"no surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
+     "must not be null"},
+#else
+    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif
   };
@@ -331,21 +377,21 @@ static void opengl_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  describe_borrowed(&call);
+  describe_borrowed_replacement(&call);
   static const mln_test_validation_case borrowed_rows[] = {
-    {"null descriptor", mln_test_call_without_descriptor,
+    {"null replacement", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
-    MLN_TEST_UNDERSIZED_CASE(opengl_borrowed),
-    {"null textures array", opengl_borrowed_without_textures,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"zero physical width", borrowed_without_physical_width,
+    MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed_replacement),
+    MLN_TEST_BORROWED_CASES(opengl_borrowed_replacement),
+    {"no texture", replacement_without_texture, MLN_STATUS_INVALID_ARGUMENT,
+     NULL},
+    {"zero physical width", replacement_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL)
     {"more textures than the session's ring has slots",
-     borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
+     replacement_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
 #else
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
+    {"a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif
   };
@@ -365,6 +411,6 @@ MLN_TEST_GROUP {
   RUN_TEST(opengl_attach_rejects_malformed_calls);
   RUN_TEST(only_the_builds_providers_attach);
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
-  RUN_TEST(opengl_set_target_rejects_malformed_descriptors);
+  RUN_TEST(opengl_set_target_rejects_malformed_replacements);
 #endif
 }

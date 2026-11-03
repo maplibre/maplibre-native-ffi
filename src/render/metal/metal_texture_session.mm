@@ -34,16 +34,11 @@ auto metal_textures(std::span<const mln_metal_borrowed_texture> entries)
   return textures;
 }
 
-// The shared validator cannot reach MTL::Texture, so the checks that read the
-// textures themselves live here, after it.
-auto validate_borrowed_texture(
-  const mln_metal_borrowed_texture_descriptor* descriptor
-) -> mln_status {
-  const auto descriptor_status =
-    mln::core::validate_metal_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
+// The shared validators cannot reach MTL::Texture, so the checks that read the
+// textures themselves live here, after them. `Target` is an attach descriptor
+// or a replacement, which share these members.
+template <typename Target>
+auto validate_borrowed_textures(const Target* descriptor) -> mln_status {
   const auto physical_status = mln::core::validate_borrowed_physical_size(
     descriptor->physical_width, descriptor->physical_height
   );
@@ -90,6 +85,28 @@ auto validate_borrowed_texture(
   return MLN_STATUS_OK;
 }
 
+auto validate_borrowed_texture(
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status =
+    mln::core::validate_metal_borrowed_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return validate_borrowed_textures(descriptor);
+}
+
+auto validate_borrowed_texture(
+  const mln_metal_borrowed_texture_replacement* replacement
+) -> mln_status {
+  const auto replacement_status =
+    mln::core::validate_metal_borrowed_texture_replacement(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
+  }
+  return validate_borrowed_textures(replacement);
+}
+
 // A failed frame keeps its map update pending. A device that was removed, or
 // that revoked this process's access, fails every later frame too, so the
 // session loses its target; any other failure leaves the next demand to retry.
@@ -117,15 +134,13 @@ class MetalTextureSessionBackend final
     MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
     std::size_t ring_depth, MTL::PixelFormat pixel_format
   )
-      : backend_(host_device, host_queue, size, ring_depth, pixel_format),
-        host_queue_(host_queue) {}
+      : backend_(host_device, host_queue, size, ring_depth, pixel_format) {}
 
   MetalTextureSessionBackend(
     std::vector<MTL::Texture*> borrowed_textures, MTL::CommandQueue* host_queue,
     mln::Size size
   )
-      : backend_(std::move(borrowed_textures), host_queue, size),
-        host_queue_(host_queue) {}
+      : backend_(std::move(borrowed_textures), host_queue, size) {}
 
   void set_producer_sync_kind(mln_gpu_sync_kind kind) {
     backend_.set_producer_sync_kind(kind);
@@ -159,15 +174,8 @@ class MetalTextureSessionBackend final
     return true;
   }
 
-  auto set_metal_borrowed_target(const mln::core::MetalBorrowedTarget& target)
+  auto set_metal_borrowed_target(const mln::core::MetalBorrowedTextures& target)
     -> mln_status override {
-    if (target.descriptor.command_queue != host_queue_) {
-      mln::core::set_thread_error(
-        "Metal texture target must name the command queue this session "
-        "attached with"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
     auto textures = metal_textures(target.textures);
     if (!backend_.has_device(textures.front()->device())) {
       mln::core::set_thread_error(
@@ -183,12 +191,7 @@ class MetalTextureSessionBackend final
         "to change it"
       );
     }
-    backend_.set_borrowed_textures(
-      std::move(textures),
-      mln::Size{
-        target.descriptor.physical_width, target.descriptor.physical_height
-      }
-    );
+    backend_.set_borrowed_textures(std::move(textures), target.physical_size);
     return MLN_STATUS_OK;
   }
 
@@ -235,9 +238,6 @@ class MetalTextureSessionBackend final
 
  private:
   mln::core::MetalTextureBackend backend_;
-  // The host's queue that the session submits to, or null for its own. The
-  // backend retains it.
-  const void* host_queue_;
 };
 
 auto retain_host_queue(
@@ -288,9 +288,12 @@ auto metal_borrowed_texture_attach_start(
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
-  set_borrowed_session_extent(
-    *session, descriptor->extent, descriptor->physical_width,
+  size_new_borrowed_session(
+    *session, descriptor->logical_size, descriptor->physical_width,
     descriptor->physical_height
+  );
+  session->target_identity = render_target_identity(
+    std::span{descriptor->textures, descriptor->texture_count}
   );
   session->texture.mode = TextureSessionMode::Borrowed;
   auto textures =
@@ -331,7 +334,7 @@ auto metal_borrowed_texture_attach_start(
 
 auto metal_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_metal_borrowed_texture_descriptor* descriptor,
+  const mln_metal_borrowed_texture_replacement* replacement,
   const mln_completion* completion
 ) -> mln_status {
   auto checked_completion = std::shared_ptr<Completion>{};
@@ -341,15 +344,16 @@ auto metal_borrowed_texture_set_target_start(
   if (submission_status != MLN_STATUS_OK) {
     return submission_status;
   }
-  const auto descriptor_status = validate_borrowed_texture(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
+  const auto replacement_status = validate_borrowed_texture(replacement);
+  if (replacement_status != MLN_STATUS_OK) {
+    return replacement_status;
   }
+  auto target = MetalBorrowedTextures{*replacement};
+  auto identity = render_target_identity(std::span{target.textures});
   return enqueue_borrowed_texture_retarget(
-    session, descriptor->texture_count, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [target =
-       MetalBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+    session, replacement->texture_count, replacement->logical_size,
+    target.physical_size, std::move(identity),
+    [target = std::move(target)](mln_render_session_object& live, mln::Size) {
       return live.texture.backend->set_metal_borrowed_target(target);
     },
     std::move(checked_completion),

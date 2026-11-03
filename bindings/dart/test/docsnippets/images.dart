@@ -12,13 +12,15 @@ void copyPixels(Uint8List data, int stride) {}
 
 Future<void> images(RuntimeHandle runtime) async {
   // #region map
-  const extent = LogicalExtent(
-    width: 800,
-    height: 600,
-    scaleFactor: 2,
-  );
   final NewMap(:map, ready: mapReady) = runtime.createMap(
-    const MapOptions(initialExtent: extent, mapMode: MapMode.static),
+    const MapOptions(
+      initialExtent: LogicalExtent(
+        width: 800,
+        height: 600,
+        scaleFactor: 2,
+      ),
+      mapMode: MapMode.static,
+    ),
   );
   await mapReady;
   // #endregion map
@@ -32,7 +34,9 @@ Future<void> images(RuntimeHandle runtime) async {
   // #region attach
   final NewRenderSession(:session, ready: sessionReady) = map
       .attachOffscreen(
-        const OffscreenDescriptor(extent: extent),
+        const OffscreenDescriptor(
+          logicalSize: LogicalSize(width: 800, height: 600),
+        ),
         // The library renders on its own thread.
         const RenderSessionAttachOptions(
           driver: RenderDriverKind.coreWorker,
