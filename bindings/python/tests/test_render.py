@@ -466,7 +466,9 @@ def test_a_caller_driven_session_is_serviced_from_a_python_thread(
         assert target.session.get_capabilities().driver == driver
         # The main thread blocks on frame wakes while the graphics thread
         # services the work, so neither holds the GIL across native calls.
-        assert target.render().disposition == mln.RenderResult.RENDERED
+        assert (
+            target.render(wait_for_update=True).disposition == mln.RenderResult.RENDERED
+        )
     # A service call publishes its frame before it returns, so
     # the count is read once closing has stopped the graphics thread.
     assert target.serviced > 0
@@ -477,8 +479,11 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
     harness: Harness, backend: str
 ) -> None:
     with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
-        target.render()
+        assert (
+            target.render(wait_for_update=True).disposition == mln.RenderResult.RENDERED
+        )
         frame = target.session.acquire_frame()
+        assert frame is not None
 
         def inspect(view: object) -> int:
             for release in (frame.close, target.session.abandon):
@@ -507,8 +512,11 @@ def test_a_borrow_on_another_thread_holds_off_close(
     harness: Harness, backend: str
 ) -> None:
     with BorrowedTexture(harness, backend, _default_driver(backend)) as target:
-        target.render()
+        assert (
+            target.render(wait_for_update=True).disposition == mln.RenderResult.RENDERED
+        )
         frame = target.session.acquire_frame()
+        assert frame is not None
         entered = threading.Event()
         release = threading.Event()
         failures: list[BaseException] = []
@@ -659,7 +667,10 @@ def test_a_native_queue_lock_reaches_native(harness: Harness, backend: str) -> N
         with BorrowedTexture(harness, backend, driver, queue_lock=lock) as target:
             # Rendering a frame submits to the queue, which native code does
             # only while it holds the lock.
-            target.render()
+            assert (
+                target.render(wait_for_update=True).disposition
+                == mln.RenderResult.RENDERED
+            )
         assert host.released.wait(TIMEOUT)
         assert host.calls
     else:
