@@ -28,6 +28,12 @@ static void create_rejects_malformed_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_offscreen_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
   );
+  options.fields = MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
+  options.client_api = MLN_OPEN_GL_CLIENT_API_UNSPECIFIED;
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_offscreen_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+  );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_offscreen_device_create(NULL, NULL, MLN_TEST_DIAGNOSTIC)
@@ -74,6 +80,28 @@ static void expect_attach_status(
   mln_test_completion_reject(&attach);
   mln_test_completion_destroy(&attach);
 }
+
+// Only an EGL device renders with either OpenGL API. A WGL device renders
+// with desktop OpenGL alone, and other devices with no OpenGL API.
+#if !defined(MLN_FFI_TEST_OPENGL_EGL)
+static void create_reports_an_unusable_client_api(void) {
+  mln_offscreen_device_options options = {
+    .size = sizeof(mln_offscreen_device_options)
+  };
+  options.fields = MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
+  options.client_api = MLN_OPEN_GL_CLIENT_API_GLES;
+#else
+  options.client_api = MLN_OPEN_GL_CLIENT_API_GL;
+#endif
+  mln_offscreen_device device = MLN_HANDLE_NULL;
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED,
+    mln_offscreen_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
+}
+#endif
 
 #if !defined(DEVICE_SUPPORTED)
 static void create_reports_an_unsupported_backend(void) {
@@ -339,6 +367,9 @@ static void create_reports_a_missing_adapter(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(create_rejects_malformed_arguments);
+#if !defined(MLN_FFI_TEST_OPENGL_EGL)
+  RUN_TEST(create_reports_an_unusable_client_api);
+#endif
 #if defined(DEVICE_SUPPORTED)
   RUN_TEST(a_session_reads_back_after_its_device_is_released);
   RUN_TEST(a_session_without_a_device_renders_a_still_image);

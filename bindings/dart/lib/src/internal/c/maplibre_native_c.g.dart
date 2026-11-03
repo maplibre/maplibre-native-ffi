@@ -750,6 +750,8 @@ final class mln_offscreen_device_options extends Struct {
   external int adapter_index;
   @Bool()
   external bool single_context;
+  @Uint32()
+  external int client_api;
 }
 
 final class mln_open_gl_borrowed_texture extends Struct {
@@ -1843,6 +1845,7 @@ const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
 // mln_offscreen_device_option_field
 const MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1;
 const MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 2;
+const MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API = 4;
 
 // mln_open_gl_client_api
 const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0;

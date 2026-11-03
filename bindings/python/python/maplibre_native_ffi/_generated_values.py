@@ -454,7 +454,7 @@ class OfflineRegionDownloadState(UnknownIntEnum):
 
 
 class OpenGlClientApi(UnknownIntEnum):
-    """The OpenGL API that a dedicated EGL context uses.
+    """The OpenGL API that a context renders with.
 
     See `mln_open_gl_client_api` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2348,10 +2348,19 @@ class OffscreenDeviceOptions:
     having one each. Only an EGL device reads it.
     """
 
+    client_api: OpenGlClientApi | None = None
+    """The OpenGL API that the device's sessions render with. An EGL device
+    defaults to `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on
+    Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.GL`, its
+    default. Other devices take neither.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            adapter_index=raw["adapter_index"], single_context=raw["single_context"]
+            adapter_index=raw["adapter_index"],
+            single_context=raw["single_context"],
+            client_api=_maybe(OpenGlClientApi, raw["client_api"]),
         )
 
 

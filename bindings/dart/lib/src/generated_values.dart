@@ -460,7 +460,7 @@ final class OfflineRegionDownloadState extends _Enum {
   };
 }
 
-/// The OpenGL API that a dedicated EGL context uses.
+/// The OpenGL API that a context renders with.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -4347,7 +4347,11 @@ final class CameraUpdate extends _Value {
 /// See `mln_offscreen_device_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
 final class OffscreenDeviceOptions extends _Value {
-  const OffscreenDeviceOptions({this.adapterIndex, this.singleContext});
+  const OffscreenDeviceOptions({
+    this.adapterIndex,
+    this.singleContext,
+    this.clientApi,
+  });
 
   /// The GPU to use, as an index into the platform's list of GPUs.
   final int? adapterIndex;
@@ -4356,19 +4360,30 @@ final class OffscreenDeviceOptions extends _Value {
   /// having one each. Only an EGL device reads it.
   final bool? singleContext;
 
+  /// The OpenGL API that the device's sessions render with. An EGL device
+  /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on
+  /// Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
+  /// default. Other devices take neither.
+  final OpenGlClientApi? clientApi;
+
   /// A copy of this value with the given members replaced.
-  OffscreenDeviceOptions copyWith({int? adapterIndex, bool? singleContext}) =>
-      OffscreenDeviceOptions(
-        adapterIndex: adapterIndex ?? this.adapterIndex,
-        singleContext: singleContext ?? this.singleContext,
-      );
+  OffscreenDeviceOptions copyWith({
+    int? adapterIndex,
+    bool? singleContext,
+    OpenGlClientApi? clientApi,
+  }) => OffscreenDeviceOptions(
+    adapterIndex: adapterIndex ?? this.adapterIndex,
+    singleContext: singleContext ?? this.singleContext,
+    clientApi: clientApi ?? this.clientApi,
+  );
 
   @override
-  List<Object?> get _members => [adapterIndex, singleContext];
+  List<Object?> get _members => [adapterIndex, singleContext, clientApi];
   @override
   String toString() => _describe('OffscreenDeviceOptions', const [
     'adapterIndex',
     'singleContext',
+    'clientApi',
   ]);
 }
 

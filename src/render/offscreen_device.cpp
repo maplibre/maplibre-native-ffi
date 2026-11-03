@@ -24,6 +24,7 @@ auto default_offscreen_device_options() -> mln_offscreen_device_options {
     .fields = 0,
     .adapter_index = 0,
     .single_context = false,
+    .client_api = MLN_OPEN_GL_CLIENT_API_UNSPECIFIED,
   };
 }
 
@@ -41,7 +42,8 @@ auto effective_offscreen_device_options(
   }
   if (
     (options->fields & ~(MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX |
-                         MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT)) != 0U
+                         MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT |
+                         MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API)) != 0U
   ) {
     set_thread_error(
       "mln_offscreen_device_options.fields contains unknown bits"
@@ -53,6 +55,26 @@ auto effective_offscreen_device_options(
   out_options.single_context =
     (options->fields & MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT) != 0U &&
     options->single_context;
+  if ((options->fields & MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API) != 0U) {
+    if (
+      options->client_api != MLN_OPEN_GL_CLIENT_API_GL &&
+      options->client_api != MLN_OPEN_GL_CLIENT_API_GLES
+    ) {
+      set_thread_error(
+        "mln_offscreen_device_options.client_api must name an OpenGL API"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+#if defined(MLN_RENDER_BACKEND_OPENGL)
+    out_options.client_api = options->client_api;
+#else
+    set_thread_error(
+      "this build's render backend renders with no OpenGL API, so it takes no "
+      "client_api"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+#endif
+  }
   return MLN_STATUS_OK;
 }
 

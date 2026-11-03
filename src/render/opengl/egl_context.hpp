@@ -106,6 +106,14 @@ class EglSharedContext final {
   bool state_lost_ = false;
 };
 
+// The EGL API of `api`. Anything but MLN_OPEN_GL_CLIENT_API_GL is OpenGL ES.
+auto egl_api(mln_open_gl_client_api api) -> EGLenum;
+
+// Creates a context of `api`, which must be the calling thread's bound API.
+auto create_egl_context(
+  EGLDisplay display, EGLConfig config, EGLContext share_context, EGLenum api
+) -> EGLContext;
+
 auto get_egl_proc_address(
   const mln_egl_context_descriptor& descriptor, const char* name,
   EGLenum active_api

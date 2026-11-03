@@ -1324,6 +1324,13 @@ export interface OffscreenDeviceOptions {
    * having one each. Only an EGL device reads it.
    */
   singleContext?: boolean;
+  /**
+   * The OpenGL API that the device's sessions render with. An EGL device
+   * defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on
+   * Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
+   * default. Other devices take neither.
+   */
+  clientApi?: OpenGlClientApi;
 }
 
 /**
@@ -1368,7 +1375,7 @@ export interface OpenGlBorrowedTextureDescriptor {
 }
 
 /**
- * The OpenGL API that a dedicated EGL context uses.
+ * The OpenGL API that a context renders with.
  *
  * See `mln_open_gl_client_api` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

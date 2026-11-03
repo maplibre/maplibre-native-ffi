@@ -127,9 +127,7 @@ void EglSharedContext::activate_single(
 // descriptor names it.
 auto EglSharedContext::requested_api() const -> EGLenum {
   if (dedicated()) {
-    return descriptor_.client_api == MLN_OPEN_GL_CLIENT_API_GL
-             ? static_cast<EGLenum>(EGL_OPENGL_API)
-             : static_cast<EGLenum>(EGL_OPENGL_ES_API);
+    return egl_api(descriptor_.client_api);
   }
   return share_context_api();
 }
@@ -246,16 +244,9 @@ auto EglSharedContext::current_on_thread() const -> bool {
 }
 
 void EglSharedContext::create_context() {
-  const EGLint es_context_attributes[] = {
-    EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE
-  };
-  const EGLint opengl_context_attributes[] = {EGL_NONE};
-  auto* const context_attributes = active_api_ == EGL_OPENGL_ES_API
-                                     ? es_context_attributes
-                                     : opengl_context_attributes;
-  context_ = eglCreateContext(
+  context_ = create_egl_context(
     display(), config(), dedicated() ? EGL_NO_CONTEXT : share_context(),
-    context_attributes
+    active_api_
   );
   if (context_ == EGL_NO_CONTEXT) {
     throw std::runtime_error("Creating OpenGL EGL context failed");
@@ -322,6 +313,25 @@ void EglSharedContext::destroy() {
     eglDestroyContext(display(), context_);
     context_ = EGL_NO_CONTEXT;
   }
+}
+
+auto egl_api(mln_open_gl_client_api api) -> EGLenum {
+  return api == MLN_OPEN_GL_CLIENT_API_GL
+           ? static_cast<EGLenum>(EGL_OPENGL_API)
+           : static_cast<EGLenum>(EGL_OPENGL_ES_API);
+}
+
+auto create_egl_context(
+  EGLDisplay display, EGLConfig config, EGLContext share_context, EGLenum api
+) -> EGLContext {
+  const EGLint es_context_attributes[] = {
+    EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE
+  };
+  const EGLint opengl_context_attributes[] = {EGL_NONE};
+  return eglCreateContext(
+    display, config, share_context,
+    api == EGL_OPENGL_ES_API ? es_context_attributes : opengl_context_attributes
+  );
 }
 
 auto get_egl_proc_address(

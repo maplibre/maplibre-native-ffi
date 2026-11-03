@@ -252,7 +252,7 @@ typedef enum mln_open_gl_context_ownership : uint32_t {
   MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
 } mln_open_gl_context_ownership;
 
-/** The OpenGL API that a dedicated EGL context uses. */
+/** The OpenGL API that a context renders with. */
 typedef enum mln_open_gl_client_api : uint32_t {
   MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0u,
   MLN_OPEN_GL_CLIENT_API_GL = 1u,

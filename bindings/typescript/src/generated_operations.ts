@@ -3734,7 +3734,7 @@ export class OffscreenDeviceHandle extends Owner {
    * Errors:
    *
    * - `Status.unsupported` when this build's render backend can't create a
-   *   device.
+   *   device, or can't render with `client_api`.
    * - `Status.nativeError` when `adapter_index` names no GPU, or the platform
    *   can't create the device.
    */

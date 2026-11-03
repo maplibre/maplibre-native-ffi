@@ -26,7 +26,7 @@ impl OffscreenDeviceHandle {
     /// # Errors
     ///
     /// - `Status::Unsupported` when this build's render backend can't create a
-    ///   device.
+    ///   device, or can't render with `client_api`.
     /// - `Status::NativeError` when `adapter_index` names no GPU, or the
     ///   platform can't create the device.
     pub fn create(options: Option<&OffscreenDeviceOptions>) -> Result<OffscreenDeviceHandle> {

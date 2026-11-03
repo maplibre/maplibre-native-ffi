@@ -1731,6 +1731,10 @@ Pointer<raw.mln_offscreen_device_options> _writeOffscreenDeviceOptions(
     result.ref.fields |= raw.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
     result.ref.single_context = value.singleContext!;
   }
+  if (value.clientApi != null) {
+    result.ref.fields |= raw.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
+    result.ref.client_api = value.clientApi!.rawValue;
+  }
   return result;
 }
 
@@ -6054,7 +6058,7 @@ final class OffscreenDeviceHandle implements Finalizable {
   /// Errors:
   ///
   /// - `Status.unsupported` when this build's render backend can't create a
-  ///   device.
+  ///   device, or can't render with `client_api`.
   /// - `Status.nativeError` when `adapter_index` names no GPU, or the platform
   ///   can't create the device.
   static OffscreenDeviceHandle create({OffscreenDeviceOptions? options}) =>

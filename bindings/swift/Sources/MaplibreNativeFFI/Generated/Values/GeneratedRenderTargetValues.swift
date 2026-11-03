@@ -187,7 +187,7 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// The OpenGL API that a dedicated EGL context uses.
+/// The OpenGL API that a context renders with.
 ///
 /// See `mln_open_gl_client_api` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
