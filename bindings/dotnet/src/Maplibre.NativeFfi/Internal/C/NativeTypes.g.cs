@@ -187,8 +187,18 @@ internal unsafe struct mln_custom_geometry_source_options
 {
     public uint size;
     public mln_custom_geometry_source_option_field fields;
-    public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile;
-    public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile;
+    public delegate* unmanaged[Cdecl]<
+        void*,
+        MlnMap,
+        mln_buffer_view,
+        mln_canonical_tile_id,
+        void> fetch_tile;
+    public delegate* unmanaged[Cdecl]<
+        void*,
+        MlnMap,
+        mln_buffer_view,
+        mln_canonical_tile_id,
+        void> cancel_tile;
     public void* user_data;
     public double min_zoom;
     public double max_zoom;
@@ -205,8 +215,18 @@ internal unsafe struct mln_custom_vector_source_options
 {
     public uint size;
     public mln_custom_vector_source_option_field fields;
-    public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile;
-    public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile;
+    public delegate* unmanaged[Cdecl]<
+        void*,
+        MlnMap,
+        mln_buffer_view,
+        mln_canonical_tile_id,
+        void> fetch_tile;
+    public delegate* unmanaged[Cdecl]<
+        void*,
+        MlnMap,
+        mln_buffer_view,
+        mln_canonical_tile_id,
+        void> cancel_tile;
     public void* user_data;
     public double min_zoom;
     public double max_zoom;

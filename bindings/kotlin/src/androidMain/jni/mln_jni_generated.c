@@ -2873,19 +2873,19 @@ static mln_jni_upcall mln_jni_httpHeaderTransformCallback_upcall = {
 };
 static mln_jni_upcall mln_jni_customGeometrySourceOptionsFetchTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
-  "customGeometrySourceOptionsFetchTile", "(JJ)V", NULL
+  "customGeometrySourceOptionsFetchTile", "(JJJJ)V", NULL
 };
 static mln_jni_upcall mln_jni_customGeometrySourceOptionsCancelTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
-  "customGeometrySourceOptionsCancelTile", "(JJ)V", NULL
+  "customGeometrySourceOptionsCancelTile", "(JJJJ)V", NULL
 };
 static mln_jni_upcall mln_jni_customVectorSourceOptionsFetchTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
-  "customVectorSourceOptionsFetchTile", "(JJ)V", NULL
+  "customVectorSourceOptionsFetchTile", "(JJJJ)V", NULL
 };
 static mln_jni_upcall mln_jni_customVectorSourceOptionsCancelTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
-  "customVectorSourceOptionsCancelTile", "(JJ)V", NULL
+  "customVectorSourceOptionsCancelTile", "(JJJJ)V", NULL
 };
 static mln_jni_upcall mln_jni_resourceRequestCancelHandlerCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
@@ -2972,10 +2972,14 @@ static mln_status mln_jni_httpHeaderTransformCallback(
 }
 
 static void mln_jni_customGeometrySourceOptionsFetchTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.j = (jlong)map},
+    {.j = MLN_JNI_ADDRESS(&sourceId)},
+    {.j = MLN_JNI_ADDRESS(&tileId)}
   };
   mln_jni_upcall_void(
     &mln_jni_customGeometrySourceOptionsFetchTile_upcall, arguments
@@ -2983,10 +2987,14 @@ static void mln_jni_customGeometrySourceOptionsFetchTile(
 }
 
 static void mln_jni_customGeometrySourceOptionsCancelTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.j = (jlong)map},
+    {.j = MLN_JNI_ADDRESS(&sourceId)},
+    {.j = MLN_JNI_ADDRESS(&tileId)}
   };
   mln_jni_upcall_void(
     &mln_jni_customGeometrySourceOptionsCancelTile_upcall, arguments
@@ -2994,10 +3002,14 @@ static void mln_jni_customGeometrySourceOptionsCancelTile(
 }
 
 static void mln_jni_customVectorSourceOptionsFetchTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.j = (jlong)map},
+    {.j = MLN_JNI_ADDRESS(&sourceId)},
+    {.j = MLN_JNI_ADDRESS(&tileId)}
   };
   mln_jni_upcall_void(
     &mln_jni_customVectorSourceOptionsFetchTile_upcall, arguments
@@ -3005,10 +3017,14 @@ static void mln_jni_customVectorSourceOptionsFetchTile(
 }
 
 static void mln_jni_customVectorSourceOptionsCancelTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
   jvalue arguments[] = {
-    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(&tileId)}
+    {.j = MLN_JNI_ADDRESS(userData)},
+    {.j = (jlong)map},
+    {.j = MLN_JNI_ADDRESS(&sourceId)},
+    {.j = MLN_JNI_ADDRESS(&tileId)}
   };
   mln_jni_upcall_void(
     &mln_jni_customVectorSourceOptionsCancelTile_upcall, arguments

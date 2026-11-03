@@ -1937,42 +1937,58 @@ static bool mln_kw_upcall_queuedLogHandlerCallback(
 }
 
 static void mln_kw_upcall_customGeometrySourceOptionsFetchTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
-  uint64_t arguments[2] = {0};
+  uint64_t arguments[4] = {0};
   __builtin_memcpy(&arguments[0], &userData, sizeof userData);
+  __builtin_memcpy(&arguments[1], &map, sizeof map);
+  const mln_buffer_view* sourceId_address = &sourceId;
+  __builtin_memcpy(&arguments[2], &sourceId_address, sizeof sourceId_address);
   const mln_canonical_tile_id* tileId_address = &tileId;
-  __builtin_memcpy(&arguments[1], &tileId_address, sizeof tileId_address);
+  __builtin_memcpy(&arguments[3], &tileId_address, sizeof tileId_address);
   mln_kw_js_upcall(4, arguments);
 }
 
 static void mln_kw_upcall_customGeometrySourceOptionsCancelTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
-  uint64_t arguments[2] = {0};
+  uint64_t arguments[4] = {0};
   __builtin_memcpy(&arguments[0], &userData, sizeof userData);
+  __builtin_memcpy(&arguments[1], &map, sizeof map);
+  const mln_buffer_view* sourceId_address = &sourceId;
+  __builtin_memcpy(&arguments[2], &sourceId_address, sizeof sourceId_address);
   const mln_canonical_tile_id* tileId_address = &tileId;
-  __builtin_memcpy(&arguments[1], &tileId_address, sizeof tileId_address);
+  __builtin_memcpy(&arguments[3], &tileId_address, sizeof tileId_address);
   mln_kw_js_upcall(5, arguments);
 }
 
 static void mln_kw_upcall_customVectorSourceOptionsFetchTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
-  uint64_t arguments[2] = {0};
+  uint64_t arguments[4] = {0};
   __builtin_memcpy(&arguments[0], &userData, sizeof userData);
+  __builtin_memcpy(&arguments[1], &map, sizeof map);
+  const mln_buffer_view* sourceId_address = &sourceId;
+  __builtin_memcpy(&arguments[2], &sourceId_address, sizeof sourceId_address);
   const mln_canonical_tile_id* tileId_address = &tileId;
-  __builtin_memcpy(&arguments[1], &tileId_address, sizeof tileId_address);
+  __builtin_memcpy(&arguments[3], &tileId_address, sizeof tileId_address);
   mln_kw_js_upcall(6, arguments);
 }
 
 static void mln_kw_upcall_customVectorSourceOptionsCancelTile(
-  void* userData, mln_canonical_tile_id tileId
+  void* userData, mln_map map, mln_buffer_view sourceId,
+  mln_canonical_tile_id tileId
 ) {
-  uint64_t arguments[2] = {0};
+  uint64_t arguments[4] = {0};
   __builtin_memcpy(&arguments[0], &userData, sizeof userData);
+  __builtin_memcpy(&arguments[1], &map, sizeof map);
+  const mln_buffer_view* sourceId_address = &sourceId;
+  __builtin_memcpy(&arguments[2], &sourceId_address, sizeof sourceId_address);
   const mln_canonical_tile_id* tileId_address = &tileId;
-  __builtin_memcpy(&arguments[1], &tileId_address, sizeof tileId_address);
+  __builtin_memcpy(&arguments[3], &tileId_address, sizeof tileId_address);
   mln_kw_js_upcall(7, arguments);
 }
 

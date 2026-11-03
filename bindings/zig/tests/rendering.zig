@@ -35,6 +35,54 @@ test "an offscreen session renders a frame that reads back as pixels" {
     }
 }
 
+// A fetch callback borrows its map, and so does any copy of the value that the
+// binding lends it: release and dispose fail, and with deinit they leave the
+// caller's map working.
+test "a copy of a custom source's borrowed map can't release it" {
+    const fixture = try createFixture();
+    defer fixture.destroy();
+    const Probe = struct {
+        claimed: std.atomic.Value(bool) = .init(false),
+        fetched: support.Flag = .{},
+        dispose_error: ?anyerror = null,
+        release_error: ?anyerror = null,
+        message: [128]u8 = undefined,
+        message_len: usize = 0,
+
+        fn fetchTile(self: *@This(), map: *const maplibre.Map, source_id: []const u8, tile: maplibre.CanonicalTileId) anyerror!void {
+            if (!self.claimed.swap(true, .acq_rel)) {
+                var copied = map.*;
+                var diagnostic: maplibre.Diagnostic = .{};
+                if (copied.dispose(&diagnostic)) |_| {} else |err| self.dispose_error = err;
+                const message = diagnostic.message();
+                self.message_len = @min(message.len, self.message.len);
+                @memcpy(self.message[0..self.message_len], message[0..self.message_len]);
+                if (copied.release(null)) |released| {
+                    var future = released;
+                    future.deinit();
+                } else |err| self.release_error = err;
+                copied.deinit();
+            }
+            try map.discarding().setCustomGeometrySourceTileData(source_id, tile, "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+            self.fetched.set();
+        }
+    };
+    var probe = Probe{};
+    try support.expectCommitted(try fixture.map.addCustomGeometrySource("custom", .init(&probe, Probe.fetchTile, null, null), null));
+    try support.expectCommitted(try fixture.map.addStyleLayerJson("{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"custom\"}", "", null));
+    const offscreen = try support.TextureSession.attachOffscreen(fixture.map, extent);
+    defer offscreen.close();
+    // The map asks for its tiles as it renders.
+    var frame: usize = 0;
+    while (frame < 32 and !probe.fetched.isSet()) : (frame += 1) _ = try offscreen.renderFrame();
+    try probe.fetched.wait();
+    try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.dispose_error);
+    try testing.expectEqualStrings("Map is borrowed by a callback, which can't release it", probe.message[0..probe.message_len]);
+    try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.release_error);
+    try testing.expect(!fixture.map.isClosed());
+    try support.expectCommitted(try fixture.map.requestRepaint(null));
+}
+
 // Before any demand, the drain and the acquire write null handles, which read
 // as empty and as null.
 test "a drain before any demand returns no batch" {

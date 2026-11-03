@@ -1,4 +1,5 @@
 const std = @import("std");
+const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 
 const log = std.log.scoped(.maplibre_native_ffi);
@@ -11,14 +12,36 @@ const log = std.log.scoped(.maplibre_native_ffi);
 /// consuming calls take a pointer and close the value they are given. A copy
 /// made before then stays open, and native reports its later calls as stale.
 ///
+/// A value that a callback borrows, and every copy of it, can call native but
+/// can't release or dispose the handle, and deinit leaves it alone.
+///
 /// `Self` is the generated handle type, with a `raw: u64` field, a `closed:
-/// bool` field, and a `native_name`; it declares these members as its own.
+/// bool` field, and a `native_name`; it declares these members as its own. A
+/// type that callbacks borrow also has a `borrowed: bool` field.
 pub fn Handle(comptime Self: type, comptime public_name: []const u8, comptime dispose: ?*const fn (u64) status.Error!void) type {
     return struct {
         const name = Self.native_name;
 
         pub fn adopt(raw: u64) Self {
             return .{ .raw = raw };
+        }
+
+        /// Wraps a handle that a callback borrows from its owner.
+        pub fn borrow(raw: u64) Self {
+            return .{ .raw = raw, .borrowed = true };
+        }
+
+        fn isBorrowed(self: Self) bool {
+            return if (comptime @hasField(Self, "borrowed")) self.borrowed else false;
+        }
+
+        /// Fails, before native sees the call, to release or dispose a value
+        /// that a callback borrows.
+        pub fn requireOwned(self: Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+            if (!isBorrowed(self)) return;
+            status.begin(diagnostic);
+            status.record(diagnostic, null, public_name ++ " is borrowed by a callback, which can't release it");
+            return error.InvalidState;
         }
 
         /// Returns the native handle value, which stays in place after close.
@@ -39,12 +62,12 @@ pub fn Handle(comptime Self: type, comptime public_name: []const u8, comptime di
         }
 
         /// Disposes on this thread and logs a refusal, unless the value is
-        /// already closed. Native callback restrictions apply to disposals
-        /// that return a status; a refused disposal leaves the value open, so
-        /// a later deinit retries it.
+        /// already closed or a callback borrows it. Native callback
+        /// restrictions apply to disposals that return a status; a refused
+        /// disposal leaves the value open, so a later deinit retries it.
         pub fn deinit(self: *Self) void {
             const cleanup = dispose orelse @compileError(name ++ " has no scoped cleanup; release or discard it");
-            if (self.closed) return;
+            if (self.closed or isBorrowed(self.*)) return;
             cleanup(self.raw) catch |err| {
                 log.warn("native owner disposal failed: {s}", .{@errorName(err)});
                 return;

@@ -290,7 +290,17 @@ def render_owner(native, handle, bodies, bound, roots):
         parameters.append(f"{owner_names(bound.handles[handle.parent])[0]} parent")
         # Keeps the parent owner reachable while this owner lives.
         retain = "..retain(parent)"
-    if roots:
+    # A callback's borrowed owner has no parent to keep reachable, never
+    # releases or disposes its handle, and doesn't outlive its callback, so
+    # the registrations made through it stay rooted until native releases
+    # them.
+    borrowable = native in bound.borrowed_handles
+    if roots and borrowable:
+        fields.append(
+            "  // Roots this owner's callback registrations for as long as it lives.\n"
+            "  @override\n  final _CallbackRoots _callbackRoots;"
+        )
+    elif roots:
         fields.append(
             "  // Roots this owner's callback registrations for as long as it lives.\n"
             "  @override\n  final _callbackRoots = _CallbackRoots();"
@@ -323,7 +333,18 @@ def render_owner(native, handle, bodies, bound, roots):
         "/// Owner of one native handle.\n"
         + (f"///\n{summary}" if (summary := doc(bound, native)) else "")
         + f"final class {public} implements Finalizable{', _CallbackRootOwner' if roots else ''} {{\n"
-        f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}'){retain};\n"
+        + (
+            f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}'){retain}"
+            + (", _callbackRoots = _CallbackRoots()" if roots and borrowable else "")
+            + ";\n"
+        )
+        + (
+            f"  {public}._borrowed({native_type} handle) : _state = NativeHandleState(handle, '{public}', borrowed: true)"
+            + (", _callbackRoots = _globalCallbackRoots" if roots else "")
+            + ";\n"
+            if borrowable
+            else ""
+        )
         + "\n".join(fields)
         + "\n\n"
         + (

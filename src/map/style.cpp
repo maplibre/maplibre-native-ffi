@@ -293,16 +293,26 @@ auto to_c_canonical_tile_id(const mln::CanonicalTileID& tile_id)
   return mln_canonical_tile_id{.z = tile_id.z, .x = tile_id.x, .y = tile_id.y};
 }
 
+// The engine's tile function names neither the map nor the source, so each
+// source's function carries its own.
 template <typename Callback>
-auto to_native_tile_function(Callback callback, void* user_data)
-  -> mln::style::TileFunction {
+auto to_native_tile_function(
+  Callback callback, void* user_data, mln_map map,
+  std::shared_ptr<const std::string> source_id
+) -> mln::style::TileFunction {
   if (callback == nullptr) {
     return nullptr;
   }
-  return [callback, user_data](const mln::CanonicalTileID& tile_id) -> void {
+  return [callback, user_data, map,
+          source_id =
+            std::move(source_id)](const mln::CanonicalTileID& tile_id) -> void {
     if (mln::core::process_exiting()) return;
     try {
-      callback(user_data, to_c_canonical_tile_id(tile_id));
+      callback(
+        user_data, map,
+        mln_buffer_view{.data = source_id->data(), .size = source_id->size()},
+        to_c_canonical_tile_id(tile_id)
+      );
     } catch (const std::exception& exception) {
       mln::core::set_thread_error(exception);
     } catch (...) {
@@ -312,13 +322,16 @@ auto to_native_tile_function(Callback callback, void* user_data)
 }
 
 auto to_native_custom_geometry_source_options(
-  const mln_custom_geometry_source_options& options
+  const mln_custom_geometry_source_options& options, mln_map map,
+  const std::string& source_id
 ) -> mln::style::CustomGeometrySource::Options {
+  auto id = std::make_shared<const std::string>(source_id);
   auto result = mln::style::CustomGeometrySource::Options{};
   result.fetchTileFunction =
-    to_native_tile_function(options.fetch_tile, options.user_data);
-  result.cancelTileFunction =
-    to_native_tile_function(options.cancel_tile, options.user_data);
+    to_native_tile_function(options.fetch_tile, options.user_data, map, id);
+  result.cancelTileFunction = to_native_tile_function(
+    options.cancel_tile, options.user_data, map, std::move(id)
+  );
   result.zoomRange = mln::Range<uint8_t>{
     static_cast<uint8_t>(options.min_zoom),
     static_cast<uint8_t>(options.max_zoom)
@@ -379,13 +392,16 @@ auto to_native_tile_data_format(mln_style_vector_tile_encoding encoding)
 }
 
 auto to_native_custom_vector_source_options(
-  const mln_custom_vector_source_options& options
+  const mln_custom_vector_source_options& options, mln_map map,
+  const std::string& source_id
 ) -> mln::style::CustomVectorSource::Options {
+  auto id = std::make_shared<const std::string>(source_id);
   auto result = mln::style::CustomVectorSource::Options{};
   result.fetchTileFunction =
-    to_native_tile_function(options.fetch_tile, options.user_data);
-  result.cancelTileFunction =
-    to_native_tile_function(options.cancel_tile, options.user_data);
+    to_native_tile_function(options.fetch_tile, options.user_data, map, id);
+  result.cancelTileFunction = to_native_tile_function(
+    options.cancel_tile, options.user_data, map, std::move(id)
+  );
   result.zoomRange = mln::Range<uint8_t>{
     static_cast<uint8_t>(options.min_zoom),
     static_cast<uint8_t>(options.max_zoom)
@@ -1337,7 +1353,7 @@ auto map_add_custom_geometry_source(
     live, id, CallbackSourceKind::CustomGeometry, effective.release_user_data,
     effective.user_data,
     std::make_unique<mln::style::CustomGeometrySource>(
-      id, to_native_custom_geometry_source_options(effective)
+      id, to_native_custom_geometry_source_options(effective, live.self, id)
     )
   );
   return MLN_STATUS_OK;
@@ -1476,7 +1492,7 @@ auto map_add_custom_vector_source(
     live, id, CallbackSourceKind::CustomVector, effective.release_user_data,
     effective.user_data,
     std::make_unique<mln::style::CustomVectorSource>(
-      id, to_native_custom_vector_source_options(effective)
+      id, to_native_custom_vector_source_options(effective, live.self, id)
     )
   );
   return MLN_STATUS_OK;

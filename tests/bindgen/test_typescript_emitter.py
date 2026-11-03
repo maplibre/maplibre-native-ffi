@@ -285,8 +285,14 @@ class TypeScriptEmitterTests(unittest.TestCase):
             operations,
         )
         self.assertNotIn("handler?: RuntimeEventHandler", operations)
-        self.assertIn("  fetchTile: (tileId: CanonicalTileId) => void;", values)
-        self.assertIn("  cancelTile?: (tileId: CanonicalTileId) => void;", values)
+        self.assertIn(
+            "  fetchTile: (map: MapHandle, sourceId: string, tileId: CanonicalTileId) => void;",
+            values,
+        )
+        self.assertIn(
+            "  cancelTile?: (map: MapHandle, sourceId: string, tileId: CanonicalTileId) => void;",
+            values,
+        )
         self.assertIn("  endHandler?: CameraTransitionHandler;", values)
 
     def test_only_a_required_member_must_be_given(self):

@@ -8,6 +8,7 @@ from ._generated_values import *
 
 class _AcquiredFrameHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     def discard(self) -> Any: ...
     def metal_texture(self) -> Any: ...
@@ -19,6 +20,7 @@ class _AcquiredFrameHandle:
 
 class _GeoJsonSourceDataHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     @staticmethod
     def create(data: Any, options: GeoJsonSourceOptions | None = None) -> Any: ...
@@ -27,6 +29,7 @@ class _GeoJsonSourceDataHandle:
 
 class _MapHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
@@ -364,6 +367,7 @@ class _MapHandle:
 
 class _MapProjectionHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     @staticmethod
     def create(view: MapView) -> Any: ...
@@ -381,6 +385,7 @@ class _MapProjectionHandle:
 
 class _OffscreenDeviceHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     @staticmethod
     def create(options: OffscreenDeviceOptions | None = None) -> Any: ...
@@ -389,6 +394,7 @@ class _OffscreenDeviceHandle:
 
 class _RenderSessionHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     def abandon(self) -> Any: ...
     def acquire_frame(self) -> Any: ...
@@ -446,6 +452,7 @@ class _RenderSessionHandle:
 
 class _ResourceRequestHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     def complete(self, response: ResourceResponse) -> Any: ...
     def is_cancelled(self) -> Any: ...
@@ -456,6 +463,7 @@ class _ResourceRequestHandle:
 
 class _ResourceTransformRequestHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     def complete(self, url: str) -> Any: ...
     def fail(self, error: ResourceTransformError) -> Any: ...
@@ -464,6 +472,7 @@ class _ResourceTransformRequestHandle:
 
 class _RuntimeHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     def clear_event_handler(self) -> Future[CommandCompletion]: ...
     def _discard_clear_event_handler(self) -> None: ...
@@ -523,6 +532,7 @@ class _RuntimeHandle:
 
 class _StyleExpressionHandle:
     _is_closed: bool
+    _is_borrowed: bool
     id: int
     @staticmethod
     def create(

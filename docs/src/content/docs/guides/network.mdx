@@ -71,7 +71,7 @@ each tile. For encoded vector tiles, add a custom vector source with
 Add the source after the map's style loads, then add a layer that draws it, as
 in [Style](/maplibre-native-ffi/guides/style/).
 
-Answer each request with the tile's data through
+Each request names its map and source. Answer it with the tile's data through
 [](api:mln_map_set_custom_geometry_source_tile_data). When your data for a tile
 changes, invalidate the tile with
 [](api:mln_map_invalidate_custom_geometry_source_tile), and the map asks for it

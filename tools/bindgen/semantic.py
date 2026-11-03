@@ -598,6 +598,19 @@ class BoundApi:
         )
 
     @functools.cached_property
+    def borrowed_handles(self) -> frozenset[str]:
+        """The handle types that a callback receives as `ownership=borrowed`
+        arguments. A binding presents each one as a handle that its callback
+        can call but can't release, and never disposes it."""
+        return frozenset(
+            parameter.value.native
+            for callback in self.callbacks.values()
+            for parameter in callback.arguments
+            if parameter.value.kind == "handle"
+            and parameter.value.ownership == "borrowed"
+        )
+
+    @functools.cached_property
     def enum_numbers(self) -> dict[str, int]:
         return {
             member.name: member.value

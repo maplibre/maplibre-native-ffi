@@ -24,22 +24,30 @@ internal object DispatchedUpcalls {
       4 ->
         Upcalls.customGeometrySourceOptionsFetchTile(
           readAddress(arguments),
-          readAddress(arguments + 8),
+          readI64(arguments + 8),
+          readAddress(arguments + 16),
+          readAddress(arguments + 24),
         )
       5 ->
         Upcalls.customGeometrySourceOptionsCancelTile(
           readAddress(arguments),
-          readAddress(arguments + 8),
+          readI64(arguments + 8),
+          readAddress(arguments + 16),
+          readAddress(arguments + 24),
         )
       6 ->
         Upcalls.customVectorSourceOptionsFetchTile(
           readAddress(arguments),
-          readAddress(arguments + 8),
+          readI64(arguments + 8),
+          readAddress(arguments + 16),
+          readAddress(arguments + 24),
         )
       7 ->
         Upcalls.customVectorSourceOptionsCancelTile(
           readAddress(arguments),
-          readAddress(arguments + 8),
+          readI64(arguments + 8),
+          readAddress(arguments + 16),
+          readAddress(arguments + 24),
         )
       8 ->
         Upcalls.resourceRequestCancelHandlerCallback(readAddress(arguments), readI64(arguments + 8))

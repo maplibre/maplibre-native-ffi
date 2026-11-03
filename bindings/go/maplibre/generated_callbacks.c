@@ -15,40 +15,52 @@ bool binding_mln_log_handler_callback(
   );
 }
 extern void mlnGo_mln_custom_geometry_source_options_fetch_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 );
 void binding_mln_custom_geometry_source_options_fetch_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
   mlnGo_mln_custom_geometry_source_options_fetch_tile(
-    (void*)user_data, tile_id
+    (void*)user_data, map, source_id, tile_id
   );
 }
 extern void mlnGo_mln_custom_geometry_source_options_cancel_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 );
 void binding_mln_custom_geometry_source_options_cancel_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
   mlnGo_mln_custom_geometry_source_options_cancel_tile(
-    (void*)user_data, tile_id
+    (void*)user_data, map, source_id, tile_id
   );
 }
 extern void mlnGo_mln_custom_vector_source_options_fetch_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 );
 void binding_mln_custom_vector_source_options_fetch_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
-  mlnGo_mln_custom_vector_source_options_fetch_tile((void*)user_data, tile_id);
+  mlnGo_mln_custom_vector_source_options_fetch_tile(
+    (void*)user_data, map, source_id, tile_id
+  );
 }
 extern void mlnGo_mln_custom_vector_source_options_cancel_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 );
 void binding_mln_custom_vector_source_options_cancel_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
-  mlnGo_mln_custom_vector_source_options_cancel_tile((void*)user_data, tile_id);
+  mlnGo_mln_custom_vector_source_options_cancel_tile(
+    (void*)user_data, map, source_id, tile_id
+  );
 }
 extern void mlnGo_mln_camera_transition_handler_callback(
   void* user_data, mln_camera_transition_end* end

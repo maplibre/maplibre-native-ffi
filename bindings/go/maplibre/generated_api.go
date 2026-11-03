@@ -2301,8 +2301,8 @@ type CustomGeometrySourceOptions struct {
 	Clip *bool
 	// Whether to wrap geometry that crosses the antimeridian.
 	Wrap       *bool
-	FetchTile  func(tileId CanonicalTileId)
-	CancelTile func(tileId CanonicalTileId)
+	FetchTile  func(map_ *MapHandle, sourceId string, tileId CanonicalTileId)
+	CancelTile func(map_ *MapHandle, sourceId string, tileId CanonicalTileId)
 }
 
 func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena *bindingArena) C.mln_custom_geometry_source_options {
@@ -2339,8 +2339,8 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 type CustomVectorSourceOptions struct {
 	MinZoom    *float64
 	MaxZoom    *float64
-	FetchTile  func(tileId CanonicalTileId)
-	CancelTile func(tileId CanonicalTileId)
+	FetchTile  func(map_ *MapHandle, sourceId string, tileId CanonicalTileId)
+	CancelTile func(map_ *MapHandle, sourceId string, tileId CanonicalTileId)
 }
 
 func nativeCustomVectorSourceOptions(input CustomVectorSourceOptions, arena *bindingArena) C.mln_custom_vector_source_options {
@@ -5739,7 +5739,7 @@ func adoptMapHandle(raw uint64, parent any) *MapHandle {
 	owner := &MapHandle{bindingAdopt(raw, parent, "MapHandle", func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
 	return owner
 }
-
+func borrowMapHandle(raw uint64) *MapHandle { return &MapHandle{bindingBorrow(raw, "MapHandle")} }
 func (handle *MapHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
@@ -9289,7 +9289,7 @@ func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_seve
 }
 
 //export mlnGo_mln_custom_geometry_source_options_fetch_tile
-func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
+func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe.Pointer, native__map C.mln_map, native_source_id C.mln_buffer_view, native_tile_id C.mln_canonical_tile_id) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
@@ -9299,12 +9299,12 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 	if !ok || callbacks.FetchTile == nil {
 		return
 	}
-	callbacks.FetchTile(copyCanonicalTileId(native_tile_id))
+	callbacks.FetchTile(borrowMapHandle(uint64(native__map)), bindingString(native_source_id.data, uint64(native_source_id.size)), copyCanonicalTileId(native_tile_id))
 	return
 }
 
 //export mlnGo_mln_custom_geometry_source_options_cancel_tile
-func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
+func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsafe.Pointer, native__map C.mln_map, native_source_id C.mln_buffer_view, native_tile_id C.mln_canonical_tile_id) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
@@ -9314,12 +9314,12 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	if !ok || callbacks.CancelTile == nil {
 		return
 	}
-	callbacks.CancelTile(copyCanonicalTileId(native_tile_id))
+	callbacks.CancelTile(borrowMapHandle(uint64(native__map)), bindingString(native_source_id.data, uint64(native_source_id.size)), copyCanonicalTileId(native_tile_id))
 	return
 }
 
 //export mlnGo_mln_custom_vector_source_options_fetch_tile
-func mlnGo_mln_custom_vector_source_options_fetch_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
+func mlnGo_mln_custom_vector_source_options_fetch_tile(native_user_data unsafe.Pointer, native__map C.mln_map, native_source_id C.mln_buffer_view, native_tile_id C.mln_canonical_tile_id) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_fetch_tile_callback", failure)
@@ -9329,12 +9329,12 @@ func mlnGo_mln_custom_vector_source_options_fetch_tile(native_user_data unsafe.P
 	if !ok || callbacks.FetchTile == nil {
 		return
 	}
-	callbacks.FetchTile(copyCanonicalTileId(native_tile_id))
+	callbacks.FetchTile(borrowMapHandle(uint64(native__map)), bindingString(native_source_id.data, uint64(native_source_id.size)), copyCanonicalTileId(native_tile_id))
 	return
 }
 
 //export mlnGo_mln_custom_vector_source_options_cancel_tile
-func mlnGo_mln_custom_vector_source_options_cancel_tile(native_user_data unsafe.Pointer, native_tile_id C.mln_canonical_tile_id) {
+func mlnGo_mln_custom_vector_source_options_cancel_tile(native_user_data unsafe.Pointer, native__map C.mln_map, native_source_id C.mln_buffer_view, native_tile_id C.mln_canonical_tile_id) {
 	defer func() {
 		if failure := recover(); failure != nil {
 			bindingReportCallbackPanic("mln_custom_source_cancel_tile_callback", failure)
@@ -9344,7 +9344,7 @@ func mlnGo_mln_custom_vector_source_options_cancel_tile(native_user_data unsafe.
 	if !ok || callbacks.CancelTile == nil {
 		return
 	}
-	callbacks.CancelTile(copyCanonicalTileId(native_tile_id))
+	callbacks.CancelTile(borrowMapHandle(uint64(native__map)), bindingString(native_source_id.data, uint64(native_source_id.size)), copyCanonicalTileId(native_tile_id))
 	return
 }
 

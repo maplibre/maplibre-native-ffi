@@ -195,12 +195,20 @@ def owner_declarations(bound):
             else "  /// The native handle, which no later handle in the process reuses.\n"
             "  /// It stays valid after the handle closes.\n"
         )
+        # A callback's borrowed owner never releases or disposes its handle.
+        borrow = (
+            f"  init(borrowing raw: {handle.native}) throws {{\n"
+            f'    handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw), borrowed: true)\n'
+            "  }\n"
+            if handle.native in bound.borrowed_handles
+            else ""
+        )
         chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {{
   let handle: NativeHandleState<{raw}>
   init(adopting raw: {handle.native}{parent}) throws {{
     handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw){passed})
   }}
-{id_doc}  public var id: UInt64 {{ handle.value.raw }}
+{borrow}{id_doc}  public var id: UInt64 {{ handle.value.raw }}
   /// Whether the binding has accepted a close, dispose, discard, or release
   /// of this handle.
   public var isClosed: Bool {{ handle.isClosed }}

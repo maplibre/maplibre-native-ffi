@@ -89,9 +89,13 @@ def network(
     # #endregion provider
 
     # #region custom-source
-    def fetch_tile(tile: mln.CanonicalTileId) -> None:
+    def fetch_tile(
+        map_handle: mln.MapHandle,
+        source_id: str,
+        tile: mln.CanonicalTileId,
+    ) -> None:
         map_handle.discarding.set_custom_geometry_source_tile_data(
-            "app-data", tile, geojson_for_tile(tile)
+            source_id, tile, geojson_for_tile(tile)
         )
 
     map_handle.discarding.add_custom_geometry_source(

@@ -107,6 +107,12 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     /// Takes the handle for a consuming call; an idempotent close skips a released handle.
     fn reserve(&self, idempotent: bool) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
         let state = self.state();
+        if state.borrowed {
+            return Err(invalid_state_error(format!(
+                "{} is borrowed by a callback, which can't release it",
+                state.type_name
+            )));
+        }
         if idempotent && state.handle.is_released() {
             return Ok(None);
         }
@@ -132,6 +138,17 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
             state = state.with_disposal(dispose);
         }
         Py::new(py, Self::from_shared(generated_owner_state(state))).map(|value| value.into_any())
+    }
+
+    /// Wraps a handle that a callback borrows, which nothing releases or
+    /// disposes.
+    fn borrow(py: Python<'_>, raw: Self::Native) -> PyResult<Py<PyAny>> {
+        // SAFETY: a borrowed state never releases or disposes the handle.
+        let mut state =
+            unsafe { NativeHandleState::from_handle(raw, Self::NATIVE) }.map_err(map_error)?;
+        state.borrowed = true;
+        let state = Arc::new(Mutex::new(state));
+        Py::new(py, Self::from_shared(state)).map(|value| value.into_any())
     }
 }
 
@@ -161,6 +178,11 @@ macro_rules! generated_owner {
             #[getter]
             fn _is_closed(&self) -> bool {
                 self.state().is_closed()
+            }
+
+            #[getter]
+            fn _is_borrowed(&self) -> bool {
+                self.state().borrowed
             }
 
             #[getter]

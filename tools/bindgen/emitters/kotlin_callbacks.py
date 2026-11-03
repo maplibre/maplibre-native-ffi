@@ -644,6 +644,19 @@ def owns(callback, parameter):
     return parameter.value.kind == "handle" and parameter.value.ownership == "owned"
 
 
+def borrowed_owner(parameter, values):
+    """The owner of a handle that the callback borrows, which never releases
+    or disposes it, or None for any other argument."""
+    value = parameter.value
+    if value.kind != "handle" or value.ownership != "borrowed":
+        return None
+    handle = values.bound.handles[value.native]
+    parent = ", null" if handle.parent else ""
+    return (
+        f"{owner_class(handle)}({identifier(parameter.name)}{parent}, borrowed = true)"
+    )
+
+
 def callback_site(site_name, callback_value, member, root_type, values, site_form):
     """Register the upcall site that runs [member] of the root's [root_type] value."""
     callback = values.bound.callbacks[callback_value.native]
@@ -669,6 +682,8 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
             )
             arguments.append(local)
             owned.append(local)
+        elif borrowed := borrowed_owner(parameter, values):
+            arguments.append(borrowed)
         else:
             arguments.append(callback_argument(parameter, values))
     # A status callback's host callback returns nothing and throws to fail, so
@@ -739,6 +754,8 @@ def queued_site(
             )
             owners.append(local)
             arguments.append(local)
+        elif borrowed := borrowed_owner(parameter, values):
+            arguments.append(borrowed)
         else:
             arguments.append(callback_argument(parameter, values))
     released = "; ".join(f"{local}.close()" for local in owners)

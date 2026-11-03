@@ -87,9 +87,9 @@ internal static class Network
             new CustomGeometrySourceOptions
             {
                 // Runs on a library thread.
-                FetchTile = tile =>
-                    map.Discarding.SetCustomGeometrySourceTileData(
-                        "app-data",
+                FetchTile = (sourceMap, sourceId, tile) =>
+                    sourceMap.Discarding.SetCustomGeometrySourceTileData(
+                        sourceId,
                         tile,
                         GeoJsonForTile(tile)
                     ),

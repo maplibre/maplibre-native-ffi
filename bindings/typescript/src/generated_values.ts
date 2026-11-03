@@ -1,6 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
+  MapHandle,
   ResourceRequestHandle,
   ResourceTransformRequestHandle,
 } from "./generated_operations.ts";
@@ -470,8 +471,16 @@ export type ConstrainMode =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CustomGeometrySourceOptions {
-  fetchTile: (tileId: CanonicalTileId) => void;
-  cancelTile?: (tileId: CanonicalTileId) => void;
+  fetchTile: (
+    map: MapHandle,
+    sourceId: string,
+    tileId: CanonicalTileId,
+  ) => void;
+  cancelTile?: (
+    map: MapHandle,
+    sourceId: string,
+    tileId: CanonicalTileId,
+  ) => void;
   minZoom?: number;
   maxZoom?: number;
   /**
@@ -506,8 +515,16 @@ export interface CustomGeometrySourceOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CustomVectorSourceOptions {
-  fetchTile: (tileId: CanonicalTileId) => void;
-  cancelTile?: (tileId: CanonicalTileId) => void;
+  fetchTile: (
+    map: MapHandle,
+    sourceId: string,
+    tileId: CanonicalTileId,
+  ) => void;
+  cancelTile?: (
+    map: MapHandle,
+    sourceId: string,
+    tileId: CanonicalTileId,
+  ) => void;
   minZoom?: number;
   maxZoom?: number;
 }

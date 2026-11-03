@@ -30,7 +30,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
   await map.setStyleJson(_style);
   await map.addCustomGeometrySource(
     'source',
-    CustomGeometrySourceOptions(fetchTile: (_) {}),
+    CustomGeometrySourceOptions(fetchTile: (_, _, _) {}),
   );
   return (runtime, map);
 }

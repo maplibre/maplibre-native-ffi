@@ -20,7 +20,7 @@ class ExitSessionsTest {
       sessions.enroll(session.binding)
       // A fresh state stands in for a session that its host destroys after abandonAll takes its
       // snapshot, so abandonAll passes the destroyed handle to native.
-      sessions.enroll(HandleState("RenderSessionHandle", destroyed.binding.handle) {})
+      sessions.enroll(HandleState("RenderSessionHandle", destroyed.binding.handle, dispose = {}))
       sessions.abandonAll()
       assertEquals(RenderSessionState.ABANDONED, session.getSnapshot().state)
     }

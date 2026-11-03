@@ -213,6 +213,50 @@ private func attachBorrowedTexture(
   }
 }
 
+/// A custom source's callback answers through the map that it borrows, which
+/// it can't release.
+@Test func aCustomSourceAnswersThroughTheMapItBorrows() async throws {
+  try await withOffscreenSession { rendered in
+    let map = rendered.fixture.map
+    let calls = LockedBox<[(
+      id: UInt64,
+      sourceId: String,
+      refusal: Status?
+    )]>([])
+    try await map.addCustomGeometrySource(
+      "custom",
+      options: CustomGeometrySourceOptions(
+        fetchTile: { borrowed, sourceId, tile in
+          try? borrowed.discarding.setCustomGeometrySourceTileData(
+            sourceId,
+            tileId: tile,
+            data: #"{"type": "FeatureCollection", "features": []}"#
+          )
+          var refusal: Status?
+          do { try borrowed.dispose() } catch {
+            refusal = (error as? MaplibreError)?.status
+          }
+          calls.update { $0.append((borrowed.id, sourceId, refusal)) }
+        }
+      )
+    )
+    try await map.addStyleLayerJson(
+      #"{"id": "dots", "type": "circle", "source": "custom"}"#,
+      beforeLayerId: ""
+    )
+    // The map asks for its tiles as it renders.
+    for _ in 0 ..< 32 where calls.value.isEmpty {
+      try await rendered.session.awaitRenderedFrame()
+    }
+    await awaitCondition("a tile fetch") { !calls.value.isEmpty }
+    let first = try #require(calls.value.first)
+    #expect(first.id == map.id)
+    #expect(first.sourceId == "custom")
+    #expect(first.refusal == .invalidState)
+    #expect(!map.isClosed)
+  }
+}
+
 #if canImport(Metal)
   /// A Metal frame view lends its texture, device, and pixel format as Metal
   /// types: the texture the session rendered, on the device it attached with.

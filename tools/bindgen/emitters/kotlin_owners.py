@@ -91,17 +91,28 @@ def owner(bound, native, plans, factories, members, imports):
             operations[index] = operations[index].replace(
                 head, f"  public override fun {release.member}(", 1
             )
+    # A callback's borrowed owner has no parent to keep reachable, and
+    # nothing disposes its handle.
+    borrowable = native in bound.borrowed_handles
     parameters = ["handle: Long"]
     if handle.parent:
         # The owner, not its state, keeps the parent reachable, so leak cleanup
         # and exit abandonment never hold a parent.
         parameters.append(
             f'@Suppress("unused") private val parent: {owner_name(bound.handles[handle.parent])}'
+            + ("?" if borrowable else "")
         )
+    if borrowable:
+        parameters.append("borrowed: Boolean = false")
     dispose = family[0].lower() + family[1:]
     body = [
-        f'  internal val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose})',
-        '  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)',
+        f'  internal val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose}'
+        + (", borrowed)" if borrowable else ")"),
+        (
+            '  @Suppress("unused") private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)'
+            if borrowable
+            else '  @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)'
+        ),
         "  /**\n"
         + (
             "   * The native handle value, which runtime events report as their source. It stays readable\n"

@@ -121,43 +121,73 @@ public struct CustomGeometrySourceOptions: Sendable {
 
 private func invokeCustomGeometrySourceOptionsFetchTile(
   user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
   tile_id: mln_canonical_tile_id
 ) {
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.fetchTile(CanonicalTileId(raw: tile_id))
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.fetchTile(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_fetch_tile_callback failed: \(error)\n"
+    )
+  }
 }
 
 private func invokeCustomGeometrySourceOptionsCancelTile(
   user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
   tile_id: mln_canonical_tile_id
 ) {
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.cancelTile?(CanonicalTileId(raw: tile_id))
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.cancelTile?(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_cancel_tile_callback failed: \(error)\n"
+    )
+  }
 }
 
 /// Reports that a custom source no longer needs a tile.
 ///
+/// `map` and `sourceId` name the source.
+///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomSourceCancelTileCallback =
-  @Sendable (_ tileId: CanonicalTileId) -> Void
+public typealias CustomSourceCancelTileCallback = @Sendable (
+  _ map: MapHandle,
+  _ sourceId: String,
+  _ tileId: CanonicalTileId
+) -> Void
 
 /// Asks for the data of a tile in a custom source.
 ///
-/// Return quickly. Once the data is ready, pass it to
-/// `MapHandle.setCustomGeometrySourceTileData()` or
+/// `map` and `sourceId` name the source that asks. Return quickly. Once the
+/// data is ready, pass it to `MapHandle.setCustomGeometrySourceTileData()` or
 /// `MapHandle.setCustomVectorSourceTileData()`. If it fails to load, report
 /// that with `MapHandle.setCustomGeometrySourceTileError()` or
 /// `MapHandle.setCustomVectorSourceTileError()`.
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomSourceFetchTileCallback =
-  @Sendable (_ tileId: CanonicalTileId) -> Void
+public typealias CustomSourceFetchTileCallback = @Sendable (
+  _ map: MapHandle,
+  _ sourceId: String,
+  _ tileId: CanonicalTileId
+) -> Void
 
 /// The callbacks and options of a custom vector source.
 ///
@@ -207,22 +237,44 @@ public struct CustomVectorSourceOptions: Sendable {
 
 private func invokeCustomVectorSourceOptionsFetchTile(
   user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
   tile_id: mln_canonical_tile_id
 ) {
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.fetchTile(CanonicalTileId(raw: tile_id))
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.fetchTile(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_fetch_tile_callback failed: \(error)\n"
+    )
+  }
 }
 
 private func invokeCustomVectorSourceOptionsCancelTile(
   user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
   tile_id: mln_canonical_tile_id
 ) {
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  box.value.cancelTile?(CanonicalTileId(raw: tile_id))
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.cancelTile?(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_cancel_tile_callback failed: \(error)\n"
+    )
+  }
 }
 
 /// Options for a GeoJSON

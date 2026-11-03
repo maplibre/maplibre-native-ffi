@@ -93,9 +93,11 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 
 	// #region custom-source
 	source := maplibre.CustomGeometrySourceOptions{
-		FetchTile: func(tile maplibre.CanonicalTileId) {
+		FetchTile: func(
+			m *maplibre.MapHandle, sourceId string, tile maplibre.CanonicalTileId,
+		) {
 			err := m.Discarding().SetCustomGeometrySourceTileData(
-				"app-data", tile, geojsonForTile(tile),
+				sourceId, tile, geojsonForTile(tile),
 			)
 			if err != nil {
 				log.Print(err)

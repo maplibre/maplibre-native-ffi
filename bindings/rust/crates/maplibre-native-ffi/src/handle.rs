@@ -107,6 +107,14 @@ macro_rules! native_owner {
                 Ok(Self { inner })
             }
 
+            /// Wraps `raw`, which a callback borrows, in an owner that never
+            /// disposes it. The callback reaches it only by reference.
+            pub(crate) fn borrow(
+                raw: maplibre_native_ffi_sys::$native,
+            ) -> $crate::Result<std::mem::ManuallyDrop<Self>> {
+                Self::adopt(raw).map(std::mem::ManuallyDrop::new)
+            }
+
             /// Runs a consuming call, which ends this owner once native
             /// accepts it and hands it back otherwise.
             pub(crate) fn consume<R>(

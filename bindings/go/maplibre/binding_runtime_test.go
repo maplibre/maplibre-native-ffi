@@ -94,3 +94,18 @@ func TestExportsRecoverFromPanics(t *testing.T) {
 		t.Fatalf("release panic log = %+v", got)
 	}
 }
+
+// A callback borrows the map that calls it, so a release through it fails
+// rather than ending the caller's map.
+func TestABorrowedHandleRefusesRelease(t *testing.T) {
+	m := borrowMapHandle(7)
+	if err := m.Dispose(); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("Dispose = %v, want StatusInvalidState", err)
+	}
+	if _, err := m.Close(); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("Close = %v, want StatusInvalidState", err)
+	}
+	if m.IsClosed() || m.Id() != 7 {
+		t.Fatalf("the borrowed handle is %v", m)
+	}
+}

@@ -4,7 +4,6 @@
 #include <maplibre_native_c.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 static const char api_key_parameter[] = "key=my-api-key";
@@ -83,10 +82,13 @@ static void serve_tile(
 // #endregion provider
 
 // #region custom-source
-static void fetch_tile(void* user_data, mln_canonical_tile_id tile) {
-  const mln_map* map = user_data;
+static void fetch_tile(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile
+) {
+  (void)user_data;
   mln_map_set_custom_geometry_source_tile_data(
-    *map, mln_buffer_view_from_cstr("app-data"), tile,
+    map, source_id, tile,
     mln_buffer_view_from_cstr(geojson_for_tile(tile)), NULL, NULL
   );
 }
@@ -155,15 +157,9 @@ void mln_doc_network(mln_runtime runtime, mln_map map) {
 
   {
     // #region custom-source
-    // The library frees this copy when it removes the source.
-    mln_map* source_map = malloc(sizeof(*source_map));
-    *source_map = map;
-
     const mln_custom_geometry_source_options options = {
       .size = sizeof(mln_custom_geometry_source_options),
       .fetch_tile = fetch_tile,
-      .user_data = source_map,
-      .release_user_data = free,
     };
 
     mln_map_add_custom_geometry_source(

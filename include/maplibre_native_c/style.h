@@ -308,19 +308,33 @@ typedef struct mln_canonical_tile_id {
 /**
  * Asks for the data of a tile in a custom source.
  *
- * Return quickly. Once the data is ready, pass it to
- * mln_map_set_custom_geometry_source_tile_data() or
+ * `map` and `source_id` name the source that asks. Return quickly. Once the
+ * data is ready, pass it to mln_map_set_custom_geometry_source_tile_data() or
  * mln_map_set_custom_vector_source_tile_data(). If it fails to load, report
  * that with mln_map_set_custom_geometry_source_tile_error() or
  * mln_map_set_custom_vector_source_tile_error().
+ *
+ * Lifetimes:
+ * `source_id` stays valid until the callback returns. The callback borrows
+ * `map`, so it must not release it.
  */
 typedef void (*mln_custom_source_fetch_tile_callback)(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map MLN_BINDING("ownership=borrowed"),
+  mln_buffer_view source_id, mln_canonical_tile_id tile_id
 );
 
-/** Reports that a custom source no longer needs a tile. */
+/**
+ * Reports that a custom source no longer needs a tile.
+ *
+ * `map` and `source_id` name the source.
+ *
+ * Lifetimes:
+ * `source_id` stays valid until the callback returns. The callback borrows
+ * `map`, so it must not release it.
+ */
 typedef void (*mln_custom_source_cancel_tile_callback)(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map MLN_BINDING("ownership=borrowed"),
+  mln_buffer_view source_id, mln_canonical_tile_id tile_id
 );
 
 /**

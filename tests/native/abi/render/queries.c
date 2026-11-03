@@ -384,15 +384,25 @@ static const uint8_t two_layer_tile[] = {
   0x09, 0x80, 0x20, 0x80, 0x20, 0x28, 0x80, 0x20,
 };
 
-static void count_fetch(void* user_data, mln_canonical_tile_id tile_id) {
+static void count_fetch(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
+  (void)map;
+  (void)source_id;
   if (tile_id.z == 0) {
     atomic_fetch_add((atomic_int*)user_data, 1);
   }
   mln_test_pulse();
 }
 
-static void ignore_cancel(void* user_data, mln_canonical_tile_id tile_id) {
+static void ignore_cancel(
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
+) {
   (void)user_data;
+  (void)map;
+  (void)source_id;
   (void)tile_id;
 }
 

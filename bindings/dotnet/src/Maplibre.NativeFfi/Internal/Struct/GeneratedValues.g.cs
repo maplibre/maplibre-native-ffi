@@ -277,12 +277,16 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCustomGeometrySourceOptionsFetchTile(
         void* user_data,
+        MlnMap map,
+        mln_buffer_view source_id,
         mln_canonical_tile_id tile_id
     )
     {
         try
         {
             ((CustomGeometrySourceOptions)NativeCallbackRoot.Value(user_data)).FetchTile?.Invoke(
+                MapHandle.Borrow(map),
+                RuntimeStructs.CopyUtf8((sbyte*)source_id.data, source_id.size),
                 CopyCanonicalTileId(tile_id)
             );
         }
@@ -295,12 +299,16 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCustomGeometrySourceOptionsCancelTile(
         void* user_data,
+        MlnMap map,
+        mln_buffer_view source_id,
         mln_canonical_tile_id tile_id
     )
     {
         try
         {
             ((CustomGeometrySourceOptions)NativeCallbackRoot.Value(user_data)).CancelTile?.Invoke(
+                MapHandle.Borrow(map),
+                RuntimeStructs.CopyUtf8((sbyte*)source_id.data, source_id.size),
                 CopyCanonicalTileId(tile_id)
             );
         }
@@ -372,12 +380,16 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCustomVectorSourceOptionsFetchTile(
         void* user_data,
+        MlnMap map,
+        mln_buffer_view source_id,
         mln_canonical_tile_id tile_id
     )
     {
         try
         {
             ((CustomVectorSourceOptions)NativeCallbackRoot.Value(user_data)).FetchTile?.Invoke(
+                MapHandle.Borrow(map),
+                RuntimeStructs.CopyUtf8((sbyte*)source_id.data, source_id.size),
                 CopyCanonicalTileId(tile_id)
             );
         }
@@ -390,12 +402,16 @@ internal static unsafe class GeneratedValues
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCustomVectorSourceOptionsCancelTile(
         void* user_data,
+        MlnMap map,
+        mln_buffer_view source_id,
         mln_canonical_tile_id tile_id
     )
     {
         try
         {
             ((CustomVectorSourceOptions)NativeCallbackRoot.Value(user_data)).CancelTile?.Invoke(
+                MapHandle.Borrow(map),
+                RuntimeStructs.CopyUtf8((sbyte*)source_id.data, source_id.size),
                 CopyCanonicalTileId(tile_id)
             );
         }

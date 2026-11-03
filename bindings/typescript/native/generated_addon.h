@@ -97,10 +97,12 @@ void mln_ts_dispatch_camera_transition_end_callback(
   void* user_data, const mln_camera_transition_end* end
 );
 void mln_ts_dispatch_custom_source_cancel_tile_callback(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 );
 void mln_ts_dispatch_custom_source_fetch_tile_callback(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 );
 bool mln_ts_dispatch_log_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,

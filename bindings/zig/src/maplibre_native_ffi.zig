@@ -206,6 +206,7 @@ pub const GeoJsonSourceData = struct {
 pub const Map = struct {
     raw: u64,
     closed: bool = false,
+    borrowed: bool = false,
     pub const native_name = "mln_map";
     const methods = owner.Handle(@This(), "Map", struct {
         fn dispose(raw: u64) status.Error!void {
@@ -213,6 +214,8 @@ pub const Map = struct {
         }
     }.dispose);
     pub const adopt = methods.adopt;
+    const borrow = methods.borrow;
+    const requireOwned = methods.requireOwned;
     pub const id = methods.id;
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
@@ -538,6 +541,7 @@ pub const Map = struct {
     /// See `mln_map_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn dispose(self: *Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        try self.requireOwned(diagnostic);
         if (self.closed) return;
         try call.invoke("mln_map_dispose", .handle, self.*, null, diagnostic, .{});
         self.closed = true;
@@ -859,6 +863,7 @@ pub const Map = struct {
     /// See `mln_map_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn release(self: *Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+        try self.requireOwned(diagnostic);
         const released = try call.submit("mln_map_release", .handle, self.*, call.unit, null, diagnostic, .{});
         self.closed = true;
         return released;
@@ -3047,8 +3052,8 @@ pub const ConstrainMode = enum(u32) {
 pub const CustomGeometrySourceOptions = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void,
-    cancel_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
+    fetch_tile: *const fn (context: ?*anyopaque, map: *const Map, source_id: []const u8, tile_id: CanonicalTileId) anyerror!void,
+    cancel_tile: ?*const fn (context: ?*anyopaque, map: *const Map, source_id: []const u8, tile_id: CanonicalTileId) anyerror!void = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
     /// How far, in pixels, simplified geometry can stray from the original.
@@ -3080,28 +3085,30 @@ pub const CustomGeometrySourceOptions = struct {
         raw.release_user_data = callbacks.Registration(CustomGeometrySourceOptions).releaseNative;
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 3)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 3)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
                 const state = callbacks.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile;
-                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
+                const borrowed_map = Map.borrow(callback_arg_1);
+                try host(state.value.context, &borrowed_map, try marshal.borrowView(callback_arg_2), CanonicalTileId.fromNative(callback_arg_3));
             }
-        }.invoke(native_arg_0, native_arg_1) catch |err| {
+        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
             callbacks.reportError("mln_custom_source_fetch_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 3)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 3)) anyerror!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
                 const state = callbacks.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
-                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
+                const borrowed_map = Map.borrow(callback_arg_1);
+                try host(state.value.context, &borrowed_map, try marshal.borrowView(callback_arg_2), CanonicalTileId.fromNative(callback_arg_3));
             }
-        }.invoke(native_arg_0, native_arg_1) catch |err| {
+        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
             callbacks.reportError("mln_custom_source_cancel_tile_callback", err);
             return;
         };
@@ -3122,13 +3129,13 @@ pub const CustomGeometrySourceOptions = struct {
                 }
             }.call,
             .fetch_tile = struct {
-                fn call(erased: ?*anyopaque, argument_0: CanonicalTileId) anyerror!void {
-                    return fetch_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
+                fn call(erased: ?*anyopaque, argument_0: *const Map, argument_1: []const u8, argument_2: CanonicalTileId) anyerror!void {
+                    return fetch_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
             .cancel_tile = if (@TypeOf(cancel_tile) == @TypeOf(null)) null else struct {
-                fn call(erased: ?*anyopaque, argument_0: CanonicalTileId) anyerror!void {
-                    return cancel_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
+                fn call(erased: ?*anyopaque, argument_0: *const Map, argument_1: []const u8, argument_2: CanonicalTileId) anyerror!void {
+                    return cancel_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
         };
@@ -3144,8 +3151,8 @@ pub const CustomGeometrySourceOptions = struct {
 pub const CustomVectorSourceOptions = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    fetch_tile: *const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void,
-    cancel_tile: ?*const fn (context: ?*anyopaque, tile_id: CanonicalTileId) anyerror!void = null,
+    fetch_tile: *const fn (context: ?*anyopaque, map: *const Map, source_id: []const u8, tile_id: CanonicalTileId) anyerror!void,
+    cancel_tile: ?*const fn (context: ?*anyopaque, map: *const Map, source_id: []const u8, tile_id: CanonicalTileId) anyerror!void = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
     pub fn toNative(self: CustomVectorSourceOptions, roots: *callbacks.Roots) status.Error!c.mln_custom_vector_source_options {
@@ -3161,28 +3168,30 @@ pub const CustomVectorSourceOptions = struct {
         raw.release_user_data = callbacks.Registration(CustomVectorSourceOptions).releaseNative;
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 3)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_custom_source_fetch_tile_callback, 3)) anyerror!marshal.CallbackResult(c.mln_custom_source_fetch_tile_callback) {
                 const state = callbacks.Registration(CustomVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile;
-                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
+                const borrowed_map = Map.borrow(callback_arg_1);
+                try host(state.value.context, &borrowed_map, try marshal.borrowView(callback_arg_2), CanonicalTileId.fromNative(callback_arg_3));
             }
-        }.invoke(native_arg_0, native_arg_1) catch |err| {
+        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
             callbacks.reportError("mln_custom_source_fetch_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 3)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_custom_source_cancel_tile_callback, 3)) anyerror!marshal.CallbackResult(c.mln_custom_source_cancel_tile_callback) {
                 const state = callbacks.Registration(CustomVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
-                try host(state.value.context, CanonicalTileId.fromNative(callback_arg_1));
+                const borrowed_map = Map.borrow(callback_arg_1);
+                try host(state.value.context, &borrowed_map, try marshal.borrowView(callback_arg_2), CanonicalTileId.fromNative(callback_arg_3));
             }
-        }.invoke(native_arg_0, native_arg_1) catch |err| {
+        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch |err| {
             callbacks.reportError("mln_custom_source_cancel_tile_callback", err);
             return;
         };
@@ -3203,13 +3212,13 @@ pub const CustomVectorSourceOptions = struct {
                 }
             }.call,
             .fetch_tile = struct {
-                fn call(erased: ?*anyopaque, argument_0: CanonicalTileId) anyerror!void {
-                    return fetch_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
+                fn call(erased: ?*anyopaque, argument_0: *const Map, argument_1: []const u8, argument_2: CanonicalTileId) anyerror!void {
+                    return fetch_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
             .cancel_tile = if (@TypeOf(cancel_tile) == @TypeOf(null)) null else struct {
-                fn call(erased: ?*anyopaque, argument_0: CanonicalTileId) anyerror!void {
-                    return cancel_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
+                fn call(erased: ?*anyopaque, argument_0: *const Map, argument_1: []const u8, argument_2: CanonicalTileId) anyerror!void {
+                    return cancel_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
         };

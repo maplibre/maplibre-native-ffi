@@ -27,6 +27,9 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     callback_roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
     type_name: &'static str,
+    /// Whether a callback borrows the handle, which the binding then never
+    /// releases or disposes.
+    borrowed: bool,
 }
 
 impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
@@ -43,10 +46,17 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
             callback_roots: Vec::new(),
             dispose_abandoned: None,
             type_name,
+            borrowed: false,
         })
     }
 
+    /// Lets the collector reach the callbacks that this owner registered. A
+    /// borrowed handle doesn't outlive its callback, so the registrations made
+    /// through it stay out of its graph, rooted until native releases them.
     fn retain_callback_roots(&mut self, roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>) {
+        if self.borrowed {
+            return;
+        }
         self.callback_roots.retain(|root| root.strong_count() != 0);
         self.callback_roots.extend(roots);
     }

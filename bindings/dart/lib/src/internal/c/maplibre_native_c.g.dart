@@ -39,11 +39,21 @@ typedef mln_completion_callbackFunction =
 typedef mln_custom_source_cancel_tile_callback =
     Pointer<NativeFunction<mln_custom_source_cancel_tile_callbackFunction>>;
 typedef mln_custom_source_cancel_tile_callbackFunction =
-    Void Function(Pointer<Void> user_data, mln_canonical_tile_id tile_id);
+    Void Function(
+      Pointer<Void> user_data,
+      mln_map map,
+      mln_buffer_view source_id,
+      mln_canonical_tile_id tile_id,
+    );
 typedef mln_custom_source_fetch_tile_callback =
     Pointer<NativeFunction<mln_custom_source_fetch_tile_callbackFunction>>;
 typedef mln_custom_source_fetch_tile_callbackFunction =
-    Void Function(Pointer<Void> user_data, mln_canonical_tile_id tile_id);
+    Void Function(
+      Pointer<Void> user_data,
+      mln_map map,
+      mln_buffer_view source_id,
+      mln_canonical_tile_id tile_id,
+    );
 typedef mln_http_header_transform_callback =
     Pointer<NativeFunction<mln_http_header_transform_callbackFunction>>;
 typedef mln_http_header_transform_callbackFunction =

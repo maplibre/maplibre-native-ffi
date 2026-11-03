@@ -27,7 +27,9 @@ class NativeHandleMixin:
         # Finalizers cannot report warning-delivery failures, including during
         # interpreter shutdown when Python globals may be partially torn down.
         with suppress(BaseException):
-            if hasattr(self, "_native") and not self._native._is_closed:
+            native = getattr(self, "_native", None)
+            # A callback's borrowed handle is its owner's to close.
+            if native is not None and not native._is_closed and not native._is_borrowed:
                 warnings.warn(
                     f"{self._handle_name} was not explicitly closed",
                     ResourceWarning,

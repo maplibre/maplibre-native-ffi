@@ -152,6 +152,10 @@ def sources(values, plan):
             value = p.value.unwrapped
             if value.kind == "handle" and value.ownership == "owned":
                 copied.append("owned_" + p.name)
+            elif value.kind == "handle" and value.ownership == "borrowed":
+                copied.append(
+                    f"borrow{values.owner(value.native)}(uint64(native_{native_identifier(p.name)}))"
+                )
             elif value.response:
                 copied.append(
                     f"&{public(value.native)}Scope{{native: native_{p.name}, scope: scope}}"

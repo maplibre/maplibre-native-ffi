@@ -1821,10 +1821,22 @@ pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
 pub type mln_custom_geometry_source_option_fields = u32;
-pub type mln_custom_source_cancel_tile_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
-pub type mln_custom_source_fetch_tile_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
+pub type mln_custom_source_cancel_tile_callback = Option<
+    unsafe extern "C" fn(
+        user_data: *mut std::ffi::c_void,
+        map: mln_map,
+        source_id: mln_buffer_view,
+        tile_id: mln_canonical_tile_id,
+    ),
+>;
+pub type mln_custom_source_fetch_tile_callback = Option<
+    unsafe extern "C" fn(
+        user_data: *mut std::ffi::c_void,
+        map: mln_map,
+        source_id: mln_buffer_view,
+        tile_id: mln_canonical_tile_id,
+    ),
+>;
 pub type mln_custom_vector_source_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

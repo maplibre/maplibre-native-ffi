@@ -1097,7 +1097,11 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
     parameters = ["key: AdoptKey", "handle: bigint"]
     options = []
     if handle.parent in bound.public_handles:
-        parameters.append(f"parent: {owner_class(bound.handles[handle.parent])}")
+        # A borrowed owner has no parent to keep reachable.
+        absent = " | undefined" if native in bound.borrowed_handles else ""
+        parameters.append(
+            f"parent: {owner_class(bound.handles[handle.parent])}{absent}"
+        )
         options.append("parent")
     parameters.append("registrations?: Registrations")
     options.append("registrations")
@@ -1252,6 +1256,7 @@ def render_views(bound, values: Values, lowered: list[Lowered]) -> list[str]:
 def render_adapter(bound, values: Values, callback, uses) -> str:
     """The adapter of one callback type: the host callback of a rooted
     registration, run with the arguments that the trampoline converted."""
+    borrows: list[str] = []
     forms = {(entry.function, field.name) for entry, field in uses}
     if len(forms) != 1:
         raise Unsupported(f"{callback.native}: registrations name it differently")
@@ -1272,6 +1277,16 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
             # registration held.
             target += f" as {function_type}"
     names = [parameter_name(p.name) for p in callback.arguments]
+    # A borrowed handle reaches the host in an owner that never releases it.
+    passed = list(names)
+    for index, (p, name) in enumerate(zip(callback.arguments, names)):
+        if values.borrowed_argument(p):
+            handle = values.argument_handle(p)
+            parent = ", undefined" if handle.parent in bound.public_handles else ""
+            borrows.append(
+                f"const {name}Owner = new {owner_class(handle)}(BORROW, {name} as unknown as bigint{parent});"
+            )
+            passed[index] = f"{name}Owner"
     owned = [
         (p, name)
         for p, name in zip(callback.arguments, names)
@@ -1283,6 +1298,7 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
         lines.append(
             f"const [{', '.join(names)}] = args as Parameters<{function_type}>;"
         )
+    lines += borrows
     if owned:
         if len(owned) != 1:
             raise Unsupported(f"{callback.native}: one owned argument at most")
@@ -1295,14 +1311,14 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
             f"const owner = adopt({name} as unknown as bigint, () => new {owner_class(handle)}(ADOPT, {name} as unknown as bigint), {disposer(handle)});",
             "try {",
             f"  {read}",
-            f"  callback({', '.join('owner' if n == name else n for n in names)});",
+            f"  callback({', '.join('owner' if n == name else p for n, p in zip(names, passed))});",
             "} catch (error) {",
             "  owner.close();",
             "  throw error;",
             "}",
         ]
     else:
-        lines.append(f"callback({', '.join(names)});")
+        lines.append(f"callback({', '.join(passed)});")
     head = f"(target, {'args' if names else '_args'}) => {{"
     return f"  // {callback.native}\n  {head}\n" + "".join(
         f"    {line}\n" for line in lines
@@ -1364,6 +1380,7 @@ def runtime_imports(text: str) -> str:
         ],
         "./internal/owners.ts": [
             "ADOPT",
+            "BORROW",
             "type AdoptKey",
             "Owner",
             "ViewScope",

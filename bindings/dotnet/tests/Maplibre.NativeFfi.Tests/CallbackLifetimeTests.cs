@@ -64,7 +64,7 @@ public sealed class CallbackLifetimeTests
         map.SetStyleJsonAsync(NativeFixture.EmptyStyle).GetAwaiter().GetResult();
         map.AddCustomGeometrySourceAsync(
                 "captured-map",
-                new CustomGeometrySourceOptions { FetchTile = _ => GC.KeepAlive(map) }
+                new CustomGeometrySourceOptions { FetchTile = (_, _, _) => GC.KeepAlive(map) }
             )
             .GetAwaiter()
             .GetResult();

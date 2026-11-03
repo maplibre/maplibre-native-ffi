@@ -137,8 +137,9 @@ class Values:
     def supported(self, plan: ValuePlan, *, input: bool = False) -> None:
         if plan.response:
             self.fail(plan, "a callback response needs a synchronous Python callback")
-        if plan.kind == "handle" and plan.ownership == "owned":
-            # A callback adopts an owned handle into its generated owner.
+        if plan.kind == "handle" and plan.ownership in {"owned", "borrowed"}:
+            # A callback adopts an owned handle into its generated owner, and
+            # wraps a borrowed one in an owner that never releases it.
             return
         if plan.ownership == "owned":
             self.fail(plan, "owned values require a handle adoption transaction")

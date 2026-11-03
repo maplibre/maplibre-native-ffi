@@ -422,6 +422,8 @@ struct Delivered<CameraTransitionEndArguments> {
   }
 };
 struct CustomSourceCancelTileArguments {
+  mln_map map;
+  mln_buffer_view source_id;
   mln_canonical_tile_id tile_id;
 };
 template <bool Writing>
@@ -430,6 +432,7 @@ auto capture_element(
   const CustomSourceCancelTileArguments& source
 ) -> CustomSourceCancelTileArguments {
   auto result = source;
+  result.source_id = buffer(arena, source.source_id);
   return result;
 }
 inline auto discard_element(
@@ -448,10 +451,14 @@ struct Delivered<CustomSourceCancelTileArguments> {
     Callback callback, void* user_data,
     const CustomSourceCancelTileArguments& record
   ) noexcept -> void {
-    static_cast<void>(callback(user_data, record.tile_id));
+    static_cast<void>(
+      callback(user_data, record.map, record.source_id, record.tile_id)
+    );
   }
 };
 struct CustomSourceFetchTileArguments {
+  mln_map map;
+  mln_buffer_view source_id;
   mln_canonical_tile_id tile_id;
 };
 template <bool Writing>
@@ -460,6 +467,7 @@ auto capture_element(
   const CustomSourceFetchTileArguments& source
 ) -> CustomSourceFetchTileArguments {
   auto result = source;
+  result.source_id = buffer(arena, source.source_id);
   return result;
 }
 inline auto discard_element(
@@ -478,7 +486,9 @@ struct Delivered<CustomSourceFetchTileArguments> {
     Callback callback, void* user_data,
     const CustomSourceFetchTileArguments& record
   ) noexcept -> void {
-    static_cast<void>(callback(user_data, record.tile_id));
+    static_cast<void>(
+      callback(user_data, record.map, record.source_id, record.tile_id)
+    );
   }
 };
 struct LogArguments {

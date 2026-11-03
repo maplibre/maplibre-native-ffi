@@ -1121,7 +1121,7 @@ def lower(api: Api | BoundApi) -> Lowered:
     files["python/maplibre_native_ffi/_native.pyi"] = (
         f"# {notice}\nfrom collections.abc import Buffer, Sequence\nfrom concurrent.futures import Future\nfrom typing import Any, Callable\nfrom ._completion import CommandCompletion\nfrom ._generated_values import *\n\n"
         + "\n".join(
-            f"class _{owner}:\n    _is_closed: bool\n    id: int\n{''.join(methods)}"
+            f"class _{owner}:\n    _is_closed: bool\n    _is_borrowed: bool\n    id: int\n{''.join(methods)}"
             for owner, methods in sorted(stubs.items())
             if owner
         )

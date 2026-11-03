@@ -12,6 +12,7 @@ from ._operation import _adopt_value
 
 if TYPE_CHECKING:
     from ._generated_owners import (
+        MapHandle,
         ResourceRequestHandle,
         ResourceTransformRequestHandle,
     )
@@ -1490,14 +1491,16 @@ class CustomGeometrySourceOptions:
     wrap: bool | None = None
     """Whether to wrap geometry that crosses the antimeridian."""
 
-    def _invoke_fetch_tile(self, tile_id):
+    def _invoke_fetch_tile(self, map, source_id, tile_id):
         callback = self.fetch_tile
-        return callback(CanonicalTileId._from_native(tile_id))
+        map = _adopt_value(map, "MapHandle")
+        return callback(map, source_id, CanonicalTileId._from_native(tile_id))
 
-    def _invoke_cancel_tile(self, tile_id):
+    def _invoke_cancel_tile(self, map, source_id, tile_id):
         callback = self.cancel_tile
         assert callback is not None
-        return callback(CanonicalTileId._from_native(tile_id))
+        map = _adopt_value(map, "MapHandle")
+        return callback(map, source_id, CanonicalTileId._from_native(tile_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -1516,14 +1519,16 @@ class CustomVectorSourceOptions:
 
     max_zoom: float | None = None
 
-    def _invoke_fetch_tile(self, tile_id):
+    def _invoke_fetch_tile(self, map, source_id, tile_id):
         callback = self.fetch_tile
-        return callback(CanonicalTileId._from_native(tile_id))
+        map = _adopt_value(map, "MapHandle")
+        return callback(map, source_id, CanonicalTileId._from_native(tile_id))
 
-    def _invoke_cancel_tile(self, tile_id):
+    def _invoke_cancel_tile(self, map, source_id, tile_id):
         callback = self.cancel_tile
         assert callback is not None
-        return callback(CanonicalTileId._from_native(tile_id))
+        map = _adopt_value(map, "MapHandle")
+        return callback(map, source_id, CanonicalTileId._from_native(tile_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -4893,17 +4898,22 @@ class CameraTransitionEndCallback(Protocol):
 class CustomSourceCancelTileCallback(Protocol):
     """Reports that a custom source no longer needs a tile.
 
+    `map` and `source_id` name the source.
+
     See `mln_custom_source_cancel_tile_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    def __call__(self, tile_id: CanonicalTileId, /) -> None: ...
+    def __call__(
+        self, map: MapHandle, source_id: str, tile_id: CanonicalTileId, /
+    ) -> None: ...
 
 
 class CustomSourceFetchTileCallback(Protocol):
     """Asks for the data of a tile in a custom source.
 
-    Return quickly. Once the data is ready, pass it to
+    `map` and `source_id` name the source that asks. Return quickly. Once the
+    data is ready, pass it to
     `MapHandle.set_custom_geometry_source_tile_data()` or
     `MapHandle.set_custom_vector_source_tile_data()`. If it fails to load,
     report that with `MapHandle.set_custom_geometry_source_tile_error()` or
@@ -4913,7 +4923,9 @@ class CustomSourceFetchTileCallback(Protocol):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    def __call__(self, tile_id: CanonicalTileId, /) -> None: ...
+    def __call__(
+        self, map: MapHandle, source_id: str, tile_id: CanonicalTileId, /
+    ) -> None: ...
 
 
 class LogCallback(Protocol):

@@ -103,14 +103,13 @@ typedef struct mlt_map {
 // Runs on a MapLibre worker thread, where tile delivery may be called
 // directly. The null completion discards the command's outcome.
 static void deliver_recorded_tile(
-  void* user_data, mln_canonical_tile_id tile_id
+  void* user_data, mln_map map, mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id
 ) {
-  const mlt_map* map = user_data;
+  const mlt_tile* tile = user_data;
   (void)mln_map_set_custom_vector_source_tile_data(
-    map->map, MLN_BUFFER_LITERAL("mlt-source"), tile_id,
-    MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
-    (mln_buffer_view){.data = map->tile.bytes, .size = map->tile.byte_count},
-    NULL, NULL
+    map, source_id, tile_id, MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
+    (mln_buffer_view){.data = tile->bytes, .size = tile->byte_count}, NULL, NULL
   );
 }
 
@@ -122,7 +121,7 @@ static void add_custom_vector_source(mlt_map* map) {
   options.fields = MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM;
   options.max_zoom = 0;
   options.fetch_tile = deliver_recorded_tile;
-  options.user_data = map;
+  options.user_data = &map->tile;
   MLN_TEST_AWAIT_OK(mln_map_add_custom_vector_source(
     map->map, MLN_BUFFER_LITERAL("mlt-source"), &options,
     &completion.descriptor, NULL

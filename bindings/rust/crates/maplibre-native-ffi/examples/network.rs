@@ -3,8 +3,6 @@
 
 #![allow(dead_code)]
 
-use std::sync::Arc;
-
 use maplibre_native_ffi::*;
 
 fn with_api_key(url: &str) -> String {
@@ -20,10 +18,7 @@ fn geojson_for_tile(_tile: CanonicalTileId) -> String {
     r#"{"type":"FeatureCollection","features":[]}"#.to_owned()
 }
 
-fn network(
-    runtime: &RuntimeHandle,
-    map: &Arc<MapHandle>,
-) -> Result<()> {
+fn network(runtime: &RuntimeHandle, map: &MapHandle) -> Result<()> {
     // #region headers
     let rule = HttpHeaderRule {
         flags: UrlMatchFlag::GLOB,
@@ -82,18 +77,15 @@ fn network(
     // #endregion provider
 
     // #region custom-source
-    // A strong reference would keep the map from dropping.
-    let source_map = Arc::downgrade(map);
-    let options = CustomGeometrySourceOptions::new(move |tile| {
-        if let Some(map) = source_map.upgrade() {
+    let options =
+        CustomGeometrySourceOptions::new(|map, source_id, tile| {
             let data = geojson_for_tile(tile);
             let _ = map
                 .discarding()
                 .set_custom_geometry_source_tile_data(
-                    "app-data", tile, &data,
+                    source_id, tile, &data,
                 );
-        }
-    });
+        });
 
     map.discarding()
         .add_custom_geometry_source("app-data", options)?;

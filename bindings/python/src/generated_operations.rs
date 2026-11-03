@@ -166,6 +166,8 @@ fn generated_copy_mln_canonical_tile_id(
 
 unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch_tile(
     user_data: *mut std::ffi::c_void,
+    map: sys::mln_map,
+    source_id: sys::mln_buffer_view,
     tile_id: sys::mln_canonical_tile_id,
 ) {
     let outcome = generated_invoke(
@@ -174,9 +176,11 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
                 return Ok(());
             };
-            let _result = callback
-                .bind(py)
-                .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
+            let _result = callback.bind(py).call1((
+                MapHandle::borrow(py, map)?,
+                generated_text(py, source_id)?,
+                generated_copy_mln_canonical_tile_id(py, &tile_id)?,
+            ))?;
             Ok(())
         },
     );
@@ -185,6 +189,8 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_fetch
 
 unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cancel_tile(
     user_data: *mut std::ffi::c_void,
+    map: sys::mln_map,
+    source_id: sys::mln_buffer_view,
     tile_id: sys::mln_canonical_tile_id,
 ) {
     let outcome = generated_invoke(
@@ -193,9 +199,11 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cance
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
                 return Ok(());
             };
-            let _result = callback
-                .bind(py)
-                .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
+            let _result = callback.bind(py).call1((
+                MapHandle::borrow(py, map)?,
+                generated_text(py, source_id)?,
+                generated_copy_mln_canonical_tile_id(py, &tile_id)?,
+            ))?;
             Ok(())
         },
     );
@@ -204,6 +212,8 @@ unsafe extern "C" fn generated_callback_mln_custom_geometry_source_options_cance
 
 unsafe extern "C" fn generated_callback_mln_custom_vector_source_options_fetch_tile(
     user_data: *mut std::ffi::c_void,
+    map: sys::mln_map,
+    source_id: sys::mln_buffer_view,
     tile_id: sys::mln_canonical_tile_id,
 ) {
     let outcome = generated_invoke(
@@ -212,9 +222,11 @@ unsafe extern "C" fn generated_callback_mln_custom_vector_source_options_fetch_t
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
                 return Ok(());
             };
-            let _result = callback
-                .bind(py)
-                .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
+            let _result = callback.bind(py).call1((
+                MapHandle::borrow(py, map)?,
+                generated_text(py, source_id)?,
+                generated_copy_mln_canonical_tile_id(py, &tile_id)?,
+            ))?;
             Ok(())
         },
     );
@@ -223,6 +235,8 @@ unsafe extern "C" fn generated_callback_mln_custom_vector_source_options_fetch_t
 
 unsafe extern "C" fn generated_callback_mln_custom_vector_source_options_cancel_tile(
     user_data: *mut std::ffi::c_void,
+    map: sys::mln_map,
+    source_id: sys::mln_buffer_view,
     tile_id: sys::mln_canonical_tile_id,
 ) {
     let outcome = generated_invoke(
@@ -231,9 +245,11 @@ unsafe extern "C" fn generated_callback_mln_custom_vector_source_options_cancel_
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
                 return Ok(());
             };
-            let _result = callback
-                .bind(py)
-                .call1((generated_copy_mln_canonical_tile_id(py, &tile_id)?,))?;
+            let _result = callback.bind(py).call1((
+                MapHandle::borrow(py, map)?,
+                generated_text(py, source_id)?,
+                generated_copy_mln_canonical_tile_id(py, &tile_id)?,
+            ))?;
             Ok(())
         },
     );

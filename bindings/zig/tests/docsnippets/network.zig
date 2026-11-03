@@ -53,11 +53,13 @@ fn serveTile(
 
 // #region custom-source
 fn fetchTile(
+    _: ?*anyopaque,
     map: *const maplibre.Map,
+    source_id: []const u8,
     tile: maplibre.CanonicalTileId,
-) !void {
+) anyerror!void {
     try map.discarding().setCustomGeometrySourceTileData(
-        "app-data",
+        source_id,
         tile,
         geojsonForTile(tile),
         null,
@@ -98,11 +100,9 @@ fn network(allocator: std.mem.Allocator, runtime: maplibre.Runtime, map: *const 
     // #endregion provider
 
     // #region custom-source
-    // The source calls fetchTile with
-    // map, which must outlive the source.
     try map.discarding().addCustomGeometrySource(
         "app-data",
-        .init(map, fetchTile, null, null),
+        .{ .fetch_tile = fetchTile },
         null,
     );
     // #endregion custom-source

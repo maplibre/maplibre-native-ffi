@@ -57,34 +57,82 @@ internal actual object UpcallStubs {
     }
     .toLong()
   actual val customGeometrySourceOptionsFetchTile: Long =
-    staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
-      tileId.useContents {
-        val tileIdAddress = ptr.toLong()
-        Upcalls.customGeometrySourceOptionsFetchTile(userData.toLong(), tileIdAddress)
+    staticCFunction {
+      userData: COpaquePointer?,
+      map: ULong,
+      sourceId: CValue<mln_buffer_view>,
+      tileId: CValue<mln_canonical_tile_id> ->
+      sourceId.useContents {
+        val sourceIdAddress = ptr.toLong()
+        tileId.useContents {
+          val tileIdAddress = ptr.toLong()
+          Upcalls.customGeometrySourceOptionsFetchTile(
+            userData.toLong(),
+            map.toLong(),
+            sourceIdAddress,
+            tileIdAddress,
+          )
+        }
       }
     }
     .toLong()
   actual val customGeometrySourceOptionsCancelTile: Long =
-    staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
-      tileId.useContents {
-        val tileIdAddress = ptr.toLong()
-        Upcalls.customGeometrySourceOptionsCancelTile(userData.toLong(), tileIdAddress)
+    staticCFunction {
+      userData: COpaquePointer?,
+      map: ULong,
+      sourceId: CValue<mln_buffer_view>,
+      tileId: CValue<mln_canonical_tile_id> ->
+      sourceId.useContents {
+        val sourceIdAddress = ptr.toLong()
+        tileId.useContents {
+          val tileIdAddress = ptr.toLong()
+          Upcalls.customGeometrySourceOptionsCancelTile(
+            userData.toLong(),
+            map.toLong(),
+            sourceIdAddress,
+            tileIdAddress,
+          )
+        }
       }
     }
     .toLong()
   actual val customVectorSourceOptionsFetchTile: Long =
-    staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
-      tileId.useContents {
-        val tileIdAddress = ptr.toLong()
-        Upcalls.customVectorSourceOptionsFetchTile(userData.toLong(), tileIdAddress)
+    staticCFunction {
+      userData: COpaquePointer?,
+      map: ULong,
+      sourceId: CValue<mln_buffer_view>,
+      tileId: CValue<mln_canonical_tile_id> ->
+      sourceId.useContents {
+        val sourceIdAddress = ptr.toLong()
+        tileId.useContents {
+          val tileIdAddress = ptr.toLong()
+          Upcalls.customVectorSourceOptionsFetchTile(
+            userData.toLong(),
+            map.toLong(),
+            sourceIdAddress,
+            tileIdAddress,
+          )
+        }
       }
     }
     .toLong()
   actual val customVectorSourceOptionsCancelTile: Long =
-    staticCFunction { userData: COpaquePointer?, tileId: CValue<mln_canonical_tile_id> ->
-      tileId.useContents {
-        val tileIdAddress = ptr.toLong()
-        Upcalls.customVectorSourceOptionsCancelTile(userData.toLong(), tileIdAddress)
+    staticCFunction {
+      userData: COpaquePointer?,
+      map: ULong,
+      sourceId: CValue<mln_buffer_view>,
+      tileId: CValue<mln_canonical_tile_id> ->
+      sourceId.useContents {
+        val sourceIdAddress = ptr.toLong()
+        tileId.useContents {
+          val tileIdAddress = ptr.toLong()
+          Upcalls.customVectorSourceOptionsCancelTile(
+            userData.toLong(),
+            map.toLong(),
+            sourceIdAddress,
+            tileIdAddress,
+          )
+        }
       }
     }
     .toLong()
