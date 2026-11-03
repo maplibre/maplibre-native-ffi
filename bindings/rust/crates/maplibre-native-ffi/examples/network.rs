@@ -38,6 +38,25 @@ fn network(runtime: &RuntimeHandle, map: &MapHandle) -> Result<()> {
     )?;
     // #endregion headers
 
+    // #region query-rules
+    let rule = ResourceTransformRule {
+        flags: UrlMatchFlag::GLOB,
+        url: "https://tiles.example.com/**".to_owned(),
+        parameters: vec![UrlQueryParameter {
+            name: "key".to_owned(),
+            value: "my-api-key".to_owned(),
+        }],
+        ..Default::default()
+    };
+
+    runtime.discarding().set_resource_transform(
+        ResourceTransform {
+            rules: vec![rule],
+            ..Default::default()
+        },
+    )?;
+    // #endregion query-rules
+
     // #region rewrite
     runtime.discarding().set_resource_transform(
         ResourceTransform::new(|_kind, url, request| {

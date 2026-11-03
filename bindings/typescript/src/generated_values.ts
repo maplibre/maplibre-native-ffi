@@ -2530,16 +2530,25 @@ export type ResourceStoragePolicy =
   | (number & {});
 
 /**
- * A resource transform callback, for `RuntimeHandle.setResourceTransform()`.
+ * How to rewrite request URLs, for `RuntimeHandle.setResourceTransform()`.
+ *
+ * Set either `callback` or `rules`, not both.
  *
  * See `mln_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export type ResourceTransform = (
-  kind: ResourceKind,
-  url: string,
-  request: ResourceTransformRequestHandle,
-) => void;
+export interface ResourceTransform {
+  callback?: (
+    kind: ResourceKind,
+    url: string,
+    request: ResourceTransformRequestHandle,
+  ) => void;
+  /**
+   * The first rule that matches a request adds its parameters, and no other. A
+   * request that no rule matches keeps its URL. Rules never fail a request.
+   */
+  rules?: readonly ResourceTransformRule[];
+}
 
 /**
  * Why a resource transform fails a request.
@@ -2554,6 +2563,27 @@ export interface ResourceTransformError {
    * When to retry, for `ResourceErrorReason.rateLimit`.
    */
   retryAfterUnixMs?: bigint;
+}
+
+/**
+ * Query parameters to add to the URLs of requests that match a pattern.
+ *
+ * The library adds the parameters, in order, at the end of the URL's query and
+ * before any fragment. It writes `?` before them when the URL has no `?`, or
+ * `&` when the text before them ends with neither `?` nor `&`. It keeps the
+ * parameters that the URL already has, even one with the same name.
+ *
+ * See `mln_resource_transform_rule` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface ResourceTransformRule {
+  /**
+   * The kinds of resource that the rule covers. Zero covers every kind.
+   */
+  kinds?: ResourceKindFlag;
+  flags?: UrlMatchFlag;
+  url?: string;
+  parameters?: readonly UrlQueryParameter[];
 }
 
 /**
@@ -3488,6 +3518,21 @@ export const UrlMatchFlag = {
 } as const;
 /** A bitwise OR of UrlMatchFlag flags. */
 export type UrlMatchFlag = number;
+
+/**
+ * A query parameter that a resource transform rule adds to a URL.
+ *
+ * Pass `name` and `value` unencoded. The library percent-encodes every byte of
+ * them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+ * `name=value`.
+ *
+ * See `mln_url_query_parameter` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export interface UrlQueryParameter {
+  name: string;
+  value?: string;
+}
 
 /**
  * A vector in three dimensions.

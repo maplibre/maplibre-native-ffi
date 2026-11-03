@@ -4224,17 +4224,24 @@ impl Default for ResourceStoragePolicy {
     }
 }
 
-/// A resource transform callback, for
-/// `RuntimeHandle::set_resource_transform()`.
+/// How to rewrite request URLs, for `RuntimeHandle::set_resource_transform()`.
+///
+/// Set either `callback` or `rules`, not both.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ResourceTransform {
     /// The callback receives (`kind`, `url`, `request`).
-    pub callback: std::sync::Arc<
-        dyn Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
+    pub callback: Option<
+        std::sync::Arc<
+            dyn Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
+        >,
     >,
+    /// The first rule that matches a request adds its parameters, and no other.
+    /// A request that no rule matches keeps its URL. Rules never fail a
+    /// request.
+    pub rules: Vec<ResourceTransformRule>,
 }
 impl std::fmt::Debug for ResourceTransform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -4242,13 +4249,18 @@ impl std::fmt::Debug for ResourceTransform {
     }
 }
 impl ResourceTransform {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
+    {
+        self.callback = Some(std::sync::Arc::new(callback));
+        self
+    }
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn(ResourceKind, &str, ResourceTransformRequestHandle) + Send + Sync + 'static,
     {
-        Self {
-            callback: std::sync::Arc::new(callback),
-        }
+        Self::default().with_callback(callback)
     }
     unsafe extern "C" fn callback_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -4261,7 +4273,7 @@ impl ResourceTransform {
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke("mln_resource_transform_callback", (), || {
             let request = ResourceTransformRequestHandle::adopt(request)?;
-            (state.callback)(
+            callback::require(&state.callback)?(
                 ResourceKind::from_raw(kind),
                 unsafe { crate::string::borrow_string_view(url) }?,
                 request,
@@ -4274,7 +4286,12 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_transform> {
         let mut raw: sys::mln_resource_transform = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_transform>() as _;
-        raw.callback = Some(Self::callback_trampoline as _);
+        raw.callback = self
+            .callback
+            .as_ref()
+            .map(|_| Self::callback_trampoline as _);
+        raw.rules = convert::array(&self.rules, arena)?;
+        raw.rule_count = convert::count(self.rules.len())?;
         if !(raw.callback.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -4306,6 +4323,36 @@ impl<'a> ToNative<sys::mln_resource_transform_error> for ResourceTransformError<
             raw.fields |= sys::MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
             raw.retry_after_unix_ms = *item;
         }
+        Ok(raw)
+    }
+}
+
+/// Query parameters to add to the URLs of requests that match a pattern.
+///
+/// The library adds the parameters, in order, at the end of the URL's query and
+/// before any fragment. It writes `?` before them when the URL has no `?`, or
+/// `&` when the text before them ends with neither `?` nor `&`. It keeps the
+/// parameters that the URL already has, even one with the same name.
+///
+/// See `mln_resource_transform_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ResourceTransformRule {
+    /// The kinds of resource that the rule covers. Zero covers every kind.
+    pub kinds: ResourceKindFlag,
+    pub flags: UrlMatchFlag,
+    pub url: String,
+    pub parameters: Vec<UrlQueryParameter>,
+}
+impl ToNative<sys::mln_resource_transform_rule> for ResourceTransformRule {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_transform_rule> {
+        let mut raw: sys::mln_resource_transform_rule = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_resource_transform_rule>() as _;
+        raw.kinds = to_native(&self.kinds, arena)?;
+        raw.flags = to_native(&self.flags, arena)?;
+        raw.url = to_native(&self.url, arena)?;
+        raw.parameters = convert::array(&self.parameters, arena)?;
+        raw.parameter_count = convert::count(self.parameters.len())?;
         Ok(raw)
     }
 }
@@ -5593,6 +5640,36 @@ pub struct UrlMatchFlag: u32 {
     /// each subdomain of `example.com`.
     const GLOB = 1;
 }
+}
+
+/// A query parameter that a resource transform rule adds to a URL.
+///
+/// Pass `name` and `value` unencoded. The library percent-encodes every byte of
+/// them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+/// `name=value`.
+///
+/// See `mln_url_query_parameter` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct UrlQueryParameter {
+    pub name: String,
+    pub value: String,
+}
+impl UrlQueryParameter {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            value: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_url_query_parameter> for UrlQueryParameter {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_url_query_parameter> {
+        let mut raw: sys::mln_url_query_parameter = unsafe { std::mem::zeroed() };
+        raw.name = to_native(&self.name, arena)?;
+        raw.value = to_native(&self.value, arena)?;
+        Ok(raw)
+    }
 }
 
 /// A vector in three dimensions.

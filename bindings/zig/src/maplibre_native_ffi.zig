@@ -2449,14 +2449,14 @@ pub const Runtime = struct {
         return call.submit("mln_runtime_set_resource_provider", .handle, self, call.command, allocator, diagnostic, .{provider});
     }
 
-    /// Rewrites the URLs of the runtime's network requests through a callback.
+    /// Rewrites the URLs of the runtime's network requests.
     ///
     /// The transform replaces the one set before.
     ///
     /// See `mln_runtime_set_resource_transform` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn setResourceTransform(self: Runtime, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_runtime_set_resource_transform", .handle, self, call.command, null, diagnostic, .{transform});
+    pub fn setResourceTransform(self: Runtime, allocator: std.mem.Allocator, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_runtime_set_resource_transform", .handle, self, call.command, allocator, diagnostic, .{transform});
     }
 
     /// Replaces the metadata of the offline region `region_id`.
@@ -6174,28 +6174,44 @@ pub const ResourceStoragePolicy = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// A resource transform callback, for `Runtime.setResourceTransform()`.
+/// How to rewrite request URLs, for `Runtime.setResourceTransform()`.
+///
+/// Set either `callback` or `rules`, not both.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceTransform = struct {
     context: ?*anyopaque = null,
     release_context: ?*const fn (?*anyopaque) void = null,
-    callback: *const fn (context: ?*anyopaque, kind: ResourceKind, url: []const u8, request: ResourceTransformRequest) anyerror!void,
-    pub fn toNative(self: ResourceTransform, roots: *callbacks.Roots) status.Error!c.mln_resource_transform {
+    callback: ?*const fn (context: ?*anyopaque, kind: ResourceKind, url: []const u8, request: ResourceTransformRequest) anyerror!void = null,
+    /// The first rule that matches a request adds its parameters, and no other.
+    /// A request that no rule matches keeps its URL. Rules never fail a
+    /// request.
+    rules: []const ResourceTransformRule = &.{},
+    pub fn toNative(self: ResourceTransform, allocator: std.mem.Allocator, roots: *callbacks.Roots) status.Error!c.mln_resource_transform {
         var raw = std.mem.zeroes(c.mln_resource_transform);
         raw.size = @sizeOf(c.mln_resource_transform);
-        raw.callback = callbackTrampoline;
-        const retained = try roots.retain(ResourceTransform, self);
-        raw.user_data = retained;
-        raw.release_user_data = callbacks.Registration(ResourceTransform).releaseNative;
+        raw.rules = blk: {
+            const items = try allocator.alloc(c.mln_resource_transform_rule, self.rules.len);
+            for (self.rules, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator);
+            break :blk items.ptr;
+        };
+        raw.rule_count = std.math.cast(@TypeOf(raw.rule_count), self.rules.len) orelse return error.InvalidArgument;
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(ResourceTransform, self);
+            raw.user_data = retained;
+            raw.release_user_data = callbacks.Registration(ResourceTransform).releaseNative;
+        }
         return raw;
     }
     fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_transform_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_resource_transform_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_resource_transform_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_resource_transform_callback, 3)) callconv(.c) marshal.CallbackResult(c.mln_resource_transform_callback) {
         return struct {
             fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_transform_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_resource_transform_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_resource_transform_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_resource_transform_callback, 3)) anyerror!marshal.CallbackResult(c.mln_resource_transform_callback) {
                 const state = callbacks.Registration(ResourceTransform).get(callback_arg_0);
-                const host = state.value.callback;
+                const host = state.value.callback orelse {
+                    return;
+                };
                 var ownership_transferred = false;
                 var owned_request = ResourceTransformRequest.adopt(callback_arg_3);
                 defer if (!ownership_transferred) {
@@ -6211,7 +6227,7 @@ pub const ResourceTransform = struct {
     }
     /// Builds a `ResourceTransform` whose callbacks receive `context`, a pointer, as
     /// its own type. Each callback takes the context and then the arguments
-    /// of its field, and may return any error; pass null to leave an optional one unset.
+    /// of its field, and may return any error; pass null to leave one unset.
     /// Native runs `release`, when it is not null, once it releases the
     /// registration.
     pub fn init(context: anytype, comptime callback: anytype, comptime release: ?fn (@TypeOf(context)) void) ResourceTransform {
@@ -6224,7 +6240,7 @@ pub const ResourceTransform = struct {
                     release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
-            .callback = struct {
+            .callback = if (@TypeOf(callback) == @TypeOf(null)) null else struct {
                 fn call(erased: ?*anyopaque, argument_0: ResourceKind, argument_1: []const u8, argument_2: ResourceTransformRequest) anyerror!void {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
@@ -6257,6 +6273,50 @@ pub const ResourceTransformError = struct {
             .reason = ResourceErrorReason.fromNative(raw.reason),
             .message = try marshal.copyView(allocator, raw.message),
             .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
+        };
+    }
+};
+
+/// Query parameters to add to the URLs of requests that match a pattern.
+///
+/// The library adds the parameters, in order, at the end of the URL's query and
+/// before any fragment. It writes `?` before them when the URL has no `?`, or
+/// `&` when the text before them ends with neither `?` nor `&`. It keeps the
+/// parameters that the URL already has, even one with the same name.
+///
+/// See `mln_resource_transform_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceTransformRule = struct {
+    /// The kinds of resource that the rule covers. Zero covers every kind.
+    kinds: ResourceKindFlag = .{},
+    flags: UrlMatchFlag = .{},
+    url: []const u8 = &.{},
+    parameters: []const UrlQueryParameter = &.{},
+    pub fn toNative(self: ResourceTransformRule, allocator: std.mem.Allocator) status.Error!c.mln_resource_transform_rule {
+        var raw = std.mem.zeroes(c.mln_resource_transform_rule);
+        raw.size = @sizeOf(c.mln_resource_transform_rule);
+        raw.kinds = self.kinds.toNative();
+        raw.flags = self.flags.toNative();
+        raw.url = marshal.view(self.url);
+        raw.parameters = blk: {
+            const items = try allocator.alloc(c.mln_url_query_parameter, self.parameters.len);
+            for (self.parameters, 0..) |array_item_0, index| items[index] = try array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.parameter_count = std.math.cast(@TypeOf(raw.parameter_count), self.parameters.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_transform_rule) status.Error!ResourceTransformRule {
+        return .{
+            .kinds = ResourceKindFlag.fromNative(raw.kinds),
+            .flags = UrlMatchFlag.fromNative(raw.flags),
+            .url = try marshal.copyView(allocator, raw.url),
+            .parameters = blk: {
+                const copied = try allocator.alloc(UrlQueryParameter, raw.parameter_count);
+                for (try marshal.nativeSlice(c.mln_url_query_parameter, raw.parameters, raw.parameter_count), 0..) |item, index| copied[index] = try UrlQueryParameter.fromNative(allocator, item);
+                break :blk copied;
+            },
         };
     }
 };
@@ -7455,6 +7515,32 @@ pub const UrlMatchFlag = struct {
     pub const toNative = methods.toNative;
 };
 
+/// A query parameter that a resource transform rule adds to a URL.
+///
+/// Pass `name` and `value` unencoded. The library percent-encodes every byte of
+/// them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+/// `name=value`.
+///
+/// See `mln_url_query_parameter` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const UrlQueryParameter = struct {
+    name: []const u8,
+    value: []const u8 = &.{},
+    pub fn toNative(self: UrlQueryParameter) status.Error!c.mln_url_query_parameter {
+        var raw = std.mem.zeroes(c.mln_url_query_parameter);
+        raw.name = marshal.view(self.name);
+        raw.value = marshal.view(self.value);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_url_query_parameter) status.Error!UrlQueryParameter {
+        return .{
+            .name = try marshal.copyView(allocator, raw.name),
+            .value = try marshal.copyView(allocator, raw.value),
+        };
+    }
+};
+
 /// A vector in three dimensions.
 ///
 /// See `mln_vec3` in the
@@ -8409,8 +8495,8 @@ pub const RuntimeDiscarding = struct {
         return call.discard("mln_runtime_set_resource_provider", .handle, runtime, allocator, diagnostic, .{provider});
     }
 
-    pub fn setResourceTransform(self: RuntimeDiscarding, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setResourceTransform(self: RuntimeDiscarding, allocator: std.mem.Allocator, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const runtime = self.receiver;
-        return call.discard("mln_runtime_set_resource_transform", .handle, runtime, null, diagnostic, .{transform});
+        return call.discard("mln_runtime_set_resource_transform", .handle, runtime, allocator, diagnostic, .{transform});
     }
 };

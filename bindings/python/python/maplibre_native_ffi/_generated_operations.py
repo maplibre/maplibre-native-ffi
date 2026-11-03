@@ -2716,8 +2716,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
     def set_resource_transform(
         self, transform: ResourceTransform
     ) -> Future[CommandCompletion]:
-        """Rewrites the URLs of the runtime's network requests through a
-        callback.
+        """Rewrites the URLs of the runtime's network requests.
 
         The transform replaces the one set before.
 
@@ -3737,8 +3736,7 @@ class RuntimeHandleDiscarding:
         return self._native._discard_set_resource_provider(provider)
 
     def set_resource_transform(self, transform: ResourceTransform) -> None:
-        """Rewrites the URLs of the runtime's network requests through a
-        callback.
+        """Rewrites the URLs of the runtime's network requests.
 
         The transform replaces the one set before.
 

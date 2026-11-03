@@ -2835,6 +2835,13 @@ fn generated_input_mln_resource_transform<'py>(
 ) -> PyResult<sys::mln_resource_transform> {
     let mut raw: sys::mln_resource_transform = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_transform>() as _;
+    raw.rules = {
+        let items = generated_items(&value.getattr("rules")?, |item| {
+            generated_input_mln_resource_transform_rule(&item, storage)
+        })?;
+        raw.rule_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =
@@ -2865,6 +2872,29 @@ fn generated_input_mln_resource_transform_error<'py>(
         raw.retry_after_unix_ms = field.extract::<i64>()?;
         raw.fields |= sys::MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
     }
+    Ok(raw)
+}
+
+fn generated_input_mln_resource_transform_rule<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_resource_transform_rule> {
+    let mut raw: sys::mln_resource_transform_rule = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_resource_transform_rule>() as _;
+    raw.kinds = value
+        .getattr("kinds")?
+        .extract::<sys::mln_resource_kind_flags>()?;
+    raw.flags = value
+        .getattr("flags")?
+        .extract::<sys::mln_url_match_flags>()?;
+    raw.url = storage.buffer(value.getattr("url")?, true)?;
+    raw.parameters = {
+        let items = generated_items(&value.getattr("parameters")?, |item| {
+            generated_input_mln_url_query_parameter(&item, storage)
+        })?;
+        raw.parameter_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     Ok(raw)
 }
 
@@ -3119,6 +3149,16 @@ fn generated_input_mln_unit_bezier<'py>(
     raw.y1 = value.getattr("y1")?.extract::<f64>()?;
     raw.x2 = value.getattr("x2")?.extract::<f64>()?;
     raw.y2 = value.getattr("y2")?.extract::<f64>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_url_query_parameter<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_url_query_parameter> {
+    let mut raw: sys::mln_url_query_parameter = unsafe { std::mem::zeroed() };
+    raw.name = storage.buffer(value.getattr("name")?, true)?;
+    raw.value = storage.buffer(value.getattr("value")?, true)?;
     Ok(raw)
 }
 

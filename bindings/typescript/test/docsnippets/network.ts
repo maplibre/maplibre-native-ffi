@@ -44,9 +44,23 @@ export function network(
   });
   // #endregion headers
 
+  // #region query-rules
+  runtime.discarding.setResourceTransform({
+    rules: [
+      {
+        flags: UrlMatchFlag.glob,
+        url: "https://tiles.example.com/**",
+        parameters: [{ name: "key", value: "my-api-key" }],
+      },
+    ],
+  });
+  // #endregion query-rules
+
   // #region rewrite
-  runtime.discarding.setResourceTransform((_kind, url, request) => {
-    request.complete(withApiKey(url));
+  runtime.discarding.setResourceTransform({
+    callback: (_kind, url, request) => {
+      request.complete(withApiKey(url));
+    },
   });
   // #endregion rewrite
 

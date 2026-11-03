@@ -3595,17 +3595,27 @@ class ResourceRoute:
 
 @dataclass(frozen=True, slots=True)
 class ResourceTransform:
-    """A resource transform callback, for
+    """How to rewrite request URLs, for
     `RuntimeHandle.set_resource_transform()`.
+
+    Set either `callback` or `rules`, not both.
 
     See `mln_resource_transform` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    callback: ResourceTransformCallback
+    callback: ResourceTransformCallback | None = None
+    rules: Sequence[ResourceTransformRule] = ()
+    """The first rule that matches a request adds its parameters, and no other.
+    A request that no rule matches keeps its URL. Rules never fail a request.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "rules", _sequence(self.rules))
 
     def _invoke_callback(self, kind, url, request):
         callback = self.callback
+        assert callback is not None
         request = _adopt_value(request, "ResourceTransformRequestHandle")
         try:
             return callback(ResourceKind(kind), url, request)
@@ -3635,6 +3645,44 @@ class ResourceTransformError:
             reason=ResourceErrorReason(raw["reason"]),
             message=raw["message"],
             retry_after_unix_ms=raw["retry_after_unix_ms"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceTransformRule:
+    """Query parameters to add to the URLs of requests that match a pattern.
+
+    The library adds the parameters, in order, at the end of the URL's query
+    and before any fragment. It writes `?` before them when the URL has no
+    `?`, or `&` when the text before them ends with neither `?` nor `&`. It
+    keeps the parameters that the URL already has, even one with the same
+    name.
+
+    See `mln_resource_transform_rule` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    kinds: ResourceKindFlag = field(default_factory=lambda: ResourceKindFlag(0))
+    """The kinds of resource that the rule covers. Zero covers every kind."""
+
+    flags: UrlMatchFlag = field(default_factory=lambda: UrlMatchFlag(0))
+
+    url: str = ""
+
+    parameters: Sequence[UrlQueryParameter] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "parameters", _sequence(self.parameters))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            kinds=ResourceKindFlag(raw["kinds"]),
+            flags=UrlMatchFlag(raw["flags"]),
+            url=raw["url"],
+            parameters=tuple(
+                UrlQueryParameter._from_native(item) for item in raw["parameters"]
+            ),
         )
 
 
@@ -4500,6 +4548,27 @@ class UnitBezier:
     @classmethod
     def _from_native(cls, raw):
         return cls(x1=raw["x1"], y1=raw["y1"], x2=raw["x2"], y2=raw["y2"])
+
+
+@dataclass(frozen=True, slots=True)
+class UrlQueryParameter:
+    """A query parameter that a resource transform rule adds to a URL.
+
+    Pass `name` and `value` unencoded. The library percent-encodes every byte
+    of them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them
+    as `name=value`.
+
+    See `mln_url_query_parameter` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    name: str
+
+    value: str = ""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(name=raw["name"], value=raw["value"])
 
 
 @dataclass(frozen=True, slots=True)

@@ -15,8 +15,10 @@ import org.maplibre.nativeffi.ResourceResponse
 import org.maplibre.nativeffi.ResourceResponseStatus
 import org.maplibre.nativeffi.ResourceRoute
 import org.maplibre.nativeffi.ResourceTransform
+import org.maplibre.nativeffi.ResourceTransformRule
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.UrlMatchFlag
+import org.maplibre.nativeffi.UrlQueryParameter
 import org.maplibre.nativeffi.setHttpHeaderTransform
 import org.maplibre.nativeffi.setNetworkStatus
 
@@ -49,6 +51,27 @@ private fun network(runtime: RuntimeHandle, map: MapHandle) {
     ),
   )
   // #endregion headers
+
+  // #region query-rules
+  runtime.discarding.setResourceTransform(
+    ResourceTransform(
+      rules =
+        listOf(
+          ResourceTransformRule(
+            flags = UrlMatchFlag.GLOB,
+            url = "https://tiles.example.com/**",
+            parameters =
+              listOf(
+                UrlQueryParameter(
+                  name = "key",
+                  value = "my-api-key",
+                ),
+              ),
+          ),
+        ),
+    ),
+  )
+  // #endregion query-rules
 
   // #region rewrite
   runtime.discarding.setResourceTransform(

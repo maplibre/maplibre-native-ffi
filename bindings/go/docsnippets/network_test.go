@@ -40,6 +40,23 @@ func network(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	}
 	// #endregion headers
 
+	// #region query-rules
+	keys := maplibre.ResourceTransform{
+		Rules: []maplibre.ResourceTransformRule{{
+			Flags: maplibre.UrlMatchFlagGlob,
+			Url:   "https://tiles.example.com/**",
+			Parameters: []maplibre.UrlQueryParameter{{
+				Name:  "key",
+				Value: "my-api-key",
+			}},
+		}},
+	}
+	err = runtime.Discarding().SetResourceTransform(keys)
+	if err != nil {
+		return err
+	}
+	// #endregion query-rules
+
 	// #region rewrite
 	rewrite := maplibre.ResourceTransform{
 		Callback: func(

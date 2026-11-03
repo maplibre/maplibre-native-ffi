@@ -218,7 +218,7 @@ public extension RuntimeHandle {
     }
   }
 
-  /// Rewrites the URLs of the runtime's network requests through a callback.
+  /// Rewrites the URLs of the runtime's network requests.
   ///
   /// The transform replaces the one set before.
   ///

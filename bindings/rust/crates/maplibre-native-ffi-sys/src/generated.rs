@@ -1362,6 +1362,8 @@ pub struct mln_resource_transform {
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
+    pub rules: *const mln_resource_transform_rule,
+    pub rule_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1371,6 +1373,16 @@ pub struct mln_resource_transform_error {
     pub reason: mln_resource_error_reason,
     pub message: mln_buffer_view,
     pub retry_after_unix_ms: i64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_resource_transform_rule {
+    pub size: u32,
+    pub kinds: mln_resource_kind_flags,
+    pub flags: mln_url_match_flags,
+    pub url: mln_buffer_view,
+    pub parameters: *const mln_url_query_parameter,
+    pub parameter_count: usize,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1641,6 +1653,12 @@ pub struct mln_unit_bezier {
     pub y1: f64,
     pub x2: f64,
     pub y2: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_url_query_parameter {
+    pub name: mln_buffer_view,
+    pub value: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

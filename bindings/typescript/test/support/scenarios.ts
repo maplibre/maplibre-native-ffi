@@ -113,7 +113,9 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
     routes: [styleRoute("exit://style.json")],
     callback: (_request, handle) => hold(handle),
   });
-  await runtime.setResourceTransform((_kind, _url, request) => request.close());
+  await runtime.setResourceTransform({
+    callback: (_kind, _url, request) => request.close(),
+  });
   const { map: pending, ready: pendingReady } = runtime.createMap({
     initialExtent: renderExtent,
   });

@@ -59,17 +59,26 @@ static void resource_transform_with_zero_size(void* descriptor) {
   ((mln_resource_transform*)descriptor)->size = 0;
 }
 
-static void resource_transform_without_callback_or_queue(void* descriptor) {
+static void resource_transform_without_callback_or_rules(void* descriptor) {
   ((mln_resource_transform*)descriptor)->callback = NULL;
+}
+
+static void resource_transform_with_callback_and_rules(void* descriptor) {
+  static mln_resource_transform_rule rule;
+  rule =
+    (mln_resource_transform_rule){.size = sizeof(mln_resource_transform_rule)};
+  ((mln_resource_transform*)descriptor)->rules = &rule;
+  ((mln_resource_transform*)descriptor)->rule_count = 1;
 }
 
 static const mln_test_validation_case resource_transform_cases[] = {
   {"a well-formed transform", NULL, MLN_STATUS_OK, NULL},
   {"a zero size", resource_transform_with_zero_size,
    MLN_STATUS_INVALID_ARGUMENT, "size"},
-  {"neither a callback nor a queue",
-   resource_transform_without_callback_or_queue, MLN_STATUS_INVALID_ARGUMENT,
-   NULL},
+  {"neither a callback nor rules", resource_transform_without_callback_or_rules,
+   MLN_STATUS_INVALID_ARGUMENT, "rules"},
+  {"a callback with rules", resource_transform_with_callback_and_rules,
+   MLN_STATUS_INVALID_ARGUMENT, "rules"},
 };
 
 static void resource_transform_registration_validates_its_descriptor(void) {
@@ -86,6 +95,117 @@ static void resource_transform_registration_validates_its_descriptor(void) {
   MLN_TEST_INVALID(mln_test_set_resource_transform(runtime, NULL));
   MLN_TEST_INVALID(mln_test_clear_resource_transform(MLN_HANDLE_NULL));
   MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
+  mln_test_destroy_runtime(runtime);
+}
+
+// The rule and parameter that a rules validation case edits. Each submission
+// restores them for the next case.
+static mln_url_query_parameter parameter_under_test;
+static mln_resource_transform_rule rule_under_test;
+static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF};
+
+static void reset_rule_under_test(void) {
+  parameter_under_test = (mln_url_query_parameter){
+    .name = MLN_BUFFER_LITERAL("key"),
+    .value = MLN_BUFFER_LITERAL("value"),
+  };
+  rule_under_test = (mln_resource_transform_rule){
+    .size = sizeof(mln_resource_transform_rule),
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = MLN_BUFFER_LITERAL("http://127.0.0.1/**"),
+    .parameters = &parameter_under_test,
+    .parameter_count = 1,
+  };
+}
+
+static mln_status submit_rules_transform(
+  void* context, const void* descriptor, mln_diagnostic* diagnostic
+) {
+  const mln_status status =
+    submit_resource_transform(context, descriptor, diagnostic);
+  reset_rule_under_test();
+  return status;
+}
+
+static void rules_with_user_data(void* descriptor) {
+  static int context;
+  ((mln_resource_transform*)descriptor)->user_data = &context;
+}
+
+static void rules_with_a_queue(void* descriptor) {
+  ((mln_resource_transform*)descriptor)->queue = (mln_delivery_queue)1;
+}
+
+static void rules_that_are_null(void* descriptor) {
+  ((mln_resource_transform*)descriptor)->rules = NULL;
+}
+
+static void rule_with_zero_size(void* descriptor) {
+  (void)descriptor;
+  rule_under_test.size = 0;
+}
+
+static void rule_with_unknown_kinds(void* descriptor) {
+  (void)descriptor;
+  rule_under_test.kinds = 1U << 31U;
+}
+
+static void rule_with_null_parameters(void* descriptor) {
+  (void)descriptor;
+  rule_under_test.parameters = NULL;
+}
+
+static void parameter_with_an_empty_name(void* descriptor) {
+  (void)descriptor;
+  parameter_under_test.name = (mln_buffer_view){0};
+}
+
+static void parameter_name_with_nul(void* descriptor) {
+  (void)descriptor;
+  parameter_under_test.name = (mln_buffer_view){.data = "a\0b", .size = 3};
+}
+
+static void parameter_value_that_is_not_utf8(void* descriptor) {
+  (void)descriptor;
+  parameter_under_test.value =
+    (mln_buffer_view){.data = invalid_utf8, .size = sizeof(invalid_utf8)};
+}
+
+static const mln_test_validation_case rules_transform_cases[] = {
+  {"well-formed rules", NULL, MLN_STATUS_OK, NULL},
+  {"rules with user_data", rules_with_user_data, MLN_STATUS_INVALID_ARGUMENT,
+   "user_data"},
+  {"rules with a queue", rules_with_a_queue, MLN_STATUS_INVALID_ARGUMENT,
+   "queue"},
+  {"null rules with a count", rules_that_are_null, MLN_STATUS_INVALID_ARGUMENT,
+   "rules"},
+  {"a rule with a zero size", rule_with_zero_size, MLN_STATUS_INVALID_ARGUMENT,
+   "size"},
+  {"a rule with unknown kinds", rule_with_unknown_kinds,
+   MLN_STATUS_INVALID_ARGUMENT, "kind"},
+  {"null parameters with a count", rule_with_null_parameters,
+   MLN_STATUS_INVALID_ARGUMENT, "parameters"},
+  {"a parameter with an empty name", parameter_with_an_empty_name,
+   MLN_STATUS_INVALID_ARGUMENT, "name"},
+  {"a parameter name with NUL", parameter_name_with_nul,
+   MLN_STATUS_INVALID_ARGUMENT, "name"},
+  {"a parameter value that is not UTF-8", parameter_value_that_is_not_utf8,
+   MLN_STATUS_INVALID_ARGUMENT, "value"},
+};
+
+static void a_rules_transform_validates_its_rules(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  reset_rule_under_test();
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .rules = &rule_under_test,
+    .rule_count = 1,
+  };
+  mln_test_run_validation_table(
+    rules_transform_cases,
+    sizeof(rules_transform_cases) / sizeof(rules_transform_cases[0]),
+    &transform, sizeof(transform), submit_rules_transform, &runtime
+  );
   mln_test_destroy_runtime(runtime);
 }
 
@@ -159,8 +279,6 @@ typedef struct header_case {
   const char* value;
   size_t value_size;
 } header_case;
-
-static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF};
 
 // Headers the helper refuses: malformed names, values that could split the
 // request, values that are not UTF-8, and headers MapLibre or the transport
@@ -295,6 +413,228 @@ static void a_resource_transform_rewrites_until_cleared(void) {
     0, mln_test_http_server_requests(server, "/b/second.json")
   );
   TEST_ASSERT_EQUAL_INT(calls, atomic_load(&probe.calls));
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
+static void expect_request_target(
+  mln_test_http_server* server, const char* path, int index,
+  const char* expected
+) {
+  char target[512];
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_http_server_request_target(
+      server, path, index, target, sizeof(target)
+    ),
+    path
+  );
+  TEST_ASSERT_EQUAL_STRING(expected, target);
+}
+
+static void a_rules_transform_adds_query_parameters(void) {
+  static const mln_test_http_route routes[] = {
+    {.path = "/exact.json",
+     .body = empty_style_json,
+     .body_size = sizeof(empty_style_json) - 1},
+    {.path = "/glob/style.json",
+     .body = empty_style_json,
+     .body_size = sizeof(empty_style_json) - 1},
+    {.path = "/other.json",
+     .body = empty_style_json,
+     .body_size = sizeof(empty_style_json) - 1},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 3);
+  char exact[256];
+  char glob[256];
+  char glob_tree[256];
+  mln_test_http_server_url(server, "/exact.json", exact, sizeof(exact));
+  mln_test_http_server_url(server, "/glob/*", glob, sizeof(glob));
+  mln_test_http_server_url(server, "/glob/**", glob_tree, sizeof(glob_tree));
+  const mln_url_query_parameter tile_parameter = {
+    .name = MLN_BUFFER_LITERAL("tile"),
+    .value = MLN_BUFFER_LITERAL("yes"),
+  };
+  const mln_url_query_parameter exact_parameter = {
+    .name = MLN_BUFFER_LITERAL("exact"),
+    .value = MLN_BUFFER_LITERAL("yes"),
+  };
+  const mln_url_query_parameter glob_parameters[] = {
+    {.name = MLN_BUFFER_LITERAL("api key"),
+     .value = MLN_BUFFER_LITERAL("a/b \xC3\xA9&c=~-._+%41")},
+    {.name = MLN_BUFFER_LITERAL("empty"), .value = {0}},
+  };
+  const mln_url_query_parameter shadowed_parameter = {
+    .name = MLN_BUFFER_LITERAL("shadowed"),
+    .value = MLN_BUFFER_LITERAL("yes"),
+  };
+  const mln_resource_transform_rule rules[] = {
+    {.size = sizeof(mln_resource_transform_rule),
+     .kinds = MLN_RESOURCE_KIND_FLAG_TILE,
+     .flags = MLN_URL_MATCH_GLOB,
+     .url = MLN_BUFFER_LITERAL("**"),
+     .parameters = &tile_parameter,
+     .parameter_count = 1},
+    {.size = sizeof(mln_resource_transform_rule),
+     .url = mln_buffer_view_from_cstr(exact),
+     .parameters = &exact_parameter,
+     .parameter_count = 1},
+    {.size = sizeof(mln_resource_transform_rule),
+     .flags = MLN_URL_MATCH_GLOB,
+     .url = mln_buffer_view_from_cstr(glob),
+     .parameters = glob_parameters,
+     .parameter_count = 2},
+    {.size = sizeof(mln_resource_transform_rule),
+     .flags = MLN_URL_MATCH_GLOB,
+     .url = mln_buffer_view_from_cstr(glob_tree),
+     .parameters = &shadowed_parameter,
+     .parameter_count = 1},
+  };
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .rules = rules,
+    .rule_count = sizeof(rules) / sizeof(rules[0]),
+  };
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+
+  // An exact pattern, then the first of two globs, which adds to the query
+  // that the URL has. A style request skips the tile rule, and a URL that no
+  // rule matches loads unchanged.
+  load_from_server(runtime, server, "/exact.json", true);
+  expect_request_target(server, "/exact.json", 0, "/exact.json?exact=yes");
+  load_from_server(runtime, server, "/glob/style.json?v=1", true);
+  expect_request_target(
+    server, "/glob/style.json", 0,
+    "/glob/style.json?v=1&api%20key=a%2Fb%20%C3%A9%26c%3D~-._%2B%2541&empty="
+  );
+  load_from_server(runtime, server, "/other.json", true);
+  expect_request_target(server, "/other.json", 0, "/other.json");
+
+  // A rejected transform leaves the rules in place. Each load uses a new URL,
+  // which the cache can't answer.
+  const mln_resource_transform_rule invalid_rule = {
+    .size = sizeof(mln_resource_transform_rule),
+    .parameters = &(const mln_url_query_parameter){.name = {0}},
+    .parameter_count = 1,
+  };
+  const mln_resource_transform invalid = {
+    .size = sizeof(mln_resource_transform),
+    .rules = &invalid_rule,
+    .rule_count = 1,
+  };
+  MLN_TEST_INVALID(mln_test_set_resource_transform(runtime, &invalid));
+  load_from_server(runtime, server, "/glob/style.json?v=2", true);
+  expect_request_target(
+    server, "/glob/style.json", 1,
+    "/glob/style.json?v=2&api%20key=a%2Fb%20%C3%A9%26c%3D~-._%2B%2541&empty="
+  );
+
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
+  load_from_server(runtime, server, "/glob/style.json?v=3", true);
+  expect_request_target(server, "/glob/style.json", 2, "/glob/style.json?v=3");
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
+// A rate-limited request retries with the URL that the rules rewrote, so the
+// retry carries each parameter once.
+static void a_retry_keeps_the_parameters_of_its_first_request(void) {
+  static const mln_test_http_route routes[] = {
+    {.path = "/limited.json", .status = 429, .headers = "Retry-After: 0\r\n"},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+  const mln_url_query_parameter parameter = {
+    .name = MLN_BUFFER_LITERAL("key"),
+    .value = MLN_BUFFER_LITERAL("abc"),
+  };
+  const mln_resource_transform_rule rule = {
+    .size = sizeof(mln_resource_transform_rule),
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = MLN_BUFFER_LITERAL("**"),
+    .parameters = &parameter,
+    .parameter_count = 1,
+  };
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .rules = &rule,
+    .rule_count = 1,
+  };
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  char url[256];
+  mln_test_http_server_url(server, "/limited.json", url, sizeof(url));
+  mln_map map = mln_test_create_map(runtime);
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
+  TEST_ASSERT_TRUE(
+    mln_test_http_server_wait_for_requests(server, "/limited.json", 2)
+  );
+  expect_request_target(server, "/limited.json", 0, "/limited.json?key=abc");
+  expect_request_target(server, "/limited.json", 1, "/limited.json?key=abc");
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
+// What the provider saw of the style request before it passed it through.
+static char provided_url[256];
+static atomic_bool provided;
+
+static void record_and_pass_through(
+  void* user_data, const mln_resource_request_info* request,
+  mln_resource_request handle
+) {
+  (void)user_data;
+  if (!atomic_load(&provided)) {
+    const size_t size = request->requested_url.size < sizeof(provided_url)
+                          ? request->requested_url.size
+                          : sizeof(provided_url) - 1;
+    memcpy(provided_url, request->requested_url.data, size);
+    provided_url[size] = '\0';
+    mln_test_flag_set(&provided);
+  }
+  mln_test_request_pass_through(handle);
+}
+
+// A provider sees the URL before the rules, and the request it passes through
+// loads with them.
+static void a_passed_through_request_reaches_the_rules(void) {
+  static const mln_test_http_route routes[] = {
+    {.path = "/provided.json",
+     .body = empty_style_json,
+     .body_size = sizeof(empty_style_json) - 1},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+  const mln_url_query_parameter parameter = {
+    .name = MLN_BUFFER_LITERAL("key"),
+    .value = MLN_BUFFER_LITERAL("abc"),
+  };
+  const mln_resource_transform_rule rule = {
+    .size = sizeof(mln_resource_transform_rule),
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = MLN_BUFFER_LITERAL("**"),
+    .parameters = &parameter,
+    .parameter_count = 1,
+  };
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .rules = &rule,
+    .rule_count = 1,
+  };
+  atomic_store(&provided, false);
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = record_and_pass_through,
+  };
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
+
+  char url[256];
+  mln_test_http_server_url(server, "/provided.json", url, sizeof(url));
+  load_from_server(runtime, server, "/provided.json", true);
+  TEST_ASSERT_TRUE(atomic_load(&provided));
+  TEST_ASSERT_EQUAL_STRING(url, provided_url);
+  expect_request_target(server, "/provided.json", 0, "/provided.json?key=abc");
   mln_test_destroy_runtime(runtime);
   mln_test_http_server_stop(server);
 }
@@ -535,6 +875,59 @@ static void a_header_transform_skips_requests_that_are_not_http(void) {
   (void)remove(path);
 }
 
+// Header rules match the URL that the resource transform's rules wrote.
+static void header_rules_see_the_rewritten_url(void) {
+  static const mln_test_http_route routes[] = {
+    {.path = "/keyed.json",
+     .body = empty_style_json,
+     .body_size = sizeof(empty_style_json) - 1},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+  char rewritten[256];
+  mln_test_http_server_url(
+    server, "/keyed.json?key=abc", rewritten, sizeof(rewritten)
+  );
+  const mln_url_query_parameter parameter = {
+    .name = MLN_BUFFER_LITERAL("key"),
+    .value = MLN_BUFFER_LITERAL("abc"),
+  };
+  const mln_resource_transform_rule rule = {
+    .size = sizeof(mln_resource_transform_rule),
+    .flags = MLN_URL_MATCH_GLOB,
+    .url = MLN_BUFFER_LITERAL("**"),
+    .parameters = &parameter,
+    .parameter_count = 1,
+  };
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .rules = &rule,
+    .rule_count = 1,
+  };
+  const mln_http_header header = {
+    .name = {.data = token_header, .size = sizeof(token_header) - 1},
+    .value = {.data = token_value, .size = sizeof(token_value) - 1},
+  };
+  const mln_http_header_rule header_rule = {
+    .size = sizeof(mln_http_header_rule),
+    .url = mln_buffer_view_from_cstr(rewritten),
+    .headers = &header,
+    .header_count = 1,
+  };
+  const mln_http_header_transform header_transform = {
+    .size = sizeof(mln_http_header_transform),
+    .rules = &header_rule,
+    .rule_count = 1,
+  };
+  mln_runtime runtime = mln_test_create_runtime();
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
+  MLN_TEST_OK(mln_test_set_http_header_transform(runtime, &header_transform));
+
+  load_from_server(runtime, server, "/keyed.json", true);
+  TEST_ASSERT_TRUE(request_carried_token(server, "/keyed.json"));
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
 static void a_redirect_keeps_headers_only_within_the_origin(void) {
   static const mln_test_http_route other_routes[] = {
     {.path = "/elsewhere.json",
@@ -586,15 +979,20 @@ static void a_redirect_keeps_headers_only_within_the_origin(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(resource_transform_registration_validates_its_descriptor);
+  RUN_TEST(a_rules_transform_validates_its_rules);
   RUN_TEST(header_transform_registration_validates_its_descriptor);
   RUN_TEST(a_header_needs_a_transform_invocation_and_a_valid_field);
 #if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(a_resource_transform_rewrites_until_cleared);
+  RUN_TEST(a_rules_transform_adds_query_parameters);
+  RUN_TEST(a_retry_keeps_the_parameters_of_its_first_request);
+  RUN_TEST(a_passed_through_request_reaches_the_rules);
   RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
 #endif
 #if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   RUN_TEST(a_header_transform_adds_headers_until_cleared);
   RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
   RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);
+  RUN_TEST(header_rules_see_the_rewritten_url);
 #endif
 }

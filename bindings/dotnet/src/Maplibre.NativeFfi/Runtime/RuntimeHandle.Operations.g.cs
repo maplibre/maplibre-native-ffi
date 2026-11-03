@@ -611,7 +611,7 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Rewrites the URLs of the runtime's network requests through a callback.
+    /// Rewrites the URLs of the runtime's network requests.
     /// </summary>
     /// <remarks>
     /// <para>The transform replaces the one set before.</para>

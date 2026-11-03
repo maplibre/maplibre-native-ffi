@@ -81,8 +81,22 @@ fn network(allocator: std.mem.Allocator, runtime: maplibre.Runtime, map: *const 
     }, null);
     // #endregion headers
 
+    // #region query-rules
+    try runtime.discarding().setResourceTransform(allocator, .{
+        .rules = &.{.{
+            .flags = .{ .glob = true },
+            .url = "https://tiles.example.com/**",
+            .parameters = &.{.{
+                .name = "key",
+                .value = "my-api-key",
+            }},
+        }},
+    }, null);
+    // #endregion query-rules
+
     // #region rewrite
     try runtime.discarding().setResourceTransform(
+        allocator,
         .{ .callback = addApiKey },
         null,
     );

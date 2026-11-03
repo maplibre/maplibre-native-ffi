@@ -295,6 +295,23 @@ class TypeScriptEmitterTests(unittest.TestCase):
         )
         self.assertIn("  endHandler?: CameraTransitionHandler;", values)
 
+    def test_a_registration_with_rules_beside_its_callback_must_be_given(self):
+        # A host passes a queued callback or native rules. Left out, the
+        # registration would carry neither, so it is a required argument with
+        # both members optional.
+        generated = emitted(typescript, self.api)
+        values = generated["bindings/typescript/src/generated_values.ts"]
+        operations = generated["bindings/typescript/src/generated_operations.ts"]
+        self.assertIn(
+            "setResourceTransform(transform: ResourceTransform): "
+            "Promise<CommandCompletion>",
+            operations,
+        )
+        interface = values[values.index("export interface ResourceTransform {") :]
+        interface = interface[: interface.index("\n}\n")]
+        self.assertIn("  callback?: (", interface)
+        self.assertIn("  rules?: readonly ResourceTransformRule[];", interface)
+
     def test_only_a_required_member_must_be_given(self):
         # A member that a host leaves out is zero, as native reads it, except
         # a required one, which makes its record a required argument too.

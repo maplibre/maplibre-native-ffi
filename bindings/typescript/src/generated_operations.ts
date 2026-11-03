@@ -5158,7 +5158,7 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Rewrites the URLs of the runtime's network requests through a callback.
+   * Rewrites the URLs of the runtime's network requests.
    *
    * The transform replaces the one set before.
    *
@@ -5327,7 +5327,7 @@ export class RuntimeHandleDiscarding {
   }
 
   /**
-   * Rewrites the URLs of the runtime's network requests through a callback.
+   * Rewrites the URLs of the runtime's network requests.
    *
    * The transform replaces the one set before.
    *
@@ -5760,7 +5760,9 @@ defineCallbacks([
   },
   // mln_resource_transform_callback
   (target, args) => {
-    const [kind, url, request] = args as Parameters<ResourceTransform>;
+    const [kind, url, request] = args as Parameters<
+      NonNullable<ResourceTransform["callback"]>
+    >;
     const owner = adopt(
       request as unknown as bigint,
       () =>
@@ -5769,7 +5771,9 @@ defineCallbacks([
         native.mln_resource_transform_request_release(disposed, undefined),
     );
     try {
-      const callback = target as ResourceTransform;
+      const callback = (target as ResourceTransform).callback as NonNullable<
+        ResourceTransform["callback"]
+      >;
       callback(kind, url, owner);
     } catch (error) {
       owner.close();

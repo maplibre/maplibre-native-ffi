@@ -4095,6 +4095,39 @@ public data class ResourceRoute(
 )
 
 /**
+ * A query parameter that a resource transform rule adds to a URL.
+ *
+ * Pass `name` and `value` unencoded. The library percent-encodes every byte of them except the
+ * letters, digits, `-`, `.`, `_`, and `~`, and adds them as `name=value`.
+ *
+ * See `mln_url_query_parameter` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class UrlQueryParameter(
+  public val name: String,
+  public val value: String = "",
+)
+
+/**
+ * Query parameters to add to the URLs of requests that match a pattern.
+ *
+ * The library adds the parameters, in order, at the end of the URL's query and before any fragment.
+ * It writes `?` before them when the URL has no `?`, or `&` when the text before them ends with
+ * neither `?` nor `&`. It keeps the parameters that the URL already has, even one with the same
+ * name.
+ *
+ * See `mln_resource_transform_rule` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceTransformRule(
+  /** The kinds of resource that the rule covers. Zero covers every kind. */
+  public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
+  public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
+  public val url: String = "",
+  public val parameters: List<UrlQueryParameter> = emptyList(),
+)
+
+/**
  * The inputs that a style expression reads while it evaluates.
  *
  * See `mln_style_expression_inputs` in the
@@ -4461,13 +4494,20 @@ public fun interface ResourceProviderCallback {
 }
 
 /**
- * A resource transform callback, for `RuntimeHandle.setResourceTransform()`.
+ * How to rewrite request URLs, for `RuntimeHandle.setResourceTransform()`.
+ *
+ * Set either `callback` or `rules`, not both.
  *
  * See `mln_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceTransform(
-  public val callback: ResourceTransformCallback,
+  /**
+   * The first rule that matches a request adds its parameters, and no other. A request that no rule
+   * matches keeps its URL. Rules never fail a request.
+   */
+  public val rules: List<ResourceTransformRule> = emptyList(),
+  public val callback: ResourceTransformCallback? = null,
 )
 
 /**

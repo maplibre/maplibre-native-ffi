@@ -4299,6 +4299,32 @@ bool mln_ts_write_list_resource_route(
   return true;
 }
 
+bool mln_ts_write_list_resource_transform_rule(
+  mln_ts_call* call, napi_value value, size_t maximum,
+  mln_resource_transform_rule** out, size_t* out_count, const char* path
+) {
+  mln_resource_transform_rule* items = NULL;
+  if (!mln_ts_read_list(
+        call, value, sizeof *items, maximum, (void**)&items, out_count, path
+      ))
+    return false;
+  for (size_t index = 0; index < *out_count; index++) {
+    napi_value element;
+    char item_path[256];
+    if (!mln_ts_element(call, value, index, &element)) return false;
+    mln_ts_index_path(item_path, sizeof item_path, path, index);
+    memset(&items[index], 0, sizeof items[index]);
+    items[index].size = sizeof items[index];
+    if (!mln_ts_read_record(call, element, item_path)) return false;
+    if (!mln_ts_write_resource_transform_rule(
+          call, element, &items[index], item_path
+        ))
+      return false;
+  }
+  *out = items;
+  return true;
+}
+
 bool mln_ts_write_list_screen_point(
   mln_ts_call* call, napi_value value, size_t maximum, mln_screen_point** out,
   size_t* out_count, const char* path
@@ -4316,6 +4342,31 @@ bool mln_ts_write_list_screen_point(
     memset(&items[index], 0, sizeof items[index]);
     if (!mln_ts_read_record(call, element, item_path)) return false;
     if (!mln_ts_write_screen_point(call, element, &items[index], item_path))
+      return false;
+  }
+  *out = items;
+  return true;
+}
+
+bool mln_ts_write_list_url_query_parameter(
+  mln_ts_call* call, napi_value value, size_t maximum,
+  mln_url_query_parameter** out, size_t* out_count, const char* path
+) {
+  mln_url_query_parameter* items = NULL;
+  if (!mln_ts_read_list(
+        call, value, sizeof *items, maximum, (void**)&items, out_count, path
+      ))
+    return false;
+  for (size_t index = 0; index < *out_count; index++) {
+    napi_value element;
+    char item_path[256];
+    if (!mln_ts_element(call, value, index, &element)) return false;
+    mln_ts_index_path(item_path, sizeof item_path, path, index);
+    memset(&items[index], 0, sizeof items[index]);
+    if (!mln_ts_read_record(call, element, item_path)) return false;
+    if (!mln_ts_write_url_query_parameter(
+          call, element, &items[index], item_path
+        ))
       return false;
   }
   *out = items;
@@ -5913,6 +5964,43 @@ bool mln_ts_write_resource_route(
   return true;
 }
 
+bool mln_ts_write_resource_transform(
+  mln_ts_call* call, napi_value value, mln_resource_transform* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "callback", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "callback");
+  bool has_callback = !mln_ts_is_absent(call, member);
+  if (has_callback && !mln_ts_read_function(call, member, child)) return false;
+  if (has_callback) {
+    if (!mln_ts_read_registration(
+          call, value, &(*out).user_data, &(*out).release_user_data,
+          &(*out).queue
+        ))
+      return false;
+    if (has_callback)
+      (*out).callback = mln_ts_dispatch_resource_transform_callback;
+  }
+  if (!mln_ts_member(call, value, "rules", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "rules");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_resource_transform_rule* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_resource_transform_rule(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->rules = items;
+      out->rule_count = (size_t)count;
+    }
+  }
+  return true;
+}
+
 bool mln_ts_write_resource_transform_error(
   mln_ts_call* call, napi_value value, mln_resource_transform_error* out,
   const char* path
@@ -5945,6 +6033,55 @@ bool mln_ts_write_resource_transform_error(
       out->retry_after_unix_ms = (int64_t)number;
     }
     out->fields |= MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER;
+  }
+  return true;
+}
+
+bool mln_ts_write_resource_transform_rule(
+  mln_ts_call* call, napi_value value, mln_resource_transform_rule* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "kinds", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "kinds");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->kinds = (mln_resource_kind_flags)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "flags", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "flags");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->flags = (mln_url_match_flags)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "url", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "url");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->url, child)) return false;
+  }
+  if (!mln_ts_member(call, value, "parameters", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "parameters");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_url_query_parameter* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_url_query_parameter(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->parameters = items;
+      out->parameter_count = (size_t)count;
+    }
   }
   return true;
 }
@@ -6385,6 +6522,24 @@ bool mln_ts_write_unit_bezier(
       if (!mln_ts_read_double(call, member, &number, child)) return false;
       out->y2 = (double)number;
     }
+  }
+  return true;
+}
+
+bool mln_ts_write_url_query_parameter(
+  mln_ts_call* call, napi_value value, mln_url_query_parameter* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "name", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "name");
+  if (!mln_ts_read_text_view(call, member, &out->name, child)) return false;
+  if (!mln_ts_member(call, value, "value", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "value");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->value, child)) return false;
   }
   return true;
 }

@@ -1863,6 +1863,11 @@ internal static unsafe class GeneratedValues
             native.release_user_data = &NativeCallbackRoot.Release;
             native.callback = value.Callback is null ? null : &InvokeResourceTransformCallback;
         }
+        native.rules = scope.Array<mln_resource_transform_rule, ResourceTransformRule>(
+            value.RulesStorage.Items,
+            static (item, scope) => NativeResourceTransformRule(item, scope)
+        );
+        native.rule_count = checked((nuint)value.RulesStorage.Items.Length);
         return native;
     }
 
@@ -1882,6 +1887,25 @@ internal static unsafe class GeneratedValues
             ref native.retry_after_unix_ms,
             MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER
         );
+        return native;
+    }
+
+    internal static mln_resource_transform_rule NativeResourceTransformRule(
+        ResourceTransformRule value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Url, "ResourceTransformRule.Url must not be null.");
+        var native = new mln_resource_transform_rule();
+        native.size = (uint)sizeof(mln_resource_transform_rule);
+        native.kinds = (uint)value.Kinds;
+        native.flags = (uint)value.Flags;
+        native.url = scope.Utf8(value.Url);
+        native.parameters = scope.Array<mln_url_query_parameter, UrlQueryParameter>(
+            value.ParametersStorage.Items,
+            static (item, scope) => NativeUrlQueryParameter(item, scope)
+        );
+        native.parameter_count = checked((nuint)value.ParametersStorage.Items.Length);
         return native;
     }
 
@@ -2401,6 +2425,19 @@ internal static unsafe class GeneratedValues
         native.y1 = value.Y1;
         native.x2 = value.X2;
         native.y2 = value.Y2;
+        return native;
+    }
+
+    internal static mln_url_query_parameter NativeUrlQueryParameter(
+        UrlQueryParameter value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Name, "UrlQueryParameter.Name must not be null.");
+        Required(value.Value, "UrlQueryParameter.Value must not be null.");
+        var native = new mln_url_query_parameter();
+        native.name = scope.Utf8(value.Name);
+        native.value = scope.Utf8(value.Value);
         return native;
     }
 

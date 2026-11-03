@@ -6412,6 +6412,94 @@ typedef ResourceTransformCallback =
       ResourceTransformRequestHandle request,
     );
 
+/// A query parameter that a resource transform rule adds to a URL.
+///
+/// Pass `name` and `value` unencoded. The library percent-encodes every byte of
+/// them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+/// `name=value`.
+///
+/// See `mln_url_query_parameter` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class UrlQueryParameter extends _Value {
+  const UrlQueryParameter({required this.name, this.value = ''});
+  final String name;
+  final String value;
+
+  /// A copy of this value with the given members replaced.
+  UrlQueryParameter copyWith({String? name, String? value}) =>
+      UrlQueryParameter(name: name ?? this.name, value: value ?? this.value);
+
+  @override
+  List<Object?> get _members => [name, value];
+  @override
+  String toString() => _describe('UrlQueryParameter', const ['name', 'value']);
+}
+
+/// Query parameters to add to the URLs of requests that match a pattern.
+///
+/// The library adds the parameters, in order, at the end of the URL's query and
+/// before any fragment. It writes `?` before them when the URL has no `?`, or
+/// `&` when the text before them ends with neither `?` nor `&`. It keeps the
+/// parameters that the URL already has, even one with the same name.
+///
+/// See `mln_resource_transform_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceTransformRule extends _Value {
+  ResourceTransformRule({
+    this.kinds = ResourceKindFlag.none,
+    this.flags = UrlMatchFlag.none,
+    this.url = '',
+    List<UrlQueryParameter> parameters = const [],
+  }) : parameters = List.unmodifiable(parameters);
+
+  /// The kinds of resource that the rule covers. Zero covers every kind.
+  final ResourceKindFlag kinds;
+  final UrlMatchFlag flags;
+  final String url;
+  final List<UrlQueryParameter> parameters;
+
+  /// A copy of this value with the given members replaced.
+  ResourceTransformRule copyWith({
+    ResourceKindFlag? kinds,
+    UrlMatchFlag? flags,
+    String? url,
+    List<UrlQueryParameter>? parameters,
+  }) => ResourceTransformRule(
+    kinds: kinds ?? this.kinds,
+    flags: flags ?? this.flags,
+    url: url ?? this.url,
+    parameters: parameters ?? this.parameters,
+  );
+
+  @override
+  List<Object?> get _members => [kinds, flags, url, parameters];
+  @override
+  String toString() => _describe('ResourceTransformRule', const [
+    'kinds',
+    'flags',
+    'url',
+    'parameters',
+  ]);
+}
+
+/// How to rewrite request URLs, for `RuntimeHandle.setResourceTransform()`.
+///
+/// Set either `callback` or `rules`, not both.
+///
+/// See `mln_resource_transform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceTransform {
+  ResourceTransform({
+    this.callback,
+    List<ResourceTransformRule> rules = const [],
+  }) : rules = List.unmodifiable(rules);
+  final ResourceTransformCallback? callback;
+
+  /// The first rule that matches a request adds its parameters, and no other. A
+  /// request that no rule matches keeps its URL. Rules never fail a request.
+  final List<ResourceTransformRule> rules;
+}
+
 /// The type of a style expression's result.
 ///
 /// See `mln_style_expression_type` in the

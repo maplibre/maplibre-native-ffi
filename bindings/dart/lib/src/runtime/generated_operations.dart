@@ -2744,8 +2744,43 @@ final raw.mln_resource_transform_callback _deliverResourceTransformCallback =
       }),
     );
 
+Pointer<raw.mln_url_query_parameter> _writeUrlQueryParameter(
+  UrlQueryParameter value,
+  Allocator arena, {
+  Pointer<raw.mln_url_query_parameter>? into,
+}) {
+  final result = into ?? arena<raw.mln_url_query_parameter>();
+  result.ref.name = nativeStringView(value.name, arena).value;
+  result.ref.value = nativeStringView(value.value, arena).value;
+  return result;
+}
+
+Pointer<raw.mln_resource_transform_rule> _writeResourceTransformRule(
+  ResourceTransformRule value,
+  Allocator arena, {
+  Pointer<raw.mln_resource_transform_rule>? into,
+}) {
+  final result = into ?? arena<raw.mln_resource_transform_rule>();
+  result.ref.size = sizeOf<raw.mln_resource_transform_rule>();
+  result.ref.kinds = value.kinds.rawValue;
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = nativeStringView(value.url, arena).value;
+  result.ref.parameters = arena<raw.mln_url_query_parameter>(
+    value.parameters.isEmpty ? 1 : value.parameters.length,
+  );
+  result.ref.parameter_count = value.parameters.length;
+  for (var index = 0; index < value.parameters.length; index++) {
+    _writeUrlQueryParameter(
+      value.parameters[index],
+      arena,
+      into: result.ref.parameters + index,
+    );
+  }
+  return result;
+}
+
 _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
-  ResourceTransformCallback value,
+  ResourceTransform value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -2753,8 +2788,22 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
   try {
     final result = arena<raw.mln_resource_transform>();
     result.ref.size = sizeOf<raw.mln_resource_transform>();
+    result.ref.rules = arena<raw.mln_resource_transform_rule>(
+      value.rules.isEmpty ? 1 : value.rules.length,
+    );
+    result.ref.rule_count = value.rules.length;
+    for (var index = 0; index < value.rules.length; index++) {
+      _writeResourceTransformRule(
+        value.rules[index],
+        arena,
+        into: result.ref.rules + index,
+      );
+    }
+    if (value.callback == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
     final registered = registration = roots.registerQueued({
-      #mln_resource_transform_callback: value,
+      #mln_resource_transform_callback: value.callback!,
     });
     result.ref.callback = _deliverResourceTransformCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
@@ -7259,7 +7308,7 @@ extension type RuntimeHandleDiscarding._(RuntimeHandle _owner) {
           ),
         );
       });
-  void setResourceTransform(ResourceTransformCallback transform) =>
+  void setResourceTransform(ResourceTransform transform) =>
       _discard((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
@@ -7714,27 +7763,26 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
         );
       });
 
-  /// Rewrites the URLs of the runtime's network requests through a callback.
+  /// Rewrites the URLs of the runtime's network requests.
   ///
   /// The transform replaces the one set before.
   ///
   /// See `mln_runtime_set_resource_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<CommandCompletion> setResourceTransform(
-    ResourceTransformCallback transform,
-  ) => _command((arena, completion) {
-    final registrations = _NativeRegistrations(_callbackRoots);
-    return registrations.run(
-      () => raw.mln_runtime_set_resource_transform(
-        _handle.raw,
-        registrations.add(
-          _prepareResourceTransform(transform, registrations.roots),
-        ),
-        completion,
-        nativeDiagnostic,
-      ),
-    );
-  });
+  Future<CommandCompletion> setResourceTransform(ResourceTransform transform) =>
+      _command((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackRoots);
+        return registrations.run(
+          () => raw.mln_runtime_set_resource_transform(
+            _handle.raw,
+            registrations.add(
+              _prepareResourceTransform(transform, registrations.roots),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
 
   /// Replaces the metadata of the offline region `regionId`.
   ///

@@ -1,7 +1,7 @@
 // The URL language that provider routes and transform rules share: the glob
-// patterns that mln_url_match_flag documents, and which URL a route
-// compares. A loader cannot produce every candidate URL, so these cases call
-// the matchers directly.
+// patterns that mln_url_match_flag documents, which URL a route compares, and
+// where a resource transform rule adds its query parameters. A loader cannot
+// produce every candidate URL, so these cases call the matchers directly.
 
 #include <array>
 #include <cstdint>
@@ -111,9 +111,42 @@ void routes_match_resolved_urls_and_selected_kinds() {
   );
 }
 
+struct QueryCase {
+  std::string_view url;
+  std::string_view rewritten;
+};
+
+// Where the parameters go in each shape of URL. The transport never sends a
+// fragment, so only these cases can see one.
+constexpr auto query_cases = std::array{
+  QueryCase{"https://maps.localhost/a", "https://maps.localhost/a?k=v"},
+  QueryCase{"https://maps.localhost/a?x=1", "https://maps.localhost/a?x=1&k=v"},
+  QueryCase{"https://maps.localhost/a?", "https://maps.localhost/a?k=v"},
+  QueryCase{"https://maps.localhost/a?x&", "https://maps.localhost/a?x&k=v"},
+  QueryCase{"https://maps.localhost/a#top", "https://maps.localhost/a?k=v#top"},
+  QueryCase{
+    "https://maps.localhost/a?x#y?z", "https://maps.localhost/a?x&k=v#y?z"
+  },
+};
+
+void rules_add_parameters_before_the_fragment() {
+  for (const auto& row : query_cases) {
+    const auto url = std::string{row.url};
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+      std::string{row.rewritten}.c_str(),
+      mln::core::append_query(row.url, "k=v").c_str(), url.c_str()
+    );
+  }
+  TEST_ASSERT_EQUAL_STRING(
+    "https://maps.localhost/a#top",
+    mln::core::append_query("https://maps.localhost/a#top", "").c_str()
+  );
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(globs_match_the_documented_pattern_language);
   RUN_TEST(routes_match_resolved_urls_and_selected_kinds);
+  RUN_TEST(rules_add_parameters_before_the_fragment);
 }

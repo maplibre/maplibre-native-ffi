@@ -40,12 +40,37 @@ internal static class Network
         );
         // #endregion headers
 
+        // #region query-rules
+        runtime.Discarding.SetResourceTransform(
+            new ResourceTransform
+            {
+                Rules =
+                [
+                    new ResourceTransformRule
+                    {
+                        Flags = UrlMatchFlag.Glob,
+                        Url = "https://tiles.example.com/**",
+                        Parameters =
+                        [
+                            new UrlQueryParameter(
+                                "key",
+                                "my-api-key"
+                            ),
+                        ],
+                    },
+                ],
+            }
+        );
+        // #endregion query-rules
+
         // #region rewrite
         // Runs on a library thread.
         runtime.Discarding.SetResourceTransform(
-            new ResourceTransform(
-                (_, url, request) => request.Complete(WithApiKey(url))
-            )
+            new ResourceTransform
+            {
+                Callback = (_, url, request) =>
+                    request.Complete(WithApiKey(url)),
+            }
         );
         // #endregion rewrite
 

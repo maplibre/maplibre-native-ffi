@@ -147,6 +147,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformError.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformRequestHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformRule.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCallback.g.cs linguist-generated=true
@@ -167,6 +168,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/TileId.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/TileOperation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/UrlMatchFlag.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/UrlQueryParameter.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CanonicalTileId.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomGeometrySourceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/CustomSourceCancelTileCallback.g.cs linguist-generated=true

@@ -968,6 +968,8 @@ internal unsafe struct mln_resource_transform
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
+    public mln_resource_transform_rule* rules;
+    public nuint rule_count;
 }
 
 internal unsafe struct mln_resource_transform_error
@@ -977,6 +979,16 @@ internal unsafe struct mln_resource_transform_error
     public mln_resource_error_reason reason;
     public mln_buffer_view message;
     public long retry_after_unix_ms;
+}
+
+internal unsafe struct mln_resource_transform_rule
+{
+    public uint size;
+    public uint kinds;
+    public uint flags;
+    public mln_buffer_view url;
+    public mln_url_query_parameter* parameters;
+    public nuint parameter_count;
 }
 
 internal unsafe struct mln_runtime_event
@@ -1263,6 +1275,12 @@ internal unsafe struct mln_unit_bezier
     public double y1;
     public double x2;
     public double y2;
+}
+
+internal unsafe struct mln_url_query_parameter
+{
+    public mln_buffer_view name;
+    public mln_buffer_view value;
 }
 
 internal unsafe struct mln_vec3

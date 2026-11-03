@@ -18,13 +18,17 @@ void main() {
         styleRoute('custom://unused.json'),
       ], (_, handle) => handle.close()),
     );
-    await fixture.runtime.setResourceTransform((kind, url, request) {
-      if (url == styleUrl) {
-        handed.complete(request);
-      } else {
-        request.close();
-      }
-    });
+    await fixture.runtime.setResourceTransform(
+      ResourceTransform(
+        callback: (kind, url, request) {
+          if (url == styleUrl) {
+            handed.complete(request);
+          } else {
+            request.close();
+          }
+        },
+      ),
+    );
     final map = await fixture.openMap();
 
     final loaded = map.setStyleUrl(styleUrl);

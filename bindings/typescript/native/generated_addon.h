@@ -467,9 +467,17 @@ bool mln_ts_write_list_resource_route(
   mln_ts_call* call, napi_value value, size_t maximum, mln_resource_route** out,
   size_t* out_count, const char* path
 );
+bool mln_ts_write_list_resource_transform_rule(
+  mln_ts_call* call, napi_value value, size_t maximum,
+  mln_resource_transform_rule** out, size_t* out_count, const char* path
+);
 bool mln_ts_write_list_screen_point(
   mln_ts_call* call, napi_value value, size_t maximum, mln_screen_point** out,
   size_t* out_count, const char* path
+);
+bool mln_ts_write_list_url_query_parameter(
+  mln_ts_call* call, napi_value value, size_t maximum,
+  mln_url_query_parameter** out, size_t* out_count, const char* path
 );
 bool mln_ts_write_list_vulkan_borrowed_texture(
   mln_ts_call* call, napi_value value, size_t maximum,
@@ -615,8 +623,16 @@ bool mln_ts_write_resource_response(
 bool mln_ts_write_resource_route(
   mln_ts_call* call, napi_value value, mln_resource_route* out, const char* path
 );
+bool mln_ts_write_resource_transform(
+  mln_ts_call* call, napi_value value, mln_resource_transform* out,
+  const char* path
+);
 bool mln_ts_write_resource_transform_error(
   mln_ts_call* call, napi_value value, mln_resource_transform_error* out,
+  const char* path
+);
+bool mln_ts_write_resource_transform_rule(
+  mln_ts_call* call, napi_value value, mln_resource_transform_rule* out,
   const char* path
 );
 bool mln_ts_write_runtime_options(
@@ -659,6 +675,10 @@ bool mln_ts_write_style_transition_options(
 );
 bool mln_ts_write_unit_bezier(
   mln_ts_call* call, napi_value value, mln_unit_bezier* out, const char* path
+);
+bool mln_ts_write_url_query_parameter(
+  mln_ts_call* call, napi_value value, mln_url_query_parameter* out,
+  const char* path
 );
 bool mln_ts_write_vec3(
   mln_ts_call* call, napi_value value, mln_vec3* out, const char* path

@@ -6484,13 +6484,11 @@ static napi_value mln_ts_export_mln_runtime_set_resource_transform(
   }
   memset(&arg_transform, 0, sizeof arg_transform);
   arg_transform.size = sizeof arg_transform;
-  if (!mln_ts_read_function(call, call->argv[1], "transform")) goto done;
-  if (!mln_ts_read_registration(
-        call, call->argv[1], &arg_transform.user_data,
-        &arg_transform.release_user_data, &arg_transform.queue
+  if (!mln_ts_read_record(call, call->argv[1], "transform")) goto done;
+  if (!mln_ts_write_resource_transform(
+        call, call->argv[1], &arg_transform, "transform"
       ))
     goto done;
-  arg_transform.callback = mln_ts_dispatch_resource_transform_callback;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))

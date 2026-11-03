@@ -71,6 +71,12 @@ bool mln_test_http_server_request_header(
   mln_test_http_server* server, const char* path, int index, const char* name,
   char* out, size_t capacity
 );
+// Copies the request target, query included, of the `index`th request for
+// `path`. Returns false when that request does not exist, leaving `out` empty.
+bool mln_test_http_server_request_target(
+  mln_test_http_server* server, const char* path, int index, char* out,
+  size_t capacity
+);
 // Answers every held request, and every later one for a held route.
 void mln_test_http_server_release_held(mln_test_http_server* server);
 

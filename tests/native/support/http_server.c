@@ -705,6 +705,39 @@ bool mln_test_http_server_request_header(
   return found;
 }
 
+bool mln_test_http_server_request_target(
+  mln_test_http_server* server, const char* path, int index, char* out,
+  size_t capacity
+) {
+  if (capacity > 0) {
+    out[0] = '\0';
+  }
+  bool found = false;
+  int seen = 0;
+  lock_server(server);
+  for (size_t entry = 0; entry < server->request_count; entry += 1) {
+    if (strcmp(server->requests[entry].path, path) != 0) {
+      continue;
+    }
+    if (seen == index) {
+      const char* target = strchr(server->requests[entry].head, ' ');
+      if (target != NULL) {
+        target += 1;
+        const size_t size = strcspn(target, " \r\n");
+        found = size < capacity;
+        if (found) {
+          memcpy(out, target, size);
+          out[size] = '\0';
+        }
+      }
+      break;
+    }
+    seen += 1;
+  }
+  unlock_server(server);
+  return found;
+}
+
 void mln_test_http_server_release_held(mln_test_http_server* server) {
   lock_server(server);
   server->held_released = true;

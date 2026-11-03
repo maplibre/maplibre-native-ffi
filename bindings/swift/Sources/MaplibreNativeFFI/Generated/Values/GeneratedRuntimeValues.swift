@@ -887,22 +887,35 @@ public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// A resource transform callback, for `RuntimeHandle.setResourceTransform()`.
+/// How to rewrite request URLs, for `RuntimeHandle.setResourceTransform()`.
+///
+/// Set either `callback` or `rules`, not both.
 ///
 /// See `mln_resource_transform` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceTransform: Sendable {
-  public var callback: ResourceTransformCallback
-  public init(callback: @escaping ResourceTransformCallback) {
+  public var callback: ResourceTransformCallback?
+  /// The first rule that matches a request adds its parameters, and no other. A
+  /// request that no rule matches keeps its URL. Rules never fail a request.
+  public var rules: [ResourceTransformRule]
+  public init(
+    callback: ResourceTransformCallback? = nil,
+    rules: [ResourceTransformRule] = []
+  ) {
     self.callback = callback
+    self.rules = rules
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_transform {
     var raw = mln_resource_transform()
     raw.size = UInt32(MemoryLayout<mln_resource_transform>.size)
-    raw.callback = invokeResourceTransformCallback
-    raw.user_data = arena.callback(self)
-    raw.release_user_data = releaseGeneratedCallback
+    raw.callback = callback == nil ? nil : invokeResourceTransformCallback
+    raw.rules = try arena.array(rules.map { try $0.nativeValue(arena: arena) })
+    raw.rule_count = try NativeInputArena.count(rules.count)
+    if callback != nil {
+      raw.user_data = arena.callback(self)
+      raw.release_user_data = releaseGeneratedCallback
+    }
     return raw
   }
 }
@@ -919,7 +932,7 @@ private func invokeResourceTransformCallback(
   guard let ownedRequest =
     try? ResourceTransformRequestHandle(adopting: request)
   else { mln_resource_transform_request_release(request); return }
-  do { try box.value.callback(
+  do { try box.value.callback?(
     ResourceKind(rawValue: kind.rawValue),
     NativeString.copyUTF8(data: url.data, size: url.size),
     ownedRequest
@@ -978,6 +991,48 @@ public struct ResourceTransformError: Equatable, Hashable, Sendable {
       raw.fields |= MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER.rawValue; raw
         .retry_after_unix_ms = item
     }
+    return raw
+  }
+}
+
+/// Query parameters to add to the URLs of requests that match a pattern.
+///
+/// The library adds the parameters, in order, at the end of the URL's query and
+/// before any fragment. It writes `?` before them when the URL has no `?`, or
+/// `&` when the text before them ends with neither `?` nor `&`. It keeps the
+/// parameters that the URL already has, even one with the same name.
+///
+/// See `mln_resource_transform_rule` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceTransformRule: Equatable, Hashable, Sendable {
+  /// The kinds of resource that the rule covers. Zero covers every kind.
+  public var kinds: ResourceKindFlag
+  public var flags: UrlMatchFlag
+  public var url: String
+  public var parameters: [UrlQueryParameter]
+  public init(
+    kinds: ResourceKindFlag = .init(rawValue: 0),
+    flags: UrlMatchFlag = .init(rawValue: 0),
+    url: String = "",
+    parameters: [UrlQueryParameter] = []
+  ) {
+    self.kinds = kinds
+    self.flags = flags
+    self.url = url
+    self.parameters = parameters
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_resource_transform_rule
+  {
+    var raw = mln_resource_transform_rule()
+    raw.size = UInt32(MemoryLayout<mln_resource_transform_rule>.size)
+    raw.kinds = kinds.rawValue
+    raw.flags = flags.rawValue
+    raw.url = arena.view(url)
+    raw.parameters = try arena
+      .array(parameters.map { try $0.nativeValue(arena: arena) })
+    raw.parameter_count = try NativeInputArena.count(parameters.count)
     return raw
   }
 }
@@ -1656,4 +1711,28 @@ public struct UrlMatchFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   /// `https://*.example.com/tiles/**` matches every URL under `/tiles/` on each
   /// subdomain of `example.com`.
   public static let glob: UrlMatchFlag = .init(rawValue: 1)
+}
+
+/// A query parameter that a resource transform rule adds to a URL.
+///
+/// Pass `name` and `value` unencoded. The library percent-encodes every byte of
+/// them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+/// `name=value`.
+///
+/// See `mln_url_query_parameter` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct UrlQueryParameter: Equatable, Hashable, Sendable {
+  public var name: String
+  public var value: String
+  public init(name: String, value: String = "") {
+    self.name = name
+    self.value = value
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_url_query_parameter {
+    var raw = mln_url_query_parameter()
+    raw.name = arena.view(name)
+    raw.value = arena.view(value)
+    return raw
+  }
 }
