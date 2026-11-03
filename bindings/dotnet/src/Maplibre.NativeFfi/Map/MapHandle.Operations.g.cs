@@ -791,22 +791,20 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Stops the running camera animations whose animation options set
-    /// <c>transitionId</c>.
+    /// Stops every running camera animation where it is.
     /// </summary>
     /// <remarks>
-    /// <para>Other animations keep running. The end handler of each stopped
-    /// animation reports <c>CameraTransitionOutcome.Cancelled</c>.</para>
-    /// <para>See <c>mln_map_cancel_camera_transition</c> in the <see
+    /// <para>The end handler of each stopped animation reports
+    /// <c>CameraTransitionOutcome.Cancelled</c>.</para>
+    /// <para>See <c>mln_map_cancel_camera_transitions</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
-    public Task<CommandCompletion> CancelCameraTransitionAsync(ulong transitionId)
+    public Task<CommandCompletion> CancelCameraTransitionsAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_cancel_camera_transition(
+        var nativeStatus = NativeMethods.mln_map_cancel_camera_transitions(
             Handle,
-            transitionId,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -814,20 +812,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Stops every running camera animation where it is.
+    /// Stops the running camera animations whose animation options set
+    /// <c>transitionId</c>.
     /// </summary>
     /// <remarks>
-    /// <para>The end handler of each stopped animation reports
-    /// <c>CameraTransitionOutcome.Cancelled</c>.</para>
-    /// <para>See <c>mln_map_cancel_transitions</c> in the <see
+    /// <para>Other animations keep running. The end handler of each stopped
+    /// animation reports <c>CameraTransitionOutcome.Cancelled</c>.</para>
+    /// <para>See <c>mln_map_cancel_camera_transitions_with_id</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
-    public Task<CommandCompletion> CancelTransitionsAsync()
+    public Task<CommandCompletion> CancelCameraTransitionsWithIdAsync(ulong transitionId)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_cancel_transitions(
+        var nativeStatus = NativeMethods.mln_map_cancel_camera_transitions_with_id(
             Handle,
+            transitionId,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1931,8 +1931,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Places the camera at a position and orientation in space.
     /// </summary>
     /// <remarks>
-    /// <para>The map adjusts them to a camera that it can show, and stops
-    /// running camera animations.</para>
+    /// <para>The map adjusts them to a camera that it can show. It stops
+    /// running camera animations first, and their end handlers report
+    /// <c>CameraTransitionOutcome.Cancelled</c>.</para>
     /// <para>See <c>mln_map_set_free_camera_options</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -2695,26 +2696,28 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void CancelCameraTransition(ulong transitionId)
+        public void CancelCameraTransitions()
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
-                NativeMethods.mln_map_cancel_camera_transition(
+                NativeMethods.mln_map_cancel_camera_transitions(receiverHandle, null, Diagnostic)
+            );
+            scope.Accept();
+        }
+
+        public void CancelCameraTransitionsWithId(ulong transitionId)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_map_cancel_camera_transitions_with_id(
                     receiverHandle,
                     transitionId,
                     null,
                     Diagnostic
                 )
             );
-            scope.Accept();
-        }
-
-        public void CancelTransitions()
-        {
-            var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner);
-            Check(NativeMethods.mln_map_cancel_transitions(receiverHandle, null, Diagnostic));
             scope.Accept();
         }
 

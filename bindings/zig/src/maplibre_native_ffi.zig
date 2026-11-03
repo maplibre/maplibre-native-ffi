@@ -517,27 +517,27 @@ pub const Map = struct {
         return call.submit("mln_map_camera_for_lat_lngs", .handle, self, call.value(CameraOptions, c.mln_camera_options), allocator, diagnostic, .{ coordinates, coordinates.len, fit_options });
     }
 
+    /// Stops every running camera animation where it is.
+    ///
+    /// The end handler of each stopped animation reports
+    /// `CameraTransitionOutcome.cancelled`.
+    ///
+    /// See `mln_map_cancel_camera_transitions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn cancelCameraTransitions(self: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_cancel_camera_transitions", .handle, self, call.command, null, diagnostic, .{});
+    }
+
     /// Stops the running camera animations whose animation options set
     /// `transition_id`.
     ///
     /// Other animations keep running. The end handler of each stopped animation
     /// reports `CameraTransitionOutcome.cancelled`.
     ///
-    /// See `mln_map_cancel_camera_transition` in the
+    /// See `mln_map_cancel_camera_transitions_with_id` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn cancelCameraTransition(self: Map, transition_id: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_cancel_camera_transition", .handle, self, call.command, null, diagnostic, .{transition_id});
-    }
-
-    /// Stops every running camera animation where it is.
-    ///
-    /// The end handler of each stopped animation reports
-    /// `CameraTransitionOutcome.cancelled`.
-    ///
-    /// See `mln_map_cancel_transitions` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn cancelTransitions(self: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_cancel_transitions", .handle, self, call.command, null, diagnostic, .{});
+    pub fn cancelCameraTransitionsWithId(self: Map, transition_id: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_cancel_camera_transitions_with_id", .handle, self, call.command, null, diagnostic, .{transition_id});
     }
 
     /// Releases the map in any state, and finishes in the background.
@@ -1003,8 +1003,9 @@ pub const Map = struct {
 
     /// Places the camera at a position and orientation in space.
     ///
-    /// The map adjusts them to a camera that it can show, and stops running camera
-    /// animations.
+    /// The map adjusts them to a camera that it can show. It stops running camera
+    /// animations first, and their end handlers report
+    /// `CameraTransitionOutcome.cancelled`.
     ///
     /// See `mln_map_set_free_camera_options` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2429,8 +2430,8 @@ pub const AnimationOptions = struct {
     /// The zoom level at the peak of a fly animation.
     min_zoom: ?f64 = null,
     easing: ?UnitBezier = null,
-    /// An ID that `Map.cancelCameraTransition()` cancels the change by. Several
-    /// changes can share one.
+    /// An ID that `Map.cancelCameraTransitionsWithId()` cancels the change by.
+    /// Several changes can share one.
     transition_id: ?u64 = null,
     end_handler: CameraTransitionHandler = .{},
     pub fn toNative(self: AnimationOptions, roots: *callbacks.Roots) status.Error!c.mln_animation_options {
@@ -2817,16 +2818,32 @@ pub const CameraTransitionHandler = struct {
 
 /// How a camera change ended.
 ///
+/// A camera delta that pans and also scales, rotates, or pitches animates as
+/// two parts, and any other change as one. When the parts of a change end in
+/// different ways, the change reports `CameraTransitionOutcome.cancelled` if
+/// any part was cancelled, then `CameraTransitionOutcome.replaced` if any part
+/// was replaced.
+///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraTransitionOutcome = enum(u32) {
-    /// The camera finished the change, or a later camera change replaced it.
+    /// The camera finished the change.
     completed = 0,
-    /// `Map.cancelTransitions()`, `Map.cancelCameraTransition()`, or a
-    /// gesture's `GesturePhase.cancel` stopped the change.
+    /// `Map.cancelCameraTransitions()`, `Map.cancelCameraTransitionsWithId()`,
+    /// a gesture's `GesturePhase.begin` or `GesturePhase.cancel`,
+    /// `Map.setFreeCameraOptions()`, or a resize that moves the camera back
+    /// inside its bounds stopped the change.
     cancelled = 1,
     /// The map closed before the change ended.
     closed = 2,
+    /// A later camera change set every camera field that a part of the change
+    /// still animated, so that part stopped.
+    ///
+    /// A fly animates its center and zoom together, and an anchor animates the
+    /// center together with the fields it keeps in place, so a later change of
+    /// any of them replaces them all. A part that a later change took only some
+    /// fields from keeps animating the others, and ends as they end.
+    replaced = 3,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -3349,15 +3366,23 @@ pub const GeoJsonSourceOptions = struct {
 
 /// Where a camera change falls in a gesture that the user makes.
 ///
+/// `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
+/// and `GesturePhase.end` and `GesturePhase.cancel` end it.
+///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const GesturePhase = enum(u32) {
     /// The change isn't part of a gesture.
     none = 0,
+    /// The gesture starts. This cancels every running camera animation before
+    /// the change applies.
     begin = 1,
+    /// The gesture continues. To start a gesture that keeps the running camera
+    /// animations, start it with this phase instead of `GesturePhase.begin`.
     update = 2,
     end = 3,
-    /// The platform cancelled the gesture. This also cancels camera changes.
+    /// The platform cancelled the gesture. This also cancels every running
+    /// camera animation after the change applies.
     cancel = 4,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
@@ -7829,14 +7854,14 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_begin_command_group", .handle, map, null, diagnostic, .{});
     }
 
-    pub fn cancelCameraTransition(self: MapDiscarding, transition_id: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn cancelCameraTransitions(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_cancel_camera_transition", .handle, map, null, diagnostic, .{transition_id});
+        return call.discard("mln_map_cancel_camera_transitions", .handle, map, null, diagnostic, .{});
     }
 
-    pub fn cancelTransitions(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn cancelCameraTransitionsWithId(self: MapDiscarding, transition_id: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_cancel_transitions", .handle, map, null, diagnostic, .{});
+        return call.discard("mln_map_cancel_camera_transitions_with_id", .handle, map, null, diagnostic, .{transition_id});
     }
 
     pub fn dumpDebugLogs(self: MapDiscarding, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

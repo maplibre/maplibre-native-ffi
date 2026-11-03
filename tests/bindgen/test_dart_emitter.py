@@ -174,10 +174,10 @@ class DartEmitterTests(unittest.TestCase):
 
     def test_docs_name_the_dart_symbols_of_c_declarations(self):
         values = dart.lower(real_api()).files[dart.VALUES]
-        self.assertIn("`MapHandle.cancelTransitions()`", values)
-        self.assertIn("`MapHandle.cancelCameraTransition()`", values)
-        self.assertIn("`GesturePhase.cancel` stopped", values)
-        self.assertNotIn("`mln_map_cancel_transitions()`", values)
+        self.assertIn("`MapHandle.cancelCameraTransitions()`", values)
+        self.assertIn("`MapHandle.cancelCameraTransitionsWithId()`", values)
+        self.assertIn("`GesturePhase.begin` or `GesturePhase.cancel`", values)
+        self.assertNotIn("`mln_map_cancel_camera_transitions()`", values)
 
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
         values = dart.lower(real_api()).files[dart.VALUES]

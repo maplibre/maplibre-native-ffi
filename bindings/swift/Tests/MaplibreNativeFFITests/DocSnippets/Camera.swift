@@ -11,7 +11,6 @@ private func flyEnded(_: Bool) {}
 // #region gesture
 
 private func beginGesture(_ map: MapHandle) throws {
-  try map.discarding.cancelTransitions()
   try map.discarding
     .applyCameraDelta(CameraDelta(gesturePhase: .begin))
 }

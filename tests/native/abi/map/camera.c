@@ -938,7 +938,7 @@ static void flights_reject_unrepresentable_derived_durations(void) {
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
   MLN_TEST_AWAIT_OK(
-    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
   );
 
   update.animation.fields |= MLN_ANIMATION_OPTION_DURATION;

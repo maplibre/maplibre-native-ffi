@@ -50,25 +50,44 @@ final class CameraChangeMode extends _Enum {
 
 /// How a camera change ended.
 ///
+/// A camera delta that pans and also scales, rotates, or pitches animates as
+/// two parts, and any other change as one. When the parts of a change end in
+/// different ways, the change reports `CameraTransitionOutcome.cancelled` if
+/// any part was cancelled, then `CameraTransitionOutcome.replaced` if any part
+/// was replaced.
+///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraTransitionOutcome extends _Enum {
   const CameraTransitionOutcome.fromRawValue(super.rawValue);
 
-  /// The camera finished the change, or a later camera change replaced it.
+  /// The camera finished the change.
   static const completed = CameraTransitionOutcome.fromRawValue(0);
 
-  /// `MapHandle.cancelTransitions()`, `MapHandle.cancelCameraTransition()`, or
-  /// a gesture's `GesturePhase.cancel` stopped the change.
+  /// `MapHandle.cancelCameraTransitions()`,
+  /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
+  /// `GesturePhase.begin` or `GesturePhase.cancel`,
+  /// `MapHandle.setFreeCameraOptions()`, or a resize that moves the camera back
+  /// inside its bounds stopped the change.
   static const cancelled = CameraTransitionOutcome.fromRawValue(1);
 
   /// The map closed before the change ended.
   static const closed = CameraTransitionOutcome.fromRawValue(2);
+
+  /// A later camera change set every camera field that a part of the change
+  /// still animated, so that part stopped.
+  ///
+  /// A fly animates its center and zoom together, and an anchor animates the
+  /// center together with the fields it keeps in place, so a later change of
+  /// any of them replaces them all. A part that a later change took only some
+  /// fields from keeps animating the others, and ends as they end.
+  static const replaced = CameraTransitionOutcome.fromRawValue(3);
   @override
   String toString() => switch (rawValue) {
     0 => 'CameraTransitionOutcome.completed',
     1 => 'CameraTransitionOutcome.cancelled',
     2 => 'CameraTransitionOutcome.closed',
+    3 => 'CameraTransitionOutcome.replaced',
     _ => 'CameraTransitionOutcome($rawValue)',
   };
 }
@@ -156,6 +175,9 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
 
 /// Where a camera change falls in a gesture that the user makes.
 ///
+/// `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
+/// and `GesturePhase.end` and `GesturePhase.cancel` end it.
+///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class GesturePhase extends _Enum {
@@ -163,11 +185,18 @@ final class GesturePhase extends _Enum {
 
   /// The change isn't part of a gesture.
   static const none = GesturePhase.fromRawValue(0);
+
+  /// The gesture starts. This cancels every running camera animation before the
+  /// change applies.
   static const begin = GesturePhase.fromRawValue(1);
+
+  /// The gesture continues. To start a gesture that keeps the running camera
+  /// animations, start it with this phase instead of `GesturePhase.begin`.
   static const update = GesturePhase.fromRawValue(2);
   static const end = GesturePhase.fromRawValue(3);
 
-  /// The platform cancelled the gesture. This also cancels camera changes.
+  /// The platform cancelled the gesture. This also cancels every running camera
+  /// animation after the change applies.
   static const cancel = GesturePhase.fromRawValue(4);
   @override
   String toString() => switch (rawValue) {
@@ -2398,8 +2427,8 @@ final class AnimationOptions extends _Value {
   final double? minZoom;
   final UnitBezier? easing;
 
-  /// An ID that `MapHandle.cancelCameraTransition()` cancels the change by.
-  /// Several changes can share one.
+  /// An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
+  /// by. Several changes can share one.
   final int? transitionId;
   final CameraTransitionEndCallback? endHandler;
 

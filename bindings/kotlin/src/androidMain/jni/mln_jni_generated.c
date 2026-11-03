@@ -498,22 +498,22 @@ static jint mln_map_camera_for_lat_lngs_jni(
   );
 }
 
-static jint mln_map_cancel_camera_transition_jni(
-  JNIEnv* env, jclass type, jlong map, jlong transition_id, jlong completion,
-  jlong out_diagnostic
+static jint mln_map_cancel_camera_transitions_jni(
+  JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_cancel_camera_transition(
-    (mln_map)map, (uint64_t)transition_id,
-    MLN_JNI_POINTER(const mln_completion*, completion),
+  return (jint)mln_map_cancel_camera_transitions(
+    (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
-static jint mln_map_cancel_transitions_jni(
-  JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
+static jint mln_map_cancel_camera_transitions_with_id_jni(
+  JNIEnv* env, jclass type, jlong map, jlong transition_id, jlong completion,
+  jlong out_diagnostic
 ) {
-  return (jint)mln_map_cancel_transitions(
-    (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
+  return (jint)mln_map_cancel_camera_transitions_with_id(
+    (mln_map)map, (uint64_t)transition_id,
+    MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2192,10 +2192,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_camera_for_lat_lng_bounds_jni},
   {"mln_map_camera_for_lat_lngs", "(JJJJJJ)I",
    (void*)mln_map_camera_for_lat_lngs_jni},
-  {"mln_map_cancel_camera_transition", "(JJJJ)I",
-   (void*)mln_map_cancel_camera_transition_jni},
-  {"mln_map_cancel_transitions", "(JJJ)I",
-   (void*)mln_map_cancel_transitions_jni},
+  {"mln_map_cancel_camera_transitions", "(JJJ)I",
+   (void*)mln_map_cancel_camera_transitions_jni},
+  {"mln_map_cancel_camera_transitions_with_id", "(JJJJ)I",
+   (void*)mln_map_cancel_camera_transitions_with_id_jni},
   {"mln_map_dispose", "(JJ)I", (void*)mln_map_dispose_jni},
   {"mln_map_dump_debug_logs", "(JJJ)I", (void*)mln_map_dump_debug_logs_jni},
   {"mln_map_end_command_group", "(JJJ)I", (void*)mln_map_end_command_group_jni},
@@ -2545,10 +2545,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_camera_for_lat_lng_bounds_jni},
   {"mln_map_camera_for_lat_lngs", "(JJJJJJ)I",
    (void*)mln_map_camera_for_lat_lngs_jni},
-  {"mln_map_cancel_camera_transition", "(JJJJ)I",
-   (void*)mln_map_cancel_camera_transition_jni},
-  {"mln_map_cancel_transitions", "(JJJ)I",
-   (void*)mln_map_cancel_transitions_jni},
+  {"mln_map_cancel_camera_transitions", "(JJJ)I",
+   (void*)mln_map_cancel_camera_transitions_jni},
+  {"mln_map_cancel_camera_transitions_with_id", "(JJJJ)I",
+   (void*)mln_map_cancel_camera_transitions_with_id_jni},
   {"mln_map_dispose", "(JJ)I", (void*)mln_map_dispose_jni},
   {"mln_map_dump_debug_logs", "(JJJ)I", (void*)mln_map_dump_debug_logs_jni},
   {"mln_map_end_command_group", "(JJJ)I", (void*)mln_map_end_command_group_jni},

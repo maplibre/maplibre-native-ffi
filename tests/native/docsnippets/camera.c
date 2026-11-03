@@ -64,8 +64,6 @@ static void on_fit(
 
 // #region gesture
 static void begin_gesture(mln_map map) {
-  mln_map_cancel_transitions(map, NULL, NULL);
-
   const mln_camera_delta begin = {
     .size = sizeof(mln_camera_delta),
     .gesture_phase = MLN_GESTURE_PHASE_BEGIN,

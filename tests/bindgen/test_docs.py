@@ -166,7 +166,7 @@ class SummaryTests(unittest.TestCase):
 
 class TranslateTests(unittest.TestCase):
     symbols = {
-        "mln_map_cancel_transitions": "Map.cancelTransitions",
+        "mln_map_cancel_camera_transitions": "Map.cancelCameraTransitions",
         "MLN_GESTURE_PHASE_CANCEL": "GesturePhase.cancel",
         "mln_runtime_event.source_type": "RuntimeEvent.sourceType",
     }.get
@@ -174,11 +174,11 @@ class TranslateTests(unittest.TestCase):
     def test_spells_c_identifiers_as_binding_symbols(self):
         self.assertEqual(
             docs.translate(
-                "Use `mln_map_cancel_transitions()` or `MLN_GESTURE_PHASE_CANCEL`, "
+                "Use `mln_map_cancel_camera_transitions()` or `MLN_GESTURE_PHASE_CANCEL`, "
                 "as `mln_runtime_event.source_type` reports; `x[i]` stays.",
                 self.symbols,
             ),
-            "Use `Map.cancelTransitions()` or `GesturePhase.cancel`, as "
+            "Use `Map.cancelCameraTransitions()` or `GesturePhase.cancel`, as "
             "`RuntimeEvent.sourceType` reports; `x[i]` stays.",
         )
 
@@ -186,10 +186,10 @@ class TranslateTests(unittest.TestCase):
         self.assertEqual(
             docs.translate(
                 "Cancels transitions. The end reaches `mln_delivery_queue` "
-                "instead. Prefer `mln_map_cancel_transitions()`.",
+                "instead. Prefer `mln_map_cancel_camera_transitions()`.",
                 self.symbols,
             ),
-            "Cancels transitions. Prefer `Map.cancelTransitions()`.",
+            "Cancels transitions. Prefer `Map.cancelCameraTransitions()`.",
         )
 
     def test_keeps_sentences_together_across_code_spans(self):

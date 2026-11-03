@@ -702,28 +702,30 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: CameraOptions._from_native(value),
         )
 
-    def cancel_camera_transition(self, transition_id: int) -> Future[CommandCompletion]:
+    def cancel_camera_transitions(self) -> Future[CommandCompletion]:
+        """Stops every running camera animation where it is.
+
+        The end handler of each stopped animation reports
+        `CameraTransitionOutcome.CANCELLED`.
+
+        See `mln_map_cancel_camera_transitions` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native.cancel_camera_transitions()
+
+    def cancel_camera_transitions_with_id(
+        self, transition_id: int
+    ) -> Future[CommandCompletion]:
         """Stops the running camera animations whose animation options set
         `transition_id`.
 
         Other animations keep running. The end handler of each stopped
         animation reports `CameraTransitionOutcome.CANCELLED`.
 
-        See `mln_map_cancel_camera_transition` in the
+        See `mln_map_cancel_camera_transitions_with_id` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
-        return self._native.cancel_camera_transition(transition_id)
-
-    def cancel_transitions(self) -> Future[CommandCompletion]:
-        """Stops every running camera animation where it is.
-
-        The end handler of each stopped animation reports
-        `CameraTransitionOutcome.CANCELLED`.
-
-        See `mln_map_cancel_transitions` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native.cancel_transitions()
+        return self._native.cancel_camera_transitions_with_id(transition_id)
 
     def dump_debug_logs(self) -> Future[CommandCompletion]:
         """Logs debugging information about the map's style and sources.
@@ -1253,8 +1255,9 @@ class _MapHandleOperations(GeneratedOperations):
     ) -> Future[CommandCompletion]:
         """Places the camera at a position and orientation in space.
 
-        The map adjusts them to a camera that it can show, and stops running
-        camera animations.
+        The map adjusts them to a camera that it can show. It stops running
+        camera animations first, and their end handlers report
+        `CameraTransitionOutcome.CANCELLED`.
 
         See `mln_map_set_free_camera_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2944,28 +2947,28 @@ class MapHandleDiscarding:
         """
         return self._native._discard_begin_command_group()
 
-    def cancel_camera_transition(self, transition_id: int) -> None:
+    def cancel_camera_transitions(self) -> None:
+        """Stops every running camera animation where it is.
+
+        The end handler of each stopped animation reports
+        `CameraTransitionOutcome.CANCELLED`.
+
+        See `mln_map_cancel_camera_transitions` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_cancel_camera_transitions()
+
+    def cancel_camera_transitions_with_id(self, transition_id: int) -> None:
         """Stops the running camera animations whose animation options set
         `transition_id`.
 
         Other animations keep running. The end handler of each stopped
         animation reports `CameraTransitionOutcome.CANCELLED`.
 
-        See `mln_map_cancel_camera_transition` in the
+        See `mln_map_cancel_camera_transitions_with_id` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
-        return self._native._discard_cancel_camera_transition(transition_id)
-
-    def cancel_transitions(self) -> None:
-        """Stops every running camera animation where it is.
-
-        The end handler of each stopped animation reports
-        `CameraTransitionOutcome.CANCELLED`.
-
-        See `mln_map_cancel_transitions` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native._discard_cancel_transitions()
+        return self._native._discard_cancel_camera_transitions_with_id(transition_id)
 
     def dump_debug_logs(self) -> None:
         """Logs debugging information about the map's style and sources.
@@ -3189,8 +3192,9 @@ class MapHandleDiscarding:
     def set_free_camera_options(self, options: FreeCameraOptions | None = None) -> None:
         """Places the camera at a position and orientation in space.
 
-        The map adjusts them to a camera that it can show, and stops running
-        camera animations.
+        The map adjusts them to a camera that it can show. It stops running
+        camera animations first, and their end handlers report
+        `CameraTransitionOutcome.CANCELLED`.
 
         See `mln_map_set_free_camera_options` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

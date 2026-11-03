@@ -248,13 +248,13 @@ export interface NativeOperations {
     fitOptions: CameraFitOptions | undefined,
     completion: NativeCompletion,
   ): void;
-  mln_map_cancel_camera_transition(
+  mln_map_cancel_camera_transitions(
     map: bigint,
-    transitionId: bigint,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_cancel_transitions(
+  mln_map_cancel_camera_transitions_with_id(
     map: bigint,
+    transitionId: bigint,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_dispose(map: bigint, token: object | undefined): void;

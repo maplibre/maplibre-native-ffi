@@ -11,7 +11,6 @@ void flyEnded(bool completed) {}
 
 // #region gesture
 void beginGesture(MapHandle map) {
-  map.discarding.cancelTransitions();
   map.discarding.applyCameraDelta(
     const CameraDelta(gesturePhase: GesturePhase.begin),
   );

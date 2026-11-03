@@ -344,10 +344,10 @@ class TypeScriptEmitterTests(unittest.TestCase):
         values = emitted(typescript, self.api)[
             "bindings/typescript/src/generated_values.ts"
         ]
-        self.assertIn("`MapHandle.cancelTransitions()`", values)
-        self.assertIn("`MapHandle.cancelCameraTransition()`", values)
-        self.assertIn("`GesturePhase.cancel` stopped", values)
-        self.assertNotIn("`mln_map_cancel_transitions()`", values)
+        self.assertIn("`MapHandle.cancelCameraTransitions()`", values)
+        self.assertIn("`MapHandle.cancelCameraTransitionsWithId()`", values)
+        self.assertIn("`GesturePhase.begin` or `GesturePhase.cancel`", values)
+        self.assertNotIn("`mln_map_cancel_camera_transitions()`", values)
 
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an

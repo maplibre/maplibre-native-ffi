@@ -78,7 +78,7 @@ func TestCameraEndHandlerSurvivesACollectionUntilItRuns(t *testing.T) {
 	update.Animation.EndHandler = CameraTransitionHandler{Callback: func(end CameraTransitionEnd) { ends <- end }}
 	await(t, submitted(f.m.UpdateCamera(update)))
 	stdruntime.GC()
-	await(t, submitted(f.m.CancelCameraTransition(identity)))
+	await(t, submitted(f.m.CancelCameraTransitionsWithId(identity)))
 	end := receive(t, ends, "the end handler")
 	if end.Outcome != CameraTransitionOutcomeCancelled || end.Generation == 0 {
 		t.Fatalf("end = %+v, want a cancellation with a generation", end)

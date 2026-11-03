@@ -75,6 +75,22 @@ struct CameraTransitionCancellation {
   // Every transition, or only the commands that carry `transition_id`.
   bool all = false;
   uint64_t transition_id = 0;
+  // Ends the cancellation at MapLibre's next immediate camera change. A resize
+  // cancels running transitions before that change, and the map update that
+  // follows it completes elapsed ones.
+  bool until_immediate_change = false;
+};
+
+// A camera write that the C API makes for a command, so that the finish
+// callbacks of the other commands' transitions that it supersedes report
+// MLN_CAMERA_TRANSITION_OUTCOME_REPLACED. MapLibre finishes the superseded
+// transitions before it announces the write's camera change, which ends the
+// replacement, and completes elapsed transitions after it.
+struct CameraTransitionReplacement {
+  bool active = false;
+  // The end handler of the command that writes, or null for a write without
+  // one. That command's own transitions are not replaced.
+  const CameraTransitionEnd* command = nullptr;
 };
 
 // One map's event state, shared by its observer and camera transitions.
@@ -107,6 +123,7 @@ struct MapEventState {
   // a finish. A transaction takes every end that its work produced.
   std::vector<EndedCameraTransition> ended_transitions;
   CameraTransitionCancellation cancelling_transitions;
+  CameraTransitionReplacement replacing_transitions;
 
   [[nodiscard]] auto in_transaction() const noexcept -> bool {
     return transaction_depth != 0;

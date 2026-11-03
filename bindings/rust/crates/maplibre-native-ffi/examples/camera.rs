@@ -11,7 +11,6 @@ fn fly_ended(_completed: bool) {}
 
 // #region gesture
 fn begin_gesture(map: &MapHandle) -> Result<()> {
-    map.discarding().cancel_transitions()?;
     map.discarding().apply_camera_delta(&CameraDelta {
         gesture_phase: GesturePhase::Begin,
         ..Default::default()

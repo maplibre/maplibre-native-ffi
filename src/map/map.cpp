@@ -606,6 +606,35 @@ class TransitionCancellationScope final {
   CameraTransitionCancellation previous_;
 };
 
+// Marks the transitions of other commands that one MapLibre camera write
+// supersedes, so their finish callbacks report them replaced. Open one around
+// each MapLibre call that writes the camera for a caller, naming the end
+// handler of the command that writes, or null for a write without one.
+class TransitionReplacementScope final {
+ public:
+  TransitionReplacementScope(
+    MapEventState& events, const std::shared_ptr<CameraTransitionEnd>& command
+  ) noexcept
+      : events_(events),
+        previous_(
+          std::exchange(
+            events.replacing_transitions,
+            {.active = true, .command = command.get()}
+          )
+        ) {}
+  TransitionReplacementScope(const TransitionReplacementScope&) = delete;
+  TransitionReplacementScope(TransitionReplacementScope&&) = delete;
+  auto operator=(const TransitionReplacementScope&)
+    -> TransitionReplacementScope& = delete;
+  auto operator=(TransitionReplacementScope&&)
+    -> TransitionReplacementScope& = delete;
+  ~TransitionReplacementScope() { events_.replacing_transitions = previous_; }
+
+ private:
+  MapEventState& events_;
+  CameraTransitionReplacement previous_;
+};
+
 }  // namespace
 
 // Every callback tests the map's subscription mask before it builds anything,
@@ -621,7 +650,11 @@ class HeadlessObserver final : public mln::MapObserver {
       : event_state_(std::move(event_state)),
         callback_sources_(std::move(callback_sources)) {}
 
+  // MapLibre announces a camera write's change after it finishes the
+  // transitions that the write supersedes, and before the map update that
+  // completes elapsed transitions, so this ends the write's replacement.
   void onCameraWillChange(CameraChangeMode mode) override {
+    event_state_->replacing_transitions.active = false;
     if (const auto map = event_state_->owner.lock())
       map->snapshot_camera_dirty = true;
     if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)) {
@@ -646,10 +679,20 @@ class HeadlessObserver final : public mln::MapObserver {
   // the commands that it ended take this change's generation. A transaction
   // runs their handlers when it publishes. Outside one, they run from a later
   // task, after this change's event is queued, whatever the mask selects.
+  //
+  // A finished transition ends with a change in its own mode, and a running
+  // transition always has a duration, so an immediate change ends a resize's
+  // cancellation after the transitions that the resize cancelled.
   void onCameraDidChange(CameraChangeMode mode) override {
+    auto& events = *event_state_;
+    if (
+      mode == CameraChangeMode::Immediate &&
+      events.cancelling_transitions.until_immediate_change
+    ) {
+      events.cancelling_transitions.active = false;
+    }
     if (const auto map = event_state_->owner.lock())
       map->snapshot_camera_dirty = true;
-    auto& events = *event_state_;
     const auto did_change = selected(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE);
     const auto ended =
       !events.in_transaction() && !events.ended_transitions.empty();
@@ -2137,9 +2180,11 @@ auto from_native_complete_camera(const mln::CameraOptions& camera)
 // started. A command that starts several transitions, such as a camera delta
 // that pans and zooms, gives each of them a copy of one finish function, and
 // the copies share this state. The command ends once, after the last of its
-// transitions finishes, as cancelled when a C API cancellation finished any of
-// them. MapLibre invokes the finish functions on the runtime worker,
-// immediately before the camera change that ends each transition.
+// transitions finishes: as cancelled when a C API cancellation finished any of
+// them, otherwise as replaced when another command's camera write finished
+// any of them, otherwise as completed. MapLibre invokes the finish functions
+// on the runtime worker, immediately before the camera change that ends each
+// transition.
 //
 // The state holds event state by value, so it stays valid for as long as
 // MapLibre keeps a copy. When MapLibre drops the last copy without finishing
@@ -2151,6 +2196,7 @@ struct CommandTransitions {
   std::optional<uint64_t> transition_id;
   uint32_t remaining = 0;
   bool cancelled = false;
+  bool replaced = false;
 
   CommandTransitions(
     std::shared_ptr<mln::core::MapEventState> events,
@@ -2182,13 +2228,19 @@ struct CommandTransitions {
     ) {
       cancelled = true;
     }
+    const auto& replacement = event_state->replacing_transitions;
+    if (replacement.active && replacement.command != end.get()) {
+      replaced = true;
+    }
     remaining -= 1;
     if (remaining != 0) return;
-    mln::core::end_camera_command(
-      *event_state, end,
-      cancelled ? MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED
-                : MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED
-    );
+    auto outcome = MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED;
+    if (cancelled) {
+      outcome = MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED;
+    } else if (replaced) {
+      outcome = MLN_CAMERA_TRANSITION_OUTCOME_REPLACED;
+    }
+    mln::core::end_camera_command(*event_state, end, outcome);
   }
 };
 
@@ -3578,6 +3630,12 @@ auto submit_map_resize(
               live.logical_extent.width = size.width;
               live.logical_extent.height = size.height;
               live.snapshot_camera_dirty = true;
+              // MapLibre cancels running transitions when the new size forces
+              // the camera inside the map's limits.
+              const auto cancellation = TransitionCancellationScope{
+                *live.event_state,
+                {.active = true, .all = true, .until_immediate_change = true}
+              };
               live.map->setSize(mln::Size{size.width, size.height});
               return MLN_STATUS_OK;
             }
@@ -4287,10 +4345,18 @@ auto submit_camera_command(
   );
 }
 
-// BEGIN and UPDATE mark the gesture before the camera write, so MapLibre
-// applies its gesture rules to that write.
+auto cancel_all_camera_transitions(MapObject& live) -> void {
+  const auto cancellation = TransitionCancellationScope{
+    *live.event_state, {.active = true, .all = true}
+  };
+  live.map->cancelTransitions();
+}
+
+// BEGIN cancels running transitions, and BEGIN and UPDATE mark the gesture,
+// before the camera write, so MapLibre applies its gesture rules to that write.
 auto apply_gesture_phase_before(MapObject& live, mln_gesture_phase phase)
   -> void {
+  if (phase == MLN_GESTURE_PHASE_BEGIN) cancel_all_camera_transitions(live);
   if (phase == MLN_GESTURE_PHASE_BEGIN || phase == MLN_GESTURE_PHASE_UPDATE) {
     live.map->setGestureInProgress(true);
   }
@@ -4298,12 +4364,7 @@ auto apply_gesture_phase_before(MapObject& live, mln_gesture_phase phase)
 
 auto apply_gesture_phase_after(MapObject& live, mln_gesture_phase phase)
   -> void {
-  if (phase == MLN_GESTURE_PHASE_CANCEL) {
-    const auto cancellation = TransitionCancellationScope{
-      *live.event_state, {.active = true, .all = true}
-    };
-    live.map->cancelTransitions();
-  }
+  if (phase == MLN_GESTURE_PHASE_CANCEL) cancel_all_camera_transitions(live);
   if (phase == MLN_GESTURE_PHASE_END || phase == MLN_GESTURE_PHASE_CANCEL) {
     live.map->setGestureInProgress(false);
   }
@@ -4342,21 +4403,27 @@ auto map_update_camera(
           const auto animation =
             to_native_animation(live.event_state, copied.animation, end);
           apply_gesture_phase_before(live, copied.gesture_phase);
-          switch (copied.mode) {
-            case MLN_CAMERA_UPDATE_MODE_JUMP:
-              // MapLibre gives a jump no animation options, so the jump ends
-              // its command here, as soon as it applies.
-              live.map->jumpTo(to_native_camera(copied.camera));
-              if (animation.transitionFinishFn) animation.transitionFinishFn();
-              break;
-            case MLN_CAMERA_UPDATE_MODE_EASE:
-              live.map->easeTo(to_native_camera(copied.camera), animation);
-              break;
-            case MLN_CAMERA_UPDATE_MODE_FLY:
-              live.map->flyTo(to_native_camera(copied.camera), animation);
-              break;
-            default:
-              break;
+          {
+            const auto replacing =
+              TransitionReplacementScope{*live.event_state, end};
+            switch (copied.mode) {
+              case MLN_CAMERA_UPDATE_MODE_JUMP:
+                // MapLibre gives a jump no animation options, so the jump ends
+                // its command here, as soon as it applies.
+                live.map->jumpTo(to_native_camera(copied.camera));
+                if (animation.transitionFinishFn) {
+                  animation.transitionFinishFn();
+                }
+                break;
+              case MLN_CAMERA_UPDATE_MODE_EASE:
+                live.map->easeTo(to_native_camera(copied.camera), animation);
+                break;
+              case MLN_CAMERA_UPDATE_MODE_FLY:
+                live.map->flyTo(to_native_camera(copied.camera), animation);
+                break;
+              default:
+                break;
+            }
           }
           apply_gesture_phase_after(live, copied.gesture_phase);
         },
@@ -4492,9 +4559,13 @@ auto map_apply_camera_delta(
           );
           apply_gesture_phase_before(live, copied.gesture_phase);
           if (pans) {
+            const auto replacing =
+              TransitionReplacementScope{*live.event_state, end};
             live.map->moveBy(to_native_screen_point(copied.offset), animation);
           }
           if (eases) {
+            const auto replacing =
+              TransitionReplacementScope{*live.event_state, end};
             live.map->easeTo(camera_delta_target(*live.map, copied), animation);
           }
           // A delta without components starts no transition, so it ends its
@@ -4510,21 +4581,16 @@ auto map_apply_camera_delta(
   );
 }
 
-auto map_cancel_transitions(mln_map map, const mln_completion* completion)
-  -> mln_status {
+auto map_cancel_camera_transitions(
+  mln_map map, const mln_completion* completion
+) -> mln_status {
   return submit_camera_command(
-    map,
-    [](MapObject& live) -> void {
-      const auto cancellation = TransitionCancellationScope{
-        *live.event_state, {.active = true, .all = true}
-      };
-      live.map->cancelTransitions();
-    },
+    map, [](MapObject& live) -> void { cancel_all_camera_transitions(live); },
     completion
   );
 }
 
-auto map_cancel_camera_transition(
+auto map_cancel_camera_transitions_with_id(
   mln_map map, uint64_t transition_id, const mln_completion* completion
 ) -> mln_status {
   return submit_camera_command(
@@ -5205,6 +5271,8 @@ auto map_set_bounds(MapObject& live, const mln_bound_options* options)
   // constraints omitted from options->fields.
   live.snapshot_config_dirty = true;
   live.snapshot_camera_dirty = true;
+  // MapLibre jumps to move the camera inside the new limits.
+  const auto replacing = TransitionReplacementScope{*live.event_state, nullptr};
   live.map->setBounds(to_native_bound_options(*options));
   return MLN_STATUS_OK;
 }
@@ -5218,6 +5286,9 @@ auto map_set_free_camera_options(
   }
 
   live.snapshot_camera_dirty = true;
+  const auto cancellation = TransitionCancellationScope{
+    *live.event_state, {.active = true, .all = true}
+  };
   live.map->setFreeCameraOptions(to_native_free_camera(*options));
   return MLN_STATUS_OK;
 }

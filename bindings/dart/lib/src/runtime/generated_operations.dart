@@ -3433,17 +3433,17 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void cancelCameraTransition(int transitionId) => _discard(
-    (arena, completion) => raw.mln_map_cancel_camera_transition(
+  void cancelCameraTransitions() => _discard(
+    (arena, completion) => raw.mln_map_cancel_camera_transitions(
       _handle.raw,
-      transitionId,
       completion,
       nativeDiagnostic,
     ),
   );
-  void cancelTransitions() => _discard(
-    (arena, completion) => raw.mln_map_cancel_transitions(
+  void cancelCameraTransitionsWithId(int transitionId) => _discard(
+    (arena, completion) => raw.mln_map_cancel_camera_transitions_with_id(
       _handle.raw,
+      transitionId,
       completion,
       nativeDiagnostic,
     ),
@@ -4509,38 +4509,38 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   });
 
+  /// Stops every running camera animation where it is.
+  ///
+  /// The end handler of each stopped animation reports
+  /// `CameraTransitionOutcome.cancelled`.
+  ///
+  /// See `mln_map_cancel_camera_transitions` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  Future<CommandCompletion> cancelCameraTransitions() => _command(
+    (arena, completion) => raw.mln_map_cancel_camera_transitions(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Stops the running camera animations whose animation options set
   /// `transitionId`.
   ///
   /// Other animations keep running. The end handler of each stopped animation
   /// reports `CameraTransitionOutcome.cancelled`.
   ///
-  /// See `mln_map_cancel_camera_transition` in the
+  /// See `mln_map_cancel_camera_transitions_with_id` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> cancelCameraTransition(int transitionId) =>
+  Future<CommandCompletion> cancelCameraTransitionsWithId(int transitionId) =>
       _command(
-        (arena, completion) => raw.mln_map_cancel_camera_transition(
+        (arena, completion) => raw.mln_map_cancel_camera_transitions_with_id(
           _handle.raw,
           transitionId,
           completion,
           nativeDiagnostic,
         ),
       );
-
-  /// Stops every running camera animation where it is.
-  ///
-  /// The end handler of each stopped animation reports
-  /// `CameraTransitionOutcome.cancelled`.
-  ///
-  /// See `mln_map_cancel_transitions` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> cancelTransitions() => _command(
-    (arena, completion) => raw.mln_map_cancel_transitions(
-      _handle.raw,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
 
   /// Releases the map in any state, and finishes in the background.
   ///
@@ -5234,8 +5234,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Places the camera at a position and orientation in space.
   ///
-  /// The map adjusts them to a camera that it can show, and stops running
-  /// camera animations.
+  /// The map adjusts them to a camera that it can show. It stops running camera
+  /// animations first, and their end handlers report
+  /// `CameraTransitionOutcome.cancelled`.
   ///
   /// See `mln_map_set_free_camera_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

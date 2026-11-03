@@ -17,7 +17,6 @@ function flyEnded(_completed: boolean): void {}
 
 // #region gesture
 function beginGesture(map: MapHandle): void {
-  map.discarding.cancelTransitions();
   map.discarding.applyCameraDelta({
     gesturePhase: GesturePhase.begin,
   });

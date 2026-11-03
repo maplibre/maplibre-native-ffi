@@ -97,7 +97,7 @@ MLN_API mln_status mln_map_apply_camera_delta(
  * MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_cancel_transitions(
+MLN_API mln_status mln_map_cancel_camera_transitions(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -109,7 +109,7 @@ MLN_API mln_status mln_map_cancel_transitions(
  * reports MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_cancel_camera_transition(
+MLN_API mln_status mln_map_cancel_camera_transitions_with_id(
   mln_map map, uint64_t transition_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -196,8 +196,9 @@ MLN_API mln_status mln_map_set_bounds(
 /**
  * Places the camera at a position and orientation in space.
  *
- * The map adjusts them to a camera that it can show, and stops running camera
- * animations.
+ * The map adjusts them to a camera that it can show. It stops running camera
+ * animations first, and their end handlers report
+ * MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_free_camera_options(

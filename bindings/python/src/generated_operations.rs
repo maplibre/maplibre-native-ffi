@@ -4238,18 +4238,47 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (transition_id))]
-    fn cancel_camera_transition(&self, py: Python<'_>, transition_id: u64) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = ())]
+    fn cancel_camera_transitions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_cancel_camera_transition(handle, transition_id, completion, diagnostic)
+                sys::mln_map_cancel_camera_transitions(handle, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = ())]
+    fn _discard_cancel_camera_transitions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_cancel_camera_transitions(handle, completion, diagnostic)
             })
         }
     }
     #[pyo3(signature = (transition_id))]
-    fn _discard_cancel_camera_transition(
+    fn cancel_camera_transitions_with_id(
+        &self,
+        py: Python<'_>,
+        transition_id: u64,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_cancel_camera_transitions_with_id(
+                    handle,
+                    transition_id,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
+    #[pyo3(signature = (transition_id))]
+    fn _discard_cancel_camera_transitions_with_id(
         &self,
         py: Python<'_>,
         transition_id: u64,
@@ -4258,27 +4287,12 @@ impl MapHandle {
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_cancel_camera_transition(handle, transition_id, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = ())]
-    fn cancel_transitions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_cancel_transitions(handle, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = ())]
-    fn _discard_cancel_transitions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_cancel_transitions(handle, completion, diagnostic)
+                sys::mln_map_cancel_camera_transitions_with_id(
+                    handle,
+                    transition_id,
+                    completion,
+                    diagnostic,
+                )
             })
         }
     }

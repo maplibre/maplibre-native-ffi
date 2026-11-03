@@ -47,6 +47,7 @@ pub type mln_camera_transition_outcome = u32;
 pub const MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED: mln_camera_transition_outcome = 0;
 pub const MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED: mln_camera_transition_outcome = 1;
 pub const MLN_CAMERA_TRANSITION_OUTCOME_CLOSED: mln_camera_transition_outcome = 2;
+pub const MLN_CAMERA_TRANSITION_OUTCOME_REPLACED: mln_camera_transition_outcome = 3;
 pub type mln_camera_update_mode = u32;
 pub const MLN_CAMERA_UPDATE_MODE_JUMP: mln_camera_update_mode = 0;
 pub const MLN_CAMERA_UPDATE_MODE_EASE: mln_camera_update_mode = 1;
@@ -2182,14 +2183,14 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_cancel_camera_transition(
+    pub fn mln_map_cancel_camera_transitions(
         map: mln_map,
-        transition_id: u64,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_cancel_transitions(
+    pub fn mln_map_cancel_camera_transitions_with_id(
         map: mln_map,
+        transition_id: u64,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

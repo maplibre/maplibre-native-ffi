@@ -14,7 +14,6 @@ internal static class Camera
     // #region gesture
     private static void BeginGesture(MapHandle map)
     {
-        map.Discarding.CancelTransitions();
         map.Discarding.ApplyCameraDelta(
             new CameraDelta { GesturePhase = GesturePhase.Begin }
         );

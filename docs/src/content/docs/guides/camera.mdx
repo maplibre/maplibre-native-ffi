@@ -35,7 +35,7 @@ straight to the target, while fly zooms out, travels, and zooms back in.
 To act when an animation ends, set a [](api:mln_camera_transition_handler).
 
 To stop an animation where it is, cancel the map's camera transitions with
-[](api:mln_map_cancel_transitions).
+[](api:mln_map_cancel_camera_transitions).
 
 <Snippet page="camera" region="animate" />
 
@@ -63,9 +63,9 @@ The library doesn't handle input, so your app recognizes gestures from its own
 input events and applies them to the camera as deltas. Screen points are in
 logical pixels from the map's top-left corner.
 
-When a gesture starts, cancel camera transitions, then send a delta with
-[](api:mln_map_apply_camera_delta) in the begin phase. For each movement, send a
-delta in the update phase with the change since the last one: the movement as
+When a gesture starts, send a delta with [](api:mln_map_apply_camera_delta) in
+the begin phase, which stops running camera animations. For each movement, send
+a delta in the update phase with the change since the last one: the movement as
 the offset for a drag, or the scale and the pinch's center as the anchor for a
 pinch. When the gesture ends, send the end phase, or the cancel phase if the
 platform cancels it.
