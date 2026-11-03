@@ -16,12 +16,13 @@
   defined(MLN_PROTOCOL_CALLER_SIZED_TEXT)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
-#if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||    \
-  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                 \
-  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
-  defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
-  defined(MLN_PROTOCOL_NESTED_REGISTRATION) ||                           \
-  defined(MLN_PROTOCOL_STRIDED_RECORDS) || defined(MLN_PROTOCOL_VERSIONING)
+#if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||          \
+  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                       \
+  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                                  \
+  defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) ||       \
+  defined(MLN_PROTOCOL_NESTED_REGISTRATION) ||                                 \
+  defined(MLN_PROTOCOL_STRIDED_RECORDS) || defined(MLN_PROTOCOL_VERSIONING) || \
+  defined(MLN_PROTOCOL_VALUE_UNION)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -436,6 +437,38 @@ typedef struct mln_event {
 BIND("execution=query;result=mln_event")
 mln_status mln_map_event(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_VALUE_UNION
+// A tagged union whose variants are text and plain numbers rather than
+// records, embedded by value in a masked member of a record that a caller
+// passes by pointer.
+typedef enum mln_key_type : uint32_t {
+  MLN_KEY_TEXT = 1,
+  MLN_KEY_COUNT = 2,
+  MLN_KEY_RATIO = 3
+} mln_key_type;
+typedef union mln_key_data {
+  mln_buffer_view text BIND("variant=MLN_KEY_TEXT");
+  uint64_t count BIND("variant=MLN_KEY_COUNT");
+  double ratio BIND("variant=MLN_KEY_RATIO");
+} mln_key_data;
+typedef struct mln_key {
+  mln_key_type type;
+  mln_key_data data BIND("tag=type");
+} mln_key;
+typedef enum BIND("kind=bitmask") mln_lookup_field : uint32_t {
+  MLN_LOOKUP_KEY = 1
+} mln_lookup_field;
+typedef uint32_t mln_lookup_fields;
+typedef struct mln_lookup {
+  uint32_t size;
+  mln_lookup_fields fields;
+  mln_key key BIND("mask=fields;bit=MLN_LOOKUP_KEY");
+} mln_lookup;
+mln_status mln_map_lookup(
+  mln_map map, const mln_lookup* lookup, mln_diagnostic* out_diagnostic
 );
 #endif
 

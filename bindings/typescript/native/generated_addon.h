@@ -389,6 +389,9 @@ bool mln_ts_write_egl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_egl_context_descriptor* out,
   const char* path
 );
+bool mln_ts_write_feature_id(
+  mln_ts_call* call, napi_value value, mln_feature_id* out, const char* path
+);
 bool mln_ts_write_feature_state_selector(
   mln_ts_call* call, napi_value value, mln_feature_state_selector* out,
   const char* path

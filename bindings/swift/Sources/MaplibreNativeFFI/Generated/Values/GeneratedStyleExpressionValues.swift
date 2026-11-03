@@ -60,35 +60,6 @@ public struct StyleExpressionInputs: Equatable, Hashable, Sendable {
     self.availableImages = availableImages
   }
 
-  init(
-    raw: mln_style_expression_inputs,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    zoom = raw.fields & MLN_STYLE_EXPRESSION_INPUT_ZOOM.rawValue != 0 ? raw
-      .zoom : nil
-    colorRampParameter = raw
-      .fields & MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER
-      .rawValue != 0 ? raw.color_ramp_parameter : nil
-    feature = try NativeString.copyUTF8(
-      data: raw.feature.data,
-      size: raw.feature.size
-    )
-    featureState = try NativeString.copyUTF8(
-      data: raw.feature_state.data,
-      size: raw.feature_state.size
-    )
-    globalState = try NativeString.copyUTF8(
-      data: raw.global_state.data,
-      size: raw.global_state.size
-    )
-    canonicalTileId = raw.fields & MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID
-      .rawValue != 0 ? CanonicalTileId(raw: raw.canonical_tile_id) : nil
-    availableImages = try NativeInputArena.copyArray(
-      raw.available_images,
-      count: Int(raw.available_image_count)
-    ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_style_expression_inputs
   {

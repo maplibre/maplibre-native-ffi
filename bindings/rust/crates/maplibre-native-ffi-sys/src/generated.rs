@@ -72,6 +72,11 @@ pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: mln_custom_geometry_source_opt
 pub type mln_custom_vector_source_option_field = u32;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_vector_source_option_field = 1;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_vector_source_option_field = 2;
+pub type mln_feature_id_type = u32;
+pub const MLN_FEATURE_ID_TYPE_STRING: mln_feature_id_type = 1;
+pub const MLN_FEATURE_ID_TYPE_UINT: mln_feature_id_type = 2;
+pub const MLN_FEATURE_ID_TYPE_INT: mln_feature_id_type = 3;
+pub const MLN_FEATURE_ID_TYPE_DOUBLE: mln_feature_id_type = 4;
 pub type mln_feature_state_selector_field = u32;
 pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_field = 1;
 pub type mln_frame_demand_flag = u32;
@@ -706,13 +711,27 @@ pub struct mln_event_batch_view {
     pub event_count: usize,
 }
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
+pub struct mln_feature_id {
+    pub type_: mln_feature_id_type,
+    pub data: mln_feature_id_data,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union mln_feature_id_data {
+    pub string_value: mln_buffer_view,
+    pub uint_value: u64,
+    pub int_value: i64,
+    pub double_value: f64,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct mln_feature_state_selector {
     pub size: u32,
     pub fields: mln_feature_state_selector_fields,
     pub source_id: mln_buffer_view,
     pub source_layer_id: mln_buffer_view,
-    pub feature_id: mln_buffer_view,
+    pub feature_id: mln_feature_id,
     pub state_key: mln_buffer_view,
 }
 #[repr(C)]

@@ -601,6 +601,37 @@ typedef struct mln_free_camera {
   mln_quaternion orientation;
 } mln_free_camera;
 
+/** The type of an mln_feature_id. */
+typedef enum mln_feature_id_type : uint32_t {
+  MLN_FEATURE_ID_TYPE_STRING = 1,
+  MLN_FEATURE_ID_TYPE_UINT = 2,
+  MLN_FEATURE_ID_TYPE_INT = 3,
+  MLN_FEATURE_ID_TYPE_DOUBLE = 4,
+} mln_feature_id_type;
+
+/** The string or number of an mln_feature_id. */
+typedef union mln_feature_id_data {
+  mln_buffer_view string_value
+    MLN_BINDING("variant=MLN_FEATURE_ID_TYPE_STRING");
+  uint64_t uint_value MLN_BINDING("variant=MLN_FEATURE_ID_TYPE_UINT");
+  int64_t int_value MLN_BINDING("variant=MLN_FEATURE_ID_TYPE_INT");
+  /** A finite number. */
+  double double_value MLN_BINDING("variant=MLN_FEATURE_ID_TYPE_DOUBLE");
+} mln_feature_id_data;
+
+/**
+ * The ID of a feature in a source, as the source's data gives it.
+ *
+ * The map compares feature IDs as text, so a string and a number with the same
+ * text, such as "7" and 7, name the same feature. A number's text is its
+ * shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+ * same feature, and so do 1e21 and "1e21".
+ */
+typedef struct mln_feature_id {
+  mln_feature_id_type type;
+  mln_feature_id_data data MLN_BINDING("tag=type");
+} mln_feature_id;
+
 /** The fields that mln_feature_state_selector sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -623,7 +654,7 @@ typedef struct mln_feature_state_selector {
    * mln_map_remove_feature_state() removes the state of every feature in the
    * source layer.
    */
-  mln_buffer_view feature_id
+  mln_feature_id feature_id
     MLN_BINDING("mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_FEATURE_ID");
   /**
    * The one key that mln_map_remove_feature_state() removes. It needs

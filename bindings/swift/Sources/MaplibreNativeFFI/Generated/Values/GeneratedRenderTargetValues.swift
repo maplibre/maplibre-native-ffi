@@ -230,28 +230,6 @@ public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
     self.data = data
   }
 
-  init(
-    raw: mln_open_gl_context_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    ownership = OpenGlContextOwnership(rawValue: raw.ownership.rawValue)
-    data = try { () throws -> OpenGlContextDescriptorData in
-      switch raw.platform
-        .rawValue
-      {
-      case MLN_OPEN_GL_CONTEXT_PLATFORM_WGL
-        .rawValue: return .wgl(WglContextDescriptor(raw: raw.data
-            .wgl)) case MLN_OPEN_GL_CONTEXT_PLATFORM_EGL
-                  .rawValue: return .egl(EglContextDescriptor(raw: raw.data
-            .egl)) case MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL
-                  .rawValue: return try .webGl(WebGlContextDescriptor(raw: raw
-            .data
-            .web_gl)) default: throw MaplibreError
-        .invalidState("native union contains an unsupported variant")
-      }
-    }()
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_open_gl_context_descriptor
   {
@@ -447,17 +425,6 @@ public struct RenderSessionAttachOptions: Sendable {
     self.queueLock = queueLock
   }
 
-  init(
-    raw: mln_render_session_attach_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    driver = RenderDriverKind(rawValue: raw.driver.rawValue)
-    producerSyncKinds = GpuSyncKindFlag(rawValue: raw.producer_sync_kinds)
-    frameWake = Wake()
-    driverWorkWake = Wake()
-    queueLock = QueueLock()
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_render_session_attach_options
   {
@@ -631,18 +598,6 @@ public struct WebGlContextDescriptor: Equatable, Hashable, Sendable {
     self.kind = kind
     self.context = context
     self.canvasSelector = canvasSelector
-  }
-
-  init(
-    raw: mln_web_gl_context_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    kind = WebGlContextKind(rawValue: raw.kind.rawValue)
-    context = raw.context
-    canvasSelector = try NativeString.copyUTF8(
-      data: raw.canvas_selector.data,
-      size: raw.canvas_selector.size
-    )
   }
 
   func nativeValue(arena: NativeInputArena) throws

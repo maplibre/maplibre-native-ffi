@@ -35,23 +35,6 @@ public struct AnimationOptions: Sendable {
     self.endHandler = endHandler
   }
 
-  init(
-    raw: mln_animation_options,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    durationMs = raw.fields & MLN_ANIMATION_OPTION_DURATION.rawValue != 0 ? raw
-      .duration_ms : nil
-    velocity = raw.fields & MLN_ANIMATION_OPTION_VELOCITY.rawValue != 0 ? raw
-      .velocity : nil
-    minZoom = raw.fields & MLN_ANIMATION_OPTION_MIN_ZOOM.rawValue != 0 ? raw
-      .min_zoom : nil
-    easing = raw.fields & MLN_ANIMATION_OPTION_EASING
-      .rawValue != 0 ? UnitBezier(raw: raw.easing) : nil
-    transitionId = raw.fields & MLN_ANIMATION_OPTION_TRANSITION_ID
-      .rawValue != 0 ? raw.transition_id : nil
-    endHandler = CameraTransitionHandler()
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_animation_options {
     var raw = mln_animation_options()
     raw.fields = 0
@@ -309,22 +292,6 @@ public struct CameraDelta: Sendable {
     self.gesturePhase = gesturePhase
   }
 
-  init(
-    raw: mln_camera_delta,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    offset = raw.fields & MLN_CAMERA_DELTA_OFFSET
-      .rawValue != 0 ? ScreenPoint(raw: raw.offset) : nil
-    scale = raw.fields & MLN_CAMERA_DELTA_SCALE.rawValue != 0 ? raw.scale : nil
-    bearing = raw.fields & MLN_CAMERA_DELTA_BEARING.rawValue != 0 ? raw
-      .bearing : nil
-    pitch = raw.fields & MLN_CAMERA_DELTA_PITCH.rawValue != 0 ? raw.pitch : nil
-    anchor = raw.fields & MLN_CAMERA_DELTA_ANCHOR
-      .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
-    animation = try AnimationOptions(raw: raw.animation)
-    gesturePhase = GesturePhase(rawValue: raw.gesture_phase.rawValue)
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_delta {
     var raw = mln_camera_delta()
     raw.fields = 0
@@ -420,15 +387,6 @@ public struct CameraFitUpdate: Sendable {
     self.mode = mode
     self.fit = fit
     self.animation = animation
-  }
-
-  init(
-    raw: mln_camera_fit_update,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    mode = CameraUpdateMode(rawValue: raw.mode.rawValue)
-    fit = CameraFitOptions(raw: raw.fit)
-    animation = try AnimationOptions(raw: raw.animation)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_fit_update {
@@ -707,16 +665,6 @@ public struct CameraUpdate: Sendable {
     self.gesturePhase = gesturePhase
   }
 
-  init(
-    raw: mln_camera_update,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    mode = CameraUpdateMode(rawValue: raw.mode.rawValue)
-    camera = CameraOptions(raw: raw.camera)
-    animation = try AnimationOptions(raw: raw.animation)
-    gesturePhase = GesturePhase(rawValue: raw.gesture_phase.rawValue)
-  }
-
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_update {
     var raw = mln_camera_update()
     raw.size = UInt32(MemoryLayout<mln_camera_update>.size)
@@ -824,6 +772,37 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
   }
 }
 
+/// The ID of a feature in a source, as the source's data gives it.
+///
+/// The map compares feature IDs as text, so a string and a number with the same
+/// text, such as "7" and 7, name the same feature. A number's text is its
+/// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+/// same feature, and so do 1e21 and "1e21".
+///
+/// See `mln_feature_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public enum FeatureId: Equatable, Hashable, Sendable {
+  case stringValue(String)
+  case uintValue(UInt64)
+  case intValue(Int64)
+  /// A finite number.
+  case doubleValue(Double)
+  func nativeValue(arena: NativeInputArena) throws -> mln_feature_id {
+    var raw = mln_feature_id()
+    switch self {
+    case let .stringValue(item): raw.type = MLN_FEATURE_ID_TYPE_STRING; raw.data
+      .string_value = arena.view(item)
+    case let .uintValue(item): raw.type = MLN_FEATURE_ID_TYPE_UINT; raw.data
+      .uint_value = item
+    case let .intValue(item): raw.type = MLN_FEATURE_ID_TYPE_INT; raw.data
+      .int_value = item
+    case let .doubleValue(item): raw.type = MLN_FEATURE_ID_TYPE_DOUBLE; raw.data
+      .double_value = item
+    }
+    return raw
+  }
+}
+
 /// The features whose state to set, read, or remove.
 ///
 /// See `mln_feature_state_selector` in the
@@ -835,43 +814,20 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   /// The feature's ID. Setting or reading state needs it. Without it,
   /// `MapHandle.removeFeatureState()` removes the state of every feature in the
   /// source layer.
-  public var featureId: String?
+  public var featureId: FeatureId?
   /// The one key that `MapHandle.removeFeatureState()` removes. It needs
   /// `feature_id`. Empty removes every key.
   public var stateKey: String
   public init(
     sourceId: String,
     sourceLayerId: String = "",
-    featureId: String? = nil,
+    featureId: FeatureId? = nil,
     stateKey: String = ""
   ) {
     self.sourceId = sourceId
     self.sourceLayerId = sourceLayerId
     self.featureId = featureId
     self.stateKey = stateKey
-  }
-
-  init(
-    raw: mln_feature_state_selector,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    sourceId = try NativeString.copyUTF8(
-      data: raw.source_id.data,
-      size: raw.source_id.size
-    )
-    sourceLayerId = try NativeString.copyUTF8(
-      data: raw.source_layer_id.data,
-      size: raw.source_layer_id.size
-    )
-    featureId = raw.fields & MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-      .rawValue != 0 ? try NativeString.copyUTF8(
-        data: raw.feature_id.data,
-        size: raw.feature_id.size
-      ) : nil
-    stateKey = try NativeString.copyUTF8(
-      data: raw.state_key.data,
-      size: raw.state_key.size
-    )
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -884,7 +840,7 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
     raw.source_layer_id = arena.view(sourceLayerId)
     if let item = featureId {
       raw.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue; raw
-        .feature_id = arena.view(item)
+        .feature_id = try item.nativeValue(arena: arena)
     }
     raw.state_key = arena.view(stateKey)
     return raw

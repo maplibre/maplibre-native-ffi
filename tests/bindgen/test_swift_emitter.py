@@ -189,6 +189,18 @@ class SwiftEmitterTests(unittest.TestCase):
         definition = values.split("public enum OfflineRegionDefinition:")[1]
         self.assertIn("case unknown(UInt32, Data)", definition.split("\n}")[0])
 
+    def test_only_a_record_that_native_returns_decodes_from_native(self):
+        api = parse(groups=("value_union",))
+        validate(api)
+        values = emitted(swift, api)["Generated/Values/GeneratedApiValues.swift"]
+        # The lookup embeds a union record that native never returns, so
+        # neither has a decoder for the other to call.
+        lookup = values.split("public struct Lookup:")[1].split("\n}")[0]
+        key = values.split("public enum Key:")[1].split("\n}")[0]
+        self.assertIn("func nativeValue(arena: NativeInputArena)", lookup)
+        self.assertNotIn("init(raw:", lookup)
+        self.assertNotIn("init(raw:", key)
+
     def test_a_summary_names_the_swift_symbols_of_c_declarations(self):
         values = emitted(swift, real_api())["Generated/Values/GeneratedMapValues.swift"]
         summary = " ".join(

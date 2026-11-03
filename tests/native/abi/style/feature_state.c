@@ -1,8 +1,46 @@
 // Feature state: the map-owned store behind set, get, and remove, the
 // selectors that address it, and its delivery to the renderer.
 
+#include <math.h>
+
 #include "support/style.h"
 #include "support/test_support.h"
+
+static mln_feature_state_selector selector_with_id(
+  const char* source_id, mln_feature_id feature_id
+) {
+  return (mln_feature_state_selector){
+    .size = sizeof(mln_feature_state_selector),
+    .fields = MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+    .source_id = mln_buffer_view_from_cstr(source_id),
+    .feature_id = feature_id,
+  };
+}
+
+static mln_feature_id string_id(const char* text) {
+  return (mln_feature_id){
+    .type = MLN_FEATURE_ID_TYPE_STRING,
+    .data.string_value = mln_buffer_view_from_cstr(text),
+  };
+}
+
+static mln_feature_id uint_id(uint64_t value) {
+  return (mln_feature_id){
+    .type = MLN_FEATURE_ID_TYPE_UINT, .data.uint_value = value
+  };
+}
+
+static mln_feature_id int_id(int64_t value) {
+  return (mln_feature_id){
+    .type = MLN_FEATURE_ID_TYPE_INT, .data.int_value = value
+  };
+}
+
+static mln_feature_id double_id(double value) {
+  return (mln_feature_id){
+    .type = MLN_FEATURE_ID_TYPE_DOUBLE, .data.double_value = value
+  };
+}
 
 static mln_feature_state_selector selector_for(
   const char* source_id, const char* source_layer_id, const char* feature_id
@@ -16,7 +54,7 @@ static mln_feature_state_selector selector_for(
   }
   if (feature_id != NULL) {
     selector.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-    selector.feature_id = mln_buffer_view_from_cstr(feature_id);
+    selector.feature_id = string_id(feature_id);
   }
   return selector;
 }
@@ -137,6 +175,39 @@ static void state_merges_on_set_and_prunes_on_remove(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void a_string_and_a_number_with_the_same_text_name_one_feature(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  set_state(map, selector_with_id("points", uint_id(7)), "{\"n\":1}");
+  EXPECT_STATE("{\"n\":1}", map, selector_with_id("points", string_id("7")));
+  EXPECT_STATE("{\"n\":1}", map, selector_with_id("points", int_id(7)));
+  // A whole double's text has no trailing ".0".
+  EXPECT_STATE("{\"n\":1}", map, selector_with_id("points", double_id(7.0)));
+  EXPECT_STATE("{}", map, selector_with_id("points", string_id("7.0")));
+
+  set_state(map, selector_with_id("points", int_id(-3)), "{\"n\":2}");
+  EXPECT_STATE("{\"n\":2}", map, selector_with_id("points", string_id("-3")));
+  set_state(map, selector_with_id("points", uint_id(UINT64_MAX)), "{\"n\":3}");
+  EXPECT_STATE(
+    "{\"n\":3}", map,
+    selector_with_id("points", string_id("18446744073709551615"))
+  );
+
+  // A double's text is its shortest form, which printf's formats don't give.
+  set_state(map, selector_with_id("points", double_id(0.1)), "{\"n\":4}");
+  EXPECT_STATE("{\"n\":4}", map, selector_with_id("points", string_id("0.1")));
+  set_state(map, selector_with_id("points", double_id(1e21)), "{\"n\":5}");
+  EXPECT_STATE("{\"n\":5}", map, selector_with_id("points", string_id("1e21")));
+
+  // Removal goes by the same text.
+  remove_state(map, selector_with_id("points", string_id("7")));
+  EXPECT_STATE("{}", map, selector_with_id("points", uint_id(7)));
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 enum feature_state_call_kind {
   FEATURE_STATE_SET,
   FEATURE_STATE_GET,
@@ -220,6 +291,34 @@ static void remove_everything_under_a_source(void* descriptor) {
   no_feature_id(descriptor);
   ((feature_state_call*)descriptor)->kind = FEATURE_STATE_REMOVE;
 }
+static void unset_feature_id_type(void* descriptor) {
+  ((feature_state_call*)descriptor)->selector.feature_id.type = 0;
+}
+static void unknown_feature_id_type(void* descriptor) {
+  ((feature_state_call*)descriptor)->selector.feature_id.type = 99;
+}
+static void remove_with_unknown_feature_id_type(void* descriptor) {
+  unknown_feature_id_type(descriptor);
+  ((feature_state_call*)descriptor)->kind = FEATURE_STATE_REMOVE;
+}
+static void get_with_unknown_feature_id_type(void* descriptor) {
+  unknown_feature_id_type(descriptor);
+  ((feature_state_call*)descriptor)->kind = FEATURE_STATE_GET;
+}
+static void null_feature_id_bytes(void* descriptor) {
+  ((feature_state_call*)descriptor)->selector.feature_id.data.string_value =
+    (mln_buffer_view){.data = NULL, .size = 4};
+}
+static void nan_feature_id(void* descriptor) {
+  ((feature_state_call*)descriptor)->selector.feature_id = double_id(NAN);
+}
+static void infinite_feature_id(void* descriptor) {
+  ((feature_state_call*)descriptor)->selector.feature_id = double_id(-INFINITY);
+}
+static void unknown_feature_id_type_without_its_field(void* descriptor) {
+  unknown_feature_id_type(descriptor);
+  remove_everything_under_a_source(descriptor);
+}
 static void empty_state(void* descriptor) {
   ((feature_state_call*)descriptor)->state = (mln_buffer_view){0};
 }
@@ -257,6 +356,22 @@ static void malformed_selectors_are_rejected_at_submission(void) {
      MLN_STATUS_INVALID_ARGUMENT, "must not be null"},
     {"null state_key bytes", null_state_key_bytes, MLN_STATUS_INVALID_ARGUMENT,
      "must not be null"},
+    {"unset feature_id type", unset_feature_id_type,
+     MLN_STATUS_INVALID_ARGUMENT, "unknown type"},
+    {"unknown feature_id type", unknown_feature_id_type,
+     MLN_STATUS_INVALID_ARGUMENT, "unknown type"},
+    {"get with unknown feature_id type", get_with_unknown_feature_id_type,
+     MLN_STATUS_INVALID_ARGUMENT, "unknown type"},
+    {"remove with unknown feature_id type", remove_with_unknown_feature_id_type,
+     MLN_STATUS_INVALID_ARGUMENT, "unknown type"},
+    {"unknown feature_id type without its field",
+     unknown_feature_id_type_without_its_field, MLN_STATUS_OK, NULL},
+    {"null feature_id bytes", null_feature_id_bytes,
+     MLN_STATUS_INVALID_ARGUMENT, "must not be null"},
+    {"NaN feature_id", nan_feature_id, MLN_STATUS_INVALID_ARGUMENT,
+     "must be finite"},
+    {"infinite feature_id", infinite_feature_id, MLN_STATUS_INVALID_ARGUMENT,
+     "must be finite"},
     {"empty state", empty_state, MLN_STATUS_INVALID_ARGUMENT,
      "must not be empty"},
     {"unparsable state", unparsable_state, MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -340,8 +455,78 @@ static void rendered_features_carry_state_from_the_last_frame(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Points whose IDs are a string, an unsigned and a negative integer, and two
+// doubles whose shortest forms printf's formats don't give.
+static const char typed_id_style_json[] =
+  "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"FeatureCollection\",\"features\":["
+  "{\"type\":\"Feature\",\"id\":\"8\",\"properties\":{\"name\":\"string\"},"
+  "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]}},"
+  "{\"type\":\"Feature\",\"id\":7,\"properties\":{\"name\":\"uint\"},"
+  "\"geometry\":{\"type\":\"Point\",\"coordinates\":[5,0]}},"
+  "{\"type\":\"Feature\",\"id\":-3,\"properties\":{\"name\":\"int\"},"
+  "\"geometry\":{\"type\":\"Point\",\"coordinates\":[-5,0]}},"
+  "{\"type\":\"Feature\",\"id\":0.1,\"properties\":{\"name\":\"tenth\"},"
+  "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,5]}},"
+  "{\"type\":\"Feature\",\"id\":1e21,\"properties\":{\"name\":\"large\"},"
+  "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,-5]}}"
+  "]}}},\"layers\":[{\"id\":\"circle\",\"type\":\"circle\",\"source\":"
+  "\"points\",\"paint\":{\"circle-radius\":4}}]}";
+
+static bool every_typed_id_feature_rendered(void* context) {
+  rendered_query* query = context;
+  query->list = mln_test_style_query_rendered(query->fixture);
+  return query->list.status == MLN_STATUS_OK && query->list.count == 5;
+}
+
+static void typed_ids_reach_the_features_that_carry_them(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(typed_id_style_json));
+  // Each ID has a type other than its feature's, except the doubles, so the
+  // state reaches a feature only when the engine keys both by the same text.
+  set_state(
+    map, selector_with_id("points", uint_id(8)), "{\"name\":\"string\"}"
+  );
+  set_state(
+    map, selector_with_id("points", string_id("7")), "{\"name\":\"uint\"}"
+  );
+  set_state(map, selector_with_id("points", int_id(-3)), "{\"name\":\"int\"}");
+  set_state(
+    map, selector_with_id("points", double_id(0.1)), "{\"name\":\"tenth\"}"
+  );
+  set_state(
+    map, selector_with_id("points", double_id(1e21)), "{\"name\":\"large\"}"
+  );
+
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  rendered_query query = {.fixture = &fixture};
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, every_typed_id_feature_rendered, &query, "every feature"
+  ));
+  for (size_t i = 0; i < query.list.count; ++i) {
+    const mln_test_feature* feature = &query.list.features[i];
+    TEST_ASSERT_TRUE_MESSAGE(feature->has_state, feature->feature);
+    // The state names the feature it was set for.
+    char properties[128];
+    snprintf(
+      properties, sizeof(properties), "\"properties\":%s", feature->state
+    );
+    TEST_ASSERT_NOT_NULL_MESSAGE(
+      strstr(feature->feature, properties), feature->feature
+    );
+  }
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(state_merges_on_set_and_prunes_on_remove);
+  RUN_TEST(a_string_and_a_number_with_the_same_text_name_one_feature);
   RUN_TEST(malformed_selectors_are_rejected_at_submission);
   RUN_TEST(rendered_features_carry_state_from_the_last_frame);
+  RUN_TEST(typed_ids_reach_the_features_that_carry_them);
 }

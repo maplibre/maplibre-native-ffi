@@ -36,6 +36,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraUpdateMode.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/ConstrainMode.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/EdgeInsets.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Map/FeatureId.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/FeatureStateSelector.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/FreeCamera.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/FreeCameraOptions.g.cs",

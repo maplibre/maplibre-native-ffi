@@ -97,18 +97,6 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
     self.surface = surface
   }
 
-  init(
-    raw: mln_open_gl_surface_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    context = try OpenGlContextDescriptor(raw: raw.context)
-    surface = NativePointer(bitPattern: unsafeBitCast(
-      raw.surface,
-      to: UInt.self
-    ))
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_open_gl_surface_descriptor
   {

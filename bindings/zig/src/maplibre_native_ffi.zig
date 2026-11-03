@@ -3278,6 +3278,56 @@ pub const EglContextDescriptor = struct {
     }
 };
 
+/// The ID of a feature in a source, as the source's data gives it.
+///
+/// The map compares feature IDs as text, so a string and a number with the same
+/// text, such as "7" and 7, name the same feature. A number's text is its
+/// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+/// same feature, and so do 1e21 and "1e21".
+///
+/// See `mln_feature_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const FeatureId = union(enum) {
+    string_value: []const u8,
+    uint_value: u64,
+    int_value: i64,
+    /// A finite number.
+    double_value: f64,
+
+    pub fn toNative(self: FeatureId) status.Error!c.mln_feature_id {
+        var raw = std.mem.zeroes(c.mln_feature_id);
+        switch (self) {
+            .string_value => |item| {
+                raw.type = c.MLN_FEATURE_ID_TYPE_STRING;
+                raw.data.string_value = marshal.view(item);
+            },
+            .uint_value => |item| {
+                raw.type = c.MLN_FEATURE_ID_TYPE_UINT;
+                raw.data.uint_value = item;
+            },
+            .int_value => |item| {
+                raw.type = c.MLN_FEATURE_ID_TYPE_INT;
+                raw.data.int_value = item;
+            },
+            .double_value => |item| {
+                raw.type = c.MLN_FEATURE_ID_TYPE_DOUBLE;
+                raw.data.double_value = item;
+            },
+        }
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_feature_id) status.Error!FeatureId {
+        return switch (raw.type) {
+            c.MLN_FEATURE_ID_TYPE_STRING => .{ .string_value = try marshal.copyView(allocator, raw.data.string_value) },
+            c.MLN_FEATURE_ID_TYPE_UINT => .{ .uint_value = raw.data.uint_value },
+            c.MLN_FEATURE_ID_TYPE_INT => .{ .int_value = raw.data.int_value },
+            c.MLN_FEATURE_ID_TYPE_DOUBLE => .{ .double_value = raw.data.double_value },
+            else => return error.NativeError,
+        };
+    }
+};
+
 /// The features whose state to set, read, or remove.
 ///
 /// See `mln_feature_state_selector` in the
@@ -3289,7 +3339,7 @@ pub const FeatureStateSelector = struct {
     /// The feature's ID. Setting or reading state needs it. Without it,
     /// `Map.removeFeatureState()` removes the state of every feature in the
     /// source layer.
-    feature_id: ?[]const u8 = null,
+    feature_id: ?FeatureId = null,
     /// The one key that `Map.removeFeatureState()` removes. It needs
     /// `feature_id`. Empty removes every key.
     state_key: []const u8 = &.{},
@@ -3301,7 +3351,7 @@ pub const FeatureStateSelector = struct {
         raw.source_layer_id = marshal.view(self.source_layer_id);
         if (self.feature_id) |item| {
             raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-            raw.feature_id = marshal.view(item);
+            raw.feature_id = try item.toNative();
         }
         raw.state_key = marshal.view(self.state_key);
         return raw;
@@ -3311,7 +3361,7 @@ pub const FeatureStateSelector = struct {
         return .{
             .source_id = try marshal.copyView(allocator, raw.source_id),
             .source_layer_id = try marshal.copyView(allocator, raw.source_layer_id),
-            .feature_id = if (raw.fields & c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID != 0) try marshal.copyView(allocator, raw.feature_id) else null,
+            .feature_id = if (raw.fields & c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID != 0) try FeatureId.fromNative(allocator, raw.feature_id) else null,
             .state_key = try marshal.copyView(allocator, raw.state_key),
         };
     }

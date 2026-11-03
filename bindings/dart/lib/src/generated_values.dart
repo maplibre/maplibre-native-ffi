@@ -3544,6 +3544,65 @@ final class CameraQueryResult extends _Value {
       _describe('CameraQueryResult', const ['generation', 'camera']);
 }
 
+/// The ID of a feature in a source, as the source's data gives it.
+///
+/// The map compares feature IDs as text, so a string and a number with the same
+/// text, such as "7" and 7, name the same feature. A number's text is its
+/// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+/// same feature, and so do 1e21 and "1e21".
+///
+/// See `mln_feature_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+sealed class FeatureId {
+  const FeatureId._();
+  const factory FeatureId.stringValue(String value) = FeatureIdStringValue;
+  const factory FeatureId.uintValue(int value) = FeatureIdUintValue;
+  const factory FeatureId.intValue(int value) = FeatureIdIntValue;
+
+  /// A finite number.
+  const factory FeatureId.doubleValue(double value) = FeatureIdDoubleValue;
+}
+
+final class FeatureIdStringValue extends FeatureId {
+  const FeatureIdStringValue(this.value) : super._();
+  final String value;
+  @override
+  bool operator ==(Object other) =>
+      other is FeatureIdStringValue && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class FeatureIdUintValue extends FeatureId {
+  const FeatureIdUintValue(this.value) : super._();
+  final int value;
+  @override
+  bool operator ==(Object other) =>
+      other is FeatureIdUintValue && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class FeatureIdIntValue extends FeatureId {
+  const FeatureIdIntValue(this.value) : super._();
+  final int value;
+  @override
+  bool operator ==(Object other) =>
+      other is FeatureIdIntValue && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class FeatureIdDoubleValue extends FeatureId {
+  const FeatureIdDoubleValue(this.value) : super._();
+  final double value;
+  @override
+  bool operator ==(Object other) =>
+      other is FeatureIdDoubleValue && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
 /// The features whose state to set, read, or remove.
 ///
 /// See `mln_feature_state_selector` in the
@@ -3563,7 +3622,7 @@ final class FeatureStateSelector extends _Value {
   /// The feature's ID. Setting or reading state needs it. Without it,
   /// `MapHandle.removeFeatureState()` removes the state of every feature in the
   /// source layer.
-  final String? featureId;
+  final FeatureId? featureId;
 
   /// The one key that `MapHandle.removeFeatureState()` removes. It needs
   /// `feature_id`. Empty removes every key.
@@ -3573,7 +3632,7 @@ final class FeatureStateSelector extends _Value {
   FeatureStateSelector copyWith({
     String? sourceId,
     String? sourceLayerId,
-    String? featureId,
+    FeatureId? featureId,
     String? stateKey,
   }) => FeatureStateSelector(
     sourceId: sourceId ?? this.sourceId,

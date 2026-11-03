@@ -467,20 +467,20 @@ internal fun NativeCall.writeCameraFitUpdate(value: CameraFitUpdate): Long =
   allocate(w(160, 168, 152), w(8, 8, 4)).also { putCameraFitUpdate(it, value) }
 
 internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureStateSelector) {
-  writeU32(target, w(40, 72).toUInt())
+  writeU32(target, w(48, 80, 44).toUInt())
   var fields = 0u
   putView(target + 8, value.sourceId)
   putView(target + w(16, 24), value.sourceLayerId)
   value.featureId?.let {
     fields = fields or 1u
-    putView(target + w(24, 40), it)
+    putFeatureId(target + w(24, 40), it)
   }
-  putView(target + w(32, 56), value.stateKey)
+  putView(target + w(40, 64, 36), value.stateKey)
   writeU32(target + 4, fields)
 }
 
 internal fun NativeArena.writeFeatureStateSelector(value: FeatureStateSelector): Long =
-  allocate(w(40, 72), w(4, 8)).also { putFeatureStateSelector(it, value) }
+  allocate(w(48, 80, 44), w(8, 8, 4)).also { putFeatureStateSelector(it, value) }
 
 internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
   writeU32(target, 120.toUInt())
@@ -1596,6 +1596,30 @@ internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
 
 internal fun NativeArena.writeEdgeInsets(value: EdgeInsets): Long =
   allocate(32, w(8, 8, 4)).also { putEdgeInsets(it, value) }
+
+internal fun NativeArena.putFeatureId(target: Long, value: FeatureId) {
+  when (val variant = value) {
+    is FeatureId.StringValue -> {
+      writeU32(target, 1u)
+      putView(target + w(8, 8, 4), variant.value)
+    }
+    is FeatureId.UintValue -> {
+      writeU32(target, 2u)
+      writeU64(target + w(8, 8, 4), variant.value)
+    }
+    is FeatureId.IntValue -> {
+      writeU32(target, 3u)
+      writeI64(target + w(8, 8, 4), variant.value)
+    }
+    is FeatureId.DoubleValue -> {
+      writeU32(target, 4u)
+      writeF64(target + w(8, 8, 4), variant.value)
+    }
+  }
+}
+
+internal fun NativeArena.writeFeatureId(value: FeatureId): Long =
+  allocate(w(16, 24, 12), w(8, 8, 4)).also { putFeatureId(it, value) }
 
 internal fun NativeArena.putVec3(target: Long, value: Vec3) {
   writeF64(target, value.x)

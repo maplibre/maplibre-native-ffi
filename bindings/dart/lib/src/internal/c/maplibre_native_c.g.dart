@@ -393,6 +393,22 @@ final class mln_event_batch_view extends Struct {
   external int event_count;
 }
 
+final class mln_feature_id extends Struct {
+  @Uint32()
+  external int type;
+  external mln_feature_id_data data;
+}
+
+final class mln_feature_id_data extends Union {
+  external mln_buffer_view string_value;
+  @Uint64()
+  external int uint_value;
+  @Int64()
+  external int int_value;
+  @Double()
+  external double double_value;
+}
+
 final class mln_feature_state_selector extends Struct {
   @Uint32()
   external int size;
@@ -400,7 +416,7 @@ final class mln_feature_state_selector extends Struct {
   external int fields;
   external mln_buffer_view source_id;
   external mln_buffer_view source_layer_id;
-  external mln_buffer_view feature_id;
+  external mln_feature_id feature_id;
   external mln_buffer_view state_key;
 }
 
@@ -1822,6 +1838,12 @@ const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
 // mln_custom_vector_source_option_field
 const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
 const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
+
+// mln_feature_id_type
+const MLN_FEATURE_ID_TYPE_STRING = 1;
+const MLN_FEATURE_ID_TYPE_UINT = 2;
+const MLN_FEATURE_ID_TYPE_INT = 3;
+const MLN_FEATURE_ID_TYPE_DOUBLE = 4;
 
 // mln_feature_state_selector_field
 const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1;

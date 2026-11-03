@@ -1000,6 +1000,48 @@ impl ToNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     }
 }
 
+/// The ID of a feature in a source, as the source's data gives it.
+///
+/// The map compares feature IDs as text, so a string and a number with the same
+/// text, such as "7" and 7, name the same feature. A number's text is its
+/// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+/// same feature, and so do 1e21 and "1e21".
+///
+/// See `mln_feature_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub enum FeatureId<'a> {
+    StringValue(&'a str),
+    UintValue(u64),
+    IntValue(i64),
+    /// A finite number.
+    DoubleValue(f64),
+}
+impl<'a> ToNative<sys::mln_feature_id> for FeatureId<'a> {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_feature_id> {
+        let mut raw: sys::mln_feature_id = unsafe { std::mem::zeroed() };
+        match self {
+            FeatureId::StringValue(item) => {
+                raw.type_ = sys::MLN_FEATURE_ID_TYPE_STRING;
+                raw.data.string_value = to_native(&(*item), arena)?;
+            }
+            FeatureId::UintValue(item) => {
+                raw.type_ = sys::MLN_FEATURE_ID_TYPE_UINT;
+                raw.data.uint_value = *item;
+            }
+            FeatureId::IntValue(item) => {
+                raw.type_ = sys::MLN_FEATURE_ID_TYPE_INT;
+                raw.data.int_value = *item;
+            }
+            FeatureId::DoubleValue(item) => {
+                raw.type_ = sys::MLN_FEATURE_ID_TYPE_DOUBLE;
+                raw.data.double_value = *item;
+            }
+        }
+        Ok(raw)
+    }
+}
+
 /// The features whose state to set, read, or remove.
 ///
 /// See `mln_feature_state_selector` in the
@@ -1012,7 +1054,7 @@ pub struct FeatureStateSelector<'a> {
     /// The feature's ID. Setting or reading state needs it. Without it,
     /// `MapHandle::remove_feature_state()` removes the state of every feature
     /// in the source layer.
-    pub feature_id: Option<&'a str>,
+    pub feature_id: Option<FeatureId<'a>>,
     /// The one key that `MapHandle::remove_feature_state()` removes. It needs
     /// `feature_id`. Empty removes every key.
     pub state_key: &'a str,

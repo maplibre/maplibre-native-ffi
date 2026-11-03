@@ -81,6 +81,48 @@ class OpenGlContextDescriptorWebGlVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class FeatureIdStringValueVariant:
+    value: str
+    _tag = 1
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(raw)
+
+
+@dataclass(frozen=True, slots=True)
+class FeatureIdUintValueVariant:
+    value: int
+    _tag = 2
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(raw)
+
+
+@dataclass(frozen=True, slots=True)
+class FeatureIdIntValueVariant:
+    value: int
+    _tag = 3
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(raw)
+
+
+@dataclass(frozen=True, slots=True)
+class FeatureIdDoubleValueVariant:
+    """A finite number."""
+
+    value: float
+    _tag = 4
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(raw)
+
+
+@dataclass(frozen=True, slots=True)
 class RenderedQueryGeometryPointVariant:
     value: ScreenPoint
     _tag = 1
@@ -1541,6 +1583,24 @@ class EglContextDescriptor:
         )
 
 
+type FeatureId = (
+    FeatureIdStringValueVariant
+    | FeatureIdUintValueVariant
+    | FeatureIdIntValueVariant
+    | FeatureIdDoubleValueVariant
+)
+"""The ID of a feature in a source, as the source's data gives it.
+
+The map compares feature IDs as text, so a string and a number with the same
+text, such as "7" and 7, name the same feature. A number's text is its
+shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+same feature, and so do 1e21 and "1e21".
+
+See `mln_feature_id` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
     """The features whose state to set, read, or remove.
@@ -1554,7 +1614,7 @@ class FeatureStateSelector:
     source_layer_id: str = ""
     """The source layer, for a vector source. Empty for other sources."""
 
-    feature_id: str | None = None
+    feature_id: FeatureId | None = None
     """The feature's ID. Setting or reading state needs it. Without it,
     `MapHandle.remove_feature_state()` removes the state of every feature in
     the source layer.
@@ -1570,7 +1630,20 @@ class FeatureStateSelector:
         return cls(
             source_id=raw["source_id"],
             source_layer_id=raw["source_layer_id"],
-            feature_id=raw["feature_id"],
+            feature_id=None
+            if raw["feature_id"] is None
+            else (
+                _copy_variant(
+                    raw["feature_id"],
+                    {
+                        "string_value": FeatureIdStringValueVariant,
+                        "uint_value": FeatureIdUintValueVariant,
+                        "int_value": FeatureIdIntValueVariant,
+                        "double_value": FeatureIdDoubleValueVariant,
+                    },
+                    None,
+                )
+            ),
             state_key=raw["state_key"],
         )
 

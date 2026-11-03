@@ -163,10 +163,15 @@ def submit(values, union, owner, source, place):
     tag into the union storage `place`."""
     name = values.name(owner)
     tag = native_identifier(union.tag)
-    cases = [
-        f"{name}::{pascal(member.name)}(item) => {{ raw.{tag} = sys::{member.presence.variant}; {place}.{native_identifier(member.name)} = {encode(values, member.value, '(*item)')}; }}"
-        for member in union.fields
-    ]
+    cases = []
+    for member in union.fields:
+        written = encode(values, member.value, "(*item)")
+        if written == "(*item)":
+            # A plain value is copied as is.
+            written = "*item"
+        cases.append(
+            f"{name}::{pascal(member.name)}(item) => {{ raw.{tag} = sys::{member.presence.variant}; {place}.{native_identifier(member.name)} = {written}; }}"
+        )
     if union.empty_variant:
         cases.append(f"{name}::Empty => raw.{tag} = sys::{union.empty_variant[0]},")
     if owner.native in values.bound.returned:

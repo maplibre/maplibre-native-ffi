@@ -1221,6 +1221,30 @@ CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
       camera: _readCamera(source.camera),
     );
 
+Pointer<raw.mln_feature_id> _writeFeatureId(
+  FeatureId value,
+  Allocator arena, {
+  Pointer<raw.mln_feature_id>? into,
+}) {
+  final result = into ?? arena<raw.mln_feature_id>();
+
+  switch (value) {
+    case FeatureIdStringValue():
+      result.ref.type = 1;
+      result.ref.data.string_value = nativeStringView(value.value, arena).value;
+    case FeatureIdUintValue():
+      result.ref.type = 2;
+      result.ref.data.uint_value = value.value;
+    case FeatureIdIntValue():
+      result.ref.type = 3;
+      result.ref.data.int_value = value.value;
+    case FeatureIdDoubleValue():
+      result.ref.type = 4;
+      result.ref.data.double_value = value.value;
+  }
+  return result;
+}
+
 Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   FeatureStateSelector value,
   Allocator arena, {
@@ -1235,7 +1259,7 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   ).value;
   if (value.featureId != null) {
     result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-    result.ref.feature_id = nativeStringView(value.featureId!, arena).value;
+    result.ref.feature_id = _writeFeatureId(value.featureId!, arena).ref;
   }
   result.ref.state_key = nativeStringView(value.stateKey, arena).value;
   return result;

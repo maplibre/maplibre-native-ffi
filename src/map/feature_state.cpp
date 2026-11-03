@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <utility>
 
@@ -24,6 +25,25 @@ auto validate_string_view(mln_buffer_view string) -> bool {
     return false;
   }
   return true;
+}
+
+auto validate_feature_id(const mln_feature_id& id) -> bool {
+  switch (id.type) {
+    case MLN_FEATURE_ID_TYPE_STRING:
+      return validate_string_view(id.data.string_value);
+    case MLN_FEATURE_ID_TYPE_UINT:
+    case MLN_FEATURE_ID_TYPE_INT:
+      return true;
+    case MLN_FEATURE_ID_TYPE_DOUBLE:
+      if (!std::isfinite(id.data.double_value)) {
+        mln::core::set_thread_error("feature_id double_value must be finite");
+        return false;
+      }
+      return true;
+    default:
+      mln::core::set_thread_error("feature_id has an unknown type");
+      return false;
+  }
 }
 
 auto string_from_view(mln_buffer_view string) -> std::string {
@@ -223,7 +243,7 @@ auto validate_feature_state_selector(
   }
   if (
     selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID) &&
-    !validate_string_view(selector->feature_id)
+    !validate_feature_id(selector->feature_id)
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -244,14 +264,34 @@ auto validate_feature_state_selector(
   return MLN_STATUS_OK;
 }
 
-auto optional_selector_string(
-  const mln_feature_state_selector& selector, uint32_t field,
-  mln_buffer_view value
-) -> std::optional<std::string> {
-  if (!selector_has_field(selector, field)) {
+auto feature_id_string(const mln_feature_id& id) -> std::string {
+  // The engine keys feature state by the text that featureIDtoString makes
+  // of each feature's ID, so a selector's ID goes through the same function.
+  auto text = std::optional<std::string>{};
+  switch (id.type) {
+    case MLN_FEATURE_ID_TYPE_STRING:
+      return string_from_view(id.data.string_value);
+    case MLN_FEATURE_ID_TYPE_UINT:
+      text = mln::featureIDtoString(id.data.uint_value);
+      break;
+    case MLN_FEATURE_ID_TYPE_INT:
+      text = mln::featureIDtoString(id.data.int_value);
+      break;
+    case MLN_FEATURE_ID_TYPE_DOUBLE:
+      text = mln::featureIDtoString(id.data.double_value);
+      break;
+    default:
+      break;
+  }
+  return text.value_or(std::string{});
+}
+
+auto optional_feature_id_string(const mln_feature_state_selector& selector)
+  -> std::optional<std::string> {
+  if (!selector_has_field(selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID)) {
     return std::nullopt;
   }
-  return string_from_view(value);
+  return feature_id_string(selector.feature_id);
 }
 
 auto optional_text(mln_buffer_view value) -> std::optional<std::string> {

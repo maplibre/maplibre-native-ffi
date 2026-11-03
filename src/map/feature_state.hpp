@@ -74,10 +74,11 @@ class FeatureStateStore {
 auto validate_feature_state_selector(
   const mln_feature_state_selector* selector, bool require_feature_id
 ) -> mln_status;
-auto optional_selector_string(
-  const mln_feature_state_selector& selector, uint32_t field,
-  mln_buffer_view value
-) -> std::optional<std::string>;
+// The text that the engine keys a feature's state by. The ID must be valid.
+auto feature_id_string(const mln_feature_id& id) -> std::string;
+// The selector's feature ID as text, or nullopt when it has none.
+auto optional_feature_id_string(const mln_feature_state_selector& selector)
+  -> std::optional<std::string>;
 auto optional_text(mln_buffer_view value) -> std::optional<std::string>;
 auto feature_state_source_layer(const mln_feature_state_selector& selector)
   -> FeatureStateLayerId;

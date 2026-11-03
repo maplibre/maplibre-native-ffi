@@ -63,23 +63,6 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     self.commandQueue = commandQueue
   }
 
-  init(
-    raw: mln_metal_borrowed_texture_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    physicalWidth = raw.physical_width
-    physicalHeight = raw.physical_height
-    textures = try NativeInputArena.copyArray(
-      raw.textures,
-      count: Int(raw.texture_count)
-    ).map { MetalBorrowedTexture(raw: $0) }
-    commandQueue = NativePointer(bitPattern: unsafeBitCast(
-      raw.command_queue,
-      to: UInt.self
-    ))
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_metal_borrowed_texture_descriptor
   {
@@ -122,19 +105,6 @@ public struct MetalBorrowedTextureReplacement: Equatable, Hashable, Sendable {
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.textures = textures
-  }
-
-  init(
-    raw: mln_metal_borrowed_texture_replacement,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    physicalWidth = raw.physical_width
-    physicalHeight = raw.physical_height
-    textures = try NativeInputArena.copyArray(
-      raw.textures,
-      count: Int(raw.texture_count)
-    ).map { MetalBorrowedTexture(raw: $0) }
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -260,21 +230,6 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     self.target = target
   }
 
-  init(
-    raw: mln_open_gl_borrowed_texture_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    physicalWidth = raw.physical_width
-    physicalHeight = raw.physical_height
-    context = try OpenGlContextDescriptor(raw: raw.context)
-    textures = try NativeInputArena.copyArray(
-      raw.textures,
-      count: Int(raw.texture_count)
-    ).map { OpenGlBorrowedTexture(raw: $0) }
-    target = raw.target
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_open_gl_borrowed_texture_descriptor
   {
@@ -319,19 +274,6 @@ public struct OpenGlBorrowedTextureReplacement: Equatable, Hashable, Sendable {
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.textures = textures
-  }
-
-  init(
-    raw: mln_open_gl_borrowed_texture_replacement,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    physicalWidth = raw.physical_width
-    physicalHeight = raw.physical_height
-    textures = try NativeInputArena.copyArray(
-      raw.textures,
-      count: Int(raw.texture_count)
-    ).map { OpenGlBorrowedTexture(raw: $0) }
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -512,23 +454,6 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     self.owner = owner
   }
 
-  init(
-    raw: mln_vulkan_borrowed_texture_descriptor,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    physicalWidth = raw.physical_width
-    physicalHeight = raw.physical_height
-    context = VulkanContextDescriptor(raw: raw.context)
-    textures = try NativeInputArena.copyArray(
-      raw.textures,
-      count: Int(raw.texture_count)
-    ).map { VulkanBorrowedTexture(raw: $0) }
-    format = raw.format
-    finalLayout = raw.final_layout
-    owner = VulkanImageOwner(rawValue: raw.owner.rawValue)
-  }
-
   func nativeValue(arena: NativeInputArena) throws
     -> mln_vulkan_borrowed_texture_descriptor
   {
@@ -574,19 +499,6 @@ public struct VulkanBorrowedTextureReplacement: Equatable, Hashable, Sendable {
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.textures = textures
-  }
-
-  init(
-    raw: mln_vulkan_borrowed_texture_replacement,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    logicalSize = LogicalSize(raw: raw.logical_size)
-    physicalWidth = raw.physical_width
-    physicalHeight = raw.physical_height
-    textures = try NativeInputArena.copyArray(
-      raw.textures,
-      count: Int(raw.texture_count)
-    ).map { VulkanBorrowedTexture(raw: $0) }
   }
 
   func nativeValue(arena: NativeInputArena) throws

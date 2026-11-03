@@ -555,6 +555,23 @@ export interface EglContextDescriptor {
 }
 
 /**
+ * The ID of a feature in a source, as the source's data gives it.
+ *
+ * The map compares feature IDs as text, so a string and a number with the same
+ * text, such as "7" and 7, name the same feature. A number's text is its
+ * shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
+ * same feature, and so do 1e21 and "1e21".
+ *
+ * See `mln_feature_id` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export type FeatureId =
+  | { readonly kind: "stringValue"; readonly value: string }
+  | { readonly kind: "uintValue"; readonly value: bigint }
+  | { readonly kind: "intValue"; readonly value: bigint }
+  | { readonly kind: "doubleValue"; readonly value: number };
+
+/**
  * The features whose state to set, read, or remove.
  *
  * See `mln_feature_state_selector` in the
@@ -571,7 +588,7 @@ export interface FeatureStateSelector {
    * `MapHandle.removeFeatureState()` removes the state of every feature in the
    * source layer.
    */
-  featureId?: string;
+  featureId?: FeatureId;
   /**
    * The one key that `MapHandle.removeFeatureState()` removes. It needs
    * `feature_id`. Empty removes every key.
