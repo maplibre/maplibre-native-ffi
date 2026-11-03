@@ -8,8 +8,8 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
+import 'package:maplibre_native_ffi/src/runtime/runtime.dart';
 
-import 'support/runtime_probes.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
 
@@ -149,13 +149,13 @@ void main() {
       result.ref.value_count = 2;
       result.ref.value_size = stride;
 
-      expect(decodeLatLngListForTesting(result.ref), const [
+      expect(readLatLngListForTesting(result.ref), const [
         LatLng(latitude: 1, longitude: 2),
         LatLng(latitude: 3, longitude: 4),
       ]);
       result.ref.value_size = sizeOf<raw.mln_lat_lng>() - 1;
       expect(
-        () => decodeLatLngListForTesting(result.ref),
+        () => readLatLngListForTesting(result.ref),
         throwsA(
           isA<MaplibreException>().having(
             (error) => error.status,
@@ -215,7 +215,7 @@ void main() {
       batch.ref.event_size = eventSize;
       batch.ref.events = events.cast<raw.mln_runtime_event>();
       batch.ref.event_count = 2;
-      final decoded = decodeRuntimeEventBatchForTesting(batch.ref);
+      final decoded = readEventBatchViewForTesting(batch.ref);
       // Every field is copied before the drain returns, so overwriting the
       // arena cannot change what the host already holds.
       unknownWindow.fillRange(0, unknownWindow.length, 9);
