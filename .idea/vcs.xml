@@ -204,14 +204,6 @@
       vcs="Git"
     />
     <mapping
-      directory="$PROJECT_DIR$/third_party/maplibre-native/vendor/wagyu"
-      vcs="Git"
-    />
-    <mapping
-      directory="$PROJECT_DIR$/third_party/maplibre-native/vendor/wagyu/tests/geometry-test-data"
-      vcs="Git"
-    />
-    <mapping
       directory="$PROJECT_DIR$/third_party/maplibre-native/vendor/webgpu-cpp"
       vcs="Git"
     />

@@ -3,7 +3,7 @@ waits for both on synchronous GeoJSON tiles (https://github.com/maplibre/maplibr
 Upstream: https://github.com/maplibre/maplibre-native/pull/4580
 
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7915f46a9 100644
+index d9070ca2cd..066746adbe 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
 @@ -376,7 +376,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
@@ -49,7 +49,7 @@ index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7
      MBGL_TIMING_FINISH(watch,
                         " Action: " << "Parsing,"
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index dd3bb48c53546332d4c17d3cad3d16c3aec9c76e..d488206f573992917e2dee4fd3166c20843c5095 100644
+index 8b226804c1..b3f69518fb 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
 @@ -76,8 +76,7 @@ private:
@@ -63,7 +63,7 @@ index dd3bb48c53546332d4c17d3cad3d16c3aec9c76e..d488206f573992917e2dee4fd3166c20
      void symbolDependenciesChanged();
      bool hasPendingDependencies() const;
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index de8b3a9f56b8d467151146ab611d8bc70b18695e..6b2417d538f46405d43158c008adb3f9e37d1aed 100644
+index 0fdba7eafe..f7d3024b5a 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -24,10 +24,10 @@
@@ -93,7 +93,7 @@ index de8b3a9f56b8d467151146ab611d8bc70b18695e..6b2417d538f46405d43158c008adb3f9
  
  using namespace mln;
  using namespace mln::style;
-@@ -2132,6 +2134,87 @@ TEST(Map, SetFrustumOffset) {
+@@ -2169,6 +2171,87 @@ TEST(Map, SetFrustumOffset) {
      test::checkImage("test/fixtures/map/setFrustumOffset/after", test.frontend.render(test.map).image, 0.0006, 0.1);
  }
  

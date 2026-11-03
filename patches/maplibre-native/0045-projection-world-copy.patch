@@ -2,6 +2,7 @@ Converts a coordinate in the world copy nearest the camera center.
 Upstream: not proposed
 
 diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
+index f50a1db5e2..8c95c22026 100644
 --- a/src/mln/map/map_projection.cpp
 +++ b/src/mln/map/map_projection.cpp
 @@ -3,6 +3,8 @@
@@ -13,7 +14,7 @@ diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
  namespace mln {
  
  MapProjection::MapProjection(const Map& map)
-@@ -14,9 +16,11 @@
+@@ -14,9 +16,11 @@ MapProjection::MapProjection(const TransformState& state)
  MapProjection::~MapProjection() = default;
  
  ScreenCoordinate MapProjection::pixelForLatLng(const LatLng& latLng) const {

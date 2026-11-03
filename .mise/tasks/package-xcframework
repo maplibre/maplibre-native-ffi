@@ -46,6 +46,15 @@ root = component(
     "BSD-2-Clause",
 )
 root["group"] = "org.maplibre.nativeffi"
+root["properties"] = [
+    {
+        "name": property["name"],
+        "value": "macos-arm64_x86_64"
+        if property["name"] == "maplibre:platform"
+        else property["value"],
+    }
+    for property in inventories[0]["metadata"]["component"]["properties"]
+]
 write_json(Path(sys.argv[1]) / "Resources/sbom.cdx.json", compose(root, inventories))
 PY
 

@@ -2,7 +2,7 @@ Cancels only the camera commands that carry one transition ID. Needs 0015.
 Upstream: not proposed
 
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
-index a67ab2dddec5..c437052e42a9 100644
+index a67ab2ddde..c437052e42 100644
 --- a/include/mln/map/camera.hpp
 +++ b/include/mln/map/camera.hpp
 @@ -131,6 +131,11 @@ struct AnimationOptions {
@@ -18,7 +18,7 @@ index a67ab2dddec5..c437052e42a9 100644
      AnimationOptions() = default;
  
 diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
-index d5dca349dedb..19dd8288bc05 100644
+index d5dca349de..777c31eeaa 100644
 --- a/include/mln/map/map.hpp
 +++ b/include/mln/map/map.hpp
 @@ -63,6 +63,10 @@ public:
@@ -33,7 +33,7 @@ index d5dca349dedb..19dd8288bc05 100644
      bool isGestureInProgress() const;
      bool isRotating() const;
 diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
-index ef034b4bd8b1..89a4b90737db 100644
+index ef034b4bd8..e4029bbe28 100644
 --- a/src/mln/map/map.cpp
 +++ b/src/mln/map/map.cpp
 @@ -120,6 +120,10 @@ void Map::cancelTransitions() {
@@ -48,7 +48,7 @@ index ef034b4bd8b1..89a4b90737db 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index f091f2d5cf35..793b44a3f7ad 100644
+index f091f2d5cf..7dd49c545d 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -718,6 +718,19 @@ void Transform::cancelTransitions() {
@@ -72,7 +72,7 @@ index f091f2d5cf35..793b44a3f7ad 100644
      state.setGestureInProgress(inProgress);
  }
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index 3107c308b74b..73ff1457b174 100644
+index 3107c308b7..f7673426d0 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -120,6 +120,10 @@ public:
@@ -87,10 +87,10 @@ index 3107c308b74b..73ff1457b174 100644
      // Gesture
      void setGestureInProgress(bool);
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index 8547b69fcdf2..d018e7366bbd 100644
+index 8c176138da..7ab06e333c 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1515,3 +1515,56 @@ TEST(Transform, PartialCameraCommandsFinishTogetherForStillImage) {
+@@ -1539,3 +1539,56 @@ TEST(Transform, PartialCameraCommandsFinishTogetherForStillImage) {
      transform.cancelTransitions();
      EXPECT_EQ(observer.events, (std::vector<int>{1, 0, 2, 0}));
  }

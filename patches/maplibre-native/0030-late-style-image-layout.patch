@@ -3,7 +3,7 @@ missing, so a late image shows without discarding other tiles.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4714, which rebuilds every tile
 
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
-index f45d750..720e73c 100644
+index 0730fcaaa1..cd55ae4cec 100644
 --- a/src/mln/renderer/image_manager.cpp
 +++ b/src/mln/renderer/image_manager.cpp
 @@ -49,8 +49,14 @@ void ImageManager::addImage(Immutable<style::Image::Impl> image_) {
@@ -47,7 +47,7 @@ index f45d750..720e73c 100644
          ImageRequestor& requestor = *it->first;
          if (!requestor.hasPendingRequests()) {
 diff --git a/src/mln/renderer/image_manager.hpp b/src/mln/renderer/image_manager.hpp
-index d31787d..b800363 100644
+index d31787d6fe..b8003637fd 100644
 --- a/src/mln/renderer/image_manager.hpp
 +++ b/src/mln/renderer/image_manager.hpp
 @@ -68,6 +68,7 @@ private:
@@ -67,7 +67,7 @@ index d31787d..b800363 100644
                                     ImageMap patterns,
                                     ImageVersionMap versionMap,
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
-index 999ae01..3e1ef42 100644
+index 878e601ed3..affdfbe8ce 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
 @@ -331,6 +331,22 @@ void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& laye
@@ -94,7 +94,7 @@ index 999ae01..3e1ef42 100644
      MLN_TRACE_FUNC();
  
 diff --git a/src/mln/tile/geometry_tile.hpp b/src/mln/tile/geometry_tile.hpp
-index b3f3fcd..72d6142 100644
+index b3f3fcd7f4..72d61426ac 100644
 --- a/src/mln/tile/geometry_tile.hpp
 +++ b/src/mln/tile/geometry_tile.hpp
 @@ -45,6 +45,7 @@ public:
@@ -106,7 +106,7 @@ index b3f3fcd..72d6142 100644
      void onImagesAvailable(ImageMap, ImageMap, ImageVersionMap versionMap, uint64_t imageCorrelationID) override;
  
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index 885d618..963bf91 100644
+index 066746adbe..c57eabf725 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
 @@ -191,6 +191,33 @@ void GeometryTileWorker::setLayers(std::vector<Immutable<LayerProperties>> layer
@@ -144,7 +144,7 @@ index 885d618..963bf91 100644
      layers = std::nullopt;
      data = std::nullopt;
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index d488206..079d6ff 100644
+index b3f69518fb..8cb30ab2d0 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
 @@ -59,6 +59,7 @@ public:
@@ -156,10 +156,10 @@ index d488206..079d6ff 100644
      void setShowCollisionBoxes(bool showCollisionBoxes_, uint64_t correlationID_);
  
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 15575f3..3ef23f3 100644
+index b617f69a0d..c3409abee9 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2563,3 +2563,109 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
+@@ -2583,3 +2583,109 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
      check(&Map::setTileLodZoomShift, &UpdateParameters::tileLodZoomShift, 1.0);
      check(&Map::setTileLodMode, &UpdateParameters::tileLodMode, TileLodMode::Distance);
  }

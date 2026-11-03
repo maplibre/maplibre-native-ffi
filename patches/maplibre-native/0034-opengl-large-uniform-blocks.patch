@@ -3,7 +3,7 @@ uniform buffers.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4707
 
 diff --git a/src/mln/gl/buffer_allocator.cpp b/src/mln/gl/buffer_allocator.cpp
-index 4cf4a39..918a1ab 100644
+index 1cadfe923c..76ed1c845c 100644
 --- a/src/mln/gl/buffer_allocator.cpp
 +++ b/src/mln/gl/buffer_allocator.cpp
 @@ -213,12 +213,7 @@ public:
@@ -21,7 +21,7 @@ index 4cf4a39..918a1ab 100644
  
  public:
 diff --git a/src/mln/gl/uniform_buffer_gl.cpp b/src/mln/gl/uniform_buffer_gl.cpp
-index 6f0ff4a..a0bbc68 100644
+index 6f0ff4a264..a0bbc68ae3 100644
 --- a/src/mln/gl/uniform_buffer_gl.cpp
 +++ b/src/mln/gl/uniform_buffer_gl.cpp
 @@ -141,7 +141,7 @@ void UniformBufferGL::update(const void* data, std::size_t dataSize) {
@@ -34,10 +34,10 @@ index 6f0ff4a..a0bbc68 100644
      }
  
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index 52b3afc..f1e9f30 100644
+index 88937133f5..33a868b818 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
-@@ -153,6 +153,7 @@ if(MLN_WITH_OPENGL)
+@@ -155,6 +155,7 @@ if(MLN_WITH_OPENGL)
              ${PROJECT_SOURCE_DIR}/test/gl/gl_functions.test.cpp
              ${PROJECT_SOURCE_DIR}/test/gl/object.test.cpp
              ${PROJECT_SOURCE_DIR}/test/gl/resource_pool.test.cpp
@@ -47,7 +47,7 @@ index 52b3afc..f1e9f30 100644
      )
 diff --git a/test/gl/uniform_buffer.test.cpp b/test/gl/uniform_buffer.test.cpp
 new file mode 100644
-index 0000000..62c6c0e
+index 0000000000..62c6c0e937
 --- /dev/null
 +++ b/test/gl/uniform_buffer.test.cpp
 @@ -0,0 +1,57 @@

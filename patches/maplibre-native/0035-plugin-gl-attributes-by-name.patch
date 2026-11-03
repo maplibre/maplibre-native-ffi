@@ -3,7 +3,7 @@ linked locations differ from metadata order.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4708
 
 diff --git a/src/mln/shaders/gl/shader_program_gl.cpp b/src/mln/shaders/gl/shader_program_gl.cpp
-index d46d0d29b2a9f38a06baaa24435b997d7488db3e..3b4bbf28238ef69bef5a934e2781ba53b9172a4f 100644
+index 5afa48ac7e..51f24016b7 100644
 --- a/src/mln/shaders/gl/shader_program_gl.cpp
 +++ b/src/mln/shaders/gl/shader_program_gl.cpp
 @@ -7,6 +7,7 @@
@@ -14,7 +14,7 @@ index d46d0d29b2a9f38a06baaa24435b997d7488db3e..3b4bbf28238ef69bef5a934e2781ba53
  #include <cstring>
  #include <utility>
  
-@@ -173,8 +174,16 @@ std::shared_ptr<ShaderProgramGL> ShaderProgramGL::create(
+@@ -180,8 +181,16 @@ std::shared_ptr<ShaderProgramGL> ShaderProgramGL::create(
                  continue;
              }
              const GLint location = MBGL_CHECK_ERROR(glGetAttribLocation(program, name.data()));
@@ -34,10 +34,10 @@ index d46d0d29b2a9f38a06baaa24435b997d7488db3e..3b4bbf28238ef69bef5a934e2781ba53
  
          return std::make_shared<ShaderProgramGL>(std::move(program), std::move(attrs), std::move(samplerLocations));
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index f1e9f30e7c6d4cbf8beae94ee32c8b57fc8c789d..f99d287753a3ae958584046e64f83dcb8653bede 100644
+index 33a868b818..34c8087c40 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
-@@ -153,6 +153,7 @@ if(MLN_WITH_OPENGL)
+@@ -155,6 +155,7 @@ if(MLN_WITH_OPENGL)
              ${PROJECT_SOURCE_DIR}/test/gl/gl_functions.test.cpp
              ${PROJECT_SOURCE_DIR}/test/gl/object.test.cpp
              ${PROJECT_SOURCE_DIR}/test/gl/resource_pool.test.cpp
@@ -47,7 +47,7 @@ index f1e9f30e7c6d4cbf8beae94ee32c8b57fc8c789d..f99d287753a3ae958584046e64f83dcb
              ${PROJECT_SOURCE_DIR}/test/util/offscreen_texture.test.cpp
 diff --git a/test/gl/shader_program.test.cpp b/test/gl/shader_program.test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..5fffd1dd9d2716cd72a34c9d9b467d0b28069123
+index 0000000000..5fffd1dd9d
 --- /dev/null
 +++ b/test/gl/shader_program.test.cpp
 @@ -0,0 +1,39 @@
@@ -91,7 +91,7 @@ index 0000000000000000000000000000000000000000..5fffd1dd9d2716cd72a34c9d9b467d0b
 +
 +#endif
 diff --git a/test/plugin/rendering.test.cpp b/test/plugin/rendering.test.cpp
-index 5e0a4f486c7ee27ecbb4fb4a91a6b1641b744b37..0403357dc39263cc467f253b59d6a2b94c281d25 100644
+index 5793d0cf22..1e9c66f5c2 100644
 --- a/test/plugin/rendering.test.cpp
 +++ b/test/plugin/rendering.test.cpp
 @@ -46,14 +46,17 @@ void registerTriangles(const std::string& pluginID,
@@ -259,7 +259,7 @@ index 5e0a4f486c7ee27ecbb4fb4a91a6b1641b744b37..0403357dc39263cc467f253b59d6a2b9
          layer.enable_stencil_overlap_dedup = stencilOverlapDedup;
          layer.should_animate = shouldAnimate;
          layer.update_uniform_block = [](const mln_plugin_uniform_context_v1*, uint32_t, uint8_t*, size_t) {
-@@ -303,6 +368,42 @@ TEST(PluginRendering, StencilOverlapDedupGeneratesStencilUpdates) {
+@@ -329,6 +394,42 @@ TEST(PluginRendering, StencilOverlapDedupGeneratesStencilUpdates) {
      EXPECT_GT(result.stats.stencilUpdates, 0u);
  }
  

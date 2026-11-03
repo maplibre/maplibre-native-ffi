@@ -3,6 +3,7 @@ malformed UTF-8 as an expression error.
 Upstream: not proposed
 
 diff --git a/platform/darwin/core/collator.mm b/platform/darwin/core/collator.mm
+index 4ad7a85970..995f39e64c 100644
 --- a/platform/darwin/core/collator.mm
 +++ b/platform/darwin/core/collator.mm
 @@ -1,6 +1,6 @@
@@ -37,17 +38,18 @@ diff --git a/platform/darwin/core/collator.mm b/platform/darwin/core/collator.mm
      // experimentally we've checked that if LHS is a prefix of RHS compare returns -1
      // https://developer.apple.com/documentation/foundation/nsstring/1414561-compare
 diff --git a/platform/darwin/core/number_format.mm b/platform/darwin/core/number_format.mm
+index 95f6325143..98a8249698 100644
 --- a/platform/darwin/core/number_format.mm
 +++ b/platform/darwin/core/number_format.mm
-@@ -1,6 +1,8 @@
- #import <Foundation/Foundation.h>
+@@ -2,6 +2,8 @@
  
  #include <mln/i18n/number_format.hpp>
-+
-+#include "utf8.hpp"
  
++#include "utf8.hpp"
++
  namespace mln {
  namespace platform {
+ 
 @@ -12,19 +14,33 @@
    NSNumberFormatter* numberFormatter = [[NSNumberFormatter alloc] init];
  
@@ -90,6 +92,7 @@ diff --git a/platform/darwin/core/number_format.mm b/platform/darwin/core/number
  }  // namespace platform
 diff --git a/platform/darwin/core/utf8.hpp b/platform/darwin/core/utf8.hpp
 new file mode 100644
+index 0000000000..3ca2f653e6
 --- /dev/null
 +++ b/platform/darwin/core/utf8.hpp
 @@ -0,0 +1,18 @@

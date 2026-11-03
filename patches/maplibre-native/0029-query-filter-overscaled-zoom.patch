@@ -3,10 +3,10 @@ fix of 0028, which it follows.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4704
 
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8cab386315 100644
+index 2a91013fe4..736bea05f7 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
-@@ -155,7 +155,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
+@@ -158,7 +158,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
                           const double scale,
                           const RenderedQueryOptions& queryOptions,
                           const GlobalStateMap* globalState,
@@ -15,7 +15,7 @@ index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8c
                           const std::unordered_map<std::string, const RenderLayer*>& layers,
                           const float additionalQueryPadding,
                           const SourceFeatureState& sourceFeatureState) const {
-@@ -186,7 +186,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
+@@ -189,7 +189,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
                     indexedFeature,
                     queryOptions,
                     globalState,
@@ -24,7 +24,7 @@ index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8c
                     layers,
                     queryGeometry,
                     transformState,
-@@ -239,7 +239,7 @@ std::unordered_map<std::string, std::vector<Feature>> FeatureIndex::lookupSymbol
+@@ -242,7 +242,7 @@ std::unordered_map<std::string, std::vector<Feature>> FeatureIndex::lookupSymbol
                     symbolFeature,
                     queryOptions,
                     globalState,
@@ -33,7 +33,7 @@ index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8c
                     layers,
                     GeometryCoordinates(),
                     {},
-@@ -254,7 +254,7 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+@@ -257,7 +257,7 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
                                const RefIndexedSubfeature& indexedFeature,
                                const RenderedQueryOptions& options,
                                const GlobalStateMap* globalState,
@@ -42,7 +42,7 @@ index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8c
                                const std::unordered_map<std::string, const RenderLayer*>& layers,
                                const GeometryCoordinates& queryGeometry,
                                const TransformState& transformState,
-@@ -303,13 +303,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+@@ -306,13 +306,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
              continue;
          }
  
@@ -61,7 +61,7 @@ index ecfd8c9696438279fabce2ec4bbfb1a00a673706..998227381e7de151463e6f30927e9f8c
          feature.sourceLayer = sourceLayer->getName();
          feature.state = state;
 diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
-index 84eacdf3bebe65e002e03844fe5b50e709e689af..4d337e6f2f94c24684f619fb3291408a152852d8 100644
+index 84eacdf3be..4d337e6f2f 100644
 --- a/src/mln/geometry/feature_index.hpp
 +++ b/src/mln/geometry/feature_index.hpp
 @@ -126,7 +126,7 @@ public:
@@ -83,7 +83,7 @@ index 84eacdf3bebe65e002e03844fe5b50e709e689af..4d337e6f2f94c24684f619fb3291408a
                      const GeometryCoordinates& queryGeometry,
                      const TransformState& transformState,
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
-index a817b5d0f226e51d06216713ccbcb27a5b83b36b..999ae01a578748d08d306286badfb683afa6f5cd 100644
+index 9f22b06a0b..878e601ed3 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
 @@ -535,7 +535,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
@@ -96,7 +96,7 @@ index a817b5d0f226e51d06216713ccbcb27a5b83b36b..999ae01a578748d08d306286badfb683
                                        queryPadding * transformState.maxPitchScaleFactor(),
                                        featureState);
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index b94f10253df4cf7364875a8e80c27f65b7ee2b6a..332ece1727acb037704d85a86a91ad8337547af0 100644
+index ac31a8924e..ad758cea20 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -1,4 +1,5 @@

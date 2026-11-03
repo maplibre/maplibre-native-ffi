@@ -5,7 +5,7 @@ updates without changing style or TileJSON validation
 Upstream: not proposed
 
 diff --git a/src/mln/renderer/sources/render_tile_source.cpp b/src/mln/renderer/sources/render_tile_source.cpp
-index a3856f4..7a34ff8 100644
+index 9192c9d5e8..a4ab5165aa 100644
 --- a/src/mln/renderer/sources/render_tile_source.cpp
 +++ b/src/mln/renderer/sources/render_tile_source.cpp
 @@ -607,7 +607,7 @@ void RenderTileSetSource::update(Immutable<style::Source::Impl> baseImpl_,
@@ -18,7 +18,7 @@ index a3856f4..7a34ff8 100644
      updateInternal(*cachedTileset, layers, needsRendering, needsRelayout, parameters);
  }
 diff --git a/test/style/source.test.cpp b/test/style/source.test.cpp
-index ae2905a..fb1eef5 100644
+index ae2905a2c4..fb1eef5faa 100644
 --- a/test/style/source.test.cpp
 +++ b/test/style/source.test.cpp
 @@ -937,6 +937,33 @@ TEST(Source, RenderTileSetSourceUpdate) {

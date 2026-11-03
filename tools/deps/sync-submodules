@@ -17,7 +17,6 @@ vendor_paths=(
   vendor/polylabel # polygon label placement
   vendor/protozero # MVT / glyph PBF
   vendor/vector-tile # MVT decode headers
-  vendor/wagyu # geometry clipping
   vendor/unique_resource # OpenGL headless RAII
   vendor/boost # header-only utilities
   vendor/rapidjson # style JSON (not thirdparty/gtest)

@@ -4,7 +4,7 @@ macOS SDKs cancel transitions first to keep their behavior.
 Upstream: https://github.com/maplibre/maplibre-native/pull/4637
 
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
-index 63e7d2b92c20..a67ab2dddec5 100644
+index 63e7d2b92c..a67ab2ddde 100644
 --- a/include/mln/map/camera.hpp
 +++ b/include/mln/map/camera.hpp
 @@ -13,6 +13,10 @@ namespace mln {
@@ -31,7 +31,7 @@ index 63e7d2b92c20..a67ab2dddec5 100644
  
      /** Creates an animation with no options specified. */
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
-index 56059f023100..30b02b65d597 100644
+index 56059f0231..30b02b65d5 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
 @@ -877,6 +877,9 @@ public final class MapLibreMap {
@@ -65,7 +65,7 @@ index 56059f023100..30b02b65d597 100644
    }
  
 diff --git a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
-index dd722a6003b7..0831b6239e7e 100644
+index dd722a6003..0831b6239e 100644
 --- a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
 +++ b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
 @@ -106,6 +106,7 @@ class MapLibreMapTest : BaseTest() {
@@ -93,7 +93,7 @@ index dd722a6003b7..0831b6239e7e 100644
      }
  
 diff --git a/platform/macos/src/MLNMapView.mm b/platform/macos/src/MLNMapView.mm
-index 90a44dd7888f..55dd1e77fdc0 100644
+index 90a44dd788..55dd1e77fd 100644
 --- a/platform/macos/src/MLNMapView.mm
 +++ b/platform/macos/src/MLNMapView.mm
 @@ -1307,6 +1307,9 @@ - (void)setCenterCoordinate:(CLLocationCoordinate2D)centerCoordinate
@@ -137,7 +137,7 @@ index 90a44dd7888f..55dd1e77fdc0 100644
    _mbglMap->easeTo(mln::CameraOptions().withBearing(direction).withPadding(
                         MLNEdgeInsetsFromNSEdgeInsets(self.contentInsets)),
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index c05acb105252..f091f2d5cf35 100644
+index c05acb1052..f091f2d5cf 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -95,8 +95,7 @@ CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& paddi
@@ -586,7 +586,7 @@ index c05acb105252..f091f2d5cf35 100644
  
  void Transform::setGestureInProgress(bool inProgress) {
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index d9ec6acf284a..3107c308b74b 100644
+index d9ec6acf28..3107c308b7 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -13,6 +13,8 @@
@@ -668,7 +668,7 @@ index d9ec6acf284a..3107c308b74b 100644
  
  } // namespace mln
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index 3a886f6622c9..8547b69fcdf2 100644
+index fe44091489..8c176138da 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
 @@ -45,7 +45,7 @@ TEST(Transform, InvalidZoom) {
@@ -689,7 +689,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
  
      ASSERT_TRUE(transform.getState().valid());
      ASSERT_DOUBLE_EQ(transform.getState().getMaxZoom(), transform.getZoom());
-@@ -497,10 +497,10 @@ TEST(Transform, Camera) {
+@@ -521,10 +521,10 @@ TEST(Transform, Camera) {
  
      transform.easeTo(cameraOptions1, easeOptions);
      ASSERT_TRUE(transform.inTransition());
@@ -704,7 +704,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
      ASSERT_FALSE(transform.inTransition());
  
      AnimationOptions flyOptions(Seconds(1));
-@@ -519,10 +519,10 @@ TEST(Transform, Camera) {
+@@ -543,10 +543,10 @@ TEST(Transform, Camera) {
  
      transform.flyTo(cameraOptions2, flyOptions);
      ASSERT_TRUE(transform.inTransition());
@@ -719,7 +719,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
      ASSERT_FALSE(transform.inTransition());
  
      // Anchor and center points are mutually exclusive.
-@@ -531,10 +531,10 @@ TEST(Transform, Camera) {
+@@ -555,10 +555,10 @@ TEST(Transform, Camera) {
      camera.anchor = ScreenCoordinate{0, 0}; // top-left
      camera.zoom = transform.getState().getMaxZoom();
      transform.easeTo(camera, AnimationOptions(Seconds(1)));
@@ -734,7 +734,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
      ASSERT_DOUBLE_EQ(transform.getLatLng().latitude(), 0);
      ASSERT_DOUBLE_EQ(transform.getLatLng().longitude(), 0);
  }
-@@ -560,10 +560,10 @@ TEST(Transform, IsPanning) {
+@@ -584,10 +584,10 @@ TEST(Transform, IsPanning) {
  
      transform.resize({1000, 1000});
      transform.easeTo(CameraOptions().withCenter(LatLng(0, 360.0)), easeOptions);
@@ -749,7 +749,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
  }
  
  TEST(Transform, DefaultTransform) {
-@@ -647,7 +647,7 @@ TEST(Transform, DefaultTransform) {
+@@ -671,7 +671,7 @@ TEST(Transform, DefaultTransform) {
      AnimationOptions easeOptions(Seconds(1));
      transform.easeTo(CameraOptions().withCenter(LatLng{56, 11}).withZoom(1), easeOptions);
      ASSERT_TRUE(transform.inTransition());
@@ -758,7 +758,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
  
      // Rotate the screen during a transition (resize it)
      transform.resize({500, 1000});
-@@ -776,11 +776,11 @@ TEST(Transform, LatLngBounds) {
+@@ -800,11 +800,11 @@ TEST(Transform, LatLngBounds) {
      };
      transform.moveBy(ScreenCoordinate{-500, -500}, easeOptions);
  
@@ -775,7 +775,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
  
      // Constrain to the right edge.
      transform.jumpTo(CameraOptions().withCenter(LatLng{inside.latitude(), 241.0}));
-@@ -795,11 +795,11 @@ TEST(Transform, LatLngBounds) {
+@@ -819,11 +819,11 @@ TEST(Transform, LatLngBounds) {
      };
      transform.moveBy(ScreenCoordinate{500, 500}, easeOptions);
  
@@ -792,7 +792,7 @@ index 3a886f6622c9..8547b69fcdf2 100644
  
      //    -1   |   0   |  +1
      // ┌───┬───┰───┬───┰───┬───┐
-@@ -1268,3 +1268,250 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
+@@ -1292,3 +1292,250 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
      EXPECT_NEAR(pitch, pitch_, 1.0e-9);
      EXPECT_NEAR(0.0, roll_, 1.0e-9);
  }

@@ -5,7 +5,7 @@ needs it.
 Upstream: not proposed
 
 diff --git a/include/mln/style/expression/expression.hpp b/include/mln/style/expression/expression.hpp
-index 21f6a71..9eb413a 100644
+index 4ea57a920c..51bda64361 100644
 --- a/include/mln/style/expression/expression.hpp
 +++ b/include/mln/style/expression/expression.hpp
 @@ -272,6 +272,10 @@ public:
@@ -20,7 +20,7 @@ index 21f6a71..9eb413a 100644
      /**
       * Statically analyze the expression, attempting to enumerate possible
 diff --git a/src/mln/style/expression/expression.cpp b/src/mln/style/expression/expression.cpp
-index 4083c7f..f1443b2 100644
+index e5d414930a..058c122485 100644
 --- a/src/mln/style/expression/expression.cpp
 +++ b/src/mln/style/expression/expression.cpp
 @@ -148,6 +148,12 @@ EvaluationResult Expression::evaluate(std::optional<mln::Value> accumulated, con
