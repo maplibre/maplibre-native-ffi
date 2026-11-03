@@ -937,12 +937,12 @@ int32_t mln_kw_mln_map_set_custom_vector_source_tile_error(
   );
 }
 
-int32_t mln_kw_mln_map_set_debug_options(
-  int64_t map, int32_t options, uintptr_t completion, uintptr_t out_diagnostic
+int32_t mln_kw_mln_map_set_debug_flags(
+  int64_t map, int32_t flags, uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_set_debug_options(
-    (mln_map)map, (mln_map_debug_flags)options,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  return (int32_t)mln_map_set_debug_flags(
+    (mln_map)map, (mln_map_debug_flags)flags, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

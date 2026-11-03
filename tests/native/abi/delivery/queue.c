@@ -21,8 +21,8 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
     mln_test_queue_completion(queue.handle, (void*)1);
   const mln_completion second =
     mln_test_queue_completion(queue.handle, (void*)2);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &first, NULL));
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &second, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &first, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &second, NULL));
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&queue.wakes));
 
@@ -35,7 +35,7 @@ static void the_wake_fires_once_per_empty_to_nonempty_transition(void) {
   // The dispatch re-armed the wake.
   const mln_completion third =
     mln_test_queue_completion(queue.handle, (void*)3);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &third, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &third, NULL));
   MLN_TEST_OK(mln_test_map_fence(map));
   TEST_ASSERT_EQUAL_INT(2, atomic_load(&queue.wakes));
 

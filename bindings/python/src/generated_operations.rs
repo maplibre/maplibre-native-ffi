@@ -403,7 +403,7 @@ fn generated_copy_mln_map_snapshot(
     value: &sys::mln_map_snapshot,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("debug_options", generated_value(py, value.debug_options)?)?;
+    dict.set_item("debug_flags", generated_value(py, value.debug_flags)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("fully_loaded", generated_value(py, value.fully_loaded)?)?;
     dict.set_item(
@@ -5471,31 +5471,31 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (options))]
-    fn set_debug_options(
+    #[pyo3(signature = (flags))]
+    fn set_debug_flags(
         &self,
         py: Python<'_>,
-        options: sys::mln_map_debug_flags,
+        flags: sys::mln_map_debug_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_set_debug_options(handle, options, completion, diagnostic)
+                sys::mln_map_set_debug_flags(handle, flags, completion, diagnostic)
             })
         }
     }
-    #[pyo3(signature = (options))]
-    fn _discard_set_debug_options(
+    #[pyo3(signature = (flags))]
+    fn _discard_set_debug_flags(
         &self,
         py: Python<'_>,
-        options: sys::mln_map_debug_flags,
+        flags: sys::mln_map_debug_flags,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_set_debug_options(handle, options, completion, diagnostic)
+                sys::mln_map_set_debug_flags(handle, flags, completion, diagnostic)
             })
         }
     }

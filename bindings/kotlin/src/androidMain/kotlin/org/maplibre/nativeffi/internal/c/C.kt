@@ -710,9 +710,9 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_debug_options(
+  actual external fun mln_map_set_debug_flags(
     map: Long,
-    options: Int,
+    flags: Int,
     completion: Long,
     outDiagnostic: Long,
   ): Int

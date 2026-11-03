@@ -455,7 +455,7 @@ auto map_cancel_camera_transition(
 ) -> mln_status;
 auto map_camera_query_start(mln_map map, const mln_completion* completion)
   -> mln_status;
-auto map_set_debug_options(MapObject& live, uint32_t options) -> mln_status;
+auto map_set_debug_flags(MapObject& live, uint32_t flags) -> mln_status;
 auto map_set_rendering_stats_view_enabled(MapObject& live, bool enabled)
   -> mln_status;
 auto map_dump_debug_logs(MapObject& live) -> mln_status;
@@ -560,7 +560,7 @@ auto map_set_bounds(MapObject& live, const mln_bound_options* options)
 auto map_set_free_camera_options(
   MapObject& live, const mln_free_camera_options* options
 ) -> mln_status;
-auto validate_debug_options_input(uint32_t options) -> mln_status;
+auto validate_debug_flags_input(uint32_t flags) -> mln_status;
 auto validate_viewport_options_input(const mln_map_viewport_options* options)
   -> mln_status;
 auto validate_tile_options_input(const mln_map_tile_options* options)

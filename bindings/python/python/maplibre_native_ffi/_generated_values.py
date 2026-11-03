@@ -1839,7 +1839,7 @@ class MapSnapshot:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    debug_options: MapDebugFlag
+    debug_flags: MapDebugFlag
 
     generation: int
     """Grows with each change to the map's state."""
@@ -1869,7 +1869,7 @@ class MapSnapshot:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            debug_options=MapDebugFlag(raw["debug_options"]),
+            debug_flags=MapDebugFlag(raw["debug_flags"]),
             generation=raw["generation"],
             fully_loaded=raw["fully_loaded"],
             rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],

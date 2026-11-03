@@ -61,17 +61,17 @@ auto mln_map_set_projection_mode(
   });
 }
 
-auto mln_map_set_debug_options(
-  mln_map map, uint32_t options, const mln_completion* completion,
+auto mln_map_set_debug_flags(
+  mln_map map, uint32_t flags, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    const auto validation = mln::core::validate_debug_options_input(options);
+    const auto validation = mln::core::validate_debug_flags_input(flags);
     if (validation != MLN_STATUS_OK) return validation;
     return mln::core::submit_map_command(
       map,
-      [options](mln::core::MapObject& live) {
-        return mln::core::map_set_debug_options(live, options);
+      [flags](mln::core::MapObject& live) {
+        return mln::core::map_set_debug_flags(live, flags);
       },
       completion
     );

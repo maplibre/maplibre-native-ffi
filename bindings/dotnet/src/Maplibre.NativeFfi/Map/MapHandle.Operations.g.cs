@@ -1898,17 +1898,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Draws debugging overlays, such as tile borders, on the map.
     /// </summary>
     /// <remarks>
-    /// <para><c>options</c> replaces the overlays set before.</para>
-    /// <para>See <c>mln_map_set_debug_options</c> in the <see
+    /// <para><c>flags</c> replaces the overlays set before.</para>
+    /// <para>See <c>mln_map_set_debug_flags</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
-    public Task<CommandCompletion> SetDebugOptionsAsync(MapDebugFlag options)
+    public Task<CommandCompletion> SetDebugFlagsAsync(MapDebugFlag flags)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_debug_options(
+        var nativeStatus = NativeMethods.mln_map_set_debug_flags(
             Handle,
-            (uint)options,
+            (uint)flags,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -3014,17 +3014,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetDebugOptions(MapDebugFlag options)
+        public void SetDebugFlags(MapDebugFlag flags)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
-                NativeMethods.mln_map_set_debug_options(
-                    receiverHandle,
-                    (uint)options,
-                    null,
-                    Diagnostic
-                )
+                NativeMethods.mln_map_set_debug_flags(receiverHandle, (uint)flags, null, Diagnostic)
             );
             scope.Accept();
         }

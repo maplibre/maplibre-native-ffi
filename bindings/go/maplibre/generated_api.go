@@ -2754,7 +2754,7 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 // See mln_map_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapSnapshot struct {
-	DebugOptions MapDebugFlag
+	DebugFlags MapDebugFlag
 	// Grows with each change to the map's state.
 	Generation uint64
 	// Whether the style and every resource that the view needs have loaded.
@@ -2773,7 +2773,7 @@ type MapSnapshot struct {
 
 func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	var result MapSnapshot
-	result.DebugOptions = MapDebugFlag(raw.debug_options)
+	result.DebugFlags = MapDebugFlag(raw.debug_flags)
 	result.Generation = uint64(raw.generation)
 	result.FullyLoaded = bool(raw.fully_loaded)
 	result.RenderingStatsViewEnabled = bool(raw.rendering_stats_view_enabled)
@@ -7024,15 +7024,15 @@ func (receiver *MapHandle) SetCustomVectorSourceTileError(sourceId string, tileI
 	}, completionCommand)
 }
 
-// SetDebugOptions draws debugging overlays, such as tile borders, on the map.
+// SetDebugFlags draws debugging overlays, such as tile borders, on the map.
 //
-// options replaces the overlays set before.
+// flags replaces the overlays set before.
 //
-// See mln_map_set_debug_options in the C API reference:
+// See mln_map_set_debug_flags in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) SetDebugOptions(options MapDebugFlag) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetDebugFlags(flags MapDebugFlag) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.mln_map_debug_flags(options), completion, diagnostic))
+		return int32(C.mln_map_set_debug_flags(C.mln_map(raw), C.mln_map_debug_flags(flags), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -8677,10 +8677,10 @@ func (view MapHandleDiscarding) SetCustomVectorSourceTileError(sourceId string, 
 	})
 }
 
-func (view MapHandleDiscarding) SetDebugOptions(options MapDebugFlag) error {
+func (view MapHandleDiscarding) SetDebugFlags(flags MapDebugFlag) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.mln_map_debug_flags(options), completion, diagnostic))
+		return int32(C.mln_map_set_debug_flags(C.mln_map(raw), C.mln_map_debug_flags(flags), completion, diagnostic))
 	})
 }
 

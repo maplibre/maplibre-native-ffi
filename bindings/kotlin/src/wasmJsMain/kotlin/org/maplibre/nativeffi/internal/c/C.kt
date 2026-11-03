@@ -931,12 +931,12 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_debug_options(
+  actual fun mln_map_set_debug_flags(
     map: Long,
-    options: Int,
+    flags: Int,
     completion: Long,
     outDiagnostic: Long,
-  ): Int = mln_kw_mln_map_set_debug_options(map, options, word(completion), word(outDiagnostic))
+  ): Int = mln_kw_mln_map_set_debug_flags(map, flags, word(completion), word(outDiagnostic))
 
   actual fun mln_map_set_event_mask(
     map: Long,
@@ -2541,9 +2541,9 @@ private fun mln_kw_mln_map_set_custom_vector_source_tile_error(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_vector_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_set_debug_options(p0: Long, p1: Int, p2: Int, p3: Int): Int =
+private fun mln_kw_mln_map_set_debug_flags(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_debug_options(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_debug_flags(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_event_mask(p0: Long, p1: Long, p2: Int, p3: Int): Int =

@@ -1771,14 +1771,14 @@ auto validate_free_camera_options(const mln_free_camera_options* options)
   return MLN_STATUS_OK;
 }
 
-auto validate_debug_options(uint32_t options) -> mln_status {
-  constexpr auto known_options =
+auto validate_debug_flags(uint32_t flags) -> mln_status {
+  constexpr auto known_flags =
     static_cast<uint32_t>(MLN_MAP_DEBUG_TILE_BORDERS) |
     MLN_MAP_DEBUG_PARSE_STATUS | MLN_MAP_DEBUG_TIMESTAMPS |
     MLN_MAP_DEBUG_COLLISION | MLN_MAP_DEBUG_OVERDRAW |
     MLN_MAP_DEBUG_STENCIL_CLIP | MLN_MAP_DEBUG_DEPTH_BUFFER;
-  if ((options & ~known_options) != 0U) {
-    mln::core::set_thread_error("debug options contain unknown bits");
+  if ((flags & ~known_flags) != 0U) {
+    mln::core::set_thread_error("debug flags contain unknown bits");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
@@ -2340,12 +2340,12 @@ auto camera_fit_pitch(const mln_camera_fit_options* options)
   return options->pitch;
 }
 
-auto to_native_debug_options(uint32_t options) -> mln::MapDebugOptions {
-  return static_cast<mln::MapDebugOptions>(options);
+auto to_native_debug_flags(uint32_t flags) -> mln::MapDebugOptions {
+  return static_cast<mln::MapDebugOptions>(flags);
 }
 
-auto from_native_debug_options(mln::MapDebugOptions options) -> uint32_t {
-  return static_cast<uint32_t>(options);
+auto from_native_debug_flags(mln::MapDebugOptions flags) -> uint32_t {
+  return static_cast<uint32_t>(flags);
 }
 
 auto to_native_north_orientation(mln_north_orientation orientation)
@@ -2778,8 +2778,8 @@ auto map_view_from_transform(
   };
 }
 
-auto validate_debug_options_input(uint32_t options) -> mln_status {
-  return validate_debug_options(options);
+auto validate_debug_flags_input(uint32_t flags) -> mln_status {
+  return validate_debug_flags(flags);
 }
 
 auto validate_viewport_options_input(const mln_map_viewport_options* options)
@@ -2922,7 +2922,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
 
   auto snapshot = mln_map_snapshot{
     .size = sizeof(mln_map_snapshot),
-    .debug_options = from_native_debug_options(live.map->getDebug()),
+    .debug_flags = from_native_debug_flags(live.map->getDebug()),
     .generation = live.next_snapshot_generation++,
     .fully_loaded = live.map->isFullyLoaded(),
     .rendering_stats_view_enabled = live.map->isRenderingStatsViewEnabled(),
@@ -4669,13 +4669,13 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   return submit_status;
 }
 
-auto map_set_debug_options(MapObject& live, uint32_t options) -> mln_status {
-  const auto options_status = validate_debug_options(options);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
+auto map_set_debug_flags(MapObject& live, uint32_t flags) -> mln_status {
+  const auto flags_status = validate_debug_flags(flags);
+  if (flags_status != MLN_STATUS_OK) {
+    return flags_status;
   }
   live.snapshot_config_dirty = true;
-  live.map->setDebug(to_native_debug_options(options));
+  live.map->setDebug(to_native_debug_flags(flags));
   return MLN_STATUS_OK;
 }
 

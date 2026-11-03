@@ -39,7 +39,7 @@ test("a failed command rejects with its status and generation", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();
   const committed = await bounded(
-    map.setDebugOptions(MapDebugFlag.tileBorders),
+    map.setDebugFlags(MapDebugFlag.tileBorders),
     "a committed command",
   );
 
@@ -59,7 +59,7 @@ test("discarded commands are fenced and synchronous rejection throws", async () 
 
   // A discarded command returns once native accepts it, and a later
   // completion on the same map follows it.
-  map.discarding.setDebugOptions(MapDebugFlag.tileBorders);
+  map.discarding.setDebugFlags(MapDebugFlag.tileBorders);
   map.discarding.addStyleSourceJson("discarded", {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },

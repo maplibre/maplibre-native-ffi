@@ -1592,17 +1592,14 @@ impl MapHandle {
 
     /// Draws debugging overlays, such as tile borders, on the map.
     ///
-    /// `options` replaces the overlays set before.
+    /// `flags` replaces the overlays set before.
     ///
-    /// See `mln_map_set_debug_options` in the
+    /// See `mln_map_set_debug_flags` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn set_debug_options(
-        &self,
-        options: MapDebugFlag,
-    ) -> Result<NativeFuture<CommandCompletion>> {
+    pub fn set_debug_flags(&self, flags: MapDebugFlag) -> Result<NativeFuture<CommandCompletion>> {
         let call = self.inner.call();
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_debug_options(map, options.bits(), completion, out_diagnostic)
+            sys::mln_map_set_debug_flags(map, flags.bits(), completion, out_diagnostic)
         })
     }
 
@@ -2698,14 +2695,14 @@ impl MapHandleDiscarding<'_> {
 
     /// Draws debugging overlays, such as tile borders, on the map.
     ///
-    /// `options` replaces the overlays set before.
+    /// `flags` replaces the overlays set before.
     ///
-    /// See `mln_map_set_debug_options` in the
+    /// See `mln_map_set_debug_flags` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn set_debug_options(&self, options: MapDebugFlag) -> Result<()> {
+    pub fn set_debug_flags(&self, flags: MapDebugFlag) -> Result<()> {
         let call = self.0.inner.call();
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_debug_options(map, options.bits(), completion, out_diagnostic)
+            sys::mln_map_set_debug_flags(map, flags.bits(), completion, out_diagnostic)
         })
     }
 

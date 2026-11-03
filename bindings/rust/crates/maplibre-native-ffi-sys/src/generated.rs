@@ -829,7 +829,7 @@ pub struct mln_map_options {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_map_snapshot {
     pub size: u32,
-    pub debug_options: mln_map_debug_flags,
+    pub debug_flags: mln_map_debug_flags,
     pub generation: u64,
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
@@ -2431,9 +2431,9 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_debug_options(
+    pub fn mln_map_set_debug_flags(
         map: mln_map,
-        options: mln_map_debug_flags,
+        flags: mln_map_debug_flags,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

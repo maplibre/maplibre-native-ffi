@@ -323,7 +323,7 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   mln_test_gate gate;
   mln_test_gate_init(&gate);
   const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &hold, NULL));
+  MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );

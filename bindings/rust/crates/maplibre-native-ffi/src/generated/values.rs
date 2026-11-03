@@ -1839,7 +1839,7 @@ impl ToNative<sys::mln_map_options> for MapOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MapSnapshot {
-    pub debug_options: MapDebugFlag,
+    pub debug_flags: MapDebugFlag,
     /// Grows with each change to the map's state.
     pub generation: u64,
     /// Whether the style and every resource that the view needs have loaded.
@@ -1858,7 +1858,7 @@ pub struct MapSnapshot {
 impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
     unsafe fn from_native(raw: sys::mln_map_snapshot) -> Result<Self> {
         Ok(Self {
-            debug_options: MapDebugFlag::from_bits_retain(raw.debug_options),
+            debug_flags: MapDebugFlag::from_bits_retain(raw.debug_flags),
             generation: raw.generation,
             fully_loaded: raw.fully_loaded,
             rendering_stats_view_enabled: raw.rendering_stats_view_enabled,

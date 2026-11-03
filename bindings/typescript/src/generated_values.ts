@@ -932,7 +932,7 @@ export interface MapOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapSnapshot {
-  readonly debugOptions: MapDebugFlag;
+  readonly debugFlags: MapDebugFlag;
   /**
    * Grows with each change to the map's state.
    */

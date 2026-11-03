@@ -1276,14 +1276,14 @@ internal constructor(
   /**
    * Draws debugging overlays, such as tile borders, on the map.
    *
-   * `options` replaces the overlays set before.
+   * `flags` replaces the overlays set before.
    *
-   * See `mln_map_set_debug_options` in the
+   * See `mln_map_set_debug_flags` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setDebugOptions(options: MapDebugFlag): Deferred<CommandCompletion> =
+  public fun setDebugFlags(flags: MapDebugFlag): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
-      check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
+      check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
     }
 
   /**
@@ -2145,10 +2145,10 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
       )
     }
 
-  /** [MapHandle.setDebugOptions] without its completion. */
-  public fun setDebugOptions(options: MapDebugFlag): Unit =
+  /** [MapHandle.setDebugFlags] without its completion. */
+  public fun setDebugFlags(flags: MapDebugFlag): Unit =
     nativeDiscard(owner, binding) {
-      check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
+      check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
     }
 
   /** [MapHandle.setEventMask] without its completion. */

@@ -986,12 +986,12 @@ pub const Map = struct {
 
     /// Draws debugging overlays, such as tile borders, on the map.
     ///
-    /// `options` replaces the overlays set before.
+    /// `flags` replaces the overlays set before.
     ///
-    /// See `mln_map_set_debug_options` in the
+    /// See `mln_map_set_debug_flags` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn setDebugOptions(self: Map, options: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_debug_options", .handle, self, call.command, null, diagnostic, .{options});
+    pub fn setDebugFlags(self: Map, flags: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_debug_flags", .handle, self, call.command, null, diagnostic, .{flags});
     }
 
     /// Selects the events that the map reports.
@@ -3883,7 +3883,7 @@ pub const MapOptions = struct {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapSnapshot = struct {
-    debug_options: MapDebugFlag = .{},
+    debug_flags: MapDebugFlag = .{},
     /// Grows with each change to the map's state.
     generation: u64 = 0,
     /// Whether the style and every resource that the view needs have loaded.
@@ -3900,7 +3900,7 @@ pub const MapSnapshot = struct {
     view: MapView = .{},
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
-            .debug_options = MapDebugFlag.fromNative(raw.debug_options),
+            .debug_flags = MapDebugFlag.fromNative(raw.debug_flags),
             .generation = raw.generation,
             .fully_loaded = raw.fully_loaded,
             .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
@@ -7774,9 +7774,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_custom_vector_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
     }
 
-    pub fn setDebugOptions(self: MapDiscarding, options: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn setDebugFlags(self: MapDiscarding, flags: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_set_debug_options", .handle, map, null, diagnostic, .{options});
+        return call.discard("mln_map_set_debug_flags", .handle, map, null, diagnostic, .{flags});
     }
 
     pub fn setEventMask(self: MapDiscarding, mask: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

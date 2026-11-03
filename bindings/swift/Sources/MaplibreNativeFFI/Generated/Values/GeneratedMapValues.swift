@@ -1055,7 +1055,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapSnapshot: Equatable, Hashable, Sendable {
-  public var debugOptions: MapDebugFlag
+  public var debugFlags: MapDebugFlag
   /// Grows with each change to the map's state.
   public var generation: UInt64
   /// Whether the style and every resource that the view needs have loaded.
@@ -1071,7 +1071,7 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var freeCamera: FreeCameraOptions
   public var view: MapView
   public init(
-    debugOptions: MapDebugFlag = .init(rawValue: 0),
+    debugFlags: MapDebugFlag = .init(rawValue: 0),
     generation: UInt64 = 0,
     fullyLoaded: Bool = false,
     renderingStatsViewEnabled: Bool = false,
@@ -1084,7 +1084,7 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     freeCamera: FreeCameraOptions = .init(),
     view: MapView = .init()
   ) {
-    self.debugOptions = debugOptions
+    self.debugFlags = debugFlags
     self.generation = generation
     self.fullyLoaded = fullyLoaded
     self.renderingStatsViewEnabled = renderingStatsViewEnabled
@@ -1099,7 +1099,7 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_map_snapshot) {
-    debugOptions = MapDebugFlag(rawValue: raw.debug_options)
+    debugFlags = MapDebugFlag(rawValue: raw.debug_flags)
     generation = raw.generation
     fullyLoaded = raw.fully_loaded
     renderingStatsViewEnabled = raw.rendering_stats_view_enabled

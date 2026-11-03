@@ -1233,15 +1233,15 @@ class _MapHandleOperations(GeneratedOperations):
             source_id, tile_id, message
         )
 
-    def set_debug_options(self, options: MapDebugFlag) -> Future[CommandCompletion]:
+    def set_debug_flags(self, flags: MapDebugFlag) -> Future[CommandCompletion]:
         """Draws debugging overlays, such as tile borders, on the map.
 
-        `options` replaces the overlays set before.
+        `flags` replaces the overlays set before.
 
-        See `mln_map_set_debug_options` in the
+        See `mln_map_set_debug_flags` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
-        return self._native.set_debug_options(options)
+        return self._native.set_debug_flags(flags)
 
     def set_event_mask(self, mask: RuntimeEventFlag) -> Future[CommandCompletion]:
         """Selects the events that the map reports.
@@ -3171,15 +3171,15 @@ class MapHandleDiscarding:
             source_id, tile_id, message
         )
 
-    def set_debug_options(self, options: MapDebugFlag) -> None:
+    def set_debug_flags(self, flags: MapDebugFlag) -> None:
         """Draws debugging overlays, such as tile borders, on the map.
 
-        `options` replaces the overlays set before.
+        `flags` replaces the overlays set before.
 
-        See `mln_map_set_debug_options` in the
+        See `mln_map_set_debug_flags` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
-        return self._native._discard_set_debug_options(options)
+        return self._native._discard_set_debug_flags(flags)
 
     def set_event_mask(self, mask: RuntimeEventFlag) -> None:
         """Selects the events that the map reports.

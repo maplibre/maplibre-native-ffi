@@ -124,9 +124,8 @@ void discarded_commands_keep_the_graph_alive_until_the_worker_drains() {
   auto weak = std::weak_ptr{live};
   auto worker = WorkerGate{};
   park_worker(*live, worker);
-  const auto submitted = mln_map_set_debug_options(
-    map, MLN_MAP_DEBUG_TILE_BORDERS, nullptr, nullptr
-  );
+  const auto submitted =
+    mln_map_set_debug_flags(map, MLN_MAP_DEBUG_TILE_BORDERS, nullptr, nullptr);
   const auto map_disposed = mln_map_dispose(map, nullptr);
   const auto runtime_disposed = mln_runtime_dispose(runtime, nullptr);
   // With the case's lease gone, only the parked worker's queue holds the graph.

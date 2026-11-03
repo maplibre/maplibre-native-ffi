@@ -1996,14 +1996,14 @@ export class MapHandle extends Owner {
   /**
    * Draws debugging overlays, such as tile borders, on the map.
    *
-   * `options` replaces the overlays set before.
+   * `flags` replaces the overlays set before.
    *
-   * See `mln_map_set_debug_options` in the
+   * See `mln_map_set_debug_flags` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setDebugOptions(options: MapDebugFlag): Promise<CommandCompletion> {
+  setDebugFlags(flags: MapDebugFlag): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_set_debug_options(this.id, options, completion),
+      native.mln_map_set_debug_flags(this.id, flags, completion),
     );
   }
 
@@ -2990,13 +2990,13 @@ export class MapHandleDiscarding {
   /**
    * Draws debugging overlays, such as tile borders, on the map.
    *
-   * `options` replaces the overlays set before.
+   * `flags` replaces the overlays set before.
    *
-   * See `mln_map_set_debug_options` in the
+   * See `mln_map_set_debug_flags` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setDebugOptions(options: MapDebugFlag): void {
-    native.mln_map_set_debug_options(this.#owner.id, options, undefined);
+  setDebugFlags(flags: MapDebugFlag): void {
+    native.mln_map_set_debug_flags(this.#owner.id, flags, undefined);
   }
 
   /**
