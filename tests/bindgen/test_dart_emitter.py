@@ -213,6 +213,7 @@ class DartEmitterTests(unittest.TestCase):
                 "mln_probe_batch_points",
                 "mln_probe_batch_scores",
                 "mln_probe_zeros_json",
+                "mln_probe_zeros_text",
                 "mln_probe_read_level",
                 "mln_probe_roundtrip",
                 "mln_probe_settings_check",

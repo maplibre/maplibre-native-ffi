@@ -2808,6 +2808,12 @@ class RenderSessionSnapshot:
 
     acquired_frame_count: int
 
+    failure_status: Status
+    """`Status.OK` until the session fails. Then `Status.TARGET_LOST` when it
+    failed because it lost its target, or `Status.NATIVE_ERROR` when it
+    failed for another reason.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2818,6 +2824,7 @@ class RenderSessionSnapshot:
             rendered_update_generation=raw["rendered_update_generation"],
             frame_generation=raw["frame_generation"],
             acquired_frame_count=raw["acquired_frame_count"],
+            failure_status=Status(raw["failure_status"]),
         )
 
 

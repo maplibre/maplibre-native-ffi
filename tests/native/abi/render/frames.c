@@ -46,7 +46,7 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
-  MLN_TEST_OK(mln_render_session_get_failure(fixture.session, NULL));
+  MLN_TEST_OK(mln_test_render_session_failure(fixture.session, NULL, 0));
   mln_test_completion readback = mln_test_completion_readback();
   MLN_TEST_OK(
     mln_render_session_read_texture(fixture.session, &readback.descriptor, NULL)
@@ -60,7 +60,7 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
     mln_test_completion_diagnostic(&readback)
   );
   mln_test_completion_destroy(&readback);
-  MLN_TEST_OK(mln_render_session_get_failure(fixture.session, NULL));
+  MLN_TEST_OK(mln_test_render_session_failure(fixture.session, NULL, 0));
 
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_request_forced(&fixture, 260);
@@ -422,9 +422,14 @@ static void an_acquired_frame_still_releases_after_abandon(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(2, abandoned.quarantined_resource_count);
 #endif
-  mln_render_frame_result invalid = {.size = sizeof(mln_render_frame_result)};
+  // The frame keeps its own result, but the session no longer backs the
+  // objects that it lends.
+  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
+  MLN_TEST_OK(mln_acquired_frame_get_result(frame, &result, NULL));
+  mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
   MLN_TEST_STATUS(
-    MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(frame, &invalid, NULL)
+    MLN_STATUS_TARGET_LOST,
+    mln_acquired_frame_get_producer_sync(frame, &sync, NULL)
   );
   mln_test_render_release_frame(&frame);
   detach(runtime, map, &fixture);

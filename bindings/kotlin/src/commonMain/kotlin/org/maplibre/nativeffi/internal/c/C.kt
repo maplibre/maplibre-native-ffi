@@ -698,7 +698,13 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_render_session_get_failure(session: Long, outDiagnostic: Long): Int
+  fun mln_render_session_get_failure(
+    session: Long,
+    outMessage: Long,
+    messageCapacity: Long,
+    outMessageLength: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_render_session_get_snapshot(session: Long, outSnapshot: Long, outDiagnostic: Long): Int
 

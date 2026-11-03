@@ -213,20 +213,36 @@ internal constructor(
     }
 
   /**
-   * Reports the error that made the session fail.
+   * Reads the message of the error that made the session fail.
    *
-   * The call fails with that error, and succeeds while the session hasn't failed.
+   * `RenderSessionSnapshot.failureStatus` reports the error's status. The message is empty while
+   * the session hasn't failed, and doesn't change once it fails.
    *
    * See `mln_render_session_get_failure` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.TARGET_LOST` when the session failed because it lost its target.
-   * - `Status.NATIVE_ERROR` when the session failed for another reason.
    */
-  public fun getFailure(): Unit =
-    nativeCall(this, binding) { check(C.mln_render_session_get_failure(handle, diagnostic)) }
+  public fun getFailure(): String =
+    nativeCall(this, binding) {
+      val textLength = allocate(w(4, 8), w(4, 8))
+      var textCapacity = 256L
+      var textStorage = allocate(textCapacity, 1)
+      while (true) {
+        check(
+          C.mln_render_session_get_failure(
+            handle,
+            textStorage,
+            textCapacity,
+            textLength,
+            diagnostic,
+          ),
+        )
+        val written = readSize(textLength).toLong()
+        if (written < textCapacity) break
+        textCapacity = written + 1
+        textStorage = allocate(textCapacity, 1)
+      }
+      readBytes(textStorage, readSize(textLength)).decodeToString()
+    }
 
   /**
    * Reads the session's current state.
@@ -236,7 +252,7 @@ internal constructor(
    */
   public fun getSnapshot(): RenderSessionSnapshot =
     nativeCall(this, binding) {
-      val out = sized(w(64, 64, 60), w(8, 8, 4))
+      val out = sized(64, w(8, 8, 4))
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
     }

@@ -1490,10 +1490,12 @@ static jint mln_render_session_get_capabilities_jni(
 }
 
 static jint mln_render_session_get_failure_jni(
-  JNIEnv* env, jclass type, jlong session, jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong session, jlong out_message,
+  jlong message_capacity, jlong out_message_length, jlong out_diagnostic
 ) {
   return (jint)mln_render_session_get_failure(
-    (mln_render_session)session,
+    (mln_render_session)session, MLN_JNI_POINTER(char*, out_message),
+    (size_t)message_capacity, MLN_JNI_POINTER(size_t*, out_message_length),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -2352,7 +2354,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_dump_debug_logs_jni},
   {"mln_render_session_get_capabilities", "(JJJ)I",
    (void*)mln_render_session_get_capabilities_jni},
-  {"mln_render_session_get_failure", "(JJ)I",
+  {"mln_render_session_get_failure", "(JJJJJ)I",
    (void*)mln_render_session_get_failure_jni},
   {"mln_render_session_get_snapshot", "(JJJ)I",
    (void*)mln_render_session_get_snapshot_jni},
@@ -2708,7 +2710,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_dump_debug_logs_jni},
   {"mln_render_session_get_capabilities", "(JJJ)I",
    (void*)mln_render_session_get_capabilities_jni},
-  {"mln_render_session_get_failure", "(JJ)I",
+  {"mln_render_session_get_failure", "(JJJJJ)I",
    (void*)mln_render_session_get_failure_jni},
   {"mln_render_session_get_snapshot", "(JJJ)I",
    (void*)mln_render_session_get_snapshot_critical},

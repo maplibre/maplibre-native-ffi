@@ -75,8 +75,8 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.TargetLost</c> when the session lost its
-    /// target.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
@@ -113,8 +113,8 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.TargetLost</c> when the session lost its
-    /// target.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
     /// </remarks>
     public void WithOpenGlTexture(Action<OpenGlTextureFrameView> callback)
@@ -150,8 +150,8 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.TargetLost</c> when the session lost its
-    /// target.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
     /// </remarks>
     public void WithProducerSync(Action<GpuSyncView> callback)
@@ -178,13 +178,10 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// Reads the frame result of an acquired frame.
     /// </summary>
     /// <remarks>
+    /// <para>It succeeds until you release or discard the frame, whatever the
+    /// session's state.</para>
     /// <para>See <c>mln_acquired_frame_get_result</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.TargetLost</c> when the session lost its
-    /// target.</description></item>
-    /// </list>
     /// </remarks>
     public RenderFrameResult GetResult()
     {
@@ -205,8 +202,8 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.TargetLost</c> when the session lost its
-    /// target.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
     /// </remarks>
     [global::System.Runtime.Versioning.SupportedOSPlatform("android")]

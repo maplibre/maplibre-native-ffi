@@ -241,25 +241,32 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_capabilities) }?)
     }
 
-    /// Reports the error that made the session fail.
+    /// Reads the message of the error that made the session fail.
     ///
-    /// The call fails with that error, and succeeds while the session hasn't
-    /// failed.
+    /// `RenderSessionSnapshot::failure_status` reports the error's status. The
+    /// message is empty while the session hasn't failed, and doesn't change
+    /// once it fails.
     ///
     /// See `mln_render_session_get_failure` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::TargetLost` when the session failed because it lost its
-    ///   target.
-    /// - `Status::NativeError` when the session failed for another reason.
-    pub fn get_failure(&self) -> Result<()> {
+    pub fn get_failure(&self) -> Result<String> {
         let mut call = self.inner.call();
+        let mut out_message = Vec::new();
         call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_get_failure(session, out_diagnostic)
+            convert::caller_sized_text(
+                &mut out_message,
+                |out_message, message_capacity, out_message_length| {
+                    sys::mln_render_session_get_failure(
+                        session,
+                        out_message,
+                        message_capacity,
+                        out_message_length,
+                        out_diagnostic,
+                    )
+                },
+            )
         })?;
-        Ok(())
+        Ok(convert::utf8(out_message)?)
     }
 
     /// Reads the session's current state.

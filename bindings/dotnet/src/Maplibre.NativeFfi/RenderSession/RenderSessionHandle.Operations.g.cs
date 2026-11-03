@@ -344,25 +344,39 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Reports the error that made the session fail.
+    /// Reads the message of the error that made the session fail.
     /// </summary>
     /// <remarks>
-    /// <para>The call fails with that error, and succeeds while the session
-    /// hasn't failed.</para>
+    /// <para><c>RenderSessionSnapshot.FailureStatus</c> reports the error's
+    /// status. The message is empty while the session hasn't failed, and
+    /// doesn't change once it fails.</para>
     /// <para>See <c>mln_render_session_get_failure</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.TargetLost</c> when the session failed
-    /// because it lost its target.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the session failed for
-    /// another reason.</description></item>
-    /// </list>
     /// </remarks>
-    public void GetFailure()
+    public string GetFailure()
     {
-        using var call = Enter(this);
-        Check(NativeMethods.mln_render_session_get_failure(Handle, Diagnostic));
+        using var scope = new NativeCallScope(this);
+        nuint messageCapacity = 256;
+        nuint outMessageLength = 0;
+        var outMessage = scope.OutputArray<sbyte>((int)messageCapacity);
+        while (true)
+        {
+            Check(
+                NativeMethods.mln_render_session_get_failure(
+                    Handle,
+                    outMessage,
+                    messageCapacity,
+                    &outMessageLength,
+                    Diagnostic
+                )
+            );
+            if (outMessageLength < messageCapacity)
+                break;
+            messageCapacity = outMessageLength + 1;
+            outMessage = scope.OutputArray<sbyte>(checked((int)messageCapacity));
+        }
+        scope.Accept();
+        return RuntimeStructs.CopyUtf8(outMessage, outMessageLength);
     }
 
     /// <summary>

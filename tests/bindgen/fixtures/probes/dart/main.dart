@@ -42,6 +42,8 @@ void main() {
     jsonEncode(probeZerosJson(300)) == jsonEncode(List.filled(300, 0)),
     'long text',
   );
+  // Caller-sized UTF-8 text is a string.
+  check(probeZerosText(300) == '0' * 300, 'utf-8 text');
 
   // A caller-sized output array holds one element per input element, in
   // input order.

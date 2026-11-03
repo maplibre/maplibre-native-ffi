@@ -311,7 +311,11 @@ class Values:
         if plan.kind == "native_pointer":
             return f"NativePointer.FromNativeAddress((nint){expression})"
         if plan.kind == "enum":
-            return f"({public_name(plan.native)}){expression}"
+            # Qualified, because an internal namespace such as
+            # Internal.Status can hide a public enum of the same name.
+            return (
+                f"(global::Maplibre.NativeFfi.{public_name(plan.native)}){expression}"
+            )
         if plan.kind == "scalar":
             if plan.native == "size_t":
                 return f"(ulong){expression}"

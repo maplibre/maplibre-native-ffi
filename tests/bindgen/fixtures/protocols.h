@@ -285,6 +285,15 @@ mln_status mln_probe_zeros_json(
   size_t json_capacity, size_t* out_json_length BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
+// UTF-8 text in storage that the caller sizes, which a binding copies as a
+// string.
+mln_status mln_probe_zeros_text(
+  uint32_t count,
+  char* out_text
+    BIND("direction=out;length=text_capacity;result_length=out_text_length"),
+  size_t text_capacity, size_t* out_text_length BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
 #endif
 
 #ifdef MLN_PROTOCOL_PRESENCE_MASK

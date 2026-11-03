@@ -1732,6 +1732,7 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   renderedUpdateGeneration: source.rendered_update_generation,
   frameGeneration: source.frame_generation,
   acquiredFrameCount: source.acquired_frame_count,
+  failureStatus: Status.fromRawValue(source.failure_status),
 );
 
 Pointer<raw.mln_screen_box> _writeScreenBox(
@@ -2936,7 +2937,8 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.targetLost` when the session lost its target.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
   T withMetalTexture<T>(T Function(ScopedMetalTextureFrame view) use) =>
       _NativeViewScope(
         _state,
@@ -2966,7 +2968,8 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.targetLost` when the session lost its target.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
   T withOpenGlTexture<T>(T Function(ScopedOpenGlTextureFrame view) use) =>
       _NativeViewScope(
         _state,
@@ -2996,7 +2999,8 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.targetLost` when the session lost its target.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
   T withProducerSync<T>(T Function(ScopedGpuSync view) use) => _NativeViewScope(
     _state,
     raw.mln_acquired_frame_view_begin,
@@ -3018,12 +3022,11 @@ final class AcquiredFrameHandle implements Finalizable {
 
   /// Reads the frame result of an acquired frame.
   ///
+  /// It succeeds until you release or discard the frame, whatever the session's
+  /// state.
+  ///
   /// See `mln_acquired_frame_get_result` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.targetLost` when the session lost its target.
   RenderFrameResult getResult() => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_frame_result>();
     outResult.ref.size = sizeOf<raw.mln_render_frame_result>();
@@ -3044,7 +3047,8 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.targetLost` when the session lost its target.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
   T withVulkanTexture<T>(T Function(ScopedVulkanTextureFrame view) use) =>
       _NativeViewScope(
         _state,
@@ -6165,20 +6169,31 @@ final class RenderSessionHandle implements Finalizable {
     return _readRenderSessionCapabilities(outCapabilities.ref);
   });
 
-  /// Reports the error that made the session fail.
+  /// Reads the message of the error that made the session fail.
   ///
-  /// The call fails with that error, and succeeds while the session hasn't
-  /// failed.
+  /// `RenderSessionSnapshot.failureStatus` reports the error's status. The
+  /// message is empty while the session hasn't failed, and doesn't change once
+  /// it fails.
   ///
   /// See `mln_render_session_get_failure` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.targetLost` when the session failed because it lost its target.
-  /// - `Status.nativeError` when the session failed for another reason.
-  void getFailure() =>
-      _check(raw.mln_render_session_get_failure(_handle.raw, nativeDiagnostic));
+  String getFailure() => withNativeArena((arena) {
+    final text = _CallerSizedText();
+    _check(
+      text.call(
+        arena,
+        (textStorage, textCapacity, textLength) =>
+            raw.mln_render_session_get_failure(
+              _handle.raw,
+              textStorage,
+              textCapacity,
+              textLength,
+              nativeDiagnostic,
+            ),
+      ),
+    );
+    return utf8.decode(text.text);
+  });
 
   /// Reads the session's current state.
   ///

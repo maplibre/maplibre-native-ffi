@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <exception>
 #include <map>
@@ -12,6 +13,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -3308,16 +3310,35 @@ auto render_session_get_snapshot(
     .rendered_update_generation = live->rendered_update_generation,
     .frame_generation = live->frame_generation,
     .acquired_frame_count = live->acquired_frame_count,
+    .failure_status = live->failure_status,
   };
   return MLN_STATUS_OK;
 }
 
-auto render_session_get_failure(mln_render_session session) -> mln_status {
+auto render_session_get_failure(
+  mln_render_session session, char* out_message, std::size_t message_capacity,
+  std::size_t* out_message_length
+) -> mln_status {
+  if (out_message == nullptr && message_capacity != 0) {
+    set_thread_error(
+      "out_message must not be null when message_capacity is nonzero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_message_length == nullptr) {
+    set_thread_error("out_message_length must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->control_mutex};
-  set_thread_error(live->failure.message);
-  return live->failure_status;
+  const auto message = std::string_view{live->failure.message};
+  *out_message_length = message.size();
+  if (message_capacity > message.size()) {
+    std::memcpy(out_message, message.data(), message.size());
+    out_message[message.size()] = '\0';
+  }
+  return MLN_STATUS_OK;
 }
 
 auto render_session_request_frame(
@@ -3636,19 +3657,49 @@ auto lease_valid_acquired_frame(
       HandleTraits<mln_acquired_frame_object>::kind, frame, HandleFault::Stale
     );
   }
+  out_frame = std::move(live);
+  return MLN_STATUS_OK;
+}
+
+namespace {
+
+// Whether `session` still backs the objects its acquired frames lend.
+auto frame_backing_status_locked(const mln_render_session_object& session)
+  -> mln_status {
+  if (session.state == MLN_RENDER_SESSION_STATE_FAILED) {
+    set_thread_error(session.failure.message);
+    return MLN_STATUS_TARGET_LOST;
+  }
+  if (
+    session.disposal_requested.load() || session.views_invalidated ||
+    session.state == MLN_RENDER_SESSION_STATE_ABANDONED
+  ) {
+    set_thread_error("render session no longer owns this frame's target");
+    return MLN_STATUS_TARGET_LOST;
+  }
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto lease_backed_acquired_frame(
+  mln_acquired_frame frame,
+  std::shared_ptr<mln_acquired_frame_object>& out_frame
+) -> mln_status {
+  auto live = std::shared_ptr<mln_acquired_frame_object>{};
+  if (
+    const auto status = lease_valid_acquired_frame(frame, live);
+    status != MLN_STATUS_OK
+  ) {
+    return status;
+  }
   {
     const auto lock = std::scoped_lock{live->session->control_mutex};
-    if (live->session->state == MLN_RENDER_SESSION_STATE_FAILED) {
-      set_thread_error(live->session->failure.message);
-      return live->session->failure_status;
-    }
     if (
-      live->session->disposal_requested.load() ||
-      live->session->views_invalidated ||
-      live->session->state == MLN_RENDER_SESSION_STATE_ABANDONED
+      const auto status = frame_backing_status_locked(*live->session);
+      status != MLN_STATUS_OK
     ) {
-      set_thread_error("render session no longer owns this frame's target");
-      return MLN_STATUS_TARGET_LOST;
+      return status;
     }
   }
   out_frame = std::move(live);
@@ -3665,22 +3716,16 @@ auto acquired_frame_view_begin(mln_acquired_frame frame, void** out_scope)
   auto live = handle_table<mln_acquired_frame_object>().lease(frame);
   if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->session->control_mutex};
-  if (live->session->state == MLN_RENDER_SESSION_STATE_FAILED) {
-    set_thread_error(live->session->failure.message);
-    return live->session->failure_status;
-  }
   if (!live->valid.load()) {
     return report_handle_fault(
       HandleTraits<mln_acquired_frame_object>::kind, frame, HandleFault::Stale
     );
   }
   if (
-    live->session->views_invalidated ||
-    live->session->disposal_requested.load() ||
-    live->session->state == MLN_RENDER_SESSION_STATE_ABANDONED
+    const auto status = frame_backing_status_locked(*live->session);
+    status != MLN_STATUS_OK
   ) {
-    set_thread_error("render session no longer owns this frame's target");
-    return MLN_STATUS_TARGET_LOST;
+    return status;
   }
   if (live->active_views++ == 0) live->view_owner = live;
   ++live->session->active_views;
@@ -3730,7 +3775,7 @@ auto acquired_frame_get_producer_sync(
   }
   auto live = std::shared_ptr<mln_acquired_frame_object>{};
   if (
-    const auto status = lease_valid_acquired_frame(frame, live);
+    const auto status = lease_backed_acquired_frame(frame, live);
     status != MLN_STATUS_OK
   ) {
     return status;

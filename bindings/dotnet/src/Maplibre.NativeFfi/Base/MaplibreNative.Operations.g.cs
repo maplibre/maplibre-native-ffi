@@ -34,6 +34,6 @@ public static unsafe partial class MaplibreNative
     {
         using var call = Enter(null);
         var returned = NativeMethods.mln_supported_render_backend_mask();
-        return (RenderBackendFlag)returned;
+        return (global::Maplibre.NativeFfi.RenderBackendFlag)returned;
     }
 }

@@ -174,7 +174,8 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.TARGET_LOST` when the session lost its target.
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
         """
         return _view(
             self,
@@ -192,7 +193,8 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.TARGET_LOST` when the session lost its target.
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
         """
         return _view(
             self,
@@ -210,7 +212,8 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.TARGET_LOST` when the session lost its target.
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
         """
         return _view(
             self,
@@ -221,12 +224,11 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
     def get_result(self) -> RenderFrameResult:
         """Reads the frame result of an acquired frame.
 
+        It succeeds until you release or discard the frame, whatever the
+        session's state.
+
         See `mln_acquired_frame_get_result` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-
-        Errors:
-
-        - `Status.TARGET_LOST` when the session lost its target.
         """
         return RenderFrameResult._from_native(self._native.get_result())
 
@@ -240,7 +242,8 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.TARGET_LOST` when the session lost its target.
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
         """
         return _view(
             self,
@@ -1873,20 +1876,15 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return RenderSessionCapabilities._from_native(self._native.get_capabilities())
 
-    def get_failure(self) -> None:
-        """Reports the error that made the session fail.
+    def get_failure(self) -> str:
+        """Reads the message of the error that made the session fail.
 
-        The call fails with that error, and succeeds while the session hasn't
-        failed.
+        `RenderSessionSnapshot.failure_status` reports the error's status.
+        The message is empty while the session hasn't failed, and doesn't
+        change once it fails.
 
         See `mln_render_session_get_failure` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-
-        Errors:
-
-        - `Status.TARGET_LOST` when the session failed because it lost its
-          target.
-        - `Status.NATIVE_ERROR` when the session failed for another reason.
         """
         return self._native.get_failure()
 

@@ -298,12 +298,11 @@ export class AcquiredFrameHandle extends Owner {
   /**
    * Reads the frame result of an acquired frame.
    *
+   * It succeeds until you release or discard the frame, whatever the session's
+   * state.
+   *
    * See `mln_acquired_frame_get_result` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.targetLost` when the session lost its target.
    */
   getResult(): RenderFrameResult {
     return native.mln_acquired_frame_get_result(this.id);
@@ -338,7 +337,8 @@ export class AcquiredFrameHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.targetLost` when the session lost its target.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
    */
   withMetalTexture<T>(use: (view: ScopedMetalTextureFrame) => T): T {
     return new ViewScope(
@@ -365,7 +365,8 @@ export class AcquiredFrameHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.targetLost` when the session lost its target.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
    */
   withOpenGlTexture<T>(use: (view: ScopedOpenGlTextureFrame) => T): T {
     return new ViewScope(
@@ -392,7 +393,8 @@ export class AcquiredFrameHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.targetLost` when the session lost its target.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
    */
   withProducerSync<T>(use: (view: ScopedGpuSync) => T): T {
     return new ViewScope(
@@ -419,7 +421,8 @@ export class AcquiredFrameHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.targetLost` when the session lost its target.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
    */
   withVulkanTexture<T>(use: (view: ScopedVulkanTextureFrame) => T): T {
     return new ViewScope(
@@ -446,7 +449,8 @@ export class AcquiredFrameHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.targetLost` when the session lost its target.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
    */
   withWebGpuTexture<T>(use: (view: ScopedWebGpuTextureFrame) => T): T {
     return new ViewScope(
@@ -3810,21 +3814,17 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Reports the error that made the session fail.
+   * Reads the message of the error that made the session fail.
    *
-   * The call fails with that error, and succeeds while the session hasn't
-   * failed.
+   * `RenderSessionSnapshot.failureStatus` reports the error's status. The
+   * message is empty while the session hasn't failed, and doesn't change once
+   * it fails.
    *
    * See `mln_render_session_get_failure` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.targetLost` when the session failed because it lost its target.
-   * - `Status.nativeError` when the session failed for another reason.
    */
-  getFailure(): void {
-    native.mln_render_session_get_failure(this.id);
+  getFailure(): string {
+    return native.mln_render_session_get_failure(this.id);
   }
 
   /**

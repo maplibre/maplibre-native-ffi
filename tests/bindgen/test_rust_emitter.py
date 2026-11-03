@@ -284,6 +284,7 @@ void mln_query_release(mln_query query);
                 "mln_probe_batch_points",
                 "mln_probe_batch_scores",
                 "mln_probe_zeros_json",
+                "mln_probe_zeros_text",
                 "mln_keyword_combine",
                 "mln_map_match",
                 "mln_map_move",

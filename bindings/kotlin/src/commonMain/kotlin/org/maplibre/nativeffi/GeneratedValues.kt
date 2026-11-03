@@ -3092,6 +3092,11 @@ public data class RenderSessionSnapshot(
   public val renderedUpdateGeneration: ULong,
   public val frameGeneration: ULong,
   public val acquiredFrameCount: UInt,
+  /**
+   * `Status.OK` until the session fails. Then `Status.TARGET_LOST` when it failed because it lost
+   * its target, or `Status.NATIVE_ERROR` when it failed for another reason.
+   */
+  public val failureStatus: Status,
 )
 
 /**

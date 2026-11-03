@@ -3236,6 +3236,10 @@ pub struct RenderSessionSnapshot {
     pub rendered_update_generation: u64,
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
+    /// `Status::Ok` until the session fails. Then `Status::TargetLost` when it
+    /// failed because it lost its target, or `Status::NativeError` when it
+    /// failed for another reason.
+    pub failure_status: Status,
 }
 impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
     unsafe fn from_native(raw: sys::mln_render_session_snapshot) -> Result<Self> {
@@ -3247,6 +3251,7 @@ impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
             rendered_update_generation: raw.rendered_update_generation,
             frame_generation: raw.frame_generation,
             acquired_frame_count: raw.acquired_frame_count,
+            failure_status: Status::from_raw(raw.failure_status),
         })
     }
 }

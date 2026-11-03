@@ -435,7 +435,8 @@ MLN_API mln_status mln_render_session_read_texture(
  * Gets the Metal texture of an acquired frame.
  *
  * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
  *
  * Lifetimes:
  * The texture and device in `out_frame` stay valid until you release or
@@ -454,7 +455,8 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
  * Gets the Vulkan image of an acquired frame.
  *
  * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
  *
  * Lifetimes:
  * The image, view, and device in `out_frame` stay valid until you release or
@@ -475,7 +477,8 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
  * Gets the OpenGL texture of an acquired frame.
  *
  * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
  *
  * Lifetimes:
  * The texture in `out_frame` stays valid until you release or discard the
@@ -494,7 +497,8 @@ MLN_API mln_status mln_acquired_frame_get_open_gl_texture(
  * Gets the WebGPU texture of an acquired frame.
  *
  * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
  *
  * Lifetimes:
  * The texture, view, and device in `out_frame` stay valid until you release or

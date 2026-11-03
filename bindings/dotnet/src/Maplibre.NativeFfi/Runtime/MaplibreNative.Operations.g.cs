@@ -19,7 +19,7 @@ public static unsafe partial class MaplibreNative
         using var call = Enter(null);
         mln_network_status outStatus = default;
         Check(NativeMethods.mln_network_get_status(&outStatus, Diagnostic));
-        return (NetworkStatus)outStatus;
+        return (global::Maplibre.NativeFfi.NetworkStatus)outStatus;
     }
 
     /// <summary>

@@ -34,10 +34,13 @@ auto mln_render_session_request_frame(
 }
 
 auto mln_render_session_get_failure(
-  mln_render_session session, mln_diagnostic* out_diagnostic
+  mln_render_session session, char* out_message, size_t message_capacity,
+  size_t* out_message_length, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_get_failure(session);
+    return mln::core::render_session_get_failure(
+      session, out_message, message_capacity, out_message_length
+    );
   });
 }
 

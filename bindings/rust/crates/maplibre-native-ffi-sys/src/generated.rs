@@ -1134,6 +1134,7 @@ pub struct mln_render_session_snapshot {
     pub rendered_update_generation: u64,
     pub frame_generation: u64,
     pub acquired_frame_count: u32,
+    pub failure_status: mln_status,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2596,6 +2597,9 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_get_failure(
         session: mln_render_session,
+        out_message: *mut std::ffi::c_char,
+        message_capacity: usize,
+        out_message_length: *mut usize,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_get_snapshot(

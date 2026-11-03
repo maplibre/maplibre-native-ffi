@@ -257,7 +257,7 @@ public sealed unsafe partial class RuntimeHandle
         using var call = Enter(this);
         ulong outMask = default;
         Check(NativeMethods.mln_runtime_get_event_mask(Handle, &outMask, Diagnostic));
-        return (RuntimeEventFlag)outMask;
+        return (global::Maplibre.NativeFfi.RuntimeEventFlag)outMask;
     }
 
     /// <summary>

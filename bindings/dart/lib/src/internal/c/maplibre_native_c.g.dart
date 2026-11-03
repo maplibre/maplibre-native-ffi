@@ -944,6 +944,8 @@ final class mln_render_session_snapshot extends Struct {
   external int frame_generation;
   @Uint32()
   external int acquired_frame_count;
+  @Int32()
+  external int failure_status;
 }
 
 final class mln_rendered_feature extends Struct {
@@ -3991,9 +3993,20 @@ external int mln_render_session_get_capabilities(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<Char>,
+    Size,
+    Pointer<Size>,
+    Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_render_session_get_failure(
   int session,
+  Pointer<Char> out_message,
+  int message_capacity,
+  Pointer<Size> out_message_length,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

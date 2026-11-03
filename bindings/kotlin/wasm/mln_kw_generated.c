@@ -1312,10 +1312,12 @@ int32_t mln_kw_mln_render_session_get_capabilities(
 }
 
 int32_t mln_kw_mln_render_session_get_failure(
-  int64_t session, uintptr_t out_diagnostic
+  int64_t session, uintptr_t out_message, uint32_t message_capacity,
+  uintptr_t out_message_length, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_render_session_get_failure(
-    (mln_render_session)session, (mln_diagnostic*)out_diagnostic
+    (mln_render_session)session, (char*)out_message, (size_t)message_capacity,
+    (size_t*)out_message_length, (mln_diagnostic*)out_diagnostic
   );
 }
 

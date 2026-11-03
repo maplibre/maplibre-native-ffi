@@ -4664,6 +4664,9 @@ static napi_value mln_ts_export_mln_render_session_get_failure(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
+  char* arg_out_message = NULL;
+  size_t arg_message_capacity = 256;
+  size_t arg_out_message_length = 0;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
@@ -4672,10 +4675,25 @@ static napi_value mln_ts_export_mln_render_session_get_failure(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
+  arg_out_message = mln_ts_allocate(call, arg_message_capacity);
+  if (arg_out_message == NULL) goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_render_session_get_failure(arg_session, &diagnostic);
+  for (;;) {
+    status = mln_render_session_get_failure(
+      arg_session, arg_out_message, arg_message_capacity,
+      &arg_out_message_length, &diagnostic
+    );
+    if (
+      status != MLN_STATUS_OK || arg_out_message_length < arg_message_capacity
+    )
+      break;
+    arg_message_capacity = arg_out_message_length + 1;
+    arg_out_message = mln_ts_allocate(call, arg_message_capacity);
+    if (arg_out_message == NULL) goto done;
+  }
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_text(env, arg_out_message, arg_out_message_length);
 done:
   return mln_ts_end(call);
 }

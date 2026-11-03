@@ -220,3 +220,23 @@ mln_status mln_probe_zeros_json(
   out_json[length] = 0;
   return MLN_STATUS_OK;
 }
+
+// Writes `count` zero digits as UTF-8 text when they fit, and reports their
+// length either way.
+mln_status mln_probe_zeros_text(
+  uint32_t count, char* out_text, size_t text_capacity, size_t* out_text_length,
+  mln_diagnostic* out_diagnostic
+) {
+  if (out_text_length == NULL || (out_text == NULL && text_capacity != 0)) {
+    return fail(out_diagnostic, "missing text storage");
+  }
+  *out_text_length = count;
+  if (text_capacity <= count) {
+    return MLN_STATUS_OK;
+  }
+  for (size_t index = 0; index < count; ++index) {
+    out_text[index] = '0';
+  }
+  out_text[count] = 0;
+  return MLN_STATUS_OK;
+}

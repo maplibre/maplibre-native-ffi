@@ -220,23 +220,28 @@ public extension RenderSessionHandle {
     } result: { RenderSessionCapabilities(raw: value0) }
   }
 
-  /// Reports the error that made the session fail.
+  /// Reads the message of the error that made the session fail.
   ///
-  /// The call fails with that error, and succeeds while the session hasn't
-  /// failed.
+  /// `RenderSessionSnapshot.failureStatus` reports the error's status. The
+  /// message is empty while the session hasn't failed, and doesn't change once
+  /// it fails.
   ///
   /// See `mln_render_session_get_failure` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.targetLost` when the session failed because it lost its target.
-  /// - `Status.nativeError` when the session failed for another reason.
-  func getFailure() throws {
-    try nativeInvoke { raw, _, diagnostic in mln_render_session_get_failure(
-      raw,
-      diagnostic
-    ) }
+  func getFailure() throws -> String {
+    var bindingText = ""
+    return try nativeInvoke { raw, _, diagnostic in
+      try NativeString
+        .callerSized(&bindingText) { bindingTextStorage, bindingTextCapacity, bindingTextLength in
+          mln_render_session_get_failure(
+            raw,
+            bindingTextStorage,
+            bindingTextCapacity,
+            bindingTextLength,
+            diagnostic
+          )
+        }
+    } result: { bindingText }
   }
 
   /// Reads the session's current state.

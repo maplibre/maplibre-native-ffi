@@ -1721,6 +1721,11 @@ napi_value mln_ts_read_render_session_snapshot(
         mln_ts_number(env, (double)(source->acquired_frame_count))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "failureStatus",
+        mln_ts_number(env, (double)(source->failure_status))
+      ))
+    return NULL;
   return result;
 }
 

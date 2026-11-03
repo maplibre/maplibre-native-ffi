@@ -394,11 +394,13 @@ void native_failures_finish_demands_and_fail_the_session() {
     MLN_TEST_OK(
       mln_render_session_abandon(fixture.render.session, &abandoned, nullptr)
     );
-    auto saved = mln_diagnostic{.size = sizeof(mln_diagnostic)};
+    auto saved = std::array<char, MLN_DIAGNOSTIC_MESSAGE_CAPACITY>{};
     MLN_TEST_STATUS(
-      status, mln_render_session_get_failure(fixture.render.session, &saved)
+      status, mln_test_render_session_failure(
+                fixture.render.session, saved.data(), saved.size()
+              )
     );
-    TEST_ASSERT_NOT_NULL(std::strstr(saved.message, message));
+    TEST_ASSERT_NOT_NULL(std::strstr(saved.data(), message));
     destroy_fixture(fixture);
     TEST_ASSERT_TRUE(reported);
     TEST_ASSERT_NOT_NULL(std::strstr(error_message.data(), message));
@@ -431,17 +433,24 @@ void failure_results_and_the_saved_cause_need_no_allocation() {
     );
   }
   auto service = MLN_STATUS_NATIVE_ERROR;
-  auto saved = MLN_STATUS_OK;
-  auto diagnostic = mln_diagnostic{.size = sizeof(mln_diagnostic)};
+  auto read = MLN_STATUS_NATIVE_ERROR;
+  auto saved = std::array<char, MLN_DIAGNOSTIC_MESSAGE_CAPACITY>{};
+  auto saved_length = std::size_t{0};
   {
     const auto faults = mln::native_tests::AllocationFaults{};
     service = mln_render_session_service_driver_work(session->self, nullptr);
-    saved = mln_render_session_get_failure(session->self, &diagnostic);
+    read = mln_render_session_get_failure(
+      session->self, saved.data(), saved.size(), &saved_length, nullptr
+    );
   }
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_FAILED, session->state);
   MLN_TEST_OK(service);
-  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, saved);
-  TEST_ASSERT_NOT_EQUAL('\0', diagnostic.message[0]);
+  MLN_TEST_OK(read);
+  TEST_ASSERT_NOT_EQUAL(0, saved_length);
+  MLN_TEST_STATUS(
+    MLN_STATUS_NATIVE_ERROR,
+    mln_test_render_session_failure(session->self, nullptr, 0)
+  );
   auto batch = MLN_HANDLE_NULL;
   auto view =
     mln_render_frame_batch_view{.size = sizeof(mln_render_frame_batch_view)};
@@ -541,12 +550,14 @@ void resize_and_driver_exceptions_use_the_session_failure_path() {
       MLN_RENDER_RESULT_FAILED, batch_result(batch, 0).disposition
     );
     mln_render_frame_batch_release(batch);
-    auto saved = mln_diagnostic{.size = sizeof(mln_diagnostic)};
+    auto saved = std::array<char, MLN_DIAGNOSTIC_MESSAGE_CAPACITY>{};
     MLN_TEST_STATUS(
       MLN_STATUS_NATIVE_ERROR,
-      mln_render_session_get_failure(fixture.render.session, &saved)
+      mln_test_render_session_failure(
+        fixture.render.session, saved.data(), saved.size()
+      )
     );
-    TEST_ASSERT_EQUAL_STRING(expected, saved.message);
+    TEST_ASSERT_EQUAL_STRING(expected, saved.data());
     mln_test_completion_destroy(&failed);
     mln_test_completion_destroy(&later);
     destroy_fixture(fixture);
@@ -606,17 +617,16 @@ void a_caller_driver_failure_preserves_the_hosts_frame_until_release() {
   mln_render_frame_batch_release(batch);
   auto result =
     mln_render_frame_result{.size = sizeof(mln_render_frame_result)};
+  MLN_TEST_OK(mln_acquired_frame_get_result(acquired, &result, nullptr));
+  TEST_ASSERT_EQUAL_UINT64(9300, result.token);
+  // The failed session no longer backs the frame's texture, and says why.
   auto diagnostic = mln_diagnostic{.size = sizeof(mln_diagnostic)};
-  MLN_TEST_STATUS(
-    MLN_STATUS_NATIVE_ERROR,
-    mln_acquired_frame_get_result(acquired, &result, &diagnostic)
-  );
-  TEST_ASSERT_EQUAL_STRING("resource preparation failed", diagnostic.message);
   void* view = nullptr;
   MLN_TEST_STATUS(
-    MLN_STATUS_NATIVE_ERROR,
+    MLN_STATUS_TARGET_LOST,
     mln_acquired_frame_view_begin(acquired, &view, &diagnostic)
   );
+  TEST_ASSERT_EQUAL_STRING("resource preparation failed", diagnostic.message);
   TEST_ASSERT_NULL(view);
   // Acknowledging completed host GPU work remains valid after session failure.
   mln_test_render_release_frame(&acquired);
@@ -1652,14 +1662,16 @@ void a_failed_release_of_the_last_slot_ends_a_waiting_demand() {
                                        : MLN_RENDER_RESULT_FAILED,
       ended.disposition
     );
-    auto diagnostic = mln_diagnostic{.size = sizeof(mln_diagnostic)};
+    auto saved = std::array<char, MLN_DIAGNOSTIC_MESSAGE_CAPACITY>{};
     MLN_TEST_STATUS(
       failure == FrameFailure::Release ? MLN_STATUS_OK : MLN_STATUS_TARGET_LOST,
-      mln_render_session_get_failure(fixture.render.session, &diagnostic)
+      mln_test_render_session_failure(
+        fixture.render.session, saved.data(), saved.size()
+      )
     );
     if (failure == FrameFailure::ReleaseTargetLost)
       TEST_ASSERT_EQUAL_STRING(
-        "consumer synchronization lost its target", diagnostic.message
+        "consumer synchronization lost its target", saved.data()
       );
     // Detach keeps the quarantined ring, and a kept Vulkan ring is a child of
     // the host's device.

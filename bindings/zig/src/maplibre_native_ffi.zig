@@ -65,7 +65,8 @@ pub const AcquiredFrame = struct {
     ///
     /// Errors:
     ///
-    /// - `error.TargetLost` when the session lost its target.
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
     pub const getMetalTexture = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
         fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
             return call.scopedView("mln_acquired_frame_get_metal_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", MetalTextureFrame, self, context, use, diagnostic);
@@ -79,7 +80,8 @@ pub const AcquiredFrame = struct {
     ///
     /// Errors:
     ///
-    /// - `error.TargetLost` when the session lost its target.
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
     pub fn getOpenGlTexture(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
         return call.scopedView("mln_acquired_frame_get_open_gl_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpenGlTextureFrame, self, context, use, diagnostic);
     }
@@ -91,19 +93,19 @@ pub const AcquiredFrame = struct {
     ///
     /// Errors:
     ///
-    /// - `error.TargetLost` when the session lost its target.
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
     pub fn getProducerSync(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
         return call.scopedView("mln_acquired_frame_get_producer_sync", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", GpuSync, self, context, use, diagnostic);
     }
 
     /// Reads the frame result of an acquired frame.
     ///
+    /// It succeeds until you release or discard the frame, whatever the session's
+    /// state.
+    ///
     /// See `mln_acquired_frame_get_result` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.TargetLost` when the session lost its target.
     pub fn getResult(self: AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameResult {
         return call.invoke("mln_acquired_frame_get_result", .handle, self, null, diagnostic, .{call.sizedOut(RenderFrameResult)});
     }
@@ -115,7 +117,8 @@ pub const AcquiredFrame = struct {
     ///
     /// Errors:
     ///
-    /// - `error.TargetLost` when the session lost its target.
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
     pub const getVulkanTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
             return call.scopedView("mln_acquired_frame_get_vulkan_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", VulkanTextureFrame, self, context, use, diagnostic);
@@ -1614,20 +1617,16 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_get_capabilities", .handle, self, null, diagnostic, .{call.sizedOut(RenderSessionCapabilities)});
     }
 
-    /// Reports the error that made the session fail.
+    /// Reads the message of the error that made the session fail.
     ///
-    /// The call fails with that error, and succeeds while the session hasn't
-    /// failed.
+    /// `RenderSessionSnapshot.failure_status` reports the error's status. The
+    /// message is empty while the session hasn't failed, and doesn't change once it
+    /// fails.
     ///
     /// See `mln_render_session_get_failure` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.TargetLost` when the session failed because it lost its target.
-    /// - `error.NativeError` when the session failed for another reason.
-    pub fn getFailure(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_render_session_get_failure", .handle, self, null, diagnostic, .{});
+    pub fn getFailure(self: RenderSession, allocator: std.mem.Allocator, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const u8) {
+        return call.invoke("mln_render_session_get_failure", .handle, self, allocator, diagnostic, .{ call.text(), call.textCapacity(), call.textLength() });
     }
 
     /// Reads the session's current state.
@@ -5026,6 +5025,10 @@ pub const RenderSessionSnapshot = struct {
     rendered_update_generation: u64 = 0,
     frame_generation: u64 = 0,
     acquired_frame_count: u32 = 0,
+    /// `Status.ok` until the session fails. Then `error.TargetLost` when it
+    /// failed because it lost its target, or `error.NativeError` when it failed
+    /// for another reason.
+    failure_status: Status = .ok,
     pub fn fromNative(raw: c.mln_render_session_snapshot) RenderSessionSnapshot {
         return .{
             .state = RenderSessionState.fromNative(raw.state),
@@ -5035,6 +5038,7 @@ pub const RenderSessionSnapshot = struct {
             .rendered_update_generation = raw.rendered_update_generation,
             .frame_generation = raw.frame_generation,
             .acquired_frame_count = raw.acquired_frame_count,
+            .failure_status = Status.fromNative(raw.failure_status),
         };
     }
 };

@@ -593,7 +593,7 @@ def operation(
         if text and output == text.name:
             if text.value.encoding == "json":
                 return f"generated_json(py, sys::mln_buffer_view {{ data: {output}.as_ptr().cast(), size: {output}.len() }})?"
-            return f"PyBytes::new(py, &{output}).into_any().unbind()"
+            return f"generated_text(py, sys::mln_buffer_view {{ data: {output}.as_ptr().cast(), size: {output}.len() }})?"
         if any(p.name == output and p.sized_by for p in plan.outputs):
             copied = values.copy(value.element, "*element")
             return f"generated_list(py, &{output}, |element| {ok(copied)})?"

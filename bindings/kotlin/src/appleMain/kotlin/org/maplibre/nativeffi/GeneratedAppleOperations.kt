@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.internal.memory.*
  *
  * Errors:
  *
- * - `Status.TARGET_LOST` when the session lost its target.
+ * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
  */
 public fun <T> AcquiredFrameHandle.withMetalTexture(block: (MetalTextureFrame) -> T): T =
   nativeCall(this, binding) {

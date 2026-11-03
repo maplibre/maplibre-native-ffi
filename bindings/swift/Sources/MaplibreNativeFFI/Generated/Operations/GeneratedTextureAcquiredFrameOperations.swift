@@ -12,7 +12,9 @@ public extension AcquiredFrameHandle {
     ///
     /// Errors:
     ///
-    /// - `Status.targetLost` when the session lost its target.
+    /// - `Status.targetLost` when the session failed, or you detached,
+    /// abandoned,
+    ///   or disposed it.
     func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws
       -> Result) throws -> Result
     {
@@ -45,7 +47,8 @@ public extension AcquiredFrameHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.targetLost` when the session lost its target.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
   func withOpenGlTexture<Result>(_ body: (OpenGlTextureFrameView) throws
     -> Result) throws -> Result
   {
@@ -78,7 +81,9 @@ public extension AcquiredFrameHandle {
     ///
     /// Errors:
     ///
-    /// - `Status.targetLost` when the session lost its target.
+    /// - `Status.targetLost` when the session failed, or you detached,
+    /// abandoned,
+    ///   or disposed it.
     func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws
       -> Result) throws -> Result
     {
