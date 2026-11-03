@@ -840,6 +840,7 @@ fn generated_copy_mln_render_session_snapshot(
         "acquired_frame_count",
         generated_value(py, value.acquired_frame_count)?,
     )?;
+    dict.set_item("failure_status", generated_value(py, value.failure_status)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -6839,10 +6840,30 @@ impl RenderSessionHandle {
     fn get_failure(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
+        let mut out_message: Vec<u8> = Vec::new();
         unsafe {
-            call.status(|diagnostic| sys::mln_render_session_get_failure(handle, diagnostic))
+            call.status(|diagnostic| {
+                generated_caller_sized_text(
+                    &mut out_message,
+                    |out_message, message_capacity, out_message_length| {
+                        sys::mln_render_session_get_failure(
+                            handle,
+                            out_message,
+                            message_capacity,
+                            out_message_length,
+                            diagnostic,
+                        )
+                    },
+                )
+            })
         }?;
-        Ok(py.None())
+        generated_text(
+            py,
+            sys::mln_buffer_view {
+                data: out_message.as_ptr().cast(),
+                size: out_message.len(),
+            },
+        )
     }
     #[pyo3(signature = ())]
     fn get_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

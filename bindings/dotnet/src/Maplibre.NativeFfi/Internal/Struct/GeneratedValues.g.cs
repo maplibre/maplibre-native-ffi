@@ -200,7 +200,7 @@ internal static unsafe class GeneratedValues
         new(value.generation, CopyCamera(value.camera));
 
     internal static CameraTransitionEnd CopyCameraTransitionEnd(mln_camera_transition_end value) =>
-        new((CameraTransitionOutcome)value.outcome, value.generation);
+        new((global::Maplibre.NativeFfi.CameraTransitionOutcome)value.outcome, value.generation);
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCameraTransitionHandlerCallback(
@@ -596,7 +596,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static GpuSync CopyGpuSync(mln_gpu_sync value) =>
-        new((GpuSyncKind)value.kind, value.handle, value.value);
+        new((global::Maplibre.NativeFfi.GpuSyncKind)value.kind, value.handle, value.value);
 
     internal static mln_gpu_sync NativeGpuSync(GpuSync value)
     {
@@ -651,7 +651,7 @@ internal static unsafe class GeneratedValues
             try
             {
                 ((HttpHeaderTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
-                    (ResourceKind)kind,
+                    (global::Maplibre.NativeFfi.ResourceKind)kind,
                     RuntimeStructs.CopyUtf8((sbyte*)url.data, url.size),
                     responseOutResponse
                 );
@@ -755,8 +755,8 @@ internal static unsafe class GeneratedValues
                 ? (byte)0
                 : (byte)(
                     answer(
-                        (LogSeverity)severity,
-                        (LogEvent)@event,
+                        (global::Maplibre.NativeFfi.LogSeverity)severity,
+                        (global::Maplibre.NativeFfi.LogEvent)@event,
                         code,
                         RuntimeStructs.CopyUtf8((sbyte*)message.data, message.size)
                     )
@@ -821,13 +821,13 @@ internal static unsafe class GeneratedValues
 
     internal static MapSnapshot CopyMapSnapshot(mln_map_snapshot value) =>
         new(
-            (MapDebugFlag)value.debug_options,
+            (global::Maplibre.NativeFfi.MapDebugFlag)value.debug_options,
             value.generation,
             value.fully_loaded != 0,
             value.rendering_stats_view_enabled != 0,
             value.gesture_in_progress != 0,
             value.transition_in_progress != 0,
-            (RuntimeEventFlag)value.event_mask,
+            (global::Maplibre.NativeFfi.RuntimeEventFlag)value.event_mask,
             value.latest_render_update_generation,
             CopyMapTileOptions(value.tile),
             CopyBoundOptions(value.bounds),
@@ -852,7 +852,7 @@ internal static unsafe class GeneratedValues
                 ? value.lod_zoom_shift
                 : null,
             LodMode = value.fields.HasFlag(MLN_MAP_TILE_OPTION_LOD_MODE)
-                ? (TileLodMode)value.lod_mode
+                ? (global::Maplibre.NativeFfi.TileLodMode)value.lod_mode
                 : null,
         };
 
@@ -916,13 +916,13 @@ internal static unsafe class GeneratedValues
         new()
         {
             NorthOrientation = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION)
-                ? (NorthOrientation)value.north_orientation
+                ? (global::Maplibre.NativeFfi.NorthOrientation)value.north_orientation
                 : null,
             ConstrainMode = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE)
-                ? (ConstrainMode)value.constrain_mode
+                ? (global::Maplibre.NativeFfi.ConstrainMode)value.constrain_mode
                 : null,
             ViewportMode = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE)
-                ? (ViewportMode)value.viewport_mode
+                ? (global::Maplibre.NativeFfi.ViewportMode)value.viewport_mode
                 : null,
             FrustumOffset = value.fields.HasFlag(MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET)
                 ? CopyEdgeInsets(value.frustum_offset)
@@ -1112,7 +1112,7 @@ internal static unsafe class GeneratedValues
 
     internal static OfflineRegionStatus CopyOfflineRegionStatus(mln_offline_region_status value) =>
         new(
-            (OfflineRegionDownloadState)value.download_state,
+            (global::Maplibre.NativeFfi.OfflineRegionDownloadState)value.download_state,
             value.completed_resource_count,
             value.completed_resource_size,
             value.completed_tile_count,
@@ -1387,7 +1387,10 @@ internal static unsafe class GeneratedValues
     }
 
     internal static RenderAbandonResult CopyRenderAbandonResult(mln_render_abandon_result value) =>
-        new((RenderAbandonDisposition)value.disposition, value.quarantined_resource_count);
+        new(
+            (global::Maplibre.NativeFfi.RenderAbandonDisposition)value.disposition,
+            value.quarantined_resource_count
+        );
 
     internal static RenderFrameResult[] CopyRenderFrameBatchViewResults(
         mln_render_frame_batch_view value
@@ -1415,14 +1418,14 @@ internal static unsafe class GeneratedValues
         nuint recordSize = 0
     ) =>
         new(
-            (RenderResult)value.disposition,
+            (global::Maplibre.NativeFfi.RenderResult)value.disposition,
             value.token,
             value.map_update_generation,
             value.generation,
             value.frame_generation,
             value.needs_repaint != 0,
             CopyMapView(value.view),
-            (RenderMode)value.mode
+            (global::Maplibre.NativeFfi.RenderMode)value.mode
         );
 
     internal static mln_render_session_attach_options NativeRenderSessionAttachOptions(
@@ -1444,24 +1447,25 @@ internal static unsafe class GeneratedValues
         mln_render_session_capabilities value
     ) =>
         new(
-            (RenderDriverKind)value.driver,
+            (global::Maplibre.NativeFfi.RenderDriverKind)value.driver,
             value.texture_ring_depth,
-            (RenderSessionCapabilityFlag)value.flags,
-            (GpuSyncKind)value.producer_sync_kind,
-            (GpuSyncKindFlag)value.consumer_sync_kinds
+            (global::Maplibre.NativeFfi.RenderSessionCapabilityFlag)value.flags,
+            (global::Maplibre.NativeFfi.GpuSyncKind)value.producer_sync_kind,
+            (global::Maplibre.NativeFfi.GpuSyncKindFlag)value.consumer_sync_kinds
         );
 
     internal static RenderSessionSnapshot CopyRenderSessionSnapshot(
         mln_render_session_snapshot value
     ) =>
         new(
-            (RenderSessionState)value.state,
+            (global::Maplibre.NativeFfi.RenderSessionState)value.state,
             CopyLogicalExtent(value.extent),
             value.generation,
             value.map_update_generation,
             value.rendered_update_generation,
             value.frame_generation,
-            value.acquired_frame_count
+            value.acquired_frame_count,
+            (global::Maplibre.NativeFfi.Status)value.failure_status
         );
 
     internal static RenderedFeature CopyRenderedFeature(mln_rendered_feature value) =>
@@ -1625,11 +1629,11 @@ internal static unsafe class GeneratedValues
                 (sbyte*)value.resolved_url.data,
                 value.resolved_url.size
             ),
-            Kind = (ResourceKind)value.kind,
-            LoadingMethod = (ResourceLoadingMethod)value.loading_method,
-            Priority = (ResourcePriority)value.priority,
-            Usage = (ResourceUsage)value.usage,
-            StoragePolicy = (ResourceStoragePolicy)value.storage_policy,
+            Kind = (global::Maplibre.NativeFfi.ResourceKind)value.kind,
+            LoadingMethod = (global::Maplibre.NativeFfi.ResourceLoadingMethod)value.loading_method,
+            Priority = (global::Maplibre.NativeFfi.ResourcePriority)value.priority,
+            Usage = (global::Maplibre.NativeFfi.ResourceUsage)value.usage,
+            StoragePolicy = (global::Maplibre.NativeFfi.ResourceStoragePolicy)value.storage_policy,
             Range = value.fields.HasFlag(MLN_RESOURCE_REQUEST_RANGE)
                 ? CopyResourceRange(value.range)
                 : null,
@@ -1714,7 +1718,7 @@ internal static unsafe class GeneratedValues
         {
             ownedRequest = ResourceTransformRequestHandle.Adopt(request);
             ((ResourceTransform)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
-                (ResourceKind)kind,
+                (global::Maplibre.NativeFfi.ResourceKind)kind,
                 RuntimeStructs.CopyUtf8((sbyte*)url.data, url.size),
                 ownedRequest
             );
@@ -1748,8 +1752,8 @@ internal static unsafe class GeneratedValues
         nuint recordSize = 0
     ) =>
         new(
-            (RuntimeEventType)value.type,
-            (RuntimeEventSourceType)value.source_type,
+            (global::Maplibre.NativeFfi.RuntimeEventType)value.type,
+            (global::Maplibre.NativeFfi.RuntimeEventSourceType)value.source_type,
             value.source,
             value.generation,
             value.code,
@@ -1865,7 +1869,7 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeEventOfflineRegionResponseError CopyRuntimeEventOfflineRegionResponseError(
         mln_runtime_event_offline_region_response_error value
-    ) => new(value.region_id, (ResourceErrorReason)value.reason);
+    ) => new(value.region_id, (global::Maplibre.NativeFfi.ResourceErrorReason)value.reason);
 
     internal static RuntimeEventOfflineRegionStatus CopyRuntimeEventOfflineRegionStatus(
         mln_runtime_event_offline_region_status value
@@ -1879,7 +1883,7 @@ internal static unsafe class GeneratedValues
         mln_runtime_event_render_frame value
     ) =>
         new(
-            (RenderMode)value.mode,
+            (global::Maplibre.NativeFfi.RenderMode)value.mode,
             value.needs_repaint != 0,
             value.placement_changed != 0,
             CopyRenderingStats(value.stats)
@@ -1887,7 +1891,7 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeEventRenderMap CopyRuntimeEventRenderMap(
         mln_runtime_event_render_map value
-    ) => new((RenderMode)value.mode);
+    ) => new((global::Maplibre.NativeFfi.RenderMode)value.mode);
 
     internal static RuntimeEventSprite CopyRuntimeEventSprite(mln_runtime_event_sprite value) =>
         new(
@@ -1897,7 +1901,7 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeEventTileAction CopyRuntimeEventTileAction(
         mln_runtime_event_tile_action value
-    ) => new((TileOperation)value.operation, CopyTileId(value.tile_id));
+    ) => new((global::Maplibre.NativeFfi.TileOperation)value.operation, CopyTileId(value.tile_id));
 
     internal static mln_runtime_options NativeRuntimeOptions(
         RuntimeOptions value,
@@ -2064,10 +2068,10 @@ internal static unsafe class GeneratedValues
                 ? CopyImageContent(value.content)
                 : null,
             TextFitWidth = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
-                ? (StyleImageTextFit)value.text_fit_width
+                ? (global::Maplibre.NativeFfi.StyleImageTextFit)value.text_fit_width
                 : null,
             TextFitHeight = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
-                ? (StyleImageTextFit)value.text_fit_height
+                ? (global::Maplibre.NativeFfi.StyleImageTextFit)value.text_fit_height
                 : null,
             PixelRatio = value.pixel_ratio,
             Sdf = value.sdf != 0,
@@ -2146,14 +2150,14 @@ internal static unsafe class GeneratedValues
             RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size),
             value.min_zoom,
             value.max_zoom,
-            (StyleLayerVisibility)value.visibility
+            (global::Maplibre.NativeFfi.StyleLayerVisibility)value.visibility
         );
 
     internal static StyleSourceInfo CopyStyleSourceInfo(mln_style_source_info value) =>
         new()
         {
             Id = RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
-            Type = (StyleSourceType)value.type,
+            Type = (global::Maplibre.NativeFfi.StyleSourceType)value.type,
             IsVolatile = value.is_volatile != 0,
             Attribution = RuntimeStructs.CopyUtf8(
                 (sbyte*)value.attribution.data,
@@ -2170,10 +2174,10 @@ internal static unsafe class GeneratedValues
                 ? value.tile_size
                 : null,
             VectorEncoding = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
-                ? (StyleVectorTileEncoding)value.vector_encoding
+                ? (global::Maplibre.NativeFfi.StyleVectorTileEncoding)value.vector_encoding
                 : null,
             RasterEncoding = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
-                ? (StyleRasterDemEncoding)value.raster_encoding
+                ? (global::Maplibre.NativeFfi.StyleRasterDemEncoding)value.raster_encoding
                 : null,
         };
 
@@ -2189,7 +2193,7 @@ internal static unsafe class GeneratedValues
             ),
             MinZoom = value.min_zoom,
             MaxZoom = value.max_zoom,
-            Scheme = (StyleTileScheme)value.scheme,
+            Scheme = (global::Maplibre.NativeFfi.StyleTileScheme)value.scheme,
         };
 
     internal static StyleTransitionOptions CopyStyleTransitionOptions(

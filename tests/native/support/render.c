@@ -129,6 +129,23 @@ mln_status mln_test_render_fixture_finish_operation(
   return mln_test_completion_status(completion);
 }
 
+mln_status mln_test_render_session_failure(
+  mln_render_session session, char* message, size_t capacity
+) {
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
+  size_t length = 0;
+  MLN_TEST_OK(mln_render_session_get_failure(
+    session, message, capacity, &length, MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_TRUE_MESSAGE(
+    capacity == 0 || length < capacity, "failure message did not fit"
+  );
+  return snapshot.failure_status;
+}
+
 mln_status mln_test_render_session_dispose(mln_render_session session) {
   mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status = mln_render_session_dispose(

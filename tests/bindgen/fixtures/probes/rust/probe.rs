@@ -31,6 +31,7 @@ pub fn run() {
     let long = probe_zeros_json(300).unwrap();
     assert_eq!(long.len(), 601);
     assert!(long.starts_with("[0,0,") && long.ends_with(",0]"));
+    assert_eq!(probe_zeros_text(300).unwrap(), "0".repeat(300));
 
     // Fields named after Rust keywords and runtime locals keep their values
     // through both conversions.

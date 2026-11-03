@@ -34,12 +34,11 @@ impl AcquiredFrameHandle {
 
     /// Reads the frame result of an acquired frame.
     ///
+    /// It succeeds until you release or discard the frame, whatever the
+    /// session's state.
+    ///
     /// See `mln_acquired_frame_get_result` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::TargetLost` when the session lost its target.
     pub fn get_result(&self) -> Result<RenderFrameResult> {
         let mut call = self.inner.call();
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
@@ -90,7 +89,8 @@ impl AcquiredFrameHandle {
 ///
 /// # Errors
 ///
-/// - `Status::TargetLost` when the session lost its target.
+/// - `Status::TargetLost` when the session failed, or you detached, abandoned,
+///   or disposed it.
 pub struct AcquiredFrameView<'a> {
     owner: &'a AcquiredFrameHandle,
     _scope: crate::call::ViewScope,
@@ -109,7 +109,8 @@ impl AcquiredFrameHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::TargetLost` when the session lost its target.
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
     pub fn view(&self) -> Result<AcquiredFrameView<'_>> {
         // SAFETY: these are this handle type's view scope functions.
         let scope = unsafe {
@@ -133,7 +134,8 @@ impl AcquiredFrameView<'_> {
     ///
     /// # Errors
     ///
-    /// - `Status::TargetLost` when the session lost its target.
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
     #[cfg(any(
         target_os = "ios",
         target_os = "macos",
@@ -157,7 +159,8 @@ impl AcquiredFrameView<'_> {
     ///
     /// # Errors
     ///
-    /// - `Status::TargetLost` when the session lost its target.
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
     pub fn get_open_gl_texture(&self) -> Result<Lent<'_, OpenGlTextureFrame>> {
         let mut call = self.owner.inner.call();
         let mut out_frame: sys::mln_open_gl_texture_frame = unsafe { std::mem::zeroed() };
@@ -175,7 +178,8 @@ impl AcquiredFrameView<'_> {
     ///
     /// # Errors
     ///
-    /// - `Status::TargetLost` when the session lost its target.
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
     pub fn get_producer_sync(&self) -> Result<Lent<'_, GpuSync>> {
         let mut call = self.owner.inner.call();
         let mut out_sync: sys::mln_gpu_sync = unsafe { std::mem::zeroed() };
@@ -193,7 +197,8 @@ impl AcquiredFrameView<'_> {
     ///
     /// # Errors
     ///
-    /// - `Status::TargetLost` when the session lost its target.
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
     #[cfg(any(
         target_os = "android",
         target_os = "freebsd",
@@ -218,7 +223,8 @@ impl AcquiredFrameView<'_> {
     ///
     /// # Errors
     ///
-    /// - `Status::TargetLost` when the session lost its target.
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
     #[cfg(target_os = "emscripten")]
     pub fn get_web_gpu_texture(&self) -> Result<Lent<'_, WebGpuTextureFrame>> {
         let mut call = self.owner.inner.call();

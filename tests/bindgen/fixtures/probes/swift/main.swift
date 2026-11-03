@@ -113,6 +113,10 @@ check(
     && longText.hasSuffix(",0]"),
   "long text"
 )
+try check(
+  probeZerosText(count: 300) == String(repeating: "0", count: 300),
+  "utf-8 text"
+)
 
 /// A caller-sized output array holds one element per input element, in input
 /// order.

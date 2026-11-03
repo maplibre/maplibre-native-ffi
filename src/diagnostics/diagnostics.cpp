@@ -15,6 +15,20 @@ auto thread_last_error_buffer() noexcept
   thread_local std::array<char, diagnostic_capacity> value{};
   return value;
 }
+
+// The longest prefix of message that fits in capacity - 1 bytes and doesn't
+// end inside a UTF-8 sequence, so a truncated message stays valid UTF-8.
+auto truncated(const char* message, std::size_t capacity) noexcept
+  -> std::string_view {
+  const auto full = std::string_view{message};
+  if (full.size() < capacity) return full;
+  auto length = capacity - 1;
+  while (length > 0 &&
+         (static_cast<unsigned char>(full[length]) & 0xC0U) == 0x80U) {
+    length -= 1;
+  }
+  return full.substr(0, length);
+}
 }  // namespace
 
 namespace mln::core {
@@ -34,10 +48,8 @@ auto set_thread_error(const char* message) noexcept -> void {
     return;
   }
 
-  const auto length =
-    std::min(std::char_traits<char>::length(message), buffer.size() - 1);
   const auto result =
-    std::ranges::copy(std::string_view{message, length}, buffer.begin());
+    std::ranges::copy(truncated(message, buffer.size()), buffer.begin());
   *result.out = '\0';
 }
 
@@ -54,10 +66,9 @@ auto write_diagnostic(mln_diagnostic* diagnostic, const char* message) noexcept
   const auto capacity = std::min<std::size_t>(
     diagnostic->size - message_offset, sizeof(diagnostic->message)
   );
-  const auto length =
-    std::min(std::char_traits<char>::length(message), capacity - 1);
-  std::ranges::copy(std::string_view{message, length}, diagnostic->message);
-  diagnostic->message[length] = '\0';
+  const auto result =
+    std::ranges::copy(truncated(message, capacity), diagnostic->message);
+  *result.out = '\0';
 }
 
 }  // namespace mln::core

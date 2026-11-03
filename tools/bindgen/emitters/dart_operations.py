@@ -178,7 +178,7 @@ def convert(
                 returns.append(
                     ("Object?", "_decodeJson(text.text)")
                     if text.value.encoding == "json"
-                    else ("Uint8List", "text.text")
+                    else ("String", "utf8.decode(text.text)")
                 )
             args.append(text_arguments[parameter.name])
             continue

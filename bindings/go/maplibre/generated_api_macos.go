@@ -19,7 +19,8 @@ import "unsafe"
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
 // Errors:
-//   - StatusTargetLost when the session lost its target.
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
 func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTextureFrameView) error) error {
 	var outFrame C.mln_metal_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))

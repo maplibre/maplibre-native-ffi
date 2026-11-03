@@ -4325,6 +4325,7 @@ final class RenderSessionSnapshot extends _Value {
     this.renderedUpdateGeneration = 0,
     this.frameGeneration = 0,
     this.acquiredFrameCount = 0,
+    this.failureStatus = const Status.fromRawValue(0),
   });
   final RenderSessionState state;
   final LogicalExtent extent;
@@ -4333,6 +4334,11 @@ final class RenderSessionSnapshot extends _Value {
   final int renderedUpdateGeneration;
   final int frameGeneration;
   final int acquiredFrameCount;
+
+  /// `Status.ok` until the session fails. Then `Status.targetLost` when it
+  /// failed because it lost its target, or `Status.nativeError` when it failed
+  /// for another reason.
+  final Status failureStatus;
 
   @override
   List<Object?> get _members => [
@@ -4343,6 +4349,7 @@ final class RenderSessionSnapshot extends _Value {
     renderedUpdateGeneration,
     frameGeneration,
     acquiredFrameCount,
+    failureStatus,
   ];
   @override
   String toString() => _describe('RenderSessionSnapshot', const [
@@ -4353,6 +4360,7 @@ final class RenderSessionSnapshot extends _Value {
     'renderedUpdateGeneration',
     'frameGeneration',
     'acquiredFrameCount',
+    'failureStatus',
   ]);
 }
 

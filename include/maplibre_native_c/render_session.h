@@ -121,6 +121,12 @@ typedef struct mln_render_session_snapshot {
   uint64_t rendered_update_generation;
   uint64_t frame_generation;
   uint32_t acquired_frame_count;
+  /**
+   * MLN_STATUS_OK until the session fails. Then MLN_STATUS_TARGET_LOST when
+   * it failed because it lost its target, or MLN_STATUS_NATIVE_ERROR when it
+   * failed for another reason.
+   */
+  mln_status failure_status;
 } mln_render_session_snapshot;
 
 /** What mln_render_session_abandon() did with a session's graphics objects. */
@@ -158,17 +164,25 @@ MLN_API mln_status mln_render_session_get_snapshot(
 ) MLN_NOEXCEPT;
 
 /**
- * Reports the error that made the session fail.
+ * Reads the message of the error that made the session fail.
  *
- * The call fails with that error, and succeeds while the session hasn't
- * failed.
+ * mln_render_session_snapshot.failure_status reports the error's status. The
+ * message is empty while the session hasn't failed, and doesn't change once
+ * it fails.
  *
- * Returns:
- * - MLN_STATUS_TARGET_LOST when the session failed because it lost its target.
- * - MLN_STATUS_NATIVE_ERROR when the session failed for another reason.
+ * Lifetimes:
+ * The function writes the message and a terminating NUL to `out_message` only
+ * when `message_capacity` is greater than the message's length. It always
+ * sets `out_message_length` to the length without the NUL.
  */
 MLN_API mln_status mln_render_session_get_failure(
-  mln_render_session session, mln_diagnostic* out_diagnostic
+  mln_render_session session,
+  char* out_message MLN_BINDING(
+    "direction=out;length=message_capacity;result_length=out_message_length"
+  ),
+  size_t message_capacity,
+  size_t* out_message_length MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -233,8 +247,8 @@ MLN_API mln_status mln_render_session_acquire_frame(
 /**
  * Reads the frame result of an acquired frame.
  *
- * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * It succeeds until you release or discard the frame, whatever the session's
+ * state.
  */
 MLN_API mln_status mln_acquired_frame_get_result(
   mln_acquired_frame frame,
@@ -246,7 +260,8 @@ MLN_API mln_status mln_acquired_frame_get_result(
  * Reads what to wait for before you read an acquired frame's texture.
  *
  * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
  *
  * Lifetimes:
  * The object that `out_sync` names belongs to the session. It stays valid until
@@ -289,7 +304,8 @@ MLN_API mln_status mln_acquired_frame_release(
  * MLN_STATUS_BUSY.
  *
  * Returns:
- * - MLN_STATUS_TARGET_LOST when the session lost its target.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
  *
  * Lifetimes:
  * Pass `out_scope` to mln_acquired_frame_view_end().

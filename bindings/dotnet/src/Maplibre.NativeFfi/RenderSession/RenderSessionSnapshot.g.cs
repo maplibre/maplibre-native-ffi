@@ -9,6 +9,11 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_render_session_snapshot</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="FailureStatus">
+/// <c>Status.Ok</c> until the session fails. Then <c>Status.TargetLost</c> when
+/// it failed because it lost its target, or <c>Status.NativeError</c> when it
+/// failed for another reason.
+/// </param>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     LogicalExtent Extent,
@@ -16,5 +21,6 @@ public readonly partial record struct RenderSessionSnapshot(
     ulong MapUpdateGeneration,
     ulong RenderedUpdateGeneration,
     ulong FrameGeneration,
-    uint AcquiredFrameCount
+    uint AcquiredFrameCount,
+    Status FailureStatus
 );

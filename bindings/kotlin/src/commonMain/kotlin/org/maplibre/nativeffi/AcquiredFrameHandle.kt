@@ -48,7 +48,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.TARGET_LOST` when the session lost its target.
+   * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
    */
   public fun <T> withOpenGlTexture(block: (OpenGlTextureFrame) -> T): T =
     nativeCall(this, binding) {
@@ -70,7 +70,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.TARGET_LOST` when the session lost its target.
+   * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
    */
   public fun <T> withProducerSync(block: (GpuSync) -> T): T =
     nativeCall(this, binding) {
@@ -87,12 +87,10 @@ internal constructor(
   /**
    * Reads the frame result of an acquired frame.
    *
+   * It succeeds until you release or discard the frame, whatever the session's state.
+   *
    * See `mln_acquired_frame_get_result` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.TARGET_LOST` when the session lost its target.
    */
   public fun getResult(): RenderFrameResult =
     nativeCall(this, binding) {

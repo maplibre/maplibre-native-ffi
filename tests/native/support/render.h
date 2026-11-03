@@ -109,6 +109,13 @@ mln_status mln_test_render_fixture_finish_operation(
     mln_test_completion_destroy(&completion);                                \
   } while (false)
 
+// Returns the status of the error that made `session` fail, MLN_STATUS_OK
+// while it hasn't failed, and copies the error's message into `message`, which
+// holds `capacity` bytes, when that is nonzero.
+mln_status mln_test_render_session_failure(
+  mln_render_session session, char* message, size_t capacity
+);
+
 // Disposes `session` and waits until it retires. Returns the completion's
 // status, or the status that rejected the disposal.
 mln_status mln_test_render_session_dispose(mln_render_session session);

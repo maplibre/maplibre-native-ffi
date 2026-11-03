@@ -42,6 +42,6 @@ public static unsafe partial class MaplibreNative
     {
         using var call = Enter(null);
         var returned = NativeMethods.mln_open_gl_supported_context_provider_mask();
-        return (OpenGlContextProviderFlag)returned;
+        return (global::Maplibre.NativeFfi.OpenGlContextProviderFlag)returned;
     }
 }

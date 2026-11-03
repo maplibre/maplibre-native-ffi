@@ -9,6 +9,7 @@ import {
   probeBatchPoints,
   probeBatchScores,
   probeZerosJson,
+  probeZerosText,
   probeReadLevel,
   probeRoundtrip,
   probeSettingsCheck,
@@ -41,6 +42,8 @@ assert.deepEqual(probeRoundtrip({ right: [] }), { right: [] });
 assert.deepEqual(probeZerosJson(0), []);
 assert.deepEqual(probeZerosJson(3), [0, 0, 0]);
 assert.deepEqual(probeZerosJson(300), Array(300).fill(0));
+// Caller-sized UTF-8 text is a string.
+assert.equal(probeZerosText(300), "0".repeat(300));
 
 // A caller-sized output array holds one element per input element, in input
 // order.

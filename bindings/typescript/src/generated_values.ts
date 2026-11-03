@@ -1800,6 +1800,12 @@ export interface RenderSessionSnapshot {
   readonly renderedUpdateGeneration: bigint;
   readonly frameGeneration: bigint;
   readonly acquiredFrameCount: number;
+  /**
+   * `Status.ok` until the session fails. Then `Status.targetLost` when it
+   * failed because it lost its target, or `Status.nativeError` when it failed
+   * for another reason.
+   */
+  readonly failureStatus: Status;
 }
 
 /**

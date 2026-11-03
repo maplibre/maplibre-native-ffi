@@ -705,7 +705,7 @@ const (
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
 	// A later request with the same flags replaced this one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
-	// The session failed, and RenderSessionHandle.Failure() reports why. Once
+	// The session failed, and RenderSessionHandle.GetFailure() reports why. Once
 	// RenderSessionHandle.Close() completes, you can attach a new session.
 	RenderResultFailed RenderResult = RenderResult(C.MLN_RENDER_RESULT_FAILED)
 )
@@ -3666,6 +3666,10 @@ type RenderSessionSnapshot struct {
 	RenderedUpdateGeneration uint64
 	FrameGeneration          uint64
 	AcquiredFrameCount       uint32
+	// StatusOk until the session fails. Then StatusTargetLost when it failed
+	// because it lost its target, or StatusNativeError when it failed for another
+	// reason.
+	FailureStatus Status
 }
 
 func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionSnapshot {
@@ -3677,6 +3681,7 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.RenderedUpdateGeneration = uint64(raw.rendered_update_generation)
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.AcquiredFrameCount = uint32(raw.acquired_frame_count)
+	result.FailureStatus = Status(raw.failure_status)
 	return result
 }
 
@@ -5561,7 +5566,8 @@ func (receiver *AcquiredFrameHandle) Discard() error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
 // Errors:
-//   - StatusTargetLost when the session lost its target.
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
 func (receiver *AcquiredFrameHandle) WithOpenGlTexture(callback func(OpenGlTextureFrameView) error) error {
 	var outFrame C.mln_open_gl_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
@@ -5581,7 +5587,8 @@ func (receiver *AcquiredFrameHandle) WithOpenGlTexture(callback func(OpenGlTextu
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusTargetLost when the session lost its target.
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
 func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView) error) error {
 	var outSync C.mln_gpu_sync
 	outSync.size = C.uint32_t(unsafe.Sizeof(outSync))
@@ -5594,11 +5601,11 @@ func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView)
 
 // Result reads the frame result of an acquired frame.
 //
+// It succeeds until you release or discard the frame, whatever the session's
+// state.
+//
 // See mln_acquired_frame_get_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-//
-// Errors:
-//   - StatusTargetLost when the session lost its target.
 func (receiver *AcquiredFrameHandle) Result() (RenderFrameResult, error) {
 	var outResult C.mln_render_frame_result
 	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
@@ -5615,7 +5622,8 @@ func (receiver *AcquiredFrameHandle) Result() (RenderFrameResult, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
 // Errors:
-//   - StatusTargetLost when the session lost its target.
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
 func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextureFrameView) error) error {
 	var outFrame C.mln_vulkan_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
@@ -7435,19 +7443,21 @@ func (receiver *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, 
 	})
 }
 
-// Failure reports the error that made the session fail.
+// GetFailure reads the message of the error that made the session fail.
 //
-// The call fails with that error, and succeeds while the session hasn't failed.
+// RenderSessionSnapshot.FailureStatus reports the error's status. The message
+// is empty while the session hasn't failed, and doesn't change once it fails.
 //
 // See mln_render_session_get_failure in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-//
-// Errors:
-//   - StatusTargetLost when the session failed because it lost its target.
-//   - StatusNativeError when the session failed for another reason.
-func (receiver *RenderSessionHandle) Failure() error {
-	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_get_failure(C.mln_render_session(raw), diagnostic))
+func (receiver *RenderSessionHandle) GetFailure() (string, error) {
+	var outMessage string
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(bindingCallerSizedText(&outMessage, func(outMessage *C.char, messageCapacity C.size_t, outMessageLength *C.size_t) int32 {
+			return int32(C.mln_render_session_get_failure(C.mln_render_session(raw), outMessage, messageCapacity, outMessageLength, diagnostic))
+		}))
+	}, func(arena *bindingArena) string {
+		return outMessage
 	})
 }
 

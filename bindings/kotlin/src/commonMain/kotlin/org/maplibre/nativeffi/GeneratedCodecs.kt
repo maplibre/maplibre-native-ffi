@@ -1213,6 +1213,7 @@ internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
     renderedUpdateGeneration = readU64(source + 40),
     frameGeneration = readU64(source + 48),
     acquiredFrameCount = readU32(source + 56),
+    failureStatus = Status(readI32(source + 60)),
   )
 
 internal fun readRenderedFeature(source: Long): RenderedFeature =

@@ -25,7 +25,8 @@ public extension AcquiredFrameHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.targetLost` when the session lost its target.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
   func withProducerSync<Result>(_ body: (GpuSyncView) throws -> Result) throws
     -> Result
   {
@@ -49,12 +50,11 @@ public extension AcquiredFrameHandle {
 
   /// Reads the frame result of an acquired frame.
   ///
+  /// It succeeds until you release or discard the frame, whatever the session's
+  /// state.
+  ///
   /// See `mln_acquired_frame_get_result` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.targetLost` when the session lost its target.
   func getResult() throws -> RenderFrameResult {
     var value0 = mln_render_frame_result()
     value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)

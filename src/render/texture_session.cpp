@@ -444,7 +444,7 @@ auto acquired_frame_get_backend(mln_acquired_frame handle, Frame* out_frame)
   }
   auto frame = std::shared_ptr<mln_acquired_frame_object>{};
   if (
-    const auto status = lease_valid_acquired_frame(handle, frame);
+    const auto status = lease_backed_acquired_frame(handle, frame);
     status != MLN_STATUS_OK
   ) {
     return status;

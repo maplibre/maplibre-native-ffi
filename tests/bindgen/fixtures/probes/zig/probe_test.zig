@@ -132,4 +132,8 @@ test "generated caller-sized text" {
     try std.testing.expectEqual(@as(usize, 601), long.value.len);
     try std.testing.expect(std.mem.startsWith(u8, long.value, "[0,0,"));
     try std.testing.expect(std.mem.endsWith(u8, long.value, ",0]"));
+    var text = try api.probeZerosText(allocator, 300, null);
+    defer text.deinit();
+    try std.testing.expectEqual(@as(usize, 300), text.value.len);
+    for (text.value) |digit| try std.testing.expectEqual(@as(u8, '0'), digit);
 }

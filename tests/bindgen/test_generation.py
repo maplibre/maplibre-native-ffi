@@ -61,7 +61,11 @@ class GenerationTests(unittest.TestCase):
         api = parse(groups=("caller_sized_text",))
         validate(api)
         bound = compile_api(api)
-        (plan,) = bound.operations
+        plan = next(
+            plan
+            for plan in bound.operations
+            if plan.function.name == "mln_probe_zeros_json"
+        )
         text = plan.caller_sized_text
         self.assertEqual(text.name, "out_json")
         self.assertEqual(text.result_length, "out_json_length")
@@ -78,7 +82,7 @@ class GenerationTests(unittest.TestCase):
         length = 'unsigned long *out_length BIND("direction=out")'
         cases = {
             "mutable character output": f'const char *out_json BIND("encoding=json;length=capacity;result_length=out_length"), unsigned long capacity, {length}',
-            "encoding=json": f'char *out_json BIND("direction=out;encoding=bytes;length=capacity;result_length=out_length"), unsigned long capacity, {length}',
+            "utf8 or json text": f'char *out_json BIND("direction=out;encoding=bytes;length=capacity;result_length=out_length"), unsigned long capacity, {length}',
             "unsigned capacity input": f"{text}, int capacity, {length}",
             "output of the capacity's type": f'{text}, unsigned long capacity, unsigned *out_length BIND("direction=out")',
             "follow every input": f"{text}, unsigned long capacity, {length}, unsigned later",

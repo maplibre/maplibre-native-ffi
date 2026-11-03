@@ -1008,7 +1008,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_render_session_get_failure(session: Long, outDiagnostic: Long): Int
+  actual external fun mln_render_session_get_failure(
+    session: Long,
+    outMessage: Long,
+    messageCapacity: Long,
+    outMessageLength: Long,
+    outDiagnostic: Long,
+  ): Int
 
   @CriticalNative
   @JvmStatic

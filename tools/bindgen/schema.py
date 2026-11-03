@@ -519,7 +519,7 @@ def value_metadata_errors(
 
 
 def caller_sized_text_errors(function, parameter, parameters, context) -> list[str]:
-    """A caller-sized JSON text output fills storage that a binding allocates.
+    """A caller-sized text output fills storage that a binding allocates.
 
     The text is the function's only output besides its length. The binding
     passes the storage's capacity in the input that `length` names, and
@@ -540,8 +540,8 @@ def caller_sized_text_errors(function, parameter, parameters, context) -> list[s
         or pointee.const
     ):
         errors.append(f"{context}: result_length requires a mutable character output")
-    if metadata.get("encoding") != "json":
-        errors.append(f"{context}: result_length requires encoding=json")
+    if metadata.get("encoding") not in {"utf8", "json"}:
+        errors.append(f"{context}: result_length requires utf8 or json text")
     if has_completion(function) or not is_status(function.return_type):
         errors.append(
             f"{context}: result_length requires an immediate function that returns a status"

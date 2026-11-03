@@ -1256,7 +1256,10 @@ auto render_session_get_capabilities(
 auto render_session_get_snapshot(
   mln_render_session session, mln_render_session_snapshot* out_snapshot
 ) -> mln_status;
-auto render_session_get_failure(mln_render_session session) -> mln_status;
+auto render_session_get_failure(
+  mln_render_session session, char* out_message, std::size_t message_capacity,
+  std::size_t* out_message_length
+) -> mln_status;
 auto render_session_request_frame(
   mln_render_session session, const mln_frame_demand* demand
 ) -> mln_status;
@@ -1304,10 +1307,17 @@ auto render_session_abandon(
   mln_render_session session, mln_render_abandon_result* out_result
 ) -> mln_status;
 
-// Leases an acquired frame and checks that its session can still describe it.
-// A failed session reports its saved cause. An abandoned session no longer
-// owns the texture the frame names and reports MLN_STATUS_TARGET_LOST.
+// Leases an acquired frame that the caller hasn't released.
 auto lease_valid_acquired_frame(
+  mln_acquired_frame frame,
+  std::shared_ptr<mln_acquired_frame_object>& out_frame
+) -> mln_status;
+
+// Leases an acquired frame and checks that its session still backs the
+// objects the frame lends. A session that failed, detached, was abandoned, or
+// is being disposed reports MLN_STATUS_TARGET_LOST, with a failed session's
+// saved message.
+auto lease_backed_acquired_frame(
   mln_acquired_frame frame,
   std::shared_ptr<mln_acquired_frame_object>& out_frame
 ) -> mln_status;

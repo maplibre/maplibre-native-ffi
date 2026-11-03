@@ -267,9 +267,11 @@ mln_status mln_map_get_marks(mln_map map, mln_mark_flags *out_marks BIND("direct
         self.assertIn("SetMapMode(ulong map, Mode mode, MarkFlag marks)", operations)
         self.assertIn("(mln_mode)mode, (ulong)marks", operations)
         self.assertIn("mln_mode outMode = default;", operations)
-        self.assertIn("return (Mode)outMode;", operations)
+        self.assertIn("return (global::Maplibre.NativeFfi.Mode)outMode;", operations)
         self.assertIn("ulong outMarks = default;", operations)
-        self.assertIn("return (MarkFlag)outMarks;", operations)
+        self.assertIn(
+            "return (global::Maplibre.NativeFfi.MarkFlag)outMarks;", operations
+        )
 
     def test_dotnet_scalar_absence_cannot_disappear(self):
         source = """
