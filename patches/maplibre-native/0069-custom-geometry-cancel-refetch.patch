@@ -1,0 +1,67 @@
+Forgets a custom geometry tile when it's cancelled, as the custom vector loader
+already does, so the tile fetches again when it is next required. Before, the
+source told the provider to cancel the tile and never asked for it again
+(https://github.com/maplibre/maplibre-native-ffi/issues/778).
+Upstream: not proposed
+
+diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
+index a7e306c..6b2d590 100644
+--- a/src/mln/style/custom_tile_loader.cpp
++++ b/src/mln/style/custom_tile_loader.cpp
+@@ -38,6 +38,8 @@ void CustomTileLoader::cancelTile(const OverscaledTileID& tileID) {
+     std::scoped_lock guard(dataMutex);
+     if (tileCallbackMap.contains(tileID.canonical)) {
+         invokeTileCancel(tileID.canonical);
++        // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
++        tileCallbackMap.erase(tileID.canonical);
+     }
+ }
+ 
+diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
+index db0a5b2..ef9bf90 100644
+--- a/src/mln/style/custom_vector_tile_loader.cpp
++++ b/src/mln/style/custom_vector_tile_loader.cpp
+@@ -37,8 +37,6 @@ void CustomVectorTileLoader::cancelTile(const OverscaledTileID& tileID) {
+     if (tileCallbackMap.contains(tileID.canonical)) {
+         invokeTileCancel(tileID.canonical);
+         // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
+-        // Intentionally diverges from CustomTileLoader which omits this — that is a
+-        // latent bug there that needs a separate cleanup.
+         tileCallbackMap.erase(tileID.canonical);
+     }
+ }
+diff --git a/test/tile/custom_geometry_tile.test.cpp b/test/tile/custom_geometry_tile.test.cpp
+index d7e19d4..c4c2e43 100644
+--- a/test/tile/custom_geometry_tile.test.cpp
++++ b/test/tile/custom_geometry_tile.test.cpp
+@@ -107,6 +107,30 @@ TEST(CustomGeometryTile, InvokeCancelTile) {
+     test.loop.run();
+ }
+ 
++TEST(CustomGeometryTile, FetchCancelledTileAgain) {
++    CustomTileTest test;
++
++    int fetches = 0;
++    CustomTileLoader loader([&](const CanonicalTileID&) { fetches++; }, nullptr);
++    auto mb = std::make_shared<Mailbox>(*Scheduler::GetCurrent());
++    ActorRef<CustomTileLoader> loaderActor(loader, mb);
++
++    CustomGeometryTile tile(OverscaledTileID(0, 0, 0),
++                            "source",
++                            test.tileParameters,
++                            makeMutable<CustomGeometrySource::TileOptions>(),
++                            loaderActor);
++
++    tile.setNecessity(TileNecessity::Required);
++    tile.setNecessity(TileNecessity::Optional);
++    test.loop.waitForEmpty();
++    ASSERT_EQ(1, fetches);
++
++    tile.setNecessity(TileNecessity::Required);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(2, fetches);
++}
++
+ TEST(CustomGeometryTile, InvokeTileChanged) {
+     CustomTileTest test;
+ 
