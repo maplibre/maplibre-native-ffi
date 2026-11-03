@@ -64,9 +64,7 @@ fn camera(map: maplibre.Map) !void {
     const snapshot = try map.getSnapshot(null);
     useCamera(snapshot.view.camera);
 
-    var query = try map.getCamera(null);
-    defer query.deinit();
-    const result = try query.wait(null);
+    const result = try (try map.getCamera(null)).await(null);
     useCamera(result.camera);
     // #endregion read
 

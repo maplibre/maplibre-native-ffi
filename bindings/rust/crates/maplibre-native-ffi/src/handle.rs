@@ -116,18 +116,18 @@ macro_rules! native_owner {
             }
 
             /// Runs a consuming call, which ends this owner once native
-            /// accepts it and hands it back otherwise.
+            /// accepts it and hands it back in the error otherwise.
             pub(crate) fn consume<R>(
                 self,
                 close: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
-            ) -> std::result::Result<R, (Self, $crate::Error)> {
+            ) -> std::result::Result<R, $crate::ReleaseError<Self>> {
                 match close(self.inner.native()) {
                     Ok(value) => {
                         // Native took the handle, so nothing is left to dispose.
                         std::mem::forget(self);
                         Ok(value)
                     }
-                    Err(error) => Err((self, error)),
+                    Err(error) => Err($crate::ReleaseError { handle: self, error }),
                 }
             }
 
@@ -140,10 +140,8 @@ macro_rules! native_owner {
                 self,
                 close: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
             ) -> $crate::Result<R> {
-                self.consume(close).map_err(|(owner, error)| {
-                    drop(owner);
-                    error
-                })
+                // Converting the refusal drops the handle it gave back.
+                self.consume(close).map_err($crate::Error::from)
             }
 
             $(#[$id_meta])*

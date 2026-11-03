@@ -76,15 +76,14 @@ fn renderToTexture(
         .final_layout = 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
 
-    var borrowed = try map.attachVulkanBorrowedTexture(
+    const borrowed = try map.attachVulkanBorrowedTexture(
         allocator,
         ring,
         options,
         null,
     );
-    defer borrowed.ready.deinit();
     session = borrowed.session;
-    try borrowed.ready.wait(null);
+    try borrowed.ready.await(null);
     // #endregion attach-borrowed
 
     try drawFrame();
@@ -102,13 +101,12 @@ fn renderToTexture(
         .textures = &new_textures,
     };
 
-    var replaced = try session.setVulkanBorrowedTextureTarget(
+    const replaced = try session.setVulkanBorrowedTextureTarget(
         allocator,
         resized,
         null,
     );
-    defer replaced.deinit();
-    try replaced.wait(null);
+    try replaced.await(null);
 
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views);

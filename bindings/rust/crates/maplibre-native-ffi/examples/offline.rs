@@ -112,7 +112,7 @@ async fn offline() -> Result<()> {
     runtime.delete_offline_region(region.id)?.await?;
     // #endregion manage
 
-    runtime.release().map_err(|(_, error)| error)?.await?;
+    runtime.release()?.await?;
 
     Ok(())
 }

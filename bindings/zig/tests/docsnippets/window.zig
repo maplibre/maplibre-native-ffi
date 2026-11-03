@@ -94,20 +94,17 @@ fn surfaceLost() !void {
     // #region lost-surface
     paused = true;
 
-    var released = try session.releaseTarget(null);
-    defer released.deinit();
-    try released.wait(null);
+    try (try session.releaseTarget(null)).await(null);
     // #endregion lost-surface
 }
 
 fn surfaceRestored(new_surface: u64) !void {
     // #region lost-surface
-    var replaced = try session.setVulkanSurfaceTarget(.{
+    const replaced = try session.setVulkanSurfaceTarget(.{
         .logical_size = .{ .width = 800, .height = 600 },
         .surface = new_surface,
     }, null);
-    defer replaced.deinit();
-    try replaced.wait(null);
+    try replaced.await(null);
 
     paused = false;
     try demandFrame();
@@ -116,7 +113,7 @@ fn surfaceRestored(new_surface: u64) !void {
 
 fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, window_surface: u64) !void {
     // #region attach
-    var attached = try map.attachVulkanSurface(.{
+    const attached = try map.attachVulkanSurface(.{
         // The window's size in logical pixels. The map's scale factor
         // turns it into pixels.
         .logical_size = .{ .width = 800, .height = 600 },
@@ -129,9 +126,8 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
         .driver = .core_worker,
         .frame_wake = .{ .callback = onFrameWake },
     }, null);
-    defer attached.ready.deinit();
     session = attached.session;
-    try attached.ready.wait(null);
+    try attached.ready.await(null);
     // #endregion attach
 
     try demandFrame();
@@ -149,9 +145,7 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
 
     paused = true;
 
-    var closed = try session.release(null);
-    defer closed.deinit();
-    try closed.wait(null);
+    try (try session.release(null)).await(null);
 
     destroySurface(); // For example, with vkDestroySurfaceKHR.
 }

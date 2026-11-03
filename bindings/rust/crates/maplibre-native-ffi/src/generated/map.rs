@@ -774,7 +774,7 @@ impl MapHandle {
     ///
     /// See `mln_map_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
+    pub fn dispose(self) -> std::result::Result<(), ReleaseError<Self>> {
         self.consume(|map| {
             let mut call = Call::new(map);
             call.status(|map, out_diagnostic| unsafe { sys::mln_map_dispose(map, out_diagnostic) })
@@ -1357,7 +1357,7 @@ impl MapHandle {
     ///
     /// See `mln_map_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+    pub fn release(self) -> std::result::Result<NativeFuture<()>, ReleaseError<Self>> {
         self.consume(|map| {
             let call = Call::new(map);
             call.complete(

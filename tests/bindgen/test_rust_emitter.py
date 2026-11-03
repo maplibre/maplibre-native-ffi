@@ -267,13 +267,13 @@ class RustEmitterTests(unittest.TestCase):
         )
         # Both consume the owner, and a refusal hands it back.
         self.assertIn(
-            "pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {\n"
+            "pub fn release(self) -> std::result::Result<NativeFuture<()>, ReleaseError<Self>> {\n"
             "        self.consume(|session| {",
             source,
         )
         self.assertIn("call.complete(", source)
         self.assertIn(
-            "pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {\n"
+            "pub fn dispose(self) -> std::result::Result<(), ReleaseError<Self>> {\n"
             "        self.consume(|session| {",
             source,
         )
@@ -296,12 +296,12 @@ mln_status mln_session_service(mln_session session, mln_diagnostic *out_diagnost
         # The release and the dispose consume the owner and hand back a value
         # that names the retiring handle without owning it.
         self.assertIn(
-            "pub fn release(self) -> std::result::Result<(NativeFuture<()>, RetiringSession), (Self, Error)> {",
+            "pub fn release(self) -> std::result::Result<(NativeFuture<()>, RetiringSession), ReleaseError<Self>> {",
             source,
         )
         self.assertIn(".map(|value| (value, RetiringSession(session)))", source)
         self.assertIn(
-            "pub fn dispose(self) -> std::result::Result<RetiringSession, (Self, Error)> {",
+            "pub fn dispose(self) -> std::result::Result<RetiringSession, ReleaseError<Self>> {",
             source,
         )
         self.assertIn(".map(|()| RetiringSession(session))", source)

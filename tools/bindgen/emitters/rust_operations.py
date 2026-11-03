@@ -712,7 +712,7 @@ def method_code(
         ]
         lines += [*prelude, *setup, *ending]
     returns = (
-        f" -> std::result::Result<{public}, (Self, Error)>"
+        f" -> std::result::Result<{public}, ReleaseError<Self>>"
         if consuming and not plan.answers
         else f" -> Result<{public}>"
     )

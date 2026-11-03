@@ -72,7 +72,7 @@ impl ResourceRequestHandle {
     ///
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+    pub fn release(self) -> std::result::Result<(), ReleaseError<Self>> {
         self.consume(|handle| {
             let mut call = Call::new(handle);
             call.run(|handle| unsafe { sys::mln_resource_request_release(handle) });

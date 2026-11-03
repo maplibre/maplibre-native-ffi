@@ -24,10 +24,9 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
         .map_mode = .static,
     };
 
-    var created = try runtime.createMap(map_options, null);
-    defer created.ready.deinit();
+    const created = try runtime.createMap(map_options, null);
     var map = created.map;
-    try created.ready.wait(null);
+    try created.ready.await(null);
     // #endregion map
 
     // #region style
@@ -38,7 +37,7 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
     // #endregion style
 
     // #region attach
-    var attached = try map.attachOffscreen(
+    const attached = try map.attachOffscreen(
         .{ .logical_size = .{ .width = 800, .height = 600 } },
         // The library renders on its own thread.
         .{ .driver = .core_worker },
@@ -46,9 +45,8 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
         null,
         null,
     );
-    defer attached.ready.deinit();
     var session = attached.session;
-    try attached.ready.wait(null);
+    try attached.ready.await(null);
     // #endregion attach
 
     // #region image
@@ -60,29 +58,23 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
         },
     }, null);
 
-    var still = try map.requestStillImage(null);
-    defer still.deinit();
-    try still.wait(null);
+    try (try map.requestStillImage(null)).await(null);
     // #endregion image
 
     // #region read
-    var read = try session.readTexture(allocator, null);
-    defer read.deinit();
-    var image = try read.wait(null);
+    var image = try (try session.readTexture(allocator, null)).await(null);
     defer image.deinit();
     copyPixels(image.value.data, image.value.info.stride);
     // #endregion read
 
     try session.dispose(null);
 
-    var map_released = try map.release(null);
-    defer map_released.deinit();
-    try map_released.wait(null);
+    try (try map.release(null)).await(null);
 }
 
 fn imagesTile(runtime: maplibre.Runtime, z: u32, x: u32, y: u32) !void {
     // #region tile
-    var created = try runtime.createMap(.{
+    const created = try runtime.createMap(.{
         .initial_extent = .{
             .width = 512,
             .height = 512,
@@ -90,9 +82,8 @@ fn imagesTile(runtime: maplibre.Runtime, z: u32, x: u32, y: u32) !void {
         },
         .map_mode = .tile,
     }, null);
-    defer created.ready.deinit();
     var map = created.map;
-    try created.ready.wait(null);
+    try created.ready.await(null);
 
     try map.discarding().updateCamera(.{
         .mode = .jump,
@@ -104,7 +95,5 @@ fn imagesTile(runtime: maplibre.Runtime, z: u32, x: u32, y: u32) !void {
     }, null);
     // #endregion tile
 
-    var map_released = try map.release(null);
-    defer map_released.deinit();
-    try map_released.wait(null);
+    try (try map.release(null)).await(null);
 }

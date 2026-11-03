@@ -40,10 +40,10 @@ fn disposeOwned(comptime Value: type, owned: *Value) void {
 }
 
 /// One pending native completion and its copied result. A future has unique
-/// ownership: move it rather than copy it, since deinit on two copies releases
-/// the native completion twice. A future that is dropped without `deinit`
-/// leaks its state and any value it holds; call a command through its
-/// handle's `discarding()` view to submit it without a future.
+/// ownership: move it rather than copy it, since `await` or `deinit` on two
+/// copies releases the native completion twice. A future that is dropped
+/// without either leaks its state and any value it holds; call a command
+/// through its handle's `discarding()` view to submit it without a future.
 pub fn Future(comptime T: type) type {
     return struct {
         const Self = @This();
@@ -102,6 +102,17 @@ pub fn Future(comptime T: type) type {
         pub fn wait(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
             status.begin(diagnostic);
             return status.propagate(diagnostic, self.waitInner(diagnostic));
+        }
+
+        /// Waits as `wait` does, then releases the future as `deinit` does,
+        /// whatever the outcome. It takes the future by value, so it can wait
+        /// on the call that returned it:
+        /// `try (try runtime.release(null)).await(null);`. Don't use another
+        /// copy of the future afterwards.
+        pub fn await(self: Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
+            var owned = self;
+            defer owned.deinit();
+            return owned.wait(diagnostic);
         }
 
         fn waitInner(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
@@ -329,10 +340,14 @@ const FakeSubmission = struct {
     }
 
     fn deliver(value_count: usize) void {
+        deliverStatus(c.MLN_STATUS_OK, value_count);
+    }
+
+    fn deliverStatus(raw_status: c.mln_status, value_count: usize) void {
         const payload: u32 = 7;
         const result = std.mem.zeroInit(c.mln_completion_result, .{
             .size = @sizeOf(c.mln_completion_result),
-            .status = c.MLN_STATUS_OK,
+            .status = raw_status,
             .value = @as(?*const anyopaque, &payload),
             .value_count = value_count,
         });
@@ -403,6 +418,40 @@ test "a pending future polls without blocking and deinit abandons it" {
     try std.testing.expectError(error.InvalidState, future.poll());
     FakeSubmission.deliver(1);
     FakeSubmission.retire();
+}
+
+/// A copy context that counts its releases. The future releases it with the
+/// state that keeps it, once both native and the owner are done with it.
+const CountedContext = struct {
+    releases: *usize,
+
+    pub fn deinit(self: *CountedContext) void {
+        self.releases.* += 1;
+    }
+
+    fn copy(result: *const c.mln_completion_result, _: *CountedContext) status.Error!u32 {
+        return value(u32)(result);
+    }
+};
+
+// `await` releases its future whatever the completion reports, so once native
+// has retired its user data, nothing the call kept outlives the await.
+test "await releases its future after a success and after a failure" {
+    FakeSubmission.refuse = false;
+    for ([_]c.mln_status{ c.MLN_STATUS_OK, c.MLN_STATUS_NOT_FOUND }) |raw_status| {
+        var releases: usize = 0;
+        const future = try submitWithCopyContext(u32, CountedContext, null, CountedContext.copy, .{ .releases = &releases }, FakeSubmission.start, .{});
+        FakeSubmission.deliverStatus(raw_status, 1);
+        FakeSubmission.retire();
+        try std.testing.expectEqual(@as(usize, 0), releases);
+        const outcome = future.await(null);
+        try std.testing.expectEqual(@as(usize, 1), releases);
+        if (raw_status == c.MLN_STATUS_OK) {
+            try std.testing.expectEqual(@as(u32, 7), try outcome);
+        } else {
+            try std.testing.expectError(error.NotFound, outcome);
+        }
+    }
 }
 
 const CountedWake = struct {

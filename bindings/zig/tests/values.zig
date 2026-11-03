@@ -23,10 +23,10 @@ test "host strings use views and native-lent strings decode" {
     try fixture.loadStyle();
     const source_id = "nul\x00source";
     try support.expectCommitted(try fixture.map.addStyleSourceJson(source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
-    var info = (try support.resolve(try fixture.map.getStyleSource(testing.allocator, source_id, null))).?;
+    var info = (try (try fixture.map.getStyleSource(testing.allocator, source_id, null)).await(null)).?;
     defer info.deinit();
     try testing.expectEqual(maplibre.StyleSourceType.geo_json, info.value.type);
-    try testing.expect(try support.resolve(try fixture.map.getStyleSource(testing.allocator, "nul", null)) == null);
+    try testing.expect(try (try fixture.map.getStyleSource(testing.allocator, "nul", null)).await(null) == null);
 }
 
 // A null optional field sets no presence bit, so the command leaves that value
@@ -170,7 +170,7 @@ test "an array input is copied at submission" {
     @memset(&pixels, 0);
     try support.expectCommitted(submitted);
 
-    var copy = (try support.resolve(try fixture.map.getStyleImage(testing.allocator, "copied", null))).?;
+    var copy = (try (try fixture.map.getStyleImage(testing.allocator, "copied", null)).await(null)).?;
     defer copy.deinit();
     try testing.expectEqual(@as(usize, pixels.len), copy.value.pixels.len);
     for (copy.value.pixels) |byte| try testing.expectEqual(@as(u8, 0x80), byte);

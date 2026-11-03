@@ -49,7 +49,7 @@ impl GeoJsonSourceDataHandle {
     ///
     /// See `mln_geo_json_source_data_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn release(self) -> std::result::Result<(), (Self, Error)> {
+    pub fn release(self) -> std::result::Result<(), ReleaseError<Self>> {
         self.consume(|data| {
             let mut call = Call::new(data);
             call.run(|data| unsafe { sys::mln_geo_json_source_data_release(data) });

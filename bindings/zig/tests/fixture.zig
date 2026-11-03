@@ -133,14 +133,8 @@ pub const EndProbe = struct {
     }
 };
 
-pub fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
-    var future = future_value;
-    defer future.deinit();
-    return future.wait(null);
-}
-
-pub fn expectCommitted(future_value: maplibre.Future(maplibre.CommandCompletion)) !void {
-    _ = try resolve(future_value);
+pub fn expectCommitted(future: maplibre.Future(maplibre.CommandCompletion)) !void {
+    _ = try future.await(null);
 }
 
 /// Answers every request with a not-found error, so no test reaches the
@@ -192,7 +186,7 @@ pub const Fixture = struct {
         const created = try self.runtime.createMap(map_options, null);
         self.map = created.map;
         errdefer self.map.deinit();
-        try resolve(created.ready);
+        try created.ready.await(null);
         return self;
     }
 
@@ -240,12 +234,11 @@ pub const Fixture = struct {
     pub fn releaseRuntimeWhenChildless(self: *Fixture) !void {
         try self.events.waitUntil(self, struct {
             fn ready(fixture: *Fixture) anyerror!bool {
-                var teardown = fixture.runtime.release(null) catch |err| switch (err) {
+                const teardown = fixture.runtime.release(null) catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => return err,
                 };
-                defer teardown.deinit();
-                try teardown.wait(null);
+                try teardown.await(null);
                 return true;
             }
         }.ready);
@@ -288,11 +281,11 @@ pub const Fixture = struct {
 };
 
 pub fn closeRuntimeHandle(runtime: *maplibre.Runtime) !void {
-    try resolve(try runtime.release(null));
+    try (try runtime.release(null)).await(null);
 }
 
 pub fn closeMapHandle(map: *maplibre.Map) !void {
-    try resolve(try map.release(null));
+    try (try map.release(null)).await(null);
 }
 
 // Rendering. Every native backend but WebGL and WebGPU takes its context from
@@ -514,12 +507,11 @@ pub const TextureSession = struct {
     /// may destroy its graphics objects. A failure logs an error, which fails
     /// the test.
     fn release(self: *TextureSession) void {
-        var retired = self.session.release(null) catch |err| {
+        const retired = self.session.release(null) catch |err| {
             std.log.err("render session release failed: {s}", .{@errorName(err)});
             return;
         };
-        defer retired.deinit();
-        retired.wait(null) catch |err| {
+        retired.await(null) catch |err| {
             std.log.err("render session retirement failed: {s}", .{@errorName(err)});
         };
     }

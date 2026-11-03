@@ -12,7 +12,7 @@ fn useFeature(_: []const u8) void {}
 
 fn query(allocator: std.mem.Allocator, session: maplibre.RenderSession, point: maplibre.ScreenPoint) !void {
     // #region rendered
-    var rendered = try session.queryRenderedFeatures(
+    const rendered = try session.queryRenderedFeatures(
         allocator,
         .{ .box = .{
             .min = .{ .x = point.x - 5, .y = point.y - 5 },
@@ -21,8 +21,7 @@ fn query(allocator: std.mem.Allocator, session: maplibre.RenderSession, point: m
         .{ .layer_ids = &.{"poi"} },
         null,
     );
-    defer rendered.deinit();
-    var hits = try rendered.wait(null);
+    var hits = try rendered.await(null);
     defer hits.deinit();
 
     for (hits.value) |hit| {
@@ -32,7 +31,7 @@ fn query(allocator: std.mem.Allocator, session: maplibre.RenderSession, point: m
     // #endregion rendered
 
     // #region source
-    var source = try session.querySourceFeatures(
+    const source = try session.querySourceFeatures(
         allocator,
         "openmaptiles",
         .{
@@ -42,8 +41,7 @@ fn query(allocator: std.mem.Allocator, session: maplibre.RenderSession, point: m
         },
         null,
     );
-    defer source.deinit();
-    var features = try source.wait(null);
+    var features = try source.await(null);
     defer features.deinit();
 
     for (features.value) |feature| {

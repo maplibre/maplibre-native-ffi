@@ -32,7 +32,10 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
 
     // A runtime refuses to close while one of its maps is live, and hands
     // itself back.
-    let (runtime, error) = runtime.release().unwrap_err();
+    let ReleaseError {
+        handle: runtime,
+        error,
+    } = runtime.release().unwrap_err();
     assert_eq!(error.status(), Status::InvalidState);
     wait_for(runtime.clear_resource_transform());
 

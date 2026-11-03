@@ -52,7 +52,7 @@ mod string;
 
 pub use call::Lent;
 pub use completion::{CommandCompletion, NativeFuture};
-pub use error::{Error, Result};
+pub use error::{Error, ReleaseError, Result};
 pub use generated::*;
 pub use handle::NativeHandleLeak;
 /// The raw C declarations, which some calls take or return.

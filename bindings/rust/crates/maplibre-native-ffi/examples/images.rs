@@ -56,7 +56,7 @@ async fn images(runtime: &RuntimeHandle) -> Result<()> {
     // #endregion read
 
     drop(session);
-    map.release().map_err(|(_, error)| error)?.await?;
+    map.release()?.await?;
 
     Ok(())
 }
@@ -85,7 +85,7 @@ async fn images_tile(
     })?;
     // #endregion tile
 
-    map.release().map_err(|(_, error)| error)?.await?;
+    map.release()?.await?;
 
     Ok(())
 }

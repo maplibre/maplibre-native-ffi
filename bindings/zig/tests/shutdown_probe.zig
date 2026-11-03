@@ -13,21 +13,15 @@ fn passThrough(_: ?*anyopaque, _: maplibre.ResourceRequestInfo, request: maplibr
     try owned.passThrough(null);
 }
 
-fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
-    var future = future_value;
-    defer future.deinit();
-    return future.wait(null);
-}
-
 pub fn main() !void {
     const allocator = std.heap.smp_allocator;
     try maplibre.setLogCallback(.{ .callback = ignoreLog }, null);
 
     const runtime = try maplibre.Runtime.create(.{}, null);
-    _ = try resolve(try runtime.setResourceProvider(allocator, .{ .callback = passThrough }, null));
+    _ = try (try runtime.setResourceProvider(allocator, .{ .callback = passThrough }, null)).await(null);
     const created = try runtime.createMap(.{ .initial_extent = .{ .width = 256, .height = 256, .scale_factor = 1.0 } }, null);
     const map = created.map;
-    try resolve(created.ready);
-    _ = try resolve(try map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}", null));
-    _ = try resolve(try runtime.clearResourceTransform(null));
+    try created.ready.await(null);
+    _ = try (try map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}", null)).await(null);
+    _ = try (try runtime.clearResourceTransform(null)).await(null);
 }

@@ -23,7 +23,7 @@ impl AcquiredFrameHandle {
     ///
     /// See `mln_acquired_frame_discard` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn discard(self) -> std::result::Result<(), (Self, Error)> {
+    pub fn discard(self) -> std::result::Result<(), ReleaseError<Self>> {
         self.consume(|frame| {
             let mut call = Call::new(frame);
             call.status(|frame, out_diagnostic| unsafe {
@@ -72,7 +72,7 @@ impl AcquiredFrameHandle {
     pub unsafe fn release(
         self,
         consumer_completion: &GpuSync,
-    ) -> std::result::Result<(), (Self, Error)> {
+    ) -> std::result::Result<(), ReleaseError<Self>> {
         self.consume(|frame| {
             let mut call = Call::new(frame);
             let consumer_completion = call.reference(&consumer_completion)?;

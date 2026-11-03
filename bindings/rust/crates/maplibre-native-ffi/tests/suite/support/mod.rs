@@ -152,7 +152,7 @@ pub fn wait_for<T, E: std::fmt::Debug>(submitted: std::result::Result<NativeFutu
 #[track_caller]
 pub fn wait_on<T>(future: NativeFuture<T>) -> T {
     future
-        .wait(timeout())
+        .wait_timeout(timeout())
         .expect("the operation never completed")
         .expect("the operation failed")
 }
@@ -431,7 +431,7 @@ impl Drop for Fixture {
         // reported only when the test passed.
         let panicking = std::thread::panicking();
         let release = |future: Result<NativeFuture<()>>| match future {
-            Ok(future) => match future.wait(timeout()) {
+            Ok(future) => match future.wait_timeout(timeout()) {
                 Ok(Err(error)) if !panicking => panic!("fixture release failed: {error}"),
                 Err(_) if !panicking => panic!("fixture release never completed"),
                 _ => {}
@@ -440,10 +440,10 @@ impl Drop for Fixture {
             Err(_) => {}
         };
         if let Some(map) = self.map.take() {
-            release(map.release().map_err(|(_, error)| error));
+            release(map.release().map_err(Error::from));
         }
         if let Some(runtime) = self.runtime.take() {
-            release(runtime.release().map_err(|(_, error)| error));
+            release(runtime.release().map_err(Error::from));
         }
     }
 }

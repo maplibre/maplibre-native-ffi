@@ -163,7 +163,7 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn dispose(self) -> std::result::Result<(), (Self, Error)> {
+    pub fn dispose(self) -> std::result::Result<(), ReleaseError<Self>> {
         self.consume(|runtime| {
             let mut call = Call::new(runtime);
             call.status(|runtime, out_diagnostic| unsafe {
@@ -299,7 +299,7 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn release(self) -> std::result::Result<NativeFuture<()>, (Self, Error)> {
+    pub fn release(self) -> std::result::Result<NativeFuture<()>, ReleaseError<Self>> {
         self.consume(|runtime| {
             let call = Call::new(runtime);
             call.complete(
