@@ -129,10 +129,14 @@ void main() {
     final fixture = await runZonedGuarded(
       () => openRuntime(
         provider: routedProvider([styleRoute(styleUrl)], (_, handle) {
-          final alreadyCancelled = handle.setCancelCallback(() {
-            cancelled.complete(handle.isCancelled());
-            throw StateError('cancel callback failed');
-          });
+          final alreadyCancelled = handle.setCancelCallback(
+            ResourceRequestCancelHandler(
+              callback: () {
+                cancelled.complete(handle.isCancelled());
+                throw StateError('cancel callback failed');
+              },
+            ),
+          );
           expect(alreadyCancelled, isFalse);
           handed.complete(handle);
         }),

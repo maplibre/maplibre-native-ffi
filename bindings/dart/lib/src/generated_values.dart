@@ -2517,6 +2517,18 @@ final class CameraTransitionEnd extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd end);
 
+/// A callback for the end of a camera change, for `AnimationOptions`.
+///
+/// The callback runs once for each camera command, after every part of the
+/// change that the command started has ended.
+///
+/// See `mln_camera_transition_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraTransitionHandler {
+  const CameraTransitionHandler({this.callback});
+  final CameraTransitionEndCallback? callback;
+}
+
 /// How a camera change animates.
 ///
 /// See `mln_animation_options` in the
@@ -2528,7 +2540,7 @@ final class AnimationOptions extends _Value {
     this.minZoom,
     this.easing,
     this.transitionId,
-    this.endHandler,
+    this.endHandler = const CameraTransitionHandler(),
   });
   final double? durationMs;
 
@@ -2543,7 +2555,7 @@ final class AnimationOptions extends _Value {
   /// An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
   /// by. Several changes can share one.
   final int? transitionId;
-  final CameraTransitionEndCallback? endHandler;
+  final CameraTransitionHandler endHandler;
 
   /// A copy of this value with the given members replaced.
   AnimationOptions copyWith({
@@ -2552,17 +2564,14 @@ final class AnimationOptions extends _Value {
     double? minZoom,
     UnitBezier? easing,
     int? transitionId,
-    CameraTransitionEndCallback? endHandler =
-        _unchangedCameraTransitionEndCallback,
+    CameraTransitionHandler? endHandler,
   }) => AnimationOptions(
     durationMs: durationMs ?? this.durationMs,
     velocity: velocity ?? this.velocity,
     minZoom: minZoom ?? this.minZoom,
     easing: easing ?? this.easing,
     transitionId: transitionId ?? this.transitionId,
-    endHandler: identical(endHandler, _unchangedCameraTransitionEndCallback)
-        ? this.endHandler
-        : endHandler,
+    endHandler: endHandler ?? this.endHandler,
   );
 
   @override
@@ -2584,8 +2593,6 @@ final class AnimationOptions extends _Value {
     'endHandler',
   ]);
 }
-
-void _unchangedCameraTransitionEndCallback(CameraTransitionEnd end) {}
 
 /// A change to the camera from where it is now, for gestures.
 ///
@@ -5487,6 +5494,15 @@ final class ResourceResponse extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
 
+/// A cancel callback, for `ResourceRequestHandle.setCancelCallback()`.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRequestCancelHandler {
+  const ResourceRequestCancelHandler({required this.callback});
+  final ResourceRequestCancelCallback callback;
+}
+
 /// Why a resource transform fails a request.
 ///
 /// See `mln_resource_transform_error` in the
@@ -6293,6 +6309,15 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 /// See `mln_runtime_event_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef RuntimeEventCallback = void Function(List<RuntimeEvent> events);
+
+/// An event callback, for `RuntimeHandle.setEventHandler()`.
+///
+/// See `mln_runtime_event_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class RuntimeEventHandler {
+  const RuntimeEventHandler({required this.callback});
+  final RuntimeEventCallback callback;
+}
 
 /// An HTTP header.
 ///

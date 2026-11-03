@@ -68,7 +68,7 @@ export async function routeRequests(
  */
 export async function burst(started: () => void): Promise<never> {
   const runtime: RuntimeHandle = await RuntimeHandle.create();
-  await runtime.setEventHandler(() => {});
+  await runtime.setEventHandler({ callback: () => {} });
   const { map, ready } = runtime.createMap({ initialExtent: renderExtent });
   await ready;
   let ended = 0;
@@ -78,7 +78,10 @@ export async function burst(started: () => void): Promise<never> {
       map.updateCamera({
         mode: CameraUpdateMode.ease,
         camera: { zoom: round % 8 },
-        animation: { durationMs: 1, endHandler: () => ended++ },
+        animation: {
+          durationMs: 1,
+          endHandler: { callback: () => ended++ },
+        },
       }),
       map.addCustomGeometrySource(`source-${round}`, { fetchTile() {} }),
       map.getCamera(),
@@ -104,7 +107,7 @@ const liveWork: object[] = [];
 export async function liveNativeWork(): Promise<RenderSessionHandle> {
   setLogCallback({ callback: () => {} });
   const runtime = await RuntimeHandle.create();
-  await runtime.setEventHandler(() => {});
+  await runtime.setEventHandler({ callback: () => {} });
   let hold!: (handle: ResourceRequestHandle) => void;
   const held = new Promise<ResourceRequestHandle>(
     (resolve) => (hold = resolve),

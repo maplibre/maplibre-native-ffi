@@ -14,18 +14,22 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
 
   // #region handler
   // The handler runs in this isolate. The binding queues each call.
-  runtime.discarding.setEventHandler((events) {
-    for (final event in events) {
-      if (event.source != map?.id) continue;
+  runtime.discarding.setEventHandler(
+    RuntimeEventHandler(
+      callback: (events) {
+        for (final event in events) {
+          if (event.source != map?.id) continue;
 
-      switch (event.type) {
-        case RuntimeEventType.mapStyleLoaded:
-          onStyleLoaded();
-        case RuntimeEventType.mapLoadingFailed:
-          onLoadingFailed(event.message);
-      }
-    }
-  });
+          switch (event.type) {
+            case RuntimeEventType.mapStyleLoaded:
+              onStyleLoaded();
+            case RuntimeEventType.mapLoadingFailed:
+              onLoadingFailed(event.message);
+          }
+        }
+      },
+    ),
+  );
   // #endregion handler
 
   // #region mask

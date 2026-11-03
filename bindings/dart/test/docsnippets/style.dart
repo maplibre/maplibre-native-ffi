@@ -100,18 +100,22 @@ Future<void> style(MapHandle map, Uint8List pixels) async {
 void styleEvents(RuntimeHandle runtime, MapHandle map) {
   // #region missing-image
   // The handler runs in this isolate. The binding queues each call.
-  runtime.discarding.setEventHandler((events) {
-    for (final event in events) {
-      if (event.source != map.id) continue;
-      if (event.payload case RuntimeEventPayloadStyleImage(
-        :final value,
-      )) {
-        map.discarding.setStyleImage(
-          value.imageId,
-          drawImage(value.imageId),
-        );
-      }
-    }
-  });
+  runtime.discarding.setEventHandler(
+    RuntimeEventHandler(
+      callback: (events) {
+        for (final event in events) {
+          if (event.source != map.id) continue;
+          if (event.payload case RuntimeEventPayloadStyleImage(
+            :final value,
+          )) {
+            map.discarding.setStyleImage(
+              value.imageId,
+              drawImage(value.imageId),
+            );
+          }
+        }
+      },
+    ),
+  );
   // #endregion missing-image
 }

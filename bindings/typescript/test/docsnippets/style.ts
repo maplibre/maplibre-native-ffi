@@ -98,13 +98,15 @@ export function styleEvents(
 ): void {
   // #region missing-image
   // The handler runs on this thread. The binding queues each call.
-  runtime.discarding.setEventHandler((events) => {
-    for (const { source, payload } of events) {
-      if (source !== map.id || payload.kind !== "styleImage")
-        continue;
-      const { imageId } = payload.value;
-      map.discarding.setStyleImage(imageId, drawImage(imageId));
-    }
+  runtime.discarding.setEventHandler({
+    callback: (events) => {
+      for (const { source, payload } of events) {
+        if (source !== map.id || payload.kind !== "styleImage")
+          continue;
+        const { imageId } = payload.value;
+        map.discarding.setStyleImage(imageId, drawImage(imageId));
+      }
+    },
   });
   // #endregion missing-image
 }

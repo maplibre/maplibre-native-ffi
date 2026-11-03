@@ -130,15 +130,19 @@ class DartEmitterTests(unittest.TestCase):
             r"_NativeResourceRequest\(handle\)\);\s*if \(callback == null\) \{\s*owner\.close\(\);",
         )
 
-    def test_a_registration_of_one_callback_is_the_callback(self):
+    def test_a_registration_of_one_callback_is_a_class(self):
         values = dart.lower(real_api()).files[dart.VALUES]
         operations = dart.lower(real_api()).files[dart.OPERATIONS]
-        self.assertNotIn("class RuntimeEventHandler", values)
-        self.assertIn("setEventHandler(RuntimeEventCallback handler)", operations)
-        # An optional lone callback makes its record member optional.
-        self.assertIn("final CameraTransitionEndCallback? endHandler;", values)
-        # A registration with more than its callback stays a class.
-        self.assertIn("final class ResourceProvider {", values)
+        self.assertIn(
+            "final class RuntimeEventHandler {\n"
+            "  const RuntimeEventHandler({required this.callback});",
+            values,
+        )
+        self.assertIn("setEventHandler(RuntimeEventHandler handler)", operations)
+        # An optional callback leaves its registration's record member a
+        # disabled registration by default.
+        self.assertIn("final CameraTransitionHandler endHandler;", values)
+        self.assertIn("this.endHandler = const CameraTransitionHandler()", values)
 
     def test_a_required_member_has_no_default_and_others_default_to_zero(self):
         values = dart.lower(real_api()).files[dart.VALUES]

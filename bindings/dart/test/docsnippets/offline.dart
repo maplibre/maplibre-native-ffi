@@ -25,26 +25,32 @@ Future<void> offline() async {
   // #endregion cache-file
 
   // #region progress
-  runtime.discarding.setEventHandler((events) {
-    for (final RuntimeEvent(:payload, :message) in events) {
-      switch (payload) {
-        case RuntimeEventPayloadOfflineRegionStatus(:final value):
-          final RuntimeEventOfflineRegionStatus(:regionId, :status) =
-              value;
-          recordProgress(
-            regionId,
-            status.completedResourceCount,
-            status.requiredResourceCount,
-            status.complete,
-          );
-        case RuntimeEventPayloadOfflineRegionResponseError(
-          :final value,
-        ):
-          recordError(value.regionId, message);
-        default:
-      }
-    }
-  });
+  runtime.discarding.setEventHandler(
+    RuntimeEventHandler(
+      callback: (events) {
+        for (final RuntimeEvent(:payload, :message) in events) {
+          switch (payload) {
+            case RuntimeEventPayloadOfflineRegionStatus(:final value):
+              final RuntimeEventOfflineRegionStatus(
+                :regionId,
+                :status,
+              ) = value;
+              recordProgress(
+                regionId,
+                status.completedResourceCount,
+                status.requiredResourceCount,
+                status.complete,
+              );
+            case RuntimeEventPayloadOfflineRegionResponseError(
+              :final value,
+            ):
+              recordError(value.regionId, message);
+            default:
+          }
+        }
+      },
+    ),
+  );
   // #endregion progress
 
   // #region ambient

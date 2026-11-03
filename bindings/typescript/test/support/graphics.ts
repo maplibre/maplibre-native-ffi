@@ -420,7 +420,9 @@ export class TestSession {
   /** Attaches an offscreen worker session on `map`, released by a teardown. */
   static async offscreen(map: MapHandle): Promise<TestSession> {
     const wake = new AwaitableWake();
-    const { session, ready } = attachSession(map, { frameWake: wake.wake });
+    const { session, ready } = attachSession(map, {
+      frameWake: { callback: wake.wake },
+    });
     const attached = new TestSession(session, wake, false);
     await attached.settle(ready, "the attachment");
     return attached;
@@ -447,8 +449,8 @@ export class TestSession {
       driver: serviced
         ? RenderDriverKind.callerGraphicsThread
         : RenderDriverKind.coreWorker,
-      frameWake: wake.wake,
-      driverWorkWake: serviced ? wake.wake : undefined,
+      frameWake: { callback: wake.wake },
+      driverWorkWake: serviced ? { callback: wake.wake } : undefined,
     });
     teardown(() => releaseSession(session));
     const attached = new TestSession(session, wake, serviced);

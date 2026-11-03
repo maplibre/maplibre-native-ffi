@@ -122,7 +122,6 @@ class Values:
 
         self.results: dict[str, str] = {}
         # The no-op defaults that copyWith declares for optional callbacks.
-        self.unchanged: set[str] = set()
 
     def scalar(self, value):
         return SCALARS.get(
@@ -223,17 +222,6 @@ class Values:
     def native_only(self, value):
         return async_hosts.native_only(self.bound, value)
 
-    def single_callback(self, value):
-        """The callback field of a queued registration that holds nothing else,
-        which Dart takes as the callback itself, as `Stream.listen` does."""
-        if not value.registration or self.wake(value) or self.native_only(value):
-            return None
-        callbacks = self.queue_callbacks(value)
-        fields = self.fields(value)
-        if len(callbacks) == 1 and [f.name for f in fields] == [callbacks[0].name]:
-            return callbacks[0]
-        return None
-
     def check_arguments(self, callback):
         """Accept a queued callback whose arguments Dart can convert."""
         for parameter in callback.arguments:
@@ -274,18 +262,9 @@ class Values:
         # A registration that only native code supplies may be absent, which
         # keeps the record's initial value: its native default, or zero. Both
         # leave the registration disabled.
-        # A lone optional callback stands for its registration, so the
-        # registration is optional too.
         return tuple(
             replace(f, value=replace(f.value, nullable=True))
-            if f.value.registration
-            and (
-                self.native_only(f.value)
-                or (
-                    (callback := self.single_callback(f.value))
-                    and callback.value.nullable
-                )
-            )
+            if f.value.registration and self.native_only(f.value)
             else f
             for f in value.fields
             if f.name not in controls
@@ -309,10 +288,6 @@ class Values:
             )
         elif value.native in self.bound.slices:
             name = self.public(self.bound.slices[value.native].value)
-        elif callback := self.single_callback(value):
-            name = self.public(replace(callback.value, nullable=False))
-            if callback.value.nullable:
-                name += "?"
         elif value.kind in {"record", "callback"}:
             name = public_name(value.native)
         elif value.kind == "reference":
@@ -482,10 +457,6 @@ class Values:
         )
 
     def copy(self, value, expression, count=None):
-        if self.single_callback(value):
-            # Native never returns callbacks, so a copy is the caller's.
-            required = required_callbacks(value)
-            return identifier(required[0].name) if required else "null"
         if value.registration:
             public = public_name(value.native)
             # Native never returns callbacks. A registration's own default
@@ -839,13 +810,10 @@ class Values:
         members, args, initializers, writes = self.registration_members(
             value, skip=names
         )
-        single = self.single_callback(value)
-        # A lone callback is the value itself, which the null check promotes.
-        member = (
-            (lambda name, nullable: "value")
-            if single
-            else (lambda name, nullable: f"value.{name}{'!' if nullable else ''}")
-        )
+
+        def member(name, nullable):
+            return f"value.{name}{'!' if nullable else ''}"
+
         callbacks, pointers = [], []
         for index, field in enumerate(fields):
             callback = self.bound.callbacks[field.value.native]
@@ -868,13 +836,8 @@ class Values:
             if fields[0].value.nullable
             else ""
         )
-        parameter = (
-            self.public(replace(value, nullable=single.value.nullable))
-            if single
-            else public
-        )
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> {name or '_prepare' + public}({parameter} value, _CallbackRoots roots) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
+            f"_NativeRegistration<raw.{value.native}> {name or '_prepare' + public}({public} value, _CallbackRoots roots) {{\n  final arena = Arena();\n  DeliveryRegistration? registration;\n  try {{\n    final result = arena<raw.{value.native}>();\n"
             + self.registration_initializer(value)
             + "".join(line + "\n" for line in writes)
             + disabled
@@ -906,13 +869,11 @@ class Values:
                 ]
             )
             + ");\n"
-            if value.native in self.bound.returned and not single
+            if value.native in self.bound.returned
             else ""
         )
         return (
-            ""
-            if single
-            else self.registration_class(value, members, args, initializers),
+            self.registration_class(value, members, args, initializers),
             conversion + reader,
         )
 
@@ -1338,38 +1299,13 @@ class Values:
             compared = ", ".join(names)
             described = ", ".join(f"'{name}'" for name in names)
             copy = ""
-            helpers = []
             if value.native in self.bound.inputs:
                 # A JSON member takes null as a value meaning absent, so its
                 # parameter defaults to a sentinel instead of null.
                 json = {name for name, typ, _ in members if typ == "Object?"}
-                # An optional lone callback takes null to disable it, so its
-                # parameter defaults to a no-op of its own type instead.
-                unchanged = {
-                    name: f"_unchanged{typ.removesuffix('?')}"
-                    for name, typ, field in members
-                    if typ.endswith("?") and self.single_callback(field.value)
-                }
-                for name, typ, field in members:
-                    if name in unchanged and unchanged[name] not in self.unchanged:
-                        callback = self.single_callback(field.value)
-                        arguments = self.bound.callbacks[
-                            callback.value.native
-                        ].arguments
-                        self.unchanged.add(unchanged[name])
-                        helpers.append(
-                            f"void {unchanged[name]}("
-                            + ", ".join(
-                                f"{self.public(p.value)} {identifier(p.name)}"
-                                for p in arguments
-                            )
-                            + ") {}\n"
-                        )
                 parameters = ", ".join(
                     f"Object? {name} = _unchanged"
                     if name in json
-                    else f"{typ} {name} = {unchanged[name]}"
-                    if name in unchanged
                     else f"{typ.removesuffix('?')}? {name}"
                     for name, typ, _ in members
                 ) + "".join(f", bool? {name}" for name, _ in flags)
@@ -1379,8 +1315,6 @@ class Values:
                     + ", ".join(
                         f"{name}: identical({name}, _unchanged) ? this.{name} : {name}"
                         if name in json
-                        else f"{name}: identical({name}, {unchanged[name]}) ? this.{name} : {name}"
-                        if name in unchanged
                         else f"{name}: {name} ?? this.{name}"
                         for name in names
                     )
@@ -1389,7 +1323,6 @@ class Values:
             declarations.append(
                 f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n{copy}{self.to_options(value)}\n  @override List<Object?> get _members => [{compared}];\n"
                 f"  @override String toString() => _describe('{public}', const [{described}]);\n}}\n"
-                + "".join("\n" + helper for helper in helpers)
             )
             write = [
                 f"Pointer<raw.{value.native}> _write{public}({public} value, Allocator arena"

@@ -2963,13 +2963,11 @@ bool mln_ts_write_animation_options(
   if (!mln_ts_member(call, value, "endHandler", &member)) return false;
   mln_ts_path(child, sizeof child, path, "endHandler");
   if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_function(call, member, child)) return false;
-    if (!mln_ts_read_registration(
-          call, member, &out->end_handler.user_data,
-          &out->end_handler.release_user_data, &out->end_handler.queue
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_camera_transition_handler(
+          call, member, &out->end_handler, child
         ))
       return false;
-    out->end_handler.callback = mln_ts_dispatch_camera_transition_end_callback;
   }
   return true;
 }
@@ -3343,6 +3341,28 @@ bool mln_ts_write_camera_options(
       out->field_of_view = (double)number;
     }
     out->fields |= MLN_CAMERA_OPTION_FOV;
+  }
+  return true;
+}
+
+bool mln_ts_write_camera_transition_handler(
+  mln_ts_call* call, napi_value value, mln_camera_transition_handler* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "callback", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "callback");
+  bool has_callback = !mln_ts_is_absent(call, member);
+  if (has_callback && !mln_ts_read_function(call, member, child)) return false;
+  if (has_callback) {
+    if (!mln_ts_read_registration(
+          call, value, &(*out).user_data, &(*out).release_user_data,
+          &(*out).queue
+        ))
+      return false;
+    (*out).callback = mln_ts_dispatch_camera_transition_end_callback;
   }
   return true;
 }
@@ -5618,56 +5638,45 @@ bool mln_ts_write_render_session_attach_options(
   if (!mln_ts_member(call, value, "frameWake", &member)) return false;
   mln_ts_path(child, sizeof child, path, "frameWake");
   if (!mln_ts_is_absent(call, member)) {
-    if (mln_ts_is_object(call, member)) {
-      {
-        uint64_t fields[3];
-        if (!mln_ts_read_native_registration(
-              call, member, "Wake", 1, fields, child
-            ))
-          return false;
+    {
+      uint64_t fields[3];
+      bool native = false;
+      if (!mln_ts_read_native_registration(
+            call, member, "Wake", 1, fields, &native, child
+          ))
+        return false;
+      if (native) {
         out->frame_wake.callback = (mln_wake_callback)(uintptr_t)fields[0];
         out->frame_wake.user_data = (void*)(uintptr_t)fields[1];
         out->frame_wake.release_user_data =
           (mln_user_data_release)(uintptr_t)fields[2];
-      }
-    } else {
-      if (!mln_ts_is_absent(call, member)) {
-        if (!mln_ts_read_function(call, member, child)) return false;
-        if (!mln_ts_read_registration(
-              call, member, &out->frame_wake.user_data,
-              &out->frame_wake.release_user_data, &out->frame_wake.queue
-            ))
+      } else {
+        if (!mln_ts_read_record(call, member, child)) return false;
+        if (!mln_ts_write_wake(call, member, &out->frame_wake, child))
           return false;
-        out->frame_wake.callback = mln_ts_dispatch_wake_callback;
       }
     }
   }
   if (!mln_ts_member(call, value, "driverWorkWake", &member)) return false;
   mln_ts_path(child, sizeof child, path, "driverWorkWake");
   if (!mln_ts_is_absent(call, member)) {
-    if (mln_ts_is_object(call, member)) {
-      {
-        uint64_t fields[3];
-        if (!mln_ts_read_native_registration(
-              call, member, "Wake", 1, fields, child
-            ))
-          return false;
+    {
+      uint64_t fields[3];
+      bool native = false;
+      if (!mln_ts_read_native_registration(
+            call, member, "Wake", 1, fields, &native, child
+          ))
+        return false;
+      if (native) {
         out->driver_work_wake.callback =
           (mln_wake_callback)(uintptr_t)fields[0];
         out->driver_work_wake.user_data = (void*)(uintptr_t)fields[1];
         out->driver_work_wake.release_user_data =
           (mln_user_data_release)(uintptr_t)fields[2];
-      }
-    } else {
-      if (!mln_ts_is_absent(call, member)) {
-        if (!mln_ts_read_function(call, member, child)) return false;
-        if (!mln_ts_read_registration(
-              call, member, &out->driver_work_wake.user_data,
-              &out->driver_work_wake.release_user_data,
-              &out->driver_work_wake.queue
-            ))
+      } else {
+        if (!mln_ts_read_record(call, member, child)) return false;
+        if (!mln_ts_write_wake(call, member, &out->driver_work_wake, child))
           return false;
-        out->driver_work_wake.callback = mln_ts_dispatch_wake_callback;
       }
     }
   }
@@ -5677,7 +5686,7 @@ bool mln_ts_write_render_session_attach_options(
     {
       uint64_t fields[4];
       if (!mln_ts_read_native_registration(
-            call, member, "QueueLock", 2, fields, child
+            call, member, "QueueLock", 2, fields, NULL, child
           ))
         return false;
       out->queue_lock.lock = (mln_queue_lock_callback)(uintptr_t)fields[0];
@@ -5795,6 +5804,24 @@ bool mln_ts_write_resource_provider(
       out->route_count = (size_t)count;
     }
   }
+  return true;
+}
+
+bool mln_ts_write_resource_request_cancel_handler(
+  mln_ts_call* call, napi_value value, mln_resource_request_cancel_handler* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "callback", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "callback");
+  if (!mln_ts_read_function(call, member, child)) return false;
+  if (!mln_ts_read_registration(
+        call, value, &(*out).user_data, &(*out).release_user_data, &(*out).queue
+      ))
+    return false;
+  (*out).callback = mln_ts_dispatch_resource_request_cancel_callback;
   return true;
 }
 
@@ -5943,8 +5970,7 @@ bool mln_ts_write_resource_transform(
           &(*out).queue
         ))
       return false;
-    if (has_callback)
-      (*out).callback = mln_ts_dispatch_resource_transform_callback;
+    (*out).callback = mln_ts_dispatch_resource_transform_callback;
   }
   if (!mln_ts_member(call, value, "rules", &member)) return false;
   mln_ts_path(child, sizeof child, path, "rules");
@@ -6045,6 +6071,24 @@ bool mln_ts_write_resource_transform_rule(
       out->parameter_count = (size_t)count;
     }
   }
+  return true;
+}
+
+bool mln_ts_write_runtime_event_handler(
+  mln_ts_call* call, napi_value value, mln_runtime_event_handler* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "callback", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "callback");
+  if (!mln_ts_read_function(call, member, child)) return false;
+  if (!mln_ts_read_registration(
+        call, value, &(*out).user_data, &(*out).release_user_data, &(*out).queue
+      ))
+    return false;
+  (*out).callback = mln_ts_dispatch_runtime_event_callback;
   return true;
 }
 
@@ -6795,6 +6839,27 @@ bool mln_ts_write_vulkan_surface_replacement(
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, member, &number, child)) return false;
     out->surface = (uint64_t)number;
+  }
+  return true;
+}
+
+bool mln_ts_write_wake(
+  mln_ts_call* call, napi_value value, mln_wake* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "callback", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "callback");
+  bool has_callback = !mln_ts_is_absent(call, member);
+  if (has_callback && !mln_ts_read_function(call, member, child)) return false;
+  if (has_callback) {
+    if (!mln_ts_read_registration(
+          call, value, &(*out).user_data, &(*out).release_user_data,
+          &(*out).queue
+        ))
+      return false;
+    (*out).callback = mln_ts_dispatch_wake_callback;
   }
   return true;
 }

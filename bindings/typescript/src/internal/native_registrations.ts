@@ -71,19 +71,21 @@ export function nativeRegistration<Kind extends string>(
 
 /**
  * Takes the fields of a native registration for the call that the addon
- * converts. Returns undefined for a registration that an earlier call took,
- * which the addon reports as an invalid state, and throws a TypeError for a
- * value that is no native registration of `kind`.
+ * converts. Returns null for a value that is no native registration, which
+ * the addon reads as the registration's host form or rejects, undefined for a
+ * registration that an earlier call took, which the addon reports as an
+ * invalid state, and throws a TypeError for a native registration of another
+ * kind.
  */
 export function takeNativeRegistration(
   value: unknown,
   kind: string,
   path: string,
-): readonly bigint[] | undefined {
-  const fields =
-    value instanceof NativeRegistration
-      ? NativeRegistration.take(value, kind)
-      : null;
+): readonly bigint[] | undefined | null {
+  if (!(value instanceof NativeRegistration)) {
+    return null;
+  }
+  const fields = NativeRegistration.take(value, kind);
   if (fields === null) {
     throw new TypeError(
       `${path}: expected a native ${kind} registration from ${kind}.native()`,

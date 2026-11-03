@@ -378,6 +378,10 @@ bool mln_ts_write_camera_fit_update(
 bool mln_ts_write_camera_options(
   mln_ts_call* call, napi_value value, mln_camera_options* out, const char* path
 );
+bool mln_ts_write_camera_transition_handler(
+  mln_ts_call* call, napi_value value, mln_camera_transition_handler* out,
+  const char* path
+);
 bool mln_ts_write_camera_update(
   mln_ts_call* call, napi_value value, mln_camera_update* out, const char* path
 );
@@ -625,6 +629,10 @@ bool mln_ts_write_resource_provider(
   mln_ts_call* call, napi_value value, mln_resource_provider* out,
   const char* path
 );
+bool mln_ts_write_resource_request_cancel_handler(
+  mln_ts_call* call, napi_value value, mln_resource_request_cancel_handler* out,
+  const char* path
+);
 bool mln_ts_write_resource_response(
   mln_ts_call* call, napi_value value, mln_resource_response* out,
   const char* path
@@ -642,6 +650,10 @@ bool mln_ts_write_resource_transform_error(
 );
 bool mln_ts_write_resource_transform_rule(
   mln_ts_call* call, napi_value value, mln_resource_transform_rule* out,
+  const char* path
+);
+bool mln_ts_write_runtime_event_handler(
+  mln_ts_call* call, napi_value value, mln_runtime_event_handler* out,
   const char* path
 );
 bool mln_ts_write_runtime_options(
@@ -715,6 +727,9 @@ bool mln_ts_write_vulkan_surface_descriptor(
 bool mln_ts_write_vulkan_surface_replacement(
   mln_ts_call* call, napi_value value, mln_vulkan_surface_replacement* out,
   const char* path
+);
+bool mln_ts_write_wake(
+  mln_ts_call* call, napi_value value, mln_wake* out, const char* path
 );
 bool mln_ts_write_web_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gl_context_descriptor* out,

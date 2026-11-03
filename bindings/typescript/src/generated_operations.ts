@@ -88,6 +88,7 @@ import type {
   VulkanSurfaceDescriptor,
   VulkanSurfaceReplacement,
   VulkanTextureFrame,
+  Wake,
   WebGpuBorrowedTextureDescriptor,
   WebGpuBorrowedTextureReplacement,
   WebGpuSurfaceDescriptor,
@@ -104,6 +105,7 @@ import {
   submitRun,
   threadStart,
 } from "./internal/completions.ts";
+import { type NativeRegistration } from "./internal/native_registrations.ts";
 import {
   ADOPT,
   BORROW,
@@ -5695,8 +5697,11 @@ export class ScopedWebGpuTextureFrame {
 defineCallbacks([
   // mln_camera_transition_end_callback
   (target, args) => {
-    const callback = target as CameraTransitionHandler;
-    const [end] = args as Parameters<CameraTransitionHandler>;
+    const callback = (target as CameraTransitionHandler)
+      .callback as NonNullable<CameraTransitionHandler["callback"]>;
+    const [end] = args as Parameters<
+      NonNullable<CameraTransitionHandler["callback"]>
+    >;
     callback(end);
   },
   // mln_custom_source_cancel_tile_callback
@@ -5746,7 +5751,7 @@ defineCallbacks([
   },
   // mln_resource_request_cancel_callback
   (target, _args) => {
-    const callback = target as ResourceRequestCancelHandler;
+    const callback = (target as ResourceRequestCancelHandler).callback;
     callback();
   },
   // mln_resource_transform_callback
@@ -5773,13 +5778,16 @@ defineCallbacks([
   },
   // mln_runtime_event_callback
   (target, args) => {
-    const callback = target as RuntimeEventHandler;
-    const [events] = args as Parameters<RuntimeEventHandler>;
+    const callback = (target as RuntimeEventHandler).callback;
+    const [events] = args as Parameters<
+      NonNullable<RuntimeEventHandler["callback"]>
+    >;
     callback(events);
   },
   // mln_wake_callback
   (target, _args) => {
-    const callback = target as () => void;
+    const callback = (target as Exclude<Wake, NativeRegistration>)
+      .callback as NonNullable<Exclude<Wake, NativeRegistration>["callback"]>;
     callback();
   },
 ]);

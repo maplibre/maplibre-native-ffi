@@ -109,7 +109,10 @@ export async function renderToWindow(
       // Your VkSurfaceKHR.
       surface: windowSurface,
     },
-    { driver: RenderDriverKind.coreWorker, frameWake: onFrameWake },
+    {
+      driver: RenderDriverKind.coreWorker,
+      frameWake: { callback: onFrameWake },
+    },
   );
   session = attachment.session;
   await attachment.ready;
@@ -121,8 +124,8 @@ export async function renderToWindow(
   // #region service
   const graphicsThreadOptions: RenderSessionAttachOptions = {
     driver: RenderDriverKind.callerGraphicsThread,
-    frameWake: onFrameWake,
-    driverWorkWake: onDriverWorkWake,
+    frameWake: { callback: onFrameWake },
+    driverWorkWake: { callback: onDriverWorkWake },
   };
   // #endregion service
   void graphicsThreadOptions;

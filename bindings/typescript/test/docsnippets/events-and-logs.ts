@@ -23,19 +23,21 @@ export async function eventsAndLogs(
 
   // #region handler
   // The handler runs on this thread. The binding queues each call.
-  runtime.discarding.setEventHandler((events) => {
-    for (const event of events) {
-      if (event.source !== map?.id) continue;
+  runtime.discarding.setEventHandler({
+    callback: (events) => {
+      for (const event of events) {
+        if (event.source !== map?.id) continue;
 
-      switch (event.type) {
-        case RuntimeEventType.mapStyleLoaded:
-          onStyleLoaded();
-          break;
-        case RuntimeEventType.mapLoadingFailed:
-          onLoadingFailed(event.message);
-          break;
+        switch (event.type) {
+          case RuntimeEventType.mapStyleLoaded:
+            onStyleLoaded();
+            break;
+          case RuntimeEventType.mapLoadingFailed:
+            onLoadingFailed(event.message);
+            break;
+        }
       }
-    }
+    },
   });
   // #endregion handler
 

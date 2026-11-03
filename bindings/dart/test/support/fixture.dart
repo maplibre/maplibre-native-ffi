@@ -133,10 +133,14 @@ Future<RuntimeFixture> openRuntime({
   );
   addTearDown(() => closeIfLive(runtime.close));
   final pending = <RuntimeEvent>[];
-  await runtime.setEventHandler((batch) {
-    pending.addAll(batch);
-    events.notify();
-  });
+  await runtime.setEventHandler(
+    RuntimeEventHandler(
+      callback: (batch) {
+        pending.addAll(batch);
+        events.notify();
+      },
+    ),
+  );
   await runtime.setResourceProvider(provider ?? denyingProvider);
   return RuntimeFixture._(runtime, events, pending);
 }

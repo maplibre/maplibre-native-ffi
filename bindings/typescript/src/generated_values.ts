@@ -342,7 +342,9 @@ export interface CameraTransitionEnd {
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-export type CameraTransitionHandler = (end: CameraTransitionEnd) => void;
+export interface CameraTransitionHandler {
+  callback?: (end: CameraTransitionEnd) => void;
+}
 
 /**
  * How a camera change ended.
@@ -2423,7 +2425,9 @@ export interface ResourceRange {
  * See `mln_resource_request_cancel_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export type ResourceRequestCancelHandler = () => void;
+export interface ResourceRequestCancelHandler {
+  callback: () => void;
+}
 
 /**
  * A request that a resource provider serves.
@@ -2724,7 +2728,9 @@ export interface RuntimeEventGlyphs {
  * See `mln_runtime_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;
+export interface RuntimeEventHandler {
+  callback: (events: readonly RuntimeEvent[]) => void;
+}
 
 /**
  * The details of `RuntimeEventType.mapLoadingFailed`.
@@ -3898,7 +3904,14 @@ export interface VulkanTextureFrame {
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
  */
-export type Wake = (() => void) | NativeRegistration<"Wake">;
+export type Wake =
+  | {
+      /**
+       * Null to turn the wake off.
+       */
+      callback?: () => void;
+    }
+  | NativeRegistration<"Wake">;
 export const Wake = {
   /**
    * Creates a native registration from a native function pointer for

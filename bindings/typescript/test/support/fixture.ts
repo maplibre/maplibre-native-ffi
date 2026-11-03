@@ -130,7 +130,10 @@ export class EventStream {
 /** Registers an event stream as the runtime's event handler. */
 export async function listen(runtime: RuntimeHandle): Promise<EventStream> {
   const events = new EventStream();
-  await bounded(runtime.setEventHandler(events.handler), "the event handler");
+  await bounded(
+    runtime.setEventHandler({ callback: events.handler }),
+    "the event handler",
+  );
   return events;
 }
 

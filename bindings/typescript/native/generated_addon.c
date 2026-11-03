@@ -5490,13 +5490,11 @@ static napi_value mln_ts_export_mln_resource_request_set_cancel_callback(
   }
   memset(&arg_handler, 0, sizeof arg_handler);
   arg_handler.size = sizeof arg_handler;
-  if (!mln_ts_read_function(call, call->argv[1], "handler")) goto done;
-  if (!mln_ts_read_registration(
-        call, call->argv[1], &arg_handler.user_data,
-        &arg_handler.release_user_data, &arg_handler.queue
+  if (!mln_ts_read_record(call, call->argv[1], "handler")) goto done;
+  if (!mln_ts_write_resource_request_cancel_handler(
+        call, call->argv[1], &arg_handler, "handler"
       ))
     goto done;
-  arg_handler.callback = mln_ts_dispatch_resource_request_cancel_callback;
   memset(&arg_out_cancelled, 0, sizeof arg_out_cancelled);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -6196,13 +6194,11 @@ static napi_value mln_ts_export_mln_runtime_set_event_handler(
   }
   memset(&arg_handler, 0, sizeof arg_handler);
   arg_handler.size = sizeof arg_handler;
-  if (!mln_ts_read_function(call, call->argv[1], "handler")) goto done;
-  if (!mln_ts_read_registration(
-        call, call->argv[1], &arg_handler.user_data,
-        &arg_handler.release_user_data, &arg_handler.queue
+  if (!mln_ts_read_record(call, call->argv[1], "handler")) goto done;
+  if (!mln_ts_write_runtime_event_handler(
+        call, call->argv[1], &arg_handler, "handler"
       ))
     goto done;
-  arg_handler.callback = mln_ts_dispatch_runtime_event_callback;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))

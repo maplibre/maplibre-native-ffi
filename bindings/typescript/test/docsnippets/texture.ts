@@ -56,7 +56,7 @@ export async function renderToTexture(
   // #region attach-options
   const options: RenderSessionAttachOptions = {
     driver: RenderDriverKind.coreWorker,
-    frameWake: onFrameWake,
+    frameWake: { callback: onFrameWake },
     // Only if your renderer also submits to the graphics queue. The
     // lock and unlock are native function pointers.
     queueLock: QueueLock.native({

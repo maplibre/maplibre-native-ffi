@@ -29,9 +29,9 @@ export interface AwaitableWakeOptions {
 /**
  * Turns a wake callback into Promises.
  *
- * Pass {@link AwaitableWake.wake} as any wake field, such as a render
- * session's frame wake, or call it from a callback, such as a runtime's event
- * handler. {@link AwaitableWake.next} resolves at the next wake. A wake that
+ * Pass {@link AwaitableWake.wake} as the callback of any wake, such as a
+ * render session's frame wake, or call it from a callback, such as a runtime's
+ * event handler. {@link AwaitableWake.next} resolves at the next wake. A wake that
  * arrives while nothing waits is kept for the next call. A pending wait holds
  * the event loop open, as every pending binding Promise does, while the wake
  * callback alone keeps nothing alive. Draining stays explicit: a resolved wait
