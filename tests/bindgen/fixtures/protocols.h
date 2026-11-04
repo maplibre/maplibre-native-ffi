@@ -78,9 +78,11 @@ typedef enum mln_status : int {
   MLN_STATUS_TARGET_LOST = -8,
   MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
+/** The size of a diagnostic message in bytes, with its terminator. */
+#define MLN_DIAGNOSTIC_MESSAGE_CAPACITY 4096
 typedef struct mln_diagnostic {
   unsigned int size;
-  char message[4096];
+  char message[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
 } mln_diagnostic;
 typedef struct mln_buffer_view {
   const void* data;
@@ -135,6 +137,8 @@ typedef enum mln_runtime_event_source_type : unsigned int {
 #ifdef MLN_PROTOCOL_ABI_VERSION
 // The C ABI version and its query, for a probe that compiles a binding's
 // handwritten runtime, which checks the version before its first call.
+
+/** The API epoch of these headers. */
 #define MLN_C_VERSION 0u
 uint32_t mln_c_version(void);
 #endif

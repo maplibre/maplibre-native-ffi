@@ -200,6 +200,7 @@ def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Sy
         constant=constant,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{identifier(name)}"
             for name in ("generation", "render_update_generation")
@@ -216,6 +217,26 @@ def _symbols(bound: BoundApi, values: Values, lowered: list[Lowered]) -> docs.Sy
     )
 
 
+def constant_name(constant: model.Constant) -> str:
+    """A constant macro's name without `MLN_`: `TEXTURE_RING_MAX_DEPTH`."""
+    return constant.name.removeprefix("MLN_")
+
+
+def constants_source(bound: BoundApi) -> str:
+    """The public constant macros, each a number or, at 64 bits, a bigint."""
+    from .typescript_values import SCALARS, doc
+
+    def declaration(constant: model.Constant) -> str:
+        typ = SCALARS[constant.type].ts
+        value = f"{constant.value}n" if typ == "bigint" else str(constant.value)
+        return f"export const {constant_name(constant)}: {typ} = {value};\n"
+
+    return "".join(
+        f"\n{doc(bound, constant.name)}{declaration(constant)}"
+        for constant in bound.public_constants
+    )
+
+
 def lower(api: Api | BoundApi) -> model.Lowered:
     from .typescript_native import render_native
     from .typescript_operations import render_operations, view_scopes
@@ -227,6 +248,7 @@ def lower(api: Api | BoundApi) -> model.Lowered:
     outputs[f"{TS_DIRECTORY}/generated_values.ts"] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n\n"
         + values.render()
+        + constants_source(bound)
     )
     outputs.update(render_native(bound, natives, lowered, view_scopes(lowered)))
     return model.Lowered(outputs, unsupported, [entry.plan.name for entry in lowered])

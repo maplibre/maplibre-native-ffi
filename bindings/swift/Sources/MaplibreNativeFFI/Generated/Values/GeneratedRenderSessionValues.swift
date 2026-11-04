@@ -294,3 +294,10 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
     }
   }
 }
+
+/// The token of the frame results that a session adds when it renders an image
+/// for `MapHandle.requestStillImage()`. Your own demands can't use it.
+///
+/// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+public let frameDemandTokenStillImage: UInt64 = 18_446_744_073_709_551_615

@@ -93,6 +93,22 @@ class Enum:
 
 
 @dataclass(frozen=True)
+class Constant:
+    """An object-like macro whose expansion is an integer constant expression.
+
+    `type` is the fixed-width C integer type of the expansion, such as
+    `int32_t` for `8` or `uint64_t` for `UINT64_MAX`, and `value` is its value
+    in that type's domain.
+    """
+
+    name: str
+    value: int
+    type: str
+    location: Location
+    documentation: str = ""
+
+
+@dataclass(frozen=True)
 class Typedef:
     name: str
     type: CType
@@ -108,10 +124,11 @@ class Api:
     records: tuple[Record, ...]
     enums: tuple[Enum, ...]
     typedefs: tuple[Typedef, ...]
+    constants: tuple[Constant, ...] = ()
     runtime_exports: tuple[str, ...] = ()
+    # The records, enums, typedefs, and constants that only the runtime
+    # interface declares.
     runtime_types: tuple[str, ...] = ()
-    # MLN_C_VERSION, the ABI version the headers declare, when they define it.
-    c_version: int | None = None
 
     @property
     def public_functions(self) -> tuple[Function, ...]:
@@ -136,6 +153,10 @@ class Api:
     @property
     def enums_by_name(self) -> dict[str, Enum]:
         return {enum.name: enum for enum in self.enums}
+
+    @property
+    def constants_by_name(self) -> dict[str, Constant]:
+        return {constant.name: constant for constant in self.constants}
 
     def enum_for(self, type_name: str) -> Enum | None:
         """The enum whose values a type holds: the enum's own type, or for a

@@ -16,7 +16,7 @@ from typing import Literal, TypedDict
 
 from . import docs
 from .docs import Doc, Symbol
-from .model import Api, CType, Function, ModelError
+from .model import Api, Constant, CType, Function, ModelError
 from .names import type_name
 from .protocol import (
     ABI_VERSION,
@@ -24,6 +24,7 @@ from .protocol import (
     COMPLETION_VALUE_COUNT,
     COMPLETION_VALUE_SIZE,
     DELIVERY_QUEUE,
+    RUNTIME_CONSTANTS,
     RUNTIME_EVENT_SOURCE,
     RUNTIME_EVENT_SOURCE_PREFIX,
     is_completion,
@@ -781,6 +782,16 @@ class BoundApi:
             and name not in self.control_enums
             and name not in self.slices
         }
+
+    @property
+    def public_constants(self) -> tuple[Constant, ...]:
+        """The constants that a host can name; the runtimes keep their own."""
+        return tuple(
+            constant
+            for constant in self.source.constants
+            if constant.name not in RUNTIME_CONSTANTS
+            and constant.name not in self.source.runtime_types
+        )
 
     @property
     def public_handles(self) -> dict[str, HandlePlan]:

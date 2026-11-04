@@ -2717,6 +2717,7 @@ public data class MetalBorrowedTexture(
  * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
  * size in pixels, which is usually `logical_size` times the map's scale factor. The textures must
  * all have that size, one device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
+ * The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
  *
  * The session uses the textures until a replacement or release of the target completes, a detach or
  * release of the session completes, or an abandon of it returns.
@@ -2858,7 +2859,7 @@ public data class OpenGlBorrowedTexture(
  * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
  * size in pixels, which is usually `logical_size` times the map's scale factor. The context must
  * use `OpenGlContextOwnership.SHARED`. Each texture must be in your context's share group, with
- * storage of that size.
+ * storage of that size. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
  *
  * The session uses the textures until a replacement or release of the target completes, a detach or
  * release of the session completes, or an abandon of it returns.
@@ -2939,6 +2940,7 @@ public data class VulkanBorrowedTexture(
  * `logical_size` sets the map's size. `physical_width` and `physical_height` give the images' size
  * in pixels, which is usually `logical_size` times the map's scale factor. Each image must have
  * that size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
+ * The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct images.
  *
  * The session uses the images until a replacement or release of the target completes, a detach or
  * release of the session completes, or an abandon of it returns.
@@ -3025,7 +3027,8 @@ public data class WebGpuBorrowedTexture(
  * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
  * size in pixels, which is usually `logical_size` times the map's scale factor. Each texture must
  * be 2D with that size, `format`, one layer, one mip level, one sample, and
- * WGPUTextureUsage_RenderAttachment.
+ * WGPUTextureUsage_RenderAttachment. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct
+ * textures.
  *
  * The session uses the textures until a replacement or release of the target completes, a detach or
  * release of the session completes, or an abandon of it returns.
@@ -4906,3 +4909,36 @@ public fun interface ResourceTransformCallback {
     request: ResourceTransformRequestHandle,
   )
 }
+
+/**
+ * The size of a diagnostic message in bytes, with its terminator.
+ *
+ * See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+public const val DIAGNOSTIC_MESSAGE_CAPACITY: UInt = 4096u
+
+/**
+ * The token of the frame results that a session adds when it renders an image for
+ * `MapHandle.requestStillImage()`. Your own demands can't use it.
+ *
+ * See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public const val FRAME_DEMAND_TOKEN_STILL_IMAGE: ULong = 18446744073709551615uL
+
+/**
+ * The most textures that a render session's texture ring can have.
+ *
+ * See `MLN_TEXTURE_RING_MAX_DEPTH` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public const val TEXTURE_RING_MAX_DEPTH: UInt = 8u
+
+/**
+ * The null Vulkan non-dispatchable handle.
+ *
+ * See `MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public const val VULKAN_NON_DISPATCHABLE_HANDLE_NULL: ULong = 0uL

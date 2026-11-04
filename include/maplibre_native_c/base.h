@@ -71,8 +71,8 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_ALREADY_EXISTS = -11,
 } mln_status;
 
-/** The size of mln_diagnostic's message in bytes, with its terminator. */
-#define MLN_DIAGNOSTIC_MESSAGE_CAPACITY 4096
+/** The size of a diagnostic message in bytes, with its terminator. */
+#define MLN_DIAGNOSTIC_MESSAGE_CAPACITY 4096u
 
 /**
  * A message that explains why a call failed.

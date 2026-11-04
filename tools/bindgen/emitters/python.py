@@ -301,6 +301,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         constant=constant,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{name}"
             for name in ("generation", "render_update_generation")
@@ -313,6 +314,20 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             "queues the call.",
         ),
         fields=async_hosts.omitted_fields(bound),
+    )
+
+
+def constant_name(constant) -> str:
+    """A constant macro's name without `MLN_`: `TEXTURE_RING_MAX_DEPTH`."""
+    return constant.name.removeprefix("MLN_")
+
+
+def constants_source(bound: BoundApi) -> str:
+    """The public constant macros, each documented by the string after it."""
+    return "".join(
+        f"\n{constant_name(constant)}: Final[int] = {constant.value}\n"
+        + docs.docstring(bound.doc(constant.name), symbols(bound), "")
+        for constant in bound.public_constants
     )
 
 
@@ -1133,7 +1148,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         for owner, methods in discards.items()
     )
     files["python/maplibre_native_ffi/_generated_values.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom collections.abc import Buffer, Sequence\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Any, Protocol\nfrom ._enum import UnknownIntEnum\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom collections.abc import Buffer, Sequence\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Any, Final, Protocol\nfrom ._enum import UnknownIntEnum\n'
         # A callback receives an owned handle in its owner.
         + (
             "from ._operation import _adopt_value\n"
@@ -1142,6 +1157,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         )
         + f"\nif TYPE_CHECKING:\n    from ._generated_owners import {', '.join(OWNERS.values()) or '__name__'}\n\n"
         + public_values
+        + constants_source(bound)
     )
     owner_classes = []
     for native, owner in OWNERS.items():
@@ -1222,9 +1238,14 @@ def lower(api: Api | BoundApi) -> Lowered:
         + "\n".join(owner_classes)
     )
     public_values_names = sorted(
-        node.name.id if isinstance(node, ast.TypeAlias) else node.name
-        for node in ast.parse(public_values).body
-        if isinstance(node, (ast.ClassDef, ast.TypeAlias))
+        [
+            *(
+                node.name.id if isinstance(node, ast.TypeAlias) else node.name
+                for node in ast.parse(public_values).body
+                if isinstance(node, (ast.ClassDef, ast.TypeAlias))
+            ),
+            *(constant_name(constant) for constant in bound.public_constants),
+        ]
     )
     public_globals = sorted(
         plan.member

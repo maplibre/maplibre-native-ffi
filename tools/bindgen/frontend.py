@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import functools
 import os
 import re
@@ -10,7 +11,7 @@ import subprocess
 import sys
 import tomllib
 from collections.abc import Iterable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from clang import cindex
 
 from .model import (
     Api,
+    Constant,
     CType,
     Enum,
     EnumValue,
@@ -30,7 +32,7 @@ from .model import (
     Typedef,
 )
 from .names import type_name
-from .protocol import DELIVERY_QUEUE, DIAGNOSTIC
+from .protocol import C_VERSION, DELIVERY_QUEUE, DIAGNOSTIC
 from .schema import apply_defaults
 
 # libclang creates its enum members after class construction. Its Python
@@ -39,7 +41,6 @@ CursorKind: Any = cindex.CursorKind
 TypeKind: Any = cindex.TypeKind
 
 ANNOTATION_PREFIX = "mln:"
-C_VERSION = "MLN_C_VERSION"
 # Source that may separate a doc comment from the start of its declaration,
 # spelled backward: whitespace, an annotation macro, which takes only string
 # literals, or the `typedef` before a tag. Matching the reversed source at a
@@ -47,6 +48,31 @@ C_VERSION = "MLN_C_VERSION"
 _DECLARATION_PREFIX_REVERSED = re.compile(
     rb'(?:\s|\)\s*(?:"[^"]*"\s*)*\([A-Z0-9_]*[A-Z]\b|fedepyt\b)*'
 )
+# The directive before a macro definition's name, where its extent starts.
+_DEFINE = re.compile(rb"[ \t]*#[ \t]*define[ \t]+")
+# The fixed-width integer types that a constant's expansion can have, by
+# signedness and size in bytes.
+_FIXED_WIDTH = {
+    (signed, size): f"{'' if signed else 'u'}int{8 * size}_t"
+    for signed in (True, False)
+    for size in (1, 2, 4, 8)
+}
+_SIGNED_KINDS = frozenset(
+    {"CHAR_S", "SCHAR", "SHORT", "INT", "LONG", "LONGLONG", "INT128"}
+)
+_UNSIGNED_KINDS = frozenset(
+    {"CHAR_U", "UCHAR", "USHORT", "UINT", "ULONG", "ULONGLONG", "UINT128"}
+)
+
+
+@functools.cache
+def _is_function_like():
+    """libclang's test for a function-like macro, which its Python bindings
+    leave unwrapped."""
+    function = cindex.conf.lib.clang_Cursor_isMacroFunctionLike
+    function.argtypes = [cindex.Cursor]
+    function.restype = ctypes.c_uint
+    return function
 
 
 def is_diagnostic_type(native: cindex.Type) -> bool:
@@ -110,12 +136,24 @@ def _compiler_arguments(clang: str, sdk: str | None) -> tuple[str, ...]:
 UPSTREAM_DIRECTORY = "mln"
 
 
+@dataclass(frozen=True)
+class Macro:
+    """An object-like macro with an expansion, which may be a constant."""
+
+    name: str
+    location: Location
+    documentation: str
+
+
 class Extractor:
     def __init__(self, include_directory: Path):
         self.include_directory = include_directory.resolve()
         self.errors: list[str] = []
         self.records: dict[str, Record] = {}
         self.sources: dict[str, tuple[bytes, bytes]] = {}
+        # The object-like macros with an expansion, by name, which
+        # `constants` evaluates.
+        self.macros: dict[str, Macro] = {}
 
     def location(self, cursor: cindex.Cursor) -> Location:
         source = cursor.location
@@ -146,8 +184,14 @@ class Extractor:
             source = Path(name).read_bytes()
             self.sources[name] = (source, source[::-1])
         source, reversed_source = self.sources[name]
+        offset = start.offset
+        if cursor.kind == CursorKind.MACRO_DEFINITION:
+            # A macro's extent starts at its name, after `#define`.
+            line = source.rfind(b"\n", 0, offset) + 1
+            if _DEFINE.fullmatch(source, line, offset):
+                offset = line
         prefix = _DECLARATION_PREFIX_REVERSED.match(
-            reversed_source, len(source) - start.offset
+            reversed_source, len(source) - offset
         )
         # The pattern matches the empty string, so it always matches.
         assert prefix is not None
@@ -333,14 +377,13 @@ class Extractor:
         functions: dict[str, Function] = {}
         enums: dict[str, Enum] = {}
         typedefs: dict[str, Typedef] = {}
-        c_version: int | None = None
         for cursor in unit.cursor.get_children():
             if not self.owned(cursor):
                 continue
             kind = cursor.kind
             name = cursor.spelling
-            if kind == CursorKind.MACRO_DEFINITION and name == C_VERSION:
-                c_version = self.c_version(cursor)
+            if kind == CursorKind.MACRO_DEFINITION:
+                self.macro(cursor)
             elif kind == CursorKind.FUNCTION_DECL:
                 arguments = list(cursor.get_arguments())
                 diagnostic = bool(arguments) and is_diagnostic_type(arguments[-1].type)
@@ -407,7 +450,6 @@ class Extractor:
                     ),
                 )
             elif kind not in (
-                CursorKind.MACRO_DEFINITION,
                 CursorKind.MACRO_INSTANTIATION,
                 CursorKind.INCLUSION_DIRECTIVE,
             ):
@@ -421,18 +463,104 @@ class Extractor:
             records=tuple(self.records[name] for name in sorted(self.records)),
             enums=tuple(enums[name] for name in sorted(enums)),
             typedefs=tuple(typedefs[name] for name in sorted(typedefs)),
-            c_version=c_version,
         )
 
-    def c_version(self, cursor: cindex.Cursor) -> int | None:
-        tokens = [token.spelling for token in cursor.get_tokens()][1:]
-        match = re.fullmatch(r"(\d+)[uU]?", "".join(tokens))
-        if match is None:
-            self.errors.append(
-                f"{self.location(cursor)}: {C_VERSION} must be an integer literal"
+    def macro(self, cursor: cindex.Cursor) -> None:
+        """Keep an object-like macro that expands to something.
+
+        A function-like macro, such as MLN_BINDING, and an empty one, such as
+        an include guard, declare no constant.
+        """
+        if _is_function_like()(cursor):
+            return
+        if len(list(cursor.get_tokens())) < 2:
+            return
+        self.macros[cursor.spelling] = Macro(
+            cursor.spelling, self.location(cursor), self.comment(cursor)
+        )
+
+    def constants(self, unit, filename: str, source: str) -> list[Constant]:
+        """Evaluate each kept macro as an integer constant.
+
+        Each macro initializes an enum constant whose fixed underlying type is
+        the macro's own type, in a parse of the headers that appends one such
+        enum per macro. The compiler checks that the expansion is an integer
+        constant expression, and gives its type and value. A documented macro
+        must evaluate, and one that evaluates must be documented. An
+        undocumented macro that doesn't evaluate, such as MLN_API, declares
+        no constant.
+        """
+        if not self.macros:
+            return []
+        macros = list(self.macros.values())
+        first = source.count("\n") + 1
+        probes = source + "".join(
+            f"enum mln_bindgen_constant_{index} : __typeof__({macro.name}) "
+            f"{{ mln_bindgen_constant_{index}_value = ({macro.name}) }};\n"
+            for index, macro in enumerate(macros)
+        )
+        unit.reparse(unsaved_files=[(filename, probes)])
+        failures: dict[int, str] = {}
+        for diagnostic in unit.diagnostics:
+            location = diagnostic.location
+            if (
+                diagnostic.severity >= cindex.Diagnostic.Error
+                and location.file
+                and location.file.name == filename
+                and location.line >= first
+            ):
+                failures.setdefault(location.line - first, diagnostic.spelling)
+        found: dict[int, cindex.Cursor] = {}
+        for cursor in unit.cursor.get_children():
+            if cursor.kind == CursorKind.ENUM_DECL and cursor.spelling.startswith(
+                "mln_bindgen_constant_"
+            ):
+                found[int(cursor.spelling.rsplit("_", 1)[1])] = cursor
+        constants = []
+        for index, macro in enumerate(macros):
+            probe = found.get(index)
+            values = [
+                child
+                for child in (probe.get_children() if probe else ())
+                if child.kind == CursorKind.ENUM_CONSTANT_DECL
+            ]
+            underlying = probe.enum_type.get_canonical() if probe else None
+            kind = underlying.kind.name if underlying else ""
+            signed = kind in _SIGNED_KINDS
+            type_ = (
+                _FIXED_WIDTH.get((signed, underlying.get_size()))
+                if underlying and (signed or kind in _UNSIGNED_KINDS)
+                else None
             )
-            return None
-        return int(match.group(1))
+            failure = failures.get(index)
+            if failure is None and (len(values) != 1 or type_ is None):
+                spelling = underlying.spelling if underlying else "its type"
+                failure = f"{spelling} is not a supported integer type"
+            if failure is not None:
+                if macro.documentation:
+                    self.errors.append(
+                        f"{macro.location}: {macro.name}: a documented macro must "
+                        f"be an integer constant: {failure}"
+                    )
+                continue
+            if not macro.documentation:
+                self.errors.append(
+                    f"{macro.location}: {macro.name}: constant has no documentation"
+                )
+                continue
+            assert type_ is not None and probe is not None
+            constants.append(
+                Constant(
+                    macro.name,
+                    enum_value(values[0], probe.enum_type),
+                    type_,
+                    macro.location,
+                    macro.documentation,
+                )
+            )
+        if self.errors:
+            raise ModelError(self.errors)
+        return sorted(constants, key=lambda constant: constant.name)
 
 
 def parse_headers(
@@ -498,7 +626,7 @@ def extract_headers(
         filename,
         args=arguments,
         unsaved_files=[(filename, source)],
-        # Keeps macro definitions in the AST, for MLN_C_VERSION.
+        # Keeps macro definitions in the AST, for the constants.
         options=cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD,
     )
     diagnostics = [
@@ -508,9 +636,11 @@ def extract_headers(
     ]
     if diagnostics:
         raise ModelError(diagnostics)
-    api = Extractor(include_directory).extract(unit)
+    extractor = Extractor(include_directory)
+    api = extractor.extract(unit)
+    api = replace(api, constants=tuple(extractor.constants(unit, filename, source)))
     if classify_interfaces:
-        if api.c_version is None:
+        if C_VERSION not in api.constants_by_name:
             raise ModelError([f"{include_directory}: no header defines {C_VERSION}"])
         manifest_path = include_directory / "binding-interfaces.toml"
         try:
@@ -539,7 +669,7 @@ def extract_headers(
         }
         # Every exported declaration belongs to an explicit entrypoint closure,
         # so a header that the manifest omits fails generation.
-        for kind in ("functions", "records", "enums", "typedefs"):
+        for kind in ("functions", "records", "enums", "typedefs", "constants"):
             reachable = {
                 item.name
                 for interface in interfaces.values()
@@ -559,12 +689,12 @@ def extract_headers(
         runtime = {function.name for function in interfaces["runtime"].functions}
         public_types = {
             item.name
-            for kind in ("records", "enums", "typedefs")
+            for kind in ("records", "enums", "typedefs", "constants")
             for item in getattr(interfaces["public"], kind)
         }
         runtime_types = {
             item.name
-            for kind in ("records", "enums", "typedefs")
+            for kind in ("records", "enums", "typedefs", "constants")
             for item in getattr(interfaces["runtime"], kind)
         }
         api = replace(

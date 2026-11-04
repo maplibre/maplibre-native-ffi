@@ -13,6 +13,7 @@
 /dotnet/src/Maplibre.NativeFfi/Apple/IoSurfaceFrameView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Apple/IoSurfaceRingDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Apple/MaplibreNative.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Base/MaplibreNative.Constants.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
@@ -100,6 +101,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderSession/FrameDemandFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/FramePacerHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/FramePacerOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderSession/MaplibreNative.Constants.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameResult.g.cs linguist-generated=true
@@ -112,6 +114,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncKindFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/GpuSyncView.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderTarget/MaplibreNative.Constants.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/MetalContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenGlClientApi.g.cs linguist-generated=true
