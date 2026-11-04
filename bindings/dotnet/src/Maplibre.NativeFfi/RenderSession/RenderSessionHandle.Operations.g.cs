@@ -350,35 +350,24 @@ public sealed unsafe partial class RenderSessionHandle
     /// Reads the children of a cluster in a clustered GeoJSON source.
     /// </summary>
     /// <remarks>
-    /// <para><c>clusterId</c> is the value of the "cluster_id" property of a
-    /// cluster feature that a query found. The children are the clusters and
-    /// points that the cluster splits into one zoom level closer. The result is
-    /// a GeoJSON feature collection.</para>
-    /// <para>The query reads the clustered index of the source's data in the
-    /// session's most recent render attempt. Data that changes after that
-    /// attempt shows from the next one, and before the first attempt there is
-    /// no source.</para>
-    /// <para>A feature query, such as
-    /// <c>RenderSessionHandle.QuerySourceFeaturesAsync()</c>, returns what the
-    /// source's loaded tiles hold. After the source's data, URL, or options
-    /// change, or the style changes, those tiles can hold the older data until
-    /// they reload. Until then, a cluster ID that a feature query found can
-    /// name a cluster of the older data. Cluster IDs repeat across versions of
-    /// the data, so this query can then complete with <c>Status.NotFound</c> or
-    /// read the newer data's cluster with that ID. Treat <c>Status.NotFound</c>
-    /// as a cluster that is gone, and query the features again.</para>
-    /// <para>When a source's data fails to load, its earlier tiles can stay
-    /// until new data loads, so feature queries can keep finding the earlier
-    /// clusters while this query completes with <c>Status.NotFound</c>.</para>
+    /// <para><c>clusterId</c> is the "cluster_id" property of a cluster
+    /// feature. The result is a GeoJSON feature collection of the clusters and
+    /// points that the cluster splits into at the next zoom level.</para>
+    /// <para>The query reads the source's data from the session's most recent
+    /// render attempt, so a change to the data shows once the session tries to
+    /// render again.</para>
+    /// <para>A cluster ID belongs to one version of the source's data. After
+    /// the data changes, feature queries can return IDs from the earlier
+    /// version until the source's tiles reload, and such an ID completes with
+    /// <c>Status.NotFound</c> or names a different cluster. Query the features
+    /// again for current IDs.</para>
     /// <para>See <c>mln_render_session_get_cluster_children</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when you detached,
-    /// abandoned, released, or disposed the session.</description></item>
-    /// <item><description><c>Status.NotFound</c> when that data has no source
-    /// named <c>sourceId</c>, or the source has no cluster
-    /// <c>clusterId</c>.</description></item>
+    /// <item><description><c>Status.NotFound</c> when the session's most recent
+    /// render attempt had no source named <c>sourceId</c>, or the source has no
+    /// cluster <c>clusterId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source isn't a
     /// GeoJSON source with clustering turned on.</description></item>
     /// </list>
@@ -410,24 +399,19 @@ public sealed unsafe partial class RenderSessionHandle
     /// splits.
     /// </summary>
     /// <remarks>
-    /// <para><c>clusterId</c> is the value of the "cluster_id" property of a
-    /// cluster feature that a query found. At the result's zoom level, the
-    /// cluster's points no longer form this cluster, but two or more clusters
-    /// or points.</para>
-    /// <para>The query reads its data as
-    /// <c>RenderSessionHandle.GetClusterChildrenAsync()</c> describes,
-    /// including when a cluster ID that a feature query found names a cluster
-    /// of older data.</para>
+    /// <para><c>clusterId</c> is the "cluster_id" property of a cluster
+    /// feature. At the result's zoom level, the cluster's points no longer form
+    /// this cluster, but two or more clusters or points.</para>
+    /// <para>A cluster ID can go out of date as
+    /// <c>RenderSessionHandle.GetClusterChildrenAsync()</c> describes.</para>
     /// <para>See <c>mln_render_session_get_cluster_expansion_zoom</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when you detached,
-    /// abandoned, released, or disposed the session.</description></item>
-    /// <item><description><c>Status.NotFound</c> when that data has no source
-    /// named <c>sourceId</c>, or the source has no cluster
-    /// <c>clusterId</c>.</description></item>
+    /// <item><description><c>Status.NotFound</c> when the session's most recent
+    /// render attempt had no source named <c>sourceId</c>, or the source has no
+    /// cluster <c>clusterId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source isn't a
     /// GeoJSON source with clustering turned on.</description></item>
     /// </list>
@@ -454,24 +438,20 @@ public sealed unsafe partial class RenderSessionHandle
     /// Reads the points in a cluster of a clustered GeoJSON source.
     /// </summary>
     /// <remarks>
-    /// <para><c>clusterId</c> is the value of the "cluster_id" property of a
-    /// cluster feature that a query found. The result is a GeoJSON feature
-    /// collection of the original point features. It skips the first
-    /// <c>offset</c> points and then holds up to <c>limit</c> of them, so a
-    /// <c>limit</c> of 0 gives an empty collection.</para>
-    /// <para>The query reads its data as
-    /// <c>RenderSessionHandle.GetClusterChildrenAsync()</c> describes,
-    /// including when a cluster ID that a feature query found names a cluster
-    /// of older data.</para>
+    /// <para><c>clusterId</c> is the "cluster_id" property of a cluster
+    /// feature. The result is a GeoJSON feature collection of the original
+    /// point features. It skips the first <c>offset</c> points and then holds
+    /// up to <c>limit</c> of them, so a <c>limit</c> of 0 gives an empty
+    /// collection.</para>
+    /// <para>A cluster ID can go out of date as
+    /// <c>RenderSessionHandle.GetClusterChildrenAsync()</c> describes.</para>
     /// <para>See <c>mln_render_session_get_cluster_leaves</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when you detached,
-    /// abandoned, released, or disposed the session.</description></item>
-    /// <item><description><c>Status.NotFound</c> when that data has no source
-    /// named <c>sourceId</c>, or the source has no cluster
-    /// <c>clusterId</c>.</description></item>
+    /// <item><description><c>Status.NotFound</c> when the session's most recent
+    /// render attempt had no source named <c>sourceId</c>, or the source has no
+    /// cluster <c>clusterId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source isn't a
     /// GeoJSON source with clustering turned on.</description></item>
     /// </list>

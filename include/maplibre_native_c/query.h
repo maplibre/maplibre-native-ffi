@@ -161,35 +161,22 @@ MLN_API mln_status mln_render_session_query_source_features(
 /**
  * Reads the children of a cluster in a clustered GeoJSON source.
  *
- * `cluster_id` is the value of the "cluster_id" property of a cluster feature
- * that a query found. The children are the clusters and points that the cluster
- * splits into one zoom level closer. The result is a GeoJSON feature
- * collection.
+ * `cluster_id` is the "cluster_id" property of a cluster feature. The result
+ * is a GeoJSON feature collection of the clusters and points that the cluster
+ * splits into at the next zoom level.
  *
- * The query reads the clustered index of the source's data in the session's
- * most recent render attempt. Data that changes after that attempt shows from
- * the next one, and before the first attempt there is no source.
+ * The query reads the source's data from the session's most recent render
+ * attempt, so a change to the data shows once the session tries to render
+ * again.
  *
- * A feature query, such as mln_render_session_query_source_features(),
- * returns what the source's loaded tiles hold. After the source's data, URL,
- * or options change, or the style changes, those tiles can hold the older
- * data until they reload. Until then, a cluster ID that a feature query found
- * can name a cluster of the older data. Cluster IDs repeat across versions of
- * the data, so this query can then complete with MLN_STATUS_NOT_FOUND or read
- * the newer data's cluster with that ID. Treat MLN_STATUS_NOT_FOUND as a
- * cluster that is gone, and query the features again.
- *
- * When a source's data fails to load, its earlier tiles can stay until new
- * data loads, so feature queries can keep finding the earlier clusters while
- * this query completes with MLN_STATUS_NOT_FOUND.
- *
- * Returns:
- * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
- *   disposed the session.
+ * A cluster ID belongs to one version of the source's data. After the data
+ * changes, feature queries can return IDs from the earlier version until the
+ * source's tiles reload, and such an ID completes with MLN_STATUS_NOT_FOUND or
+ * names a different cluster. Query the features again for current IDs.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when that data has no source named `source_id`, or
- *   the source has no cluster `cluster_id`.
+ * - MLN_STATUS_NOT_FOUND when the session's most recent render attempt had no
+ *   source named `source_id`, or the source has no cluster `cluster_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source isn't a GeoJSON source with
  *   clustering turned on.
  */
@@ -202,22 +189,17 @@ MLN_API mln_status mln_render_session_get_cluster_children(
 /**
  * Reads the points in a cluster of a clustered GeoJSON source.
  *
- * `cluster_id` is the value of the "cluster_id" property of a cluster feature
- * that a query found. The result is a GeoJSON feature collection of the
- * original point features. It skips the first `offset` points and then holds up
- * to `limit` of them, so a `limit` of 0 gives an empty collection.
+ * `cluster_id` is the "cluster_id" property of a cluster feature. The result is
+ * a GeoJSON feature collection of the original point features. It skips the
+ * first `offset` points and then holds up to `limit` of them, so a `limit` of 0
+ * gives an empty collection.
  *
- * The query reads its data as mln_render_session_get_cluster_children()
- * describes, including when a cluster ID that a feature query found names a
- * cluster of older data.
- *
- * Returns:
- * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
- *   disposed the session.
+ * A cluster ID can go out of date as mln_render_session_get_cluster_children()
+ * describes.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when that data has no source named `source_id`, or
- *   the source has no cluster `cluster_id`.
+ * - MLN_STATUS_NOT_FOUND when the session's most recent render attempt had no
+ *   source named `source_id`, or the source has no cluster `cluster_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source isn't a GeoJSON source with
  *   clustering turned on.
  */
@@ -231,21 +213,16 @@ MLN_API mln_status mln_render_session_get_cluster_leaves(
 /**
  * Reads the zoom level at which a cluster of a clustered GeoJSON source splits.
  *
- * `cluster_id` is the value of the "cluster_id" property of a cluster feature
- * that a query found. At the result's zoom level, the cluster's points no
+ * `cluster_id` is the "cluster_id" property of a cluster feature. At the
+ * result's zoom level, the cluster's points no
  * longer form this cluster, but two or more clusters or points.
  *
- * The query reads its data as mln_render_session_get_cluster_children()
- * describes, including when a cluster ID that a feature query found names a
- * cluster of older data.
- *
- * Returns:
- * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
- *   disposed the session.
+ * A cluster ID can go out of date as mln_render_session_get_cluster_children()
+ * describes.
  *
  * Completes with:
- * - MLN_STATUS_NOT_FOUND when that data has no source named `source_id`, or
- *   the source has no cluster `cluster_id`.
+ * - MLN_STATUS_NOT_FOUND when the session's most recent render attempt had no
+ *   source named `source_id`, or the source has no cluster `cluster_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source isn't a GeoJSON source with
  *   clustering turned on.
  */
