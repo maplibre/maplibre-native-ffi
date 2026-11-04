@@ -280,6 +280,22 @@ fn generated_copy_mln_dma_buf_frame(
     dict.set_item("slot", generated_value(py, value.slot)?)?;
     dict.set_item("fourcc", generated_value(py, value.fourcc)?)?;
     dict.set_item("modifier", generated_value(py, value.modifier)?)?;
+    dict.set_item(
+        "planes",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.planes, value.plane_count)? },
+            |element| generated_copy_mln_dma_buf_plane(py, element),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_dma_buf_plane(
+    py: Python<'_>,
+    value: &sys::mln_dma_buf_plane,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
     dict.set_item("fd", generated_value(py, value.fd)?)?;
     dict.set_item("offset", generated_value(py, value.offset)?)?;
     dict.set_item("stride", generated_value(py, value.stride)?)?;

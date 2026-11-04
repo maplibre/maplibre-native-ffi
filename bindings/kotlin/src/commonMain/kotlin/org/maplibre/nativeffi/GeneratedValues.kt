@@ -1838,6 +1838,23 @@ public class AndroidHardwareBufferFrame(
 }
 
 /**
+ * Where one plane of a dmabuf keeps its data.
+ *
+ * See `mln_dma_buf_plane` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+public data class DmaBufPlane(
+  /**
+   * The file descriptor of the dmabuf that holds the plane. The planes of a buffer often share one.
+   */
+  public val fd: Int,
+  /** The bytes from the start of the dmabuf to the plane's first byte. */
+  public val offset: UInt,
+  /** The bytes from the start of one row to the start of the next. */
+  public val stride: UInt,
+)
+
+/**
  * The dmabuf of an acquired frame.
  *
  * See `mln_dma_buf_frame` in the
@@ -1851,18 +1868,19 @@ public class DmaBufFrame(
   public val slot: UInt,
   public val fourcc: UInt,
   public val modifier: ULong,
-  fd: Int,
-  /** The bytes from the start of the buffer to its first pixel. */
-  public val offset: UInt,
-  /** The bytes from the start of one row to the start of the next. */
-  public val stride: UInt,
+  /**
+   * The buffer's planes, in the order that its fourcc and modifier define. Import all of them, as
+   * EGL_EXT_image_dma_buf_import_modifiers planes 0 and up, or with one
+   * `zwp_linux_buffer_params_v1.add` call each.
+   */
+  planes: List<DmaBufPlane>,
 ) {
   internal var bindingScope: ViewScope? = null
-  private val storedFd: Int = fd
-  public val fd: Int
+  private val storedPlanes: List<DmaBufPlane> = planes
+  public val planes: List<DmaBufPlane>
     get() {
       bindingScope?.ensureActive()
-      return storedFd
+      return storedPlanes
     }
 }
 
@@ -2638,8 +2656,9 @@ public data class DmaBufFormat(
  * A ring of dmabufs that the library allocates, for `MapHandle.attachDmaBufRing()`.
  *
  * Each buffer has the map's size in pixels and a format and modifier from `formats`. The library
- * renders only DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888, and only with modifiers that keep one
- * plane.
+ * renders only DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888. A modifier can give a buffer more
+ * planes than its format has, such as a plane of compression metadata, and the library takes any
+ * such modifier that its GPU can render into and share.
  *
  * See `mln_dma_buf_ring_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).

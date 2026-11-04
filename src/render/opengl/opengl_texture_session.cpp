@@ -861,6 +861,66 @@ struct EglDmaBufRing {
   mln::core::DmaBufChoice choice;
 };
 
+// The EGL_EXT_image_dma_buf_import_modifiers attributes of an image over every
+// plane of `buffer`.
+auto image_attributes(
+  uint32_t fourcc, mln::Size size, const mln::platform::dma_buf::Buffer& buffer
+) -> std::vector<EGLint> {
+  struct PlaneAttributes {
+    EGLint fd;
+    EGLint offset;
+    EGLint pitch;
+    EGLint modifier_lo;
+    EGLint modifier_hi;
+  };
+  static constexpr auto names =
+    std::array<PlaneAttributes, mln::core::dma_buf_max_planes>{{
+      {EGL_DMA_BUF_PLANE0_FD_EXT, EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+       EGL_DMA_BUF_PLANE0_PITCH_EXT, EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+       EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT},
+      {EGL_DMA_BUF_PLANE1_FD_EXT, EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+       EGL_DMA_BUF_PLANE1_PITCH_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT,
+       EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT},
+      {EGL_DMA_BUF_PLANE2_FD_EXT, EGL_DMA_BUF_PLANE2_OFFSET_EXT,
+       EGL_DMA_BUF_PLANE2_PITCH_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT,
+       EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT},
+      {EGL_DMA_BUF_PLANE3_FD_EXT, EGL_DMA_BUF_PLANE3_OFFSET_EXT,
+       EGL_DMA_BUF_PLANE3_PITCH_EXT, EGL_DMA_BUF_PLANE3_MODIFIER_LO_EXT,
+       EGL_DMA_BUF_PLANE3_MODIFIER_HI_EXT},
+    }};
+  if (buffer.planes.empty() || buffer.planes.size() > names.size()) {
+    throw std::runtime_error("EGL takes a dmabuf of 1 to 4 planes");
+  }
+  auto attributes = std::vector<EGLint>{
+    EGL_WIDTH,
+    static_cast<EGLint>(size.width),
+    EGL_HEIGHT,
+    static_cast<EGLint>(size.height),
+    EGL_LINUX_DRM_FOURCC_EXT,
+    static_cast<EGLint>(fourcc),
+  };
+  for (auto index = std::size_t{0}; index < buffer.planes.size(); ++index) {
+    const auto& plane = buffer.planes[index];
+    const auto& name = names.at(index);
+    attributes.insert(
+      attributes.end(), {
+                          name.fd,
+                          plane.fd,
+                          name.offset,
+                          static_cast<EGLint>(plane.offset),
+                          name.pitch,
+                          static_cast<EGLint>(plane.stride),
+                          name.modifier_lo,
+                          static_cast<EGLint>(buffer.modifier & 0xFFFFFFFFU),
+                          name.modifier_hi,
+                          static_cast<EGLint>(buffer.modifier >> 32U),
+                        }
+    );
+  }
+  attributes.push_back(EGL_NONE);
+  return attributes;
+}
+
 // A slot's texture over a dmabuf that the ring allocated.
 class DmaBufTexture final : public ExportedTexture {
  public:
@@ -871,28 +931,9 @@ class DmaBufTexture final : public ExportedTexture {
           size.width, size.height, ring.choice.fourcc, ring.choice.modifiers
         )) {
     try {
-      const auto modifier = buffer_.modifier;
-      const EGLint attributes[] = {
-        EGL_WIDTH,
-        static_cast<EGLint>(size.width),
-        EGL_HEIGHT,
-        static_cast<EGLint>(size.height),
-        EGL_LINUX_DRM_FOURCC_EXT,
-        static_cast<EGLint>(ring.choice.fourcc),
-        EGL_DMA_BUF_PLANE0_FD_EXT,
-        buffer_.fd.get(),
-        EGL_DMA_BUF_PLANE0_OFFSET_EXT,
-        static_cast<EGLint>(buffer_.offset),
-        EGL_DMA_BUF_PLANE0_PITCH_EXT,
-        static_cast<EGLint>(buffer_.stride),
-        EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
-        static_cast<EGLint>(modifier & 0xFFFFFFFFU),
-        EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
-        static_cast<EGLint>(modifier >> 32U),
-        EGL_NONE,
-      };
       image_ = egl_.create_image(
-        egl_.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, nullptr, attributes
+        egl_.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, nullptr,
+        image_attributes(ring.choice.fourcc, size, buffer_).data()
       );
       if (image_ == EGL_NO_IMAGE_KHR) {
         throw std::runtime_error("EGL can't make an image of the dmabuf");
@@ -901,17 +942,19 @@ class DmaBufTexture final : public ExportedTexture {
       if (texture_ == 0) {
         throw std::runtime_error("OpenGL can't make a texture of the dmabuf");
       }
+      layout_.fourcc = ring.choice.fourcc;
+      layout_.modifier = buffer_.modifier;
+      for (const auto& plane : buffer_.planes) {
+        layout_.planes.push_back(
+          mln_dma_buf_plane{
+            .fd = plane.fd, .offset = plane.offset, .stride = plane.stride
+          }
+        );
+      }
     } catch (...) {
       destroy();
       throw;
     }
-    layout_ = mln::core::DmaBufLayout{
-      .fourcc = ring.choice.fourcc,
-      .modifier = buffer_.modifier,
-      .fd = buffer_.fd.get(),
-      .offset = buffer_.offset,
-      .stride = buffer_.stride,
-    };
   }
   DmaBufTexture(const DmaBufTexture&) = delete;
   auto operator=(const DmaBufTexture&) -> DmaBufTexture& = delete;

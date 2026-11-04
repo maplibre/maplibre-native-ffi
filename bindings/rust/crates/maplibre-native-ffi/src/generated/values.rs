@@ -1134,7 +1134,7 @@ impl ToNative<sys::mln_dma_buf_format> for DmaBufFormat {
 ///
 /// See `mln_dma_buf_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct DmaBufFrame {
     pub width: u32,
     pub height: u32,
@@ -1143,11 +1143,10 @@ pub struct DmaBufFrame {
     pub slot: u32,
     pub fourcc: u32,
     pub modifier: u64,
-    pub fd: i32,
-    /// The bytes from the start of the buffer to its first pixel.
-    pub offset: u32,
-    /// The bytes from the start of one row to the start of the next.
-    pub stride: u32,
+    /// The buffer's planes, in the order that its fourcc and modifier define.
+    /// Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0
+    /// and up, or with one `zwp_linux_buffer_params_v1.add` call each.
+    pub planes: Vec<DmaBufPlane>,
 }
 impl FromNative<sys::mln_dma_buf_frame> for DmaBufFrame {
     unsafe fn from_native(raw: sys::mln_dma_buf_frame) -> Result<Self> {
@@ -1158,6 +1157,28 @@ impl FromNative<sys::mln_dma_buf_frame> for DmaBufFrame {
             slot: raw.slot,
             fourcc: raw.fourcc,
             modifier: raw.modifier,
+            planes: unsafe { convert::copy_array(raw.planes, raw.plane_count) }?,
+        })
+    }
+}
+
+/// Where one plane of a dmabuf keeps its data.
+///
+/// See `mln_dma_buf_plane` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct DmaBufPlane {
+    /// The file descriptor of the dmabuf that holds the plane. The planes of a
+    /// buffer often share one.
+    pub fd: i32,
+    /// The bytes from the start of the dmabuf to the plane's first byte.
+    pub offset: u32,
+    /// The bytes from the start of one row to the start of the next.
+    pub stride: u32,
+}
+impl FromNative<sys::mln_dma_buf_plane> for DmaBufPlane {
+    unsafe fn from_native(raw: sys::mln_dma_buf_plane) -> Result<Self> {
+        Ok(Self {
             fd: raw.fd,
             offset: raw.offset,
             stride: raw.stride,
@@ -1170,7 +1191,9 @@ impl FromNative<sys::mln_dma_buf_frame> for DmaBufFrame {
 ///
 /// Each buffer has the map's size in pixels and a format and modifier from
 /// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
-/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+/// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+/// format has, such as a plane of compression metadata, and the library takes
+/// any such modifier that its GPU can render into and share.
 ///
 /// See `mln_dma_buf_ring_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).

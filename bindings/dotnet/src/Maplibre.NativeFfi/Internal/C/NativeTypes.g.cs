@@ -300,6 +300,12 @@ internal unsafe struct mln_dma_buf_frame
     public uint slot;
     public uint fourcc;
     public ulong modifier;
+    public mln_dma_buf_plane* planes;
+    public nuint plane_count;
+}
+
+internal unsafe struct mln_dma_buf_plane
+{
     public int fd;
     public uint offset;
     public uint stride;

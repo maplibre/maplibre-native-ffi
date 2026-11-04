@@ -1496,22 +1496,44 @@ final class AndroidHardwareBufferFrame extends _Value {
   ]);
 }
 
+/// Where one plane of a dmabuf keeps its data.
+///
+/// See `mln_dma_buf_plane` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+final class DmaBufPlane extends _Value {
+  const DmaBufPlane({this.fd = 0, this.offset = 0, this.stride = 0});
+
+  /// The file descriptor of the dmabuf that holds the plane. The planes of a
+  /// buffer often share one.
+  final int fd;
+
+  /// The bytes from the start of the dmabuf to the plane's first byte.
+  final int offset;
+
+  /// The bytes from the start of one row to the start of the next.
+  final int stride;
+
+  @override
+  List<Object?> get _members => [fd, offset, stride];
+  @override
+  String toString() =>
+      _describe('DmaBufPlane', const ['fd', 'offset', 'stride']);
+}
+
 /// The dmabuf of an acquired frame.
 ///
 /// See `mln_dma_buf_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
 final class DmaBufFrame extends _Value {
-  const DmaBufFrame({
+  DmaBufFrame({
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     this.slot = 0,
     this.fourcc = 0,
     this.modifier = 0,
-    this.fd = 0,
-    this.offset = 0,
-    this.stride = 0,
-  });
+    List<DmaBufPlane> planes = const [],
+  }) : planes = List.unmodifiable(planes);
   final int width;
   final int height;
   final double scaleFactor;
@@ -1520,13 +1542,11 @@ final class DmaBufFrame extends _Value {
   final int slot;
   final int fourcc;
   final int modifier;
-  final int fd;
 
-  /// The bytes from the start of the buffer to its first pixel.
-  final int offset;
-
-  /// The bytes from the start of one row to the start of the next.
-  final int stride;
+  /// The buffer's planes, in the order that its fourcc and modifier define.
+  /// Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and
+  /// up, or with one `zwp_linux_buffer_params_v1.add` call each.
+  final List<DmaBufPlane> planes;
 
   @override
   List<Object?> get _members => [
@@ -1536,9 +1556,7 @@ final class DmaBufFrame extends _Value {
     slot,
     fourcc,
     modifier,
-    fd,
-    offset,
-    stride,
+    planes,
   ];
   @override
   String toString() => _describe('DmaBufFrame', const [
@@ -1548,9 +1566,7 @@ final class DmaBufFrame extends _Value {
     'slot',
     'fourcc',
     'modifier',
-    'fd',
-    'offset',
-    'stride',
+    'planes',
   ]);
 }
 
@@ -3125,7 +3141,9 @@ final class DmaBufFormat extends _Value {
 ///
 /// Each buffer has the map's size in pixels and a format and modifier from
 /// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
-/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+/// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+/// format has, such as a plane of compression metadata, and the library takes
+/// any such modifier that its GPU can render into and share.
 ///
 /// See `mln_dma_buf_ring_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).

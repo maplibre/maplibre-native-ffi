@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -80,16 +81,20 @@ class OwnedFd {
   int fd_ = -1;
 };
 
-// Where a ring's dmabuf keeps its pixels. The ring owns `fd`.
+// The most planes that a dmabuf has, as DRM defines it.
+inline constexpr std::size_t dma_buf_max_planes = 4;
+
+// Where a ring's dmabuf keeps its pixels. The ring owns each plane's `fd`,
+// which planes can share, and keeps `planes` in place for as long as frames
+// lend it.
 struct DmaBufLayout {
   uint32_t fourcc = 0;
   uint64_t modifier = 0;
-  int fd = -1;
-  uint32_t offset = 0;
-  uint32_t stride = 0;
+  std::vector<mln_dma_buf_plane> planes;
 };
 
-// What an acquired frame of a dmabuf ring reports.
+// What an acquired frame of a dmabuf ring reports. The frame points into
+// `layout`, which outlives the frame.
 inline auto dma_buf_frame(
   const DmaBufLayout& layout, const RenderFrameMetadata& frame
 ) -> mln_dma_buf_frame {
@@ -101,9 +106,8 @@ inline auto dma_buf_frame(
     .slot = frame.slot,
     .fourcc = layout.fourcc,
     .modifier = layout.modifier,
-    .fd = layout.fd,
-    .offset = layout.offset,
-    .stride = layout.stride,
+    .planes = layout.planes.data(),
+    .plane_count = layout.planes.size(),
   };
 }
 

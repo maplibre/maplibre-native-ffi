@@ -62,16 +62,8 @@ public final class DmaBufFrameView {
     snapshot.modifier
   }
 
-  public var fd: Int32 {
-    get throws { try scope.check(); return snapshot.fd }
-  }
-
-  public var offset: UInt32 {
-    snapshot.offset
-  }
-
-  public var stride: UInt32 {
-    snapshot.stride
+  public var planes: [DmaBufPlane] {
+    get throws { try scope.check(); return snapshot.planes }
   }
 }
 

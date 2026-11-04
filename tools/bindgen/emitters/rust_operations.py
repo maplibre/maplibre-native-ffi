@@ -475,7 +475,11 @@ def convert(plan: OperationPlan, value_types, body: Body, receiver: str | None):
                 continue
             value_types.add(value, "out")
             public = value_types.public(value)
-            if dynamic(value):
+            # A view's output lends native memory, such as an array, for as
+            # long as the view's owner keeps its scope, so the decode copies
+            # it while the scope holds. Any other output's memory would have
+            # no owner.
+            if dynamic(value) and not plan.view:
                 raise Unsupported("borrowed output record needs its native owner scope")
             raw_type = ctype(pointee)
             initial = (

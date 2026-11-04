@@ -9,6 +9,7 @@
 
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -44,6 +45,7 @@ struct GbmFunctions {
   ) = nullptr;
   int (*plane_count)(gbm_bo*) = nullptr;
   int (*fd)(gbm_bo*) = nullptr;
+  int (*fd_for_plane)(gbm_bo*, int) = nullptr;
   uint64_t (*modifier)(gbm_bo*) = nullptr;
   uint32_t (*offset)(gbm_bo*, int) = nullptr;
   uint32_t (*stride)(gbm_bo*, int) = nullptr;
@@ -65,8 +67,10 @@ auto gbm_functions() -> const GbmFunctions* {
       return out != nullptr;
     };
     // gbm_bo_create_with_modifiers2, which takes the buffer's usage, came in
-    // Mesa 21.3.
+    // Mesa 21.3, and gbm_bo_get_fd_for_plane in Mesa 21.1. Without the
+    // latter, a buffer can have only one plane.
     load(loaded.create_with_modifiers2, "gbm_bo_create_with_modifiers2");
+    load(loaded.fd_for_plane, "gbm_bo_get_fd_for_plane");
     if (
       !load(loaded.create_device, "gbm_create_device") ||
       !load(loaded.device_destroy, "gbm_device_destroy") ||
@@ -89,6 +93,33 @@ auto gbm_functions() -> const GbmFunctions* {
   return functions;
 }
 
+// A plane in `fd`, which shares the descriptor of an earlier plane in the same
+// dmabuf. GBM exports each plane as a descriptor of its own, even when the
+// planes share one dmabuf.
+auto share_plane(
+  const std::vector<Plane>& earlier, core::OwnedFd fd, uint32_t offset,
+  uint32_t stride
+) -> Plane {
+  struct stat exported = {};
+  if (fd.get() >= 0 && fstat(fd.get(), &exported) == 0) {
+    for (const auto& plane : earlier) {
+      struct stat other = {};
+      if (
+        fstat(plane.fd, &other) == 0 && other.st_dev == exported.st_dev &&
+        other.st_ino == exported.st_ino
+      ) {
+        return Plane{
+          .owned = {}, .fd = plane.fd, .offset = offset, .stride = stride
+        };
+      }
+    }
+  }
+  const auto descriptor = fd.get();
+  return Plane{
+    .owned = std::move(fd), .fd = descriptor, .offset = offset, .stride = stride
+  };
+}
+
 class GbmAllocator final : public Allocator {
  public:
   GbmAllocator(const GbmFunctions& gbm, core::OwnedFd node, gbm_device* device)
@@ -101,7 +132,10 @@ class GbmAllocator final : public Allocator {
 
   [[nodiscard]] auto allocates(uint32_t fourcc, uint64_t modifier) const
     -> bool override {
-    return gbm_.modifier_plane_count(device_, fourcc, modifier) == 1;
+    const auto planes = gbm_.modifier_plane_count(device_, fourcc, modifier);
+    return planes == 1 ||
+           (gbm_.fd_for_plane != nullptr && planes > 1 &&
+            static_cast<std::size_t>(planes) <= core::dma_buf_max_planes);
   }
 
   [[nodiscard]] auto allocate(
@@ -121,15 +155,27 @@ class GbmAllocator final : public Allocator {
     if (object == nullptr) {
       throw std::runtime_error("GBM can't allocate the dmabuf");
     }
-    // The dmabuf keeps the buffer's memory once the buffer object is gone.
-    auto buffer = Buffer{
-      .fd = core::OwnedFd{gbm_.plane_count(object) == 1 ? gbm_.fd(object) : -1},
-      .modifier = gbm_.modifier(object),
-      .offset = gbm_.offset(object, 0),
-      .stride = gbm_.stride(object, 0),
-    };
-    gbm_.destroy(object);
-    if (buffer.fd.get() < 0) {
+    const auto destroy = [this](gbm_bo* bo) { gbm_.destroy(bo); };
+    auto owned = std::unique_ptr<gbm_bo, decltype(destroy)>{object, destroy};
+    // The dmabufs keep the buffer's memory once the buffer object is gone.
+    auto buffer = Buffer{.modifier = gbm_.modifier(object), .planes = {}};
+    const auto planes = gbm_.plane_count(object);
+    auto exported =
+      planes >= 1 &&
+      static_cast<std::size_t>(planes) <= core::dma_buf_max_planes &&
+      (planes == 1 || gbm_.fd_for_plane != nullptr);
+    for (auto index = 0; exported && index < planes; ++index) {
+      auto fd = core::OwnedFd{
+        planes == 1 ? gbm_.fd(object) : gbm_.fd_for_plane(object, index)
+      };
+      exported = fd.get() >= 0;
+      buffer.planes.push_back(share_plane(
+        buffer.planes, std::move(fd), gbm_.offset(object, index),
+        gbm_.stride(object, index)
+      ));
+    }
+    owned.reset();
+    if (!exported) {
       throw std::runtime_error("GBM can't export the dmabuf");
     }
     return buffer;
@@ -193,15 +239,17 @@ class UdmabufAllocator final : public Allocator {
       .offset = 0,
       .size = size,
     };
-    auto buffer = Buffer{
-      .fd = core::OwnedFd{ioctl(device_.get(), UDMABUF_CREATE, &create)},
-      .modifier = core::drm_format_mod_linear,
-      .offset = 0,
-      .stride = stride,
-    };
-    if (buffer.fd.get() < 0) {
+    auto fd = core::OwnedFd{ioctl(device_.get(), UDMABUF_CREATE, &create)};
+    if (fd.get() < 0) {
       throw std::runtime_error("udmabuf can't share the dmabuf's memory");
     }
+    auto buffer = Buffer{.modifier = core::drm_format_mod_linear, .planes = {}};
+    const auto descriptor = fd.get();
+    buffer.planes.push_back(
+      Plane{
+        .owned = std::move(fd), .fd = descriptor, .offset = 0, .stride = stride
+      }
+    );
     return buffer;
   }
 

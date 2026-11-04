@@ -697,7 +697,14 @@ fn scopedViewInner(
     var raw: Raw = std.mem.zeroes(Raw);
     raw.size = @sizeOf(Raw);
     try status.call(nativeFunction(name), .{ receiver.raw, &raw }, diagnostic);
-    return use(context, Value.fromNative(raw));
+    if (comptime @typeInfo(@TypeOf(Value.fromNative)).@"fn".param_types.len == 1) {
+        return use(context, Value.fromNative(raw));
+    }
+    // A value that copies an array, such as a frame's planes, keeps the copy
+    // only while `use` runs.
+    var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
+    defer arena.deinit();
+    return use(context, try Value.fromNative(arena.allocator(), raw));
 }
 
 // Copy completion values before native reuses their storage.

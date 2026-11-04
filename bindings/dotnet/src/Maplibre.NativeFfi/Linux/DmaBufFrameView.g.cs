@@ -19,7 +19,5 @@ public sealed class DmaBufFrameView
     public uint Slot => value.Slot;
     public uint Fourcc => value.Fourcc;
     public ulong Modifier => value.Modifier;
-    public int Fd => scope.Active(value).Fd;
-    public uint Offset => value.Offset;
-    public uint Stride => value.Stride;
+    public ImmutableArray<DmaBufPlane> Planes => scope.Active(value).Planes;
 }

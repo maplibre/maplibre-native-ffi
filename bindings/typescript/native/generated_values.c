@@ -841,6 +841,40 @@ napi_value mln_ts_read_dma_buf_frame(
         env, result, "modifier", mln_ts_u64(env, (uint64_t)(source->modifier))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "planes", mln_ts_read_dma_buf_frame_planes(env, source)
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_dma_buf_frame_planes(
+  napi_env env, const mln_dma_buf_frame* source
+) {
+  size_t count = (size_t)source->plane_count;
+  size_t stride = sizeof(mln_dma_buf_plane);
+  if (count > 0 && stride < sizeof(mln_dma_buf_plane)) {
+    napi_throw_range_error(env, NULL, "native record stride is too small");
+    return NULL;
+  }
+  napi_value result = mln_ts_array(env, count);
+  if (result == NULL) return NULL;
+  for (size_t index = 0; index < count; index++) {
+    const mln_dma_buf_plane* item =
+      (const mln_dma_buf_plane*)((const char*)source->planes + index * stride);
+    napi_value element = mln_ts_read_dma_buf_plane(env, item, stride);
+    if (element == NULL) return NULL;
+    if (!mln_ts_set_index(env, result, (uint32_t)index, element)) return NULL;
+  }
+  return result;
+}
+
+napi_value mln_ts_read_dma_buf_plane(
+  napi_env env, const mln_dma_buf_plane* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
   if (!mln_ts_set(env, result, "fd", mln_ts_number(env, (double)(source->fd))))
     return NULL;
   if (!mln_ts_set(

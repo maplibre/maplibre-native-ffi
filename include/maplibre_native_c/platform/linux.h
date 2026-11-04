@@ -33,7 +33,9 @@ typedef struct mln_dma_buf_format {
  *
  * Each buffer has the map's size in pixels and a format and modifier from
  * `formats`. The library renders only DRM_FORMAT_ABGR8888 and
- * DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+ * DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+ * format has, such as a plane of compression metadata, and the library takes
+ * any such modifier that its GPU can render into and share.
  */
 typedef struct mln_dma_buf_ring_descriptor {
   uint32_t size;
@@ -49,6 +51,19 @@ typedef struct mln_dma_buf_ring_descriptor {
   size_t format_count;
 } mln_dma_buf_ring_descriptor;
 
+/** Where one plane of a dmabuf keeps its data. */
+typedef struct mln_dma_buf_plane {
+  /**
+   * The file descriptor of the dmabuf that holds the plane. The planes of a
+   * buffer often share one.
+   */
+  int32_t fd;
+  /** The bytes from the start of the dmabuf to the plane's first byte. */
+  uint32_t offset;
+  /** The bytes from the start of one row to the start of the next. */
+  uint32_t stride;
+} mln_dma_buf_plane;
+
 /** The dmabuf of an acquired frame. */
 typedef struct mln_dma_buf_frame {
   uint32_t size;
@@ -59,11 +74,14 @@ typedef struct mln_dma_buf_frame {
   uint32_t slot;
   uint32_t fourcc;
   uint64_t modifier;
-  int32_t fd MLN_BINDING("lifetime=owner");
-  /** The bytes from the start of the buffer to its first pixel. */
-  uint32_t offset;
-  /** The bytes from the start of one row to the start of the next. */
-  uint32_t stride;
+  /**
+   * The buffer's planes, in the order that its fourcc and modifier define.
+   * Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and
+   * up, or with one `zwp_linux_buffer_params_v1.add` call each.
+   */
+  const mln_dma_buf_plane* planes
+    MLN_BINDING("length=plane_count;lifetime=owner");
+  size_t plane_count;
 } mln_dma_buf_frame;
 
 /**
@@ -107,21 +125,21 @@ MLN_API mln_status mln_map_attach_dma_buf_ring(
  *
  * Wait for mln_acquired_frame_get_producer_sync() before you read the buffer.
  * Once you release or discard the frame, the session may render into the
- * buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR with `mmap`,
- * and bracket your reads with DMA_BUF_IOCTL_SYNC.
+ * buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR, which has one
+ * plane, with `mmap`, and bracket your reads with DMA_BUF_IOCTL_SYNC.
  *
- * The session owns the file descriptor, so don't close it. To keep the buffer
- * after you release the frame, duplicate the file descriptor with `dup`. A
- * duplicate keeps the buffer's memory, but not its contents.
+ * The session owns the planes' file descriptors, so don't close them. To keep
+ * the buffer after you release the frame, duplicate each file descriptor with
+ * `dup`. A duplicate keeps the buffer's memory, but not its contents.
  *
  * Returns:
  * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
  *   or disposed it.
  *
  * Lifetimes:
- * The file descriptor in `out_frame` stays valid until you release or discard
- * the frame, or the session is abandoned or disposed. A view from
- * mln_acquired_frame_view_begin() keeps it valid until
+ * The planes in `out_frame`, and their file descriptors, stay valid until you
+ * release or discard the frame, or the session is abandoned or disposed. A
+ * view from mln_acquired_frame_view_begin() keeps them valid until
  * mln_acquired_frame_view_end().
  */
 MLN_BINDING("view_owner=frame;platforms=freebsd,linux")

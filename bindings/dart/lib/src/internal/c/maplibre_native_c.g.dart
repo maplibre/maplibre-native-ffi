@@ -437,6 +437,12 @@ final class mln_dma_buf_frame extends Struct {
   external int fourcc;
   @Uint64()
   external int modifier;
+  external Pointer<mln_dma_buf_plane> planes;
+  @Size()
+  external int plane_count;
+}
+
+final class mln_dma_buf_plane extends Struct {
   @Int32()
   external int fd;
   @Uint32()

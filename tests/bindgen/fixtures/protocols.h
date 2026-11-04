@@ -505,16 +505,22 @@ mln_status mln_measurement_take_sample(
 #endif
 
 #ifdef MLN_PROTOCOL_BORROWED_VIEW
-// A handle that lends a record inside its view scope. The texture stays valid
-// only until the frame's release, and the width is a plain value.
+// A handle that lends a record inside its view scope. The texture and the
+// planes array stay valid only until the frame's release, and the width is a
+// plain value.
 typedef unsigned long long mln_frame BIND(
   "kind=handle;release=mln_frame_release;discard=mln_frame_discard;"
   "view_begin=mln_frame_view_begin;view_end=mln_frame_view_end"
 );
+typedef struct mln_frame_plane {
+  unsigned int offset;
+} mln_frame_plane;
 typedef struct mln_frame_texture {
   unsigned int size;
   unsigned int width;
   unsigned long long texture BIND("lifetime=owner");
+  const mln_frame_plane* planes BIND("length=plane_count;lifetime=owner");
+  MLN_PROTOCOL_SIZE plane_count;
 } mln_frame_texture;
 mln_status mln_frame_acquire(
   mln_frame* out_frame BIND("direction=out"), mln_diagnostic* out_diagnostic
