@@ -4,6 +4,7 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:meta/meta.dart';
 
 import '../internal/callback/delivery_queue.dart';
 import '../internal/callback/native_registration.dart';
@@ -19,6 +20,7 @@ import '../values.dart';
 
 part 'generated_operations.dart';
 part 'native_calls.dart';
+part 'testing.dart';
 
 /// Roots for process-global registrations, such as the log handler.
 final _globalCallbackRoots = _CallbackRoots();
