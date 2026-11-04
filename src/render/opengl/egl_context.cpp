@@ -5,13 +5,14 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "diagnostics/diagnostics.hpp"
@@ -175,6 +176,17 @@ auto EglSharedContext::share_context_api() const -> EGLenum {
 auto EglSharedContext::ensure_pbuffer_surface() -> EGLSurface {
   if (pbuffer_surface_ != EGL_NO_SURFACE) {
     return pbuffer_surface_;
+  }
+  // Mesa's Wayland platform has no config for both windows and pbuffers, so a
+  // context there goes current without a surface, through
+  // EGL_KHR_surfaceless_context.
+  auto surface_type = EGLint{};
+  if (
+    eglGetConfigAttrib(display(), config(), EGL_SURFACE_TYPE, &surface_type) ==
+      EGL_TRUE &&
+    (surface_type & EGL_PBUFFER_BIT) == 0
+  ) {
+    return EGL_NO_SURFACE;
   }
 
   const EGLint surface_attributes[] = {
@@ -364,7 +376,7 @@ auto get_egl_proc_address(
   return get_egl_client_library_proc_address(name, active_api);
 }
 
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 namespace {
 
 auto egl_config_failure(const char* what) -> mln_status {
@@ -390,6 +402,79 @@ auto has_rgba8(EGLDisplay display, EGLConfig config) -> bool {
 
 }  // namespace
 
+auto choose_window_egl_config(
+  EGLDisplay display, const char* display_name, EGLConfig& out_config
+) -> mln_status {
+  // A config that also has pbuffers comes first, for a session without a
+  // window. Mesa's Wayland platform offers none, so a window-only config
+  // serves where the context can go current without a surface.
+  auto surfaceless = false;
+  if (const auto* const list = eglQueryString(display, EGL_EXTENSIONS)) {
+    for (auto rest = std::string_view{list}; !rest.empty();) {
+      const auto end = rest.find(' ');
+      if (rest.substr(0, end) == "EGL_KHR_surfaceless_context") {
+        surfaceless = true;
+        break;
+      }
+      if (end == std::string_view::npos) break;
+      rest.remove_prefix(end + 1);
+    }
+  }
+  for (const EGLint surface_type :
+       {EGLint{EGL_WINDOW_BIT | EGL_PBUFFER_BIT}, EGLint{EGL_WINDOW_BIT}}) {
+    if (surface_type == EGL_WINDOW_BIT && !surfaceless) break;
+    const auto attributes = std::array<EGLint, 17>{
+      EGL_SURFACE_TYPE,
+      surface_type,
+      EGL_RENDERABLE_TYPE,
+      EGL_OPENGL_ES3_BIT,
+      EGL_RED_SIZE,
+      8,
+      EGL_GREEN_SIZE,
+      8,
+      EGL_BLUE_SIZE,
+      8,
+      EGL_ALPHA_SIZE,
+      8,
+      EGL_DEPTH_SIZE,
+      24,
+      EGL_STENCIL_SIZE,
+      8,
+      EGL_NONE,
+    };
+    auto count = EGLint{};
+    if (
+      eglChooseConfig(display, attributes.data(), nullptr, 0, &count) ==
+      EGL_FALSE
+    ) {
+      return egl_config_failure("choosing an EGL config failed");
+    }
+    auto configs = std::vector<EGLConfig>(static_cast<std::size_t>(count));
+    if (
+      count > 0 && eglChooseConfig(
+                     display, attributes.data(), configs.data(), count, &count
+                   ) == EGL_FALSE
+    ) {
+      return egl_config_failure("choosing an EGL config failed");
+    }
+    configs.resize(static_cast<std::size_t>(count));
+    // EGL sorts deeper colors first, so a match can have more than 8 bits.
+    const auto found = std::ranges::find_if(configs, [display](auto* config) {
+      return has_rgba8(display, config);
+    });
+    if (found != configs.end()) {
+      out_config = *found;
+      return MLN_STATUS_OK;
+    }
+  }
+  const auto message = std::string{"the "} + display_name +
+                       " has no OpenGL ES 3 config for RGBA8888 windows";
+  set_thread_error(message.c_str());
+  return MLN_STATUS_NATIVE_ERROR;
+}
+#endif
+
+#if defined(__ANDROID__) || defined(__OHOS__)
 // The display stays initialized for the rest of the process: EGL returns this
 // one display to the app's own code too, so terminating it would end the app's
 // use of it.
@@ -412,51 +497,11 @@ auto window_egl_config(WindowEglConfig& out_config) -> mln_status {
   ) {
     return egl_config_failure("initializing the default EGL display failed");
   }
-  const auto attributes = std::array<EGLint, 17>{
-    EGL_SURFACE_TYPE,
-    EGL_WINDOW_BIT | EGL_PBUFFER_BIT,
-    EGL_RENDERABLE_TYPE,
-    EGL_OPENGL_ES3_BIT,
-    EGL_RED_SIZE,
-    8,
-    EGL_GREEN_SIZE,
-    8,
-    EGL_BLUE_SIZE,
-    8,
-    EGL_ALPHA_SIZE,
-    8,
-    EGL_DEPTH_SIZE,
-    24,
-    EGL_STENCIL_SIZE,
-    8,
-    EGL_NONE,
-  };
-  auto count = EGLint{};
-  if (
-    eglChooseConfig(display, attributes.data(), nullptr, 0, &count) == EGL_FALSE
-  ) {
-    return egl_config_failure("choosing an EGL config failed");
-  }
-  auto configs = std::vector<EGLConfig>(static_cast<std::size_t>(count));
-  if (
-    count > 0 && eglChooseConfig(
-                   display, attributes.data(), configs.data(), count, &count
-                 ) == EGL_FALSE
-  ) {
-    return egl_config_failure("choosing an EGL config failed");
-  }
-  configs.resize(static_cast<std::size_t>(count));
-  // EGL sorts deeper colors first, so a match can have more than 8 bits.
-  const auto found = std::ranges::find_if(configs, [display](auto* config) {
-    return has_rgba8(display, config);
-  });
-  if (found == configs.end()) {
-    set_thread_error(
-      "the default EGL display has no OpenGL ES 3 config for RGBA8888 windows"
-    );
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  chosen->config = WindowEglConfig{.display = display, .config = *found};
+  auto config = EGLConfig{};
+  const auto config_status =
+    choose_window_egl_config(display, "default EGL display", config);
+  if (config_status != MLN_STATUS_OK) return config_status;
+  chosen->config = WindowEglConfig{.display = display, .config = config};
   out_config = *chosen->config;
   return MLN_STATUS_OK;
 }

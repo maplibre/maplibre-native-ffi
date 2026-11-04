@@ -297,4 +297,40 @@ auto validate_ohos_surface_replacement(
   return validate_ohos_window(*replacement);
 }
 
+auto validate_wayland_surface_descriptor(
+  const mln_wayland_surface_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("surface descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_wayland_surface_descriptor)) {
+    set_thread_error("mln_wayland_surface_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "surface dimensions must be positive"
+  );
+  if (size_status != MLN_STATUS_OK) return size_status;
+  if (descriptor->display == nullptr || descriptor->surface == nullptr) {
+    set_thread_error("Wayland display and surface must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_wayland_surface_replacement(
+  const mln_wayland_surface_replacement* replacement
+) -> mln_status {
+  const auto status = validate_surface_replacement(
+    replacement, "mln_wayland_surface_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  if (replacement->surface == nullptr) {
+    set_thread_error("Wayland surface must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 }  // namespace mln::core

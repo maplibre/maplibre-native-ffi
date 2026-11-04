@@ -3437,6 +3437,29 @@ fn generated_input_mln_wake<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_wayland_surface_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_wayland_surface_descriptor> {
+    let mut raw: sys::mln_wayland_surface_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_wayland_surface_descriptor>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.display = value.getattr("display")?.extract::<usize>()? as _;
+    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_wayland_surface_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_wayland_surface_replacement> {
+    let mut raw: sys::mln_wayland_surface_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_wayland_surface_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
 fn generated_input_mln_web_gl_context_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -4466,6 +4489,51 @@ impl MapHandle {
                     sys::mln_map_attach_vulkan_surface(
                         handle,
                         &descriptor_value,
+                        &options_value,
+                        &mut out_session,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }?;
+        let callback_roots = call.accept_callbacks();
+        let mut out_session_owner =
+            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
+        let out_session_python = unsafe {
+            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
+        }?;
+        let result = PyDict::new(py);
+        result.set_item("session", out_session_python)?;
+        result.set_item("ready", future)?;
+        Ok(result.into_any().unbind())
+    }
+    #[pyo3(signature = (descriptor, device, options))]
+    fn attach_wayland_surface(
+        &self,
+        py: Python<'_>,
+        descriptor: &Bound<'_, PyAny>,
+        device: Option<&VulkanDeviceHandle>,
+        options: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_wayland_surface_descriptor(&descriptor.clone(), storage)?;
+        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
+        let options_value =
+            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
+        let handle = self.input();
+        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_map_attach_wayland_surface(
+                        handle,
+                        &descriptor_value,
+                        device_handle,
                         &options_value,
                         &mut out_session,
                         completion,
@@ -7898,6 +7966,32 @@ impl RenderSessionHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_render_session_set_vulkan_surface_target(
+                        handle,
+                        &replacement_value,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }
+    }
+    #[pyo3(signature = (replacement))]
+    fn set_wayland_surface_target(
+        &self,
+        py: Python<'_>,
+        replacement: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let replacement_value =
+            generated_input_mln_wayland_surface_replacement(&replacement.clone(), storage)?;
+        let handle = self.input();
+        let convert = py_none;
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_set_wayland_surface_target(
                         handle,
                         &replacement_value,
                         completion,

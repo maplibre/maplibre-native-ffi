@@ -1244,6 +1244,19 @@ Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
   return result;
 }
 
+Pointer<raw.mln_wayland_surface_descriptor> _writeWaylandSurfaceDescriptor(
+  WaylandSurfaceDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_wayland_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_wayland_surface_descriptor>();
+  result.ref.size = sizeOf<raw.mln_wayland_surface_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  return result;
+}
+
 Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   CameraFitOptions value,
   Allocator arena, {
@@ -2170,6 +2183,18 @@ Pointer<raw.mln_vulkan_surface_replacement> _writeVulkanSurfaceReplacement(
   result.ref.size = sizeOf<raw.mln_vulkan_surface_replacement>();
   result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.surface = value.surface;
+  return result;
+}
+
+Pointer<raw.mln_wayland_surface_replacement> _writeWaylandSurfaceReplacement(
+  WaylandSurfaceReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_wayland_surface_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_wayland_surface_replacement>();
+  result.ref.size = sizeOf<raw.mln_wayland_surface_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   return result;
 }
 
@@ -4993,6 +5018,63 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   }
 
+  /// Creates a session that presents the map to a Wayland surface, with a
+  /// graphics context that the library creates.
+  ///
+  /// A Vulkan build presents with `device`, or, when `device` is null, with a
+  /// device that the library creates. An OpenGL build uses an EGL context on
+  /// the display, and `device` must be null. Attach with
+  /// `RenderDriverKind.coreWorker`.
+  ///
+  /// The session presents without waiting for the compositor, so demand at most
+  /// one frame per display refresh.
+  ///
+  /// Keep the surface until a release or replacement of the target, or a detach
+  /// of the session, completes. Keep the display connected until the session's
+  /// detach completes. In an OpenGL build, if you also use EGL on the display,
+  /// initialize it before you attach.
+  ///
+  /// See `mln_map_attach_wayland_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when you created `device` without
+  ///   `VulkanDeviceOptions.presentation`.
+  /// - `Status.unsupported` when the GPU or the Vulkan loader can't present to
+  ///   Wayland.
+  /// - `Status.nativeError` when the library can't create the graphics context
+  ///   or present to the surface.
+  RenderSessionHandle attachWaylandSurface(
+    WaylandSurfaceDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    VulkanDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_wayland_surface(
+          _handle.raw,
+          _writeWaylandSurfaceDescriptor(descriptor, arena),
+          (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
+
   /// Holds back the map's changes from rendering until
   /// `MapHandle.endCommandGroup()`, so they show in the same frame.
   ///
@@ -7557,6 +7639,32 @@ final class RenderSessionHandle implements Finalizable {
           completion,
           nativeDiagnostic,
         ),
+      );
+
+  /// Replaces the Wayland surface that the session presents to.
+  ///
+  /// Use it to give the session a surface again after
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another surface, or
+  /// to resize it. Once the replacement completes, the session no longer uses
+  /// the old surface.
+  ///
+  /// See `mln_render_session_set_wayland_surface_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when, in a Vulkan build, the new surface needs a
+  ///   different color format than the old one. Attach a new session instead.
+  /// - `Status.nativeError` when the library can't present to the new surface.
+  Future<void> setWaylandSurfaceTarget(WaylandSurfaceReplacement replacement) =>
+      _run(
+        (arena, completion) =>
+            raw.mln_render_session_set_wayland_surface_target(
+              _handle.raw,
+              _writeWaylandSurfaceReplacement(replacement, arena),
+              completion,
+              nativeDiagnostic,
+            ),
       );
 }
 

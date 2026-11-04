@@ -84,6 +84,16 @@ EGLSurface eglCreatePbufferSurface(
   return fn == nullptr ? EGL_NO_SURFACE : fn(display, config, attributes);
 }
 
+EGLSurface eglCreateWindowSurface(
+  EGLDisplay display, EGLConfig config, EGLNativeWindowType window,
+  const EGLint* attributes
+) {
+  static const auto fn =
+    egl_proc<EGLSurface (*)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint*)>(
+      "eglCreateWindowSurface");
+  return fn == nullptr ? EGL_NO_SURFACE : fn(display, config, window, attributes);
+}
+
 EGLBoolean eglDestroyContext(EGLDisplay display, EGLContext context) {
   static const auto fn =
     egl_proc<EGLBoolean (*)(EGLDisplay, EGLContext)>("eglDestroyContext");
@@ -94,6 +104,15 @@ EGLBoolean eglDestroySurface(EGLDisplay display, EGLSurface surface) {
   static const auto fn =
     egl_proc<EGLBoolean (*)(EGLDisplay, EGLSurface)>("eglDestroySurface");
   return fn == nullptr ? EGL_FALSE : fn(display, surface);
+}
+
+EGLBoolean eglGetConfigAttrib(
+  EGLDisplay display, EGLConfig config, EGLint attribute, EGLint* value
+) {
+  static const auto fn =
+    egl_proc<EGLBoolean (*)(EGLDisplay, EGLConfig, EGLint, EGLint*)>(
+      "eglGetConfigAttrib");
+  return fn == nullptr ? EGL_FALSE : fn(display, config, attribute, value);
 }
 
 EGLContext eglGetCurrentContext() {
@@ -169,6 +188,12 @@ EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
   static const auto fn =
     egl_proc<EGLBoolean (*)(EGLDisplay, EGLSurface)>("eglSwapBuffers");
   return fn == nullptr ? EGL_FALSE : fn(display, surface);
+}
+
+EGLBoolean eglSwapInterval(EGLDisplay display, EGLint interval) {
+  static const auto fn =
+    egl_proc<EGLBoolean (*)(EGLDisplay, EGLint)>("eglSwapInterval");
+  return fn == nullptr ? EGL_FALSE : fn(display, interval);
 }
 
 EGLBoolean eglTerminate(EGLDisplay display) {

@@ -87,6 +87,8 @@ import type {
   VulkanSurfaceDescriptor,
   VulkanSurfaceReplacement,
   VulkanTextureFrame,
+  WaylandSurfaceDescriptor,
+  WaylandSurfaceReplacement,
   WebGpuBorrowedTextureDescriptor,
   WebGpuBorrowedTextureReplacement,
   WebGpuSurfaceDescriptor,
@@ -242,6 +244,13 @@ export interface NativeOperations {
   mln_map_attach_vulkan_surface(
     map: bigint,
     descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_wayland_surface(
+    map: bigint,
+    descriptor: WaylandSurfaceDescriptor,
+    device: bigint | undefined,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;
@@ -781,6 +790,11 @@ export interface NativeOperations {
   mln_render_session_set_vulkan_surface_target(
     session: bigint,
     replacement: VulkanSurfaceReplacement,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_set_wayland_surface_target(
+    session: bigint,
+    replacement: WaylandSurfaceReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_web_gpu_borrowed_texture_target(

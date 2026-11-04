@@ -104,6 +104,8 @@ from ._generated_values import (
     VulkanSurfaceDescriptor,
     VulkanSurfaceReplacement,
     VulkanTextureFrame,
+    WaylandSurfaceDescriptor,
+    WaylandSurfaceReplacement,
     _maybe,
 )
 from ._operation import GeneratedOperations, _adopt_value, _answer, _view
@@ -691,6 +693,45 @@ class _MapHandleOperations(GeneratedOperations):
           `RenderBackendFlag.VULKAN`.
         """
         raw = self._native.attach_vulkan_surface(descriptor, options)
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
+
+    def attach_wayland_surface(
+        self,
+        descriptor: WaylandSurfaceDescriptor,
+        device: VulkanDeviceHandle | None,
+        options: RenderSessionAttachOptions,
+    ) -> RenderSessionHandle:
+        """Creates a session that presents the map to a Wayland surface, with a
+        graphics context that the library creates.
+
+        A Vulkan build presents with `device`, or, when `device` is null,
+        with a device that the library creates. An OpenGL build uses an EGL
+        context on the display, and `device` must be null. Attach with
+        `RenderDriverKind.CORE_WORKER`.
+
+        The session presents without waiting for the compositor, so demand at
+        most one frame per display refresh.
+
+        Keep the surface until a release or replacement of the target, or a
+        detach of the session, completes. Keep the display connected until
+        the session's detach completes. In an OpenGL build, if you also use
+        EGL on the display, initialize it before you attach.
+
+        See `mln_map_attach_wayland_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when you created `device` without
+          `VulkanDeviceOptions.presentation`.
+        - `Status.UNSUPPORTED` when the GPU or the Vulkan loader can't
+          present to Wayland.
+        - `Status.NATIVE_ERROR` when the library can't create the graphics
+          context or present to the surface.
+        """
+        raw = self._native.attach_wayland_surface(
+            descriptor, None if device is None else device._native, options
+        )
         return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def begin_command_group(self) -> Future[CommandCompletion]:
@@ -2488,6 +2529,29 @@ class _RenderSessionHandleOperations(GeneratedOperations):
           session instead.
         """
         return self._native.set_vulkan_surface_target(replacement)
+
+    def set_wayland_surface_target(
+        self, replacement: WaylandSurfaceReplacement
+    ) -> Future[None]:
+        """Replaces the Wayland surface that the session presents to.
+
+        Use it to give the session a surface again after
+        `RenderSessionHandle.release_target()`, to move it to another
+        surface, or to resize it. Once the replacement completes, the session
+        no longer uses the old surface.
+
+        See `mln_render_session_set_wayland_surface_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when, in a Vulkan build, the new surface needs
+          a different color format than the old one. Attach a new session
+          instead.
+        - `Status.NATIVE_ERROR` when the library can't present to the new
+          surface.
+        """
+        return self._native.set_wayland_surface_target(replacement)
 
     @property
     def discarding(self) -> RenderSessionHandleDiscarding:

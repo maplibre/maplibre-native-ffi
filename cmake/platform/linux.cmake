@@ -203,10 +203,16 @@ function(mln_ffi_configure_platform target)
   set(MLN_FFI_LINUX_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/i18n.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/wayland_surface_session.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_LINUX_SOURCES})
+
+  # The library presents to Wayland surfaces. It takes the host's connection,
+  # and loads libwayland-egl only for an EGL session, so nothing links
+  # libwayland.
+  target_compile_definitions(${target} PRIVATE MLN_FFI_WAYLAND=1)
 
   target_include_directories(
     ${target}

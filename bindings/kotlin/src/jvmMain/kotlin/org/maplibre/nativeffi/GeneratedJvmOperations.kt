@@ -127,6 +127,56 @@ public fun MapHandle.attachMetalSurface(
   }
 
 /**
+ * Creates a session that presents the map to a Wayland surface, with a graphics context that the
+ * library creates.
+ *
+ * A Vulkan build presents with `device`, or, when `device` is null, with a device that the library
+ * creates. An OpenGL build uses an EGL context on the display, and `device` must be null. Attach
+ * with `RenderDriverKind.CORE_WORKER`.
+ *
+ * The session presents without waiting for the compositor, so demand at most one frame per display
+ * refresh.
+ *
+ * Keep the surface until a release or replacement of the target, or a detach of the session,
+ * completes. Keep the display connected until the session's detach completes. In an OpenGL build,
+ * if you also use EGL on the display, initialize it before you attach.
+ *
+ * See `mln_map_attach_wayland_surface` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when you created `device` without `VulkanDeviceOptions.presentation`.
+ * - `Status.UNSUPPORTED` when the GPU or the Vulkan loader can't present to Wayland.
+ * - `Status.NATIVE_ERROR` when the library can't create the graphics context or present to the
+ *   surface.
+ */
+public fun MapHandle.attachWaylandSurface(
+  descriptor: WaylandSurfaceDescriptor,
+  device: VulkanDeviceHandle? = null,
+  options: RenderSessionAttachOptions,
+): RenderSessionHandle =
+  nativeCall(this, binding) {
+    attach(
+      { out, completion ->
+        C.mln_map_attach_wayland_surface(
+          handle,
+          writeWaylandSurfaceDescriptor(descriptor),
+          device?.let { argument(it, it.binding) } ?: 0L,
+          writeRenderSessionAttachOptions(options),
+          out,
+          completion,
+          diagnostic,
+        )
+      },
+      GeneratedOwnerDisposal::renderSession,
+      { created, ready -> RenderSessionHandle(created, this@attachWaylandSurface, ready) },
+      { it.bindingCallbacks },
+      { it.dispose() },
+    )
+  }
+
+/**
  * Replaces the Metal textures that a borrowed ring renders into.
  *
  * Use it to resize the ring, or to give the session textures again after
@@ -173,6 +223,36 @@ public fun RenderSessionHandle.setMetalSurfaceTarget(
       C.mln_render_session_set_metal_surface_target(
         handle,
         writeMetalSurfaceReplacement(replacement),
+        completion,
+        diagnostic,
+      ),
+    )
+  }
+
+/**
+ * Replaces the Wayland surface that the session presents to.
+ *
+ * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
+ * it to another surface, or to resize it. Once the replacement completes, the session no longer
+ * uses the old surface.
+ *
+ * See `mln_render_session_set_wayland_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when, in a Vulkan build, the new surface needs a different color format
+ *   than the old one. Attach a new session instead.
+ * - `Status.NATIVE_ERROR` when the library can't present to the new surface.
+ */
+public fun RenderSessionHandle.setWaylandSurfaceTarget(
+  replacement: WaylandSurfaceReplacement,
+): Deferred<Unit> =
+  nativeUnit(this, binding) {
+    check(
+      C.mln_render_session_set_wayland_surface_target(
+        handle,
+        writeWaylandSurfaceReplacement(replacement),
         completion,
         diagnostic,
       ),

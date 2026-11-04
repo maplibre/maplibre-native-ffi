@@ -194,11 +194,16 @@ runs:
       if: ${{ runner.os == 'Linux' && inputs.software-gpu != '' }}
       shell: bash
       run: |
+        # The native suites' Wayland cases run a compositor of their own on
+        # libwayland-server, and EGL presents to it through libwayland-egl.
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
           libegl-mesa0 \
           libgl1-mesa-dri \
           libvulkan1 \
+          libwayland-client0 \
+          libwayland-egl1 \
+          libwayland-server0 \
           mesa-utils \
           mesa-utils-extra \
           mesa-vulkan-drivers

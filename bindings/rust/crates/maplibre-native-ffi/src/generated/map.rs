@@ -704,6 +704,68 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
+    /// Creates a session that presents the map to a Wayland surface, with a
+    /// graphics context that the library creates.
+    ///
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on
+    /// the display, and `device` must be null. Attach with
+    /// `RenderDriverKind::CoreWorker`.
+    ///
+    /// The session presents without waiting for the compositor, so demand at
+    /// most one frame per display refresh.
+    ///
+    /// Keep the surface until a release or replacement of the target, or a
+    /// detach of the session, completes. Keep the display connected until the
+    /// session's detach completes. In an OpenGL build, if you also use EGL on
+    /// the display, initialize it before you attach.
+    ///
+    /// See `mln_map_attach_wayland_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions::presentation`.
+    /// - `Status::Unsupported` when the GPU or the Vulkan loader can't present
+    ///   to Wayland.
+    /// - `Status::NativeError` when the library can't create the graphics
+    ///   context or present to the surface.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "freebsd",
+        all(target_os = "linux", not(target_env = "ohos"))
+    ))]
+    pub unsafe fn attach_wayland_surface(
+        &self,
+        descriptor: &WaylandSurfaceDescriptor,
+        device: Option<&VulkanDeviceHandle>,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_vulkan_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_wayland_surface(
+                    map,
+                    descriptor,
+                    device,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
     /// Creates a session that renders the map into a ring of your WebGPU
     /// textures.
     ///

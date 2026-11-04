@@ -1057,6 +1057,41 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Replaces the Wayland surface that the session presents to.
+    /// </summary>
+    /// <remarks>
+    /// <para>Use it to give the session a surface again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
+    /// surface, or to resize it. Once the replacement completes, the session no
+    /// longer uses the old surface.</para>
+    /// <para>See <c>mln_render_session_set_wayland_surface_target</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when, in a Vulkan build,
+    /// the new surface needs a different color format than the old one. Attach
+    /// a new session instead.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// present to the new surface.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public Task SetWaylandSurfaceTargetAsync(WaylandSurfaceReplacement replacement)
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeReplacement = NativeWaylandSurfaceReplacement(replacement);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_wayland_surface_target(
+            Handle,
+            &nativeReplacement,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Submits each command without a completion. Native logs a failure as
     /// a warning, and the caller sees none.
     /// </summary>

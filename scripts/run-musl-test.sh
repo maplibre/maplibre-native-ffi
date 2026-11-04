@@ -49,6 +49,8 @@ esac
       egl) apk add --no-cache mesa-dri-gallium mesa-egl mesa-gles ;;
       vulkan) apk add --no-cache mesa-vulkan-swrast vulkan-loader ;;
     esac
+    # The Wayland cases run a compositor of their own on libwayland-server.
+    apk add --no-cache wayland-libs-client wayland-libs-egl wayland-libs-server
     export LIBGL_ALWAYS_SOFTWARE=true
     # Software rendering is slow, so waits and the native hang watchdog stretch
     # by the timeout scale.

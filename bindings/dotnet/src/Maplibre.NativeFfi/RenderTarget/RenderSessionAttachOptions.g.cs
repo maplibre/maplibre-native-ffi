@@ -39,8 +39,9 @@ public readonly partial record struct RenderSessionAttachOptions
     /// shared or dedicated EGL or WGL context, an existing WebGL context, or a
     /// browser's WebGPU device.</description></item>
     /// <item><description><c>RenderDriverKind.CoreWorker</c> for a transferred
-    /// WebGL canvas, an Android or OpenHarmony window, a ring of Android
-    /// hardware buffers, or an offscreen session.</description></item>
+    /// WebGL canvas, an Android or OpenHarmony window, a Wayland surface, a
+    /// ring of Android hardware buffers, or an offscreen
+    /// session.</description></item>
     /// <item><description>Either one for a Metal or Vulkan
     /// target.</description></item>
     /// </list>

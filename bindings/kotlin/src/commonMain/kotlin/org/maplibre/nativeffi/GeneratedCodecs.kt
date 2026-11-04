@@ -470,6 +470,19 @@ internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanS
 internal fun NativeArena.writeVulkanSurfaceDescriptor(value: VulkanSurfaceDescriptor): Long =
   allocate(w(48, 80), w(8, 8, 4)).also { putVulkanSurfaceDescriptor(it, value) }
 
+internal fun NativeArena.putWaylandSurfaceDescriptor(
+  target: Long,
+  value: WaylandSurfaceDescriptor,
+) {
+  writeU32(target, w(20, 32).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.display.address)
+  writeAddress(target + w(16, 24), value.surface.address)
+}
+
+internal fun NativeArena.writeWaylandSurfaceDescriptor(value: WaylandSurfaceDescriptor): Long =
+  allocate(w(20, 32), w(4, 8)).also { putWaylandSurfaceDescriptor(it, value) }
+
 internal fun NativeArena.putWebGpuBorrowedTextureDescriptor(
   target: Long,
   value: WebGpuBorrowedTextureDescriptor,
@@ -991,6 +1004,18 @@ internal fun NativeArena.putVulkanSurfaceReplacement(
 
 internal fun NativeArena.writeVulkanSurfaceReplacement(value: VulkanSurfaceReplacement): Long =
   allocate(w(24, 24, 20), w(8, 8, 4)).also { putVulkanSurfaceReplacement(it, value) }
+
+internal fun NativeArena.putWaylandSurfaceReplacement(
+  target: Long,
+  value: WaylandSurfaceReplacement,
+) {
+  writeU32(target, w(16, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.surface.address)
+}
+
+internal fun NativeArena.writeWaylandSurfaceReplacement(value: WaylandSurfaceReplacement): Long =
+  allocate(w(16, 24), w(4, 8)).also { putWaylandSurfaceReplacement(it, value) }
 
 internal fun NativeArena.putWebGpuBorrowedTextureReplacement(
   target: Long,

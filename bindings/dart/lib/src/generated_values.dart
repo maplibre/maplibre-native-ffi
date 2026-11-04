@@ -2834,8 +2834,8 @@ final class RenderSessionAttachOptions extends _Value {
   /// - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
   ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
-  ///   or OpenHarmony window, a ring of Android hardware buffers, or an
-  ///   offscreen session.
+  ///   or OpenHarmony window, a Wayland surface, a ring of Android hardware
+  ///   buffers, or an offscreen session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
@@ -3657,6 +3657,45 @@ final class VulkanSurfaceDescriptor extends _Value {
   String toString() => _describe('VulkanSurfaceDescriptor', const [
     'logicalSize',
     'context',
+    'surface',
+  ]);
+}
+
+/// A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
+///
+/// See `mln_wayland_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+final class WaylandSurfaceDescriptor extends _Value {
+  const WaylandSurfaceDescriptor({
+    required this.logicalSize,
+    required this.display,
+    required this.surface,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `wl_display*`.
+  final NativePointer display;
+
+  /// Your `wl_surface*`, on `display`.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  WaylandSurfaceDescriptor copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? display,
+    NativePointer? surface,
+  }) => WaylandSurfaceDescriptor(
+    logicalSize: logicalSize ?? this.logicalSize,
+    display: display ?? this.display,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, display, surface];
+  @override
+  String toString() => _describe('WaylandSurfaceDescriptor', const [
+    'logicalSize',
+    'display',
     'surface',
   ]);
 }
@@ -5561,6 +5600,36 @@ final class VulkanSurfaceReplacement extends _Value {
   @override
   String toString() =>
       _describe('VulkanSurfaceReplacement', const ['logicalSize', 'surface']);
+}
+
+/// A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
+///
+/// See `mln_wayland_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+final class WaylandSurfaceReplacement extends _Value {
+  const WaylandSurfaceReplacement({
+    required this.logicalSize,
+    required this.surface,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `wl_surface*`, on the display that the session attached with.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  WaylandSurfaceReplacement copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? surface,
+  }) => WaylandSurfaceReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, surface];
+  @override
+  String toString() =>
+      _describe('WaylandSurfaceReplacement', const ['logicalSize', 'surface']);
 }
 
 /// The answer to a resource request.

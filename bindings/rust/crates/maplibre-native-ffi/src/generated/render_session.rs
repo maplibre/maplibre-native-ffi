@@ -973,6 +973,48 @@ impl RenderSessionHandle {
         )
     }
 
+    /// Replaces the Wayland surface that the session presents to.
+    ///
+    /// Use it to give the session a surface again after
+    /// `RenderSessionHandle::release_target()`, to move it to another surface,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old surface.
+    ///
+    /// See `mln_render_session_set_wayland_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when, in a Vulkan build, the new surface needs a
+    ///   different color format than the old one. Attach a new session instead.
+    /// - `Status::NativeError` when the library can't present to the new
+    ///   surface.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "freebsd",
+        all(target_os = "linux", not(target_env = "ohos"))
+    ))]
+    pub unsafe fn set_wayland_surface_target(
+        &self,
+        replacement: &WaylandSurfaceReplacement,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self.inner.call();
+        let replacement = call.reference(&replacement)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_wayland_surface_target(
+                    session,
+                    replacement,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
     /// Replaces the WebGPU textures that a borrowed ring renders into.
     ///
     /// Use it to resize the ring, or to give the session textures again after

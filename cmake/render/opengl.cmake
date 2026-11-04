@@ -231,6 +231,10 @@ function(mln_ffi_configure_renderer target)
       list(APPEND MLN_FFI_OPENGL_SOURCES
            ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_dispatch.cpp)
     endif()
+    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
+      list(APPEND MLN_FFI_OPENGL_SOURCES
+           ${PROJECT_SOURCE_DIR}/src/render/opengl/wayland_egl.cpp)
+    endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_offscreen_device.cpp)

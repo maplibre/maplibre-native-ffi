@@ -63,6 +63,12 @@ On OpenHarmony, attach an `XComponent`'s window the same way with
 and replace it with [](api:mln_render_session_set_ohos_surface_target). Release
 it before the component's `onSurfaceDestroyed` returns.
 
+On Linux and FreeBSD, attach a Wayland `wl_surface` and its `wl_display` the
+same way with [](api:mln_map_attach_wayland_surface), and replace it with
+[](api:mln_render_session_set_wayland_surface_target). Release the target before
+you destroy the surface, and detach the session before you disconnect the
+display.
+
 Attach the surface to the map at the window's size in logical pixels. The
 session renders at the scale factor that you created the map with. To move the
 window to a display of another density, create a new map and attach a new
