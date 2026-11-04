@@ -48,11 +48,14 @@ package, with the same products: `MaplibreNativeC`, the C API, and
 On a Mac, `MaplibreNativeC` is an XCFramework for macOS, iOS, Mac Catalyst,
 tvOS and visionOS, from a release of
 [louwers/maplibre-native-ffi](https://github.com/louwers/maplibre-native-ffi/releases)
-(branch `implementation-switch`). maplibre-native-next implements part of the C
-API so far: the runtime and its events, logging, delivery queues, maps with
-their style and camera, and offscreen render sessions with texture readback,
-which render through wgpu on Metal. The rest, such as Metal texture and surface
-sessions, returns `MLN_STATUS_UNSUPPORTED`.
+(branch `next-ios`, on `implementation-switch`). maplibre-native-next implements
+most of the C API: the runtime and its events, logging, delivery queues, maps
+with their camera, projections and command groups, the style (layers,
+properties, sources, GeoJSON, custom geometry sources, images, light), queries
+and feature state, offline regions, resource providers and transforms, and
+offscreen and Metal surface render sessions, which render through wgpu on Metal.
+The rest, such as texture rings, custom vector sources, and OpenGL, Vulkan and
+WebGPU surfaces on Apple platforms, returns `MLN_STATUS_UNSUPPORTED`.
 
 Each release replaces this repository's contents, so report issues to
 [louwers/maplibre-native-ffi](https://github.com/louwers/maplibre-native-ffi).
