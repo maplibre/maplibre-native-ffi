@@ -12,8 +12,8 @@ use crate::handle::NativeHandleLeak;
 #[non_exhaustive]
 pub enum Report {
     /// A handle that a destructor could not destroy. The handle stays live.
-    /// An explicit `dispose` or `release` reports the same failure through
-    /// the normal error path.
+    /// An explicit `dispose` or `release` returns the same failure as an
+    /// error.
     LeakedHandle(NativeHandleLeak),
     /// An error or panic that a callback contained. A caught panic carries
     /// the native-error status.

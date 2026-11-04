@@ -32,8 +32,8 @@ const _createOwnerToken = raw.mln_binding_owner_token_create;
 const _destroyOwnerToken = raw.mln_binding_owner_token_destroy;
 
 final class NativeHandleState<H extends NativeHandle> implements Finalizable {
-  /// Owns [_handle], or, when [borrowed], wraps a handle that a callback
-  /// borrows, which the binding never releases or disposes.
+  /// Owns [_handle], unless [borrowed]. The binding never releases or
+  /// disposes a handle that a callback borrows.
   NativeHandleState(this._handle, this.typeName, {this.borrowed = false}) {
     if (_handle.isNull) {
       throwInvalidArgument('$typeName handle must not be the null handle');
@@ -84,9 +84,9 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     _detachOwnerFinalizer();
   }
 
-  /// Runs [answer], which ends the handle whatever it returns. A repeated
-  /// answer still reaches native, which reports the handle stale, where a
-  /// second [close] does nothing.
+  /// Runs [answer], which ends the handle whatever it returns. Unlike a
+  /// second [close], a repeated answer still calls native, which reports the
+  /// handle stale.
   void answer(int Function(H) answer) {
     _checkReleasable();
     final int status;
@@ -143,8 +143,6 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     }
   }
 
-  /// Disposes the handle through its finalizer token now, and detaches the
-  /// finalizer.
   void _disposeNow() {
     final token = _ownerToken;
     if (token == null) {

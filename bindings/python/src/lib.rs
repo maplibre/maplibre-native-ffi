@@ -27,8 +27,8 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     callback_roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
     type_name: &'static str,
-    /// Whether a callback borrows the handle, which the binding then never
-    /// releases or disposes.
+    /// Whether a callback borrows the handle. The binding never releases or
+    /// disposes a borrowed handle.
     borrowed: bool,
 }
 

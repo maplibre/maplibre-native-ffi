@@ -108,11 +108,10 @@ Future<List<T>?> _queryOptionalList<T>(
 /// creation or a render-session attach. The call writes its owner's handle at
 /// admission and completes once the owner is ready.
 ///
-/// [adopt] gives the handle its owner as soon as native code admits the call,
-/// and passes the owner its readiness. The readiness doesn't keep the owner
-/// reachable, so an owner dropped before it is ready is still finalized. A
-/// failure that nothing awaits is not reported to the zone, and an `await` of
-/// the readiness still sees it.
+/// [adopt] receives the handle and its readiness as soon as native code admits
+/// the call. The readiness doesn't keep the owner reachable, so an owner
+/// dropped before it is ready is still finalized. A readiness failure that
+/// nothing awaits isn't reported to the zone, but an `await` still sees it.
 T _attach<T extends Object>(
   int Function(
     Allocator arena,

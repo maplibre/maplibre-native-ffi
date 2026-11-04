@@ -105,12 +105,11 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
   }
 
   /**
-   * Runs a call that creates an owner in a pending state, such as a map creation or a render
-   * session attach: [submit] receives an out slot and a completion, writes the new owner to the
-   * slot at once, and reports readiness through the completion. A refused call throws before
-   * anything is adopted. Otherwise [create] receives the handle and its readiness, which the owner
-   * exposes, and the owner is adopted as [adoptRegistered] does, or as [adopt] does when
-   * [callbacks] is null. A render session is held for abandonment at process exit.
+   * Runs a call that creates an owner at once and reports it ready later, such as a map creation or
+   * a render session attach. [submit] writes the new handle to its out slot and reports readiness
+   * through its completion. [create] receives the handle and its readiness, and the owner is
+   * adopted as [adoptRegistered] does, or as [adopt] does when [callbacks] is null. A render
+   * session is also held for abandonment at process exit.
    */
   fun <O> attach(
     submit: (out: Long, completion: Long) -> Int,
@@ -311,9 +310,8 @@ internal fun nativeClose(owner: Any, state: HandleState, body: NativeCall.() -> 
 }
 
 /**
- * Runs a call that answers [state]'s handle, which ends it whatever the call returns. A repeated
- * answer reaches native, which reports the handle stale, where a repeated [nativeClose] does
- * nothing.
+ * Runs a call that answers [state]'s handle, which ends it whatever the call returns. Unlike a
+ * repeated [nativeClose], a repeated answer still calls native, which reports the handle stale.
  */
 internal fun nativeAnswer(owner: Any, state: HandleState, body: NativeCall.() -> Unit) {
   try {

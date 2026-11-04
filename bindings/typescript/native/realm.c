@@ -534,7 +534,7 @@ bool mln_ts_read_native_registration(
     return false;
   }
   if (type == napi_null) {
-    // The value is no native registration.
+    // The value isn't a native registration.
     if (native != NULL) {
       *native = false;
       return true;

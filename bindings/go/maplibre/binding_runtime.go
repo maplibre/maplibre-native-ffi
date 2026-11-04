@@ -145,8 +145,8 @@ func (arena *bindingArena) accept(owner *bindingOwner) {
 		ticket.mu.Lock()
 		if !ticket.retired {
 			// A borrowed handle doesn't outlive its callback, so the
-			// registrations made through it stay rooted until native releases
-			// them.
+			// registrations made through it are rooted globally until native
+			// releases them.
 			if owner != nil && !owner.state.borrowed {
 				owner.rootsMu.Lock()
 				owner.roots[ticket.id] = ticket
@@ -284,8 +284,8 @@ type bindingState struct {
 	raw      uint64
 	released atomic.Bool
 	dispose  func(uint64)
-	// borrowed reports a handle that a callback borrows from its owner, which
-	// the binding never releases or disposes.
+	// borrowed reports that a callback borrows the handle. The binding never
+	// releases or disposes a borrowed handle.
 	borrowed bool
 }
 

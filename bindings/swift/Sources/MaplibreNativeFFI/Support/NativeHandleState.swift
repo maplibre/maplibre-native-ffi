@@ -5,8 +5,8 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private let lock = NSLock()
   private var closed = false
   private let parent: AnyObject?
-  /// Whether a callback borrows the handle, which the binding then never
-  /// releases or disposes.
+  /// Whether a callback borrows the handle. The binding never releases or
+  /// disposes a borrowed handle.
   private let borrowed: Bool
   let value: Handle
 
@@ -72,10 +72,10 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     lock.withLock { closed = true }
   }
 
-  /// Runs an answer, which ends the handle whatever it returns. Native ends a
-  /// live handle on every outcome, and a failure releases the handle in case
-  /// the failure came before native saw it. A repeated answer reaches native,
-  /// which reports the handle stale.
+  /// Runs an answer, which ends the handle whatever it returns. A failure
+  /// disposes the handle in case it came before native saw the answer. Unlike
+  /// a repeated close, a repeated answer still calls native, which reports the
+  /// handle stale.
   func answer(_ call: (Handle) throws -> Void) throws {
     guard !borrowed else {
       throw MaplibreError.invalidState(

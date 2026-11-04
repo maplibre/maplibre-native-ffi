@@ -86,8 +86,8 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// A consuming call that native refused, such as a release while a child
-/// handle is still live, which hands the handle back so the caller can retry
-/// or drop it.
+/// handle is still live. It hands the handle back, so the caller can retry or
+/// drop it.
 ///
 /// It converts into its [`Error`], so `?` works where the handle isn't needed:
 ///

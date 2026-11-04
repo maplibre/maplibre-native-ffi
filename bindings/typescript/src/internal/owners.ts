@@ -16,8 +16,8 @@ import type { Registrations, RootHolder } from "./realm.ts";
 /** The key that only generated code passes to an owner constructor. */
 export const ADOPT: unique symbol = Symbol("adopt");
 /**
- * The key that builds an owner of a handle that a callback borrows, which the
- * owner never releases or disposes.
+ * The key that builds an owner of a handle that a callback borrows. The owner
+ * never releases or disposes the handle.
  */
 export const BORROW: unique symbol = Symbol("borrow");
 export type AdoptKey = typeof ADOPT | typeof BORROW;
@@ -96,9 +96,7 @@ export abstract class Owner {
     options.registrations?.commit(this.#state);
   }
 
-  /**
-   * Whether a release, dispose, or discard has ended the handle.
-   */
+  /** Whether a release, dispose, or discard has ended the handle. */
   get isClosed(): boolean {
     return this.#state.released;
   }
@@ -155,8 +153,8 @@ export function closeSync(
 
 /**
  * Answers the handle through a synchronous call, which ends the handle
- * whatever it returns. A repeated answer still reaches native code, which
- * reports the handle stale, where a second release does nothing.
+ * whatever it returns. Unlike a second release, a repeated answer still calls
+ * native code, which reports the handle stale.
  */
 export function answerSync(
   owner: Owner,
@@ -243,8 +241,7 @@ export function defineDisposers(
     });
   };
   // An async disposer returns a Promise even when the release is
-  // synchronous. Like the synchronous one, it leaves a released owner as it
-  // is.
+  // synchronous. It leaves a released owner as it is.
   define(symbols.asyncDispose, release, async function () {
     if (!stateOf(this as unknown as Owner).released) {
       await this[release!]!();
