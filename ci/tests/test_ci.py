@@ -185,7 +185,7 @@ class SuitesTest(unittest.TestCase):
     def setUpClass(cls):
         cls.targets = targets()
 
-    def test_typescript_linux_and_freebsd_suites_publish_their_tested_addons(self):
+    def test_typescript_linux_and_freebsd_suites_publish_their_addons(self):
         expected = {
             f"linux-{libc}-{arch}-{backend}"
             for libc, architectures in (
@@ -195,16 +195,24 @@ class SuitesTest(unittest.TestCase):
             for arch in architectures
             for backend in ("egl", "vulkan")
         } | {"freebsd-x64-egl", "freebsd-x64-vulkan"}
-        tested = {
-            name
+        build_only = {"linux-gnu-riscv64-egl", "linux-gnu-riscv64-vulkan"}
+        commands = {
+            name: suite.task
             for name, target in self.targets.items()
             if (target.platform.startswith("linux-") or target.platform == "freebsd")
-            and any(
-                suite.task == "//bindings/typescript:test"
-                for suite in suites.target_suites(target)
-            )
+            for suite in suites.target_suites(target)
+            if suite.task
+            in {"//bindings/typescript:test", "//bindings/typescript:build"}
         }
-        self.assertEqual(tested, expected)
+        self.assertEqual(
+            commands,
+            {
+                name: "//bindings/typescript:build"
+                if name in build_only
+                else "//bindings/typescript:test"
+                for name in expected
+            },
+        )
         for name in expected:
             with self.subTest(preset=name):
                 self.assertEqual(plan.addon(self.targets[name]), "typescript")
