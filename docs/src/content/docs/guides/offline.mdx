@@ -64,7 +64,13 @@ released, so to resume one, set its download active again.
 
 When the server's data changes, invalidate the region with
 [](api:mln_runtime_invalidate_offline_region), and maps check each of its
-resources with the server before they use it.
+resources with the server before they use it. To refresh the region for offline
+use, set its download inactive if it's active, then set it active. The download
+fetches what the current style lists and no map has checked since. Resources
+that only an earlier version of the style listed stay in the region until you
+delete it, and the region's status counts them once the download stops. If the
+style or a TileJSON document is missing or invalid, the download reports a
+response error and goes on from the stored copy.
 
 Delete a region you no longer need with
 [](api:mln_runtime_delete_offline_region).
