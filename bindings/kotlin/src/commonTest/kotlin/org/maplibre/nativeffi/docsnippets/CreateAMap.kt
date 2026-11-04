@@ -26,7 +26,7 @@ private suspend fun createAMap() {
   // #endregion runtime
 
   // #region map
-  val (map, ready) =
+  val map =
     runtime.createMap(
       MapOptions(
         initialExtent =
@@ -38,7 +38,7 @@ private suspend fun createAMap() {
         mapMode = MapMode.CONTINUOUS,
       ),
     )
-  ready.await()
+  map.ready.await()
   // #endregion map
 
   // #region style

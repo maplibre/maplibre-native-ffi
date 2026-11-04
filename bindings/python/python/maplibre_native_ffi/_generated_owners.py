@@ -1,5 +1,8 @@
 """Generated from the C headers by tools/bindgen. Do not edit."""
 
+from concurrent.futures import Future
+
+from ._future import completed_future
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
     _GeoJsonSourceDataHandleOperations,
@@ -76,16 +79,24 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "MapHandle"
+    _ready: Future[None]
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
 
     @classmethod
-    def _from_native(cls, native, parent=None):
+    def _from_native(cls, native, parent=None, ready=None):
         owner = cls.__new__(cls)
         owner._native = native
         owner._parent = parent
+        owner._ready = completed_future() if ready is None else ready
         return owner
+
+    @property
+    def ready(self) -> Future[None]:
+        """Completes once the map is ready, and fails with `MaplibreError` when it
+        fails to become ready. The map takes calls before then."""
+        return self._ready
 
     @property
     def id(self) -> int:
@@ -169,16 +180,24 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "RenderSessionHandle"
+    _ready: Future[None]
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")
 
     @classmethod
-    def _from_native(cls, native, parent=None):
+    def _from_native(cls, native, parent=None, ready=None):
         owner = cls.__new__(cls)
         owner._native = native
         owner._parent = parent
+        owner._ready = completed_future() if ready is None else ready
         return owner
+
+    @property
+    def ready(self) -> Future[None]:
+        """Completes once the session is ready, and fails with `MaplibreError` when it
+        fails to become ready. The session takes calls before then."""
+        return self._ready
 
     @property
     def id(self) -> int:

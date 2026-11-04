@@ -22,7 +22,7 @@ private fun copyPixels(data: ByteArray, stride: UInt) {}
 
 private suspend fun images(runtime: RuntimeHandle) {
   // #region map
-  val (map, mapReady) =
+  val map =
     runtime.createMap(
       MapOptions(
         initialExtent =
@@ -34,7 +34,7 @@ private suspend fun images(runtime: RuntimeHandle) {
         mapMode = MapMode.STATIC,
       ),
     )
-  mapReady.await()
+  map.ready.await()
   // #endregion map
 
   // #region style
@@ -44,7 +44,7 @@ private suspend fun images(runtime: RuntimeHandle) {
   // #endregion style
 
   // #region attach
-  val (session, sessionReady) =
+  val session =
     map.attachOffscreen(
       OffscreenDescriptor(LogicalSize(width = 800u, height = 600u)),
       // The library renders on its own thread.
@@ -52,7 +52,7 @@ private suspend fun images(runtime: RuntimeHandle) {
         driver = RenderDriverKind.CORE_WORKER,
       ),
     )
-  sessionReady.await()
+  session.ready.await()
   // #endregion attach
 
   // #region image
@@ -86,7 +86,7 @@ private suspend fun imagesTile(
   y: UInt,
 ) {
   // #region tile
-  val (map, ready) =
+  val map =
     runtime.createMap(
       MapOptions(
         initialExtent =
@@ -98,7 +98,7 @@ private suspend fun imagesTile(
         mapMode = MapMode.TILE,
       ),
     )
-  ready.await()
+  map.ready.await()
 
   map.discarding.updateCamera(
     CameraUpdate(

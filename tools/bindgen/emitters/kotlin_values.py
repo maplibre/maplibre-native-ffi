@@ -162,7 +162,6 @@ class Values:
         self.used = {}
         self.views = set()
         self.multiple = {}
-        self.attachments = {}
         self.writers = {}
         self.readers = {}
         self.sites = None
@@ -481,15 +480,6 @@ class Values:
                         else content_equality(public, typed)
                     )
                 )
-        for public, (field, value) in self.attachments.items():
-            result.append(
-                f"/** A new {field} and the completion that reports it ready. */\n"
-                f"public data class {public}(public val {field}: {self.public(value)}, public val ready: kotlinx.coroutines.Deferred<Unit>)"
-                + content_equality(
-                    public,
-                    [(field, self.public(value)), ("ready", "Deferred")],
-                )
-            )
         for public, fields in self.multiple.items():
             result.append(
                 f"public data class {public}(\n"

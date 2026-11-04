@@ -297,10 +297,6 @@ def _lower(
         chunks[path].append(value_types.record(value))
         if stem in SUBMODULES:
             imports[path].add(SUBMODULES[stem])
-    if value_types.attachments:
-        chunks["Generated/GeneratedAttachments.swift"].extend(
-            value_types.attachments.values()
-        )
     if value_types.views:
         chunks["Generated/GeneratedViews.swift"].extend(value_types.views.values())
     return dict(chunks), dict(imports), generated, failures

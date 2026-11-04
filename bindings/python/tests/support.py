@@ -52,9 +52,9 @@ def map_options(**fields: object) -> mln.MapOptions:
 def ready_map(
     runtime: mln.RuntimeHandle, options: mln.MapOptions | None = None
 ) -> mln.MapHandle:
-    created = runtime.create_map(map_options() if options is None else options)
-    result(created.ready)
-    return created.map
+    map_handle = runtime.create_map(map_options() if options is None else options)
+    result(map_handle.ready)
+    return map_handle
 
 
 class Signal:

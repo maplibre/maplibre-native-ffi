@@ -142,6 +142,9 @@ int? _buildBackend() {
 /// sessions take a queue lock.
 bool get buildAttachesVulkan => _buildBackend() == _backendVulkan;
 
+/// Whether [TestGraphics.open] opens a context on this build.
+bool get buildOpensTestGraphics => _buildBackend() != null;
+
 /// Whether a core-worker session on this build exposes its frames to the host.
 /// Metal and Vulkan sessions do. An OpenGL session exposes frames only from a
 /// context that it shares with the host, which only a caller-driven session
@@ -182,7 +185,7 @@ final class TestGraphics {
   /// Attaches a ring of one texture on this device for a core worker, at
   /// [size] on a map of scale factor 1. [close] destroys the texture, so the
   /// session must retire first.
-  NewRenderSession attachBorrowedTexture(
+  RenderSessionHandle attachBorrowedTexture(
     MapHandle map,
     LogicalSize size,
     RenderSessionAttachOptions options,

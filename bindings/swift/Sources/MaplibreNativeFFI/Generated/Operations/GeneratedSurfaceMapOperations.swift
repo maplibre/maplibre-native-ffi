@@ -17,11 +17,9 @@ public extension MapHandle {
     func attachMetalSurface(
       descriptor bindingArg0: MetalSurfaceDescriptor,
       options bindingArg1: RenderSessionAttachOptions
-    ) throws -> NewRenderSession {
+    ) throws -> RenderSessionHandle {
       var value0: mln_render_session = 0
-      return try nativeAttach(as: NewRenderSession
-        .init)
-      { raw, arena, completion, diagnostic in
+      return try nativeAttach { raw, arena, completion, diagnostic in
         try mln_map_attach_metal_surface(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -30,7 +28,11 @@ public extension MapHandle {
           completion,
           diagnostic
         )
-      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+      } adopt: { ready in try RenderSessionHandle(
+        adopting: value0,
+        parent: self,
+        ready: ready
+      ) }
     }
   #endif
 
@@ -46,11 +48,9 @@ public extension MapHandle {
   func attachOpenGlSurface(
     descriptor bindingArg0: OpenGlSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
+  ) throws -> RenderSessionHandle {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
+    return try nativeAttach { raw, arena, completion, diagnostic in
       try mln_map_attach_open_gl_surface(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -59,7 +59,11 @@ public extension MapHandle {
         completion,
         diagnostic
       )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    } adopt: { ready in try RenderSessionHandle(
+      adopting: value0,
+      parent: self,
+      ready: ready
+    ) }
   }
 
   #if os(Android) || os(Linux) || os(macOS) || os(Windows)
@@ -75,11 +79,9 @@ public extension MapHandle {
     func attachVulkanSurface(
       descriptor bindingArg0: VulkanSurfaceDescriptor,
       options bindingArg1: RenderSessionAttachOptions
-    ) throws -> NewRenderSession {
+    ) throws -> RenderSessionHandle {
       var value0: mln_render_session = 0
-      return try nativeAttach(as: NewRenderSession
-        .init)
-      { raw, arena, completion, diagnostic in
+      return try nativeAttach { raw, arena, completion, diagnostic in
         try mln_map_attach_vulkan_surface(
           raw,
           arena.store(bindingArg0.nativeValue()),
@@ -88,7 +90,11 @@ public extension MapHandle {
           completion,
           diagnostic
         )
-      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+      } adopt: { ready in try RenderSessionHandle(
+        adopting: value0,
+        parent: self,
+        ready: ready
+      ) }
     }
   #endif
 }

@@ -145,23 +145,19 @@ extension NativeReceiver {
     return future
   }
 
-  /// Starts work that also returns an owner, and pairs the owner that `adopt`
-  /// takes with a task that awaits the work, as `combine` puts them together.
-  /// The task keeps the owner alive until the work completes.
-  func nativeAttach<Owner: AnyObject & Sendable, Attachment>(
-    as combine: (Owner, Task<Void, Error>) -> Attachment,
+  /// Starts a call that creates its owner at once and reports it ready
+  /// later. `adopt` receives the task that finishes once the owner is ready,
+  /// which holds only the completion, so the owner that stores it doesn't
+  /// keep itself alive.
+  func nativeAttach<Owner: AnyObject & Sendable>(
     _ call: NativeStartCall,
-    adopt: () throws -> Owner
-  ) throws -> Attachment {
+    adopt: (Task<Void, Error>) throws -> Owner
+  ) throws -> Owner {
     try withNative { raw, arena in
       let future = try NativeCompletion.startUnit { completion, diagnostic in
         try arena.submit { try call(raw, arena, completion, diagnostic) }
       }
-      let owner = try adopt()
-      return combine(owner, Task { [owner] in
-        defer { withExtendedLifetime(owner) {} }
-        try await future.value()
-      })
+      return try adopt(Task { try await future.value() })
     }
   }
 }

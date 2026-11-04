@@ -8,10 +8,10 @@ const host = globalThis as typeof globalThis & {
 async function run(): Promise<void> {
   host.__mlnReleaseEarly();
   const runtime = await RuntimeHandle.create();
-  const { map, ready } = runtime.createMap({
+  const map = runtime.createMap({
     initialExtent: { width: 32, height: 32, scaleFactor: 1 },
   });
-  await ready;
+  await map.ready;
   await map.close();
   await runtime.close();
   host.__mlnDone();

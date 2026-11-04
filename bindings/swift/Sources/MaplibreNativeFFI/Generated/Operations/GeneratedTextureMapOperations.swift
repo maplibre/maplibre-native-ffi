@@ -19,11 +19,9 @@ public extension MapHandle {
     func attachMetalBorrowedTexture(
       descriptor bindingArg0: MetalBorrowedTextureDescriptor,
       options bindingArg1: RenderSessionAttachOptions
-    ) throws -> NewRenderSession {
+    ) throws -> RenderSessionHandle {
       var value0: mln_render_session = 0
-      return try nativeAttach(as: NewRenderSession
-        .init)
-      { raw, arena, completion, diagnostic in
+      return try nativeAttach { raw, arena, completion, diagnostic in
         try mln_map_attach_metal_borrowed_texture(
           raw,
           arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -32,7 +30,11 @@ public extension MapHandle {
           completion,
           diagnostic
         )
-      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+      } adopt: { ready in try RenderSessionHandle(
+        adopting: value0,
+        parent: self,
+        ready: ready
+      ) }
     }
   #endif
 
@@ -50,11 +52,9 @@ public extension MapHandle {
   func attachOpenGlBorrowedTexture(
     descriptor bindingArg0: OpenGlBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
+  ) throws -> RenderSessionHandle {
     var value0: mln_render_session = 0
-    return try nativeAttach(as: NewRenderSession
-      .init)
-    { raw, arena, completion, diagnostic in
+    return try nativeAttach { raw, arena, completion, diagnostic in
       try mln_map_attach_open_gl_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -63,7 +63,11 @@ public extension MapHandle {
         completion,
         diagnostic
       )
-    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+    } adopt: { ready in try RenderSessionHandle(
+      adopting: value0,
+      parent: self,
+      ready: ready
+    ) }
   }
 
   #if os(Android) || os(Linux) || os(macOS) || os(Windows)
@@ -81,11 +85,9 @@ public extension MapHandle {
     func attachVulkanBorrowedTexture(
       descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
       options bindingArg1: RenderSessionAttachOptions
-    ) throws -> NewRenderSession {
+    ) throws -> RenderSessionHandle {
       var value0: mln_render_session = 0
-      return try nativeAttach(as: NewRenderSession
-        .init)
-      { raw, arena, completion, diagnostic in
+      return try nativeAttach { raw, arena, completion, diagnostic in
         try mln_map_attach_vulkan_borrowed_texture(
           raw,
           arena.store(bindingArg0.nativeValue(arena: arena)),
@@ -94,7 +96,11 @@ public extension MapHandle {
           completion,
           diagnostic
         )
-      } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
+      } adopt: { ready in try RenderSessionHandle(
+        adopting: value0,
+        parent: self,
+        ready: ready
+      ) }
     }
   #endif
 }

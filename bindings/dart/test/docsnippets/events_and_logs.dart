@@ -33,7 +33,7 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
   // #endregion handler
 
   // #region mask
-  final created = runtime.createMap(
+  map = runtime.createMap(
     MapOptions(
       initialExtent: const LogicalExtent(
         width: 512,
@@ -46,8 +46,7 @@ Future<void> eventsAndLogs(RuntimeHandle runtime) async {
     ),
   );
   // #endregion mask
-  map = created.map;
-  await created.ready;
+  await map.ready;
 
   // #region logs
   // The callback runs in this isolate. The binding queues each call.

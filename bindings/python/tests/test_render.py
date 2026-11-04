@@ -159,19 +159,21 @@ class Offscreen(_Target):
             map_mode=mln.MapMode.CONTINUOUS, initial_extent=EXTENT
         )
         try:
-            self.session, attached = self._attach(
+            self.session = self._attach(
                 mln.RenderSessionAttachOptions(
                     driver=mln.RenderDriverKind.CORE_WORKER,
                     frame_wake=frame_wake(self.frames.notify),
                 )
             )
-            result(attached)
+            result(self.session.ready)
         except BaseException:
             with contextlib.suppress(Exception):
                 self.close()
             raise
 
-    def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
+    def _attach(
+        self, options: mln.RenderSessionAttachOptions
+    ) -> mln.RenderSessionHandle:
         assert self.map is not None
         return self.map.attach_offscreen(
             mln.OffscreenDescriptor(logical_size=SIZE), options
@@ -260,11 +262,11 @@ class BorrowedTexture(_Target):
             )
             if queue_lock is not None:
                 options = replace(options, queue_lock=queue_lock)
-            self.session, attached = self._attach(options)
+            self.session = self._attach(options)
             # A wake that fired before the session was stored found nothing
             # to service, so the graphics thread checks again.
             self._work.set()
-            result(attached)
+            result(self.session.ready)
         except BaseException:
             # A session whose attach failed still detaches before it is
             # destroyed, and close() leaves alive what it cannot detach.
@@ -280,7 +282,9 @@ class BorrowedTexture(_Target):
         while self.textures:
             self.textures.pop().close()
 
-    def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
+    def _attach(
+        self, options: mln.RenderSessionAttachOptions
+    ) -> mln.RenderSessionHandle:
         assert self.graphics is not None and self.map is not None
         context = self.graphics.context
         infos = [texture.info for texture in self.textures]
@@ -460,8 +464,9 @@ def test_a_custom_source_answers_through_the_map_it_borrows(harness: Harness) ->
         map_handle.discarding.set_custom_geometry_source_tile_data(
             source_id, tile, {"type": "FeatureCollection", "features": []}
         )
-        # The callback borrows the map, so it can't release it.
+        # The callback borrows the map, which is ready, so it can't release it.
         try:
+            map_handle.ready.result(timeout=0)
             map_handle.dispose()
         except mln.MaplibreError as error:
             calls.append((map_handle.id, source_id, error.status))

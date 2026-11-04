@@ -20,6 +20,11 @@ public class RenderSessionHandle
 internal constructor(
   handle: Long,
   @Suppress("unused") private val parent: MapHandle,
+  /**
+   * Completes once the session is ready, and fails with a [MaplibreException] when it fails to
+   * become ready. The session takes calls before then.
+   */
+  public val ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
 ) : AsyncReleasable, AutoCloseable {
   internal val binding =
     HandleState("RenderSessionHandle", handle, GeneratedOwnerDisposal::renderSession)

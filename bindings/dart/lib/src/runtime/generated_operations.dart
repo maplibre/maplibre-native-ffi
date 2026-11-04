@@ -4091,18 +4091,24 @@ extension type const _NativeMap(int raw) implements NativeHandle {}
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapHandle implements Finalizable, _CallbackRootOwner {
-  MapHandle._(RuntimeHandle parent, _NativeMap handle)
+  MapHandle._(RuntimeHandle parent, _NativeMap handle, this.ready)
     : _state = NativeHandleState(handle, 'MapHandle')..retain(parent),
       _callbackRoots = _CallbackRoots();
   MapHandle._borrowed(_NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle', borrowed: true),
-      _callbackRoots = _globalCallbackRoots;
+      _callbackRoots = _globalCallbackRoots,
+      ready = Future<void>.value();
   // Roots this owner's callback registrations for as long as it lives.
   @override
   final _CallbackRoots _callbackRoots;
   final NativeHandleState<_NativeMap> _state;
   _NativeMap get _handle => _state.handle;
   MapHandleDiscarding get discarding => MapHandleDiscarding._(this);
+
+  /// Completes once the map is ready, and fails with a [MaplibreException] when
+  /// it fails to become ready. The map takes calls before then. A failure that
+  /// nothing awaits isn't reported to the zone.
+  final Future<void> ready;
 
   /// The native handle id, which runtime events report as their source.
   ///
@@ -4332,7 +4338,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
   ///   `RenderBackendFlag.metal`, or when the target supports none of the
   ///   `producer_sync_kinds` in `options`.
-  NewRenderSession attachMetalBorrowedTexture(
+  RenderSessionHandle attachMetalBorrowedTexture(
     MetalBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4348,10 +4354,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4359,7 +4365,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -4372,7 +4377,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
   ///   `RenderBackendFlag.metal`.
-  NewRenderSession attachMetalSurface(
+  RenderSessionHandle attachMetalSurface(
     MetalSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4388,10 +4393,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4399,7 +4404,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -4419,7 +4423,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.invalidState` when the map already has a render session.
   /// - `Status.nativeError` when `device` is null and the platform can't create
   ///   a device.
-  NewRenderSession attachOffscreen(
+  RenderSessionHandle attachOffscreen(
     OffscreenDescriptor descriptor,
     RenderSessionAttachOptions options, {
     OffscreenDeviceHandle? device,
@@ -4437,10 +4441,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4448,7 +4452,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -4463,7 +4466,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
   ///   the context's platform, or when the target supports none of the
   ///   `producer_sync_kinds` in `options`.
-  NewRenderSession attachOpenGlBorrowedTexture(
+  RenderSessionHandle attachOpenGlBorrowedTexture(
     OpenGlBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4479,10 +4482,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4490,7 +4493,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -4503,7 +4505,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
   ///   the context's platform.
-  NewRenderSession attachOpenGlSurface(
+  RenderSessionHandle attachOpenGlSurface(
     OpenGlSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4519,10 +4521,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4530,7 +4532,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -4544,7 +4545,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
   ///   `RenderBackendFlag.vulkan`, or when the target supports none of the
   ///   `producer_sync_kinds` in `options`.
-  NewRenderSession attachVulkanBorrowedTexture(
+  RenderSessionHandle attachVulkanBorrowedTexture(
     VulkanBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4560,10 +4561,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4571,7 +4572,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -4584,7 +4584,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
   ///   `RenderBackendFlag.vulkan`.
-  NewRenderSession attachVulkanSurface(
+  RenderSessionHandle attachVulkanSurface(
     VulkanSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
@@ -4600,10 +4600,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           nativeDiagnostic,
         ),
       ),
-      (handle) => _adoptOwned(
+      (handle, ready) => _adoptOwned(
         handle,
         () =>
-            (RenderSessionHandle._(this, _NativeRenderSession(handle))
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
               .._state.retain(registrations)),
         (handle) {
           _check(
@@ -4611,7 +4611,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           );
         },
       ),
-      NewRenderSession.new,
     );
   }
 
@@ -6422,12 +6421,20 @@ extension type const _NativeRenderSession(int raw) implements NativeHandle {}
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RenderSessionHandle implements Finalizable {
-  RenderSessionHandle._(MapHandle parent, _NativeRenderSession handle)
-    : _state = NativeHandleState(handle, 'RenderSessionHandle')..retain(parent);
+  RenderSessionHandle._(
+    MapHandle parent,
+    _NativeRenderSession handle,
+    this.ready,
+  ) : _state = NativeHandleState(handle, 'RenderSessionHandle')..retain(parent);
   final NativeHandleState<_NativeRenderSession> _state;
   _NativeRenderSession get _handle => _state.handle;
   RenderSessionHandleDiscarding get discarding =>
       RenderSessionHandleDiscarding._(this);
+
+  /// Completes once the session is ready, and fails with a [MaplibreException]
+  /// when it fails to become ready. The session takes calls before then. A
+  /// failure that nothing awaits isn't reported to the zone.
+  final Future<void> ready;
 
   /// The native handle id.
   int get id => _state.handleId;
@@ -7445,7 +7452,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  NewMap createMap(MapOptions options) => _attach(
+  MapHandle createMap(MapOptions options) => _attach(
     (arena, completion, outMap) => raw.mln_runtime_create_map(
       _handle.raw,
       _writeMapOptions(options, arena),
@@ -7453,14 +7460,13 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
       completion,
       nativeDiagnostic,
     ),
-    (handle) => _adoptOwned(
+    (handle, ready) => _adoptOwned(
       handle,
-      () => MapHandle._(this, _NativeMap(handle)),
+      () => MapHandle._(this, _NativeMap(handle), ready),
       (handle) {
         _check(raw.mln_map_dispose(handle, nativeDiagnostic));
       },
     ),
-    NewMap.new,
   );
 
   /// Creates an offline region in the runtime's cache file.
@@ -7932,32 +7938,6 @@ final class StyleExpressionHandle implements Finalizable {
     raw.mln_style_expression_release(handle.raw);
     return nativeStatusOk;
   });
-}
-
-/// A new map and the completion that reports it ready.
-final class NewMap {
-  const NewMap(this.map, this.ready);
-
-  /// The map, which the caller owns before it is ready.
-  final MapHandle map;
-
-  /// Completes once the map is ready, or fails with its status.
-  /// Await it or call `ignore()`, because the zone reports a failure
-  /// that nothing handles.
-  final Future<void> ready;
-}
-
-/// A new session and the completion that reports it ready.
-final class NewRenderSession {
-  const NewRenderSession(this.session, this.ready);
-
-  /// The session, which the caller owns before it is ready.
-  final RenderSessionHandle session;
-
-  /// Completes once the session is ready, or fails with its status.
-  /// Await it or call `ignore()`, because the zone reports a failure
-  /// that nothing handles.
-  final Future<void> ready;
 }
 
 /// A `MetalTextureFrame` whose native objects are readable only while the

@@ -17,7 +17,6 @@ from ..model import Unsupported
 from ..names import camel, pascal
 from ..semantic import OperationPlan
 from .dart import (
-    attachment_name,
     method_name,
     native_call,
     receiver_handle,
@@ -449,8 +448,8 @@ def start(method: Method, *outputs: str) -> str:
 
 
 def attached(plan: OperationPlan, method: Method) -> str:
-    """A call that creates its owner at once and returns it with the
-    completion that reports it ready."""
+    """A call that creates its owner at once and returns it. The owner
+    exposes the completion that reports it ready."""
     assert plan.completion is not None
     if (
         len(method.returns) != 1
@@ -458,10 +457,11 @@ def attached(plan: OperationPlan, method: Method) -> str:
         or plan.result
     ):
         raise Unsupported("completion requires one immediate owner and void readiness")
-    _, adoption = method.returns[0]
-    attachment = attachment_name(plan.completion.immediate_owners[0])
+    attachment, adoption = method.returns[0]
     assert method.attach_output is not None
-    operation = f"_attach({start(method, method.attach_output)}, (handle) => {adoption}, {attachment}.new)"
+    operation = (
+        f"_attach({start(method, method.attach_output)}, (handle, ready) => {adoption})"
+    )
     if method.transaction:
         body = [*method.transaction, f"return {operation};"]
         return (
@@ -546,6 +546,8 @@ def adopt_owner(owned, expression, function, values):
             raise Unsupported("owned output requires its parent owner")
         parent = "this"
     arguments = (parent + ", " if parent else "") + f"{native}({expression})"
+    if values.bound.operations_by_name[function.name].shape == "attach":
+        arguments += ", ready"
     result = f"{public}._({arguments})"
     if values.bound.operations_by_name[function.name].registrations:
         result = f"({result}.._state.retain(registrations))"

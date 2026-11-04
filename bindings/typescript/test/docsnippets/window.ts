@@ -98,7 +98,7 @@ export async function renderToWindow(
   windowSurface: bigint,
 ): Promise<void> {
   // #region attach
-  const attachment = map.attachVulkanSurface(
+  session = map.attachVulkanSurface(
     {
       // The window's size in logical pixels. The map's scale factor turns
       // it into pixels.
@@ -114,8 +114,7 @@ export async function renderToWindow(
       frameWake: { callback: onFrameWake },
     },
   );
-  session = attachment.session;
-  await attachment.ready;
+  await session.ready;
   // #endregion attach
 
   demandFrame();

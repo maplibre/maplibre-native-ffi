@@ -92,10 +92,10 @@ private func attachOffscreenSession(
   style: String = emptyStyle
 ) async throws -> AttachedSession {
   let fixture = try await MapFixture.make()
-  let created: NewRenderSession
+  let session: RenderSessionHandle
   do {
     try await fixture.map.setStyleJson(style)
-    created = try fixture.map.attachOffscreen(
+    session = try fixture.map.attachOffscreen(
       descriptor: OffscreenDescriptor(
         logicalSize: LogicalSize(width: 32, height: 32)
       ),
@@ -112,11 +112,11 @@ private func attachOffscreenSession(
     fixture: fixture,
     graphics: nil,
     textures: [],
-    session: created.session,
+    session: session,
     thread: nil
   )
   do {
-    try await created.ready.value
+    try await session.ready
   } catch {
     await attached.close()
     throw error
@@ -133,10 +133,10 @@ private func withBorrowedTextureSession<Result>(
   _ body: (AttachedSession) async throws -> Result
 ) async throws -> Result {
   let fixture = try await MapFixture.make()
-  let attachment: (AttachedSession, NewRenderSession)
+  let attached: AttachedSession
   do {
     try await fixture.map.setStyleJson(style)
-    attachment = try await attachBorrowedTexture(
+    attached = try await attachBorrowedTexture(
       fixture: fixture,
       ringDepth: ringDepth
     )
@@ -144,10 +144,9 @@ private func withBorrowedTextureSession<Result>(
     await fixture.close()
     throw error
   }
-  let (attached, created) = attachment
   return try await attached.use { rendered in
     rendered.thread?.service(rendered.session)
-    try await created.ready.value
+    try await rendered.session.ready
     return try await body(rendered)
   }
 }
@@ -163,7 +162,7 @@ private func attachBorrowedTexture(
   fixture: MapFixture,
   ringDepth: Int = 1,
   callerDriven: Bool = false
-) async throws -> (AttachedSession, NewRenderSession) {
+) async throws -> AttachedSession {
   let graphics = try TestGraphics()
   let textures = try graphics.createTextures(count: ringDepth)
   let thread = callerDriven || graphics.usesCurrentContext
@@ -171,7 +170,7 @@ private func attachBorrowedTexture(
     : nil
   do {
     try await thread?.perform { try graphics.makeCurrentIfNeeded() }
-    let created = try graphics.attachBorrowedTexture(
+    let session = try graphics.attachBorrowedTexture(
       map: fixture.map,
       textures: textures,
       options: RenderSessionAttachOptions(
@@ -180,14 +179,13 @@ private func attachBorrowedTexture(
         driverWorkWake: thread?.driverWorkWake ?? Wake()
       )
     )
-    let attached = AttachedSession(
+    return AttachedSession(
       fixture: fixture,
       graphics: graphics,
       textures: textures,
-      session: created.session,
+      session: session,
       thread: thread
     )
-    return (attached, created)
   } catch {
     await destroy(textures, on: thread)
     thread?.stop()
@@ -362,8 +360,8 @@ private func attachBorrowedTexture(
       ),
       options: RenderSessionAttachOptions(driver: .coreWorker)
     )
-    defer { try? next.session.dispose() }
-    try await next.ready.value
+    defer { try? next.dispose() }
+    try await next.ready
   }
 }
 
@@ -372,9 +370,9 @@ private func attachBorrowedTexture(
 /// completes the attach and renders frames.
 @Test func aCallerDrivenSessionIsServicedOnAHostThread() async throws {
   let fixture = try await MapFixture.make()
-  let attachment: (AttachedSession, NewRenderSession)
+  let attached: AttachedSession
   do {
-    attachment = try await attachBorrowedTexture(
+    attached = try await attachBorrowedTexture(
       fixture: fixture,
       callerDriven: true
     )
@@ -382,13 +380,12 @@ private func attachBorrowedTexture(
     await fixture.close()
     throw error
   }
-  let (attached, created) = attachment
   try await attached.use { rendered in
     let thread = try #require(rendered.thread)
     let session = rendered.session
     #expect(try session.getSnapshot().state == .attaching)
     thread.service(session)
-    try await created.ready.value
+    try await session.ready
     #expect(try session.getCapabilities().driver == .callerGraphicsThread)
 
     // A demand that waits for the style's first update wakes the thread when

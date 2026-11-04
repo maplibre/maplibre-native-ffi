@@ -19,6 +19,7 @@ that the addon's trampoline converted, and which handle an owner adopts first.
 from __future__ import annotations
 
 import re
+import textwrap
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -35,7 +36,6 @@ from .typescript import (
     Lowered,
     NativeParameter,
     PublicParameter,
-    attachment_name,
     owner_native,
     scoped_name,
 )
@@ -538,7 +538,7 @@ def lower_attach(call: Call, values: Values, natives: NativeValues) -> Lowered:
     submit(call, values, natives)
     if len(plan.completion.immediate_owners) != 1 or plan.result or call.returned:
         raise Unsupported("attachment requires one immediate owner and void readiness")
-    lowered.shape, lowered.returns = "attach", attachment_name(lowered.owned)
+    lowered.shape, lowered.returns = "attach", owner_class(lowered.owned.handle)
     publish(call, values, natives, invoke(call, values))
     consume(lowered, None)
     return lowered
@@ -931,6 +931,8 @@ def construct(bound, entry: Lowered, owned, handle_expression: str) -> str:
             if entry.owner and first == owned.parent_parameter
             else parameter_name(owned.parent_parameter)
         )
+    if entry.shape == "attach":
+        arguments.append("ready")
     if entry.registrations:
         arguments.append("registrations")
     return f"adopt({handle_expression}, () => new {public}({', '.join(arguments)}), {disposer(owned.handle)})"
@@ -996,10 +998,8 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
         lines = [f"return query<{result}>({start});"]
     elif shape == "attach":
         assert entry.owned is not None
-        member = identifier(output_member(entry.owned.parameter))
         lines = [
-            f"const [{member}, ready] = attach({start}, (handle) => {construct(bound, entry, entry.owned, 'handle')});",
-            f"return {{ {member}, ready }};",
+            f"return attach({start}, (handle, ready) => {construct(bound, entry, entry.owned, 'handle')});",
         ]
     elif shape == "thread_start":
         arguments = ", ".join([*entry.arguments, "start"])
@@ -1104,6 +1104,9 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
             f"parent: {owner_class(bound.handles[handle.parent])}{absent}"
         )
         options.append("parent")
+    readied = bound.readied_handles.get(native)
+    if readied:
+        parameters.append("ready?: Promise<void>")
     parameters.append("registrations?: Registrations")
     options.append("registrations")
     if handle.abandon:
@@ -1119,7 +1122,22 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
     )
     text += f"  constructor({', '.join(parameters)}) {{\n"
     text += f'    super(key, handle, "{public}", {{ {", ".join(options)} }});\n'
+    if readied:
+        # A handle that no attach created, such as a borrowed one, is ready.
+        text += "    this.ready = ready ?? Promise.resolve();\n"
     text += "  }\n"
+    if readied:
+        summary = (
+            f"Settles once the {readied} is ready, and rejects with a "
+            f"`MaplibreError` when it fails to become ready. The {readied} "
+            "takes calls before then. A rejection that nothing awaits isn't "
+            "reported as unhandled."
+        )
+        text += (
+            "\n  /**\n"
+            + "".join(f"   * {line}\n" for line in textwrap.wrap(summary, 74))
+            + "   */\n  readonly ready: Promise<void>;\n"
+        )
     if native in bound.event_sources:
         # Redeclares the inherited ID only to document it for this handle.
         text += (
@@ -1189,29 +1207,6 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
     if discarding:
         text += "\n" + render_discarding(bound, values, public, discarding)
     return text
-
-
-def render_attachments(bound, lowered: list[Lowered]) -> list[str]:
-    chunks = {}
-    for entry in lowered:
-        if entry.shape != "attach":
-            continue
-        assert entry.owned is not None
-        name = attachment_name(entry.owned)
-        member = identifier(output_member(entry.owned.parameter))
-        chunks[name] = (
-            f"/** A new {member} and the completion that reports it ready. */\n"
-            f"export interface {name} {{\n"
-            f"  /** The {member}, which the caller owns before it is ready. */\n"
-            f"  readonly {member}: {owner_class(entry.owned.handle)};\n"
-            "  /**\n"
-            f"   * Settles once the {member} is ready. It rejects with a `MaplibreError`\n"
-            "   * when it fails to become ready, so await it or attach a rejection\n"
-            "   * handler: an unhandled rejection ends a Node process by default.\n"
-            "   */\n"
-            "  readonly ready: Promise<void>;\n}\n"
-        )
-    return [chunks[name] for name in sorted(chunks)]
 
 
 def render_views(bound, values: Values, lowered: list[Lowered]) -> list[str]:
@@ -1421,7 +1416,6 @@ def render_operations(
         chunks.append(
             render_owner(bound, values, native, handle, by_owner.get(native, []))
         )
-    chunks += render_attachments(bound, lowered)
     chunks += render_views(bound, values, lowered)
     chunks.append(render_adapters(bound, values, callbacks))
     body = "\n".join(chunk for chunk in chunks if chunk)

@@ -15,7 +15,7 @@ Future<void> createAMap() async {
   // #endregion runtime
 
   // #region map
-  final NewMap(:map, :ready) = runtime.createMap(
+  final map = runtime.createMap(
     const MapOptions(
       initialExtent: LogicalExtent(
         width: 800,
@@ -25,7 +25,7 @@ Future<void> createAMap() async {
       mapMode: MapMode.continuous,
     ),
   );
-  await ready;
+  await map.ready;
   // #endregion map
 
   // #region style

@@ -298,7 +298,6 @@
     "bindings/rust/crates/maplibre-native-ffi/src/generated/style_expression.rs",
     "bindings/rust/crates/maplibre-native-ffi/src/generated/values.rs",
     "bindings/rust/crates/maplibre-native-ffi/src/status.rs",
-    "bindings/swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift",

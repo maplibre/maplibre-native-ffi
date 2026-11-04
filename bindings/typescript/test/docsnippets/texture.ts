@@ -83,9 +83,8 @@ export async function renderToTexture(
     finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
   };
 
-  const borrowed = map.attachVulkanBorrowedTexture(ring, options);
-  session = borrowed.session;
-  await borrowed.ready;
+  session = map.attachVulkanBorrowedTexture(ring, options);
+  await session.ready;
   // #endregion attach-borrowed
 
   // #region resize-borrowed

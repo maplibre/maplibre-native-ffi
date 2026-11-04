@@ -123,12 +123,18 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
   Hashable, CustomStringConvertible
 {
   let handle: NativeHandleState<NativeMapHandle>
-  init(adopting raw: mln_map, parent: RuntimeHandle) throws {
+  private let readiness: Task<Void, Error>?
+  init(
+    adopting raw: mln_map,
+    parent: RuntimeHandle,
+    ready: Task<Void, Error>
+  ) throws {
     handle = try NativeHandleState(
       typeName: "MapHandle",
       handle: NativeMapHandle(raw: raw),
       parent: parent
     )
+    readiness = ready
   }
 
   init(borrowing raw: mln_map) throws {
@@ -137,6 +143,13 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
       handle: NativeMapHandle(raw: raw),
       borrowed: true
     )
+    readiness = nil
+  }
+
+  /// Returns once the map is ready, and throws a ``MaplibreError`` when it
+  /// fails to become ready. The map takes calls before then.
+  public var ready: Void {
+    get async throws { try await readiness?.value }
   }
 
   /// The native handle, which no later handle in the process reuses
@@ -285,12 +298,24 @@ public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver,
   Identifiable, Hashable, CustomStringConvertible
 {
   let handle: NativeHandleState<NativeRenderSessionHandle>
-  init(adopting raw: mln_render_session, parent: MapHandle) throws {
+  private let readiness: Task<Void, Error>?
+  init(
+    adopting raw: mln_render_session,
+    parent: MapHandle,
+    ready: Task<Void, Error>
+  ) throws {
     handle = try NativeHandleState(
       typeName: "RenderSessionHandle",
       handle: NativeRenderSessionHandle(raw: raw),
       parent: parent
     )
+    readiness = ready
+  }
+
+  /// Returns once the session is ready, and throws a ``MaplibreError`` when it
+  /// fails to become ready. The session takes calls before then.
+  public var ready: Void {
+    get async throws { try await readiness?.value }
   }
 
   /// The native handle, which no later handle in the process reuses.

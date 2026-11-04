@@ -81,10 +81,8 @@ def render_to_texture(
         final_layout=5,  # VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-    session, ready = map_handle.attach_vulkan_borrowed_texture(
-        ring, options
-    )
-    ready.result()
+    session = map_handle.attach_vulkan_borrowed_texture(ring, options)
+    session.ready.result()
     # #endregion attach-borrowed
 
     # #region resize-borrowed

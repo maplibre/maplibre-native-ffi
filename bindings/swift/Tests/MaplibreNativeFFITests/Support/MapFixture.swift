@@ -99,16 +99,16 @@ final class MapFixture: Sendable {
     on runtime: RuntimeHandle,
     extent: LogicalExtent = LogicalExtent(width: 8, height: 8, scaleFactor: 1)
   ) async throws -> MapHandle {
-    let created = try runtime.createMap(options: MapOptions(
+    let map = try runtime.createMap(options: MapOptions(
       initialExtent: extent
     ))
     do {
-      try await created.ready.value
+      try await map.ready
     } catch {
-      try? await created.map.close()
+      try? await map.close()
       throw error
     }
-    return created.map
+    return map
   }
 
   /// Closes the map, if the test left it open, and then the runtime, waiting

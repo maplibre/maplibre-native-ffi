@@ -90,7 +90,7 @@ final class TestGraphics: @unchecked Sendable {
     map: MapHandle,
     textures: [TestTexture],
     options: RenderSessionAttachOptions
-  ) throws -> NewRenderSession {
+  ) throws -> RenderSessionHandle {
     guard let info = textures.last?.info else {
       throw FixtureError("a borrowed ring needs a texture")
     }

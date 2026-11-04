@@ -21,7 +21,7 @@ def create_a_map() -> None:
     # #endregion runtime
 
     # #region map
-    map_handle, ready = runtime.create_map(
+    map_handle = runtime.create_map(
         mln.MapOptions(
             initial_extent=mln.LogicalExtent(
                 width=800, height=600, scale_factor=2.0
@@ -29,7 +29,7 @@ def create_a_map() -> None:
             map_mode=mln.MapMode.CONTINUOUS,
         )
     )
-    ready.result()
+    map_handle.ready.result()
     # #endregion map
 
     # #region style

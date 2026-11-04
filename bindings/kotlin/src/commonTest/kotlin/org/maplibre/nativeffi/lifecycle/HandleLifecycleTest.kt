@@ -83,8 +83,8 @@ class HandleLifecycleTest {
   @Test
   fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds() = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
-    val (map, ready) = runtime.createMap(smallMapOptions())
-    ready.awaitWithin("the map")
+    val map = runtime.createMap(smallMapOptions())
+    map.ready.awaitWithin("the map")
 
     // Native refuses to release a runtime with a live map, so the call throws and the runtime
     // stays usable.
@@ -105,9 +105,8 @@ class HandleLifecycleTest {
     val failure =
       assertFailsWith<IllegalStateException> {
         runtime.use {
-          val (created, ready) = it.createMap(smallMapOptions())
-          map = created
-          ready.awaitWithin("the map")
+          map = it.createMap(smallMapOptions())
+          map.ready.awaitWithin("the map")
           error("the block failure")
         }
       }
@@ -126,9 +125,8 @@ class HandleLifecycleTest {
 
     assertFailsWithStatus(Status.INVALID_STATE) {
       runtime.use {
-        val (created, ready) = it.createMap(smallMapOptions())
-        map = created
-        ready.awaitWithin("the map")
+        map = it.createMap(smallMapOptions())
+        map.ready.awaitWithin("the map")
       }
     }
 
@@ -146,8 +144,8 @@ class HandleLifecycleTest {
   @Test
   fun aHandleIdNamesItsEventsAndOutlivesRelease() = runSuspendTest {
     RuntimeFixture.use {
-      val (map, ready) = runtime.createMap(smallMapOptions())
-      ready.awaitWithin("the map")
+      val map = runtime.createMap(smallMapOptions())
+      map.ready.awaitWithin("the map")
       map.setStyleJson(EMPTY_STYLE_JSON).await()
       val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
       assertEquals(map.id, event.source)
@@ -182,8 +180,8 @@ class HandleLifecycleTest {
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
   private suspend fun mapWithUnreferencedRuntime(): Pair<MapHandle, TestWeakReference> {
     val runtime = RuntimeHandle.create(RuntimeOptions())
-    val (map, ready) = runtime.createMap(smallMapOptions())
-    ready.awaitWithin("the map")
+    val map = runtime.createMap(smallMapOptions())
+    map.ready.awaitWithin("the map")
     return map to TestWeakReference(runtime)
   }
 

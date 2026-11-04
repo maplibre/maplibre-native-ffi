@@ -9,7 +9,7 @@ void copyPixels(Uint8List data, int stride) {}
 
 Future<void> images(RuntimeHandle runtime) async {
   // #region map
-  final NewMap(:map, ready: mapReady) = runtime.createMap(
+  final map = runtime.createMap(
     const MapOptions(
       initialExtent: LogicalExtent(
         width: 800,
@@ -19,7 +19,7 @@ Future<void> images(RuntimeHandle runtime) async {
       mapMode: MapMode.static,
     ),
   );
-  await mapReady;
+  await map.ready;
   // #endregion map
 
   // #region style
@@ -29,17 +29,16 @@ Future<void> images(RuntimeHandle runtime) async {
   // #endregion style
 
   // #region attach
-  final NewRenderSession(:session, ready: sessionReady) = map
-      .attachOffscreen(
-        const OffscreenDescriptor(
-          logicalSize: LogicalSize(width: 800, height: 600),
-        ),
-        // The library renders on its own thread.
-        const RenderSessionAttachOptions(
-          driver: RenderDriverKind.coreWorker,
-        ),
-      );
-  await sessionReady;
+  final session = map.attachOffscreen(
+    const OffscreenDescriptor(
+      logicalSize: LogicalSize(width: 800, height: 600),
+    ),
+    // The library renders on its own thread.
+    const RenderSessionAttachOptions(
+      driver: RenderDriverKind.coreWorker,
+    ),
+  );
+  await session.ready;
   // #endregion attach
 
   // #region image
@@ -72,7 +71,7 @@ Future<void> imagesTile(
   int y,
 ) async {
   // #region tile
-  final NewMap(:map, :ready) = runtime.createMap(
+  final map = runtime.createMap(
     const MapOptions(
       initialExtent: LogicalExtent(
         width: 512,
@@ -82,7 +81,7 @@ Future<void> imagesTile(
       mapMode: MapMode.tile,
     ),
   );
-  await ready;
+  await map.ready;
 
   map.discarding.updateCamera(
     CameraUpdate(

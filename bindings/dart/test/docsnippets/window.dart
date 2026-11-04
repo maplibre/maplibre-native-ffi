@@ -85,7 +85,7 @@ Future<void> renderToWindow(
   NativePointer onDriverWorkWake,
 ) async {
   // #region attach
-  final attachment = map.attachVulkanSurface(
+  session = map.attachVulkanSurface(
     VulkanSurfaceDescriptor(
       // The window's size in logical pixels. The map's scale factor
       // turns it into pixels.
@@ -101,8 +101,7 @@ Future<void> renderToWindow(
       frameWake: Wake(callback: onFrameWake),
     ),
   );
-  session = attachment.session;
-  await attachment.ready;
+  await session.ready;
   // #endregion attach
 
   demandFrame();

@@ -605,10 +605,19 @@ export class MapHandle extends Owner {
     key: AdoptKey,
     handle: bigint,
     parent: RuntimeHandle | undefined,
+    ready?: Promise<void>,
     registrations?: Registrations,
   ) {
     super(key, handle, "MapHandle", { parent, registrations });
+    this.ready = ready ?? Promise.resolve();
   }
+
+  /**
+   * Settles once the map is ready, and rejects with a `MaplibreError` when it
+   * fails to become ready. The map takes calls before then. A rejection that
+   * nothing awaits isn't reported as unhandled.
+   */
+  readonly ready: Promise<void>;
 
   /**
    * The native handle value, which runtime events report as their
@@ -854,9 +863,9 @@ export class MapHandle extends Owner {
   attachMetalBorrowedTexture(
     descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_metal_borrowed_texture(
             this.id,
@@ -864,16 +873,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -890,9 +905,9 @@ export class MapHandle extends Owner {
   attachMetalSurface(
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_metal_surface(
             this.id,
@@ -900,16 +915,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -933,9 +954,9 @@ export class MapHandle extends Owner {
     descriptor: OffscreenDescriptor,
     options: RenderSessionAttachOptions,
     device?: OffscreenDeviceHandle,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_offscreen(
             this.id,
@@ -944,16 +965,22 @@ export class MapHandle extends Owner {
             device?.id,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -971,9 +998,9 @@ export class MapHandle extends Owner {
   attachOpenGlBorrowedTexture(
     descriptor: OpenGlBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_open_gl_borrowed_texture(
             this.id,
@@ -981,16 +1008,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -1007,9 +1040,9 @@ export class MapHandle extends Owner {
   attachOpenGlSurface(
     descriptor: OpenGlSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_open_gl_surface(
             this.id,
@@ -1017,16 +1050,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -1044,9 +1083,9 @@ export class MapHandle extends Owner {
   attachVulkanBorrowedTexture(
     descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_vulkan_borrowed_texture(
             this.id,
@@ -1054,16 +1093,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -1080,9 +1125,9 @@ export class MapHandle extends Owner {
   attachVulkanSurface(
     descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_vulkan_surface(
             this.id,
@@ -1090,16 +1135,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -1117,9 +1168,9 @@ export class MapHandle extends Owner {
   attachWebGpuBorrowedTexture(
     descriptor: WebGpuBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_web_gpu_borrowed_texture(
             this.id,
@@ -1127,16 +1178,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -1153,9 +1210,9 @@ export class MapHandle extends Owner {
   attachWebGpuSurface(
     descriptor: WebGpuSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): NewRenderSession {
-    return withRegistrations((registrations) => {
-      const [session, ready] = attach(
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
         (completion) =>
           native.mln_map_attach_web_gpu_surface(
             this.id,
@@ -1163,16 +1220,22 @@ export class MapHandle extends Owner {
             options,
             completion,
           ),
-        (handle) =>
+        (handle, ready) =>
           adopt(
             handle,
-            () => new RenderSessionHandle(ADOPT, handle, this, registrations),
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
             (disposed) =>
               native.mln_render_session_dispose(disposed, undefined, undefined),
           ),
-      );
-      return { session, ready };
-    });
+      ),
+    );
   }
 
   /**
@@ -3821,6 +3884,7 @@ export class RenderSessionHandle extends Owner {
     key: AdoptKey,
     handle: bigint,
     parent: MapHandle,
+    ready?: Promise<void>,
     registrations?: Registrations,
   ) {
     super(key, handle, "RenderSessionHandle", {
@@ -3828,7 +3892,15 @@ export class RenderSessionHandle extends Owner {
       registrations,
       session: true,
     });
+    this.ready = ready ?? Promise.resolve();
   }
+
+  /**
+   * Settles once the session is ready, and rejects with a `MaplibreError` when
+   * it fails to become ready. The session takes calls before then. A rejection
+   * that nothing awaits isn't reported as unhandled.
+   */
+  readonly ready: Promise<void>;
 
   /** The commands of this owner that discard their outcomes. */
   get discarding(): RenderSessionHandleDiscarding {
@@ -4828,18 +4900,17 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  createMap(options: MapOptions): NewMap {
-    const [map, ready] = attach(
+  createMap(options: MapOptions): MapHandle {
+    return attach(
       (completion) =>
         native.mln_runtime_create_map(this.id, options, completion),
-      (handle) =>
+      (handle, ready) =>
         adopt(
           handle,
-          () => new MapHandle(ADOPT, handle, this),
+          () => new MapHandle(ADOPT, handle, this, ready),
           (disposed) => native.mln_map_dispose(disposed, undefined),
         ),
     );
-    return { map, ready };
   }
 
   /**
@@ -5430,30 +5501,6 @@ export class StyleExpressionHandle extends Owner {
   }
 }
 defineDisposers(StyleExpressionHandle, undefined, "close");
-
-/** A new map and the completion that reports it ready. */
-export interface NewMap {
-  /** The map, which the caller owns before it is ready. */
-  readonly map: MapHandle;
-  /**
-   * Settles once the map is ready. It rejects with a `MaplibreError`
-   * when it fails to become ready, so await it or attach a rejection
-   * handler: an unhandled rejection ends a Node process by default.
-   */
-  readonly ready: Promise<void>;
-}
-
-/** A new session and the completion that reports it ready. */
-export interface NewRenderSession {
-  /** The session, which the caller owns before it is ready. */
-  readonly session: RenderSessionHandle;
-  /**
-   * Settles once the session is ready. It rejects with a `MaplibreError`
-   * when it fails to become ready, so await it or attach a rejection
-   * handler: an unhandled rejection ends a Node process by default.
-   */
-  readonly ready: Promise<void>;
-}
 
 /**
  * A `GpuSync` whose native objects stay valid only while the

@@ -102,6 +102,14 @@ def owner(bound, native, plans, factories, members, imports):
             f'@Suppress("unused") private val parent: {owner_name(bound.handles[handle.parent])}'
             + ("?" if borrowable else "")
         )
+    readied = bound.readied_handles.get(native)
+    if readied:
+        # A handle that no attach created, such as a borrowed one, is ready.
+        parameters.append(
+            f"/** Completes once the {readied} is ready, and fails with a [MaplibreException] "
+            f"when it fails to become ready. The {readied} takes calls before then. */\n"
+            "  public val ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit)"
+        )
     if borrowable:
         parameters.append("borrowed: Boolean = false")
     dispose = family[0].lower() + family[1:]

@@ -51,8 +51,8 @@ private func writeLog(_: LogSeverity, _: String) {}
     eventMask: [.mapStyleLoaded, .mapLoadingFailed]
   ))
   // #endregion mask
-  map = created.map
-  try await created.ready.value
+  map = created
+  try await created.ready
 
   // #region logs
   // Runs on a library thread, and can't call the library.

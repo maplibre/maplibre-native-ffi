@@ -27,8 +27,8 @@ Future<MapHandle> _mapWithoutItsRuntime(
       },
     ),
   );
-  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
-  await within(ready, 'map creation');
+  final map = runtime.createMap(testMapOptions());
+  await within(map.ready, 'map creation');
   return map;
 }
 

@@ -21,7 +21,6 @@ from .swift import (
     identifier,
     member_doc,
     method_name,
-    name,
     native_call,
     owner_type,
     receiver_native,
@@ -266,8 +265,8 @@ def discarded(plan: OperationPlan, call: Call) -> tuple[str, str | None]:
 
 
 def attached(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | None]:
-    """A completion that readies the owner it creates returns the owner and a
-    task that finishes once the owner is ready."""
+    """A completion that readies the owner it creates returns the owner, which
+    exposes a task that finishes once it is ready."""
     completion = plan.completion
     assert completion is not None
     if len(call.outputs) != 1 or len(completion.immediate_owners) != 1:
@@ -277,22 +276,11 @@ def attached(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | N
         )
     owned = completion.immediate_owners[0]
     public = owner_name(owned.handle)
-    result = "New" + name(owned.handle.stem)
-    member = camel(output_member(owned.parameter))
-    value_types.attachments[result] = (
-        f"/// A new {member} and the task that reports it ready.\n"
-        f"public struct {result}: Sendable {{\n"
-        f"  /// The {member}, which the caller owns before it is ready.\n"
-        f"  public let {member}: {public}\n"
-        f"  /// Finishes once the {member} is ready, and throws if it fails.\n"
-        "  public let ready: Task<Void, Error>\n"
-        "}\n"
-    )
     parent = ", parent: self" if owned.parent_parameter == plan.receiver else ""
     return (
-        f"""{call.doc_comment}{call.signature} throws -> {result} {{
+        f"""{call.doc_comment}{call.signature} throws -> {public} {{
   var value0: {owned.handle.native} = 0
-  return try nativeAttach(as: {result}.init) {{ raw, arena, completion, diagnostic in {call.call} }} adopt: {{ try {public}(adopting: value0{parent}) }}
+  return try nativeAttach {{ raw, arena, completion, diagnostic in {call.call} }} adopt: {{ ready in try {public}(adopting: value0{parent}, ready: ready) }}
 }}
 """,
         call.owner,

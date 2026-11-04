@@ -96,9 +96,9 @@ class AndroidHttpTransportTest {
         awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
         assertNull(server.requests("/revalidated.json")[0].headers["if-none-match"])
 
-        val (second, ready) = runtime.createMap(smallMapOptions())
+        val second = runtime.createMap(smallMapOptions())
         runThenRelease(listOf(second)) {
-          ready.awaitWithin("the second map")
+          second.ready.awaitWithin("the second map")
           second.setStyleUrl(url).awaitWithin("the second style command")
           awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
         }

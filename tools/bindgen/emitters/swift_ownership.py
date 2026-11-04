@@ -1,5 +1,7 @@
 """Render native ownership transitions for Swift handle wrappers."""
 
+import textwrap
+
 from ..model import Unsupported
 from ..names import camel
 
@@ -207,12 +209,39 @@ def owner_declarations(bound):
             if handle.native in bound.borrowed_handles
             else ""
         )
+        readied = bound.readied_handles.get(handle.native)
+        # The task holds only the completion, not this owner, so a pending
+        # readiness never keeps the owner alive. A handle that no attach
+        # created, such as a borrowed one, has none and is ready.
+        readiness = "  private let readiness: Task<Void, Error>?\n" if readied else ""
+        ready_parameter = ", ready: Task<Void, Error>" if readied else ""
+        ready_assignment = "    readiness = ready\n" if readied else ""
+        if readied:
+            borrow = borrow.replace(
+                "borrowed: true)\n", "borrowed: true)\n    readiness = nil\n", 1
+            )
+        ready_member = (
+            "".join(
+                f"  /// {line}\n"
+                for line in textwrap.wrap(
+                    f"Returns once the {readied} is ready, and throws a "
+                    "``MaplibreError`` when it fails to become ready. The "
+                    f"{readied} takes calls before then.",
+                    74,
+                )
+            )
+            + "  public var ready: Void {\n"
+            "    get async throws { try await readiness?.value }\n"
+            "  }\n"
+            if readied
+            else ""
+        )
         chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {{
   let handle: NativeHandleState<{raw}>
-  init(adopting raw: {handle.native}{parent}) throws {{
+{readiness}  init(adopting raw: {handle.native}{parent}{ready_parameter}) throws {{
     handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw){passed})
-  }}
-{borrow}{id_doc}  public var id: UInt64 {{ handle.value.raw }}
+{ready_assignment}  }}
+{borrow}{ready_member}{id_doc}  public var id: UInt64 {{ handle.value.raw }}
   /// Whether the binding has accepted a close, dispose, discard, or release
   /// of this handle.
   public var isClosed: Bool {{ handle.isClosed }}

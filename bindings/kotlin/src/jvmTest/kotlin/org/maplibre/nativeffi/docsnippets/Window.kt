@@ -120,7 +120,7 @@ private suspend fun renderToWindow(
   windowSurface: ULong,
 ) {
   // #region attach
-  val attachment =
+  session =
     map.attachVulkanSurface(
       VulkanSurfaceDescriptor(
         // The window's size in logical pixels. The map's scale factor
@@ -137,8 +137,7 @@ private suspend fun renderToWindow(
         frameWake = Wake(::onFrameWake),
       ),
     )
-  session = attachment.session
-  attachment.ready.await()
+  session.ready.await()
   // #endregion attach
 
   demandFrame()

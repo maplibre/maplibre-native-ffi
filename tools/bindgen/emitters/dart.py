@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import textwrap
 from collections import defaultdict
 from dataclasses import replace
 
@@ -10,12 +11,11 @@ from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS
 from tools.bindgen.model import Api, Lowered
-from tools.bindgen.names import camel, pascal, type_name
+from tools.bindgen.names import camel, type_name
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
     BoundApi,
     OperationPlan,
-    output_member,
 )
 
 from .dart_values import (
@@ -191,10 +191,6 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
     )
 
 
-def attachment_name(owned):
-    return "New" + pascal(owned.handle.stem)
-
-
 def _lower(api: Api | BoundApi):
     from .dart_operations import lower_function
 
@@ -329,6 +325,19 @@ def render_owner(native, handle, bodies, bound, roots):
             f"  {public}Discarding get discarding => {public}Discarding._(this);"
         )
     parameters.append(f"{native_type} handle")
+    readied = bound.readied_handles.get(native)
+    if readied:
+        parameters.append("this.ready")
+        summary = (
+            f"Completes once the {readied} is ready, and fails with a "
+            f"[MaplibreException] when it fails to become ready. The {readied} "
+            "takes calls before then. A failure that nothing awaits isn't "
+            "reported to the zone."
+        )
+        fields.append(
+            "".join(f"  /// {line}\n" for line in textwrap.wrap(summary, 74))
+            + "  final Future<void> ready;"
+        )
     return (
         "/// Issued native handle id.\n"
         f"extension type const {native_type}(int raw) implements NativeHandle {{}}\n\n"
@@ -343,6 +352,8 @@ def render_owner(native, handle, bodies, bound, roots):
         + (
             f"  {public}._borrowed({native_type} handle) : _state = NativeHandleState(handle, '{public}', borrowed: true)"
             + (", _callbackRoots = _globalCallbackRoots" if roots else "")
+            # A borrowed owner's handle is ready.
+            + (", ready = Future<void>.value()" if readied else "")
             + ";\n"
             if borrowable
             else ""
@@ -366,30 +377,6 @@ def render_owner(native, handle, bodies, bound, roots):
         + "".join(bodies)
         + "}\n"
     )
-
-
-def render_attachments(bound, generated):
-    """Pair each owner a call creates at once with the completion that
-    reports it ready."""
-    chunks = {}
-    for plan in bound.operations:
-        if plan.name not in generated or not plan.completion:
-            continue
-        for owned in plan.completion.immediate_owners:
-            name = attachment_name(owned)
-            field = camel(output_member(owned.parameter))
-            chunks[name] = (
-                f"/// A new {field} and the completion that reports it ready.\n"
-                f"final class {name} {{\n"
-                f"  const {name}(this.{field}, this.ready);\n\n"
-                f"  /// The {field}, which the caller owns before it is ready.\n"
-                f"  final {owner_names(owned.handle)[0]} {field};\n\n"
-                f"  /// Completes once the {field} is ready, or fails with its status.\n"
-                "  /// Await it or call `ignore()`, because the zone reports a failure\n"
-                "  /// that nothing handles.\n"
-                "  final Future<void> ready;\n}\n"
-            )
-    return [chunks[name] for name in sorted(chunks)]
 
 
 def lower(api: Api | BoundApi) -> Lowered:
@@ -478,7 +465,6 @@ def operations(bound, methods, generated, values, conversions) -> str:
                 native in values.root_owners,
             )
         )
-    chunks.extend(render_attachments(bound, generated))
     chunks.append(render_scoped_views(bound, generated, values))
     return "\n".join(chunks)
 

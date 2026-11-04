@@ -64,9 +64,8 @@ Future<void> renderToTexture(
     finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
   );
 
-  final borrowed = map.attachVulkanBorrowedTexture(ring, options);
-  session = borrowed.session;
-  await borrowed.ready;
+  session = map.attachVulkanBorrowedTexture(ring, options);
+  await session.ready;
   // #endregion attach-borrowed
 
   // #region resize-borrowed

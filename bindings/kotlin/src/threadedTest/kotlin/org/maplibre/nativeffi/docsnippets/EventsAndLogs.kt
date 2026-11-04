@@ -47,7 +47,7 @@ private suspend fun eventsAndLogs(runtime: RuntimeHandle) {
   // #endregion handler
 
   // #region mask
-  val (created, ready) =
+  val created =
     runtime.createMap(
       MapOptions(
         initialExtent =
@@ -63,7 +63,7 @@ private suspend fun eventsAndLogs(runtime: RuntimeHandle) {
     )
   // #endregion mask
   map = created
-  ready.await()
+  created.ready.await()
 
   // #region logs
   // Runs on a library thread, and can't call the library.

@@ -12,8 +12,8 @@ Future<void> closeRuntimes() async {
     await Future.wait(
       List.generate(2, (_) async {
         final runtime = RuntimeHandle.create();
-        final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
-        await ready;
+        final map = runtime.createMap(testMapOptions());
+        await map.ready;
         try {
           await runtime.close();
           throw StateError('runtime closed with a live map');
@@ -40,8 +40,8 @@ const _emptyStyle = {
 /// shutdown to finalize.
 Future<void> abandonHandles() async {
   final runtime = RuntimeHandle.create();
-  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
-  await ready;
+  final map = runtime.createMap(testMapOptions());
+  await map.ready;
   await map.setStyleJson(_emptyStyle);
   print('ABANDONED_HANDLES');
 }
@@ -51,12 +51,12 @@ Future<void> abandonHandles() async {
 /// process exits.
 Future<void> abandonSession() async {
   final runtime = RuntimeHandle.create();
-  final NewMap(:map, :ready) = runtime.createMap(
+  final map = runtime.createMap(
     MapOptions(
       initialExtent: LogicalExtent(width: 32, height: 32, scaleFactor: 1),
     ),
   );
-  await ready;
+  await map.ready;
   await map.setStyleJson({
     'version': 8,
     'sources': <String, Object?>{},
@@ -69,7 +69,7 @@ Future<void> abandonSession() async {
     ],
   });
   var frames = Completer<void>();
-  final attachment = map.attachOffscreen(
+  final session = map.attachOffscreen(
     OffscreenDescriptor(logicalSize: LogicalSize(width: 32, height: 32)),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
@@ -80,8 +80,7 @@ Future<void> abandonSession() async {
       ),
     ),
   );
-  final session = attachment.session;
-  await attachment.ready;
+  await session.ready;
   // A frame wake leaves the isolate free to finish, so a port keeps it alive
   // until a frame result arrives.
   final waiting = ReceivePort();
@@ -126,8 +125,8 @@ Future<void> exitWithLiveCallbacks() async {
       },
     ),
   );
-  final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
-  await ready;
+  final map = runtime.createMap(testMapOptions());
+  await map.ready;
   await map.setStyleUrl('shutdown://style');
   await served.future;
   print('LIVE_CALLBACKS');

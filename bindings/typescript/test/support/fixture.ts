@@ -178,9 +178,9 @@ export async function openRuntime(
     awaitEvent: (matches, what) => events.awaitEvent(matches, what),
     awaitEventType: (type, source) => events.awaitEventType(type, source),
     async openMap(options = mapOptions) {
-      const { map, ready } = runtime.createMap(options);
+      const map = runtime.createMap(options);
       teardown(() => closeIfLive(() => map.close()));
-      await bounded(ready, "map creation");
+      await bounded(map.ready, "map creation");
       return map;
     },
     async openStyledMap(style = emptyStyle(), options) {

@@ -108,25 +108,25 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
    * Runs a call that creates an owner in a pending state, such as a map creation or a render
    * session attach: [submit] receives an out slot and a completion, writes the new owner to the
    * slot at once, and reports readiness through the completion. A refused call throws before
-   * anything is adopted. Otherwise the owner is adopted as [adoptRegistered] does, or as [adopt]
-   * does when [callbacks] is null, and a render session is held for abandonment at process exit.
-   * [result] pairs the owner with the readiness.
+   * anything is adopted. Otherwise [create] receives the handle and its readiness, which the owner
+   * exposes, and the owner is adopted as [adoptRegistered] does, or as [adopt] does when
+   * [callbacks] is null. A render session is held for abandonment at process exit.
    */
-  fun <O, R> attach(
+  fun <O> attach(
     submit: (out: Long, completion: Long) -> Int,
     dispose: (Long) -> Unit,
-    create: (Long) -> O,
+    create: (Long, Deferred<Unit>) -> O,
     callbacks: ((O) -> CallbackOwner)?,
     drop: (O) -> Unit,
-    result: (O, Deferred<Unit>) -> R,
-  ): R {
+  ): O {
     val out = allocate(8)
     val ready = CompletionBridge.unit(this) { completion -> check(submit(out, completion)) }
+    val withReady: (Long) -> O = { create(it, ready) }
     val owner =
-      if (callbacks == null) adopt(out, dispose, create)
-      else adoptRegistered(out, dispose, create, callbacks, drop)
+      if (callbacks == null) adopt(out, dispose, withReady)
+      else adoptRegistered(out, dispose, withReady, callbacks, drop)
     if (owner is RenderSessionHandle) endGraphicsAtExit(owner.binding)
-    return result(owner, ready)
+    return owner
   }
 
   /**

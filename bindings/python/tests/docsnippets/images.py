@@ -10,7 +10,7 @@ def copy_pixels(data: bytes, stride: int) -> None:
 
 def images(runtime: mln.RuntimeHandle) -> None:
     # #region map
-    map_handle, map_ready = runtime.create_map(
+    map_handle = runtime.create_map(
         mln.MapOptions(
             initial_extent=mln.LogicalExtent(
                 width=800, height=600, scale_factor=2.0
@@ -18,7 +18,7 @@ def images(runtime: mln.RuntimeHandle) -> None:
             map_mode=mln.MapMode.STATIC,
         )
     )
-    map_ready.result()
+    map_handle.ready.result()
     # #endregion map
 
     # #region style
@@ -28,7 +28,7 @@ def images(runtime: mln.RuntimeHandle) -> None:
     # #endregion style
 
     # #region attach
-    session, session_ready = map_handle.attach_offscreen(
+    session = map_handle.attach_offscreen(
         mln.OffscreenDescriptor(
             logical_size=mln.LogicalSize(width=800, height=600)
         ),
@@ -37,7 +37,7 @@ def images(runtime: mln.RuntimeHandle) -> None:
             driver=mln.RenderDriverKind.CORE_WORKER
         ),
     )
-    session_ready.result()
+    session.ready.result()
     # #endregion attach
 
     # #region image
@@ -67,7 +67,7 @@ def images_tile(
     runtime: mln.RuntimeHandle, z: int, x: int, y: int
 ) -> None:
     # #region tile
-    map_handle, ready = runtime.create_map(
+    map_handle = runtime.create_map(
         mln.MapOptions(
             initial_extent=mln.LogicalExtent(
                 width=512, height=512, scale_factor=1.0
@@ -75,7 +75,7 @@ def images_tile(
             map_mode=mln.MapMode.TILE,
         )
     )
-    ready.result()
+    map_handle.ready.result()
 
     map_handle.discarding.update_camera(
         mln.CameraUpdate(

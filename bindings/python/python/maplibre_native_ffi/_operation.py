@@ -27,10 +27,11 @@ class GeneratedOperations:
                     setattr(cls, name, method)
 
 
-def _adopt_value(raw, owner, parent=None):
+def _adopt_value(raw, owner, parent=None, ready=None):
     from . import _generated_owners
 
-    return getattr(_generated_owners, owner)._from_native(raw, parent)
+    adopt = getattr(_generated_owners, owner)._from_native
+    return adopt(raw, parent) if ready is None else adopt(raw, parent, ready)
 
 
 def _answer(owner, call):

@@ -17,7 +17,6 @@ import {
   RenderDriverKind,
   type RenderFrameResult,
   RenderResult,
-  type NewRenderSession,
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
   supportedRenderBackendMask,
@@ -175,7 +174,7 @@ function attachBorrowedTexture(
   context: GraphicsContext,
   map: MapHandle,
   options: RenderSessionAttachOptions,
-): NewRenderSession {
+): RenderSessionHandle {
   const texture = addon.textureCreate(context.graphics, renderSize, renderSize);
   teardown(() => addon.textureDestroy(texture.texture));
   const ring = {
@@ -276,13 +275,13 @@ function attachBorrowedTexture(
 export function attachSession(
   map: MapHandle,
   options: Partial<RenderSessionAttachOptions>,
-): NewRenderSession {
-  const attachment = map.attachOffscreen(
+): RenderSessionHandle {
+  const session = map.attachOffscreen(
     { logicalSize: renderLogicalSize },
     { driver: RenderDriverKind.coreWorker, ...options },
   );
-  teardown(() => releaseSession(attachment.session));
-  return attachment;
+  teardown(() => releaseSession(session));
+  return session;
 }
 
 /**
@@ -292,16 +291,34 @@ export function attachSession(
 export function attachVulkanSession(
   map: MapHandle,
   options: Partial<RenderSessionAttachOptions>,
-): NewRenderSession {
+): RenderSessionHandle {
   if (backend !== "vulkan") {
     throw new Error(`a ${backend} build has no Vulkan textures`);
   }
-  const attachment = attachBorrowedTexture(openGraphics(), map, {
+  const session = attachBorrowedTexture(openGraphics(), map, {
     driver: RenderDriverKind.coreWorker,
     ...options,
   });
-  teardown(() => releaseSession(attachment.session));
-  return attachment;
+  teardown(() => releaseSession(session));
+  return session;
+}
+
+/**
+ * Starts attaching a borrowed texture that this thread drives, and releases
+ * the session in a teardown. The attach finishes only as this thread services
+ * the session.
+ */
+export function attachCallerSession(map: MapHandle): RenderSessionHandle {
+  const context = openGraphics();
+  const openGl = backend === "egl" || backend === "wgl" || backend === "webgl";
+  if (openGl && !addon.makeCurrent(context.graphics)) {
+    throw new Error("the test graphics context could not be made current");
+  }
+  const session = attachBorrowedTexture(context, map, {
+    driver: RenderDriverKind.callerGraphicsThread,
+  });
+  teardown(() => releaseSession(session));
+  return session;
 }
 
 /**
@@ -420,11 +437,11 @@ export class TestSession {
   /** Attaches an offscreen worker session on `map`, released by a teardown. */
   static async offscreen(map: MapHandle): Promise<TestSession> {
     const wake = new AwaitableWake();
-    const { session, ready } = attachSession(map, {
+    const session = attachSession(map, {
       frameWake: { callback: wake.wake },
     });
     const attached = new TestSession(session, wake, false);
-    await attached.settle(ready, "the attachment");
+    await attached.settle(session.ready, "the attachment");
     return attached;
   }
 
@@ -445,7 +462,7 @@ export class TestSession {
       throw new Error("the test graphics context could not be made current");
     }
     const wake = new AwaitableWake();
-    const { session, ready } = attachBorrowedTexture(context, map, {
+    const session = attachBorrowedTexture(context, map, {
       driver: serviced
         ? RenderDriverKind.callerGraphicsThread
         : RenderDriverKind.coreWorker,
@@ -454,7 +471,7 @@ export class TestSession {
     });
     teardown(() => releaseSession(session));
     const attached = new TestSession(session, wake, serviced);
-    await attached.settle(ready, "the attachment");
+    await attached.settle(session.ready, "the attachment");
     return attached;
   }
 

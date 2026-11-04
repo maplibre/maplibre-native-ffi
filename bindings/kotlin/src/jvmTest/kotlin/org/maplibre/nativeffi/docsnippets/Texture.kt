@@ -95,9 +95,8 @@ private suspend fun renderToTexture(
       finalLayout = 5u, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-  val borrowed = map.attachVulkanBorrowedTexture(ring, options)
-  session = borrowed.session
-  borrowed.ready.await()
+  session = map.attachVulkanBorrowedTexture(ring, options)
+  session.ready.await()
   // #endregion attach-borrowed
 
   drawFrame()

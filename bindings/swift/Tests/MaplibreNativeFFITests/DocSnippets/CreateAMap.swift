@@ -18,7 +18,7 @@ private func createAMap() async throws {
   // #endregion runtime
 
   // #region map
-  let created = try runtime.createMap(options: MapOptions(
+  let map = try runtime.createMap(options: MapOptions(
     initialExtent: LogicalExtent(
       width: 800,
       height: 600,
@@ -26,8 +26,7 @@ private func createAMap() async throws {
     ),
     mapMode: .continuous
   ))
-  let map = created.map
-  try await created.ready.value
+  try await map.ready
   // #endregion map
 
   // #region style
