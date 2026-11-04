@@ -1,6 +1,8 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
+  AndroidSurfaceDescriptor,
+  AndroidSurfaceReplacement,
   BoundOptions,
   CacheDatabaseOperation,
   CameraDelta,
@@ -132,6 +134,33 @@ import {
 } from "./internal/realm.ts";
 
 /**
+ * Creates a frame pacer that follows the display through the calling thread's
+ * looper.
+ *
+ * Call it on a thread with an `ALooper`, such as the app's main thread. The
+ * pacer demands frames from that thread at the display refreshes that the
+ * looper's `AChoreographer` reports, so keep the thread running its looper
+ * while sessions use the pacer.
+ *
+ * See `mln_android_frame_pacer_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.invalidState` when the calling thread has no `ALooper`.
+ */
+export function androidFramePacerCreate(
+  options?: FramePacerOptions,
+): FramePacerHandle {
+  const handle = native.mln_android_frame_pacer_create(options);
+  return adopt(
+    handle,
+    () => new FramePacerHandle(ADOPT, handle),
+    (disposed) => native.mln_frame_pacer_release(disposed, undefined),
+  );
+}
+
+/**
  * Returns the API epoch of the library.
  *
  * Headers and a library with different epochs aren't compatible.
@@ -203,6 +232,19 @@ export function getNetworkStatus(): NetworkStatus {
  */
 export function getPluginRegisterFunctionV1(): bigint {
   return native.mln_plugin_get_register_function_v1();
+}
+
+/**
+ * Gives the library the Java VM and the app context that it needs on Android.
+ *
+ * Call it before creating a runtime. `jniEnv` is the calling thread's
+ * `JNIEnv*`, and `context` is an Android `Context`, such as the application.
+ *
+ * See `mln_android_init` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+export function initAndroid(jniEnv: bigint, context: bigint): void {
+  native.mln_android_init(jniEnv, context);
 }
 
 /**
@@ -915,6 +957,68 @@ export class MapHandle extends Owner {
         native.mln_map_apply_camera_delta(this.id, delta, completion);
         registrations.commit(rootsOf(this));
       }),
+    );
+  }
+
+  /**
+   * Creates a session that presents the map to an Android window, with a
+   * graphics context that the library creates.
+   *
+   * The build's render backend decides the context. A Vulkan build presents
+   * with `device`, or, when `device` is null, with a device that the library
+   * creates with presentation and shares between these sessions. An OpenGL
+   * build creates an EGL context on the default display, and `device` must be
+   * null. Attach with `RenderDriverKind.coreWorker`, since the context belongs
+   * to the library.
+   *
+   * Before the platform destroys the window, such as in
+   * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+   * `RenderSessionHandle.releaseTarget()` and wait for that to complete. The
+   * session's reference keeps the window, but not its buffers.
+   *
+   * See `mln_map_attach_android_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `surface` has no window, such as after the
+   *   platform destroyed it.
+   * - `Status.unsupported` when `device` can't present, because you created it
+   *   without `VulkanDeviceOptions.presentation`.
+   * - `Status.unsupported` when the GPU or the Vulkan loader can't present.
+   * - `Status.nativeError` when the library can't create the graphics context
+   *   or the window's surface.
+   */
+  attachAndroidSurface(
+    descriptor: AndroidSurfaceDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_android_surface(
+            this.id,
+            descriptor,
+            device?.id,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
     );
   }
 
@@ -4587,6 +4691,39 @@ export class RenderSessionHandle extends Owner {
    */
   serviceDriverWork(): void {
     native.mln_render_session_service_driver_work(this.id);
+  }
+
+  /**
+   * Replaces the Android window that the session presents to.
+   *
+   * Use it to give the session a window again after
+   * `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old window. A replacement with the window and logical size that the session
+   * presents to already changes nothing.
+   *
+   * See `mln_render_session_set_android_surface_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `surface` has no window, such as after the
+   *   platform destroyed it.
+   * - `Status.unsupported` when, in a Vulkan build, the new window needs a
+   *   different color format or pre-rotation support than the old one. Attach a
+   *   new session instead.
+   * - `Status.nativeError` when the library can't create the window's surface.
+   */
+  setAndroidSurfaceTarget(
+    replacement: AndroidSurfaceReplacement,
+  ): Promise<void> {
+    return run((completion) =>
+      native.mln_render_session_set_android_surface_target(
+        this.id,
+        replacement,
+        completion,
+      ),
+    );
   }
 
   /**

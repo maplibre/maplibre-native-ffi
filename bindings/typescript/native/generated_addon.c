@@ -239,6 +239,66 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_android_frame_pacer_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_frame_pacer_options arg_options;
+  const void* present_options = NULL;
+  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_frame_pacer_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_android_frame_pacer_create(
+    present_options, &arg_out_pacer, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_android_init(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  void* arg_jni_env = NULL;
+  void* arg_context = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "jniEnv")) goto done;
+    arg_jni_env = (void*)(uintptr_t)number;
+  }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[1], &number, "context")) goto done;
+    arg_context = (void*)(uintptr_t)number;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_android_init(arg_jni_env, arg_context, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_c_version(
   napi_env env, napi_callback_info info
 ) {
@@ -778,6 +838,60 @@ static napi_value mln_ts_export_mln_map_apply_camera_delta(
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_attach_android_surface(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_android_surface_descriptor arg_descriptor;
+  uint64_t arg_device = 0;
+  mln_render_session_attach_options arg_options;
+  mln_render_session arg_out_session = MLN_HANDLE_NULL;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 5)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
+  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
+  if (!mln_ts_write_android_surface_descriptor(
+        call, call->argv[1], &arg_descriptor, "descriptor"
+      ))
+    goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
+  }
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
+  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
+  if (!mln_ts_write_render_session_attach_options(
+        call, call->argv[3], &arg_options, "options"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[4], false, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_attach_android_surface(
+    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
+    present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
 done:
   return mln_ts_end(call);
 }
@@ -5322,6 +5436,45 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_render_session_set_android_surface_target(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_android_surface_replacement arg_replacement;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  memset(&arg_replacement, 0, sizeof arg_replacement);
+  arg_replacement.size = sizeof arg_replacement;
+  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
+  if (!mln_ts_write_android_surface_replacement(
+        call, call->argv[1], &arg_replacement, "replacement"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_render_session_set_android_surface_target(
+    arg_session, &arg_replacement, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_render_session_set_frame_pacer(
   napi_env env, napi_callback_info info
 ) {
@@ -7130,6 +7283,9 @@ static const mln_ts_export exports[] = {
   {"mln_acquired_frame_view_begin",
    mln_ts_export_mln_acquired_frame_view_begin},
   {"mln_acquired_frame_view_end", mln_ts_export_mln_acquired_frame_view_end},
+  {"mln_android_frame_pacer_create",
+   mln_ts_export_mln_android_frame_pacer_create},
+  {"mln_android_init", mln_ts_export_mln_android_init},
   {"mln_c_version", mln_ts_export_mln_c_version},
   {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
   {"mln_frame_pacer_release", mln_ts_export_mln_frame_pacer_release},
@@ -7157,6 +7313,8 @@ static const mln_ts_export exports[] = {
   {"mln_map_add_style_source_json",
    mln_ts_export_mln_map_add_style_source_json},
   {"mln_map_apply_camera_delta", mln_ts_export_mln_map_apply_camera_delta},
+  {"mln_map_attach_android_surface",
+   mln_ts_export_mln_map_attach_android_surface},
   {"mln_map_attach_metal_borrowed_texture",
    mln_ts_export_mln_map_attach_metal_borrowed_texture},
   {"mln_map_attach_metal_surface", mln_ts_export_mln_map_attach_metal_surface},
@@ -7348,6 +7506,8 @@ static const mln_ts_export exports[] = {
   {"mln_render_session_resize", mln_ts_export_mln_render_session_resize},
   {"mln_render_session_service_driver_work",
    mln_ts_export_mln_render_session_service_driver_work},
+  {"mln_render_session_set_android_surface_target",
+   mln_ts_export_mln_render_session_set_android_surface_target},
   {"mln_render_session_set_frame_pacer",
    mln_ts_export_mln_render_session_set_frame_pacer},
   {"mln_render_session_set_metal_borrowed_texture_target",

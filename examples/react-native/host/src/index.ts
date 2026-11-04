@@ -10,12 +10,7 @@ export {
 
 /** What a view's surface is, as handles for the binding. */
 export type SurfaceHandles =
-  | {
-      readonly kind: "egl";
-      readonly display: bigint;
-      readonly config: bigint;
-      readonly surface: bigint;
-    }
+  | { readonly kind: "android"; readonly window: bigint }
   | { readonly kind: "metal"; readonly layer: bigint };
 
 /**

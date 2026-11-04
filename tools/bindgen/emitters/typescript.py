@@ -97,16 +97,12 @@ def scoped_name(native: str) -> str:
     return "Scoped" + public_name(native)
 
 
-# The platforms that the Node-API addon builds for, and the browser module's.
-# Every entry point shares one operations module, so it leaves out only what
-# none of them can use.
-TARGETS = frozenset({"linux", "macos", "ohos", "web"})
-
-
 def lower_operations(api: Api | BoundApi):
     from .typescript_operations import lower_function
 
-    bound = compile_api(api, TARGETS)
+    # Every entry point shares one operations module. Between them, the Node-API
+    # addon, the browser module, ArkTS, and Hermes serve every platform.
+    bound = compile_api(api)
     values = Values(bound)
     natives = NativeValues(values)
     lowered: list[Lowered] = []
