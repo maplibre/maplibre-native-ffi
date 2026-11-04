@@ -241,8 +241,7 @@ private func attachBorrowedTexture(
       )
     )
     try await map.addStyleLayerJson(
-      #"{"id": "dots", "type": "circle", "source": "custom"}"#,
-      beforeLayerId: ""
+      #"{"id": "dots", "type": "circle", "source": "custom"}"#
     )
     // The map asks for its tiles as it renders.
     for _ in 0 ..< 32 where calls.value.isEmpty {

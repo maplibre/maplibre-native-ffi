@@ -87,7 +87,7 @@ class RenderSessionTest {
         "the source",
       )
       complete(
-        map.addStyleLayerJson("""{"id":"dots","type":"circle","source":"custom"}""", ""),
+        map.addStyleLayerJson("""{"id":"dots","type":"circle","source":"custom"}"""),
         "the layer",
       )
       renderUntil("a tile fetch") { calls.load().isNotEmpty() }

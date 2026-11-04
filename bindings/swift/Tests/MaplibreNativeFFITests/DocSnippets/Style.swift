@@ -90,7 +90,7 @@ private func style(map: MapHandle, pixels: Data) async throws {
     "source": "points",
     "layout": {"icon-image": "marker"}
   }
-  """, beforeLayerId: "")
+  """)
   // #endregion image
 }
 

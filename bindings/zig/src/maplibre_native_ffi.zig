@@ -307,7 +307,7 @@ pub const Map = struct {
     ///   layer's ID.
     /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
     ///   describes.
-    pub fn addStyleLayerJson(self: Map, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    pub fn addStyleLayerJson(self: Map, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_style_layer_json", .handle, self, call.command, null, diagnostic, .{ layer_json, before_layer_id });
     }
 
@@ -866,7 +866,7 @@ pub const Map = struct {
     ///   `before_layer_id`.
     /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
     ///   describes.
-    pub fn moveStyleLayer(self: Map, layer_id: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    pub fn moveStyleLayer(self: Map, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_move_style_layer", .handle, self, call.command, null, diagnostic, .{ layer_id, before_layer_id });
     }
 
@@ -8287,7 +8287,7 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_add_image_source_image", .handle, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len, image });
     }
 
-    pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn addStyleLayerJson(self: MapDiscarding, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_add_style_layer_json", .handle, map, null, diagnostic, .{ layer_json, before_layer_id });
     }
@@ -8357,7 +8357,7 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_invalidate_custom_vector_source_tile", .handle, map, null, diagnostic, .{ source_id, tile_id });
     }
 
-    pub fn moveStyleLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn moveStyleLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_move_style_layer", .handle, map, null, diagnostic, .{ layer_id, before_layer_id });
     }

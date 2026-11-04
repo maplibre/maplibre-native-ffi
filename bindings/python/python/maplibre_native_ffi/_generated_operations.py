@@ -404,7 +404,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_image_source_image(source_id, coordinates, image)
 
     def add_style_layer_json(
-        self, layer_json: Any, before_layer_id: str
+        self, layer_json: Any, before_layer_id: str | None = None
     ) -> Future[CommandCompletion]:
         """Adds a layer to the map's style.
 
@@ -1074,7 +1074,7 @@ class _MapHandleOperations(GeneratedOperations):
         )
 
     def move_style_layer(
-        self, layer_id: str, before_layer_id: str
+        self, layer_id: str, before_layer_id: str | None = None
     ) -> Future[CommandCompletion]:
         """Moves a layer of the map's style below the layer named
         `before_layer_id`, or above every layer when `before_layer_id` is
@@ -3034,7 +3034,9 @@ class MapHandleDiscarding:
             source_id, coordinates, image
         )
 
-    def add_style_layer_json(self, layer_json: Any, before_layer_id: str) -> None:
+    def add_style_layer_json(
+        self, layer_json: Any, before_layer_id: str | None = None
+    ) -> None:
         """Adds a layer to the map's style.
 
         `layer_json` is a
@@ -3209,7 +3211,9 @@ class MapHandleDiscarding:
             source_id, tile_id
         )
 
-    def move_style_layer(self, layer_id: str, before_layer_id: str) -> None:
+    def move_style_layer(
+        self, layer_id: str, before_layer_id: str | None = None
+    ) -> None:
         """Moves a layer of the map's style below the layer named
         `before_layer_id`, or above every layer when `before_layer_id` is
         empty.

@@ -3578,15 +3578,18 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     );
   });
-  void addStyleLayerJson(Object? layerJson, String beforeLayerId) => _discard(
-    (arena, completion) => raw.mln_map_add_style_layer_json(
-      _handle.raw,
-      _nativeJsonView(layerJson, arena),
-      nativeStringView(beforeLayerId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
+  void addStyleLayerJson(Object? layerJson, {String? beforeLayerId}) =>
+      _discard(
+        (arena, completion) => raw.mln_map_add_style_layer_json(
+          _handle.raw,
+          _nativeJsonView(layerJson, arena),
+          beforeLayerId == null
+              ? arena<raw.mln_buffer_view>().ref
+              : nativeStringView(beforeLayerId, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
+      );
   void addStyleSourceJson(String sourceId, Object? sourceJson) => _discard(
     (arena, completion) => raw.mln_map_add_style_source_json(
       _handle.raw,
@@ -3726,11 +3729,13 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void moveStyleLayer(String layerId, String beforeLayerId) => _discard(
+  void moveStyleLayer(String layerId, {String? beforeLayerId}) => _discard(
     (arena, completion) => raw.mln_map_move_style_layer(
       _handle.raw,
       nativeStringView(layerId, arena).value,
-      nativeStringView(beforeLayerId, arena).value,
+      beforeLayerId == null
+          ? arena<raw.mln_buffer_view>().ref
+          : nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -4257,13 +4262,15 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.invalidState` while the style isn't loaded, as
   ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addStyleLayerJson(
-    Object? layerJson,
-    String beforeLayerId,
-  ) => _command(
+    Object? layerJson, {
+    String? beforeLayerId,
+  }) => _command(
     (arena, completion) => raw.mln_map_add_style_layer_json(
       _handle.raw,
       _nativeJsonView(layerJson, arena),
-      nativeStringView(beforeLayerId, arena).value,
+      beforeLayerId == null
+          ? arena<raw.mln_buffer_view>().ref
+          : nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -5231,13 +5238,15 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// - `Status.invalidState` while the style isn't loaded, as
   ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> moveStyleLayer(
-    String layerId,
-    String beforeLayerId,
-  ) => _command(
+    String layerId, {
+    String? beforeLayerId,
+  }) => _command(
     (arena, completion) => raw.mln_map_move_style_layer(
       _handle.raw,
       nativeStringView(layerId, arena).value,
-      nativeStringView(beforeLayerId, arena).value,
+      beforeLayerId == null
+          ? arena<raw.mln_buffer_view>().ref
+          : nativeStringView(beforeLayerId, arena).value,
       completion,
       nativeDiagnostic,
     ),

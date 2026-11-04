@@ -249,14 +249,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// describes.</description></item>
     /// </list>
     /// </remarks>
-    public Task<CommandCompletion> AddStyleLayerJsonAsync(string layerJson, string beforeLayerId)
+    public Task<CommandCompletion> AddStyleLayerJsonAsync(
+        string layerJson,
+        string? beforeLayerId = null
+    )
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_style_layer_json(
             Handle,
             scope.Utf8(layerJson),
-            scope.Utf8(beforeLayerId),
+            beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1573,14 +1576,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// describes.</description></item>
     /// </list>
     /// </remarks>
-    public Task<CommandCompletion> MoveStyleLayerAsync(string layerId, string beforeLayerId)
+    public Task<CommandCompletion> MoveStyleLayerAsync(string layerId, string? beforeLayerId = null)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_move_style_layer(
             Handle,
             scope.Utf8(layerId),
-            scope.Utf8(beforeLayerId),
+            beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2764,7 +2767,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddStyleLayerJson(string layerJson, string beforeLayerId)
+        public void AddStyleLayerJson(string layerJson, string? beforeLayerId = null)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2772,7 +2775,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_add_style_layer_json(
                     receiverHandle,
                     scope.Utf8(layerJson),
-                    scope.Utf8(beforeLayerId),
+                    beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
                     null,
                     Diagnostic
                 )
@@ -2964,7 +2967,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void MoveStyleLayer(string layerId, string beforeLayerId)
+        public void MoveStyleLayer(string layerId, string? beforeLayerId = null)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -2972,7 +2975,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_move_style_layer(
                     receiverHandle,
                     scope.Utf8(layerId),
-                    scope.Utf8(beforeLayerId),
+                    beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
                     null,
                     Diagnostic
                 )

@@ -960,8 +960,8 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json MLN_BINDING("encoding=json"),
-  mln_buffer_view before_layer_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
+  mln_buffer_view before_layer_id MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1007,7 +1007,8 @@ MLN_API mln_status mln_map_list_style_layers(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_move_style_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
+  mln_map map, mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

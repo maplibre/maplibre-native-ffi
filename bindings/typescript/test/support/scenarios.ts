@@ -51,7 +51,7 @@ export async function routeRequests(
     "a command",
   );
   await bounded(
-    map.addStyleLayerJson({ id: "fill", type: "fill", source: "custom" }, ""),
+    map.addStyleLayerJson({ id: "fill", type: "fill", source: "custom" }),
     "a command",
   );
   const worker = await TestSession.offscreen(map);

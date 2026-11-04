@@ -31,7 +31,7 @@ async fn style(map: &MapHandle, pixels: &[u8]) -> Result<()> {
     // Draw the layer under the "countries-label" layer.
     map.discarding().add_style_layer_json(
         r#"{"id":"satellite","type":"raster","source":"satellite"}"#,
-        "countries-label",
+        Some("countries-label"),
     )?;
     // #endregion add
 
@@ -81,7 +81,7 @@ async fn style(map: &MapHandle, pixels: &[u8]) -> Result<()> {
             "source": "points",
             "layout": {"icon-image": "marker"}
         }"#,
-        "",
+        None,
     )?;
     // #endregion image
 

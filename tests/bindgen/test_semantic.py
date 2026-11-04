@@ -839,6 +839,20 @@ mln_status copy_values(
             ):
                 bind(self.parse(source), require_complete=True)
 
+    def test_only_text_is_nullable_among_values_passed_by_value(self):
+        # A binding passes an empty view for absent text; no other value that C
+        # passes by value has an absent state.
+        for parameter in (
+            'double value BIND("nullable=true")',
+            'mln_buffer_view value BIND("encoding=bytes;nullable=true")',
+        ):
+            source = f"mln_status write({parameter}, mln_diagnostic *out_diagnostic);"
+            with (
+                self.subTest(parameter=parameter),
+                self.assertRaisesRegex(ModelError, "requires a text view"),
+            ):
+                bind(self.parse(source), require_complete=True)
+
     def test_a_nullable_handle_output_is_absent_when_null(self):
         model = bind(
             parse(groups=("absent_handle", "strided_records")), require_complete=True

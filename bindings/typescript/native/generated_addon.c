@@ -665,10 +665,12 @@ static napi_value mln_ts_export_mln_map_add_style_layer_json(
   }
   if (!mln_ts_read_json_view(call, call->argv[1], &arg_layer_json, "layerJson"))
     goto done;
-  if (!mln_ts_read_text_view(
-        call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
-      ))
-    goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    if (!mln_ts_read_text_view(
+          call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
+        ))
+      goto done;
+  }
   if (!mln_ts_read_completion(
         call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
@@ -2404,10 +2406,12 @@ static napi_value mln_ts_export_mln_map_move_style_layer(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
     goto done;
-  if (!mln_ts_read_text_view(
-        call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
-      ))
-    goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    if (!mln_ts_read_text_view(
+          call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
+        ))
+      goto done;
+  }
   if (!mln_ts_read_completion(
         call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))

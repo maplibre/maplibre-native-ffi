@@ -773,7 +773,7 @@ export class MapHandle extends Owner {
    */
   addStyleLayerJson(
     layerJson: unknown,
-    beforeLayerId: string,
+    beforeLayerId?: string,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_add_style_layer_json(
@@ -1824,7 +1824,7 @@ export class MapHandle extends Owner {
    */
   moveStyleLayer(
     layerId: string,
-    beforeLayerId: string,
+    beforeLayerId?: string,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_move_style_layer(
@@ -2749,7 +2749,7 @@ export class MapHandleDiscarding {
    * See `mln_map_add_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addStyleLayerJson(layerJson: unknown, beforeLayerId: string): void {
+  addStyleLayerJson(layerJson: unknown, beforeLayerId?: string): void {
     native.mln_map_add_style_layer_json(
       this.#owner.id,
       layerJson,
@@ -2998,7 +2998,7 @@ export class MapHandleDiscarding {
    * See `mln_map_move_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  moveStyleLayer(layerId: string, beforeLayerId: string): void {
+  moveStyleLayer(layerId: string, beforeLayerId?: string): void {
     native.mln_map_move_style_layer(
       this.#owner.id,
       layerId,

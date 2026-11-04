@@ -109,7 +109,7 @@ fn style(pixels: []const u8) !void {
         \\  "layout": {"icon-image": "marker"}
         \\}
     ,
-        "",
+        null,
         null,
     );
     // #endregion image

@@ -229,6 +229,10 @@ def operation(plan, values, *, discard=False, dispose=False):
             arguments[p.name] = f"bindingCount[C.{p.value.native}]({length})"
             continue
         value = p.value
+        if value.kind == "buffer" and value.buffer_form == "view":
+            # Go has no optional parameters, and its zero string is the empty
+            # view that a nullable text view means when absent.
+            value = replace(value, nullable=False)
         values.require(value, input=True)
         signature.append(f"{labels[p.name]} {values.type(value)}")
         if value.kind == "array" and value.length and value.length.isdigit():

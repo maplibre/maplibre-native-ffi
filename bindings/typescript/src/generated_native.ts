@@ -149,7 +149,7 @@ export interface NativeOperations {
   mln_map_add_style_layer_json(
     map: bigint,
     layerJson: unknown,
-    beforeLayerId: string,
+    beforeLayerId: string | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_style_source_json(
@@ -357,7 +357,7 @@ export interface NativeOperations {
   mln_map_move_style_layer(
     map: bigint,
     layerId: string,
-    beforeLayerId: string,
+    beforeLayerId: string | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_projection_create(view: MapView): bigint;

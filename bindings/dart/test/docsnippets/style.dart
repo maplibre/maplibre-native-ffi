@@ -31,7 +31,7 @@ Future<void> style(MapHandle map, Uint8List pixels) async {
     'id': 'satellite',
     'type': 'raster',
     'source': 'satellite',
-  }, 'countries-label');
+  }, beforeLayerId: 'countries-label');
   // #endregion add
 
   // #region geojson
@@ -93,7 +93,7 @@ Future<void> style(MapHandle map, Uint8List pixels) async {
     'type': 'symbol',
     'source': 'points',
     'layout': {'icon-image': 'marker'},
-  }, '');
+  });
   // #endregion image
 }
 

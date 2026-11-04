@@ -477,7 +477,7 @@ def test_a_custom_source_answers_through_the_map_it_borrows(harness: Harness) ->
         )
         result(
             target.map.add_style_layer_json(
-                {"id": "dots", "type": "circle", "source": "custom"}, ""
+                {"id": "dots", "type": "circle", "source": "custom"}
             )
         )
         # The map asks for its tiles as it renders.
@@ -534,7 +534,7 @@ def test_a_source_added_through_a_borrowed_map_survives_a_collection(
         )
         result(
             target.map.add_style_layer_json(
-                {"id": "outer", "type": "circle", "source": "outer"}, ""
+                {"id": "outer", "type": "circle", "source": "outer"}
             )
         )
         for _ in range(32):
@@ -546,7 +546,7 @@ def test_a_source_added_through_a_borrowed_map_survives_a_collection(
         # The inner source fetches tiles once a layer uses it.
         result(
             target.map.add_style_layer_json(
-                {"id": "inner", "type": "circle", "source": "inner"}, ""
+                {"id": "inner", "type": "circle", "source": "inner"}
             )
         )
         for _ in range(32):

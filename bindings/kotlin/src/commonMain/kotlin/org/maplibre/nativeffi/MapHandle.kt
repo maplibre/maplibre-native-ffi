@@ -178,7 +178,7 @@ internal constructor(
    */
   public fun addStyleLayerJson(
     layerJson: String,
-    beforeLayerId: String,
+    beforeLayerId: String? = null,
   ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1050,7 +1050,10 @@ internal constructor(
    * - `Status.NOT_FOUND` when the style has no layer named `layerId` or `beforeLayerId`.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String): Deferred<CommandCompletion> =
+  public fun moveStyleLayer(
+    layerId: String,
+    beforeLayerId: String? = null,
+  ): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_move_style_layer(
@@ -1961,7 +1964,7 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
     }
 
   /** [MapHandle.addStyleLayerJson] without its completion. */
-  public fun addStyleLayerJson(layerJson: String, beforeLayerId: String): Unit =
+  public fun addStyleLayerJson(layerJson: String, beforeLayerId: String? = null): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_style_layer_json(
@@ -2117,7 +2120,7 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
     }
 
   /** [MapHandle.moveStyleLayer] without its completion. */
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String): Unit =
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_move_style_layer(
