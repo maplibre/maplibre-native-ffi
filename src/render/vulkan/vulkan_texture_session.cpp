@@ -659,6 +659,7 @@ auto configure_android_hardware_buffer_session(
     );
     return MLN_STATUS_UNSUPPORTED;
   }
+  session.accepts_queue_lock = true;
   // The buffers' readers work outside this device, so a frame hands over as a
   // sync file or as completed work.
   session.probe_sync_kinds = [context] {
