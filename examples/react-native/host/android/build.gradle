@@ -1,0 +1,43 @@
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+def appExt(name, fallback) {
+  rootProject.ext.has(name) ? rootProject.ext.get(name) : fallback
+}
+
+def architectures = (findProperty("reactNativeArchitectures") ?: "arm64-v8a")
+  .split(",").collect { it.trim() }
+
+android {
+  namespace "org.maplibre.nativeffi.example.host"
+  compileSdk appExt("compileSdkVersion", 36)
+  ndkVersion appExt("ndkVersion", null)
+
+  defaultConfig {
+    minSdk appExt("minSdkVersion", 24)
+    ndk { abiFilters(*architectures) }
+    externalNativeBuild {
+      cmake {
+        arguments "-DANDROID_STL=c++_shared"
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path "CMakeLists.txt"
+      // The binding's CMake needs a newer CMake than the SDK's default. Mise
+      // names the version that it installs in the SDK.
+      version System.getenv("MLN_FFI_ANDROID_CMAKE_VERSION") ?: "4.1.2"
+    }
+  }
+
+  buildFeatures {
+    prefab true
+  }
+}
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+}
