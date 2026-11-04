@@ -682,18 +682,18 @@ _deliverCameraTransitionEndCallback = isolateCallable(
 
 _NativeRegistration<raw.mln_camera_transition_handler>
 _prepareCameraTransitionHandler(
-  CameraTransitionEndCallback? value,
+  CameraTransitionHandler value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
   DeliveryRegistration? registration;
   try {
     final result = arena<raw.mln_camera_transition_handler>();
-    if (value == null) {
+    if (value.callback == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
     final registered = registration = roots.registerQueued({
-      #mln_camera_transition_end_callback: value,
+      #mln_camera_transition_end_callback: value.callback!,
     });
     result.ref.callback = _deliverCameraTransitionEndCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
@@ -734,16 +734,11 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_TRANSITION_ID;
     result.ref.transition_id = value.transitionId!;
   }
-  if (value.endHandler != null) {
-    result.ref.end_handler = registrations
-        .add(
-          _prepareCameraTransitionHandler(
-            value.endHandler!,
-            registrations.roots,
-          ),
-        )
-        .ref;
-  }
+  result.ref.end_handler = registrations
+      .add(
+        _prepareCameraTransitionHandler(value.endHandler, registrations.roots),
+      )
+      .ref;
   return result;
 }
 
@@ -2141,7 +2136,7 @@ _deliverResourceRequestCancelCallback = isolateCallable(
 
 _NativeRegistration<raw.mln_resource_request_cancel_handler>
 _prepareResourceRequestCancelHandler(
-  ResourceRequestCancelCallback value,
+  ResourceRequestCancelHandler value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -2150,7 +2145,7 @@ _prepareResourceRequestCancelHandler(
     final result = arena<raw.mln_resource_request_cancel_handler>();
     result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
     final registered = registration = roots.registerQueued({
-      #mln_resource_request_cancel_callback: value,
+      #mln_resource_request_cancel_callback: value.callback,
     });
     result.ref.callback = _deliverResourceRequestCancelCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
@@ -2545,7 +2540,7 @@ final raw.mln_runtime_event_callback _deliverRuntimeEventCallback =
     );
 
 _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
-  RuntimeEventCallback value,
+  RuntimeEventHandler value,
   _CallbackRoots roots,
 ) {
   final arena = Arena();
@@ -2554,7 +2549,7 @@ _NativeRegistration<raw.mln_runtime_event_handler> _prepareRuntimeEventHandler(
     final result = arena<raw.mln_runtime_event_handler>();
     result.ref.size = sizeOf<raw.mln_runtime_event_handler>();
     final registered = registration = roots.registerQueued({
-      #mln_runtime_event_callback: value,
+      #mln_runtime_event_callback: value.callback,
     });
     result.ref.callback = _deliverRuntimeEventCallback;
     result.ref.queue = isolateDeliveryQueue.handle;
@@ -6029,7 +6024,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Camera fields that `update` doesn't set keep their values, and the update
   /// stops any running animation of the fields it sets. The function finishes
   /// when the map applies the update, before an animation ends. To learn when
-  /// an animation ends, set an `CameraTransitionEndCallback` in its animation
+  /// an animation ends, set an `CameraTransitionHandler` in its animation
   /// options.
   ///
   /// See `mln_map_update_camera` in the
@@ -7169,7 +7164,7 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  bool setCancelCallback(ResourceRequestCancelCallback handler) =>
+  bool setCancelCallback(ResourceRequestCancelHandler handler) =>
       withNativeArena((arena) {
         final outCancelled = arena<Bool>();
         final registrations = _NativeRegistrations(_callbackRoots);
@@ -7302,7 +7297,7 @@ extension type RuntimeHandleDiscarding._(RuntimeHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setEventHandler(RuntimeEventCallback handler) =>
+  void setEventHandler(RuntimeEventHandler handler) =>
       _discard((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(
@@ -7669,7 +7664,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_set_event_handler` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  Future<CommandCompletion> setEventHandler(RuntimeEventCallback handler) =>
+  Future<CommandCompletion> setEventHandler(RuntimeEventHandler handler) =>
       _command((arena, completion) {
         final registrations = _NativeRegistrations(_callbackRoots);
         return registrations.run(

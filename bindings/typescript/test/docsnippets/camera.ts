@@ -75,8 +75,10 @@ export async function camera(map: MapHandle): Promise<void> {
     animation: {
       durationMs: 3000,
       // Runs on this thread, after the animation ends.
-      endHandler: (end) => {
-        flyEnded(end.outcome === CameraTransitionOutcome.completed);
+      endHandler: {
+        callback: (end) => {
+          flyEnded(end.outcome === CameraTransitionOutcome.completed);
+        },
       },
     },
   });

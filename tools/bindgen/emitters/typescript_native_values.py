@@ -13,9 +13,9 @@ A registration or a wake that JavaScript supplies names the realm's queue, and
 each of its callbacks is a trampoline that runs while the realm dispatches the
 queue. The trampoline converts the callback's arguments and passes them to the
 realm's callback adapter that its constant numbers, which calls the host
-value. A native registration, which a wake takes as an object in place of its
-function, fills the descriptor with the function pointers, context, and
-release of native code in the host.
+value. A native registration, which a wake takes in place of its object, fills
+the descriptor with the function pointers, context, and release of native code
+in the host.
 """
 
 from __future__ import annotations
@@ -120,54 +120,73 @@ class NativeValues:
             entry = self.values.registration(value)
             if entry.form == "native":
                 return self.read_native(value, entry, js, target, path, fail)
-            if entry.form == "wake":
-                lines = [
-                    f"if (!mln_ts_is_absent(call, {js})) {{",
-                    f"  if (!mln_ts_read_function(call, {js}, {path})) {fail};",
-                    *(f"  {line}" for line in self.register(value, js, target, fail)),
-                    f"  {self.assign(entry.callbacks[0], target)}",
-                    "}",
-                ]
-                if not entry.native:
-                    return lines
-                native = self.read_native(value, entry, js, target, path, fail)
-                return [
-                    f"if (mln_ts_is_object(call, {js})) {{",
-                    *(f"  {line}" for line in native),
-                    "} else {",
-                    *(f"  {line}" for line in lines),
-                    "}",
-                ]
-            if entry.form == "queue" and entry.function:
-                return [
-                    f"if (!mln_ts_read_function(call, {js}, {path})) {fail};",
-                    *self.register(value, js, target, fail),
-                    self.assign(entry.callbacks[0], target),
-                ]
+            if entry.native:
+                return self.read_native(
+                    value,
+                    entry,
+                    js,
+                    target,
+                    path,
+                    fail,
+                    host=self.read_record(value, js, target, path, fail),
+                )
         if value.kind == "record":
-            return [
-                f"if (!mln_ts_read_record(call, {js}, {path})) {fail};",
-                f"if (!{self.writer(value)}(call, {js}, &{target}, {path})) {fail};",
-            ]
+            return self.read_record(value, js, target, path, fail)
         raise Unsupported(f"{value.native}: no C reader")
 
+    def read_record(
+        self, value: ValuePlan, js: str, target: str, path: str, fail: str
+    ) -> list[str]:
+        return [
+            f"if (!mln_ts_read_record(call, {js}, {path})) {fail};",
+            f"if (!{self.writer(value)}(call, {js}, &{target}, {path})) {fail};",
+        ]
+
     def read_native(
-        self, value: ValuePlan, entry, js: str, target: str, path: str, fail: str
+        self,
+        value: ValuePlan,
+        entry,
+        js: str,
+        target: str,
+        path: str,
+        fail: str,
+        host: list[str] | None = None,
     ) -> list[str]:
         """Statements that take a native registration into the descriptor
-        `target`: its callbacks, then its context and its release."""
+        `target`: its callbacks, then its context and its release. A
+        registration with a `host` form reads any other value with those
+        statements instead."""
         if not entry.native:
             raise Unsupported(f"{value.native}: no native registration")
         kind = c_string(public_name(value.native))
         count = len(entry.native)
+        native = (
+            f"  if (!mln_ts_read_native_registration(call, {js}, {kind}, {count - 2}, fields, "
+            + ("&native" if host is not None else "NULL")
+            + f", {path})) {fail};"
+        )
+        assign = [
+            f"{target}.{field.name} = ({field.value.ctype.spelling})(uintptr_t)fields[{index}];"
+            for index, field in enumerate(entry.native)
+        ]
+        if host is None:
+            return [
+                "{",
+                f"  uint64_t fields[{count}];",
+                native,
+                *(f"  {line}" for line in assign),
+                "}",
+            ]
         return [
             "{",
             f"  uint64_t fields[{count}];",
-            f"  if (!mln_ts_read_native_registration(call, {js}, {kind}, {count - 2}, fields, {path})) {fail};",
-            *(
-                f"  {target}.{field.name} = ({field.value.ctype.spelling})(uintptr_t)fields[{index}];"
-                for index, field in enumerate(entry.native)
-            ),
+            "  bool native = false;",
+            native,
+            "  if (native) {",
+            *(f"    {line}" for line in assign),
+            "  } else {",
+            *(f"    {line}" for line in host),
+            "  }",
             "}",
         ]
 
@@ -261,7 +280,7 @@ class NativeValues:
         if value.registration:
             entry = self.values.registration(value)
             callbacks = entry.callbacks
-            if entry.form == "queue":
+            if entry.form in {"queue", "wake"}:
                 lines += self.registration_callbacks(value, entry)
         if value.union_member:
             # A record of only a union is the selected variant itself.
@@ -380,11 +399,12 @@ class NativeValues:
                 f"  if ({flag} && !mln_ts_read_function(call, member, child)) return false;",
             ]
         body = self.register(value, "value", "(*out)", "return false")
+        primary = present.get(entry.callbacks[0].name)
         for field in entry.callbacks:
             assign = self.assign(field, "(*out)")
             flag = present.get(field.name)
-            body.append(f"if ({flag}) {assign}" if flag else assign)
-        primary = present.get(entry.callbacks[0].name)
+            # The primary callback's flag already guards the whole body.
+            body.append(f"if ({flag}) {assign}" if flag and flag != primary else assign)
         if primary is None:
             return lines + [f"  {line}" for line in body]
         return lines + [

@@ -175,7 +175,11 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
     map.updateCamera({
       camera: { zoom: 2 },
       mode: CameraUpdateMode.ease,
-      animation: { durationMs: 60_000, transitionId: maximum, endHandler: end },
+      animation: {
+        durationMs: 60_000,
+        transitionId: maximum,
+        endHandler: { callback: end },
+      },
     }),
     "a command",
   );

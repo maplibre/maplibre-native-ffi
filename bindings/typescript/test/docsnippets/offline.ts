@@ -30,20 +30,22 @@ export async function offline(): Promise<void> {
   // #endregion cache-file
 
   // #region progress
-  runtime.discarding.setEventHandler((events) => {
-    for (const { payload, message } of events) {
-      if (payload.kind === "offlineRegionStatus") {
-        const { regionId, status } = payload.value;
-        recordProgress(
-          regionId,
-          status.completedResourceCount,
-          status.requiredResourceCount,
-          status.complete,
-        );
-      } else if (payload.kind === "offlineRegionResponseError") {
-        recordError(payload.value.regionId, message);
+  runtime.discarding.setEventHandler({
+    callback: (events) => {
+      for (const { payload, message } of events) {
+        if (payload.kind === "offlineRegionStatus") {
+          const { regionId, status } = payload.value;
+          recordProgress(
+            regionId,
+            status.completedResourceCount,
+            status.requiredResourceCount,
+            status.complete,
+          );
+        } else if (payload.kind === "offlineRegionResponseError") {
+          recordError(payload.value.regionId, message);
+        }
       }
-    }
+    },
   });
   // #endregion progress
 

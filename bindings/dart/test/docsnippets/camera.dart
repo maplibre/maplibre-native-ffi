@@ -71,9 +71,13 @@ Future<void> camera(MapHandle map) async {
       animation: AnimationOptions(
         durationMs: 3000,
         // Runs in this isolate, after the animation ends.
-        endHandler: (end) {
-          flyEnded(end.outcome == CameraTransitionOutcome.completed);
-        },
+        endHandler: CameraTransitionHandler(
+          callback: (end) {
+            flyEnded(
+              end.outcome == CameraTransitionOutcome.completed,
+            );
+          },
+        ),
       ),
     ),
   );

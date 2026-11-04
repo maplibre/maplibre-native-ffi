@@ -119,6 +119,15 @@ class MaskFlag:
 
 @dataclass(frozen=True)
 class RegistrationDescriptorPlan:
+    """A callback registration record.
+
+    Every binding presents a registration as a type of its own that holds its
+    callbacks, never as a bare callback, even when it holds one callback and
+    nothing else. Its callbacks are members of the type, so the registration
+    can gain members without breaking callers, and a native registration or a
+    record member has a type to name.
+    """
+
     callbacks: tuple[str, ...]
     user_data: str
     release: str

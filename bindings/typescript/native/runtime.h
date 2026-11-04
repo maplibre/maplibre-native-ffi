@@ -205,11 +205,13 @@ bool mln_ts_upcall_end(
  * consumes, into out: the function pointer of each of its callbacks, then its
  * context and its release. Throws the invalid-state error for a registration
  * that an earlier call consumed. The call releases the context unless native
- * code accepts it.
+ * code accepts it. A registration that also has a host form passes native,
+ * which reports whether value is a native registration; any other value then
+ * leaves out unset. With a NULL native, any other value throws a TypeError.
  */
 bool mln_ts_read_native_registration(
   mln_ts_call* call, napi_value value, const char* kind, size_t callbacks,
-  uint64_t* out, const char* path
+  uint64_t* out, bool* native, const char* path
 );
 /**
  * A completion that calls the function settle with the completion's status,

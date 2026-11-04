@@ -250,6 +250,9 @@ mln_status mln_log_set_callback(
 ```
 
 - Native calls `release_user_data` once, after the last call to the callback.
+- Every binding presents a registration struct as a type of its own, even one
+  that holds a single callback, so the struct can gain members without breaking
+  callers.
 - Callbacks should accept a delivery queue unless native needs the callback's
   result before it can continue.
 - Some language bindings may not expose callbacks without a delivery queue, or

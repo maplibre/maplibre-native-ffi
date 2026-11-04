@@ -266,7 +266,8 @@ class TypeScriptEmitterTests(unittest.TestCase):
             "bindings/typescript/src/generated_values.ts"
         ]
         self.assertIn(
-            "export type RuntimeEventHandler = (events: readonly RuntimeEvent[]) => void;",
+            "export interface RuntimeEventHandler {\n"
+            "  callback: (events: readonly RuntimeEvent[]) => void;\n}",
             values,
         )
         self.assertNotIn("EventBatchView", values)
@@ -294,6 +295,18 @@ class TypeScriptEmitterTests(unittest.TestCase):
             values,
         )
         self.assertIn("  endHandler?: CameraTransitionHandler;", values)
+        # A registration of one callback is an object that holds it, and a
+        # wake is one too, or a native registration.
+        self.assertIn(
+            "export interface CameraTransitionHandler {\n"
+            "  callback?: (end: CameraTransitionEnd) => void;\n}",
+            values,
+        )
+        self.assertRegex(
+            values,
+            r"export type Wake = \{\n(?:.*\n)*?  callback\?: \(\) => void;\n\}"
+            r" \| NativeRegistration<\"Wake\">;",
+        )
 
     def test_a_registration_with_rules_beside_its_callback_must_be_given(self):
         # A host passes a queued callback or native rules. Left out, the

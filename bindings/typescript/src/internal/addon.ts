@@ -46,7 +46,7 @@ export interface Addon extends NativeOperations {
       value: unknown,
       kind: string,
       path: string,
-    ) => readonly bigint[] | undefined,
+    ) => readonly bigint[] | undefined | null,
     reportLeak: (name: string, handle: bigint) => void,
   ): void;
   setReferenced(referenced: boolean): void;

@@ -126,9 +126,8 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             or value.kind not in {"record", "enum", "callback"}
         ):
             return None
-        # A lone callback that stands for its registration may be optional.
         try:
-            return values.public(replace(value, nullable=False)).removesuffix("?")
+            return values.public(replace(value, nullable=False))
         except Unsupported:
             return None
 
@@ -152,12 +151,10 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             record, union = unions[value.native]
             return variant_name(record, union, member)
         typ = type_(value.native)
-        # A lone callback stands for its registration, and a native
-        # registration takes its callbacks as constructor arguments.
+        # A native registration takes its callbacks as constructor arguments.
         if (
             typ is None
             or value.union_member
-            or values.single_callback(value)
             or value.registration
             and values.native_only(value)
             or member.name not in {f.name for f in values.fields(value)}

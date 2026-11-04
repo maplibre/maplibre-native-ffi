@@ -286,7 +286,9 @@ test("a cancel callback runs once for a request that teardown discards", async (
   teardown(() => handle.close());
   const cancels: boolean[] = [];
   assert.equal(
-    handle.setCancelCallback(() => cancels.push(handle.isCancelled())),
+    handle.setCancelCallback({
+      callback: () => cancels.push(handle.isCancelled()),
+    }),
     false,
   );
 

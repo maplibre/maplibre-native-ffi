@@ -1258,25 +1258,20 @@ def render_adapter(bound, values: Values, callback, uses) -> str:
     """The adapter of one callback type: the host callback of a rooted
     registration, run with the arguments that the trampoline converted."""
     borrows: list[str] = []
-    forms = {(entry.function, field.name) for entry, field in uses}
-    if len(forms) != 1:
+    if len({field.name for _, field in uses}) != 1:
         raise Unsupported(f"{callback.native}: registrations name it differently")
     entry, field = uses[0]
     public = public_name(entry.value.native)
-    if entry.function:
-        # A registration that also takes a native one is a union with it.
-        function_type = (
-            f"({values.callback_type(callback)})" if entry.native else public
-        )
-        target = f"target as {function_type}"
-    else:
-        member = identifier(field.name)
-        function_type = f'NonNullable<{public}["{member}"]>'
-        target = f"(target as {public}).{member}"
-        if field.value.nullable:
-            # The addon names a trampoline only for a callback that the
-            # registration held.
-            target += f" as {function_type}"
+    # A registration that also takes a native one is a union with it, and
+    # only its host form roots a target.
+    record = f"Exclude<{public}, NativeRegistration>" if entry.native else public
+    member = identifier(field.name)
+    function_type = f'NonNullable<{record}["{member}"]>'
+    target = f"(target as {record}).{member}"
+    if field.value.nullable:
+        # The addon names a trampoline only for a callback that the
+        # registration held.
+        target += f" as {function_type}"
     names = [parameter_name(p.name) for p in callback.arguments]
     # A borrowed handle reaches the host in an owner that never releases it.
     passed = list(names)
@@ -1393,6 +1388,7 @@ def runtime_imports(text: str) -> str:
             "defineDisposers",
             "rootsOf",
         ],
+        "./internal/native_registrations.ts": ["type NativeRegistration"],
         "./internal/realm.ts": [
             "type Registrations",
             "defineCallbacks",

@@ -15,12 +15,18 @@ Future<MapHandle> _mapWithoutItsRuntime(
   Completer<RuntimeHandle> styleLoaded,
 ) async {
   final runtime = RuntimeHandle.create();
-  await runtime.setEventHandler((events) {
-    if (!styleLoaded.isCompleted &&
-        events.any((event) => event.type == RuntimeEventType.mapStyleLoaded)) {
-      styleLoaded.complete(runtime);
-    }
-  });
+  await runtime.setEventHandler(
+    RuntimeEventHandler(
+      callback: (events) {
+        if (!styleLoaded.isCompleted &&
+            events.any(
+              (event) => event.type == RuntimeEventType.mapStyleLoaded,
+            )) {
+          styleLoaded.complete(runtime);
+        }
+      },
+    ),
+  );
   final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
   await within(ready, 'map creation');
   return map;

@@ -7,12 +7,12 @@ from native keeps an unknown tag, and a record of only a union and its tag is
 that union. Integers of 32 bits or fewer and floating-point values are
 `number`; 64-bit integers and native pointers are `bigint`. A JSON value is
 `unknown`, any value that `JSON.stringify` takes or `JSON.parse` returns. A callback
-registration takes the form that `async_hosts.py` chooses for a host that runs
-no code on native threads: its callback's function type, an object of its
-callbacks and members, or its members alone when native rules answer. A
-registration that accepts a native registration also has a `native()` factory
-of the same name, which takes a native function pointer for each callback, a
-context, and a release.
+registration is an interface in the form that `async_hosts.py` chooses for a
+host that runs no code on native threads: its callbacks and members, or its
+members alone when native rules answer. A registration that accepts a native
+registration is a union of that interface and the native registration, with a
+`native()` factory of the same name, which takes a native function pointer for
+each callback, a context, and a release.
 """
 
 from __future__ import annotations
@@ -46,11 +46,6 @@ class Registration:
     # The fields of a native registration in C order: each callback, then the
     # context and its release. Empty when the registration accepts none.
     native: tuple[FieldPlan, ...] = ()
-
-    @property
-    def function(self) -> bool:
-        """Whether the TypeScript form of the registration is its callback."""
-        return len(self.callbacks) == 1 and not self.members
 
 
 def registration(bound: BoundApi, value: ValuePlan) -> Registration:
@@ -691,12 +686,15 @@ class Values:
         entry = self.registration(value)
         if entry.native:
             return self.render_native_registration(value, entry)
-        if entry.function:
-            callback = self.bound.callbacks[entry.callbacks[0].value.native]
-            return (
-                doc(self.bound, value.native)
-                + f"export type {public} = {self.callback_type(callback)};\n"
-            )
+        return (
+            doc(self.bound, value.native)
+            + f"export interface {public} "
+            + self.registration_members(value, entry)
+            + "\n"
+        )
+
+    def registration_members(self, value: ValuePlan, entry: Registration) -> str:
+        """The object type of a registration's callbacks and members."""
         members = []
         for field in entry.callbacks:
             callback = self.bound.callbacks[field.value.native]
@@ -706,12 +704,7 @@ class Values:
                 + f"  {identifier(field.name)}{optional}: {self.callback_type(callback)};\n"
             )
         members += [self.member(value, field) for field in entry.members]
-        return (
-            doc(self.bound, value.native)
-            + f"export interface {public} {{\n"
-            + "".join(members)
-            + "}\n"
-        )
+        return "{\n" + "".join(members) + "}"
 
     def render_native_registration(self, value: ValuePlan, entry: Registration) -> str:
         """A registration type that admits a native registration, a value of
@@ -720,13 +713,11 @@ class Values:
         public = public_name(value.native)
         fields = native_fields(public)
         native = f'NativeRegistration<"{public}">'
-        if entry.form == "native":
-            alias = native
-        elif entry.function:
-            callback = self.bound.callbacks[entry.callbacks[0].value.native]
-            alias = f"({self.callback_type(callback)}) | {native}"
-        else:
-            raise Unsupported(f"{value.native}: no TypeScript form with a native one")
+        alias = (
+            native
+            if entry.form == "native"
+            else f"{self.registration_members(value, entry)} | {native}"
+        )
         assert value.registration is not None
         context = {value.registration.user_data, value.registration.release}
         members = "".join(

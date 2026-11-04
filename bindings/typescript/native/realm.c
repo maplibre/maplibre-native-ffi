@@ -515,7 +515,7 @@ bool mln_ts_upcall_end(
 
 bool mln_ts_read_native_registration(
   mln_ts_call* call, napi_value value, const char* kind, size_t callbacks,
-  uint64_t* out, const char* path
+  uint64_t* out, bool* native, const char* path
 ) {
   napi_env env = call->env;
   napi_value fields;
@@ -528,6 +528,27 @@ bool mln_ts_read_native_registration(
     !call_realm(env, call->realm->take_native, 3, argv, &fields)
   ) {
     return false;
+  }
+  napi_valuetype type = napi_undefined;
+  if (napi_typeof(env, fields, &type) != napi_ok) {
+    return false;
+  }
+  if (type == napi_null) {
+    // The value is no native registration.
+    if (native != NULL) {
+      *native = false;
+      return true;
+    }
+    char message[256];
+    snprintf(
+      message, sizeof message,
+      "%s: expected a native %s registration from %s.native()", path, kind, kind
+    );
+    napi_throw_type_error(env, NULL, message);
+    return false;
+  }
+  if (native != NULL) {
+    *native = true;
   }
   if (mln_ts_is_absent(call, fields)) {
     char message[256];
