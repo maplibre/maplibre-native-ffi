@@ -531,8 +531,8 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.UNSUPPORTED` when the session renders offscreen or into Android hardware buffers or
-   *   dmabufs that it allocates.
+   * - `Status.UNSUPPORTED` when the session renders offscreen or into Android hardware buffers,
+   *   dmabufs, or DXGI shared textures that it allocates.
    * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */

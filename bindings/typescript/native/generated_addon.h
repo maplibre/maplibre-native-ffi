@@ -157,6 +157,9 @@ napi_value mln_ts_read_canonical_tile_id(
 napi_value mln_ts_read_dma_buf_frame(
   napi_env env, const mln_dma_buf_frame* source, size_t size
 );
+napi_value mln_ts_read_dxgi_shared_texture_frame(
+  napi_env env, const mln_dxgi_shared_texture_frame* source, size_t size
+);
 napi_value mln_ts_read_edge_insets(
   napi_env env, const mln_edge_insets* source, size_t size
 );
@@ -437,6 +440,10 @@ bool mln_ts_write_dma_buf_format(
 bool mln_ts_write_dma_buf_ring_descriptor(
   mln_ts_call* call, napi_value value, mln_dma_buf_ring_descriptor* out,
   const char* path
+);
+bool mln_ts_write_dxgi_shared_texture_ring_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_dxgi_shared_texture_ring_descriptor* out, const char* path
 );
 bool mln_ts_write_edge_insets(
   mln_ts_call* call, napi_value value, mln_edge_insets* out, const char* path

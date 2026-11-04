@@ -75,6 +75,38 @@ public final class DmaBufFrameView {
   }
 }
 
+public final class DxgiSharedTextureFrameView {
+  private let snapshot: DxgiSharedTextureFrame
+  private let scope: NativeViewScope
+  init(_ value: DxgiSharedTextureFrame, scope: NativeViewScope) {
+    snapshot = value; self.scope = scope
+  }
+
+  public var width: UInt32 {
+    snapshot.width
+  }
+
+  public var height: UInt32 {
+    snapshot.height
+  }
+
+  public var scaleFactor: Double {
+    snapshot.scaleFactor
+  }
+
+  public var slot: UInt32 {
+    snapshot.slot
+  }
+
+  public var format: UInt32 {
+    snapshot.format
+  }
+
+  public var handle: NativePointer {
+    get throws { try scope.check(); return snapshot.handle }
+  }
+}
+
 public final class MetalTextureFrameView {
   private let snapshot: MetalTextureFrame
   private let scope: NativeViewScope

@@ -194,6 +194,36 @@ impl AcquiredFrameView<'_> {
         Ok(Lent::new(unsafe { from_native(out_frame) }?))
     }
 
+    /// Gets the DXGI shared texture of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrameView::get_producer_sync()` before you read the
+    /// texture. Once you release or discard the frame, the session may render
+    /// into the texture again. Open the handle with
+    /// `ID3D11Device1::OpenSharedResource1` or
+    /// `ID3D12Device::OpenSharedHandle`. A texture that you open keeps its
+    /// memory, but not its contents.
+    ///
+    /// The session owns the handle, so don't close it. To keep the handle after
+    /// you release the frame, duplicate it with `DuplicateHandle`.
+    ///
+    /// See `mln_acquired_frame_get_dxgi_shared_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
+    #[cfg(target_os = "windows")]
+    pub fn get_dxgi_shared_texture(&self) -> Result<Lent<'_, DxgiSharedTextureFrame>> {
+        let mut call = self.owner.inner.call();
+        let mut out_frame: sys::mln_dxgi_shared_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_dxgi_shared_texture_frame>() as _;
+        call.status(|frame, out_diagnostic| unsafe {
+            sys::mln_acquired_frame_get_dxgi_shared_texture(frame, &mut out_frame, out_diagnostic)
+        })?;
+        Ok(Lent::new(unsafe { from_native(out_frame) }?))
+    }
+
     /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the

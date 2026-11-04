@@ -340,6 +340,35 @@ auto validate_dma_buf_ring_descriptor(
   return MLN_STATUS_OK;
 }
 
+auto validate_dxgi_shared_texture_ring_descriptor(
+  const mln_dxgi_shared_texture_ring_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("DXGI shared texture ring descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_dxgi_shared_texture_ring_descriptor)) {
+    set_thread_error(
+      "mln_dxgi_shared_texture_ring_descriptor.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "DXGI shared texture dimensions must be positive"
+  );
+  if (size_status != MLN_STATUS_OK) return size_status;
+  if (
+    descriptor->texture_count == 0 ||
+    descriptor->texture_count > max_texture_ring_depth
+  ) {
+    set_thread_error(
+      "texture_count must be from 1 to MLN_TEXTURE_RING_MAX_DEPTH"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 // A borrowed target must share objects with the host context that owns its
 // texture. Dedicated ownership names no share group.
 auto validate_borrowed_texture_ownership(
@@ -653,6 +682,12 @@ auto acquired_frame_get_android_hardware_buffer(
 
 auto acquired_frame_get_dma_buf(
   mln_acquired_frame frame, mln_dma_buf_frame* out_frame
+) -> mln_status {
+  return acquired_frame_get_backend(frame, out_frame);
+}
+
+auto acquired_frame_get_dxgi_shared_texture(
+  mln_acquired_frame frame, mln_dxgi_shared_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }

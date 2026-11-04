@@ -102,6 +102,30 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
+    /// Gets the DXGI shared texture of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrame.getProducerSync()` before you read the texture. Once
+    /// you release or discard the frame, the session may render into the texture
+    /// again. Open the handle with `ID3D11Device1::OpenSharedResource1` or
+    /// `ID3D12Device::OpenSharedHandle`. A texture that you open keeps its memory,
+    /// but not its contents.
+    ///
+    /// The session owns the handle, so don't close it. To keep the handle after you
+    /// release the frame, duplicate it with `DuplicateHandle`.
+    ///
+    /// See `mln_acquired_frame_get_dxgi_shared_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
+    pub const getDxgiSharedTexture = if (builtin.os.tag == .windows) struct {
+        fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+            return call.scopedView("mln_acquired_frame_get_dxgi_shared_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", DxgiSharedTextureFrame, self, context, use, diagnostic);
+        }
+    }.function else {};
+
     /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
@@ -518,6 +542,44 @@ pub const Map = struct {
     pub const attachDmaBufRing = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
         fn function(self: Map, allocator: std.mem.Allocator, descriptor: DmaBufRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_dma_buf_ring", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
+    /// Creates a session that renders the map into a ring of DXGI shared textures
+    /// that the library allocates.
+    ///
+    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its texture
+    /// with `AcquiredFrame.getDxgiSharedTexture()`. `RenderSession.resize()` gives
+    /// the ring new textures of the new size.
+    ///
+    /// The session renders with the Vulkan device `device`, or, when `device` is
+    /// null, with one that the library creates. The textures belong to the device's
+    /// GPU, so open them on a D3D11 or D3D12 device of the same adapter. To pick
+    /// the GPU, create `device` with `VulkanDeviceOptions.device_luid` set to your
+    /// adapter's LUID. Attach with `RenderDriverKind.core_worker`.
+    ///
+    /// For a reader that waits on no fence, such as Flutter's texture registrar,
+    /// attach without `GpuSyncKindFlag.d3d12_fence` in
+    /// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// `GpuSyncKind.cpu_complete` only once the reader has finished with its
+    /// texture.
+    ///
+    /// See `mln_map_attach_dxgi_shared_texture_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` in an OpenGL build, or when the GPU can't share the
+    ///   textures: D3D11 has no adapter with the Vulkan device's LUID or can't
+    ///   share textures through NT handles, or the device lacks
+    ///   VK_KHR_external_memory_win32 or can't import D3D11 textures.
+    /// - `error.NativeError` when the library can't create its Vulkan device or a
+    ///   D3D11 device on the adapter.
+    pub const attachDxgiSharedTextureRing = if (builtin.os.tag == .windows) struct {
+        fn function(self: Map, descriptor: DxgiSharedTextureRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_dxgi_shared_texture_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
         }
     }.function else {};
@@ -2222,7 +2284,7 @@ pub const RenderSession = struct {
     /// Errors:
     ///
     /// - `error.Unsupported` when the session renders offscreen or into Android
-    ///   hardware buffers or dmabufs that it allocates.
+    ///   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -4054,6 +4116,60 @@ pub const DmaBufRingDescriptor = struct {
                 for (try marshal.nativeSlice(c.mln_dma_buf_format, raw.formats, raw.format_count), 0..) |item, index| copied[index] = DmaBufFormat.fromNative(item);
                 break :blk copied;
             },
+        };
+    }
+};
+
+/// The DXGI shared texture of an acquired frame.
+///
+/// See `mln_dxgi_shared_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+pub const DxgiSharedTextureFrame = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    scale_factor: f64 = 0,
+    /// The texture's index in the ring.
+    slot: u32 = 0,
+    /// The texture's `DXGI_FORMAT`.
+    format: u32 = 0,
+    /// The texture's shared NT `HANDLE`.
+    handle: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_dxgi_shared_texture_frame) DxgiSharedTextureFrame {
+        return .{
+            .width = raw.width,
+            .height = raw.height,
+            .scale_factor = raw.scale_factor,
+            .slot = raw.slot,
+            .format = raw.format,
+            .handle = raw.handle,
+        };
+    }
+};
+
+/// A ring of DXGI shared textures that the library allocates, for
+/// `Map.attachDxgiSharedTextureRing()`.
+///
+/// Each texture is a D3D11 2D texture with the map's size in pixels and the
+/// format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a
+/// render target, and is shared through an NT handle.
+///
+/// See `mln_dxgi_shared_texture_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+pub const DxgiSharedTextureRingDescriptor = struct {
+    logical_size: LogicalSize,
+    /// How many textures the ring has, from 1 to 8.
+    texture_count: u32,
+    pub fn toNative(self: DxgiSharedTextureRingDescriptor) c.mln_dxgi_shared_texture_ring_descriptor {
+        var raw = std.mem.zeroes(c.mln_dxgi_shared_texture_ring_descriptor);
+        raw.size = @sizeOf(c.mln_dxgi_shared_texture_ring_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.texture_count = self.texture_count;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_dxgi_shared_texture_ring_descriptor) DxgiSharedTextureRingDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .texture_count = raw.texture_count,
         };
     }
 };
@@ -6386,7 +6502,8 @@ pub const RenderSessionAttachOptions = struct {
     ///   device.
     /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
     ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-    ///   Android hardware buffers or dmabufs, or an offscreen session.
+    ///   Android hardware buffers, dmabufs, or DXGI shared textures, or an
+    ///   offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.

@@ -8,6 +8,36 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
+ * Gets the DXGI shared texture of an acquired frame.
+ *
+ * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the texture. Once you release
+ * or discard the frame, the session may render into the texture again. Open the handle with
+ * `ID3D11Device1::OpenSharedResource1` or `ID3D12Device::OpenSharedHandle`. A texture that you open
+ * keeps its memory, but not its contents.
+ *
+ * The session owns the handle, so don't close it. To keep the handle after you release the frame,
+ * duplicate it with `DuplicateHandle`.
+ *
+ * See `mln_acquired_frame_get_dxgi_shared_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
+ */
+public fun <T> AcquiredFrameHandle.withDxgiSharedTexture(block: (DxgiSharedTextureFrame) -> T): T =
+  nativeCall(this, binding) {
+    borrowView(
+      { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+      { C.mln_acquired_frame_view_end(it) },
+    ) { scope ->
+      val out = sized(w(40, 40, 32), w(8, 8, 4))
+      check(C.mln_acquired_frame_get_dxgi_shared_texture(handle, out, diagnostic))
+      block(readDxgiSharedTextureFrame(out, scope))
+    }
+  }
+
+/**
  * Gets the Vulkan image of an acquired frame.
  *
  * See `mln_acquired_frame_get_vulkan_texture` in the
@@ -60,6 +90,60 @@ public fun VulkanDeviceHandle.Companion.create(
       ),
     )
     adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle(it) }
+  }
+
+/**
+ * Creates a session that renders the map into a ring of DXGI shared textures that the library
+ * allocates.
+ *
+ * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its texture with
+ * `AcquiredFrameHandle.withDxgiSharedTexture()`. `RenderSessionHandle.resize()` gives the ring new
+ * textures of the new size.
+ *
+ * The session renders with the Vulkan device `device`, or, when `device` is null, with one that the
+ * library creates. The textures belong to the device's GPU, so open them on a D3D11 or D3D12 device
+ * of the same adapter. To pick the GPU, create `device` with `VulkanDeviceOptions.deviceLuid` set
+ * to your adapter's LUID. Attach with `RenderDriverKind.CORE_WORKER`.
+ *
+ * For a reader that waits on no fence, such as Flutter's texture registrar, attach without
+ * `GpuSyncKindFlag.D3D12_FENCE` in `RenderSessionAttachOptions.producerSyncKinds`, so that each
+ * frame finishes before you acquire it. Release a frame with `GpuSyncKind.CPU_COMPLETE` only once
+ * the reader has finished with its texture.
+ *
+ * See `mln_map_attach_dxgi_shared_texture_ring` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` in an OpenGL build, or when the GPU can't share the textures: D3D11 has no
+ *   adapter with the Vulkan device's LUID or can't share textures through NT handles, or the device
+ *   lacks VK_KHR_external_memory_win32 or can't import D3D11 textures.
+ * - `Status.NATIVE_ERROR` when the library can't create its Vulkan device or a D3D11 device on the
+ *   adapter.
+ */
+public fun MapHandle.attachDxgiSharedTextureRing(
+  descriptor: DxgiSharedTextureRingDescriptor,
+  device: VulkanDeviceHandle? = null,
+  options: RenderSessionAttachOptions,
+): RenderSessionHandle =
+  nativeCall(this, binding) {
+    attach(
+      { out, completion ->
+        C.mln_map_attach_dxgi_shared_texture_ring(
+          handle,
+          writeDxgiSharedTextureRingDescriptor(descriptor),
+          device?.let { argument(it, it.binding) } ?: 0L,
+          writeRenderSessionAttachOptions(options),
+          out,
+          completion,
+          diagnostic,
+        )
+      },
+      GeneratedOwnerDisposal::renderSession,
+      { created, ready -> RenderSessionHandle(created, this@attachDxgiSharedTextureRing, ready) },
+      { it.bindingCallbacks },
+      { it.dispose() },
+    )
   }
 
 /**

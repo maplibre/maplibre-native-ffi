@@ -382,6 +382,19 @@ internal fun NativeArena.putDmaBufRingDescriptor(target: Long, value: DmaBufRing
 internal fun NativeArena.writeDmaBufRingDescriptor(value: DmaBufRingDescriptor): Long =
   allocate(w(24, 32), w(4, 8)).also { putDmaBufRingDescriptor(it, value) }
 
+internal fun NativeArena.putDxgiSharedTextureRingDescriptor(
+  target: Long,
+  value: DxgiSharedTextureRingDescriptor,
+) {
+  writeU32(target, 16.toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.textureCount)
+}
+
+internal fun NativeArena.writeDxgiSharedTextureRingDescriptor(
+  value: DxgiSharedTextureRingDescriptor,
+): Long = allocate(16, 4).also { putDxgiSharedTextureRingDescriptor(it, value) }
+
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
   value: MetalBorrowedTextureDescriptor,
@@ -1295,6 +1308,23 @@ internal fun readDmaBufFrame(source: Long, scope: ViewScope? = null): DmaBufFram
       fd = readI32(source + w(40, 40, 36)),
       offset = readU32(source + w(44, 44, 40)),
       stride = readU32(source + w(48, 48, 44)),
+    )
+    .also { it.bindingScope = scope }
+
+internal fun readDxgiSharedTextureFrame(
+  source: Long,
+  scope: ViewScope? = null,
+): DxgiSharedTextureFrame =
+  DxgiSharedTextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      format = readU32(source + w(28, 28, 24)),
+      handle =
+        readAddress(source + w(32, 32, 28)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
     )
     .also { it.bindingScope = scope }
 

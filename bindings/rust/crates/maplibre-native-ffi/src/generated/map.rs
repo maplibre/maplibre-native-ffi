@@ -411,6 +411,68 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
+    /// Creates a session that renders the map into a ring of DXGI shared
+    /// textures that the library allocates.
+    ///
+    /// Acquire each frame with `RenderSessionHandle::acquire_frame()`, and get
+    /// its texture with `AcquiredFrameView::get_dxgi_shared_texture()`.
+    /// `RenderSessionHandle::resize()` gives the ring new textures of the new
+    /// size.
+    ///
+    /// The session renders with the Vulkan device `device`, or, when `device`
+    /// is null, with one that the library creates. The textures belong to the
+    /// device's GPU, so open them on a D3D11 or D3D12 device of the same
+    /// adapter. To pick the GPU, create `device` with
+    /// `VulkanDeviceOptions::device_luid` set to your adapter's LUID. Attach
+    /// with `RenderDriverKind::CoreWorker`.
+    ///
+    /// For a reader that waits on no fence, such as Flutter's texture
+    /// registrar, attach without `GpuSyncKindFlag::D3D12_FENCE` in
+    /// `RenderSessionAttachOptions::producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// `GpuSyncKind::CpuComplete` only once the reader has finished with its
+    /// texture.
+    ///
+    /// See `mln_map_attach_dxgi_shared_texture_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` in an OpenGL build, or when the GPU can't share
+    ///   the textures: D3D11 has no adapter with the Vulkan device's LUID or
+    ///   can't share textures through NT handles, or the device lacks
+    ///   VK_KHR_external_memory_win32 or can't import D3D11 textures.
+    /// - `Status::NativeError` when the library can't create its Vulkan device
+    ///   or a D3D11 device on the adapter.
+    #[cfg(target_os = "windows")]
+    pub fn attach_dxgi_shared_texture_ring(
+        &self,
+        descriptor: &DxgiSharedTextureRingDescriptor,
+        device: Option<&VulkanDeviceHandle>,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_vulkan_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_dxgi_shared_texture_ring(
+                    map,
+                    descriptor,
+                    device,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     ///

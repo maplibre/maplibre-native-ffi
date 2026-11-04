@@ -497,6 +497,68 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that renders the map into a ring of DXGI shared
+    /// textures that the library allocates.
+    /// </summary>
+    /// <remarks>
+    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
+    /// and get its texture with
+    /// <c>AcquiredFrameHandle.WithDxgiSharedTexture()</c>.
+    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new textures of
+    /// the new size.</para>
+    /// <para>The session renders with the Vulkan device <c>device</c>, or, when
+    /// <c>device</c> is null, with one that the library creates. The textures
+    /// belong to the device's GPU, so open them on a D3D11 or D3D12 device of
+    /// the same adapter. To pick the GPU, create <c>device</c> with
+    /// <c>VulkanDeviceOptions.DeviceLuid</c> set to your adapter's LUID. Attach
+    /// with <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>For a reader that waits on no fence, such as Flutter's texture
+    /// registrar, attach without <c>GpuSyncKindFlag.D3d12Fence</c> in
+    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// <c>GpuSyncKind.CpuComplete</c> only once the reader has finished with
+    /// its texture.</para>
+    /// <para>See <c>mln_map_attach_dxgi_shared_texture_ring</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> in an OpenGL build, or when
+    /// the GPU can't share the textures: D3D11 has no adapter with the Vulkan
+    /// device's LUID or can't share textures through NT handles, or the device
+    /// lacks VK_KHR_external_memory_win32 or can't import D3D11
+    /// textures.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create its Vulkan device or a D3D11 device on the
+    /// adapter.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public RenderSessionHandle AttachDxgiSharedTextureRing(
+        DxgiSharedTextureRingDescriptor descriptor,
+        VulkanDeviceHandle? device,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeDxgiSharedTextureRingDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_dxgi_shared_texture_ring(
+            Handle,
+            &nativeDescriptor,
+            scope.UseOptional(device),
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     /// </summary>

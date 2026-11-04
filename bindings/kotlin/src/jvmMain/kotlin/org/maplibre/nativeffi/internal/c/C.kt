@@ -18,6 +18,14 @@ internal actual object C {
     )
   private val mln_acquired_frame_get_dma_buf =
     Ffm.downcall("mln_acquired_frame_get_dma_buf", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_acquired_frame_get_dxgi_shared_texture =
+    Ffm.downcall(
+      "mln_acquired_frame_get_dxgi_shared_texture",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_acquired_frame_get_metal_texture =
     Ffm.downcall("mln_acquired_frame_get_metal_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_open_gl_texture =
@@ -204,6 +212,18 @@ internal actual object C {
   private val mln_map_attach_dma_buf_ring =
     Ffm.downcall(
       "mln_map_attach_dma_buf_ring",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_attach_dxgi_shared_texture_ring =
+    Ffm.downcall(
+      "mln_map_attach_dxgi_shared_texture_ring",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -1401,6 +1421,13 @@ internal actual object C {
   actual fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int =
     mln_acquired_frame_get_dma_buf.invokeExact(frame, outFrame, outDiagnostic) as Int
 
+  actual fun mln_acquired_frame_get_dxgi_shared_texture(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_acquired_frame_get_dxgi_shared_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
+
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -1700,6 +1727,25 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_map_attach_dma_buf_ring.invokeExact(
+      map,
+      descriptor,
+      device,
+      options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_attach_dxgi_shared_texture_ring(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_dxgi_shared_texture_ring.invokeExact(
       map,
       descriptor,
       device,

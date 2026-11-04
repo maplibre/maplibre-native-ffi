@@ -1204,6 +1204,71 @@ impl ToNative<sys::mln_dma_buf_ring_descriptor> for DmaBufRingDescriptor {
     }
 }
 
+/// The DXGI shared texture of an acquired frame.
+///
+/// See `mln_dxgi_shared_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct DxgiSharedTextureFrame {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    /// The texture's index in the ring.
+    pub slot: u32,
+    /// The texture's `DXGI_FORMAT`.
+    pub format: u32,
+    /// The texture's shared NT `HANDLE`.
+    pub handle: *mut std::ffi::c_void,
+}
+impl FromNative<sys::mln_dxgi_shared_texture_frame> for DxgiSharedTextureFrame {
+    unsafe fn from_native(raw: sys::mln_dxgi_shared_texture_frame) -> Result<Self> {
+        Ok(Self {
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            slot: raw.slot,
+            format: raw.format,
+            handle: raw.handle,
+        })
+    }
+}
+
+/// A ring of DXGI shared textures that the library allocates, for
+/// `MapHandle::attach_dxgi_shared_texture_ring()`.
+///
+/// Each texture is a D3D11 2D texture with the map's size in pixels and the
+/// format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a
+/// render target, and is shared through an NT handle.
+///
+/// See `mln_dxgi_shared_texture_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DxgiSharedTextureRingDescriptor {
+    pub logical_size: LogicalSize,
+    /// How many textures the ring has, from 1 to 8.
+    pub texture_count: u32,
+}
+impl DxgiSharedTextureRingDescriptor {
+    pub const fn new(logical_size: LogicalSize, texture_count: u32) -> Self {
+        Self {
+            logical_size,
+            texture_count,
+        }
+    }
+}
+impl ToNative<sys::mln_dxgi_shared_texture_ring_descriptor> for DxgiSharedTextureRingDescriptor {
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_dxgi_shared_texture_ring_descriptor> {
+        let mut raw: sys::mln_dxgi_shared_texture_ring_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_dxgi_shared_texture_ring_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.texture_count = self.texture_count;
+        Ok(raw)
+    }
+}
+
 /// Distances in logical pixels from each edge of the map.
 ///
 /// See `mln_edge_insets` in the
@@ -3943,7 +4008,8 @@ pub struct RenderSessionAttachOptions {
     ///   device.
     /// - `RenderDriverKind::CoreWorker` for a transferred WebGL canvas, an
     ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-    ///   Android hardware buffers or dmabufs, or an offscreen session.
+    ///   Android hardware buffers, dmabufs, or DXGI shared textures, or an
+    ///   offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.

@@ -19,6 +19,8 @@ import type {
   CustomVectorSourceOptions,
   DmaBufFrame,
   DmaBufRingDescriptor,
+  DxgiSharedTextureFrame,
+  DxgiSharedTextureRingDescriptor,
   FeatureStateSelector,
   FrameDemand,
   FramePacerOptions,
@@ -544,6 +546,43 @@ export class AcquiredFrameHandle extends Owner {
           ADOPT,
           scope,
           native.mln_acquired_frame_get_dma_buf(this.id),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Gets the DXGI shared texture of an acquired frame.
+   *
+   * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+   * texture. Once you release or discard the frame, the session may render into
+   * the texture again. Open the handle with
+   * `ID3D11Device1::OpenSharedResource1` or `ID3D12Device::OpenSharedHandle`. A
+   * texture that you open keeps its memory, but not its contents.
+   *
+   * The session owns the handle, so don't close it. To keep the handle after
+   * you release the frame, duplicate it with `DuplicateHandle`.
+   *
+   * See `mln_acquired_frame_get_dxgi_shared_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
+   */
+  withDxgiSharedTexture<T>(use: (view: ScopedDxgiSharedTextureFrame) => T): T {
+    return new ViewScope(
+      ADOPT,
+      this,
+      (handle) => native.mln_acquired_frame_view_begin(handle),
+      (scope) => native.mln_acquired_frame_view_end(scope),
+    ).use((scope) =>
+      use(
+        new ScopedDxgiSharedTextureFrame(
+          ADOPT,
+          scope,
+          native.mln_acquired_frame_get_dxgi_shared_texture(this.id),
         ),
       ),
     );
@@ -1227,6 +1266,71 @@ export class MapHandle extends Owner {
       attach(
         (completion) =>
           native.mln_map_attach_dma_buf_ring(
+            this.id,
+            descriptor,
+            device?.id,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
+    );
+  }
+
+  /**
+   * Creates a session that renders the map into a ring of DXGI shared textures
+   * that the library allocates.
+   *
+   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+   * texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+   * `RenderSessionHandle.resize()` gives the ring new textures of the new size.
+   *
+   * The session renders with the Vulkan device `device`, or, when `device` is
+   * null, with one that the library creates. The textures belong to the
+   * device's GPU, so open them on a D3D11 or D3D12 device of the same adapter.
+   * To pick the GPU, create `device` with `VulkanDeviceOptions.deviceLuid` set
+   * to your adapter's LUID. Attach with `RenderDriverKind.coreWorker`.
+   *
+   * For a reader that waits on no fence, such as Flutter's texture registrar,
+   * attach without `GpuSyncKindFlag.d3d12Fence` in
+   * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
+   * before you acquire it. Release a frame with `GpuSyncKind.cpuComplete` only
+   * once the reader has finished with its texture.
+   *
+   * See `mln_map_attach_dxgi_shared_texture_ring` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` in an OpenGL build, or when the GPU can't share the
+   *   textures: D3D11 has no adapter with the Vulkan device's LUID or can't
+   *   share textures through NT handles, or the device lacks
+   *   VK_KHR_external_memory_win32 or can't import D3D11 textures.
+   * - `Status.nativeError` when the library can't create its Vulkan device or a
+   *   D3D11 device on the adapter.
+   */
+  attachDxgiSharedTextureRing(
+    descriptor: DxgiSharedTextureRingDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_dxgi_shared_texture_ring(
             this.id,
             descriptor,
             device?.id,
@@ -4995,7 +5099,7 @@ export class RenderSessionHandle extends Owner {
    * Errors:
    *
    * - `Status.unsupported` when the session renders offscreen or into Android
-   *   hardware buffers or dmabufs that it allocates.
+   *   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
    * - `Status.unsupported` when the target is a WebGL canvas.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
@@ -6537,6 +6641,51 @@ export class ScopedDmaBufFrame {
 
   get stride(): DmaBufFrame["stride"] {
     return this.#value.stride;
+  }
+}
+
+/**
+ * A `DxgiSharedTextureFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withDxgiSharedTexture} runs. Its other members stay
+ * readable after the callback returns.
+ */
+export class ScopedDxgiSharedTextureFrame {
+  readonly #value: DxgiSharedTextureFrame;
+  readonly #scope: ViewScope;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, scope: ViewScope, value: DxgiSharedTextureFrame) {
+    checkKey(key);
+    this.#value = value;
+    this.#scope = scope;
+  }
+
+  get width(): DxgiSharedTextureFrame["width"] {
+    return this.#value.width;
+  }
+
+  get height(): DxgiSharedTextureFrame["height"] {
+    return this.#value.height;
+  }
+
+  get scaleFactor(): DxgiSharedTextureFrame["scaleFactor"] {
+    return this.#value.scaleFactor;
+  }
+
+  get slot(): DxgiSharedTextureFrame["slot"] {
+    return this.#value.slot;
+  }
+
+  get format(): DxgiSharedTextureFrame["format"] {
+    return this.#value.format;
+  }
+
+  get handle(): DxgiSharedTextureFrame["handle"] {
+    return this.#scope.active(this.#value).handle;
   }
 }
 

@@ -85,6 +85,9 @@
 #include "render/dma_buf_session.hpp"
 #include "render/vulkan_device.hpp"
 #endif
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+#include "render/dxgi_shared_texture_session.hpp"
+#endif
 
 namespace {
 
@@ -2127,6 +2130,19 @@ auto configure_dma_buf_session(
       return status;
     };
   return MLN_STATUS_OK;
+}
+#endif
+
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+auto configure_dxgi_shared_texture_session(
+  const DxgiSharedTextureRing& /*ring*/, mln_vulkan_device /*device*/,
+  mln_render_session_object& /*session*/
+) -> mln_status {
+  set_thread_error(
+    "an OpenGL build can't render into DXGI shared textures; use a Vulkan "
+    "build"
+  );
+  return MLN_STATUS_UNSUPPORTED;
 }
 #endif
 

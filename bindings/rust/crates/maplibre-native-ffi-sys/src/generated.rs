@@ -758,6 +758,24 @@ pub struct mln_dma_buf_ring_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_dxgi_shared_texture_frame {
+    pub size: u32,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub slot: u32,
+    pub format: u32,
+    pub handle: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_dxgi_shared_texture_ring_descriptor {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub texture_count: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_edge_insets {
     pub top: f64,
     pub left: f64,
@@ -2158,6 +2176,11 @@ unsafe extern "C" {
         out_frame: *mut mln_dma_buf_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_acquired_frame_get_dxgi_shared_texture(
+        frame: mln_acquired_frame,
+        out_frame: *mut mln_dxgi_shared_texture_frame,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_acquired_frame_get_metal_texture(
         frame: mln_acquired_frame,
         out_frame: *mut mln_metal_texture_frame,
@@ -2350,6 +2373,15 @@ unsafe extern "C" {
     pub fn mln_map_attach_dma_buf_ring(
         map: mln_map,
         descriptor: *const mln_dma_buf_ring_descriptor,
+        device: mln_vulkan_device,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_dxgi_shared_texture_ring(
+        map: mln_map,
+        descriptor: *const mln_dxgi_shared_texture_ring_descriptor,
         device: mln_vulkan_device,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,

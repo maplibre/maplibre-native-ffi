@@ -143,6 +143,11 @@ function(mln_ffi_configure_renderer target)
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_backend.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_surface_session.cpp)
+  # The D3D11 textures that a Vulkan session renders into on Windows.
+  if(WIN32)
+    list(APPEND MLN_FFI_VULKAN_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dxgi_texture.cpp)
+  endif()
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
