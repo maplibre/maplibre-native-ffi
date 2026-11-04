@@ -248,7 +248,7 @@ importers:
         specifier: ^0.27.0
         version: 0.27.0(@astrojs/starlight@0.42.8(astro@7.4.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(supports-color@10.2.2)(typescript@7.0.2))(astro@7.4.4(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))(supports-color@10.2.2)
 
-  docs/demo:
+  examples/browser:
     dependencies:
       '@maplibre/native-ffi':
         specifier: workspace:*

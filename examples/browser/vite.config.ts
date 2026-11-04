@@ -1,7 +1,8 @@
-// Builds the live demo: one page per backend, under the docs site's base path.
+// Builds the browser example: one page per backend, under the docs site's base
+// path, into the site's public/demo, where the site's build picks it up.
 //
-// The browser modules aren't in the repository. `mise run //docs:demo-modules`
-// copies them into public/ from the binding's Emscripten builds.
+// The browser modules aren't in the repository. The example's mise tasks copy
+// them into public/ from the binding's Emscripten builds.
 
 import { fileURLToPath } from "node:url";
 
@@ -24,7 +25,7 @@ export default defineConfig({
   server: { headers: isolation },
   preview: { headers: isolation },
   build: {
-    outDir: here("../public/demo"),
+    outDir: here("../../docs/public/demo"),
     emptyOutDir: true,
     target: "es2024",
     rollupOptions: {

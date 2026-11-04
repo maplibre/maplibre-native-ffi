@@ -189,6 +189,9 @@ ci:
       rules:
         - if: { files: ["docs/**"] }
           then: apply
+        # The site serves the browser example as its live demo.
+        - if: { files: ["examples/browser/**"] }
+          then: apply
         # Pages show regions of these files, and the build fails on a missing
         # region.
         - if:
@@ -561,7 +564,7 @@ ci:
               - bindings/kotlin/src/wasmJs*/**
               - bindings/kotlin/wasm/**
               - bindings/kotlin/karma.config.d/**
-              - docs/demo/**
+              - examples/browser/**
               - third_party/maplibre-native
           then: apply
     maven:

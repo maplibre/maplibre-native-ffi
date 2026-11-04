@@ -31,5 +31,5 @@ which installs the binding in the runtime and draws on a native view,
 
 `src/MapController.ts` attaches a render session to the view's surface, gives
 the session each new surface, and runs the frame loop, as the browser demo in
-`docs/demo` does. Both sessions render on a library thread, and on Android the
-library makes the OpenGL ES context for the window.
+`examples/browser` does. Both sessions render on a library thread, and on
+Android the library makes the OpenGL ES context for the window.

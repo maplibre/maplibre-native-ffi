@@ -653,7 +653,7 @@ jobs:
           run-id: ${{ needs.source.outputs.run_id }}
           name: typescript-addon-emscripten-wasm32-webgpu-${{ env.RELEASE_SHA }}
           path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
-      - run: mise run //docs:demo-build
+      - run: mise run //examples/browser:build
       - run: mise run //docs:build
         env:
           MISE_TASK_SKIP: "//:build"

@@ -6,7 +6,7 @@ docs/doxygen/gen/
 docs/src/generated/
 docs/public/reference/
 docs/public/demo/
-docs/demo/public/
+examples/browser/public/
 .build/
 .swiftpm/
 .zig-cache/

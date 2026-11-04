@@ -229,7 +229,7 @@ jobs:
       - name: Add the demo to the site
         run: |
           mise deps pnpm
-          mise run --no-deps --skip-tools //docs:demo-build
+          mise run --no-deps --skip-tools //examples/browser:build
           mkdir -p build/cloudflare-pages
           tar -xf build/cloudflare-pages.tar -C build/cloudflare-pages
           cp -R docs/public/demo build/cloudflare-pages/maplibre-native-ffi/demo

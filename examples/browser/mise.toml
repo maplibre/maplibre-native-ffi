@@ -1,0 +1,36 @@
+# The browser example, which the docs site serves as its live demo at /demo/.
+# Its pages load the binding's browser modules, so build those first, with the
+# Emscripten SDK:
+#
+#   mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl
+#   mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgpu
+#
+# Then run dev, or run build before //docs:build to put the demo in the site.
+
+[tasks.modules]
+hide = true
+run = '''
+for backend in webgl webgpu; do
+  install="$MISE_MONOREPO_ROOT/bindings/typescript/native/build/emscripten-wasm32-$backend/install"
+  if [[ ! -f "$install/maplibre_native_ffi.wasm" ]]; then
+    echo "error: the $backend browser module isn't built. Build it with:" >&2
+    echo "  mise -E emscripten run //bindings/typescript:build emscripten-wasm32-$backend" >&2
+    exit 1
+  fi
+  rm -rf "public/$backend"
+  mkdir -p "public/$backend"
+  cp -R "$install/maplibre_native_ffi.mjs" "$install/maplibre_native_ffi.wasm" \
+    "$install/licenses" "public/$backend/"
+done
+cp node_modules/coi-serviceworker/coi-serviceworker.min.js public/
+'''
+
+[tasks.dev]
+description = "Serve the browser example with the binding's browser modules"
+depends = ["modules"]
+run = "pnpm exec vp dev"
+
+[tasks.build]
+description = "Build the browser example into the docs site's public/demo"
+depends = ["modules"]
+run = "pnpm exec vp build"

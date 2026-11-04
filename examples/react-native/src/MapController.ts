@@ -1,7 +1,7 @@
 // A continuous map on a MaplibreSurfaceView. The view lends its surface when the
 // platform provides one, and the controller attaches a session to it, or gives
 // an attached session the new surface. Everything else matches the browser
-// demo in docs/demo.
+// example in examples/browser.
 
 import {
   CameraUpdateMode,
