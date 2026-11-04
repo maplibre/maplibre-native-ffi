@@ -87,8 +87,10 @@ case "$preset" in
     # portable loader also reaches the suite's workers and child processes.
     strip_loader="$PWD/test/run/strip-types.mjs"
     export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import=$strip_loader"
+    # The TAP reporter keeps the exit code or signal of a test process that
+    # dies, which the default reporter shows only as 'test failed'.
     "$MISE_MONOREPO_ROOT/scripts/run-qemu-test.sh" "$preset" "$root/usr/bin/node" \
-      --expose-gc --test --test-timeout=300000 test/run/node.ts
+      --expose-gc --test --test-reporter=tap --test-timeout=300000 test/run/node.ts
     ;;
   linux-musl-*)
     # The host packs and type-checks; Alpine runs the addon and consumer with
