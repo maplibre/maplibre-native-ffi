@@ -21,6 +21,7 @@ from collections.abc import Iterable
 
 from release_version import parse_version
 from sbom import SBOM_NAME, component, compose, stamp, write_json
+from swift_artifact_bundle import write_bundles
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import write_package as write_zig_package
 
@@ -469,6 +470,14 @@ def prepare_assets(
     root_component = component("MaplibreNativeC.xcframework", version, "BSD-2-Clause")
     root_component["group"] = "org.maplibre.nativeffi"
     publish_inventory(xcframework, compose(root_component, inventories), tag)
+    bundles = []
+    for bundle, inventories in write_bundles(release_dir, archives, version).values():
+        root_component = component(
+            bundle.name.removesuffix(".zip"), version, "BSD-2-Clause"
+        )
+        root_component["group"] = "org.maplibre.nativeffi"
+        publish_inventory(bundle, compose(root_component, inventories), tag)
+        bundles.append(bundle)
     artifacts_path = release_dir / ARTIFACTS_NAME
     index = write_artifacts(artifacts_path, tag, archives, xcframework)
     zig_package = release_dir / ZIG_PACKAGE_NAME
@@ -488,9 +497,10 @@ def prepare_assets(
         [
             *archives,
             xcframework,
+            *bundles,
             zig_package,
             artifacts_path,
-            *(sbom_path(archive) for archive in [*archives, xcframework]),
+            *(sbom_path(archive) for archive in [*archives, xcframework, *bundles]),
         ],
     )
 

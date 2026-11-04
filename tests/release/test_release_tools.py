@@ -24,6 +24,7 @@ from native_package_release import (
 )
 from release_version import next_release, require_current_month, validate_tag
 from sbom import SBOM_NAME, component, document
+from swift_artifact_bundle import bundle_name
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import zig_hash
 
@@ -125,6 +126,13 @@ def inventory(platform: str, backend: str) -> dict:
     )
 
 
+def ar_archive(member: str) -> bytes:
+    """A GNU archive that holds `member`, whose content is its name."""
+    content = member.encode()
+    header = f"{member + '/':<16}{0:<12}{0:<6}{0:<6}{644:<8}{len(content):<10}`\n"
+    return b"!<arch>\n" + header.encode() + content + b"\n" * (len(content) % 2)
+
+
 def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> None:
     root = f"maplibre-native-c-{preset}"
     with tarfile.open(path, "w:gz") as archive:
@@ -144,6 +152,13 @@ def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> 
             json.dumps(descriptor(preset, backend)).encode(),
         )
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.so", b"binary")
+        for name, member in (
+            ("libmaplibre-native-c.a", "c.o"),
+            ("libmln_ffi_platform.a", "rust.o"),
+        ):
+            add_bytes(archive, f"{root}/lib/{name}", ar_archive(member))
+        add_bytes(archive, f"{root}/include/maplibre_native_c.h", b"// header\n")
+        add_bytes(archive, f"{root}/share/maplibre-native-c/LICENSE", b"license\n")
         for relative in (
             "share/maplibre-native-c",
             "Frameworks/MaplibreNativeC.framework/Resources",
@@ -376,10 +391,12 @@ class NativePackageReleaseTest(unittest.TestCase):
                 for path in (
                     archive,
                     self.xcframework,
+                    self.release_dir / bundle_name("vulkan"),
                     self.release_dir / ZIG_PACKAGE_NAME,
                     self.release_dir / ARTIFACTS_NAME,
                     sbom_path(archive),
                     sbom_path(self.xcframework),
+                    sbom_path(self.release_dir / bundle_name("vulkan")),
                 )
             },
         )
@@ -464,6 +481,43 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.assertTrue(any("macos-arm64" in ref for ref in refs))
         for entry in combined["dependencies"]:
             self.assertTrue(set(entry["dependsOn"]) <= set(refs))
+
+    def test_a_swift_bundle_merges_each_platforms_archives(self) -> None:
+        self.archive()
+        self.archive("linux-gnu-x64-egl", "opengl")
+        self.write_presets(self.preset, "linux-gnu-x64-egl")
+        self.prepare("release")
+        root = "MaplibreNativeCVulkan.artifactbundle"
+        with zipfile.ZipFile(self.release_dir / bundle_name("vulkan")) as bundle:
+            info = json.loads(bundle.read(f"{root}/info.json"))
+            library = bundle.read(f"{root}/linux-gnu-x64/libmaplibre-native-c.a")
+            static = bundle.read(f"{root}/include/maplibre_native_c_static.h")
+            header = bundle.read(f"{root}/include/MaplibreNativeC/maplibre_native_c.h")
+            descriptor = json.loads(
+                bundle.read(f"{root}/linux-gnu-x64/share/artifact.json")
+            )
+        self.assertEqual(
+            info["artifacts"]["MaplibreNativeCVulkan"]["variants"],
+            [
+                {
+                    "path": "linux-gnu-x64/libmaplibre-native-c.a",
+                    "supportedTriples": ["x86_64-unknown-linux-gnu"],
+                    "staticLibraryMetadata": {
+                        "headerPaths": ["include"],
+                        "moduleMapPath": "include/module.modulemap",
+                    },
+                }
+            ],
+        )
+        self.assertEqual(
+            info["artifacts"]["MaplibreNativeCVulkan"]["version"], self.version
+        )
+        self.assertIn(b"c.o/", library)
+        self.assertIn(b"rust.o/", library)
+        self.assertIn(b"#define MLN_STATIC", static)
+        self.assertEqual(header, b"// header\n")
+        self.assertEqual(descriptor["version"], self.version)
+        self.assertTrue((self.release_dir / bundle_name("opengl")).is_file())
 
     def test_refuses_an_incomplete_native_release(self) -> None:
         self.write_presets("linux-gnu-x64-egl", self.preset)
