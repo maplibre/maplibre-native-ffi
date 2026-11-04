@@ -637,7 +637,7 @@ final class RenderDriverKind extends _Enum {
   /// A library thread.
   static const coreWorker = RenderDriverKind.fromRawValue(1);
 
-  /// Your thread, when it calls `RenderSessionHandle.serviceDriverWork()`.
+  /// Your thread, when it calls `mln_render_session_service_driver_work()`.
   static const callerGraphicsThread = RenderDriverKind.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
@@ -2859,8 +2859,8 @@ final class RenderSessionAttachOptions extends _Value {
   ///
   /// An isolate cannot service a caller-graphics-thread driver, because Dart
   /// can resume it on another native thread after any `await`. Host native code
-  /// services such a session on the graphics thread by passing its `id` to the
-  /// C function that `RenderSessionHandle.serviceDriverWork()` calls.
+  /// services such a session on the graphics thread by passing its `id` to
+  /// `mln_render_session_service_driver_work()`.
   final RenderDriverKind driver;
 
   /// The kinds of `GpuSync` that you can wait on before you read an acquired
@@ -2874,7 +2874,7 @@ final class RenderSessionAttachOptions extends _Value {
   final Wake frameWake;
 
   /// Called when a session driven by `RenderDriverKind.callerGraphicsThread`
-  /// has work for `RenderSessionHandle.serviceDriverWork()`. It isn't called
+  /// has work for `mln_render_session_service_driver_work()`. It isn't called
   /// again until a service runs.
   final Wake driverWorkWake;
 
