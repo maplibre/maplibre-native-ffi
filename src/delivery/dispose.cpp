@@ -4,6 +4,7 @@
 #include "delivery/delivery_queue.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "map/map.hpp"
+#include "render/frame_pacer.hpp"
 #include "render/offscreen_device.hpp"
 #include "render/render_session_common.hpp"
 #include "render/vulkan_device.hpp"
@@ -22,6 +23,9 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
         return core::acquired_frame_discard(handle);
       case core::HandleKind::DeliveryQueue:
         release_delivery_queue(handle);
+        return MLN_STATUS_OK;
+      case core::HandleKind::FramePacer:
+        core::frame_pacer_release(handle);
         return MLN_STATUS_OK;
       case core::HandleKind::GeoJsonSourceData:
         core::geojson_source_data_release(handle);

@@ -300,6 +300,24 @@ VulkanTextureFrame _readVulkanTextureFrame(
   layout: source.layout,
 );
 
+Pointer<raw.mln_frame_pacer_options> _writeFramePacerOptions(
+  FramePacerOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_frame_pacer_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_frame_pacer_options>();
+  result.ref.size = sizeOf<raw.mln_frame_pacer_options>();
+  if (value.maximumFramesPerSecond != null) {
+    result.ref.fields |= raw.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+    result.ref.maximum_frames_per_second = _nativeInteger(
+      value.maximumFramesPerSecond!,
+      0,
+      4294967295,
+    );
+  }
+  return result;
+}
+
 Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
   CanonicalTileId value,
   Allocator arena, {
@@ -3040,6 +3058,40 @@ final _resultint = _CompletionValue(
   (element) => element.cast<Uint32>().value,
 );
 
+/// Creates a frame pacer that follows the display through the calling
+/// thread's looper.
+///
+/// Call it on a thread with an `ALooper`, such as the app's main thread. The
+/// pacer demands frames from that thread at the display refreshes that the
+/// looper's `AChoreographer` reports, so keep the thread running its looper
+/// while sessions use the pacer.
+///
+/// See `mln_android_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+///
+/// Errors:
+///
+/// - `Status.invalidState` when the calling thread has no `ALooper`.
+FramePacerHandle androidFramePacerCreate({FramePacerOptions? options}) =>
+    withNativeArena((arena) {
+      ensureAbiVersion();
+      final outPacer = arena<Uint64>();
+      _check(
+        raw.mln_android_frame_pacer_create(
+          options == null ? nullptr : _writeFramePacerOptions(options, arena),
+          outPacer,
+          nativeDiagnostic,
+        ),
+      );
+      return _adoptOwned(
+        outPacer.value,
+        () => FramePacerHandle._(_NativeFramePacer(outPacer.value)),
+        (handle) {
+          raw.mln_frame_pacer_release(handle);
+        },
+      );
+    });
+
 /// Gives the library the Java VM and the app context that it needs on
 /// Android.
 ///
@@ -3473,6 +3525,46 @@ final class AcquiredFrameHandle implements Finalizable {
       ),
     ),
   );
+}
+
+/// Issued native handle id.
+extension type const _NativeFramePacer(int raw) implements NativeHandle {}
+
+/// Owner of one native handle.
+///
+/// Demands render sessions' frames in step with a display's refreshes.
+///
+/// See `mln_frame_pacer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class FramePacerHandle implements Finalizable {
+  FramePacerHandle._(_NativeFramePacer handle)
+    : _state = NativeHandleState(handle, 'FramePacerHandle');
+  final NativeHandleState<_NativeFramePacer> _state;
+  // ignore: unused_element
+  _NativeFramePacer get _handle => _state.handle;
+
+  /// The native handle id.
+  int get id => _state.handleId;
+
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'FramePacerHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+
+  /// Releases a frame pacer.
+  ///
+  /// Render sessions that use the pacer stay paced until you release them or
+  /// set another pacer.
+  ///
+  /// See `mln_frame_pacer_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  void release() => _state.close((handle) {
+    raw.mln_frame_pacer_release(handle.raw);
+    return nativeStatusOk;
+  });
 }
 
 /// Issued native handle id.
@@ -7068,6 +7160,32 @@ final class RenderSessionHandle implements Finalizable {
       _handle.raw,
       _writeLogicalSize(logicalSize, arena).ref,
       completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets the frame pacer that demands the session's frames.
+  ///
+  /// At the first display refresh after the session has something new to draw,
+  /// `pacer` demands a frame without flags and with token 0. Take the results
+  /// through the frame wake as usual. One pacer can serve many sessions. When
+  /// `pacer` is null, the session stops being paced. You can call it once the
+  /// attach call returns.
+  ///
+  /// See `mln_render_session_set_frame_pacer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
+  ///   `Status.nativeError`, when the session has failed. The diagnostic
+  ///   carries the failure's message.
+  /// - `Status.invalidState` when you attached the session with a redraw wake,
+  ///   or detached, abandoned, released, or disposed it.
+  void setFramePacer({FramePacerHandle? pacer}) => _check(
+    raw.mln_render_session_set_frame_pacer(
+      _handle.raw,
+      (pacer?._handle.raw ?? 0),
       nativeDiagnostic,
     ),
   );

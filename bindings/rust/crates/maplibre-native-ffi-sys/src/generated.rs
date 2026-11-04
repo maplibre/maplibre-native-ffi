@@ -78,6 +78,8 @@ pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_fiel
 pub type mln_frame_demand_flag = u32;
 pub const MLN_FRAME_DEMAND_FORCE: mln_frame_demand_flag = 1;
 pub const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE: mln_frame_demand_flag = 4;
+pub type mln_frame_pacer_option_field = u32;
+pub const MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND: mln_frame_pacer_option_field = 1;
 pub type mln_free_camera_option_field = u32;
 pub const MLN_FREE_CAMERA_OPTION_POSITION: mln_free_camera_option_field = 1;
 pub const MLN_FREE_CAMERA_OPTION_ORIENTATION: mln_free_camera_option_field = 2;
@@ -744,6 +746,13 @@ pub struct mln_frame_demand {
     pub size: u32,
     pub flags: mln_frame_demand_flags,
     pub token: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_frame_pacer_options {
+    pub size: u32,
+    pub fields: mln_frame_pacer_option_fields,
+    pub maximum_frames_per_second: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1900,6 +1909,10 @@ pub type mln_custom_vector_source_option_fields = u32;
 pub struct mln_delivery_queue(pub u64);
 pub type mln_feature_state_selector_fields = u32;
 pub type mln_frame_demand_flags = u32;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_frame_pacer(pub u64);
+pub type mln_frame_pacer_option_fields = u32;
 pub type mln_free_camera_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2006,6 +2019,7 @@ pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ff
 native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
+    mln_frame_pacer,
     mln_geo_json_source_data,
     mln_map,
     mln_map_projection,
@@ -2065,6 +2079,11 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_view_end(scope: *mut std::ffi::c_void);
+    pub fn mln_android_frame_pacer_create(
+        options: *const mln_frame_pacer_options,
+        out_pacer: *mut mln_frame_pacer,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_android_init(
         jni_env: *mut std::ffi::c_void,
         context: *mut std::ffi::c_void,
@@ -2101,6 +2120,7 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_delivery_queue_release(queue: mln_delivery_queue);
+    pub fn mln_frame_pacer_release(pacer: mln_frame_pacer);
     pub fn mln_geo_json_source_data_create(
         data: mln_buffer_view,
         options: *const mln_geo_json_source_options,
@@ -2911,6 +2931,11 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_service_driver_work(
         session: mln_render_session,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_frame_pacer(
+        session: mln_render_session,
+        pacer: mln_frame_pacer,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_metal_borrowed_texture_target(

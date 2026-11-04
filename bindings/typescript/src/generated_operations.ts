@@ -521,6 +521,49 @@ export class AcquiredFrameHandle extends Owner {
 defineDisposers(AcquiredFrameHandle, undefined, undefined);
 
 /**
+ * Demands render sessions' frames in step with a display's refreshes.
+ *
+ * See `mln_frame_pacer` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export class FramePacerHandle extends Owner {
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
+    super(key, handle, "FramePacerHandle", { registrations });
+  }
+  /**
+   * Calls `release()`, for `await using`.
+   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.asyncDispose]: () => Promise<void>;
+  /**
+   * Calls `release()`, for `using`.
+   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.dispose]: () => void;
+
+  /**
+   * Releases a frame pacer.
+   *
+   * Render sessions that use the pacer stay paced until you release them or set
+   * another pacer.
+   *
+   * See `mln_frame_pacer_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_frame_pacer_release(handle, token),
+    );
+  }
+}
+defineDisposers(FramePacerHandle, "release", "release");
+
+/**
  * GeoJSON data, parsed and ready to add to a GeoJSON source.
  *
  * See `mln_geo_json_source_data` in the
@@ -4495,6 +4538,30 @@ export class RenderSessionHandle extends Owner {
    */
   serviceDriverWork(): void {
     native.mln_render_session_service_driver_work(this.id);
+  }
+
+  /**
+   * Sets the frame pacer that demands the session's frames.
+   *
+   * At the first display refresh after the session has something new to draw,
+   * `pacer` demands a frame without flags and with token 0. Take the results
+   * through the frame wake as usual. One pacer can serve many sessions. When
+   * `pacer` is null, the session stops being paced. You can call it once the
+   * attach call returns.
+   *
+   * See `mln_render_session_set_frame_pacer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
+   *   `Status.nativeError`, when the session has failed. The diagnostic carries
+   *   the failure's message.
+   * - `Status.invalidState` when you attached the session with a redraw wake,
+   *   or detached, abandoned, released, or disposed it.
+   */
+  setFramePacer(pacer?: FramePacerHandle): void {
+    native.mln_render_session_set_frame_pacer(this.id, pacer?.id);
   }
 
   /**

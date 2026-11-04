@@ -27,6 +27,8 @@ internal expect object C {
 
   fun mln_acquired_frame_view_end(scope: Long): Unit
 
+  fun mln_android_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int
+
   fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
   fun mln_c_version(): Int
@@ -38,6 +40,8 @@ internal expect object C {
   fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int
 
   fun mln_delivery_queue_release(queue: Long): Unit
+
+  fun mln_frame_pacer_release(pacer: Long): Unit
 
   fun mln_geo_json_source_data_create(
     data: Long,
@@ -786,6 +790,8 @@ internal expect object C {
   ): Int
 
   fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int
+
+  fun mln_render_session_set_frame_pacer(session: Long, pacer: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,

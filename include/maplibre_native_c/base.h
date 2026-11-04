@@ -162,6 +162,11 @@ typedef uint64_t mln_render_frame_batch MLN_BINDING(
   "kind=handle;release=mln_render_frame_batch_release;"
   "dispose=mln_render_frame_batch_release"
 );
+/** Demands render sessions' frames in step with a display's refreshes. */
+typedef uint64_t mln_frame_pacer MLN_BINDING(
+  "kind=handle;release=mln_frame_pacer_release;"
+  "dispose=mln_frame_pacer_release"
+);
 /** A queue that holds callback calls until the caller dispatches them. */
 typedef uint64_t mln_delivery_queue MLN_BINDING(
   "kind=handle;release=mln_delivery_queue_release;"

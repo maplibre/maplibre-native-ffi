@@ -41,6 +41,7 @@
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
 #include "render/discard_present.hpp"
+#include "render/frame_pacer.hpp"
 #include "render/queue_lock.hpp"
 #include "render/worker_condition.hpp"
 #include "wake/wake.hpp"
@@ -978,6 +979,13 @@ struct mln_render_session_object
   std::shared_ptr<mln::core::Wake> frame_wake;
   std::shared_ptr<mln::core::Wake> driver_wake;
   std::shared_ptr<mln::core::Wake> redraw_wake;
+  // Whether the host attached the session with a redraw wake, which rules out
+  // a pacer.
+  bool has_redraw_wake = false;
+  // The pacer that the session asks in place of the redraw wake, which counts
+  // the session from mln_render_session_set_frame_pacer() until the session
+  // lets go of it. Null for none.
+  std::shared_ptr<mln::core::FramePacer> pacer;
   // The host's lock on the queue the backend submits to. initialize_backend
   // shares it with a backend that takes it around its queue calls. Null when
   // the host passed no lock.
@@ -996,7 +1004,8 @@ struct mln_render_session_object
   std::function<mln::core::GpuSyncSupport()> probe_sync_kinds;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
-  // Set when the redraw wake is called, and cleared by the host's next demand.
+  // Set when the redraw wake is called or the pacer asked, and cleared by the
+  // next demand.
   bool redraw_wake_pending = false;
   bool scheduler_service_queued = false;
 
@@ -1331,6 +1340,9 @@ auto render_session_get_failure(
 ) -> mln_status;
 auto render_session_demand_frame(
   mln_render_session session, const mln_frame_demand* demand
+) -> mln_status;
+auto render_session_set_frame_pacer(
+  mln_render_session session, mln_frame_pacer pacer
 ) -> mln_status;
 auto render_session_service_driver_work(mln_render_session session)
   -> mln_status;

@@ -148,6 +148,38 @@ pub const AcquiredFrame = struct {
     }
 };
 
+/// Demands render sessions' frames in step with a display's refreshes.
+///
+/// See `mln_frame_pacer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const FramePacer = struct {
+    raw: u64,
+    closed: bool = false,
+    pub const native_name = "mln_frame_pacer";
+    const methods = owner.Handle(@This(), "FramePacer", struct {
+        fn dispose(raw: u64) status.Error!void {
+            c.mln_frame_pacer_release(raw);
+        }
+    }.dispose);
+    pub const adopt = methods.adopt;
+    pub const id = methods.id;
+    pub const isClosed = methods.isClosed;
+    pub const format = methods.format;
+    pub const deinit = methods.deinit;
+    /// Releases a frame pacer.
+    ///
+    /// Render sessions that use the pacer stay paced until you release them or set
+    /// another pacer.
+    ///
+    /// See `mln_frame_pacer_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn release(self: *FramePacer) void {
+        if (self.closed) return;
+        c.mln_frame_pacer_release(self.raw);
+        self.closed = true;
+    }
+};
+
 /// GeoJSON data, parsed and ready to add to a GeoJSON source.
 ///
 /// See `mln_geo_json_source_data` in the
@@ -2018,6 +2050,28 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_service_driver_work", .handle, self, null, diagnostic, .{});
     }
 
+    /// Sets the frame pacer that demands the session's frames.
+    ///
+    /// At the first display refresh after the session has something new to draw,
+    /// `pacer` demands a frame without flags and with token 0. Take the results
+    /// through the frame wake as usual. One pacer can serve many sessions. When
+    /// `pacer` is null, the session stops being paced. You can call it once the
+    /// attach call returns.
+    ///
+    /// See `mln_render_session_set_frame_pacer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `RenderSessionSnapshot.failure_status`, `error.TargetLost` or
+    ///   `error.NativeError`, when the session has failed. The diagnostic carries
+    ///   the failure's message.
+    /// - `error.InvalidState` when you attached the session with a redraw wake, or
+    ///   detached, abandoned, released, or disposed it.
+    pub fn setFramePacer(self: RenderSession, pacer: ?FramePacer, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        return call.invoke("mln_render_session_set_frame_pacer", .handle, self, null, diagnostic, .{pacer});
+    }
+
     /// Replaces the Metal textures that a borrowed ring renders into.
     ///
     /// Use it to resize the ring, or to give the session textures again after
@@ -3679,6 +3733,30 @@ pub const FrameDemandFlag = struct {
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
+};
+
+/// Options for creating a frame pacer.
+///
+/// See `mln_frame_pacer_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub const FramePacerOptions = struct {
+    /// The most times per second that the pacer demands frames, greater than
+    /// zero. The pacer skips a display refresh that comes too soon after its
+    /// last demands, and a limit at the display's refresh rate or above skips
+    /// none. By default, it can demand frames at every refresh.
+    maximum_frames_per_second: ?u32 = null,
+    pub fn toNative(self: FramePacerOptions) c.mln_frame_pacer_options {
+        var raw = std.mem.zeroes(c.mln_frame_pacer_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_frame_pacer_options);
+        marshal.present(&raw.fields, c.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, self.maximum_frames_per_second);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_frame_pacer_options) FramePacerOptions {
+        return .{
+            .maximum_frames_per_second = if (raw.fields & c.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND != 0) raw.maximum_frames_per_second else null,
+        };
+    }
 };
 
 /// A map camera's whole position and orientation in three dimensions.
@@ -8353,6 +8431,26 @@ pub const NewRenderSession = struct {
     session: RenderSession,
     ready: completion.Future(void),
 };
+
+/// Creates a frame pacer that follows the display through the calling thread's
+/// looper.
+///
+/// Call it on a thread with an `ALooper`, such as the app's main thread. The
+/// pacer demands frames from that thread at the display refreshes that the
+/// looper's `AChoreographer` reports, so keep the thread running its looper
+/// while sessions use the pacer.
+///
+/// See `mln_android_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+///
+/// Errors:
+///
+/// - `error.InvalidState` when the calling thread has no `ALooper`.
+pub const androidFramePacerCreate = if (builtin.abi.isAndroid()) struct {
+    fn function(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
+        return call.invoke("mln_android_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
+    }
+}.function else {};
 
 /// Gives the library the Java VM and the app context that it needs on Android.
 ///

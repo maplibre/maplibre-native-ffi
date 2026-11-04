@@ -107,6 +107,7 @@ export interface NativeOperations {
     tile: CanonicalTileId,
     logicalSize: LogicalSize,
   ): CameraOptions;
+  mln_frame_pacer_release(pacer: bigint, token: object | undefined): void;
   mln_geo_json_source_data_create(
     data: unknown,
     options: GeoJsonSourceOptions | undefined,
@@ -701,6 +702,10 @@ export interface NativeOperations {
     completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
+  mln_render_session_set_frame_pacer(
+    session: bigint,
+    pacer: bigint | undefined,
+  ): void;
   mln_render_session_set_metal_borrowed_texture_target(
     session: bigint,
     replacement: MetalBorrowedTextureReplacement,

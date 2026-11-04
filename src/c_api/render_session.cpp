@@ -2,6 +2,7 @@
 
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
+#include "render/frame_pacer.hpp"
 #include "render/render_session_common.hpp"
 
 auto mln_render_session_get_capabilities(
@@ -31,6 +32,19 @@ auto mln_render_session_demand_frame(
   return mln::c_api::status_boundary(out_diagnostic, [&] {
     return mln::core::render_session_demand_frame(session, demand);
   });
+}
+
+auto mln_render_session_set_frame_pacer(
+  mln_render_session session, mln_frame_pacer pacer,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::render_session_set_frame_pacer(session, pacer);
+  });
+}
+
+void mln_frame_pacer_release(mln_frame_pacer pacer) noexcept {
+  mln::core::frame_pacer_release(pacer);
 }
 
 auto mln_render_session_get_failure(

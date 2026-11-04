@@ -2144,6 +2144,33 @@ final class VulkanTextureFrame extends _Value {
   ]);
 }
 
+/// Options for creating a frame pacer.
+///
+/// See `mln_frame_pacer_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class FramePacerOptions extends _Value {
+  const FramePacerOptions({this.maximumFramesPerSecond});
+
+  /// The most times per second that the pacer demands frames, greater than
+  /// zero. The pacer skips a display refresh that comes too soon after its last
+  /// demands, and a limit at the display's refresh rate or above skips none. By
+  /// default, it can demand frames at every refresh.
+  final int? maximumFramesPerSecond;
+
+  /// A copy of this value with the given members replaced.
+  FramePacerOptions copyWith({int? maximumFramesPerSecond}) =>
+      FramePacerOptions(
+        maximumFramesPerSecond:
+            maximumFramesPerSecond ?? this.maximumFramesPerSecond,
+      );
+
+  @override
+  List<Object?> get _members => [maximumFramesPerSecond];
+  @override
+  String toString() =>
+      _describe('FramePacerOptions', const ['maximumFramesPerSecond']);
+}
+
 /// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
 ///
 /// See `mln_canonical_tile_id` in the

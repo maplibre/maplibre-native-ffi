@@ -85,6 +85,8 @@
 /dotnet/src/Maplibre.NativeFfi/RenderSession/AcquiredFrameHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/FrameDemand.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/FrameDemandFlag.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderSession/FramePacerHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderSession/FramePacerOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameResult.g.cs linguist-generated=true
@@ -238,11 +240,13 @@
 /go/maplibre/generated_callbacks.h linguist-generated=true
 /go/maplibre/generated_native.go linguist-generated=true
 /kotlin/src/androidMain/jni/mln_jni_generated.c linguist-generated=true
+/kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/GeneratedAndroidOperations.kt linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt linguist-generated=true
 /kotlin/src/androidNativeMain/kotlin/org/maplibre/nativeffi/GeneratedAndroidNativeOperations.kt linguist-generated=true
 /kotlin/src/appleMain/kotlin/org/maplibre/nativeffi/GeneratedAppleOperations.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/AcquiredFrameHandle.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/FramePacerHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GeneratedCodecs.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GeneratedGlobals.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/GeneratedOwnerDisposal.kt linguist-generated=true
@@ -290,6 +294,7 @@
 /python/src/generated_operations.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi-sys/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/frame_pacer.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/geo_json_source_data.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/global.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/map.rs linguist-generated=true
@@ -320,6 +325,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionMapProjectionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedQueryRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionAcquiredFrameOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionFramePacerOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderTargetGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRuntimeGlobalsOperations.swift linguist-generated=true

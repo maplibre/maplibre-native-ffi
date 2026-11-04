@@ -38,6 +38,8 @@ internal actual object C {
     Ffm.downcall("mln_acquired_frame_view_begin", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_view_end =
     Ffm.downcall("mln_acquired_frame_view_end", null, JAVA_LONG)
+  private val mln_android_frame_pacer_create =
+    Ffm.downcall("mln_android_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_android_init =
     Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_c_version = Ffm.downcall("mln_c_version", JAVA_INT)
@@ -56,6 +58,7 @@ internal actual object C {
     Ffm.downcall("mln_delivery_queue_dispatch", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_release =
     Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
+  private val mln_frame_pacer_release = Ffm.downcall("mln_frame_pacer_release", null, JAVA_LONG)
   private val mln_geo_json_source_data_create =
     Ffm.downcall(
       "mln_geo_json_source_data_create",
@@ -977,6 +980,8 @@ internal actual object C {
     )
   private val mln_render_session_service_driver_work =
     Ffm.downcall("mln_render_session_service_driver_work", JAVA_INT, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_set_frame_pacer =
+    Ffm.downcall("mln_render_session_set_frame_pacer", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_set_metal_borrowed_texture_target =
     Ffm.downcall(
       "mln_render_session_set_metal_borrowed_texture_target",
@@ -1332,6 +1337,12 @@ internal actual object C {
     mln_acquired_frame_view_end.invoke(scope)
   }
 
+  actual fun mln_android_frame_pacer_create(
+    options: Long,
+    outPacer: Long,
+    outDiagnostic: Long,
+  ): Int = mln_android_frame_pacer_create.invokeExact(options, outPacer, outDiagnostic) as Int
+
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_android_init.invokeExact(jniEnv, context, outDiagnostic) as Int
 
@@ -1358,6 +1369,10 @@ internal actual object C {
 
   actual fun mln_delivery_queue_release(queue: Long) {
     mln_delivery_queue_release.invoke(queue)
+  }
+
+  actual fun mln_frame_pacer_release(pacer: Long) {
+    mln_frame_pacer_release.invoke(pacer)
   }
 
   actual fun mln_geo_json_source_data_create(
@@ -2790,6 +2805,12 @@ internal actual object C {
 
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_render_session_service_driver_work.invokeExact(session, outDiagnostic) as Int
+
+  actual fun mln_render_session_set_frame_pacer(
+    session: Long,
+    pacer: Long,
+    outDiagnostic: Long,
+  ): Int = mln_render_session_set_frame_pacer.invokeExact(session, pacer, outDiagnostic) as Int
 
   actual fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,

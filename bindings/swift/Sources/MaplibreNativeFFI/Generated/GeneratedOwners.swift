@@ -55,6 +55,56 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
+struct NativeFramePacerHandle: NativeHandle {
+  let raw: UInt64; func disposeAbandoned()
+    -> Bool
+  {
+    mln_frame_pacer_release(raw); return true
+  }
+}
+
+/// Demands render sessions' frames in step with a display's refreshes.
+///
+/// See `mln_frame_pacer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public final class FramePacerHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
+  let handle: NativeHandleState<NativeFramePacerHandle>
+  init(adopting raw: mln_frame_pacer) throws {
+    handle = try NativeHandleState(
+      typeName: "FramePacerHandle",
+      handle: NativeFramePacerHandle(raw: raw)
+    )
+  }
+
+  /// The native handle, which no later handle in the process reuses.
+  /// It stays valid after the handle is released.
+  public var id: UInt64 {
+    handle.value.raw
+  }
+
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
+  public var isClosed: Bool {
+    handle.isClosed
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: FramePacerHandle,
+                         rhs: FramePacerHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+}
+
 struct NativeGeoJsonSourceDataHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool

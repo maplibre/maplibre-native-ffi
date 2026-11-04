@@ -414,6 +414,34 @@ public extension RenderSessionHandle {
       )
     }
   }
+
+  /// Sets the frame pacer that demands the session's frames.
+  ///
+  /// At the first display refresh after the session has something new to draw,
+  /// `pacer` demands a frame without flags and with token 0. Take the results
+  /// through the frame wake as usual. One pacer can serve many sessions. When
+  /// `pacer` is null, the session stops being paced. You can call it once the
+  /// attach call returns.
+  ///
+  /// See `mln_render_session_set_frame_pacer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
+  ///   `Status.nativeError`, when the session has failed. The diagnostic
+  ///   carries the failure's message.
+  /// - `Status.invalidState` when you attached the session with a redraw wake,
+  ///   or detached, abandoned, released, or disposed it.
+  func setFramePacer(_ bindingArg0: FramePacerHandle? = nil) throws {
+    try nativeInvoke { raw, arena, diagnostic in
+      mln_render_session_set_frame_pacer(
+        raw,
+        bindingArg0.map { arena.use($0.handle) } ?? 0,
+        diagnostic
+      )
+    }
+  }
 }
 
 public extension RenderSessionHandleDiscarding {

@@ -554,6 +554,19 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_frame_pacer_options NativeFramePacerOptions(FramePacerOptions value)
+    {
+        var native = new mln_frame_pacer_options();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_frame_pacer_options);
+        native.fields |= Put(
+            value.MaximumFramesPerSecond,
+            ref native.maximum_frames_per_second,
+            MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
+        );
+        return native;
+    }
+
     internal static FreeCamera CopyFreeCamera(mln_free_camera value) =>
         new(CopyVec3(value.position), CopyQuaternion(value.orientation));
 

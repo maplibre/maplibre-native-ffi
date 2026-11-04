@@ -54,6 +54,38 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
+/// Options for creating a frame pacer.
+///
+/// See `mln_frame_pacer_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+public struct FramePacerOptions: Equatable, Hashable, Sendable {
+  /// The most times per second that the pacer demands frames, greater than
+  /// zero. The pacer skips a display refresh that comes too soon after its last
+  /// demands, and a limit at the display's refresh rate or above skips none. By
+  /// default, it can demand frames at every refresh.
+  public var maximumFramesPerSecond: UInt32?
+  public init(maximumFramesPerSecond: UInt32? = nil) {
+    self.maximumFramesPerSecond = maximumFramesPerSecond
+  }
+
+  init(raw: mln_frame_pacer_options) {
+    maximumFramesPerSecond = raw
+      .fields & MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
+      .rawValue != 0 ? raw.maximum_frames_per_second : nil
+  }
+
+  func nativeValue() -> mln_frame_pacer_options {
+    var raw = mln_frame_pacer_options()
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_frame_pacer_options>.size)
+    if let item = maximumFramesPerSecond {
+      raw.fields |= MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
+        .rawValue; raw.maximum_frames_per_second = item
+    }
+    return raw
+  }
+}
+
 /// What `RenderSessionHandle.abandon()` did with a session's graphics objects.
 ///
 /// See `mln_render_abandon_disposition` in the

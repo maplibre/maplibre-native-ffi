@@ -1,6 +1,32 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+/// Creates a frame pacer that follows the display through the calling
+/// thread's looper.
+///
+/// Call it on a thread with an `ALooper`, such as the app's main thread.
+/// The pacer demands frames from that thread at the display refreshes that
+/// the looper's `AChoreographer` reports, so keep the thread running its
+/// looper while sessions use the pacer.
+///
+/// See `mln_android_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+///
+/// # Errors
+///
+/// - `Status::InvalidState` when the calling thread has no `ALooper`.
+#[cfg(target_os = "android")]
+pub fn android_frame_pacer_create(options: Option<&FramePacerOptions>) -> Result<FramePacerHandle> {
+    let mut call = Call::global();
+    crate::abi::validate_abi_version()?;
+    let mut out_pacer = sys::mln_frame_pacer(0);
+    let options = call.optional_reference(options.as_ref())?;
+    call.status(|_, out_diagnostic| unsafe {
+        sys::mln_android_frame_pacer_create(options, &mut out_pacer, out_diagnostic)
+    })?;
+    Ok(FramePacerHandle::adopt(out_pacer)?)
+}
+
 /// Gives the library the Java VM and the app context that it needs on
 /// Android.
 ///

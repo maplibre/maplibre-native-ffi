@@ -1719,6 +1719,26 @@ class FrameDemand:
 
 
 @dataclass(frozen=True, slots=True)
+class FramePacerOptions:
+    """Options for creating a frame pacer.
+
+    See `mln_frame_pacer_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
+    maximum_frames_per_second: int | None = None
+    """The most times per second that the pacer demands frames, greater than
+    zero. The pacer skips a display refresh that comes too soon after its
+    last demands, and a limit at the display's refresh rate or above skips
+    none. By default, it can demand frames at every refresh.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(maximum_frames_per_second=raw["maximum_frames_per_second"])
+
+
+@dataclass(frozen=True, slots=True)
 class FreeCamera:
     """A map camera's whole position and orientation in three dimensions.
 

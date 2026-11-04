@@ -44,6 +44,13 @@ void mln_test_render_wait_for_result_list(
   mln_render_frame_result* out
 );
 
+// Services the fixture until a rendered frame shows map update `generation` or
+// a later one, taking every result up to it, for a case whose frames another
+// party demands.
+void mln_test_render_wait_for_update(
+  const mln_test_render_fixture* fixture, uint64_t generation
+);
+
 // Drains frame results as mln_render_session_drain_frame_results() does, and
 // records the drained batch's view for mln_test_render_batch_view().
 mln_status mln_test_drain_frame_results(

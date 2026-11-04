@@ -12,6 +12,29 @@ package maplibre
 import "C"
 import "unsafe"
 
+// AndroidFramePacerCreate creates a frame pacer that follows the display
+// through the calling thread's looper.
+//
+// Call it on a thread with an ALooper, such as the app's main thread. The pacer
+// demands frames from that thread at the display refreshes that the looper's
+// AChoreographer reports, so keep the thread running its looper while sessions
+// use the pacer.
+//
+// See mln_android_frame_pacer_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+//
+// Errors:
+//   - StatusInvalidState when the calling thread has no ALooper.
+func AndroidFramePacerCreate(options *FramePacerOptions) (*FramePacerHandle, error) {
+	var outPacer C.mln_frame_pacer
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_android_frame_pacer_create(bindingStoreOptional(options, arena, nativeFramePacerOptions), &outPacer, diagnostic))
+	}, func(arena *bindingArena) *FramePacerHandle {
+		adopted := adoptFramePacerHandle(uint64(outPacer), nil)
+		return adopted
+	})
+}
+
 // InitAndroid gives the library the Java VM and the app context that it needs
 // on Android.
 //

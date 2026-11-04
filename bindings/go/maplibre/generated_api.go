@@ -2564,6 +2564,27 @@ func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_deman
 	return raw
 }
 
+// FramePacerOptions corresponds to mln_frame_pacer_options. Options for
+// creating a frame pacer.
+//
+// See mln_frame_pacer_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+type FramePacerOptions struct {
+	// The most times per second that the pacer demands frames, greater than zero.
+	// The pacer skips a display refresh that comes too soon after its last demands,
+	// and a limit at the display's refresh rate or above skips none. By default, it
+	// can demand frames at every refresh.
+	MaximumFramesPerSecond *uint32
+}
+
+func nativeFramePacerOptions(input FramePacerOptions, arena *bindingArena) C.mln_frame_pacer_options {
+	raw := C.mln_frame_pacer_options{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, input.MaximumFramesPerSecond, arena, bindingNumber[uint32, C.uint32_t])
+	return raw
+}
+
 // FreeCamera corresponds to mln_free_camera. A map camera's whole position and
 // orientation in three dimensions.
 //
@@ -5955,6 +5976,38 @@ func (handle *AcquiredFrameHandle) String() string {
 	return bindingDescribe("AcquiredFrameHandle", handle.owner())
 }
 
+// FramePacerHandle corresponds to mln_frame_pacer. Demands render sessions'
+// frames in step with a display's refreshes.
+//
+// See mln_frame_pacer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type FramePacerHandle struct{ *bindingOwner }
+
+func adoptFramePacerHandle(raw uint64, parent any) *FramePacerHandle {
+	owner := &FramePacerHandle{bindingAdopt(raw, parent, "FramePacerHandle", func(raw uint64) { C.mln_frame_pacer_release(C.mln_frame_pacer(raw)) })}
+	return owner
+}
+
+func (handle *FramePacerHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// ID returns the native handle value. It stays readable after the handle
+// is released.
+func (handle *FramePacerHandle) ID() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *FramePacerHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as FramePacerHandle(id=0x<hex>, closed=<true|false>).
+func (handle *FramePacerHandle) String() string {
+	return bindingDescribe("FramePacerHandle", handle.owner())
+}
+
 // GeoJSONSourceDataHandle corresponds to mln_geo_json_source_data. GeoJSON
 // data, parsed and ready to add to a GeoJSON source.
 //
@@ -6438,6 +6491,21 @@ func CameraForTile(tile CanonicalTileID, logicalSize LogicalSize) (CameraOptions
 	}, func(arena *bindingArena) CameraOptions {
 		return copyCameraOptions(outCamera)
 	})
+}
+
+// Release releases a frame pacer.
+//
+// Render sessions that use the pacer stay paced until you release them or set
+// another pacer.
+//
+// See mln_frame_pacer_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *FramePacerHandle) Release() error {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_frame_pacer_release(C.mln_frame_pacer(raw))
+		return struct{}{}
+	})
+	return err
 }
 
 // NewGeoJSONSourceData prepares GeoJSON data for GeoJSON sources.
@@ -8635,6 +8703,29 @@ func (receiver *RenderSessionHandle) Resize(logicalSize LogicalSize) (*Future[Co
 func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), diagnostic))
+	})
+}
+
+// SetFramePacer sets the frame pacer that demands the session's frames.
+//
+// At the first display refresh after the session has something new to draw,
+// pacer demands a frame without flags and with token 0. Take the results
+// through the frame wake as usual. One pacer can serve many sessions. When
+// pacer is null, the session stops being paced. You can call it once the attach
+// call returns.
+//
+// See mln_render_session_set_frame_pacer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+//
+// Errors:
+//   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
+//     StatusNativeError, when the session has failed. The diagnostic carries
+//     the failure's message.
+//   - StatusInvalidState when you attached the session with a redraw wake, or
+//     detached, abandoned, released, or disposed it.
+func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) error {
+	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_frame_pacer(C.mln_render_session(raw), C.mln_frame_pacer(arena.leaseOptional(pacer.owner())), diagnostic))
 	})
 }
 

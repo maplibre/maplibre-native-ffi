@@ -7,6 +7,8 @@ internal readonly record struct MlnAcquiredFrame(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnFramePacer(ulong Value) : IMlnHandle;
+
 internal readonly record struct MlnGeoJsonSourceData(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
@@ -309,6 +311,13 @@ internal unsafe struct mln_frame_demand
     public uint size;
     public uint flags;
     public ulong token;
+}
+
+internal unsafe struct mln_frame_pacer_options
+{
+    public uint size;
+    public mln_frame_pacer_option_field fields;
+    public uint maximum_frames_per_second;
 }
 
 internal unsafe struct mln_free_camera
@@ -1606,6 +1615,11 @@ internal enum mln_frame_demand_flag : uint
 {
     MLN_FRAME_DEMAND_FORCE = 1,
     MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4,
+}
+
+internal enum mln_frame_pacer_option_field : uint
+{
+    MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1,
 }
 
 internal enum mln_free_camera_option_field : uint
