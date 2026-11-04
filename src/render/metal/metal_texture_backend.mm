@@ -17,6 +17,7 @@
 #include <Foundation/NSError.hpp>
 #include <Foundation/NSString.hpp>
 #include <IOSurface/IOSurfaceRef.h>
+#include <Metal/MTLBlitCommandEncoder.hpp>
 #include <Metal/MTLBlitPass.hpp>
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
@@ -211,6 +212,20 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
   void swap() override {
     assert(commandBuffer);
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+    // A macOS texture's storage is managed by default, and on a Mac with a
+    // discrete GPU, its CPU copy lags what the GPU wrote. The host may read the
+    // IOSurface on the CPU, after IOSurfaceLock, so the frame brings that copy
+    // up to date.
+    if (
+      ioSurfaceBacked && ownedTexture &&
+      ownedTexture->storageMode() == MTL::StorageModeManaged
+    ) {
+      auto* const blit = commandBuffer->blitCommandEncoder();
+      blit->synchronizeResource(ownedTexture.get());
+      blit->endEncoding();
+    }
+#endif
     backend.commit(std::exchange(commandBuffer, {}));
     renderPassDescriptor.reset();
   }
