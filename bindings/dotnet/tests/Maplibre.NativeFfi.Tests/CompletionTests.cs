@@ -132,7 +132,6 @@ public sealed class CompletionTests
             {
                 size = (uint)sizeof(mln_completion_result),
                 status = mln_status.MLN_STATUS_CANCELLED,
-                disposition = mln_command_disposition.MLN_COMMAND_DISPOSITION_CANCELLED,
                 generation = 9,
                 diagnostic = new mln_buffer_view { data = diagnostic, size = 9 },
             };

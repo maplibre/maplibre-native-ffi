@@ -4061,10 +4061,8 @@ auto render_session_resize_start(
       // Empty when the resize failed before the map ran it.
       const auto* generations = std::any_cast<CommandGenerations>(&value);
       complete_command(
-        state,
-        status != MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_FAILED
-                                : MLN_COMMAND_DISPOSITION_COMMITTED,
-        status, generations != nullptr ? *generations : CommandGenerations{},
+        state, status,
+        generations != nullptr ? *generations : CommandGenerations{},
         std::move(diagnostic)
       );
     },

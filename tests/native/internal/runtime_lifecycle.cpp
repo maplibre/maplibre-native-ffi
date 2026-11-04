@@ -161,9 +161,7 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
                    completion]() mutable {
     const auto status =
       mln::core::map_set_style_json(*live, mln_test_empty_style_json);
-    mln::core::complete_command(
-      completion, MLN_COMMAND_DISPOSITION_COMMITTED, status
-    );
+    mln::core::complete_command(completion, status);
   });
   MLN_TEST_OK(mln_test_completion_settle(&command));
   MLN_TEST_OK(mln_test_completion_settle(&closed));
@@ -225,9 +223,7 @@ void accepted_completions_hold_runtime_release() {
         mln::core::submit_runtime_command(
           live,
           [completion] {
-            mln::core::complete_command(
-              completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
-            );
+            mln::core::complete_command(completion, MLN_STATUS_OK);
           },
           completion
         )

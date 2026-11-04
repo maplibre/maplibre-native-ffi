@@ -625,7 +625,7 @@ def discarded(body: Body, closure: str, native: str) -> tuple[str, str]:
 def commanded(
     plan: OperationPlan, body: Body, closure: str, native: str
 ) -> tuple[str, str]:
-    """A command, whose completion reports its disposition."""
+    """A command, whose completion reports its map generations."""
     if plan.result is not None:
         raise Unsupported("command receipt cannot discard a value payload")
     return (

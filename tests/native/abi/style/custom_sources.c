@@ -342,10 +342,6 @@ static void an_explicit_removal_releases_once(void) {
       map, mln_buffer_view_from_cstr(kind->source_id), &removal.descriptor, NULL
     ));
     MLN_TEST_OK(mln_test_completion_finish(&removal));
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_COMMAND_DISPOSITION_COMMITTED,
-      mln_test_completion_disposition(&removal)
-    );
     mln_test_completion_destroy(&removal);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       1, atomic_load(&probe.release_count), kind->name

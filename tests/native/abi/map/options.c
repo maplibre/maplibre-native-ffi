@@ -18,10 +18,6 @@ static mln_map_snapshot settle_commit(
   const char* label
 ) {
   MLN_TEST_OK_MESSAGE(mln_test_completion_finish(completion), label);
-  TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    MLN_COMMAND_DISPOSITION_COMMITTED,
-    mln_test_completion_disposition(completion), label
-  );
   const uint64_t committed = mln_test_completion_generation(completion);
   mln_test_completion_destroy(completion);
   TEST_ASSERT_GREATER_THAN_UINT64_MESSAGE(*previous, committed, label);
@@ -556,16 +552,10 @@ static void resizes_apply_in_order_and_the_last_sets_the_extent(void) {
   ));
 
   MLN_TEST_OK(mln_test_completion_finish(&first));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&first)
-  );
   const uint64_t earlier = mln_test_completion_generation(&first);
   mln_test_completion_destroy(&first);
 
   MLN_TEST_OK(mln_test_completion_finish(&last));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&last)
-  );
   const uint64_t committed = mln_test_completion_generation(&last);
   mln_test_completion_destroy(&last);
   TEST_ASSERT_GREATER_THAN_UINT64(earlier, committed);
@@ -586,7 +576,6 @@ enum { submitting_threads = 4, commands_per_thread = 16 };
 typedef struct submitter {
   mln_map map;
   mln_status statuses[commands_per_thread];
-  uint32_t dispositions[commands_per_thread];
   uint64_t generations[commands_per_thread];
   uint64_t snapshot_generations[commands_per_thread];
 } submitter;
@@ -599,7 +588,6 @@ static void submit_commands(void* argument) {
       mln_map_set_debug_flags(state->map, 0, &completion.descriptor, NULL);
     if (status == MLN_STATUS_OK) {
       status = mln_test_completion_finish(&completion);
-      state->dispositions[index] = mln_test_completion_disposition(&completion);
       state->generations[index] = mln_test_completion_generation(&completion);
     } else {
       completion.descriptor.release_user_data(completion.descriptor.user_data);
@@ -640,9 +628,6 @@ static void generations_increase_across_submitting_threads(void) {
     const submitter* state = &submitters[thread];
     for (size_t index = 0; index < commands_per_thread; index += 1) {
       MLN_TEST_OK(state->statuses[index]);
-      TEST_ASSERT_EQUAL_UINT32(
-        MLN_COMMAND_DISPOSITION_COMMITTED, state->dispositions[index]
-      );
       TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
         state->generations[index], state->snapshot_generations[index]
       );

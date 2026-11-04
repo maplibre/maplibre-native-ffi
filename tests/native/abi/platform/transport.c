@@ -123,10 +123,6 @@ static void a_missing_or_invalid_style_file_fails_the_load(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&load), url
     );
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&load),
-      url
-    );
     mln_test_completion_destroy(&load);
   }
   mln_test_destroy_map(map);

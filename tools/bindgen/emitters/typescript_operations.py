@@ -561,7 +561,7 @@ def lower_attach(call: Call, values: Values, natives: NativeValues) -> Lowered:
 
 
 def lower_command(call: Call, values: Values, natives: NativeValues) -> Lowered:
-    """A completion that reports a disposition."""
+    """A completion that reports map generations."""
     lowered = call.lowered
     submit(call, values, natives)
     if lowered.plan.result:

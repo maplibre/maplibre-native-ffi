@@ -174,7 +174,6 @@ internal unsafe struct mln_completion_result
 {
     public uint size;
     public mln_status status;
-    public mln_command_disposition disposition;
     public uint value_size;
     public ulong generation;
     public ulong render_update_generation;
@@ -1545,13 +1544,6 @@ internal enum mln_camera_update_mode : uint
     MLN_CAMERA_UPDATE_MODE_JUMP = 0,
     MLN_CAMERA_UPDATE_MODE_EASE = 1,
     MLN_CAMERA_UPDATE_MODE_FLY = 2,
-}
-
-internal enum mln_command_disposition : uint
-{
-    MLN_COMMAND_DISPOSITION_COMMITTED = 0,
-    MLN_COMMAND_DISPOSITION_FAILED = 1,
-    MLN_COMMAND_DISPOSITION_CANCELLED = 2,
 }
 
 internal enum mln_constrain_mode : uint

@@ -97,9 +97,6 @@ void a_resize_queued_before_detach_completes_as_failed() {
     MLN_STATUS_INVALID_STATE,
     mln_test_render_fixture_finish_operation(&fixture.render, &resize)
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&resize)
-  );
   mln_test_completion_destroy(&resize);
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture.render, &detach)

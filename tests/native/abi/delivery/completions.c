@@ -11,7 +11,6 @@ typedef struct captured_result {
   void* user_data;
   uint32_t size;
   mln_status status;
-  mln_command_disposition disposition;
   uint64_t generation;
   bool has_value;
   size_t value_count;
@@ -37,7 +36,6 @@ static void capture_result(
   captured->user_data = user_data;
   captured->size = result->size;
   captured->status = result->status;
-  captured->disposition = result->disposition;
   captured->generation = result->generation;
   captured->has_value = result->value != NULL;
   captured->value_count = result->value_count;
@@ -118,9 +116,6 @@ static void operation_and_command_completions_reach_the_queue(void) {
   MLN_TEST_OK(mln_runtime_clear_resource_transform(runtime, &completion, NULL));
   await_capture(queue.handle, &captured, &operation_tag);
   MLN_TEST_OK(captured.status);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, captured.disposition
-  );
   TEST_ASSERT_EQUAL_UINT64(0, captured.generation);
   TEST_ASSERT_FALSE(captured.has_value);
   TEST_ASSERT_EQUAL_STRING("", captured.diagnostic);
@@ -132,9 +127,6 @@ static void operation_and_command_completions_reach_the_queue(void) {
   ));
   await_capture(queue.handle, &captured, &command_tag);
   MLN_TEST_OK(captured.status);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, captured.disposition
-  );
   TEST_ASSERT_TRUE(captured.generation > 0);
 
   completion =
@@ -144,9 +136,6 @@ static void operation_and_command_completions_reach_the_queue(void) {
   ));
   await_capture(queue.handle, &captured, &command_tag);
   MLN_TEST_STATUS(MLN_STATUS_NOT_FOUND, captured.status);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_FAILED, captured.disposition
-  );
   TEST_ASSERT_NOT_NULL(strstr(captured.diagnostic, "layer does not exist"));
 
   mln_test_destroy_map(map);

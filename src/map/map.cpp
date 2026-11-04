@@ -2978,17 +2978,11 @@ auto finish_pending_style_load(
   try {
     live.runtime_state->executor.invoke(
       [completion, status, generations, diagnostic]() noexcept -> void {
-        complete_command(
-          completion, MLN_COMMAND_DISPOSITION_COMMITTED, status, generations,
-          diagnostic
-        );
+        complete_command(completion, status, generations, diagnostic);
       }
     );
   } catch (...) {
-    complete_command(
-      completion, MLN_COMMAND_DISPOSITION_COMMITTED, status, generations,
-      std::move(diagnostic)
-    );
+    complete_command(completion, status, generations, std::move(diagnostic));
   }
 }
 
@@ -2998,8 +2992,8 @@ auto cancel_pending_style_load(MapObject& live, const char* reason) noexcept
   -> void {
   if (!std::exchange(live.style_load_pending, false)) return;
   complete_command(
-    std::exchange(live.style_load_completion, {}),
-    MLN_COMMAND_DISPOSITION_CANCELLED, MLN_STATUS_CANCELLED, {}, reason
+    std::exchange(live.style_load_completion, {}), MLN_STATUS_CANCELLED, {},
+    reason
   );
 }
 
@@ -3264,10 +3258,7 @@ auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
 auto complete_map_command(Completion* completion, MapCommandOutcome outcome)
   -> void {
   complete_command(
-    completion,
-    outcome.status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED
-                                    : MLN_COMMAND_DISPOSITION_FAILED,
-    outcome.status, outcome.generations, std::move(outcome.message)
+    completion, outcome.status, outcome.generations, std::move(outcome.message)
   );
 }
 
@@ -3768,8 +3759,7 @@ auto submit_map_resize(
           }
           if (attached) {
             complete_command(
-              self.completion, MLN_COMMAND_DISPOSITION_FAILED,
-              MLN_STATUS_INVALID_STATE, {},
+              self.completion, MLN_STATUS_INVALID_STATE, {},
               "map still has an attached render session"
             );
             return;
@@ -4327,7 +4317,7 @@ struct StyleLoadTask final : MapCommandTask {
     });
     if (replaced_pending) {
       complete_command(
-        replaced, MLN_COMMAND_DISPOSITION_CANCELLED, MLN_STATUS_CANCELLED, {},
+        replaced, MLN_STATUS_CANCELLED, {},
         "a newer style load replaced this one"
       );
     }

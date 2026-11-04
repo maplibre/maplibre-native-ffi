@@ -6,7 +6,7 @@ count. Every binding reads that pointer as the C type that the function's
 instead of choosing it by hand: a call site that delivers any other type fails
 to compile. The table also lists each query, operation, and lifecycle function
 that delivers no value, so a success without one names its function too.
-Commands carry no value by schema and complete with a disposition instead.
+Commands carry no value by schema and complete with map generations instead.
 """
 
 from __future__ import annotations

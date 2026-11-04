@@ -300,7 +300,7 @@ def attached(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | N
 
 
 def completed(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | None]:
-    """A command returns its disposition, a query its copied result, and any
+    """A command returns its map generations, a query its copied result, and any
     other completion nothing."""
     function = plan.function
     returned = plan.result

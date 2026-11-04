@@ -428,9 +428,6 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_test_completion jump = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_update_camera(map, &update, &jump.descriptor, NULL));
   MLN_TEST_OK(mln_test_completion_finish(&jump));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&jump)
-  );
   const uint64_t render_update =
     mln_test_completion_render_update_generation(&jump);
   mln_test_completion_destroy(&jump);

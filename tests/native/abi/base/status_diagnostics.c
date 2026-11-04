@@ -39,9 +39,6 @@ static void a_native_exception_becomes_native_error_with_its_text(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&completion)
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&completion)
-  );
   char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
   const char* completion_diagnostic =
     mln_test_completion_diagnostic(&completion);
