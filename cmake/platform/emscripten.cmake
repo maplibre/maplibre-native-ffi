@@ -9,6 +9,9 @@ function(mln_ffi_configure_platform_dependencies target)
       -pthread
       "-sPTHREAD_POOL_SIZE=${MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE}"
       "-sINITIAL_MEMORY=${MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY}"
+      "-sALLOW_MEMORY_GROWTH=1"
+      "-sMAXIMUM_MEMORY=${MLN_FFI_EMSCRIPTEN_MAXIMUM_MEMORY}"
+      -Wno-pthreads-mem-growth
       "-sSTACK_SIZE=${MLN_FFI_EMSCRIPTEN_STACK_SIZE}"
       "-sDEFAULT_TO_CXX=1"
       -fwasm-exceptions

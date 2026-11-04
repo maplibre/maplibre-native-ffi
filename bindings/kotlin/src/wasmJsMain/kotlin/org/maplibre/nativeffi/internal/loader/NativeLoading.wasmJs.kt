@@ -108,7 +108,6 @@ private external fun instantiate(options: JsAny): Promise<JsAny>
 
 private fun options(poolSize: Int): JsAny = js("({ mlnPoolSize: poolSize })")
 
-// Scalars go through one DataView over the module's fixed heap, which never grows.
 private fun install(
   module: JsAny,
   dispatch: () -> Unit,
@@ -117,7 +116,6 @@ private fun install(
 ): Unit =
   js(
     """{
-      module.mlnKwView = new DataView(module.HEAPU8.buffer);
       module.mlnKwDispatch = dispatch;
       module.mlnKwThreadEnd = threadEnd;
       module.mlnKwUpcall = upcall;

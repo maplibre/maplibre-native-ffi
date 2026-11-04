@@ -116,7 +116,7 @@ function(mln_kw_module target output)
       -sOFFSCREENCANVAS_SUPPORT=1
       "-sOFFSCREENCANVASES_TO_PTHREAD=''"
       "-sEXPORTED_FUNCTIONS=@${MLN_KW_EXPORTS}"
-      -sEXPORTED_RUNTIME_METHODS=HEAPU8,${MLN_KW_GRAPHICS_OBJECT}
+      -sEXPORTED_RUNTIME_METHODS=mlnKwHeap,${MLN_KW_GRAPHICS_OBJECT}
       ${js_library_flags})
   set_property(
     TARGET ${target}

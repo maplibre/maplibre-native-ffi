@@ -92,59 +92,69 @@ private fun mln_kw_free(address: Int): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_free(address)")
 
 private fun fill(start: Int, end: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].HEAPU8.fill(0, start, end)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.bytes().fill(0, start, end)")
 
 private fun indexOfNul(start: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].HEAPU8.indexOf(0, start)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.bytes().indexOf(0, start)")
 
 private fun getInt8(address: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.getInt8(address)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().getInt8(address)")
 
 private fun setInt8(address: Int, value: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.setInt8(address, value)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().setInt8(address, value)")
 
 private fun getInt16(address: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.getInt16(address, true)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().getInt16(address, true)")
 
 private fun setInt16(address: Int, value: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.setInt16(address, value, true)")
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().setInt16(address, value, true)",
+  )
 
 private fun getInt32(address: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.getInt32(address, true)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().getInt32(address, true)")
 
 private fun setInt32(address: Int, value: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.setInt32(address, value, true)")
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().setInt32(address, value, true)",
+  )
 
 private fun getBigInt64(address: Int): Long =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.getBigInt64(address, true)")
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().getBigInt64(address, true)",
+  )
 
 private fun setBigInt64(address: Int, value: Long): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.setBigInt64(address, value, true)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().setBigInt64(address, value, true)",
   )
 
 private fun getFloat32(address: Int): Float =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.getFloat32(address, true)")
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().getFloat32(address, true)",
+  )
 
 private fun setFloat32(address: Int, value: Float): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.setFloat32(address, value, true)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().setFloat32(address, value, true)",
   )
 
 private fun getFloat64(address: Int): Double =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.getFloat64(address, true)")
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().getFloat64(address, true)",
+  )
 
 private fun setFloat64(address: Int, value: Double): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwView.setFloat64(address, value, true)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.data().setFloat64(address, value, true)",
   )
 
 private fun copyFromHeap(memory: JsAny, source: Int, target: Int, count: Int): Unit =
   js(
-    "new Uint8Array(memory.buffer, target, count).set(globalThis[Symbol.for('org.maplibre.nativeffi.c')].HEAPU8.subarray(source, source + count))",
+    "new Uint8Array(memory.buffer, target, count).set(globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.bytes().subarray(source, source + count))",
   )
 
 private fun copyToHeap(memory: JsAny, source: Int, target: Int, count: Int): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].HEAPU8.set(new Uint8Array(memory.buffer, source, count), target)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnKwHeap.bytes().set(new Uint8Array(memory.buffer, source, count), target)",
   )

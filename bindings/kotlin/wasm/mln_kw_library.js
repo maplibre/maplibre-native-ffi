@@ -8,6 +8,23 @@
 // running, which stops every later wake, and one that unwound a dispatch would
 // leave the delivery queue busy.
 addToLibrary({
+  // The heap, for Kotlin, which reads it from outside the module as
+  // Module.mlnKwHeap. A growth of the heap replaces its buffer, which leaves a
+  // view of the old buffer short. The module refreshes its own views as its
+  // JavaScript reads them, so each call here returns a view of the current
+  // buffer.
+  $mlnKwHeap: {
+    view: null,
+    bytes: () => HEAPU8,
+    data: () => {
+      const buffer = HEAPU8.buffer;
+      if (mlnKwHeap.view?.buffer !== buffer) {
+        mlnKwHeap.view = new DataView(buffer);
+      }
+      return mlnKwHeap.view;
+    },
+  },
+
   // Once for each wake of the delivery queue, from a task of the page queue.
   mln_kw_js_dispatch: () => {
     try {
