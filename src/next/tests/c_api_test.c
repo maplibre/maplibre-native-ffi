@@ -315,9 +315,7 @@ static void test_base(void) {
 
   // A stubbed function reports UNSUPPORTED with a message.
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_style_expression expression = MLN_HANDLE_NULL;
-  CHECK(mln_style_expression_create(mln_buffer_view_from_cstr("1"), NULL,
-                                    &expression, &diagnostic) == MLN_STATUS_UNSUPPORTED);
+  CHECK(mln_android_init(NULL, NULL, &diagnostic) == MLN_STATUS_UNSUPPORTED);
   CHECK(strstr(diagnostic.message, "not implemented") != NULL);
 
   // Argument checks happen on the caller's thread.

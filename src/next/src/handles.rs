@@ -14,6 +14,7 @@ use crate::diagnostics::Failure;
 use crate::map::MapShared;
 use crate::runtime::RuntimeShared;
 use crate::session::{FrameBatch, SessionShared};
+use crate::style_expression::StyleExpression;
 use crate::types::{MLN_STATUS_INVALID_ARGUMENT, MLN_STATUS_INVALID_STATE};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
@@ -27,6 +28,7 @@ pub enum Kind {
     RenderSession = 4,
     RenderFrameBatch = 21,
     DeliveryQueue = 23,
+    StyleExpression = 25,
     OffscreenDevice = 26,
 }
 
@@ -80,6 +82,7 @@ pub enum Object {
     #[allow(dead_code)]
     FrameBatch(Arc<FrameBatch>),
     OffscreenDevice,
+    StyleExpression(Arc<StyleExpression>),
 }
 
 impl Object {
@@ -91,6 +94,7 @@ impl Object {
             Object::Queue(_) => Kind::DeliveryQueue,
             Object::FrameBatch(_) => Kind::RenderFrameBatch,
             Object::OffscreenDevice => Kind::OffscreenDevice,
+            Object::StyleExpression(_) => Kind::StyleExpression,
         }
     }
 }

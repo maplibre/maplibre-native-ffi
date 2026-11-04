@@ -20,5 +20,7 @@ mod plugin;
 mod runtime;
 mod session;
 mod stubs;
+mod style_expression;
+mod style_layers;
 mod surface_session;
 mod types;
