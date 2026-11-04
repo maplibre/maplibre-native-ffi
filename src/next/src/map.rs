@@ -1,24 +1,24 @@
 // Ports the map half of maplibre-native-ffi src/map/map.cpp and
-// src/c_api/map.cpp, camera.cpp (the parts this crate implements) onto
-// `mln_map::Map`.
+// src/c_api/map.cpp (the parts this crate implements) onto `mln_map::Map`.
+// camera.rs ports the camera commands.
 //
 // A map lives on its runtime's thread. `MapShared` is the thread-safe part
 // the handle table holds (state that `mln_map_get_snapshot` reads without
 // waiting); `MapEntry` is the runtime thread's part (the Map itself).
 
 use crate::delivery::{Completion, Value};
-use crate::diagnostics::{CallResult, Failure, boundary};
+use crate::diagnostics::{CallResult, Failure, boundary, panic_message};
 use crate::handles::{self, Object};
 use crate::runtime::{OwnedEvent, Payload, RuntimeShared, STATE};
 use crate::session::ProxyFrontend;
 use crate::types::*;
 use maplibre_native_next::mln_map::{
-    AnimationOptions, CameraChangeMode, CameraOptions, Map, MapLoadError, MapMode, MapObserver, MapOptions,
-    RenderFrameStatus, RenderMode,
+    CameraChangeMode, CameraOptions, Map, MapLoadError, MapMode, MapObserver, MapOptions, RenderFrameStatus,
+    RenderMode,
 };
-use maplibre_native_next::mln_util::geo::{EdgeInsets, LatLng, ScreenCoordinate};
 use maplibre_native_next::mln_util::size::Size;
 use std::cell::RefCell;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -58,6 +58,9 @@ impl MapShared {
 /// The runtime thread's part of a map.
 pub struct MapEntry {
     pub shared: Arc<MapShared>,
+    /// Declared before `map`, so a closing map reports the camera commands
+    /// that ended before the ones that still run (camera_transition.rs).
+    pub camera: Rc<crate::camera_transition::CameraState>,
     pub map: RefCell<Map>,
     pub frontend: ProxyFrontend,
     pub observer: Rc<FfiMapObserver>,
@@ -83,6 +86,7 @@ impl MapEntry {
         snapshot.view.extent =
             mln_logical_extent { width: size.width, height: size.height, scale_factor: self.shared.scale_factor };
         snapshot.latest_render_update_generation = self.frontend.update_generation();
+        crate::camera::fill_snapshot(self, &map, &mut snapshot);
     }
 
     pub fn view(&self) -> mln_map_view {
@@ -116,75 +120,6 @@ pub fn camera_of(options: &CameraOptions) -> mln_camera {
         roll: options.roll.unwrap_or(0.0),
         field_of_view: options.fov.unwrap_or(0.0),
     }
-}
-
-/// `mln_camera_options` -> `CameraOptions`, with the C++ validation messages
-/// for out-of-range values.
-fn camera_options_of(c: &mln_camera_options) -> Result<CameraOptions, Failure> {
-    if c.fields & !MLN_CAMERA_OPTION_ALL != 0 {
-        return Err(Failure::invalid_argument("camera.fields has unknown bits"));
-    }
-    let has = |bit: u32| c.fields & bit != 0;
-    let finite = |name: &str, value: f64| {
-        if value.is_finite() { Ok(value) } else { Err(Failure::invalid_argument(format!("camera.{name} must be finite"))) }
-    };
-    let mut options = CameraOptions::default();
-    if has(MLN_CAMERA_OPTION_CENTER) {
-        let center = LatLng::new(c.center.latitude, c.center.longitude)
-            .map_err(|e| Failure::invalid_argument(format!("camera.center: {e}")))?;
-        options.center = Some(center);
-    }
-    if has(MLN_CAMERA_OPTION_CENTER_ALTITUDE) {
-        options.center_altitude = Some(finite("center_altitude", c.center_altitude)?);
-    }
-    if has(MLN_CAMERA_OPTION_PADDING) {
-        let p = c.padding;
-        options.padding = Some(
-            EdgeInsets::new(p.top, p.left, p.bottom, p.right)
-                .map_err(|e| Failure::invalid_argument(format!("camera.padding: {e}")))?,
-        );
-    }
-    if has(MLN_CAMERA_OPTION_ANCHOR) {
-        options.anchor = Some(ScreenCoordinate::new(finite("anchor.x", c.anchor.x)?, finite("anchor.y", c.anchor.y)?));
-    }
-    if has(MLN_CAMERA_OPTION_ZOOM) {
-        options.zoom = Some(finite("zoom", c.zoom)?);
-    }
-    if has(MLN_CAMERA_OPTION_BEARING) {
-        options.bearing = Some(finite("bearing", c.bearing)?);
-    }
-    if has(MLN_CAMERA_OPTION_PITCH) {
-        options.pitch = Some(finite("pitch", c.pitch)?);
-    }
-    if has(MLN_CAMERA_OPTION_ROLL) {
-        options.roll = Some(finite("roll", c.roll)?);
-    }
-    if has(MLN_CAMERA_OPTION_FOV) {
-        options.fov = Some(finite("field_of_view", c.field_of_view)?);
-    }
-    Ok(options)
-}
-
-fn animation_options_of(a: &mln_animation_options) -> Result<AnimationOptions, Failure> {
-    let mut options = AnimationOptions::default();
-    if a.fields & MLN_ANIMATION_OPTION_DURATION != 0 {
-        if !(a.duration_ms.is_finite() && a.duration_ms >= 0.0) {
-            return Err(Failure::invalid_argument("animation.duration_ms must be finite and not negative"));
-        }
-        options.duration = Some(maplibre_native_next::mln_util::chrono::Duration::from_nanos((a.duration_ms * 1e6) as i64));
-    }
-    if a.fields & MLN_ANIMATION_OPTION_VELOCITY != 0 {
-        options.velocity = Some(a.velocity);
-    }
-    if a.fields & MLN_ANIMATION_OPTION_MIN_ZOOM != 0 {
-        options.min_zoom = Some(a.min_zoom);
-    }
-    if a.fields & MLN_ANIMATION_OPTION_EASING != 0 {
-        let e = a.easing;
-        options.easing = Some(maplibre_native_next::mln_util::unitbezier::UnitBezier::new(e.x1, e.y1, e.x2, e.y2));
-    }
-    // TODO(ffi): transition_id, end_handler (camera transition callbacks).
-    Ok(options)
 }
 
 /// The map's observer: turns MapObserver calls into runtime events.
@@ -297,6 +232,21 @@ pub unsafe fn command(
     optional_completion: bool,
     body: impl FnOnce(&Rc<MapEntry>) -> Result<Value, Failure> + Send + 'static,
 ) -> CallResult {
+    // SAFETY: the caller's contract.
+    let (shared, completion) = unsafe { command_target(map, completion, optional_completion) }?;
+    post_command(shared, completion, body);
+    Ok(())
+}
+
+/// The validation half of `command`: the map and the completion.
+///
+/// # Safety
+/// `completion` as for `Completion::optional`.
+pub unsafe fn command_target(
+    map: mln_map,
+    completion: *const mln_completion,
+    optional_completion: bool,
+) -> Result<(Arc<MapShared>, Option<Completion>), Failure> {
     let shared = handles::map(map)?;
     // SAFETY: the caller's contract.
     let completion = if optional_completion {
@@ -304,6 +254,19 @@ pub unsafe fn command(
     } else {
         Some(unsafe { Completion::required(completion) }?)
     };
+    Ok((shared, completion))
+}
+
+/// The running half of `command`, which can't fail: runs `body` on the
+/// runtime thread as one transaction (C++ `run_map_transaction`). The
+/// updates it makes publish as one render update, the snapshot publishes
+/// after it whether it committed or failed, and the camera commands that
+/// ended in it report their end before the completion runs.
+pub fn post_command(
+    shared: Arc<MapShared>,
+    completion: Option<Completion>,
+    body: impl FnOnce(&Rc<MapEntry>) -> Result<Value, Failure> + Send + 'static,
+) {
     let generation = shared.next_generation();
     let runtime = shared.runtime.clone();
     runtime.post(move || {
@@ -313,16 +276,24 @@ pub unsafe fn command(
             }
             return;
         };
-        let result = body(&entry);
+        entry.frontend.begin_command();
+        entry.camera.in_command.set(true);
+        let result = catch_unwind(AssertUnwindSafe(|| body(&entry)))
+            .unwrap_or_else(|panic| Err(Failure::new(MLN_STATUS_NATIVE_ERROR, panic_message(&panic))));
+        entry.camera.in_command.set(false);
+        entry.frontend.end_command();
         entry.publish_snapshot();
+        crate::camera_transition::deliver_ended(&entry, generation);
         if let Some(completion) = completion {
+            let render_update = entry.frontend.pending_update_generation();
             match result {
-                Ok(value) => completion.ok_with(generation, value),
-                Err(failure) => completion.finish(failure.status, generation, failure.message, Value::None),
+                Ok(value) => completion.finish_with(MLN_STATUS_OK, generation, render_update, String::new(), value),
+                Err(failure) => {
+                    completion.finish_with(failure.status, generation, render_update, failure.message, Value::None)
+                }
             }
         }
     });
-    Ok(())
 }
 
 /// # Safety
@@ -400,7 +371,13 @@ pub unsafe extern "C" fn mln_runtime_create_map(
                     &runtime.resource_options,
                     &maplibre_native_next::mln_storage::ClientOptions::default(),
                 );
-                let entry = Rc::new(MapEntry { shared: shared.clone(), map: RefCell::new(map), frontend, observer });
+                let entry = Rc::new(MapEntry {
+                    shared: shared.clone(),
+                    camera: crate::camera_transition::CameraState::new(shared.clone()),
+                    map: RefCell::new(map),
+                    frontend,
+                    observer,
+                });
                 STATE.with(|state| state.borrow_mut().maps.insert(handle, entry.clone()));
                 entry.publish_snapshot();
                 shared.created.store(true, Ordering::SeqCst);
@@ -584,74 +561,6 @@ pub unsafe extern "C" fn mln_map_get_loaded_style_json(
 }
 
 /// # Safety
-/// C API contract (camera.h).
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_update_camera(
-    map: mln_map,
-    update: *const mln_camera_update,
-    completion: *const mln_completion,
-    out_diagnostic: *mut mln_diagnostic,
-) -> i32 {
-    // SAFETY: C API contract.
-    unsafe {
-        boundary(out_diagnostic, || {
-            let Some(update) = read_sized(update) else {
-                return Err(Failure::invalid_argument("update must be an mln_camera_update"));
-            };
-            let Some(camera) = read_sized(&update.camera) else {
-                return Err(Failure::invalid_argument("update.camera must be an mln_camera_options"));
-            };
-            let camera = camera_options_of(&camera)?;
-            let animation = animation_options_of(&update.animation)?;
-            if update.animation.end_handler.callback.is_some() {
-                return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "camera transition end handlers are not implemented yet"));
-            }
-            let mode = update.mode;
-            if mode > MLN_CAMERA_UPDATE_MODE_FLY {
-                return Err(Failure::invalid_argument("update.mode is not an mln_camera_update_mode"));
-            }
-            // TODO(ffi): gesture_phase.
-            struct SendAnimation(AnimationOptions);
-            // SAFETY: animation options from C carry no Rc callbacks.
-            unsafe impl Send for SendAnimation {}
-            let animation = SendAnimation(animation);
-            command(map, completion, true, move |entry| {
-                let animation = animation;
-                let mut map = entry.map.borrow_mut();
-                match mode {
-                    MLN_CAMERA_UPDATE_MODE_JUMP => map.jump_to(&camera),
-                    MLN_CAMERA_UPDATE_MODE_EASE => map.ease_to(&camera, &animation.0),
-                    _ => map.fly_to(&camera, &animation.0),
-                }
-                Ok(Value::None)
-            })
-        })
-    }
-}
-
-/// # Safety
-/// C API contract (camera.h).
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_camera(
-    map: mln_map,
-    completion: *const mln_completion,
-    out_diagnostic: *mut mln_diagnostic,
-) -> i32 {
-    // SAFETY: C API contract.
-    unsafe {
-        boundary(out_diagnostic, || {
-            command(map, completion, false, |entry| {
-                let camera = camera_of(&entry.map.borrow().get_camera_options(None));
-                Ok(Value::Camera(mln_camera_query_result {
-                    generation: entry.shared.generation.load(Ordering::SeqCst),
-                    camera,
-                }))
-            })
-        })
-    }
-}
-
-/// # Safety
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_request_repaint(
@@ -690,11 +599,13 @@ pub unsafe extern "C" fn mln_map_resize(
                 return Err(Failure::invalid_argument("logical_size must not be empty"));
             }
             command(map, completion, true, move |entry| {
-                entry
-                    .map
-                    .borrow_mut()
-                    .set_size(Size::new(logical_size.width, logical_size.height))
-                    .map_err(|e| Failure::invalid_argument(e))?;
+                let size = Size::new(logical_size.width, logical_size.height);
+                // Map::set_size publishes an update even when the size is
+                // unchanged.
+                if entry.map.borrow().get_map_options().size() == size {
+                    return Ok(Value::None);
+                }
+                entry.map.borrow_mut().set_size(size).map_err(|e| Failure::invalid_argument(e))?;
                 Ok(Value::None)
             })
         })
