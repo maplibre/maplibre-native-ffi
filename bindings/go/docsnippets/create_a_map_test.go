@@ -17,7 +17,7 @@ func attachTarget(m *maplibre.MapHandle) (*maplibre.RenderSessionHandle, error) 
 
 func createAMap(ctx context.Context) error {
 	// #region runtime
-	runtime, err := maplibre.NewRuntime(maplibre.RuntimeOptions{})
+	runtime, err := maplibre.NewRuntime(nil)
 	if err != nil {
 		return err
 	}

@@ -32,7 +32,7 @@ void main() {
   });
 
   test('a second dispose is a no-op and the handle reports it', () {
-    final runtime = RuntimeHandle.create(RuntimeOptions());
+    final runtime = RuntimeHandle.create();
     addTearDown(() => closeIfLive(runtime.close));
 
     expect(runtime.isClosed, isFalse);
@@ -85,7 +85,7 @@ void main() {
   });
 
   test('a refused close leaves the handle usable for a later close', () async {
-    final runtime = RuntimeHandle.create(RuntimeOptions());
+    final runtime = RuntimeHandle.create();
     final NewMap(:map, :ready) = runtime.createMap(testMapOptions());
     addTearDown(() async {
       await closeIfLive(map.close);

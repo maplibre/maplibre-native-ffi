@@ -19,7 +19,7 @@ fn attachTarget(map: maplibre.Map) !maplibre.RenderSession {
 
 fn createAMap() !void {
     // #region runtime
-    var runtime = try maplibre.Runtime.create(.{}, null);
+    var runtime = try maplibre.Runtime.create(null, null);
     // #endregion runtime
 
     // #region map

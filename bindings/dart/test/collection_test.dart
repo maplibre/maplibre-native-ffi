@@ -14,7 +14,7 @@ import 'support/runtime_probes.dart';
 Future<MapHandle> _mapWithoutItsRuntime(
   Completer<RuntimeHandle> styleLoaded,
 ) async {
-  final runtime = RuntimeHandle.create(RuntimeOptions());
+  final runtime = RuntimeHandle.create();
   await runtime.setEventHandler((events) {
     if (!styleLoaded.isCompleted &&
         events.any((event) => event.type == RuntimeEventType.mapStyleLoaded)) {

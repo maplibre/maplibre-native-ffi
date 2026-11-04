@@ -27,9 +27,11 @@ typedef struct mln_delivery_queue_options {
   mln_wake wake;
   /**
    * Runs in place of a registration's release function when the queue is
-   * released before that function can run.
+   * released before that function can run. Null leaves that user data
+   * unreleased.
    */
-  mln_user_data_release release_abandoned_user_data;
+  mln_user_data_release release_abandoned_user_data
+    MLN_BINDING("nullable=true");
 } mln_delivery_queue_options;
 
 /**
@@ -37,7 +39,7 @@ typedef struct mln_delivery_queue_options {
  * runs them.
  */
 MLN_API mln_status mln_delivery_queue_create(
-  const mln_delivery_queue_options* options,
+  const mln_delivery_queue_options* options MLN_BINDING("nullable=true"),
   mln_delivery_queue* out_queue MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

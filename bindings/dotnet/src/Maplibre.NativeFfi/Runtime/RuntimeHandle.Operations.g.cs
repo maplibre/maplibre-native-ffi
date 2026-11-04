@@ -143,12 +143,20 @@ public sealed unsafe partial class RuntimeHandle
     /// <para>See <c>mln_runtime_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
-    public static RuntimeHandle Create(RuntimeOptions options)
+    public static RuntimeHandle Create(RuntimeOptions? options = null)
     {
         using var scope = new NativeCallScope(null);
-        var nativeOptions = NativeRuntimeOptions(options, scope);
+        var nativeOptions = options is null
+            ? default(mln_runtime_options)
+            : NativeRuntimeOptions(options.Value, scope);
         MlnRuntime outRuntime = default;
-        Check(NativeMethods.mln_runtime_create(&nativeOptions, &outRuntime, Diagnostic));
+        Check(
+            NativeMethods.mln_runtime_create(
+                options is null ? null : &nativeOptions,
+                &outRuntime,
+                Diagnostic
+            )
+        );
         scope.Accept();
         return RuntimeHandle.Adopt(outRuntime);
     }

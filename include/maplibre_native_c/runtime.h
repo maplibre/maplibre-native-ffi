@@ -1008,7 +1008,7 @@ typedef struct mln_resource_provider {
  */
 MLN_BINDING("blocks=thread_start")
 MLN_API mln_status mln_runtime_create(
-  const mln_runtime_options* options,
+  const mln_runtime_options* options MLN_BINDING("nullable=true"),
   mln_runtime* out_runtime MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

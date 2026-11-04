@@ -704,11 +704,6 @@ auto complete_from_exception(
 
 auto validate_runtime_options(const mln_runtime_options* options)
   -> mln_status {
-  if (options == nullptr) {
-    mln::core::set_thread_error("runtime options must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   if (options->size < sizeof(mln_runtime_options)) {
     mln::core::set_thread_error("mln_runtime_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -861,6 +856,11 @@ auto create_runtime(
     set_thread_error("out_runtime must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  // Null options mean the defaults.
+  const auto defaults = mln_runtime_options{
+    .size = sizeof(mln_runtime_options), .asset_path = {}, .cache_path = {}
+  };
+  if (options == nullptr) options = &defaults;
   const auto options_status = validate_runtime_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;

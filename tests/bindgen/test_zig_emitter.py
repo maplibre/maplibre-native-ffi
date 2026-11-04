@@ -90,7 +90,7 @@ class ZigEmitterTests(unittest.TestCase):
         runtime = source[source.index("pub const Runtime = struct {") :]
         runtime = runtime[: runtime.index("\n};\n")]
         self.assertIn(
-            '\npub fn create(@"options": RuntimeOptions, diagnostic: '
+            '\npub fn create(@"options": ?RuntimeOptions, diagnostic: '
             "?*diagnostics.Diagnostic) status.Error!Runtime {",
             runtime,
         )

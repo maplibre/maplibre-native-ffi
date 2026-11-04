@@ -14,7 +14,7 @@ private func attachTarget(_: MapHandle) async throws
 
 private func createAMap() async throws {
   // #region runtime
-  let runtime = try RuntimeHandle.create(options: RuntimeOptions())
+  let runtime = try RuntimeHandle.create()
   // #endregion runtime
 
   // #region map

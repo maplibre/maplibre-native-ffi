@@ -20,7 +20,7 @@ void recordRegion(int regionId, Uint8List metadata) {}
 Future<void> offline() async {
   // #region cache-file
   final runtime = RuntimeHandle.create(
-    const RuntimeOptions(cachePath: 'maplibre-cache.db'),
+    options: const RuntimeOptions(cachePath: 'maplibre-cache.db'),
   );
   // #endregion cache-file
 

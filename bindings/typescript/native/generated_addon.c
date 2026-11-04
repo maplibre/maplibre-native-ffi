@@ -263,19 +263,15 @@ static napi_value mln_ts_export_mln_camera_for_tile(
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
   memset(&arg_tile, 0, sizeof arg_tile);
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    if (!mln_ts_read_record(call, call->argv[0], "tile")) goto done;
-    if (!mln_ts_write_canonical_tile_id(call, call->argv[0], &arg_tile, "tile"))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[0], "tile")) goto done;
+  if (!mln_ts_write_canonical_tile_id(call, call->argv[0], &arg_tile, "tile"))
+    goto done;
   memset(&arg_logical_size, 0, sizeof arg_logical_size);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
-    if (!mln_ts_write_logical_size(
-          call, call->argv[1], &arg_logical_size, "logicalSize"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
+  if (!mln_ts_write_logical_size(
+        call, call->argv[1], &arg_logical_size, "logicalSize"
+      ))
+    goto done;
   memset(&arg_out_camera, 0, sizeof arg_out_camera);
   arg_out_camera.size = sizeof arg_out_camera;
   diagnostic.size = sizeof diagnostic;
@@ -354,13 +350,11 @@ static napi_value mln_ts_export_mln_lat_lng_for_projected_meters(
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
   memset(&arg_meters, 0, sizeof arg_meters);
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    if (!mln_ts_read_record(call, call->argv[0], "meters")) goto done;
-    if (!mln_ts_write_projected_meters(
-          call, call->argv[0], &arg_meters, "meters"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[0], "meters")) goto done;
+  if (!mln_ts_write_projected_meters(
+        call, call->argv[0], &arg_meters, "meters"
+      ))
+    goto done;
   memset(&arg_out_coordinate, 0, sizeof arg_out_coordinate);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -451,13 +445,9 @@ static napi_value mln_ts_export_mln_logical_extent_physical_size(
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
   memset(&arg_extent, 0, sizeof arg_extent);
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    if (!mln_ts_read_record(call, call->argv[0], "extent")) goto done;
-    if (!mln_ts_write_logical_extent(
-          call, call->argv[0], &arg_extent, "extent"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[0], "extent")) goto done;
+  if (!mln_ts_write_logical_extent(call, call->argv[0], &arg_extent, "extent"))
+    goto done;
   memset(&arg_out_width, 0, sizeof arg_out_width);
   memset(&arg_out_height, 0, sizeof arg_out_height);
   diagnostic.size = sizeof diagnostic;
@@ -1322,13 +1312,9 @@ static napi_value mln_ts_export_mln_map_camera_for_lat_lng_bounds(
     arg_map = (mln_map)number;
   }
   memset(&arg_bounds, 0, sizeof arg_bounds);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "bounds")) goto done;
-    if (!mln_ts_write_lat_lng_bounds(
-          call, call->argv[1], &arg_bounds, "bounds"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "bounds")) goto done;
+  if (!mln_ts_write_lat_lng_bounds(call, call->argv[1], &arg_bounds, "bounds"))
+    goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
     memset(&arg_fit_options, 0, sizeof arg_fit_options);
     arg_fit_options.size = sizeof arg_fit_options;
@@ -1625,13 +1611,9 @@ static napi_value mln_ts_export_mln_map_fit_camera_to_lat_lng_bounds(
     arg_map = (mln_map)number;
   }
   memset(&arg_bounds, 0, sizeof arg_bounds);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "bounds")) goto done;
-    if (!mln_ts_write_lat_lng_bounds(
-          call, call->argv[1], &arg_bounds, "bounds"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "bounds")) goto done;
+  if (!mln_ts_write_lat_lng_bounds(call, call->argv[1], &arg_bounds, "bounds"))
+    goto done;
   memset(&arg_update, 0, sizeof arg_update);
   arg_update.size = sizeof arg_update;
   arg_update.fit.size = sizeof arg_update.fit;
@@ -2204,13 +2186,9 @@ mln_ts_export_mln_map_invalidate_custom_geometry_source_region(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_bounds, 0, sizeof arg_bounds);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "bounds")) goto done;
-    if (!mln_ts_write_lat_lng_bounds(
-          call, call->argv[2], &arg_bounds, "bounds"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "bounds")) goto done;
+  if (!mln_ts_write_lat_lng_bounds(call, call->argv[2], &arg_bounds, "bounds"))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
@@ -2247,13 +2225,11 @@ static napi_value mln_ts_export_mln_map_invalidate_custom_geometry_source_tile(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_tile_id, 0, sizeof arg_tile_id);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
-    if (!mln_ts_write_canonical_tile_id(
-          call, call->argv[2], &arg_tile_id, "tileId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+  if (!mln_ts_write_canonical_tile_id(
+        call, call->argv[2], &arg_tile_id, "tileId"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
@@ -2290,13 +2266,11 @@ static napi_value mln_ts_export_mln_map_invalidate_custom_vector_source_tile(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_tile_id, 0, sizeof arg_tile_id);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
-    if (!mln_ts_write_canonical_tile_id(
-          call, call->argv[2], &arg_tile_id, "tileId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+  if (!mln_ts_write_canonical_tile_id(
+        call, call->argv[2], &arg_tile_id, "tileId"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
@@ -2519,11 +2493,9 @@ static napi_value mln_ts_export_mln_map_projection_lat_lng_for_pixel(
     arg_projection = (mln_map_projection)number;
   }
   memset(&arg_point, 0, sizeof arg_point);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "point")) goto done;
-    if (!mln_ts_write_screen_point(call, call->argv[1], &arg_point, "point"))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "point")) goto done;
+  if (!mln_ts_write_screen_point(call, call->argv[1], &arg_point, "point"))
+    goto done;
   memset(&arg_out_coordinate, 0, sizeof arg_out_coordinate);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -2554,11 +2526,9 @@ static napi_value mln_ts_export_mln_map_projection_lat_lng_for_pixel_unwrapped(
     arg_projection = (mln_map_projection)number;
   }
   memset(&arg_point, 0, sizeof arg_point);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "point")) goto done;
-    if (!mln_ts_write_screen_point(call, call->argv[1], &arg_point, "point"))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "point")) goto done;
+  if (!mln_ts_write_screen_point(call, call->argv[1], &arg_point, "point"))
+    goto done;
   memset(&arg_out_coordinate, 0, sizeof arg_out_coordinate);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -2711,13 +2681,9 @@ static napi_value mln_ts_export_mln_map_projection_pixel_for_lat_lng(
     arg_projection = (mln_map_projection)number;
   }
   memset(&arg_coordinate, 0, sizeof arg_coordinate);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "coordinate")) goto done;
-    if (!mln_ts_write_lat_lng(
-          call, call->argv[1], &arg_coordinate, "coordinate"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "coordinate")) goto done;
+  if (!mln_ts_write_lat_lng(call, call->argv[1], &arg_coordinate, "coordinate"))
+    goto done;
   memset(&arg_out_point, 0, sizeof arg_out_point);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -3071,13 +3037,11 @@ static napi_value mln_ts_export_mln_map_resize(
     arg_map = (mln_map)number;
   }
   memset(&arg_logical_size, 0, sizeof arg_logical_size);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
-    if (!mln_ts_write_logical_size(
-          call, call->argv[1], &arg_logical_size, "logicalSize"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
+  if (!mln_ts_write_logical_size(
+        call, call->argv[1], &arg_logical_size, "logicalSize"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
@@ -3150,13 +3114,11 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_data(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_tile_id, 0, sizeof arg_tile_id);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
-    if (!mln_ts_write_canonical_tile_id(
-          call, call->argv[2], &arg_tile_id, "tileId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+  if (!mln_ts_write_canonical_tile_id(
+        call, call->argv[2], &arg_tile_id, "tileId"
+      ))
+    goto done;
   if (!mln_ts_read_json_view(call, call->argv[3], &arg_data, "data")) goto done;
   if (!mln_ts_read_completion(
         call, call->argv[4], true, NULL, &arg_completion, &present_completion
@@ -3196,13 +3158,11 @@ static napi_value mln_ts_export_mln_map_set_custom_geometry_source_tile_error(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_tile_id, 0, sizeof arg_tile_id);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
-    if (!mln_ts_write_canonical_tile_id(
-          call, call->argv[2], &arg_tile_id, "tileId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+  if (!mln_ts_write_canonical_tile_id(
+        call, call->argv[2], &arg_tile_id, "tileId"
+      ))
+    goto done;
   if (!mln_ts_read_text_view(call, call->argv[3], &arg_message, "message"))
     goto done;
   if (!mln_ts_read_completion(
@@ -3244,13 +3204,11 @@ static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_data(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_tile_id, 0, sizeof arg_tile_id);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
-    if (!mln_ts_write_canonical_tile_id(
-          call, call->argv[2], &arg_tile_id, "tileId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+  if (!mln_ts_write_canonical_tile_id(
+        call, call->argv[2], &arg_tile_id, "tileId"
+      ))
+    goto done;
   memset(&arg_encoding, 0, sizeof arg_encoding);
   {
     int64_t number = 0;
@@ -3300,13 +3258,11 @@ static napi_value mln_ts_export_mln_map_set_custom_vector_source_tile_error(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   memset(&arg_tile_id, 0, sizeof arg_tile_id);
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
-    if (!mln_ts_write_canonical_tile_id(
-          call, call->argv[2], &arg_tile_id, "tileId"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[2], "tileId")) goto done;
+  if (!mln_ts_write_canonical_tile_id(
+        call, call->argv[2], &arg_tile_id, "tileId"
+      ))
+    goto done;
   if (!mln_ts_read_text_view(call, call->argv[3], &arg_message, "message"))
     goto done;
   if (!mln_ts_read_completion(
@@ -4399,13 +4355,9 @@ static napi_value mln_ts_export_mln_projected_meters_for_lat_lng(
   mln_status status;
   if (!mln_ts_begin(call, env, info, 1)) return NULL;
   memset(&arg_coordinate, 0, sizeof arg_coordinate);
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    if (!mln_ts_read_record(call, call->argv[0], "coordinate")) goto done;
-    if (!mln_ts_write_lat_lng(
-          call, call->argv[0], &arg_coordinate, "coordinate"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[0], "coordinate")) goto done;
+  if (!mln_ts_write_lat_lng(call, call->argv[0], &arg_coordinate, "coordinate"))
+    goto done;
   memset(&arg_out_meters, 0, sizeof arg_out_meters);
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
@@ -5053,13 +5005,11 @@ static napi_value mln_ts_export_mln_render_session_resize(
     arg_session = (mln_render_session)number;
   }
   memset(&arg_logical_size, 0, sizeof arg_logical_size);
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
-    if (!mln_ts_write_logical_size(
-          call, call->argv[1], &arg_logical_size, "logicalSize"
-        ))
-      goto done;
-  }
+  if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
+  if (!mln_ts_write_logical_size(
+        call, call->argv[1], &arg_logical_size, "logicalSize"
+      ))
+    goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
       ))
@@ -5763,6 +5713,7 @@ done:
 
 typedef struct mln_ts_mln_runtime_create_arguments {
   mln_runtime_options arg_options;
+  bool present_options;
 } mln_ts_mln_runtime_create_arguments;
 
 static mln_status mln_ts_run_mln_runtime_create(
@@ -5770,8 +5721,10 @@ static mln_status mln_ts_run_mln_runtime_create(
 ) {
   const mln_ts_mln_runtime_create_arguments* arguments = data;
   mln_runtime handle = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_runtime_create(&arguments->arg_options, &handle, diagnostic);
+  mln_status status = mln_runtime_create(
+    arguments->present_options ? &arguments->arg_options : NULL, &handle,
+    diagnostic
+  );
   *out_handle = (uint64_t)handle;
   return status;
 }
@@ -5786,16 +5739,21 @@ static napi_value mln_ts_export_mln_runtime_create(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_runtime_options arg_options;
+  const void* present_options = NULL;
   mln_ts_mln_runtime_create_arguments arguments;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-  if (!mln_ts_write_runtime_options(
-        call, call->argv[0], &arg_options, "options"
-      ))
-    goto done;
-  arguments.arg_options = arg_options;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_runtime_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  arguments.present_options = present_options != NULL;
+  if (present_options) arguments.arg_options = arg_options;
   mln_ts_start_thread(
     call, call->argv[1], mln_ts_run_mln_runtime_create,
     mln_ts_dispose_mln_runtime_create, &arguments, sizeof arguments

@@ -113,6 +113,10 @@ mln_status mln_probe_route_add(
   const mln_probe_route_options* options, mln_diagnostic* out_diagnostic
 );
 mln_status mln_probe_label_set(
+  const mln_probe_label_options* options BIND("nullable=true"),
+  mln_diagnostic* out_diagnostic
+);
+mln_status mln_probe_label_add(
   const mln_probe_label_options* options, mln_diagnostic* out_diagnostic
 );
 """)
@@ -124,11 +128,14 @@ mln_status mln_probe_label_set(
             values.ProbeRouteOptions(url="/tiles"),
             values.ProbeRouteOptions(url="/tiles", label="", weight=0),
         )
-        # An options record with a required member is itself required.
+        # Only a parameter that C marks nullable may be left out, however few
+        # required members its record has.
         operations = generated.operations
         route = inspect.signature(operations.probe_route_add).parameters["options"]
+        added = inspect.signature(operations.probe_label_add).parameters["options"]
         label = inspect.signature(operations.probe_label_set).parameters["options"]
         self.assertIs(route.default, inspect.Parameter.empty)
+        self.assertIs(added.default, inspect.Parameter.empty)
         self.assertIsNone(label.default)
 
     def test_a_nested_registration_defaults_to_a_disabled_one(self):

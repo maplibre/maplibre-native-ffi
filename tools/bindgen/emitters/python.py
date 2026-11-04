@@ -20,7 +20,6 @@ from tools.bindgen.semantic import (
     OperationPlan,
     ParameterPlan,
     output_member,
-    required_member,
 )
 
 from .python_values import (
@@ -378,17 +377,6 @@ def operation(
         if (receiver and parameter.name == receiver.name) or parameter.name in counts:
             continue
         value = parameter.value
-        # An options record with no required member may be omitted. Any other
-        # record is the subject of the call, which C requires.
-        record = value.element if value.kind == "reference" else value
-        has_default = bool(
-            record
-            and record.kind == "record"
-            and not any(required_member(f) for f in record.fields if f.public)
-            and record.native.endswith("_options")
-        )
-        if has_default:
-            values.omittable.add(record.native)
         # The Python facade keeps the C name. Only the Rust glue's local is
         # renamed, when it would shadow a name the glue itself uses.
         local = parameter.name
@@ -423,7 +411,7 @@ def operation(
             arguments[parameter.name] = local
         else:
             rust = "&Bound<'_, PyAny>"
-            if value.nullable or has_default:
+            if value.nullable:
                 rust = "Option<Bound<'_, PyAny>>"
                 setup.append(
                     f"        let {local} = {local}.unwrap_or_else(|| py.None().into_bound(py));"
@@ -468,10 +456,9 @@ def operation(
                 setup.append(f"        let {local}_value = {converted};")
                 arguments[parameter.name] = f"{local}_value"
         rust_parameters.append(f"{local}: {rust}")
-        absent = value.nullable or has_default
-        if has_default and "None" not in public:
-            public += " | None"
-        py_parameters.append(f"{python_name}: {public}" + (" = None" if absent else ""))
+        py_parameters.append(
+            f"{python_name}: {public}" + (" = None" if value.nullable else "")
+        )
         python_arguments.append(
             (
                 f"None if {python_name} is None else {python_name}._native"
@@ -481,7 +468,7 @@ def operation(
             if value.kind == "handle"
             else python_name
         )
-        native_signature.append(local + ("=None" if absent else ""))
+        native_signature.append(local + ("=None" if value.nullable else ""))
     for i, declaration in enumerate(py_parameters):
         if declaration.endswith(" = None") and any(
             not later.endswith(" = None") for later in py_parameters[i + 1 :]

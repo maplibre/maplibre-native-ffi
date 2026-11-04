@@ -161,8 +161,8 @@ export function cVersion(): number {
  *   for tile 0/0/0 on a 256-pixel map.
  */
 export function cameraForTile(
-  tile: CanonicalTileId = {},
-  logicalSize: LogicalSize = {},
+  tile: CanonicalTileId,
+  logicalSize: LogicalSize,
 ): CameraOptions {
   return native.mln_camera_for_tile(tile, logicalSize);
 }
@@ -208,7 +208,7 @@ export function getPluginRegisterFunctionV1(): bigint {
  * See `mln_lat_lng_for_projected_meters` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
  */
-export function latLngForProjectedMeters(meters: ProjectedMeters = {}): LatLng {
+export function latLngForProjectedMeters(meters: ProjectedMeters): LatLng {
   return native.mln_lat_lng_for_projected_meters(meters);
 }
 
@@ -218,7 +218,7 @@ export function latLngForProjectedMeters(meters: ProjectedMeters = {}): LatLng {
  * See `mln_logical_extent_physical_size` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export function logicalExtentPhysicalSize(extent: LogicalExtent = {}): {
+export function logicalExtentPhysicalSize(extent: LogicalExtent): {
   readonly width: number;
   readonly height: number;
 } {
@@ -241,9 +241,7 @@ export function openGlSupportedContextProviderMask(): OpenGlContextProviderFlag 
  * See `mln_projected_meters_for_lat_lng` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
  */
-export function projectedMetersForLatLng(
-  coordinate: LatLng = {},
-): ProjectedMeters {
+export function projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters {
   return native.mln_projected_meters_for_lat_lng(coordinate);
 }
 
@@ -830,7 +828,7 @@ export class MapHandle extends Owner {
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  applyCameraDelta(delta: CameraDelta = {}): Promise<CommandCompletion> {
+  applyCameraDelta(delta: CameraDelta): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
         native.mln_map_apply_camera_delta(this.id, delta, completion);
@@ -1236,7 +1234,7 @@ export class MapHandle extends Owner {
    *   its top and bottom to at least the map's height.
    */
   cameraForLatLngBounds(
-    bounds: LatLngBounds = {},
+    bounds: LatLngBounds,
     fitOptions?: CameraFitOptions,
   ): Promise<CameraOptions> {
     return query<CameraOptions>((completion) =>
@@ -1389,7 +1387,7 @@ export class MapHandle extends Owner {
    */
   fitCameraToGeometry(
     geometry: unknown,
-    update: CameraFitUpdate = {},
+    update: CameraFitUpdate,
   ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
@@ -1423,8 +1421,8 @@ export class MapHandle extends Owner {
    *   top and bottom to at least the map's height. The camera doesn't move.
    */
   fitCameraToLatLngBounds(
-    bounds: LatLngBounds = {},
-    update: CameraFitUpdate = {},
+    bounds: LatLngBounds,
+    update: CameraFitUpdate,
   ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
@@ -1459,7 +1457,7 @@ export class MapHandle extends Owner {
    */
   fitCameraToLatLngs(
     coordinates: readonly LatLng[],
-    update: CameraFitUpdate = {},
+    update: CameraFitUpdate,
   ): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
@@ -1706,7 +1704,7 @@ export class MapHandle extends Owner {
    */
   invalidateCustomGeometrySourceRegion(
     sourceId: string,
-    bounds: LatLngBounds = {},
+    bounds: LatLngBounds,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_invalidate_custom_geometry_source_region(
@@ -1732,7 +1730,7 @@ export class MapHandle extends Owner {
    */
   invalidateCustomGeometrySourceTile(
     sourceId: string,
-    tileId: CanonicalTileId = {},
+    tileId: CanonicalTileId,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_invalidate_custom_geometry_source_tile(
@@ -1758,7 +1756,7 @@ export class MapHandle extends Owner {
    */
   invalidateCustomVectorSourceTile(
     sourceId: string,
-    tileId: CanonicalTileId = {},
+    tileId: CanonicalTileId,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_invalidate_custom_vector_source_tile(
@@ -1780,7 +1778,7 @@ export class MapHandle extends Owner {
    * See `mln_map_lat_lng_bounds_for_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  latLngBoundsForCamera(camera: CameraOptions = {}): Promise<LatLngBounds> {
+  latLngBoundsForCamera(camera: CameraOptions): Promise<LatLngBounds> {
     return query<LatLngBounds>((completion) =>
       native.mln_map_lat_lng_bounds_for_camera(this.id, camera, completion),
     );
@@ -1954,7 +1952,7 @@ export class MapHandle extends Owner {
    * - `Status.invalidState` when a render session attached to the map before
    *   the resize applied.
    */
-  resize(logicalSize: LogicalSize = {}): Promise<CommandCompletion> {
+  resize(logicalSize: LogicalSize): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_resize(this.id, logicalSize, completion),
     );
@@ -1969,7 +1967,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setBounds(options: BoundOptions = {}): Promise<CommandCompletion> {
+  setBounds(options: BoundOptions): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_bounds(this.id, options, completion),
     );
@@ -2149,9 +2147,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setFreeCameraOptions(
-    options: FreeCameraOptions = {},
-  ): Promise<CommandCompletion> {
+  setFreeCameraOptions(options: FreeCameraOptions): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_free_camera_options(this.id, options, completion),
     );
@@ -2365,7 +2361,7 @@ export class MapHandle extends Owner {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   setProjectionMode(
-    options: ProjectionModeOptions = {},
+    options: ProjectionModeOptions,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_projection_mode(this.id, options, completion),
@@ -2554,7 +2550,7 @@ export class MapHandle extends Owner {
    *   `MapHandle.setStyleUrl()` describes.
    */
   setStyleTransitionOptions(
-    options: StyleTransitionOptions = {},
+    options: StyleTransitionOptions,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_style_transition_options(this.id, options, completion),
@@ -2600,7 +2596,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setTileOptions(options: MapTileOptions = {}): Promise<CommandCompletion> {
+  setTileOptions(options: MapTileOptions): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_tile_options(this.id, options, completion),
     );
@@ -2614,9 +2610,7 @@ export class MapHandle extends Owner {
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setViewportOptions(
-    options: MapViewportOptions = {},
-  ): Promise<CommandCompletion> {
+  setViewportOptions(options: MapViewportOptions): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_viewport_options(this.id, options, completion),
     );
@@ -2633,7 +2627,7 @@ export class MapHandle extends Owner {
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  updateCamera(update: CameraUpdate = {}): Promise<CommandCompletion> {
+  updateCamera(update: CameraUpdate): Promise<CommandCompletion> {
     return withRegistrations((registrations) =>
       command((completion) => {
         native.mln_map_update_camera(this.id, update, completion);
@@ -2795,7 +2789,7 @@ export class MapHandleDiscarding {
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  applyCameraDelta(delta: CameraDelta = {}): void {
+  applyCameraDelta(delta: CameraDelta): void {
     withRegistrations((registrations) => {
       native.mln_map_apply_camera_delta(this.#owner.id, delta, undefined);
       registrations.commit(rootsOf(this.#owner));
@@ -2879,7 +2873,7 @@ export class MapHandleDiscarding {
    * See `mln_map_fit_camera_to_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  fitCameraToGeometry(geometry: unknown, update: CameraFitUpdate = {}): void {
+  fitCameraToGeometry(geometry: unknown, update: CameraFitUpdate): void {
     withRegistrations((registrations) => {
       native.mln_map_fit_camera_to_geometry(
         this.#owner.id,
@@ -2903,10 +2897,7 @@ export class MapHandleDiscarding {
    * See `mln_map_fit_camera_to_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  fitCameraToLatLngBounds(
-    bounds: LatLngBounds = {},
-    update: CameraFitUpdate = {},
-  ): void {
+  fitCameraToLatLngBounds(bounds: LatLngBounds, update: CameraFitUpdate): void {
     withRegistrations((registrations) => {
       native.mln_map_fit_camera_to_lat_lng_bounds(
         this.#owner.id,
@@ -2932,7 +2923,7 @@ export class MapHandleDiscarding {
    */
   fitCameraToLatLngs(
     coordinates: readonly LatLng[],
-    update: CameraFitUpdate = {},
+    update: CameraFitUpdate,
   ): void {
     withRegistrations((registrations) => {
       native.mln_map_fit_camera_to_lat_lngs(
@@ -2954,7 +2945,7 @@ export class MapHandleDiscarding {
    */
   invalidateCustomGeometrySourceRegion(
     sourceId: string,
-    bounds: LatLngBounds = {},
+    bounds: LatLngBounds,
   ): void {
     native.mln_map_invalidate_custom_geometry_source_region(
       this.#owner.id,
@@ -2972,7 +2963,7 @@ export class MapHandleDiscarding {
    */
   invalidateCustomGeometrySourceTile(
     sourceId: string,
-    tileId: CanonicalTileId = {},
+    tileId: CanonicalTileId,
   ): void {
     native.mln_map_invalidate_custom_geometry_source_tile(
       this.#owner.id,
@@ -2990,7 +2981,7 @@ export class MapHandleDiscarding {
    */
   invalidateCustomVectorSourceTile(
     sourceId: string,
-    tileId: CanonicalTileId = {},
+    tileId: CanonicalTileId,
   ): void {
     native.mln_map_invalidate_custom_vector_source_tile(
       this.#owner.id,
@@ -3079,7 +3070,7 @@ export class MapHandleDiscarding {
    *
    * - `Status.invalidState` when the map has a render session.
    */
-  resize(logicalSize: LogicalSize = {}): void {
+  resize(logicalSize: LogicalSize): void {
     native.mln_map_resize(this.#owner.id, logicalSize, undefined);
   }
 
@@ -3092,7 +3083,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setBounds(options: BoundOptions = {}): void {
+  setBounds(options: BoundOptions): void {
     native.mln_map_set_bounds(this.#owner.id, options, undefined);
   }
 
@@ -3234,7 +3225,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setFreeCameraOptions(options: FreeCameraOptions = {}): void {
+  setFreeCameraOptions(options: FreeCameraOptions): void {
     native.mln_map_set_free_camera_options(this.#owner.id, options, undefined);
   }
 
@@ -3368,7 +3359,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setProjectionMode(options: ProjectionModeOptions = {}): void {
+  setProjectionMode(options: ProjectionModeOptions): void {
     native.mln_map_set_projection_mode(this.#owner.id, options, undefined);
   }
 
@@ -3496,7 +3487,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setStyleTransitionOptions(options: StyleTransitionOptions = {}): void {
+  setStyleTransitionOptions(options: StyleTransitionOptions): void {
     native.mln_map_set_style_transition_options(
       this.#owner.id,
       options,
@@ -3533,7 +3524,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setTileOptions(options: MapTileOptions = {}): void {
+  setTileOptions(options: MapTileOptions): void {
     native.mln_map_set_tile_options(this.#owner.id, options, undefined);
   }
 
@@ -3545,7 +3536,7 @@ export class MapHandleDiscarding {
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  setViewportOptions(options: MapViewportOptions = {}): void {
+  setViewportOptions(options: MapViewportOptions): void {
     native.mln_map_set_viewport_options(this.#owner.id, options, undefined);
   }
 
@@ -3560,7 +3551,7 @@ export class MapHandleDiscarding {
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  updateCamera(update: CameraUpdate = {}): void {
+  updateCamera(update: CameraUpdate): void {
     withRegistrations((registrations) => {
       native.mln_map_update_camera(this.#owner.id, update, undefined);
       registrations.commit(rootsOf(this.#owner));
@@ -3616,7 +3607,7 @@ export class MapProjectionHandle extends Owner {
    * See `mln_map_projection_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  static create(view: MapView = {}): MapProjectionHandle {
+  static create(view: MapView): MapProjectionHandle {
     const handle = native.mln_map_projection_create(view);
     return adopt(
       handle,
@@ -3643,7 +3634,7 @@ export class MapProjectionHandle extends Owner {
    * See `mln_map_projection_lat_lng_for_pixel` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  latLngForPixel(point: ScreenPoint = {}): LatLng {
+  latLngForPixel(point: ScreenPoint): LatLng {
     return native.mln_map_projection_lat_lng_for_pixel(this.id, point);
   }
 
@@ -3656,7 +3647,7 @@ export class MapProjectionHandle extends Owner {
    * See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  latLngForPixelUnwrapped(point: ScreenPoint = {}): LatLng {
+  latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
     return native.mln_map_projection_lat_lng_for_pixel_unwrapped(
       this.id,
       point,
@@ -3712,7 +3703,7 @@ export class MapProjectionHandle extends Owner {
    * See `mln_map_projection_pixel_for_lat_lng` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  pixelForLatLng(coordinate: LatLng = {}): ScreenPoint {
+  pixelForLatLng(coordinate: LatLng): ScreenPoint {
     return native.mln_map_projection_pixel_for_lat_lng(this.id, coordinate);
   }
 
@@ -3735,7 +3726,7 @@ export class MapProjectionHandle extends Owner {
    * See `mln_map_projection_set_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  setCamera(camera: CameraOptions = {}): void {
+  setCamera(camera: CameraOptions): void {
     native.mln_map_projection_set_camera(this.id, camera);
   }
 }
@@ -3988,7 +3979,7 @@ export class RenderSessionHandle extends Owner {
    * - `Status.invalidState` when you detached, abandoned, or disposed the
    *   session, or discarded a frame from every texture of its ring.
    */
-  demandFrame(demand: FrameDemand = {}): void {
+  demandFrame(demand: FrameDemand): void {
     native.mln_render_session_demand_frame(this.id, demand);
   }
 
@@ -4258,7 +4249,7 @@ export class RenderSessionHandle extends Owner {
    * - `Status.targetLost` when the session loses its target before the resize
    *   applies.
    */
-  resize(logicalSize: LogicalSize = {}): Promise<CommandCompletion> {
+  resize(logicalSize: LogicalSize): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_render_session_resize(this.id, logicalSize, completion),
     );
@@ -4511,7 +4502,7 @@ export class RenderSessionHandleDiscarding {
    * - `Status.unsupported` when the session renders into a borrowed ring. Give
    *   it new textures of the new size instead.
    */
-  resize(logicalSize: LogicalSize = {}): void {
+  resize(logicalSize: LogicalSize): void {
     native.mln_render_session_resize(this.#owner.id, logicalSize, undefined);
   }
 }
@@ -4567,7 +4558,7 @@ export class ResourceRequestHandle extends Owner {
    *
    * - `Status.invalidState` when the library cancelled the request.
    */
-  complete(response: ResourceResponse = {}): void {
+  complete(response: ResourceResponse): void {
     answerSync(this, (handle, token) =>
       native.mln_resource_request_complete(handle, token, response),
     );
@@ -4693,7 +4684,7 @@ export class ResourceTransformRequestHandle extends Owner {
    * See `mln_resource_transform_request_fail` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  fail(error: ResourceTransformError = {}): void {
+  fail(error: ResourceTransformError): void {
     answerSync(this, (handle, token) =>
       native.mln_resource_transform_request_fail(handle, token, error),
     );
@@ -4817,7 +4808,7 @@ export class RuntimeHandle extends Owner {
    * See `mln_runtime_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  static create(options: RuntimeOptions = {}): Promise<RuntimeHandle> {
+  static create(options?: RuntimeOptions): Promise<RuntimeHandle> {
     return threadStart(
       (start) => native.mln_runtime_create(options, start),
       (handle) =>

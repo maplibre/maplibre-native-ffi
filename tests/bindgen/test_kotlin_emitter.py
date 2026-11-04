@@ -330,7 +330,7 @@ class KotlinLayoutTests(unittest.TestCase):
         runtime = outputs[f"{GENERATED}/RuntimeHandle.kt"]
         self.assertIn("  public companion object {\n", runtime)
         self.assertIn(
-            "public suspend fun create(options: RuntimeOptions): RuntimeHandle =",
+            "public suspend fun create(options: RuntimeOptions? = null): RuntimeHandle =",
             runtime.split("public companion object {")[1],
         )
         api = outputs[f"{GENERATED}/GeneratedGlobals.kt"]

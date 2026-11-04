@@ -7439,13 +7439,13 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static RuntimeHandle create(RuntimeOptions options) =>
+  static RuntimeHandle create({RuntimeOptions? options}) =>
       withNativeArena((arena) {
         ensureAbiVersion();
         final outRuntime = arena<Uint64>();
         _check(
           raw.mln_runtime_create(
-            _writeRuntimeOptions(options, arena),
+            options == null ? nullptr : _writeRuntimeOptions(options, arena),
             outRuntime,
             nativeDiagnostic,
           ),

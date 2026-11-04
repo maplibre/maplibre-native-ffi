@@ -1036,9 +1036,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.invalidate_custom_vector_source_tile(source_id, tile_id)
 
-    def lat_lng_bounds_for_camera(
-        self, camera: CameraOptions | None = None
-    ) -> Future[LatLngBounds]:
+    def lat_lng_bounds_for_camera(self, camera: CameraOptions) -> Future[LatLngBounds]:
         """Computes the area that the map would show with `camera`.
 
         Camera fields that `camera` doesn't set come from the map's camera.
@@ -1199,9 +1197,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.resize(logical_size)
 
-    def set_bounds(
-        self, options: BoundOptions | None = None
-    ) -> Future[CommandCompletion]:
+    def set_bounds(self, options: BoundOptions) -> Future[CommandCompletion]:
         """Limits the camera's center to an area, and its zoom and pitch to
         ranges.
 
@@ -1327,7 +1323,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_feature_state(selector, state)
 
     def set_free_camera_options(
-        self, options: FreeCameraOptions | None = None
+        self, options: FreeCameraOptions
     ) -> Future[CommandCompletion]:
         """Places the camera at a position and orientation in space.
 
@@ -1479,7 +1475,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_image_source_url(source_id, url)
 
     def set_projection_mode(
-        self, options: ProjectionModeOptions | None = None
+        self, options: ProjectionModeOptions
     ) -> Future[CommandCompletion]:
         """Sets whether the map draws in perspective or axonometric projection,
         and how much it skews the view.
@@ -1609,7 +1605,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_style_source_volatile(source_id, is_volatile)
 
     def set_style_transition_options(
-        self, options: StyleTransitionOptions | None = None
+        self, options: StyleTransitionOptions
     ) -> Future[CommandCompletion]:
         """Sets the default transition of the map's style.
 
@@ -1651,9 +1647,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_style_url(url)
 
-    def set_tile_options(
-        self, options: MapTileOptions | None = None
-    ) -> Future[CommandCompletion]:
+    def set_tile_options(self, options: MapTileOptions) -> Future[CommandCompletion]:
         """Sets how the map chooses which tiles to load, and at what detail.
 
         Settings that `options` doesn't set keep their current values.
@@ -1664,7 +1658,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_tile_options(options)
 
     def set_viewport_options(
-        self, options: MapViewportOptions | None = None
+        self, options: MapViewportOptions
     ) -> Future[CommandCompletion]:
         """Sets how the map orients and constrains its view.
 
@@ -1811,7 +1805,7 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         """
         return self._native.close()
 
-    def set_camera(self, camera: CameraOptions | None = None) -> None:
+    def set_camera(self, camera: CameraOptions) -> None:
         """Moves the projection's camera, without changing the map.
 
         Camera fields that `camera` doesn't set keep their values.
@@ -3280,7 +3274,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_resize(logical_size)
 
-    def set_bounds(self, options: BoundOptions | None = None) -> None:
+    def set_bounds(self, options: BoundOptions) -> None:
         """Limits the camera's center to an area, and its zoom and pitch to
         ranges.
 
@@ -3379,7 +3373,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_feature_state(selector, state)
 
-    def set_free_camera_options(self, options: FreeCameraOptions | None = None) -> None:
+    def set_free_camera_options(self, options: FreeCameraOptions) -> None:
         """Places the camera at a position and orientation in space.
 
         The map adjusts them to a camera that it can show. It stops running
@@ -3474,7 +3468,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_image_source_url(source_id, url)
 
-    def set_projection_mode(self, options: ProjectionModeOptions | None = None) -> None:
+    def set_projection_mode(self, options: ProjectionModeOptions) -> None:
         """Sets whether the map draws in perspective or axonometric projection,
         and how much it skews the view.
 
@@ -3566,9 +3560,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_style_source_volatile(source_id, is_volatile)
 
-    def set_style_transition_options(
-        self, options: StyleTransitionOptions | None = None
-    ) -> None:
+    def set_style_transition_options(self, options: StyleTransitionOptions) -> None:
         """Sets the default transition of the map's style.
 
         See `mln_map_set_style_transition_options` in the
@@ -3596,7 +3588,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_style_url(url)
 
-    def set_tile_options(self, options: MapTileOptions | None = None) -> None:
+    def set_tile_options(self, options: MapTileOptions) -> None:
         """Sets how the map chooses which tiles to load, and at what detail.
 
         Settings that `options` doesn't set keep their current values.
@@ -3606,7 +3598,7 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_tile_options(options)
 
-    def set_viewport_options(self, options: MapViewportOptions | None = None) -> None:
+    def set_viewport_options(self, options: MapViewportOptions) -> None:
         """Sets how the map orients and constrains its view.
 
         Settings that `options` doesn't set keep their current values.

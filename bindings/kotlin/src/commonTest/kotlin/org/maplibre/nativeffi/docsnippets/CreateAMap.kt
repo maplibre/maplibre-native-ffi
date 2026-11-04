@@ -12,7 +12,6 @@ import org.maplibre.nativeffi.MapOptions
 import org.maplibre.nativeffi.MaplibreException
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.RuntimeHandle
-import org.maplibre.nativeffi.RuntimeOptions
 
 private fun reportFailure(error: MaplibreException) {}
 
@@ -23,7 +22,7 @@ private suspend fun attachTarget(
 
 private suspend fun createAMap() {
   // #region runtime
-  val runtime = RuntimeHandle.create(RuntimeOptions())
+  val runtime = RuntimeHandle.create()
   // #endregion runtime
 
   // #region map

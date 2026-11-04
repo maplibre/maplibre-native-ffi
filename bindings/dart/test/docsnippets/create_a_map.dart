@@ -11,7 +11,7 @@ Future<RenderSessionHandle> attachTarget(MapHandle map) =>
 
 Future<void> createAMap() async {
   // #region runtime
-  final runtime = RuntimeHandle.create(const RuntimeOptions());
+  final runtime = RuntimeHandle.create();
   // #endregion runtime
 
   // #region map

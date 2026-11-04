@@ -136,11 +136,13 @@ mod tests {
     #[test]
     fn links_delivery_queue() {
         let mut queue = super::mln_delivery_queue(0);
-        // SAFETY: null options are rejected before anything is read, and a
-        // null diagnostic asks for none.
+        // SAFETY: null options ask for the defaults, `queue` holds the null
+        // handle, and a null diagnostic asks for none.
         let status = unsafe {
             super::mln_delivery_queue_create(std::ptr::null(), &mut queue, std::ptr::null_mut())
         };
-        assert_eq!(status, super::MLN_STATUS_INVALID_ARGUMENT);
+        assert_eq!(status, super::MLN_STATUS_OK);
+        // SAFETY: the queue is live and released once.
+        unsafe { super::mln_delivery_queue_release(queue) };
     }
 }

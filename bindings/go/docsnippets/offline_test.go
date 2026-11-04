@@ -16,7 +16,7 @@ func recordRegion(regionID int64, metadata []byte) {}
 
 func offline(ctx context.Context) error {
 	// #region cache-file
-	runtime, err := maplibre.NewRuntime(maplibre.RuntimeOptions{
+	runtime, err := maplibre.NewRuntime(&maplibre.RuntimeOptions{
 		CachePath: "maplibre-cache.db",
 	})
 	if err != nil {

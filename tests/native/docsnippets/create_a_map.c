@@ -52,11 +52,8 @@ void mln_doc_create_a_map(void) {
   };
 
   // #region runtime
-  mln_runtime_options runtime_options = {
-    .size = sizeof(mln_runtime_options)
-  };
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_runtime_create(&runtime_options, &runtime, NULL);
+  mln_runtime_create(NULL, &runtime, NULL);
   // #endregion runtime
 
   // #region map
