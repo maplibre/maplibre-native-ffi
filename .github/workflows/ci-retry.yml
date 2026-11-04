@@ -20,7 +20,7 @@ jobs:
       # workflow_run gets a write token. Its checkout must stay on the trusted
       # default-branch commit, never the PR that triggered the failed run.
       - name: Check out repository
-        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
