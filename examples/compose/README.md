@@ -19,11 +19,18 @@ Pass another architecture, such as `x64`, for an x86-64 emulator, and set
 
 ## How it fits together
 
-The app has no native code of its own. It depends on the binding and its OpenGL
-runtime by their Maven coordinates, as any app does. `settings.gradle.kts`
-includes the repository's own Gradle build, which supplies both from this
-checkout and packages the C library that `//:build` installed under `build/`.
-The tasks pass that build its `-Pmaplibre.*` properties.
+The app has no native code of its own. It's a project of the repository's Gradle
+build, and depends on the binding and its OpenGL runtime as projects of that
+build, which package the C library that `//:build` installed under `build/`. The
+tasks pass the build its `-Pmaplibre.*` properties. An app outside this
+repository depends on the same two libraries by their Maven coordinates:
+
+```kotlin
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi:<version>")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:<version>")
+}
+```
 
 `MapController.kt` holds the map in a view model, so the map and its render
 session outlive the activity when a rotation recreates it. It attaches the

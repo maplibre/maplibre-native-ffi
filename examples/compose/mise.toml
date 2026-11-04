@@ -1,7 +1,7 @@
 # The Jetpack Compose example. Build and run it with
-# `mise -E android run //examples/compose:android`. The app builds the binding
-# from this repository, which packages the C library that //:build installs
-# under build/ for one ABI.
+# `mise -E android run //examples/compose:android`. The app is a project of the
+# repository's Gradle build, and builds the binding from this checkout, which
+# packages the C library that //:build installs under build/ for one ABI.
 
 [tasks.android]
 description = "Build the C library for one Android architecture, then build the Compose example, install it on the connected device or emulator, and start it. Set ANDROID_SERIAL to pick a device."
@@ -11,6 +11,7 @@ arg "[arch]" default="arm64" {
 }
 '''
 tools = { "core:java" = "{{vars.java_version}}" }
+dir = "../.."
 depends = [{ task = "//:build", args = ["android-{{usage.arch}}-egl"] }]
 run = '''
 case "$usage_arch" in
@@ -19,7 +20,7 @@ case "$usage_arch" in
   x86) abi=x86 ;;
   x64) abi=x86_64 ;;
 esac
-./gradlew -Pmaplibre.localBuild=build -Pmaplibre.android.abis="$abi" :app:installDebug
+./gradlew -Pmaplibre.localBuild=build -Pmaplibre.android.abis="$abi" :examples:compose:installDebug
 adb shell am start -W -n org.maplibre.nativeffi.example.compose/.MainActivity
 '''
 
@@ -33,6 +34,7 @@ arg "[arch]" default="arm64" {
 }
 '''
 tools = { "core:java" = "{{vars.java_version}}" }
+dir = "../.."
 depends = [{ task = "//:build", args = ["android-{{usage.arch}}-egl"] }]
 run = '''
 case "$usage_arch" in
@@ -41,5 +43,5 @@ case "$usage_arch" in
   x86) abi=x86 ;;
   x64) abi=x86_64 ;;
 esac
-./gradlew -Pmaplibre.localBuild=build -Pmaplibre.android.abis="$abi" :app:assembleRelease
+./gradlew -Pmaplibre.localBuild=build -Pmaplibre.android.abis="$abi" :examples:compose:assembleRelease
 '''

@@ -28,6 +28,9 @@ mise.*.local.toml
 CMakeUserPresets.json
 hs_err_pid*.log
 .gradle
+local.properties
+.idea/
+*.iml
 .hvigor/
 bindings/openharmony/library/libs/
 bindings/openharmony/library/include/

@@ -15,6 +15,7 @@ allprojects {
   repositories.mavenCentral()
 
   pluginManager.withPlugin("com.android.kotlin.multiplatform.library") { repositories.google() }
+  pluginManager.withPlugin("com.android.application") { repositories.google() }
 
   pluginManager.withPlugin("maven-publish") {
     rootProject.providers.gradleProperty("maplibre.maven.localRepository").orNull?.let {
