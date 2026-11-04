@@ -195,11 +195,12 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
       throw std::runtime_error("Swapping OpenGL EGL surface buffers failed");
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-    // The browser composites the canvas itself, so a frame drawn into the
-    // context's default framebuffer is presented with no call here.
-    // emscripten_webgl_commit_frame() is not that call: it answers
-    // INVALID_TARGET under implicit swap control and does nothing under
-    // explicit.
+    // The browser presents a frame drawn into the context's default
+    // framebuffer when the event loop of the thread that owns the canvas
+    // runs, so a transferred canvas's worker yields to its event loop after
+    // each piece of work. emscripten_webgl_commit_frame() is no substitute: it
+    // answers INVALID_TARGET under implicit swap control and does nothing
+    // under explicit.
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif

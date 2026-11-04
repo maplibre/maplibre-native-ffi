@@ -968,6 +968,10 @@ struct mln_render_session_object
   // worker thread before attachment.
   std::function<mln_status(std::function<void()>)> start_worker;
   std::function<void()> join_worker;
+  // Set by a backend whose worker owns a transferred browser canvas. The
+  // browser presents such a canvas only when the worker's event loop runs, so
+  // the worker runs one piece of work per event loop task instead of blocking.
+  bool core_worker_yields_to_event_loop = false;
   // Attachment descriptors are copied into this closure. It creates every
   // graphics object on the selected driver.
   std::function<mln_status(mln_render_session_object&)> initialize_backend;

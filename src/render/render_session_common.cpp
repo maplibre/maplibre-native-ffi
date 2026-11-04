@@ -24,6 +24,9 @@
 #if !defined(_WIN32)
 #include <unistd.h>
 #endif
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+#include <emscripten/emscripten.h>
+#endif
 
 #include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/renderer_backend.hpp>
@@ -1232,61 +1235,125 @@ auto gpu_report_needed_locked(const mln_render_session_object& session) noexcept
          !session.texture.gpu_wait_pending;
 }
 
+// What one pass of the core worker did.
+enum class CoreWorkerStep : std::uint8_t {
+  // It ran a piece of work, and there may be more.
+  RanWork,
+  // It found nothing to do. The worker resumes after the next notification.
+  Idle,
+  // The worker is done.
+  Stop,
+};
+
+// One pass of the core worker: it takes at most one piece of work and runs
+// it. With `wait`, it blocks until there is something to do. Without, a pass
+// with nothing to do returns Idle and sets `seen` to the notifications it
+// checked against.
+auto core_worker_step(
+  const std::shared_ptr<mln_render_session_object>& session, bool wait,
+  [[maybe_unused]] int32_t& seen
+) noexcept -> CoreWorkerStep {
+  auto work = RenderDriverWork{};
+  auto wait_for_gpu = false;
+  {
+    auto lock = std::unique_lock{session->control_mutex};
+    // An abandon waiting for the previous call to end holds the next one
+    // back, so the call it waited out is the last this worker makes.
+    const auto ready = [&]() noexcept {
+      return session->abandon_waiters == 0 &&
+             (session->stop_worker || session->disposal_detach ||
+              driver_work_runnable_locked(*session) ||
+              gpu_report_needed_locked(*session));
+    };
+    if (wait) {
+      session->worker_condition.wait_on_core_worker(lock, ready);
+    } else if (!ready()) {
+#if defined(__EMSCRIPTEN__)
+      seen = session->worker_condition.notifications();
+#endif
+      return CoreWorkerStep::Idle;
+    }
+    if (session->disposal_detach) {
+      lock.unlock();
+      detach_disposed_session(session, DisposalDriverCall::Mark);
+      return CoreWorkerStep::Stop;
+    }
+    if (session->views_invalidated || session->disposal_requested)
+      return CoreWorkerStep::Stop;
+    if (driver_work_runnable_locked(*session)) {
+      work = std::move(session->driver_work.front());
+      session->driver_work.pop_front();
+    } else if (!session->stop_worker && gpu_report_needed_locked(*session)) {
+      // A frame that the frames in flight hold back asks once for their end,
+      // as a caller driver's service does.
+      session->texture.gpu_wait_pending = true;
+      wait_for_gpu = true;
+    } else {
+      return CoreWorkerStep::Stop;
+    }
+    session->driver_call_in_flight = true;
+    session->driver_call_thread = current_owner_thread();
+  }
+  if (wait_for_gpu) {
+    // Asked without the lock, since a backend may report at once.
+    if (session->texture.backend != nullptr)
+      session->texture.backend->when_gpu_done(GpuWorkDone{session});
+    else
+      GpuWorkDone{session}.run();
+  } else {
+    execute_driver_work(session, work);
+    mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
+  }
+  auto* parked = static_cast<RetirementTask*>(nullptr);
+  {
+    const auto lock = std::scoped_lock{session->control_mutex};
+    session->driver_call_in_flight = false;
+    session->driver_call_thread.reset();
+    parked = take_parked_retirements_locked(*session);
+    session->worker_condition.notify_all();
+  }
+  resubmit_parked_retirements(parked);
+  return CoreWorkerStep::RanWork;
+}
+
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+// Runs one pass of a core worker that yields to its event loop, and schedules
+// the next. Each pass is its own event loop task, after which the browser
+// presents what the pass drew. When the worker is done, nothing is scheduled,
+// and the thread exits once this task ends.
+void core_worker_task(void* opaque) {
+  auto* session =
+    static_cast<std::shared_ptr<mln_render_session_object>*>(opaque);
+  auto seen = int32_t{0};
+  switch (core_worker_step(*session, false, seen)) {
+    case CoreWorkerStep::RanWork:
+      emscripten_async_call(core_worker_task, session, 0);
+      return;
+    case CoreWorkerStep::Idle:
+      (*session)->worker_condition.resume_after_notification(
+        seen, core_worker_task, session
+      );
+      return;
+    case CoreWorkerStep::Stop:
+      delete session;
+      return;
+  }
+}
+#endif
+
 auto run_core_worker(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
-  while (true) {
-    auto work = RenderDriverWork{};
-    auto wait_for_gpu = false;
-    {
-      auto lock = std::unique_lock{session->control_mutex};
-      // An abandon waiting for the previous call to end holds the next one
-      // back, so the call it waited out is the last this worker makes.
-      session->worker_condition.wait_on_core_worker(lock, [&]() noexcept {
-        return session->abandon_waiters == 0 &&
-               (session->stop_worker || session->disposal_detach ||
-                driver_work_runnable_locked(*session) ||
-                gpu_report_needed_locked(*session));
-      });
-      if (session->disposal_detach) {
-        lock.unlock();
-        detach_disposed_session(session, DisposalDriverCall::Mark);
-        return;
-      }
-      if (session->views_invalidated || session->disposal_requested) return;
-      if (driver_work_runnable_locked(*session)) {
-        work = std::move(session->driver_work.front());
-        session->driver_work.pop_front();
-      } else if (!session->stop_worker && gpu_report_needed_locked(*session)) {
-        // A frame that the frames in flight hold back asks once for their end,
-        // as a caller driver's service does.
-        session->texture.gpu_wait_pending = true;
-        wait_for_gpu = true;
-      } else {
-        return;
-      }
-      session->driver_call_in_flight = true;
-      session->driver_call_thread = current_owner_thread();
-    }
-    if (wait_for_gpu) {
-      // Asked without the lock, since a backend may report at once.
-      if (session->texture.backend != nullptr)
-        session->texture.backend->when_gpu_done(GpuWorkDone{session});
-      else
-        GpuWorkDone{session}.run();
-    } else {
-      execute_driver_work(session, work);
-      mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
-    }
-    auto* parked = static_cast<RetirementTask*>(nullptr);
-    {
-      const auto lock = std::scoped_lock{session->control_mutex};
-      session->driver_call_in_flight = false;
-      session->driver_call_thread.reset();
-      parked = take_parked_retirements_locked(*session);
-      session->worker_condition.notify_all();
-    }
-    resubmit_parked_retirements(parked);
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  if (session->core_worker_yields_to_event_loop) {
+    // The task holds its own reference, since this call's ends when it
+    // returns to the event loop.
+    core_worker_task(new std::shared_ptr<mln_render_session_object>{session});
+    return;
+  }
+#endif
+  auto seen = int32_t{0};
+  while (core_worker_step(session, true, seen) != CoreWorkerStep::Stop) {
   }
 }
 
