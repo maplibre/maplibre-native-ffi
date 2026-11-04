@@ -329,6 +329,15 @@ link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
 # Missing runner integration must be explicit, even when a toolchain exists.
 
 [[entry]]
+bindings = ["typescript"]
+platforms = ["linux-gnu"]
+archs = ["riscv64"]
+operations = ["test"]
+status = "blocked"
+reason = "The Node suite intermittently segfaults during its worker tests under QEMU on both OpenGL and Vulkan. The addon, Node runtime, and emulator have not yet been isolated as the cause; musl RISC-V passes all 50 tests."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/1662"
+
+[[entry]]
 bindings = ["kotlin-native"]
 platforms = ["windows"]
 archs = ["x64"]
