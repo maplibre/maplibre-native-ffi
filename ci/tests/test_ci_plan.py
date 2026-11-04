@@ -311,7 +311,7 @@ class PresetTest(unittest.TestCase):
     def test_a_job_runs_the_jobs_whose_artifacts_it_downloads(self):
         self.assertEqual(
             plan.plan(self.presets, False, ["swiftpm"])["jobs"],
-            ["apple-xcframework", "swift-package"],
+            ["apple-xcframework", "swift-package", "swift-artifact-bundles"],
         )
 
     def test_conan_runs_the_linux_archive_it_consumes(self):

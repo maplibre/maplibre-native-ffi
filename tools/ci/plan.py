@@ -127,6 +127,14 @@ JOBS = {
             target.backend == "metal" and gaps.supported("swift", target, "package")
         ),
     ),
+    # The Linux, Android, and Windows archives supply the artifact bundles.
+    "swift-artifact-bundles": (
+        "swiftpm",
+        lambda target: (
+            target.platform in ("linux-gnu", "android", "windows")
+            and gaps.supported("swift", target, "package")
+        ),
+    ),
     "vcpkg-registry": ("vcpkg", lambda target: target.preset == "linux-gnu-x64-egl"),
     "conan-recipes": ("conan", lambda target: target.preset == "linux-gnu-x64-vulkan"),
     "xmake-package": ("xmake", lambda target: target.preset == "linux-gnu-x64-egl"),

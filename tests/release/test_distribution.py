@@ -1,18 +1,42 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import pathlib
 import shutil
+import tarfile
 import tempfile
 import unittest
 
 from distribution import Release, write
 from native_package_release import XCFRAMEWORK_NAME
+from swift_artifact_bundle import bundle_name
 from xmake_package import PACKAGE
 
 REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
 DIGEST = "539f11cb25fe35a1e8b8e8b6f1c095cde9f93f0f8efddb4115469335d6d37b8a"
+
+
+def linux_archive(path: pathlib.Path, backend: str) -> None:
+    """Writes the descriptor and pkg-config file of a Linux archive."""
+    root = path.name.removesuffix(".tar.gz")
+    descriptor = {
+        "platform": {"id": "linux-gnu-x64", "defaultBackend": "vulkan"},
+        "backend": backend,
+        "link": {"libraries": ["m", "dl"]},
+    }
+    with tarfile.open(path, "w:gz") as archive:
+        for name, content in (
+            ("share/maplibre-native-c/artifact.json", json.dumps(descriptor)),
+            (
+                "share/pkgconfig/maplibre-native-c.pc",
+                "Libs: -L${libdir} -lmaplibre-native-c -lmln_ffi_platform -ldl -lgcc_s\n",
+            ),
+        ):
+            member = tarfile.TarInfo(f"{root}/{name}")
+            member.size = len(content.encode())
+            archive.addfile(member, io.BytesIO(content.encode()))
 
 
 class DistributionTest(unittest.TestCase):
@@ -25,10 +49,22 @@ class DistributionTest(unittest.TestCase):
         archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
         archive.write_bytes(b"native archive")
         self.archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        (self.assets / "SHA256SUMS").write_text(
-            f"{self.archive_digest}  maplibre-native-c-macos-arm64-metal.tar.gz\n"
-            f"{DIGEST}  {XCFRAMEWORK_NAME}\n"
-        )
+        checksums = [
+            f"{self.archive_digest}  maplibre-native-c-macos-arm64-metal.tar.gz\n",
+            f"{DIGEST}  {XCFRAMEWORK_NAME}\n",
+        ]
+        for preset, backend, digest in (
+            ("egl", "opengl", "1" * 64),
+            ("vulkan", "vulkan", "2" * 64),
+        ):
+            linux = self.assets / f"maplibre-native-c-linux-gnu-x64-{preset}.tar.gz"
+            linux_archive(linux, backend)
+            (self.assets / bundle_name(backend)).write_bytes(backend.encode())
+            checksums += [
+                f"{hashlib.sha256(linux.read_bytes()).hexdigest()}  {linux.name}\n",
+                f"{digest}  {bundle_name(backend)}\n",
+            ]
+        (self.assets / "SHA256SUMS").write_text("".join(checksums))
         (self.assets / XCFRAMEWORK_NAME).write_bytes(b"xcframework")
         self.tree = root / "tree"
 
@@ -82,7 +118,7 @@ class DistributionTest(unittest.TestCase):
             '.enableUpcomingFeature("NonisolatedNonsendingByDefault")', manifest
         )
         self.assertIn(
-            '    .library(name: "MaplibreNativeC", targets: ["MaplibreNativeC"]),\n',
+            '    .library(name: "MaplibreNativeC", targets: ["MaplibreNativeCLinkage"]),\n',
             manifest,
         )
         self.assertNotIn("bindings/swift", manifest)
@@ -96,23 +132,38 @@ class DistributionTest(unittest.TestCase):
             sorted(path.relative_to(sources) for path in sources.rglob("*")),
         )
 
-    def test_the_linux_system_library_includes_the_installed_headers(self) -> None:
+    def test_traits_select_a_bundle_that_links_its_archives_libraries(self) -> None:
         write(self.tree, Release(self.assets, "v0.202611.0"), REPOSITORY)
 
-        include = self.tree / "Sources/MaplibreNativeC/include"
-        self.assertEqual(
-            (include / "maplibre_native_c.h").read_text(),
-            "#include <maplibre_native_c.h>\n",
+        manifest = (self.tree / "Package.swift").read_text()
+        self.assertIn(
+            '    name: "MaplibreNativeCVulkan",\n'
+            '    url: "https://github.com/maplibre/maplibre-native-ffi/releases/'
+            f'download/v0.202611.0/{bundle_name("vulkan")}",\n'
+            f'    checksum: "{"2" * 64}"\n',
+            manifest,
+        )
+        for target, condition in (
+            ("MaplibreNativeCOpenGL", '[.linux], traits: ["OpenGL"]'),
+            ("MaplibreNativeCVulkan", '[.linux], traits: ["Vulkan"]'),
+            ("MaplibreNativeCVulkan", '[.linux], traits: ["DefaultBackend"]'),
+        ):
+            self.assertIn(
+                f'        name: "{target}",\n'
+                f"        condition: .when(platforms: {condition})\n",
+                manifest,
+            )
+        self.assertNotIn(
+            'name: "MaplibreNativeCOpenGL",\n'
+            '        condition: .when(platforms: [.linux], traits: ["DefaultBackend"])',
+            manifest,
         )
         self.assertEqual(
-            (include / "plugin.h").read_text(),
-            "#include <maplibre_native_c/plugin.h>\n",
-        )
-        self.assertEqual(
-            (self.tree / "Sources/MaplibreNativeC/module.modulemap").read_text(),
-            (
-                REPOSITORY / "bindings/swift/Sources/MaplibreNativeC/module.modulemap"
-            ).read_text(),
+            [line.strip() for line in manifest.splitlines() if "linkedLibrary" in line],
+            [
+                f'.linkedLibrary("{library}", .when(platforms: [.linux])),'
+                for library in ("m", "dl", "gcc_s")
+            ],
         )
 
     def test_the_tree_replaces_everything_but_the_git_directory(self) -> None:
@@ -143,7 +194,7 @@ class DistributionTest(unittest.TestCase):
         )
         self.assertEqual(
             sorted(path.name for path in (self.tree / "Sources").iterdir()),
-            ["MaplibreNativeC", "MaplibreNativeFFI"],
+            ["MaplibreNativeCLinkage", "MaplibreNativeFFI"],
         )
 
     def test_a_release_without_the_xcframework_checksum_fails(self) -> None:

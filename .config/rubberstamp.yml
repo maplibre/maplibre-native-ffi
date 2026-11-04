@@ -620,20 +620,22 @@ ci:
         changes and one ABI's addon don't.
     swiftpm:
       covers: >-
-        Assembles the XCFramework from every Apple Metal target's slice, so it
-        runs those targets, and writes the Swift package that a release pushes
-        to the distribution repository with it. Then builds and runs a Swift
-        consumer against the package on macOS and builds it for iOS. Only
-        changes to what the XCFramework or the package contains or how it is
-        assembled need it: XCFramework packaging, the release's distribution
-        tool, the root manifest's platforms and binding target, and the C module
-        shims. Ordinary Swift binding changes and one Apple target's native
-        packaging don't.
+        Assembles the XCFramework from every Apple Metal target's slice, and the
+        artifact bundles from every Linux, Android, and Windows target's
+        archive, so it runs those targets, and writes the Swift package that a
+        release pushes to the distribution repository with them. Then builds and
+        runs a Swift consumer against the package on macOS, builds it for iOS,
+        and runs it on Linux with each backend trait. Only changes to what the
+        XCFramework, the bundles, or the package contains or how they are
+        assembled need it: XCFramework and bundle packaging, the release's
+        distribution tool, and the root manifest's platforms and binding target.
+        Ordinary Swift binding changes and one target's native packaging don't.
       rules:
         - if:
             files:
               - .mise/tasks/package-xcframework
               - tools/release/swift_package.py
+              - tools/release/swift_artifact_bundle.py
               - bindings/swift/.mise/tasks/test/package
               - tests/release/swift-package/**
           then: apply

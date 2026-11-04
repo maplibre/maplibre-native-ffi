@@ -9,6 +9,8 @@ import tempfile
 import unittest
 
 from native_package_release import XCFRAMEWORK_NAME
+from swift_artifact_bundle import bundle_name
+from test_distribution import linux_archive
 
 REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = REPOSITORY / "tools/release/publish-distribution.sh"
@@ -41,9 +43,19 @@ class PublishDistributionTest(unittest.TestCase):
         archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
         archive.write_bytes(b"native archive")
         self.archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        (self.assets / "SHA256SUMS").write_text(
+        checksums = (
             f"{self.archive_digest}  {archive.name}\n{DIGEST}  {XCFRAMEWORK_NAME}\n"
         )
+        # The Swift package's artifact bundles take their backends and system
+        # libraries from these archives.
+        for preset, backend in (("egl", "opengl"), ("vulkan", "vulkan")):
+            linux = self.assets / f"maplibre-native-c-linux-gnu-x64-{preset}.tar.gz"
+            linux_archive(linux, backend)
+            checksums += (
+                f"{hashlib.sha256(linux.read_bytes()).hexdigest()}  {linux.name}\n"
+                f"{DIGEST}  {bundle_name(backend)}\n"
+            )
+        (self.assets / "SHA256SUMS").write_text(checksums)
         self.remote = root / "distribution.git"
         subprocess.run(
             ["git", "init", "--quiet", "--bare", "--initial-branch=main", self.remote],
