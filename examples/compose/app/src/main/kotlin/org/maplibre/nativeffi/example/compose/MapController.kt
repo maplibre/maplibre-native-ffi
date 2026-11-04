@@ -77,6 +77,8 @@ class MapController(application: Application) : AndroidViewModel(application) {
   private var targetSize: LogicalSize? = null
   // Target changes run one at a time, in the order the view reports them.
   private var targets: Job? = null
+  // The session's release, once the view model is cleared.
+  private var released: Deferred<Unit>? = null
 
   init {
     viewModelScope.launch {
@@ -108,6 +110,12 @@ class MapController(application: Application) : AndroidViewModel(application) {
     if (this.surface == surface) this.surface = null
     if (target != surface) return
     target = null
+    // When the activity finishes, the view model can be cleared first, and its release of the
+    // session also lets go of the surface.
+    released?.let {
+      it.waitBlocking()
+      return
+    }
     val session = session ?: return
     // A session that is still attaching can't release its target yet. One that failed to attach
     // has no target.
@@ -129,11 +137,19 @@ class MapController(application: Application) : AndroidViewModel(application) {
     this.session = null
     this.map = null
     this.runtime = null
-    // The view model's scope has ended, so the release finishes in the background, in order.
+    // The release starts now, in case the surface goes after this, and finishes in the background.
+    val release =
+      try {
+        session?.release()
+      } catch (error: MaplibreException) {
+        Log.w(TAG, "Couldn't release the session", error)
+        null
+      }
+    released = release
     @OptIn(DelicateCoroutinesApi::class)
     GlobalScope.launch(Dispatchers.Default) {
       try {
-        session?.release()?.await()
+        release?.await()
         map?.release()?.await()
         runtime?.release()?.await()
       } catch (error: MaplibreException) {
@@ -209,6 +225,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
   private suspend fun applyTarget() {
     // The view can report its surface before the map is ready to take a session.
     val map = map ?: return
+    map.ready.await()
     val surface = surface ?: return
     val size = size ?: return
     if (surface == target) return
