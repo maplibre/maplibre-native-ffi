@@ -12,6 +12,8 @@
 use crate::delivery::DeliveryQueue;
 use crate::diagnostics::Failure;
 use crate::map::MapShared;
+use crate::resource_provider::ResourceRequestObject;
+use crate::resource_transform::ResourceTransformRequestObject;
 use crate::runtime::RuntimeShared;
 use crate::session::{FrameBatch, SessionShared};
 use crate::types::{MLN_STATUS_INVALID_ARGUMENT, MLN_STATUS_INVALID_STATE};
@@ -25,6 +27,8 @@ pub enum Kind {
     Runtime = 1,
     Map = 2,
     RenderSession = 4,
+    ResourceRequest = 12,
+    ResourceTransformRequest = 13,
     RenderFrameBatch = 21,
     DeliveryQueue = 23,
     OffscreenDevice = 26,
@@ -80,6 +84,8 @@ pub enum Object {
     #[allow(dead_code)]
     FrameBatch(Arc<FrameBatch>),
     OffscreenDevice,
+    ResourceRequest(Arc<ResourceRequestObject>),
+    ResourceTransformRequest(Arc<ResourceTransformRequestObject>),
 }
 
 impl Object {
@@ -91,6 +97,8 @@ impl Object {
             Object::Queue(_) => Kind::DeliveryQueue,
             Object::FrameBatch(_) => Kind::RenderFrameBatch,
             Object::OffscreenDevice => Kind::OffscreenDevice,
+            Object::ResourceRequest(_) => Kind::ResourceRequest,
+            Object::ResourceTransformRequest(_) => Kind::ResourceTransformRequest,
         }
     }
 }
@@ -240,4 +248,28 @@ pub fn queue(handle: impl Into<u64>) -> Result<Arc<DeliveryQueue>, Failure> {
         Object::Queue(queue) => Ok(queue),
         _ => unreachable!(),
     }
+}
+
+pub fn resource_request(handle: impl Into<u64>) -> Result<Arc<ResourceRequestObject>, Failure> {
+    match resolve(Kind::ResourceRequest, handle)? {
+        Object::ResourceRequest(request) => Ok(request),
+        _ => unreachable!(),
+    }
+}
+
+pub fn resource_transform_request(handle: impl Into<u64>) -> Result<Arc<ResourceTransformRequestObject>, Failure> {
+    match resolve(Kind::ResourceTransformRequest, handle)? {
+        Object::ResourceTransformRequest(request) => Ok(request),
+        _ => unreachable!(),
+    }
+}
+
+/// The failure for a `handle` of kind `expected` that names no live object,
+/// for an object that its own state retired before the table did.
+pub fn stale(expected: Kind, handle: u64) -> Failure {
+    let expected_name = kind_name(expected as u8).unwrap_or("handle");
+    Failure::new(
+        MLN_STATUS_INVALID_STATE,
+        format!("{expected_name} handle {handle:#x} is stale; the object it named has been released"),
+    )
 }

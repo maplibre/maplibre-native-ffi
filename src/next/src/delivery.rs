@@ -127,6 +127,15 @@ pub enum Value {
     Readback { pixels: Vec<u8>, info: mln_texture_image_info },
     /// An `mln_camera_query_result`.
     Camera(mln_camera_query_result),
+    /// A value that owns its C structs and what they point at.
+    Lent(Box<dyn LentValue>),
+}
+
+/// A completion value that owns its C structs, for `Value::Lent`.
+pub trait LentValue: Send {
+    /// The address of the first struct, the size of one, and the count; a
+    /// null address with a zero count for an absent value.
+    fn view(&self) -> (*const c_void, usize, usize);
 }
 
 impl Completion {
@@ -203,6 +212,7 @@ impl Completion {
                     ((&raw const readback).cast(), size_of::<mln_texture_readback_result>(), 1)
                 }
                 Value::Camera(ref camera) => ((&raw const *camera).cast(), size_of::<mln_camera_query_result>(), 1),
+                Value::Lent(ref lent) => lent.view(),
             };
             let disposition = if status == MLN_STATUS_OK {
                 MLN_COMMAND_DISPOSITION_COMMITTED

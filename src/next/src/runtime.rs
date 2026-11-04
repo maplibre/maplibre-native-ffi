@@ -10,11 +10,12 @@ use crate::delivery::{Completion, UserData, deliver};
 use crate::diagnostics::{Failure, boundary, panic_message};
 use crate::handles::{self, Object};
 use crate::map::MapEntry;
+use crate::resource_loader::{ResourceState, install_file_source_factories};
 use crate::session::SessionEntry;
 use crate::types::*;
 use maplibre_native_next::mln_actor::{RunLoop, RunLoopHandle};
 use maplibre_native_next::mln_storage::network_status::{NetworkStatus, Status};
-use maplibre_native_next::mln_storage::ResourceOptions;
+use maplibre_native_next::mln_storage::{FileSource, ResourceOptions};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -28,6 +29,9 @@ use std::thread::JoinHandle;
 pub struct RuntimeState {
     pub maps: HashMap<u64, Rc<MapEntry>>,
     pub sessions: HashMap<u64, Rc<SessionEntry>>,
+    /// The database file source of the offline operations, from the first
+    /// one until the runtime closes (offline.rs).
+    pub database: Option<Arc<dyn FileSource>>,
 }
 
 thread_local! {
@@ -59,6 +63,9 @@ pub enum Payload {
     None,
     RenderFrame(mln_runtime_event_render_frame),
     RenderMap(mln_runtime_event_render_map),
+    OfflineRegionStatus(mln_runtime_event_offline_region_status),
+    OfflineRegionResponseError(mln_runtime_event_offline_region_response_error),
+    OfflineRegionTileCountLimit(mln_runtime_event_offline_region_tile_count_limit),
 }
 
 /// An event with the data it points at.
@@ -95,6 +102,9 @@ pub struct RuntimeShared {
     event_mask: AtomicU64,
     released: AtomicBool,
     pub resource_options: ResourceOptions,
+    /// The resource provider and transforms, and the observed offline
+    /// regions, which the runtime's file sources read.
+    pub resources: Arc<ResourceState>,
 }
 
 impl RuntimeShared {
@@ -135,6 +145,18 @@ impl RuntimeShared {
                 Payload::RenderMap(render_map) => {
                     payload.render_map = render_map;
                     MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
+                }
+                Payload::OfflineRegionStatus(status) => {
+                    payload.offline_region_status = status;
+                    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
+                }
+                Payload::OfflineRegionResponseError(error) => {
+                    payload.offline_region_response_error = error;
+                    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
+                }
+                Payload::OfflineRegionTileCountLimit(limit) => {
+                    payload.offline_region_tile_count_limit = limit;
+                    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
                 }
             };
             let c_event = mln_runtime_event {
@@ -184,28 +206,34 @@ pub unsafe extern "C" fn mln_runtime_create(
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
-            let Some(options) = read_sized(options) else {
-                return Err(Failure::invalid_argument("options must be an mln_runtime_options"));
-            };
-            if out_runtime.is_null() {
-                return Err(Failure::invalid_argument("out_runtime must not be null"));
+            if out_runtime.is_null() || (*out_runtime).0 != 0 {
+                return Err(Failure::invalid_argument("out_runtime must point to the null handle"));
             }
-            let (Some(asset_path), Some(cache_path)) = (options.asset_path.bytes(), options.cache_path.bytes()) else {
-                return Err(Failure::invalid_argument("asset_path and cache_path must be valid buffer views"));
+            if options.is_null() {
+                return Err(Failure::invalid_argument("runtime options must not be null"));
+            }
+            let Some(options) = read_sized(options) else {
+                return Err(Failure::invalid_argument("mln_runtime_options.size is too small"));
             };
+            let asset_path = crate::url_rules::validate_c_string_view(options.asset_path, "asset_path")?;
+            let cache_path = crate::url_rules::validate_c_string_view(options.cache_path, "cache_path")?;
             let asset_path = std::str::from_utf8(asset_path)
                 .map_err(|_| Failure::invalid_argument("asset_path is not UTF-8"))?;
             let cache_path = std::str::from_utf8(cache_path)
                 .map_err(|_| Failure::invalid_argument("cache_path is not UTF-8"))?;
-            let mut resource_options = ResourceOptions::default();
+            // C++ `resource_options_for_runtime`.
+            let mut resource_options = ResourceOptions::default_options();
             if !asset_path.is_empty() {
                 resource_options = resource_options.with_asset_path(asset_path);
             }
             if !cache_path.is_empty() {
                 resource_options = resource_options.with_cache_path(cache_path);
             }
+            install_file_source_factories();
 
             let handle = handles::reserve(handles::Kind::Runtime);
+            let resources = ResourceState::new(handle);
+            let resource_options = resource_options.with_platform_context(resources.token);
             let (ready_tx, ready_rx) = mpsc::channel();
             let thread = std::thread::Builder::new()
                 .name(format!("mln-runtime-{handle}"))
@@ -223,6 +251,7 @@ pub unsafe extern "C" fn mln_runtime_create(
                 event_mask: AtomicU64::new(MLN_RUNTIME_EVENT_FLAG_ALL),
                 released: AtomicBool::new(false),
                 resource_options,
+                resources,
             });
             handles::insert_at(handle, Object::Runtime(runtime));
             *out_runtime = handle.into();
@@ -234,6 +263,7 @@ pub unsafe extern "C" fn mln_runtime_create(
 fn stop_runtime(runtime: &Arc<RuntimeShared>) {
     runtime.released.store(true, Ordering::SeqCst);
     handles::remove(runtime.handle);
+    runtime.resources.retire();
     if let Some(handler) = runtime.events.lock().unwrap().take() {
         handler.release();
     }
@@ -420,7 +450,7 @@ pub unsafe extern "C" fn mln_network_set_status(status: u32, out_diagnostic: *mu
             match status {
                 MLN_NETWORK_STATUS_ONLINE => NetworkStatus::set(Status::Online),
                 MLN_NETWORK_STATUS_OFFLINE => NetworkStatus::set(Status::Offline),
-                _ => return Err(Failure::invalid_argument("status is not an mln_network_status")),
+                _ => return Err(Failure::invalid_argument("network status is invalid")),
             }
             Ok(())
         })

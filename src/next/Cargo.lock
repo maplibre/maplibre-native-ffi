@@ -865,6 +865,7 @@ name = "maplibre-native-ffi-next"
 version = "0.0.0"
 dependencies = [
  "maplibre-native-next",
+ "ureq",
 ]
 
 [[package]]
