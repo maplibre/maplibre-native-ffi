@@ -5,12 +5,12 @@
 #
 # The HAP is build/<abi>/entry-default-signed.hap under the example.
 #
-# DevEco Studio builds apps with hvigor, which isn't published. This script
-# calls the tools that hvigor calls, which all ship in the OpenHarmony SDK:
-# ets-loader compiles the ArkUI pages with the SDK's own webpack configuration,
-# es2abc merges them and the binding into modules.abc, restool compiles the
-# resources, app_packing_tool packs the HAP, and hap-sign-tool signs it with the
-# SDK's debug signing material.
+# DevEco Studio builds apps with hvigor. Its packages are on the OpenHarmony npm
+# registry, but their license is unknown: their package.json names a
+# LICENSE.txt that they don't include. This script calls the OpenHarmony SDK's
+# tools instead: ets-loader compiles the ArkUI pages with the SDK's own webpack
+# configuration, es2abc merges them and the binding into modules.abc, and
+# tools/ohos/pack-hap packs and signs the HAP.
 set -euo pipefail
 
 usage="usage: build-hap.sh <abi> <facade HAR> <backend HAR>"
@@ -19,8 +19,6 @@ facade_har=${2:?$usage}
 backend_har=${3:?$usage}
 example="$(cd "$(dirname "$0")/.." && pwd)"
 sdk="$(dirname "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must name the OpenHarmony native SDK}")"
-tools="$sdk/toolchains"
-signing="$tools/lib"
 loader="$sdk/ets/build-tools/ets-loader"
 # The ArkTS component names its compiler directory for the host it targets.
 case "$(uname -s)" in
@@ -28,8 +26,7 @@ case "$(uname -s)" in
   *) ark=build ;;
 esac
 es2abc="$loader/bin/ark/$ark/bin/es2abc"
-for tool in "$loader/webpack.config.js" "$es2abc" "$tools/restool" \
-  "$signing/app_packing_tool.jar" "$signing/hap-sign-tool.jar"; do
+for tool in "$loader/webpack.config.js" "$es2abc"; do
   if [[ ! -e "$tool" ]]; then
     echo "error: the OpenHarmony SDK has no $tool; reinstall it with mise -E ohos install --force ohos-sdk" >&2
     exit 1
@@ -39,7 +36,7 @@ done
 work="$example/build/$abi"
 module="$work/entry/src/main"
 rm -rf "$work"
-mkdir -p "$work/libs/$abi" "$work/cache" "$work/compiled" "$work/pack"
+mkdir -p "$work/libs/$abi" "$work/cache"
 cp -R "$example/entry" "$work/entry"
 
 # Install both HARs in oh_modules, where ohpm puts them and ets-loader resolves
@@ -107,70 +104,6 @@ printf '%s;%s;esm;%s;entry\n' "$facade_source" "$facade_record" \
   "entry/oh_modules/@maplibre/native-ffi/$facade_main" >>"$work/records.txt"
 "$es2abc" --merge-abc --module --output "$work/modules.abc" "@$work/records.txt"
 
-"$tools/restool" -i "$module" -o "$work/compiled" -p "$bundle" \
-  -r "$work/compiled/ResourceTable.h" -f >/dev/null
-
-# The packing tool empties its working directory when it exits, so it runs in
-# a directory of its own.
-(
-  cd "$work/pack"
-  java -jar "$signing/app_packing_tool.jar" --mode hap --force true \
-    --json-path "$work/compiled/module.json" \
-    --ets-path "$work/modules.abc" \
-    --lib-path "$work/libs" \
-    --resources-path "$work/compiled/resources" \
-    --index-path "$work/compiled/resources.index" \
-    --out-path "$work/entry-default-unsigned.hap" >/dev/null
-)
-
-# The SDK ships signing keys and an unsigned profile template but no
-# application certificate. The SDK's application CA issues one for the
-# release key, the template becomes this bundle's debug profile with no
-# device list, and the profile key signs it.
-password=123456
-keystore="$signing/OpenHarmony.p12"
-for alias in root:"openharmony application root ca" sub:"openharmony application ca"; do
-  keytool -exportcert -rfc -alias "${alias#*:}" -keystore "$keystore" \
-    -storetype PKCS12 -storepass "$password" >"$work/${alias%%:*}-ca.cer"
-done
-sign_tool=(java -jar "$signing/hap-sign-tool.jar")
-"${sign_tool[@]}" generate-app-cert -keyAlias "openharmony application release" \
-  -issuer "C=CN, O=OpenHarmony, OU=OpenHarmony Team, CN=OpenHarmony Application CA" \
-  -issuerKeyAlias "openharmony application ca" \
-  -subject "C=CN, O=OpenHarmony, OU=MapLibre, CN=MapLibre Native FFI example" \
-  -signAlg SHA256withECDSA -keystoreFile "$keystore" -keystorePwd "$password" \
-  -keyPwd "$password" -issuerKeyPwd "$password" -outForm certChain \
-  -rootCaCertFile "$work/root-ca.cer" -subCaCertFile "$work/sub-ca.cer" \
-  -outFile "$work/app.cer" >/dev/null
-python3 - "$signing/UnsgnedDebugProfileTemplate.json" "$work/profile.json" \
-  "$bundle" "$work/app.cer" <<'PYTHON'
-import json
-import sys
-
-template, target, bundle, chain = sys.argv[1:]
-with open(template) as source:
-    profile = json.load(source)
-with open(chain) as source:
-    certificates = source.read()
-marker = "-----BEGIN CERTIFICATE-----"
-leaf = certificates[: certificates.index(marker, len(marker))]
-profile["bundle-info"]["bundle-name"] = bundle
-profile["bundle-info"]["development-certificate"] = leaf
-# The template expired in 2024 and names two devices; a profile without a
-# device list installs on the emulator.
-profile["validity"] = {"not-before": 1600000000, "not-after": 2500000000}
-profile.pop("debug-info", None)
-with open(target, "w") as destination:
-    json.dump(profile, destination)
-PYTHON
-"${sign_tool[@]}" sign-profile -keyAlias "openharmony application profile release" \
-  -signAlg SHA256withECDSA -mode localSign \
-  -profileCertFile "$signing/OpenHarmonyProfileRelease.pem" \
-  -inFile "$work/profile.json" -outFile "$work/profile.p7b" \
-  -keystoreFile "$keystore" -keystorePwd "$password" -keyPwd "$password" >/dev/null
-"${sign_tool[@]}" sign-app -keyAlias "openharmony application release" \
-  -signAlg SHA256withECDSA -mode localSign -appCertFile "$work/app.cer" \
-  -profileFile "$work/profile.p7b" -inFile "$work/entry-default-unsigned.hap" \
-  -outFile "$work/entry-default-signed.hap" \
-  -keystoreFile "$keystore" -keystorePwd "$password" -keyPwd "$password" >/dev/null
+"$example/../../tools/ohos/pack-hap" "$module" "$work/modules.abc" "$work/libs" \
+  "$work/entry-default-signed.hap"
 echo "Signed $work/entry-default-signed.hap for $abi."
