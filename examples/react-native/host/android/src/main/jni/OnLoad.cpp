@@ -19,9 +19,8 @@ using facebook::react::CallInvoker;
 
 namespace {
 
-// A SurfaceView's window. A session takes its own reference to the window when
-// it attaches, so the registry holds this one only until JavaScript has passed
-// the window to the session.
+// A SurfaceView's window. The session takes its own reference when it attaches,
+// and this one keeps the window valid until then.
 class WindowSurface final : public mln::example::Surface {
  public:
   explicit WindowSurface(ANativeWindow* window) : window_(window) {}
