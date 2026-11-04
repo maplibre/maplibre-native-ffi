@@ -514,7 +514,8 @@ ci:
         and platform problems. Platform-independent code that Linux x64 tests
         doesn't need it. Nor does a C API change that only regenerates the
         TypeScript binding; a change to its handwritten runtime, native addon,
-        or ArkTS harness does.
+        or ArkTS harness does, as does a change to `tools/ohos/pack-hap`, which
+        packs and signs the ArkTS test HAP.
       rules:
         - if:
             files:
@@ -672,7 +673,8 @@ ci:
         ES target built, so it runs that target, then builds and signs the ArkUI
         example's HAP against them. It runs no app. Catches what breaks the
         example's ArkUI pages, its HAP build with the OpenHarmony SDK's tools,
-        or its use of the packages: changes to the example, and to the package
+        or its use of the packages: changes to the example, to
+        `tools/ohos/pack-hap`, which packs and signs its HAP, and to the package
         files and packing script that it consumes.
       rules:
         - if:

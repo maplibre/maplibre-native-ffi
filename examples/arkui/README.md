@@ -31,10 +31,13 @@ browser example in `examples/browser` and the React Native example in
 graphics context that the library makes for the window. `map/gestures.ets` turns
 touches into camera changes.
 
-DevEco Studio builds apps with hvigor, which isn't published, so
-`scripts/build-hap.sh` calls the tools that hvigor calls from the OpenHarmony
-SDK. ets-loader compiles the pages with its webpack configuration, which doesn't
-rewrite `@kit.*` imports. The example imports the `@ohos.*` modules instead.
+DevEco Studio builds apps with hvigor. Its packages are on the OpenHarmony npm
+registry, but their license is unknown: their `package.json` names a
+`LICENSE.txt` that they don't include. So `scripts/build-hap.sh` calls the
+OpenHarmony SDK's tools instead, and packs and signs the HAP with
+`tools/ohos/pack-hap`, as the TypeScript binding's ArkTS suite does. ets-loader
+compiles the pages with its webpack configuration, which doesn't rewrite
+`@kit.*` imports. The example imports the `@ohos.*` modules instead.
 
 ## Limits
 
