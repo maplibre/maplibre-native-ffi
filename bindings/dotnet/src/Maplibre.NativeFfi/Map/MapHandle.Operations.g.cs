@@ -834,6 +834,69 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that presents the map to a Win32 window, with a
+    /// graphics context that the library creates.
+    /// </summary>
+    /// <remarks>
+    /// <para>A Vulkan build presents with <c>device</c>, or, when <c>device</c>
+    /// is null, with a device that the library creates. An OpenGL build uses a
+    /// WGL context, and <c>device</c> must be null. Attach with
+    /// <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>An OpenGL build sets the window's pixel format, so don't set one
+    /// yourself.</para>
+    /// <para>The session presents without waiting for the display, so demand at
+    /// most one frame per display refresh. While the window is minimized, frame
+    /// demands finish with <c>RenderResult.TargetNotReady</c>.</para>
+    /// <para>Keep the window until a release or replacement of the target, or a
+    /// detach of the session, completes.</para>
+    /// <para>See <c>mln_map_attach_win32_window</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>window</c>
+    /// isn't a window, or, in an OpenGL build, already has another pixel
+    /// format.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when <c>window</c> is
+    /// minimized or has no client area.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when you created
+    /// <c>device</c> without
+    /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when <c>window</c> was
+    /// minimized before the attach ran.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
+    /// loader can't present.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create the graphics context or present to the
+    /// window.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public RenderSessionHandle AttachWin32Window(
+        Win32WindowDescriptor descriptor,
+        VulkanDeviceHandle? device,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeWin32WindowDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_win32_window(
+            Handle,
+            &nativeDescriptor,
+            scope.UseOptional(device),
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Holds back the map's changes from rendering until
     /// <c>MapHandle.EndCommandGroupAsync()</c>, so they show in the same frame.
     /// </summary>

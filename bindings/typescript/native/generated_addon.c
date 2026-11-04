@@ -1655,6 +1655,60 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_map_attach_win32_window(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_win32_window_descriptor arg_descriptor;
+  uint64_t arg_device = 0;
+  mln_render_session_attach_options arg_options;
+  mln_render_session arg_out_session = MLN_HANDLE_NULL;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 5)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
+  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
+  if (!mln_ts_write_win32_window_descriptor(
+        call, call->argv[1], &arg_descriptor, "descriptor"
+      ))
+    goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
+  }
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
+  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
+  if (!mln_ts_write_render_session_attach_options(
+        call, call->argv[3], &arg_options, "options"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[4], false, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_attach_win32_window(
+    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
+    present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_map_begin_command_group(
   napi_env env, napi_callback_info info
 ) {
@@ -6147,6 +6201,45 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_render_session_set_win32_window_target(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_win32_window_replacement arg_replacement;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  memset(&arg_replacement, 0, sizeof arg_replacement);
+  arg_replacement.size = sizeof arg_replacement;
+  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
+  if (!mln_ts_write_win32_window_replacement(
+        call, call->argv[1], &arg_replacement, "replacement"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_render_session_set_win32_window_target(
+    arg_session, &arg_replacement, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_resource_request_complete(
   napi_env env, napi_callback_info info
 ) {
@@ -7632,6 +7725,7 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_attach_web_gpu_borrowed_texture},
   {"mln_map_attach_web_gpu_surface",
    mln_ts_export_mln_map_attach_web_gpu_surface},
+  {"mln_map_attach_win32_window", mln_ts_export_mln_map_attach_win32_window},
   {"mln_map_begin_command_group", mln_ts_export_mln_map_begin_command_group},
   {"mln_map_camera_for_geometry", mln_ts_export_mln_map_camera_for_geometry},
   {"mln_map_camera_for_lat_lng_bounds",
@@ -7830,6 +7924,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_render_session_set_web_gpu_borrowed_texture_target},
   {"mln_render_session_set_web_gpu_surface_target",
    mln_ts_export_mln_render_session_set_web_gpu_surface_target},
+  {"mln_render_session_set_win32_window_target",
+   mln_ts_export_mln_render_session_set_win32_window_target},
   {"mln_resource_request_complete",
    mln_ts_export_mln_resource_request_complete},
   {"mln_resource_request_is_cancelled",

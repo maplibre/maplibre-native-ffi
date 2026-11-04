@@ -4289,9 +4289,9 @@ type RenderSessionAttachOptions struct {
 	//
 	//   - RenderDriverKindCallerGraphicsThread for a shared or dedicated EGL or WGL
 	//     context, an existing WebGL context, or a browser's WebGPU device.
-	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android or
-	//     OpenHarmony window, a Wayland surface, a ring of Android hardware buffers
-	//     or dmabufs, or an offscreen session.
+	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android,
+	//     OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
+	//     hardware buffers or dmabufs, or an offscreen session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.
@@ -6070,6 +6070,44 @@ func nativeWGLContextDescriptor(input WGLContextDescriptor, arena *bindingArena)
 	raw.device_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.DeviceContext)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
+	return raw
+}
+
+// Win32WindowDescriptor corresponds to mln_win32_window_descriptor. A Win32
+// window to present to, for MapHandle.AttachWin32Window().
+//
+// See mln_win32_window_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
+type Win32WindowDescriptor struct {
+	LogicalSize LogicalSize
+	// Your HWND.
+	Window uintptr
+}
+
+func nativeWin32WindowDescriptor(input Win32WindowDescriptor, arena *bindingArena) C.mln_win32_window_descriptor {
+	raw := C.mln_win32_window_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
+	return raw
+}
+
+// Win32WindowReplacement corresponds to mln_win32_window_replacement. A new
+// Win32 window for RenderSessionHandle.SetWin32WindowTarget().
+//
+// See mln_win32_window_replacement in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
+type Win32WindowReplacement struct {
+	LogicalSize LogicalSize
+	// Your HWND.
+	Window uintptr
+}
+
+func nativeWin32WindowReplacement(input Win32WindowReplacement, arena *bindingArena) C.mln_win32_window_replacement {
+	raw := C.mln_win32_window_replacement{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
 	return raw
 }
 

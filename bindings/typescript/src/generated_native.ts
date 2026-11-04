@@ -96,6 +96,8 @@ import type {
   WebGpuSurfaceDescriptor,
   WebGpuSurfaceReplacement,
   WebGpuTextureFrame,
+  Win32WindowDescriptor,
+  Win32WindowReplacement,
 } from "./generated_values.ts";
 import type { NativeCompletion, NativeThreadStart } from "./internal/addon.ts";
 
@@ -273,6 +275,13 @@ export interface NativeOperations {
   mln_map_attach_web_gpu_surface(
     map: bigint,
     descriptor: WebGpuSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_win32_window(
+    map: bigint,
+    descriptor: Win32WindowDescriptor,
+    device: bigint | undefined,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;
@@ -815,6 +824,11 @@ export interface NativeOperations {
   mln_render_session_set_web_gpu_surface_target(
     session: bigint,
     replacement: WebGpuSurfaceReplacement,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_set_win32_window_target(
+    session: bigint,
+    replacement: Win32WindowReplacement,
     completion: NativeCompletion,
   ): void;
   mln_resource_request_complete(

@@ -542,6 +542,21 @@ static jint mln_map_attach_web_gpu_surface_jni(
   );
 }
 
+static jint mln_map_attach_win32_window_jni(
+  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
+  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_attach_win32_window(
+    (mln_map)map,
+    MLN_JNI_POINTER(const mln_win32_window_descriptor*, descriptor),
+    (mln_vulkan_device)device,
+    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
+    MLN_JNI_POINTER(mln_render_session*, out_session),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_begin_command_group_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
@@ -1914,6 +1929,18 @@ static jint mln_render_session_set_web_gpu_surface_target_jni(
   );
 }
 
+static jint mln_render_session_set_win32_window_target_jni(
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
+  jlong out_diagnostic
+) {
+  return (jint)mln_render_session_set_win32_window_target(
+    (mln_render_session)session,
+    MLN_JNI_POINTER(const mln_win32_window_replacement*, replacement),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_resource_request_complete_jni(
   JNIEnv* env, jclass type, jlong handle, jlong response, jlong out_diagnostic
 ) {
@@ -2418,6 +2445,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_attach_web_gpu_borrowed_texture_jni},
   {"mln_map_attach_web_gpu_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_web_gpu_surface_jni},
+  {"mln_map_attach_win32_window", "(JJJJJJJ)I",
+   (void*)mln_map_attach_win32_window_jni},
   {"mln_map_begin_command_group", "(JJJ)I",
    (void*)mln_map_begin_command_group_jni},
   {"mln_map_camera_for_geometry", "(JJJJJ)I",
@@ -2638,6 +2667,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_set_web_gpu_borrowed_texture_target_jni},
   {"mln_render_session_set_web_gpu_surface_target", "(JJJJ)I",
    (void*)mln_render_session_set_web_gpu_surface_target_jni},
+  {"mln_render_session_set_win32_window_target", "(JJJJ)I",
+   (void*)mln_render_session_set_win32_window_target_jni},
   {"mln_resource_request_complete", "(JJJ)I",
    (void*)mln_resource_request_complete_jni},
   {"mln_resource_request_is_cancelled", "(JJJ)I",
@@ -2807,6 +2838,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_attach_web_gpu_borrowed_texture_jni},
   {"mln_map_attach_web_gpu_surface", "(JJJJJJ)I",
    (void*)mln_map_attach_web_gpu_surface_jni},
+  {"mln_map_attach_win32_window", "(JJJJJJJ)I",
+   (void*)mln_map_attach_win32_window_jni},
   {"mln_map_begin_command_group", "(JJJ)I",
    (void*)mln_map_begin_command_group_jni},
   {"mln_map_camera_for_geometry", "(JJJJJ)I",
@@ -3027,6 +3060,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_set_web_gpu_borrowed_texture_target_jni},
   {"mln_render_session_set_web_gpu_surface_target", "(JJJJ)I",
    (void*)mln_render_session_set_web_gpu_surface_target_jni},
+  {"mln_render_session_set_win32_window_target", "(JJJJ)I",
+   (void*)mln_render_session_set_win32_window_target_jni},
   {"mln_resource_request_complete", "(JJJ)I",
    (void*)mln_resource_request_complete_jni},
   {"mln_resource_request_is_cancelled", "(JJJ)I",

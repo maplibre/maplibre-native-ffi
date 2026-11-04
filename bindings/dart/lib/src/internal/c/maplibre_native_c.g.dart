@@ -1947,6 +1947,20 @@ final class mln_wgl_context_descriptor extends Struct {
   external Pointer<Void> get_proc_address;
 }
 
+final class mln_win32_window_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+}
+
+final class mln_win32_window_replacement extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+}
+
 // mln_animation_option_field
 const MLN_ANIMATION_OPTION_DURATION = 1;
 const MLN_ANIMATION_OPTION_VELOCITY = 2;
@@ -3165,6 +3179,27 @@ external int mln_map_attach_vulkan_surface(
 external int mln_map_attach_wayland_surface(
   int map,
   Pointer<mln_wayland_surface_descriptor> descriptor,
+  int device,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_win32_window_descriptor>,
+    mln_vulkan_device,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_win32_window(
+  int map,
+  Pointer<mln_win32_window_descriptor> descriptor,
   int device,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
@@ -4856,6 +4891,21 @@ external int mln_render_session_set_vulkan_surface_target(
 external int mln_render_session_set_wayland_surface_target(
   int session,
   Pointer<mln_wayland_surface_replacement> replacement,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_win32_window_replacement>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_win32_window_target(
+  int session,
+  Pointer<mln_win32_window_replacement> replacement,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

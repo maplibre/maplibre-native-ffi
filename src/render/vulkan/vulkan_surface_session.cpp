@@ -4,7 +4,8 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
-#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND) || \
+  defined(_WIN32)
 #include <cstddef>
 #include <mutex>
 #include <optional>
@@ -27,6 +28,12 @@
 struct wl_display;
 struct wl_surface;
 #include <vulkan/vulkan_wayland.h>
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif
+#include <Windows.h>
+#include <vulkan/vulkan_win32.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
@@ -39,6 +46,8 @@ struct wl_surface;
 #include "render/ohos_surface_session.hpp"
 #elif defined(MLN_FFI_WAYLAND)
 #include "render/wayland_surface_session.hpp"
+#elif defined(_WIN32)
+#include "render/win32_window_session.hpp"
 #endif
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
@@ -620,19 +629,22 @@ class VulkanSurfaceSessionBackend final
   VulkanSurfaceBackend backend_;
 };
 
-#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND) || \
+  defined(_WIN32)
 #if defined(__ANDROID__)
 using PlatformWindow = mln::core::AndroidWindow;
 #elif defined(__OHOS__)
 using PlatformWindow = mln::core::OhosWindow;
-#else
+#elif defined(MLN_FFI_WAYLAND)
 using PlatformWindow = mln::core::WaylandWindow;
+#else
+using PlatformWindow = mln::core::Win32Window;
 #endif
 #if defined(MLN_FFI_WAYLAND)
 // The connection that each of the session's Wayland surfaces belongs to.
 using PlatformDisplay = wl_display*;
 #else
-// An Android or OpenHarmony window stands on its own.
+// An Android, OpenHarmony, or Win32 window stands on its own.
 using PlatformDisplay = std::nullptr_t;
 #endif
 
@@ -706,7 +718,7 @@ auto create_window_vulkan_surface(
     .flags = 0,
     .window = window,
   };
-#else
+#elif defined(MLN_FFI_WAYLAND)
   // Vulkan-Hpp's dispatcher has this entry only with the Wayland headers.
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
   const auto create = reinterpret_cast<PFN_vkCreateWaylandSurfaceKHR>(
@@ -719,6 +731,25 @@ auto create_window_vulkan_surface(
     .flags = 0,
     .display = display,
     .surface = window,
+  };
+#else
+  static_cast<void>(display);
+  // Vulkan-Hpp's dispatcher has this entry only with the Win32 platform macro.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+  const auto create = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(
+    dispatcher.vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR")
+  );
+  constexpr auto create_name = "vkCreateWin32SurfaceKHR";
+  // NOLINTNEXTLINE(performance-no-int-to-ptr)
+  auto* module =
+    reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(window, GWLP_HINSTANCE));
+  if (module == nullptr) module = GetModuleHandleW(nullptr);
+  const auto info = VkWin32SurfaceCreateInfoKHR{
+    .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+    .pNext = nullptr,
+    .flags = 0,
+    .hinstance = module,
+    .hwnd = window,
   };
 #endif
   if (create == nullptr || dispatcher.vkDestroySurfaceKHR == nullptr) {
@@ -740,11 +771,11 @@ auto create_window_vulkan_surface(
   return MLN_STATUS_OK;
 }
 
-#if defined(MLN_FFI_WAYLAND)
-// A Wayland compositor answers a hidden surface's frame callbacks only once it
-// shows again, and FIFO presentation waits for them, which would hold a detach
-// queued behind a present. The host paces frames itself, so presents never
-// wait for the compositor when the surface allows it.
+#if defined(MLN_FFI_WAYLAND) || defined(_WIN32)
+// The host paces frames itself, so presents don't wait for the display when
+// the surface allows it. A Wayland compositor also answers a hidden surface's
+// frame callbacks only once it shows again, and FIFO presentation waits for
+// them, which would hold a detach queued behind a present.
 auto window_present_mode(
   const mln_vulkan_context_descriptor& context, VkSurfaceKHR surface
 ) -> vk::PresentModeKHR {
@@ -785,7 +816,7 @@ auto window_present_mode(const mln_vulkan_context_descriptor&, VkSurfaceKHR)
 }
 #endif
 
-// Presents to an Android, OpenHarmony, or Wayland window through a
+// Presents to an Android, OpenHarmony, Wayland, or Win32 window through a
 // VkSurfaceKHR that it creates for each window and destroys once the swapchain
 // no longer uses it.
 class WindowVulkanSurfaceSessionBackend final
@@ -808,10 +839,29 @@ class WindowVulkanSurfaceSessionBackend final
   }
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
+#if defined(_WIN32)
+    // A minimized window's surface has no extent, which no swapchain can have,
+    // so the swapchain takes the size once the window is restored.
+    if (!mln::core::win32_window_ready(window_.get())) {
+      pending_size_ = mln::Size{physical_width, physical_height};
+      return;
+    }
+    pending_size_.reset();
+#endif
     session_.resize(physical_width, physical_height);
   }
 
   auto prepare_frame(bool& out_ready) -> mln_status override {
+#if defined(_WIN32)
+    if (!mln::core::win32_window_ready(window_.get())) {
+      out_ready = false;
+      return MLN_STATUS_OK;
+    }
+    if (pending_size_) {
+      session_.resize(pending_size_->width, pending_size_->height);
+      pending_size_.reset();
+    }
+#endif
     return session_.prepare_frame(out_ready);
   }
 
@@ -836,8 +886,13 @@ class WindowVulkanSurfaceSessionBackend final
     -> mln_status override {
     return set_window(window, physical_size);
   }
-#else
+#elif defined(MLN_FFI_WAYLAND)
   auto set_wayland_target(const PlatformWindow& window, mln::Size physical_size)
+    -> mln_status override {
+    return set_window(window, physical_size);
+  }
+#else
+  auto set_win32_target(const PlatformWindow& window, mln::Size physical_size)
     -> mln_status override {
     return set_window(window, physical_size);
   }
@@ -889,6 +944,10 @@ class WindowVulkanSurfaceSessionBackend final
   OwnedVulkanSurface surface_;
   // Surfaces that a failed replacement left the swapchain possibly using.
   std::vector<OwnedVulkanSurface> abandoned_;
+#if defined(_WIN32)
+  // A resize that arrived while the window was minimized.
+  std::optional<mln::Size> pending_size_;
+#endif
   // Destroyed first, so the swapchain goes before the surfaces and windows.
   VulkanSurfaceSessionBackend session_;
 };
@@ -898,7 +957,8 @@ class WindowVulkanSurfaceSessionBackend final
 
 namespace mln::core {
 
-#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND) || \
+  defined(_WIN32)
 namespace {
 
 auto create_window_backend(
@@ -951,12 +1011,20 @@ auto create_ohos_surface_backend(
     nullptr, std::move(attach.window), std::move(attach.device), target
   );
 }
-#else
+#elif defined(MLN_FFI_WAYLAND)
 auto create_wayland_surface_backend(
   WaylandSurfaceAttach attach, mln_render_session_object& target
 ) -> mln_status {
   return create_window_backend(
     attach.display, std::move(attach.window), std::move(attach.device), target
+  );
+}
+#else
+auto create_win32_window_backend(
+  Win32WindowAttach attach, mln_render_session_object& target
+) -> mln_status {
+  return create_window_backend(
+    nullptr, std::move(attach.window), std::move(attach.device), target
   );
 }
 #endif

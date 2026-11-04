@@ -53,6 +53,8 @@ struct ANativeWindow;
 struct NativeWindow;
 // A Wayland surface, which libwayland-client defines.
 struct wl_surface;
+// A Win32 window, which only Windows builds define.
+struct HWND__;
 
 namespace mln {
 class UpdateParameters;
@@ -305,6 +307,16 @@ class SurfaceSessionBackend : public RenderSessionBackend {
     (void)physical_size;
     return unsupported_retarget(
       "session does not render through a Wayland surface"
+    );
+  }
+  // Presents to a new Win32 window.
+  virtual auto set_win32_target(
+    const std::shared_ptr<HWND__>& window, mln::Size physical_size
+  ) -> mln_status {
+    (void)window;
+    (void)physical_size;
+    return unsupported_retarget(
+      "session does not render through a Win32 window"
     );
   }
 

@@ -333,4 +333,40 @@ auto validate_wayland_surface_replacement(
   return MLN_STATUS_OK;
 }
 
+auto validate_win32_window_descriptor(
+  const mln_win32_window_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("window descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_win32_window_descriptor)) {
+    set_thread_error("mln_win32_window_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "window dimensions must be positive"
+  );
+  if (size_status != MLN_STATUS_OK) return size_status;
+  if (descriptor->window == nullptr) {
+    set_thread_error("Win32 window must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_win32_window_replacement(
+  const mln_win32_window_replacement* replacement
+) -> mln_status {
+  const auto status = validate_surface_replacement(
+    replacement, "mln_win32_window_replacement.size is too small"
+  );
+  if (status != MLN_STATUS_OK) return status;
+  if (replacement->window == nullptr) {
+    set_thread_error("Win32 window must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 }  // namespace mln::core

@@ -906,6 +906,71 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
+    /// Creates a session that presents the map to a Win32 window, with a
+    /// graphics context that the library creates.
+    ///
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses a WGL context, and
+    /// `device` must be null. Attach with `RenderDriverKind::CoreWorker`.
+    ///
+    /// An OpenGL build sets the window's pixel format, so don't set one
+    /// yourself.
+    ///
+    /// The session presents without waiting for the display, so demand at most
+    /// one frame per display refresh. While the window is minimized, frame
+    /// demands finish with `RenderResult::TargetNotReady`.
+    ///
+    /// Keep the window until a release or replacement of the target, or a
+    /// detach of the session, completes.
+    ///
+    /// See `mln_map_attach_win32_window` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `window` isn't a window, or, in an
+    ///   OpenGL build, already has another pixel format.
+    /// - `Status::InvalidState` when `window` is minimized or has no client
+    ///   area.
+    /// - `Status::Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions::presentation`.
+    /// - `Status::InvalidState` when `window` was minimized before the attach
+    ///   ran.
+    /// - `Status::Unsupported` when the GPU or the Vulkan loader can't present.
+    /// - `Status::NativeError` when the library can't create the graphics
+    ///   context or present to the window.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "windows")]
+    pub unsafe fn attach_win32_window(
+        &self,
+        descriptor: &Win32WindowDescriptor,
+        device: Option<&VulkanDeviceHandle>,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_vulkan_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_win32_window(
+                    map,
+                    descriptor,
+                    device,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
     /// Holds back the map's changes from rendering until
     /// `MapHandle::end_command_group()`, so they show in the same frame.
     ///

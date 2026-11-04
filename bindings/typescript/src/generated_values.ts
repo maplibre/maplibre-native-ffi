@@ -2291,9 +2291,9 @@ export interface RenderSessionAttachOptions {
    *
    * - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
    *   WGL context, an existing WebGL context, or a browser's WebGPU device.
-   * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
-   *   or OpenHarmony window, a Wayland surface, a ring of Android hardware
-   *   buffers or dmabufs, or an offscreen session.
+   * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android,
+   *   OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
+   *   hardware buffers or dmabufs, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.unsupported`.
@@ -4397,4 +4397,32 @@ export interface WglContextDescriptor {
    * Your `wglGetProcAddress`, or null to use the system's.
    */
   getProcAddress?: bigint;
+}
+
+/**
+ * A Win32 window to present to, for `MapHandle.attachWin32Window()`.
+ *
+ * See `mln_win32_window_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ */
+export interface Win32WindowDescriptor {
+  logicalSize: LogicalSize;
+  /**
+   * Your `HWND`.
+   */
+  window: bigint;
+}
+
+/**
+ * A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
+ *
+ * See `mln_win32_window_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ */
+export interface Win32WindowReplacement {
+  logicalSize: LogicalSize;
+  /**
+   * Your `HWND`.
+   */
+  window: bigint;
 }

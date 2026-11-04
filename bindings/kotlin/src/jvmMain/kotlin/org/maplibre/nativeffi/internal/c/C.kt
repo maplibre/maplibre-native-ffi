@@ -325,6 +325,18 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_attach_win32_window =
+    Ffm.downcall(
+      "mln_map_attach_win32_window",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_begin_command_group =
     Ffm.downcall("mln_map_begin_command_group", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_camera_for_geometry =
@@ -1132,6 +1144,15 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_render_session_set_win32_window_target =
+    Ffm.downcall(
+      "mln_render_session_set_win32_window_target",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_resource_request_complete =
     Ffm.downcall("mln_resource_request_complete", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_resource_request_is_cancelled =
@@ -1856,6 +1877,25 @@ internal actual object C {
     mln_map_attach_web_gpu_surface.invokeExact(
       map,
       descriptor,
+      options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_attach_win32_window(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_win32_window.invokeExact(
+      map,
+      descriptor,
+      device,
       options,
       outSession,
       completion,
@@ -3104,6 +3144,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_web_gpu_surface_target.invokeExact(
+      session,
+      replacement,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_render_session_set_win32_window_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_render_session_set_win32_window_target.invokeExact(
       session,
       replacement,
       completion,

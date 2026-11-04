@@ -1092,6 +1092,47 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Replaces the Win32 window that the session presents to.
+    /// </summary>
+    /// <remarks>
+    /// <para>Use it to give the session a window again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
+    /// window, or to resize it. Once the replacement completes, the session no
+    /// longer uses the old window.</para>
+    /// <para>See <c>mln_render_session_set_win32_window_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>window</c>
+    /// isn't a window, or, in an OpenGL build, already has another pixel
+    /// format.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when <c>window</c> is
+    /// minimized or has no client area.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when <c>window</c> was
+    /// minimized before the replacement ran.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when, in a Vulkan build,
+    /// the new window needs a different color format than the old one. Attach a
+    /// new session instead.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// present to the new window.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public Task SetWin32WindowTargetAsync(Win32WindowReplacement replacement)
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeReplacement = NativeWin32WindowReplacement(replacement);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_win32_window_target(
+            Handle,
+            &nativeReplacement,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Submits each command without a completion. Native logs a failure as
     /// a warning, and the caller sees none.
     /// </summary>

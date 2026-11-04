@@ -8,106 +8,13 @@
 #include "maplibre_native_c.h"
 #include "render/offscreen_device.hpp"
 #include "render/opengl/opengl_texture_session.hpp"
-#include "render/opengl/wgl_common.hpp"
+#include "render/opengl/wgl_window.hpp"
 #include "render/render_session_common.hpp"
 
 namespace mln::core {
 namespace {
 
-constexpr auto window_class_name = "mln_offscreen_device";
-
-// The module that holds this code, so the window class belongs to the library
-// whether it is linked as a DLL or into the host's executable.
-auto library_module() -> HMODULE {
-  auto module = HMODULE{};
-  GetModuleHandleExA(
-    GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-      GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-    reinterpret_cast<LPCSTR>(&library_module), &module
-  );
-  return module;
-}
-
-auto set_windows_error(const char* call) -> void {
-  const auto message =
-    std::string{call} + " failed (" + std::to_string(GetLastError()) + ")";
-  set_thread_error(message.c_str());
-}
-
-// A hidden window whose device context carries the pixel format that a
-// dedicated session's context needs. Only the thread that creates a window may
-// destroy it, so each session makes its own on its core worker. Windows
-// destroys a thread's windows when the thread exits, which reclaims one that
-// a kept backend never destroys.
-class HiddenWindow {
- public:
-  HiddenWindow() = default;
-  HiddenWindow(const HiddenWindow&) = delete;
-  auto operator=(const HiddenWindow&) -> HiddenWindow& = delete;
-  HiddenWindow(HiddenWindow&&) = delete;
-  auto operator=(HiddenWindow&&) -> HiddenWindow& = delete;
-  ~HiddenWindow() {
-    if (window_ != nullptr) {
-      DestroyWindow(window_);
-    }
-  }
-
-  auto create() -> mln_status {
-    static const auto registered = [] {
-      auto window_class = WNDCLASSEXA{};
-      window_class.cbSize = sizeof(window_class);
-      window_class.style = CS_OWNDC;
-      window_class.lpfnWndProc = DefWindowProcA;
-      window_class.hInstance = library_module();
-      window_class.lpszClassName = window_class_name;
-      return RegisterClassExA(&window_class) != 0 ||
-             GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
-    }();
-    if (!registered) {
-      set_thread_error(
-        "RegisterClassExA failed for the offscreen device window"
-      );
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-    window_ = CreateWindowExA(
-      0, window_class_name, window_class_name, WS_POPUP, 0, 0, 8, 8, nullptr,
-      nullptr, library_module(), nullptr
-    );
-    if (window_ == nullptr) {
-      set_windows_error("CreateWindowExA");
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-    // The class owns this device context, so it needs no release and stays
-    // valid until the window is destroyed.
-    device_context_ = GetDC(window_);
-    auto pixel_format = PIXELFORMATDESCRIPTOR{};
-    pixel_format.nSize = sizeof(pixel_format);
-    pixel_format.nVersion = 1;
-    pixel_format.dwFlags =
-      PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-    pixel_format.iPixelType = PFD_TYPE_RGBA;
-    pixel_format.cColorBits = 32;
-    pixel_format.cAlphaBits = 8;
-    pixel_format.cDepthBits = 24;
-    pixel_format.cStencilBits = 8;
-    pixel_format.iLayerType = PFD_MAIN_PLANE;
-    const auto format = ChoosePixelFormat(device_context_, &pixel_format);
-    if (
-      format == 0 ||
-      SetPixelFormat(device_context_, format, &pixel_format) == FALSE
-    ) {
-      set_windows_error("setting the offscreen device window's pixel format");
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-    return MLN_STATUS_OK;
-  }
-
-  [[nodiscard]] auto device_context() const -> HDC { return device_context_; }
-
- private:
-  HWND window_ = nullptr;
-  HDC device_context_ = nullptr;
-};
+using opengl::HiddenWindow;
 
 class WglOffscreenDevice final : public OffscreenDevice {
  public:

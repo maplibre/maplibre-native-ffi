@@ -108,6 +108,8 @@ from ._generated_values import (
     VulkanTextureFrame,
     WaylandSurfaceDescriptor,
     WaylandSurfaceReplacement,
+    Win32WindowDescriptor,
+    Win32WindowReplacement,
     _maybe,
 )
 from ._operation import GeneratedOperations, _adopt_value, _answer, _view
@@ -804,6 +806,53 @@ class _MapHandleOperations(GeneratedOperations):
           context or present to the surface.
         """
         raw = self._native.attach_wayland_surface(
+            descriptor, None if device is None else device._native, options
+        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
+
+    def attach_win32_window(
+        self,
+        descriptor: Win32WindowDescriptor,
+        device: VulkanDeviceHandle | None,
+        options: RenderSessionAttachOptions,
+    ) -> RenderSessionHandle:
+        """Creates a session that presents the map to a Win32 window, with a
+        graphics context that the library creates.
+
+        A Vulkan build presents with `device`, or, when `device` is null,
+        with a device that the library creates. An OpenGL build uses a WGL
+        context, and `device` must be null. Attach with
+        `RenderDriverKind.CORE_WORKER`.
+
+        An OpenGL build sets the window's pixel format, so don't set one
+        yourself.
+
+        The session presents without waiting for the display, so demand at
+        most one frame per display refresh. While the window is minimized,
+        frame demands finish with `RenderResult.TARGET_NOT_READY`.
+
+        Keep the window until a release or replacement of the target, or a
+        detach of the session, completes.
+
+        See `mln_map_attach_win32_window` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `window` isn't a window, or, in an
+          OpenGL build, already has another pixel format.
+        - `Status.INVALID_STATE` when `window` is minimized or has no client
+          area.
+        - `Status.UNSUPPORTED` when you created `device` without
+          `VulkanDeviceOptions.presentation`.
+        - `Status.INVALID_STATE` when `window` was minimized before the
+          attach ran.
+        - `Status.UNSUPPORTED` when the GPU or the Vulkan loader can't
+          present.
+        - `Status.NATIVE_ERROR` when the library can't create the graphics
+          context or present to the window.
+        """
+        raw = self._native.attach_win32_window(
             descriptor, None if device is None else device._native, options
         )
         return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
@@ -2626,6 +2675,35 @@ class _RenderSessionHandleOperations(GeneratedOperations):
           surface.
         """
         return self._native.set_wayland_surface_target(replacement)
+
+    def set_win32_window_target(
+        self, replacement: Win32WindowReplacement
+    ) -> Future[None]:
+        """Replaces the Win32 window that the session presents to.
+
+        Use it to give the session a window again after
+        `RenderSessionHandle.release_target()`, to move it to another window,
+        or to resize it. Once the replacement completes, the session no
+        longer uses the old window.
+
+        See `mln_render_session_set_win32_window_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `window` isn't a window, or, in an
+          OpenGL build, already has another pixel format.
+        - `Status.INVALID_STATE` when `window` is minimized or has no client
+          area.
+        - `Status.INVALID_STATE` when `window` was minimized before the
+          replacement ran.
+        - `Status.UNSUPPORTED` when, in a Vulkan build, the new window needs
+          a different color format than the old one. Attach a new session
+          instead.
+        - `Status.NATIVE_ERROR` when the library can't present to the new
+          window.
+        """
+        return self._native.set_win32_window_target(replacement)
 
     @property
     def discarding(self) -> RenderSessionHandleDiscarding:
