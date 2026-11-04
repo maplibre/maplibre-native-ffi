@@ -299,7 +299,20 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       swapchainImages.clear();
       acquireSemaphores.clear();
       presentSemaphores.clear();
-      init(size.width, size.height);
+      try {
+        init(size.width, size.height);
+      } catch (const vk::SurfaceLostKHRError&) {
+        // The surface lost its window. Only initSwapchain() asks the surface,
+        // and it builds nothing before the call that fails, so dropping the
+        // old swapchain, retired if creation reached it, leaves nothing half
+        // built. mbgl rebuilds the swapchain at the new size before the next
+        // frame, which ends not ready while the surface stays lost, so the host
+        // can still release or replace the target.
+        swapchain.reset();
+        extent = vk::Extent2D{size.width, size.height};
+        const auto scope = mln::gfx::BackendScope{backend};
+        backend.getContext<mln::vulkan::Context>().requestSurfaceUpdate(false);
+      }
     }
 
     // Whether a replacement surface can use the render pass and the shaders

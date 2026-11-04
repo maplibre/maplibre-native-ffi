@@ -16,6 +16,7 @@ typedef struct window_reader {
   AImageReader* reader;
   // The reader owns its window.
   ANativeWindow* window;
+  mln_logical_size window_size;
   atomic_bool image_available;
 } window_reader;
 
@@ -25,12 +26,13 @@ static void on_image_available(void* context, AImageReader* reader) {
   mln_test_flag_set(&state->image_available);
 }
 
-static void reader_create(window_reader* out) {
+static void reader_create_sized(window_reader* out, mln_logical_size size) {
+  out->window_size = size;
   TEST_ASSERT_EQUAL_INT(
-    AMEDIA_OK,
-    AImageReader_new(
-      window_size, window_size, AIMAGE_FORMAT_RGBA_8888, 2, &out->reader
-    )
+    AMEDIA_OK, AImageReader_new(
+                 (int32_t)size.width, (int32_t)size.height,
+                 AIMAGE_FORMAT_RGBA_8888, 2, &out->reader
+               )
   );
   AImageReader_ImageListener listener = {
     .context = out, .onImageAvailable = on_image_available
@@ -40,6 +42,12 @@ static void reader_create(window_reader* out) {
   );
   TEST_ASSERT_EQUAL_INT(
     AMEDIA_OK, AImageReader_getWindow(out->reader, &out->window)
+  );
+}
+
+static void reader_create(window_reader* out) {
+  reader_create_sized(
+    out, (mln_logical_size){.width = window_size, .height = window_size}
   );
 }
 
@@ -69,8 +77,8 @@ static void expect_red_frame(window_reader* reader) {
     status = AImage_getPlanePixelStride(image, 0, &pixel_stride);
   }
   uint8_t pixel[4] = {0};
-  const int offset =
-    (window_size / 2) * row_stride + (window_size / 2) * pixel_stride;
+  const int offset = (int)(reader->window_size.height / 2) * row_stride +
+                     (int)(reader->window_size.width / 2) * pixel_stride;
   if (status == AMEDIA_OK && offset + 4 <= length) {
     memcpy(pixel, data + offset, sizeof(pixel));
   }
@@ -125,26 +133,32 @@ static void attach(
   finish_attach(fixture, &completion);
 }
 
-static mln_render_result demand_frame(const mln_test_render_fixture* fixture) {
+static mln_render_frame_result demand_frame(
+  const mln_test_render_fixture* fixture
+) {
   mln_test_render_demand_forced(fixture, 0);
   const mln_render_frame_batch batch =
     mln_test_render_wait_for_results(fixture);
   const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
-  return result.disposition;
+  return result;
 }
 
-static void render_frame(const mln_test_render_fixture* fixture) {
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, demand_frame(fixture));
+static mln_render_frame_result render_frame(
+  const mln_test_render_fixture* fixture
+) {
+  const mln_render_frame_result result = demand_frame(fixture);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  return result;
 }
 
 static void set_window(
-  const mln_test_render_fixture* fixture, ANativeWindow* window
+  const mln_test_render_fixture* fixture, const window_reader* reader
 ) {
   const mln_android_surface_replacement replacement = {
     .size = sizeof(mln_android_surface_replacement),
-    .logical_size = {.width = window_size, .height = window_size},
-    .window = window,
+    .logical_size = reader->window_size,
+    .window = reader->window,
   };
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
@@ -225,11 +239,11 @@ static void a_session_presents_to_each_window_that_it_gets(void) {
         fixture.session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
-    set_window(&fixture, second.window);
+    set_window(&fixture, &second);
     render_frame(&fixture);
     expect_red_frame(&second);
 
-    set_window(&fixture, first.window);
+    set_window(&fixture, &first);
     render_frame(&fixture);
     expect_red_frame(&first);
   }
@@ -240,11 +254,14 @@ static void a_session_presents_to_each_window_that_it_gets(void) {
 }
 
 // A host that can't hold the reader's teardown for the release loses the
-// window first. Each frame to the lost window ends not ready, and the session
-// survives, so the host can release the window and attach the next one.
+// window first, and a resize queued before the release, as for a rotation,
+// reaches the lost window. The session takes the size, each frame to the lost
+// window ends not ready, and the host can release the window and attach the
+// next one at the new size.
 static void a_session_survives_a_window_whose_reader_went_away(void) {
   const mln_runtime runtime = mln_test_create_runtime();
   const mln_map map = create_red_map(runtime);
+  const mln_logical_size rotated = {.width = 96, .height = 48};
   window_reader first = {0};
   window_reader second = {0};
   mln_test_render_fixture fixture = {0};
@@ -255,9 +272,15 @@ static void a_session_survives_a_window_whose_reader_went_away(void) {
     expect_red_frame(&first);
 
     reader_destroy(&first);
+    MLN_TEST_RENDER_AWAIT(
+      MLN_STATUS_OK, &fixture,
+      mln_render_session_resize(
+        fixture.session, rotated, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+      )
+    );
     for (int frame = 0; frame < 2; frame += 1) {
       TEST_ASSERT_EQUAL_UINT32(
-        MLN_RENDER_RESULT_TARGET_NOT_READY, demand_frame(&fixture)
+        MLN_RENDER_RESULT_TARGET_NOT_READY, demand_frame(&fixture).disposition
       );
     }
     MLN_TEST_RENDER_AWAIT(
@@ -266,9 +289,11 @@ static void a_session_survives_a_window_whose_reader_went_away(void) {
         fixture.session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
-    reader_create(&second);
-    set_window(&fixture, second.window);
-    render_frame(&fixture);
+    reader_create_sized(&second, rotated);
+    set_window(&fixture, &second);
+    const mln_render_frame_result rendered = render_frame(&fixture);
+    TEST_ASSERT_EQUAL_UINT32(rotated.width, rendered.view.extent.width);
+    TEST_ASSERT_EQUAL_UINT32(rotated.height, rendered.view.extent.height);
     expect_red_frame(&second);
   }
   release_session(&fixture);
