@@ -24,3 +24,39 @@ run = '''
 (cd ios && pod install)
 pnpm exec react-native run-ios --no-packager ${usage_args:-}
 '''
+
+# CI builds the app with these, without running it. A release build also
+# bundles the JavaScript.
+[tasks.build-android]
+description = "Build the C library for one Android architecture, then build the React Native example's release APK for it."
+usage = '''
+arg "[arch]" default="arm64" {
+  choices "arm" "arm64" "x86" "x64"
+}
+'''
+tools = { "core:java" = "{{vars.java_version}}" }
+depends = [{ task = "//:build", args = ["android-{{usage.arch}}-egl"] }]
+dir = "{{config_root}}/android"
+run = '''
+case "$usage_arch" in
+  arm) abi=armeabi-v7a ;;
+  arm64) abi=arm64-v8a ;;
+  x86) abi=x86 ;;
+  x64) abi=x86_64 ;;
+esac
+./gradlew assembleRelease -PreactNativeArchitectures="$abi"
+'''
+
+[tasks.build-ios]
+description = "Build the C library for the iOS simulator, then build the React Native example's release app for it, unsigned."
+tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.16.2" }
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+../../bindings/typescript/react-native/scripts/stage.sh
+(cd ios && pod install)
+# The C library has an arm64 simulator slice only.
+xcodebuild -workspace ios/MaplibreExample.xcworkspace -scheme MaplibreExample \
+  -configuration Release -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' ARCHS=arm64 \
+  -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+'''

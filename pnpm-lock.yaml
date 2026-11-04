@@ -305,6 +305,9 @@ importers:
       '@types/react':
         specifier: ^19.2.0
         version: 19.3.0
+      hermes-compiler:
+        specifier: 260318099.0.5
+        version: 260318099.0.5
 
 packages:
 
