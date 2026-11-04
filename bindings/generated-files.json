@@ -238,6 +238,7 @@
     "bindings/go/maplibre/generated_api.go",
     "bindings/go/maplibre/generated_api_android.go",
     "bindings/go/maplibre/generated_api_macos.go",
+    "bindings/go/maplibre/generated_api_ohos.go",
     "bindings/go/maplibre/generated_callbacks.c",
     "bindings/go/maplibre/generated_callbacks.h",
     "bindings/go/maplibre/generated_native.go",

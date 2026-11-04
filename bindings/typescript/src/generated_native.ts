@@ -13,6 +13,7 @@ import type {
   CustomVectorSourceOptions,
   FeatureStateSelector,
   FrameDemand,
+  FramePacerOptions,
   FreeCameraOptions,
   GeoJsonSourceOptions,
   GpuSync,
@@ -616,6 +617,7 @@ export interface NativeOperations {
     options: OffscreenDeviceOptions | undefined,
   ): bigint;
   mln_offscreen_device_release(device: bigint, token: object | undefined): void;
+  mln_ohos_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
   mln_open_gl_supported_context_provider_mask(): OpenGlContextProviderFlag;
   mln_plugin_get_register_function_v1(): bigint;
   mln_projected_meters_for_lat_lng(coordinate: LatLng): ProjectedMeters;

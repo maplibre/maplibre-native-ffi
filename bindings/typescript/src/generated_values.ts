@@ -662,16 +662,20 @@ export const FrameDemandFlag = {
 export type FrameDemandFlag = number;
 
 /**
- * The optional settings of a frame pacer.
+ * Options for creating a frame pacer.
  *
- * See `mln_frame_pacer_option_field` in the
+ * See `mln_frame_pacer_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
-export const FramePacerOptionField = {
-  maximumFramesPerSecond: 1,
-} as const;
-/** A bitwise OR of FramePacerOptionField flags. */
-export type FramePacerOptionField = number;
+export interface FramePacerOptions {
+  /**
+   * The most times per second that the pacer demands frames, greater than zero.
+   * The pacer skips a display refresh that comes too soon after its last
+   * demands, and a limit at the display's refresh rate or above skips none. By
+   * default, it can demand frames at every refresh.
+   */
+  maximumFramesPerSecond?: number;
+}
 
 /**
  * A map camera's whole position and orientation in three dimensions.

@@ -7,6 +7,7 @@
 #include "maplibre_native_c/logging.h"
 #include "maplibre_native_c/map.h"
 #include "maplibre_native_c/offscreen.h"
+#include "maplibre_native_c/ohos.h"
 #include "maplibre_native_c/plugin.h"
 #include "maplibre_native_c/projection.h"
 #include "maplibre_native_c/query.h"
@@ -423,6 +424,10 @@ bool mln_ts_write_feature_state_selector(
 );
 bool mln_ts_write_frame_demand(
   mln_ts_call* call, napi_value value, mln_frame_demand* out, const char* path
+);
+bool mln_ts_write_frame_pacer_options(
+  mln_ts_call* call, napi_value value, mln_frame_pacer_options* out,
+  const char* path
 );
 bool mln_ts_write_free_camera_options(
   mln_ts_call* call, napi_value value, mln_free_camera_options* out,

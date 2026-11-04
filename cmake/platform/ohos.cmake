@@ -8,7 +8,18 @@ function(mln_ffi_configure_platform_dependencies target)
   if(MLN_FFI_TARGET_PLATFORM STREQUAL "ohos-x64")
     set(ohos_test_supported TRUE)
   endif()
-  foreach(library IN ITEMS icu image_source pixelmap hilog_ndk.z net_http uv z)
+  foreach(
+    library
+    IN
+    ITEMS
+    icu
+    image_source
+    pixelmap
+    hilog_ndk.z
+    native_vsync
+    net_http
+    uv
+    z)
     string(MAKE_C_IDENTIFIER "${library}" identifier)
     find_library(MLN_FFI_OHOS_${identifier}_LIBRARY NAMES "${library}" REQUIRED)
     target_link_libraries(
@@ -57,7 +68,8 @@ function(mln_ffi_configure_platform target)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OHOS_SOURCES})
   mln_ffi_target_project_sources(
-    ${target} ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp)
+    ${target} ${PROJECT_SOURCE_DIR}/src/platform/ohos/frame_pacer.cpp
+    ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp)
 
   # Only Native's bidi and character classes use the ICU it vendors. Its headers
   # rename every symbol for ICU 61, so they reach only those sources and do not

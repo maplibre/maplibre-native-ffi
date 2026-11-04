@@ -213,6 +213,32 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
     Ok(())
 }
 
+/// Creates a frame pacer that follows the display through OpenHarmony's
+/// native VSync.
+///
+/// You can call it on any thread. The pacer demands frames from a system
+/// thread at the display refreshes that `OH_NativeVSync` reports, so it
+/// needs no event loop of yours.
+///
+/// See `mln_ohos_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+///
+/// # Errors
+///
+/// - `Status::NativeError` when the system can't report the display's
+///   refreshes to the process.
+#[cfg(target_env = "ohos")]
+pub fn ohos_frame_pacer_create(options: Option<&FramePacerOptions>) -> Result<FramePacerHandle> {
+    let mut call = Call::global();
+    crate::abi::validate_abi_version()?;
+    let mut out_pacer = sys::mln_frame_pacer(0);
+    let options = call.optional_reference(options.as_ref())?;
+    call.status(|_, out_diagnostic| unsafe {
+        sys::mln_ohos_frame_pacer_create(options, &mut out_pacer, out_diagnostic)
+    })?;
+    Ok(FramePacerHandle::adopt(out_pacer)?)
+}
+
 /// Reports the OpenGL context platforms that this build of the library has.
 ///
 /// See `mln_open_gl_supported_context_provider_mask` in the

@@ -2823,6 +2823,11 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_offscreen_device_release(device: mln_offscreen_device);
+    pub fn mln_ohos_frame_pacer_create(
+        options: *const mln_frame_pacer_options,
+        out_pacer: *mut mln_frame_pacer,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags;
     pub fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1;
     pub fn mln_projected_meters_for_lat_lng(
