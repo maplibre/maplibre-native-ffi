@@ -1,8 +1,9 @@
 /**
  * Hermes embedding backend. Install `mln::hermes::Module` into the runtime on
  * its JavaScript thread before evaluating this module. Its scheduler must post
- * work to that thread asynchronously. Destroy the module on the same thread,
- * before destroying the runtime; cleanup ends all outstanding native work.
+ * work to that thread asynchronously. Destroy the module before destroying the
+ * runtime, on the same thread or once that thread has stopped for good;
+ * cleanup ends all outstanding native work.
  * The host supplies graphics objects and initializes Android platform services
  * through the C API when it uses them. No native views are created.
  *

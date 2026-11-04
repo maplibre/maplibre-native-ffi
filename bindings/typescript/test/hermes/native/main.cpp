@@ -7,6 +7,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include <hermes/hermes.h>
 
@@ -185,7 +186,13 @@ static void runRealm(unsigned generation) {
     failure = error.what();
   }
   probe.reset();
-  module.reset();
+  if (generation == 1) {
+    module.reset();
+  } else {
+    // As React Native does on Android, end the module on another thread once
+    // the JavaScript thread has stopped.
+    std::thread([&module] { module.reset(); }).join();
+  }
   // Drop queued pumps and timer roots before the VM, then discard late pumps
   // posted by the VM's finalizer thread after the environments have closed.
   loop.clear();

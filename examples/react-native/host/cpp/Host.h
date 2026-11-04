@@ -14,12 +14,9 @@ void install(
   std::shared_ptr<facebook::react::CallInvoker> invoker
 );
 
-// Ends the binding's native work and releases its JSI values. Call it on the
-// JavaScript thread before React Native destroys the runtime.
+// Ends the binding's native work and releases its JSI values. Call it before
+// React Native destroys the runtime, on the JavaScript thread or once that
+// thread has stopped for good.
 void cleanup();
-
-// Runs cleanup() on the JavaScript thread and waits for it, for a platform hook
-// that runs on another thread while the JavaScript thread still runs.
-void cleanupOnJavaScriptThread();
 
 }  // namespace mln::example
