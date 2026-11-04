@@ -7,6 +7,9 @@ point the plugin header documents, and nothing else. No exported name may
 belong to the test seams: a name containing `mln_test`, `testing`, or
 `sync_point` fails the check even if a header declared it.
 
+A build whose only shared library is its Apple framework's binary, as
+maplibre-native-next's, is checked through that binary.
+
 A preset without shared libraries installs only the static archive, where
 hidden symbols stay visible to a static link. There the check covers the
 archive's C symbols with the `mln_` prefix, which are the ones a host links
@@ -31,6 +34,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIBRARY_STEM = "maplibre-native-c"
+FRAMEWORK = "MaplibreNativeC"
 # Upstream defines the plugin registration function, and the library exports
 # it for include/maplibre_native_c/plugin.h; see cmake/mln_ffi_c_api.cmake.
 EXTRA_EXPORTS = frozenset({"mln_plugin_register_v1"})
@@ -74,6 +78,7 @@ def find_library(install: pathlib.Path) -> tuple[pathlib.Path, bool]:
             f"lib/lib{LIBRARY_STEM}.dylib",
             f"lib/lib{LIBRARY_STEM}.so",
             f"bin/{LIBRARY_STEM}.dll",
+            f"Frameworks/{FRAMEWORK}.framework/{FRAMEWORK}",
         )
         for path in install.glob(pattern)
     ]
@@ -152,9 +157,15 @@ def pe_symbols(library: pathlib.Path) -> set[str]:
 def library_symbols(preset: str, library: pathlib.Path, shared: bool) -> set[str]:
     if library.suffix == ".dll":
         return pe_symbols(library)
-    macho = library.suffix == ".dylib" or (
-        not shared
-        and preset.startswith(("macos-", "ios-", "tvos-", "visionos-", "maccatalyst-"))
+    macho = (
+        library.suffix == ".dylib"
+        or library.parent.suffix == ".framework"
+        or (
+            not shared
+            and preset.startswith(
+                ("macos-", "ios-", "tvos-", "visionos-", "maccatalyst-")
+            )
+        )
     )
     names = nm_symbols(nm_tool(preset), library, dynamic=library.suffix == ".so")
     if macho:

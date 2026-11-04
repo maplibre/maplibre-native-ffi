@@ -66,6 +66,21 @@ function(mln_ffi_cargo_environment env_var args_var)
       APPEND rust_environment
       "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
   endif()
+  # rustc and the C build scripts' compiler build for the deployment target of
+  # the rest of the build, rather than for the SDK's own version.
+  if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+      set(deployment_variable IPHONEOS_DEPLOYMENT_TARGET)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+      set(deployment_variable TVOS_DEPLOYMENT_TARGET)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+      set(deployment_variable XROS_DEPLOYMENT_TARGET)
+    else()
+      set(deployment_variable MACOSX_DEPLOYMENT_TARGET)
+    endif()
+    list(APPEND rust_environment
+         "${deployment_variable}=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  endif()
   # Emscripten rejects mixing objects that carry atomics with objects that do
   # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
   # built with atomics, so std is rebuilt from source. -Zbuild-std is

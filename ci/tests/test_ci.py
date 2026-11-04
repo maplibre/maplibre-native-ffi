@@ -152,15 +152,20 @@ class VendorTest(unittest.TestCase):
             {
                 "freebsd-x64-egl": freebsd,
                 "freebsd-x64-vulkan": freebsd,
-                "ios-simulator-arm64-metal": ("iOS simulator", "devices-cli get ios"),
-                "tvos-simulator-arm64-metal": (
-                    "tvOS simulator",
-                    "devices-cli get tvos",
-                ),
-                "visionos-simulator-arm64-metal": (
-                    "visionOS simulator",
-                    "devices-cli get visionos",
-                ),
+                # maplibre-native-next's simulator targets boot their C++
+                # targets' devices.
+                **{
+                    f"{platform}-simulator-arm64-metal{implementation}": (
+                        f"{label} simulator",
+                        f"devices-cli get {platform}",
+                    )
+                    for platform, label in (
+                        ("ios", "iOS"),
+                        ("tvos", "tvOS"),
+                        ("visionos", "visionOS"),
+                    )
+                    for implementation in ("", "-next")
+                },
                 "android-x86-egl": ("Android emulator", f"{android} android-x86-egl"),
                 "android-x64-egl": ("Android emulator", f"{android} android-x64-egl"),
                 "android-x64-vulkan": ("Android emulator", f"{android} x86_64"),

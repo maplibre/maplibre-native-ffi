@@ -2,18 +2,22 @@
 #MISE description="Combine the Apple Metal native packages into the XCFramework zip, and check every slice."
 #MISE shell="bash"
 #USAGE arg "[input]" default="build/packages/native/dist" help="Directory that holds the Apple Metal native packages"
+#USAGE flag "--implementation <implementation>" default="maplibre-native" help="The C API implementation whose packages to combine, such as maplibre-native-next"
 
 set -euo pipefail
 
 input_root="${usage_input?}"
-output="${MISE_MONOREPO_ROOT}/build/packages/native/dist/MaplibreNativeC.xcframework.zip"
+# Another implementation's packages carry its presets' suffix, and so does
+# its XCFramework's zip.
+suffix="$(python3 -c 'import sys; from tools.ci.gaps import IMPLEMENTATION_SUFFIXES; print(IMPLEMENTATION_SUFFIXES.get(sys.argv[1], ""))' "${usage_implementation:-maplibre-native}")"
+output="${MISE_MONOREPO_ROOT}/build/packages/native/dist/MaplibreNativeC${suffix}.xcframework.zip"
 presets="$(python3 -m tools.ci.plan --package-inputs apple-xcframework)"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 while IFS= read -r preset; do
-  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}${suffix}.tar.gz" -print -quit)"
   if [[ -z "$archive" ]]; then
     echo "Missing native package for ${preset} under ${input_root}" >&2
     exit 1
@@ -22,8 +26,8 @@ while IFS= read -r preset; do
   tar -xzf "$archive" -C "$work"
 done <<< "$presets"
 
-macos="$work/maplibre-native-c-macos-arm64-metal/Frameworks/MaplibreNativeC.framework"
-intel="$work/maplibre-native-c-macos-x64-metal/Frameworks/MaplibreNativeC.framework"
+macos="$work/maplibre-native-c-macos-arm64-metal${suffix}/Frameworks/MaplibreNativeC.framework"
+intel="$work/maplibre-native-c-macos-x64-metal${suffix}/Frameworks/MaplibreNativeC.framework"
 lipo -create "$macos/MaplibreNativeC" "$intel/MaplibreNativeC" \
   -output "$macos/Versions/A/MaplibreNativeC"
 lipo -create "$macos.dSYM/Contents/Resources/DWARF/MaplibreNativeC" \
@@ -84,7 +88,7 @@ while IFS= read -r preset; do
   arch="${preset%-*}"
   arch="${arch##*-}"
   [[ "$arch" != x64 ]] || arch=x86_64
-  framework="$work/maplibre-native-c-${preset}/Frameworks/MaplibreNativeC.framework"
+  framework="$work/maplibre-native-c-${preset}${suffix}/Frameworks/MaplibreNativeC.framework"
   if [[ "$preset" == macos-x64-metal ]]; then
     framework="$macos"
   else

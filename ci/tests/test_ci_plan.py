@@ -245,6 +245,9 @@ class PresetTest(unittest.TestCase):
                 and not emulated
             )
             packages = "cache" if emulated else zig.get(target.platform, "skip")
+            # maplibre-native-next's targets run no binding suite.
+            if target.implementation != "maplibre-native":
+                packages = "skip"
             # Windows ARM64 has no Zig toolchain.
             if (
                 target.platform in ("windows", "windows-mingw")
@@ -380,9 +383,9 @@ class PresetTest(unittest.TestCase):
         # no binding suite and no package takes its archive.
         target = self.targets["emscripten-wasm32-webgpu-next"]
         self.assertEqual(
-            (target.implementation, target.unit), ("maplibre-native-next", "next")
+            (target.implementation, target.unit), ("maplibre-native-next", "next-web")
         )
-        (row,) = plan.plan(self.presets, False, ["next"])["matrix"]
+        (row,) = plan.plan(self.presets, False, ["next-web"])["matrix"]
         self.assertEqual(
             (row["preset"], row["addon"], row["python_wheel"]),
             (target.preset, "", False),

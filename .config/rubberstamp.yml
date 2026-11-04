@@ -560,7 +560,7 @@ ci:
               - bindings/kotlin/karma.config.d/**
               - third_party/maplibre-native
           then: apply
-    next:
+    next-web:
       covers: >-
         The C API on maplibre-native-next, the Rust port of MapLibre Native's
         core in src/next, built for the browser with Emscripten and WebGPU. Runs
@@ -575,6 +575,32 @@ ci:
               - src/next/**
               - cmake/mln_ffi_maplibre_native_next.cmake
               - cmake/mln_ffi_rust.cmake
+          then: apply
+    next-apple:
+      covers: >-
+        The C API on maplibre-native-next for Apple platforms on ARM64: macOS,
+        iOS, Mac Catalyst, tvOS and visionOS with Metal, devices and simulators.
+        Builds each as MaplibreNativeC.framework for the XCFramework of a
+        maplibre-native-next release, and runs the crate's own tests on macOS
+        and the simulators. Changes to src/next, its CMake, and the shared Apple
+        framework and native packaging need it. Changes to the C++
+        implementation in src/ don't.
+      rules:
+        - if:
+            files:
+              - src/next/**
+              - cmake/mln_ffi_maplibre_native_next.cmake
+              - cmake/mln_ffi_apple_framework.cmake
+          then: apply
+    next-macos-x64:
+      covers: >-
+        The C API on maplibre-native-next for macOS x64 with Metal, the Intel
+        half of the XCFramework's macOS slice. Catches only what differs by CPU
+        architecture there; next-apple covers the rest.
+      rules:
+        - if:
+            files:
+              - cmake/mln_ffi_maplibre_native_next.cmake
           then: apply
     maven:
       covers: >-

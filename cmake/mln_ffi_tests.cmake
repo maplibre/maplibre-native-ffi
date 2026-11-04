@@ -671,25 +671,27 @@ function(mln_ffi_add_native_tests)
     endif()
   endif()
 
+  set(registered_tests)
+  if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+    # The ABI suite builds against maplibre-native-next, but calls functions
+    # that it leaves unimplemented, so only the crate's own tests run.
+    mln_ffi_add_maplibre_native_next_tests(registered_tests)
+  elseif(EMSCRIPTEN)
+    mln_native_add_browser_abi_shards()
+    mln_native_add_browser_test(native-internal/browser
+                                mln_native_internal_tests)
+  endif()
   if(EMSCRIPTEN)
-    if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
-      # The ABI suite builds against maplibre-native-next, but calls functions
-      # that it leaves unimplemented, so only the crate's own tests run.
-      mln_ffi_add_maplibre_native_next_tests(next_tests)
-    else()
-      mln_native_add_browser_abi_shards()
-      mln_native_add_browser_test(native-internal/browser
-                                  mln_native_internal_tests)
-    endif()
     return()
   endif()
 
   # Each registered test gets the same environment, so a new entry cannot miss
   # the fixture directory or the loader path.
   mln_native_test_environment(test_environment test_modifications)
-  set(registered_tests)
   mln_native_runs_off_host(off_host)
-  if(off_host)
+  if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+    # Registered above.
+  elseif(off_host)
     # Off the host, each suite runs as one entry, since a simulator spawns and
     # an emulator receives one process per run, with the plugin group in an
     # invocation of its own after the ABI suite.
@@ -723,10 +725,6 @@ function(mln_ffi_add_native_tests)
     endforeach()
     mln_native_add_exit_tests(exit_tests)
     list(APPEND registered_tests ${exit_tests})
-  endif()
-  if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
-    mln_ffi_add_maplibre_native_next_tests(next_tests)
-    list(APPEND registered_tests ${next_tests})
   endif()
   foreach(test_name IN LISTS registered_tests)
     set_property(

@@ -9,7 +9,11 @@ set(MLN_FFI_APPLE_FRAMEWORK_NAME MaplibreNativeC)
 function(mln_ffi_add_c_api_framework target implementation_target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target} ${implementation_target})
+  mln_ffi_configure_c_api_framework(${target})
+endfunction()
 
+# Builds the shared library `target` as MaplibreNativeC.framework.
+function(mln_ffi_configure_c_api_framework target)
   # App Store processing needs the platform, and MinimumOSVersion on iOS,
   # tvOS, and visionOS. The publish step replaces the project version with the
   # release's.

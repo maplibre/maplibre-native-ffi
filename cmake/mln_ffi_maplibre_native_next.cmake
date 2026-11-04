@@ -6,10 +6,12 @@
 # src/ on the C++ core, and mln_ffi_install_c_api_library packages it as it does
 # the C++ build's static archive.
 #
-# The port renders through wgpu: Vulkan on Linux, and in the browser WebGPU
-# through emdawnwebgpu (the port's wgpu custom backend over webgpu.h), so the
-# build takes Linux with the vulkan backend and Emscripten with the webgpu
-# backend.
+# The port renders through wgpu: Vulkan on Linux, Metal on Apple platforms, and
+# in the browser WebGPU through emdawnwebgpu (the port's wgpu custom backend
+# over webgpu.h), so the build takes Linux with the vulkan backend, Apple
+# platforms with the metal backend, and Emscripten with the webgpu backend. On
+# Apple platforms it also builds MaplibreNativeC.framework, which
+# package-xcframework combines as it does the C++ build's.
 
 # Checks the configuration and finds the headers that still come from MapLibre
 # Native: the plugin header that include/maplibre_native_c/plugin.h includes,
@@ -20,11 +22,17 @@ function(mln_ffi_check_maplibre_native_next)
     NOT
     (CMAKE_SYSTEM_NAME STREQUAL "Linux"
           AND MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
-    AND NOT (EMSCRIPTEN AND MLN_FFI_RENDER_BACKEND STREQUAL "webgpu"))
+    AND
+    NOT
+    (APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    AND
+    NOT
+    (EMSCRIPTEN AND MLN_FFI_RENDER_BACKEND STREQUAL "webgpu"))
     message(
       FATAL_ERROR
         "maplibre-native-next builds support Linux with the vulkan render "
-        "backend and Emscripten with the webgpu render backend")
+        "backend, Apple platforms with the metal render backend and "
+        "Emscripten with the webgpu render backend")
   endif()
 
   set(MLN_FFI_SOURCE_DIR "${PROJECT_SOURCE_DIR}/third_party/maplibre-native")
@@ -103,6 +111,22 @@ function(mln_ffi_add_maplibre_native_next_library target)
   # The Rust standard library and the port's compression need these: threads,
   # libdl, libm and zlib.
   target_link_libraries(${target} INTERFACE MLN_FFI::PlatformDependencies)
+  if(APPLE)
+    # What the crates link on Apple platforms (rustc --print
+    # native-static-libs): wgpu's Metal backend through the Objective-C
+    # runtime, zlib and iconv.
+    target_link_libraries(
+      mln_ffi_platform_dependencies
+      INTERFACE
+        "-framework Foundation"
+        "-framework CoreFoundation"
+        "-framework Metal"
+        "-framework QuartzCore"
+        "-framework CoreGraphics"
+        objc
+        z
+        iconv)
+  endif()
 
   set_property(
     DIRECTORY
@@ -111,6 +135,9 @@ function(mln_ffi_add_maplibre_native_next_library target)
   )
   mln_ffi_cargo_about(${target} "${crate}/Cargo.toml" "${crate}/about.toml")
   mln_ffi_add_rust_std_component()
+  if(APPLE)
+    mln_ffi_add_maplibre_native_next_framework(${target} "${library}")
+  endif()
 
   add_library(mln_ffi_render_dependencies INTERFACE)
   add_library(MLN_FFI::RenderDependencies ALIAS mln_ffi_render_dependencies)
@@ -134,6 +161,10 @@ function(mln_ffi_add_maplibre_native_next_library target)
       INTERFACE "-sMALLOC=mimalloc")
     return()
   endif()
+  if(APPLE)
+    # The tests render offscreen through wgpu, which opens Metal itself.
+    return()
+  endif()
   # The test harness drives Vulkan itself, as it does for the C++ build.
   include(render/vulkan)
   set_property(
@@ -142,6 +173,29 @@ function(mln_ffi_add_maplibre_native_next_library target)
       MLN_FFI_INCLUDE_DIRS "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/include"
   )
   mln_ffi_configure_vulkan_test_loader(mln_ffi_render_dependencies)
+endfunction()
+
+# Adds `target`_framework, MaplibreNativeC.framework over the Cargo-built
+# `library`, which it loads whole and of which it exports the C API, as the C++
+# build's framework does.
+function(mln_ffi_add_maplibre_native_next_framework target library)
+  set(source "${CMAKE_CURRENT_BINARY_DIR}/${target}_framework.c")
+  file(WRITE "${source}" "// The code is the Cargo-built archive's.\n")
+  add_library(${target}_framework SHARED "${source}")
+  add_dependencies(${target}_framework ${target}_cargo)
+  target_link_options(
+    ${target}_framework
+    PRIVATE "LINKER:-force_load,${library}")
+  set_property(
+    TARGET ${target}_framework
+    APPEND
+    PROPERTY LINK_DEPENDS "${library}")
+  target_link_libraries(
+    ${target}_framework
+    PRIVATE MLN_FFI::PlatformDependencies)
+  mln_ffi_configure_shared_exports(${target}_framework)
+  mln_ffi_configure_install_rpath(${target}_framework)
+  mln_ffi_configure_c_api_framework(${target}_framework)
 endfunction()
 
 # The crate's own tests: the images guide's and the offscreen ABI tests' flows,
@@ -182,6 +236,9 @@ function(mln_ffi_add_maplibre_native_next_tests out_tests)
   # path first, but this test has no harness.
   get_target_property(runtime_dirs mln_ffi_render_dependencies
                       MLN_FFI_RUNTIME_DIRS)
+  if(NOT runtime_dirs)
+    set(runtime_dirs)
+  endif()
   foreach(runtime_dir IN LISTS runtime_dirs)
     set_property(
       TEST next/c_api

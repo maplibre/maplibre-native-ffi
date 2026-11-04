@@ -58,7 +58,12 @@ def package_platforms(binding: str, all_targets: list[Target]) -> set[str]:
 
 
 def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
-    """The NuGet runtime package suffix and RID, shared with its packager."""
+    """The NuGet runtime package suffix and RID, shared with its packager.
+
+    The packages carry the default implementation's native libraries.
+    """
+    if gaps.split_implementation(preset)[1] != gaps.DEFAULT_IMPLEMENTATION:
+        return None
     target = gaps.target_from_name(preset)
     if gaps.gap("dotnet", target, "package"):
         return None
