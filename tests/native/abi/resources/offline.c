@@ -718,6 +718,8 @@ typedef struct download_watch {
   mln_offline_region_status status;
 } download_watch;
 
+// A download reports its completion while active, then again as it becomes
+// inactive, so a wait for the next download skips the second report.
 static bool download_completed(const mln_runtime_event* event, void* context) {
   download_watch* watch = context;
   if (
@@ -727,8 +729,26 @@ static bool download_completed(const mln_runtime_event* event, void* context) {
     return false;
   }
   watch->status = event->payload.offline_region_status.status;
-  watch->complete = watch->status.complete;
+  watch->complete =
+    watch->status.complete &&
+    watch->status.download_state == MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE;
   return watch->complete;
+}
+
+static void download_until_complete(
+  mln_runtime runtime, mln_offline_region_id id, download_watch* watch
+) {
+  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
+    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor,
+    NULL
+  ));
+  *watch = (download_watch){.region = id};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_await_event_matching(
+      runtime, download_completed, watch, mln_test_deadline_default()
+    ),
+    "the download never reported completion"
+  );
 }
 
 static void a_download_completes_from_provider_served_resources(void) {
@@ -762,17 +782,8 @@ static void a_download_completes_from_provider_served_resources(void) {
     runtime, id, MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED,
     &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
-    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor,
-    NULL
-  ));
-  download_watch watch = {.region = id};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_await_event_matching(
-      runtime, download_completed, &watch, mln_test_deadline_default()
-    ),
-    "the download never reported completion"
-  );
+  download_watch watch = {0};
+  download_until_complete(runtime, id, &watch);
   TEST_ASSERT_EQUAL_UINT64(1, watch.status.required_tile_count);
   TEST_ASSERT_EQUAL_UINT64(1, watch.status.completed_tile_count);
   TEST_ASSERT_EQUAL_UINT64(4, watch.status.completed_tile_size);
@@ -846,6 +857,85 @@ static void a_download_completes_from_provider_served_resources(void) {
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
 
   mln_test_destroy_map(after);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
+static void a_download_refreshes_an_invalidated_region(void) {
+  static const mln_test_provided_resource resources[] = {
+    {.url = offline_style_url,
+     .response =
+       {
+         .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+         .bytes = (const uint8_t*)offline_style_json,
+         .byte_count = sizeof(offline_style_json) - 1,
+         .etag = MLN_BUFFER_LITERAL("\"style-1\""),
+       },
+     .has_later_response = true,
+     .later_response = {.status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED}},
+    {.url = offline_tile_url,
+     .response =
+       {
+         .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+         .bytes = (const uint8_t*)"tile",
+         .byte_count = 4,
+         .etag = MLN_BUFFER_LITERAL("\"tile-1\""),
+       },
+     .has_later_response = true,
+     .later_response = {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)"new tile",
+       .byte_count = 8,
+     }},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 2);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+
+  const mln_offline_region_definition definition = tile_definition();
+  region_probe* created = create_region(runtime, &definition, NULL, 0);
+  const mln_offline_region_id id = created->regions[0].id;
+  free(created);
+  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_observed(
+    runtime, id, MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED,
+    &completion.descriptor, NULL
+  ));
+  download_watch watch = {0};
+  download_until_complete(runtime, id, &watch);
+  MLN_TEST_AWAIT_OK(mln_runtime_invalidate_offline_region(
+    runtime, id, &completion.descriptor, NULL
+  ));
+
+  // The download asks for each resource again with its stored entity tag. The
+  // style is unchanged, and the tile has new bytes.
+  download_until_complete(runtime, id, &watch);
+  TEST_ASSERT_EQUAL_INT(
+    2, mln_test_provider_requests(provider, offline_style_url)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    2, mln_test_provider_requests(provider, offline_tile_url)
+  );
+  const mln_test_provider_request* style_request =
+    mln_test_provider_request_at(provider, offline_style_url, 1);
+  TEST_ASSERT_TRUE(style_request->has_prior_etag);
+  TEST_ASSERT_EQUAL_STRING("\"style-1\"", style_request->prior_etag);
+  const mln_test_provider_request* tile_request =
+    mln_test_provider_request_at(provider, offline_tile_url, 1);
+  TEST_ASSERT_TRUE(tile_request->has_prior_etag);
+  TEST_ASSERT_EQUAL_STRING("\"tile-1\"", tile_request->prior_etag);
+  TEST_ASSERT_EQUAL_UINT64(
+    watch.status.required_resource_count, watch.status.completed_resource_count
+  );
+  TEST_ASSERT_EQUAL_UINT64(1, watch.status.completed_tile_count);
+  TEST_ASSERT_EQUAL_UINT64(8, watch.status.completed_tile_size);
+
+  mln_offline_region_status status = {0};
+  MLN_TEST_OK(get_region_status(runtime, id, &status));
+  TEST_ASSERT_TRUE(status.complete);
+  TEST_ASSERT_EQUAL_UINT64(
+    watch.status.completed_resource_size, status.completed_resource_size
+  );
+
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
 }
@@ -1171,6 +1261,7 @@ MLN_TEST_GROUP {
   RUN_TEST(offline_database_merge_reports_a_corrupt_side_database);
   RUN_TEST(offline_database_merge_copies_regions_from_a_read_only_file);
   RUN_TEST(a_download_completes_from_provider_served_resources);
+  RUN_TEST(a_download_refreshes_an_invalidated_region);
   RUN_TEST(each_region_reports_the_offline_events_it_selects);
   RUN_TEST(offline_submission_never_waits_for_the_runtime_worker);
   RUN_TEST(an_offline_operation_accepted_before_release_still_completes);
