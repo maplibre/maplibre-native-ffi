@@ -38,4 +38,20 @@
       PackagePath="buildTransitive/$(PackageId).targets"
     />
   </ItemGroup>
+  <!--
+    The native library must come from the same release as Maplibre.NativeFfi, so
+    the runtime package requires that exact version, as [x.y.z], rather than the
+    minimum that a project reference packs. Pack reads the version from this
+    item, which _GetProjectReferenceVersions fills.
+  -->
+  <Target
+    Name="PinManagedPackageVersion"
+    AfterTargets="_GetProjectReferenceVersions"
+  >
+    <ItemGroup>
+      <_ProjectReferencesWithVersions>
+        <ProjectVersion>[%(ProjectVersion)]</ProjectVersion>
+      </_ProjectReferencesWithVersions>
+    </ItemGroup>
+  </Target>
 </Project>
