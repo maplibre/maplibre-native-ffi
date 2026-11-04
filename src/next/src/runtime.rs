@@ -122,6 +122,14 @@ impl RuntimeShared {
         });
     }
 
+    /// A map of the runtime was released. A disposed runtime finishes its
+    /// teardown once its last map is gone.
+    pub fn map_released(&self) {
+        if self.is_released() && self.maps.lock().unwrap().is_empty() {
+            self.loop_handle.stop();
+        }
+    }
+
     /// Delivers one event to the event handler, if its mask selects it. Map
     /// events are filtered by their map's mask before they get here.
     pub fn emit(&self, event: OwnedEvent) {
@@ -184,7 +192,7 @@ impl RuntimeShared {
     }
 }
 
-fn runtime_thread(ready: mpsc::Sender<RunLoopHandle>) {
+fn runtime_thread(ready: mpsc::Sender<RunLoopHandle>, resources: Arc<ResourceState>) {
     let run_loop = RunLoop::new();
     if ready.send(run_loop.handle()).is_err() {
         return;
@@ -193,6 +201,10 @@ fn runtime_thread(ready: mpsc::Sender<RunLoopHandle>) {
     // Teardown of whatever release left behind (dispose without release).
     let state = STATE.with(|state| std::mem::take(&mut *state.borrow_mut()));
     drop(state);
+    // The resource provider and transforms retire last, on this thread, so
+    // a host's release_user_data never runs on the thread that released
+    // the runtime.
+    resources.retire();
 }
 
 /// # Safety
@@ -235,9 +247,10 @@ pub unsafe extern "C" fn mln_runtime_create(
             let resources = ResourceState::new(handle);
             let resource_options = resource_options.with_platform_context(resources.token);
             let (ready_tx, ready_rx) = mpsc::channel();
+            let thread_resources = resources.clone();
             let thread = std::thread::Builder::new()
                 .name(format!("mln-runtime-{handle}"))
-                .spawn(move || runtime_thread(ready_tx))
+                .spawn(move || runtime_thread(ready_tx, thread_resources))
                 .map_err(|e| Failure::new(MLN_STATUS_NATIVE_ERROR, format!("starting the runtime thread failed: {e}")))?;
             let loop_handle = ready_rx
                 .recv()
@@ -263,7 +276,9 @@ pub unsafe extern "C" fn mln_runtime_create(
 fn stop_runtime(runtime: &Arc<RuntimeShared>) {
     runtime.released.store(true, Ordering::SeqCst);
     handles::remove(runtime.handle);
-    runtime.resources.retire();
+    // File sources no longer find the runtime; its registrations retire
+    // with its thread.
+    runtime.resources.unregister();
     if let Some(handler) = runtime.events.lock().unwrap().take() {
         handler.release();
     }
@@ -313,7 +328,10 @@ pub unsafe extern "C" fn mln_runtime_dispose(runtime: mln_runtime, out_diagnosti
         boundary(out_diagnostic, || {
             let shared = handles::runtime(runtime)?;
             stop_runtime(&shared);
-            shared.loop_handle.stop();
+            // The teardown waits for the runtime's maps (map_released).
+            if shared.maps.lock().unwrap().is_empty() {
+                shared.loop_handle.stop();
+            }
             Ok(())
         })
     }

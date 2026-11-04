@@ -122,10 +122,15 @@ impl ResourceState {
         std::mem::replace(&mut *self.header_transform.lock().unwrap(), next)
     }
 
-    /// C++ `release_runtime_reachable_state`: the runtime is closing, so its
-    /// registrations retire and no file source reaches it again.
-    pub fn retire(&self) {
+    /// The runtime is closing: no file source reaches it again.
+    pub fn unregister(&self) {
         REGISTRY.lock().unwrap().remove(&self.token);
+    }
+
+    /// C++ `release_runtime_reachable_state`: the runtime is gone, so its
+    /// registrations retire.
+    pub fn retire(&self) {
+        self.unregister();
         let provider = self.replace_provider(None);
         let transform = self.replace_transform(None);
         let header_transform = self.replace_header_transform(None);

@@ -421,9 +421,9 @@ pub fn request_custom_resource(
             // the view and the text it points at live until it returns.
             unsafe { callback(user_data.get(), &view, handle.into()) };
         } else {
-            // The queue keeps a copy of the request, and the registration
-            // until the call runs.
-            let provider = provider.clone();
+            // The queue keeps a copy of the request. The registration's
+            // release, queued when the runtime retires it, follows the call
+            // (C++ `QueuedRegistration`).
             let call = QueuedProviderCall { handle, ran: false };
             deliver(
                 registration.queue,
@@ -433,7 +433,6 @@ pub fn request_custom_resource(
                     let view = request_view(&fields, &text);
                     // SAFETY: as above.
                     unsafe { callback(user_data.get(), &view, call.handle.into()) };
-                    drop(provider);
                 }),
             );
         }

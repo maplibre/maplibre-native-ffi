@@ -68,6 +68,8 @@ fn request_resource_transform(
         unsafe { callback(user_data.get(), kind, mln_buffer_view::of_text(&text), request.into()) };
         return;
     }
+    // The queue keeps a copy of the URL. The registration's release, queued
+    // when the runtime retires it, follows the call.
     let queue = registration.queue;
     let call = QueuedTransformCall { request, ran: false };
     deliver(
@@ -77,7 +79,6 @@ fn request_resource_transform(
             call.ran = true;
             // SAFETY: as above; the queue keeps a copy of the URL.
             unsafe { callback(user_data.get(), kind, mln_buffer_view::of_text(&text), call.request.into()) };
-            drop(registration);
         }),
     );
 }

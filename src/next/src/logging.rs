@@ -126,7 +126,7 @@ pub unsafe extern "C" fn mln_log_set_async_severity_mask(mask: u32, out_diagnost
     unsafe {
         boundary(out_diagnostic, || {
             if mask & !MLN_LOG_SEVERITY_FLAG_ALL != 0 {
-                return Err(Failure::invalid_argument("mask has unknown severity bits"));
+                return Err(Failure::invalid_argument("log async severity mask contains unknown bits"));
             }
             ASYNC_MASK.store(mask, Ordering::SeqCst);
             Ok(())
