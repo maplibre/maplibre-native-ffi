@@ -1,6 +1,16 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 part of 'runtime.dart';
 
+AndroidHardwareBufferFrame _readAndroidHardwareBufferFrame(
+  raw.mln_android_hardware_buffer_frame source,
+) => AndroidHardwareBufferFrame(
+  width: source.width,
+  height: source.height,
+  scaleFactor: source.scale_factor,
+  slot: source.slot,
+  buffer: NativePointer(source.buffer.address),
+);
+
 MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
     MetalTextureFrame(
       width: source.width,
@@ -797,17 +807,18 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   return result;
 }
 
-Pointer<raw.mln_android_surface_descriptor> _writeAndroidSurfaceDescriptor(
-  AndroidSurfaceDescriptor value,
+Pointer<raw.mln_android_hardware_buffer_ring_descriptor>
+_writeAndroidHardwareBufferRingDescriptor(
+  AndroidHardwareBufferRingDescriptor value,
   Allocator arena, {
-  Pointer<raw.mln_android_surface_descriptor>? into,
+  Pointer<raw.mln_android_hardware_buffer_ring_descriptor>? into,
 }) {
-  final result = into ?? arena<raw.mln_android_surface_descriptor>();
-  result.ref.size = sizeOf<raw.mln_android_surface_descriptor>();
+  final result =
+      into ?? arena<raw.mln_android_hardware_buffer_ring_descriptor>();
+  result.ref.size = sizeOf<raw.mln_android_hardware_buffer_ring_descriptor>();
   result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
-  result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
-  result.ref.jni_env = Pointer<Void>.fromAddress(value.jniEnv.address).cast();
-  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  result.ref.buffer_count = _nativeInteger(value.bufferCount, 0, 4294967295);
+  result.ref.usage = value.usage;
   return result;
 }
 
@@ -902,6 +913,20 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
         .add(_prepareQueueLock(value.queueLock!))
         .ref;
   }
+  return result;
+}
+
+Pointer<raw.mln_android_surface_descriptor> _writeAndroidSurfaceDescriptor(
+  AndroidSurfaceDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_android_surface_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_android_surface_descriptor>();
+  result.ref.size = sizeOf<raw.mln_android_surface_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
+  result.ref.jni_env = Pointer<Void>.fromAddress(value.jniEnv.address).cast();
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   return result;
 }
 
@@ -3382,6 +3407,50 @@ final class AcquiredFrameHandle implements Finalizable {
     (handle) => raw.mln_acquired_frame_discard(handle.raw, nativeDiagnostic),
   );
 
+  /// Gets the Android hardware buffer of an acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// buffer. Once you release or discard the frame, the session may render into
+  /// the buffer again. A reference that you take with `AHardwareBuffer_acquire`
+  /// keeps the buffer's memory, but not its contents.
+  ///
+  /// See `mln_acquired_frame_get_android_hardware_buffer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+  T withAndroidHardwareBuffer<T>(
+    T Function(ScopedAndroidHardwareBufferFrame view) use,
+  ) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) => use(
+          ScopedAndroidHardwareBufferFrame._(
+            scope,
+            _getAndroidHardwareBuffer(),
+          ),
+        ),
+      );
+
+  AndroidHardwareBufferFrame _getAndroidHardwareBuffer() =>
+      withNativeArena((arena) {
+        final outFrame = arena<raw.mln_android_hardware_buffer_frame>();
+        outFrame.ref.size = sizeOf<raw.mln_android_hardware_buffer_frame>();
+        _check(
+          raw.mln_acquired_frame_get_android_hardware_buffer(
+            _handle.raw,
+            outFrame,
+            nativeDiagnostic,
+          ),
+        );
+        return _readAndroidHardwareBufferFrame(outFrame.ref);
+      });
+
   /// Gets the Metal texture of an acquired frame.
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
@@ -4500,6 +4569,68 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           ),
         );
       });
+
+  /// Creates a session that renders the map into a ring of Android hardware
+  /// buffers that the library allocates.
+  ///
+  /// Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+  /// buffer with `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
+  /// `RenderSessionHandle.resize()` gives the ring new buffers of the new size.
+  ///
+  /// A Vulkan build renders with `device`, or, when `device` is null, with a
+  /// device that the library creates. An OpenGL build uses an EGL context on
+  /// the default display, and `device` must be null. Attach with
+  /// `RenderDriverKind.coreWorker`.
+  ///
+  /// To show the buffers through Android's UI, such as with
+  /// `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag.syncFd` in
+  /// `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+  /// finishes before you acquire it. Keep each frame acquired until the next
+  /// one replaces it on screen, then release it with `GpuSyncKind.cpuComplete`.
+  /// Give the ring 3 buffers, so the session can render while you hold two
+  /// frames.
+  ///
+  /// See `mln_map_attach_android_hardware_buffer_ring` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when Android is older than 8.0, API level 26, or
+  ///   when the graphics context can't render into hardware buffers: the Vulkan
+  ///   device lacks VK_ANDROID_external_memory_android_hardware_buffer, or the
+  ///   EGL display lacks EGL_ANDROID_get_native_client_buffer or
+  ///   EGL_ANDROID_image_native_buffer.
+  /// - `Status.nativeError` when the library can't create its Vulkan device or
+  ///   initialize the default EGL display.
+  RenderSessionHandle attachAndroidHardwareBufferRing(
+    AndroidHardwareBufferRingDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    VulkanDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_android_hardware_buffer_ring(
+          _handle.raw,
+          _writeAndroidHardwareBufferRingDescriptor(descriptor, arena),
+          (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
 
   /// Creates a session that presents the map to an Android window, with a
   /// graphics context that the library creates.
@@ -7173,7 +7304,8 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the session renders offscreen.
+  /// - `Status.unsupported` when the session renders offscreen or into Android
+  ///   hardware buffers that it allocates.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
@@ -8394,6 +8526,24 @@ final class VulkanDeviceHandle implements Finalizable {
     raw.mln_vulkan_device_release(handle.raw);
     return nativeStatusOk;
   });
+}
+
+/// A `AndroidHardwareBufferFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withAndroidHardwareBuffer` runs. Its
+/// other members stay readable after the callback returns.
+final class ScopedAndroidHardwareBufferFrame {
+  ScopedAndroidHardwareBufferFrame._(this._scope, this._value);
+  final AndroidHardwareBufferFrame _value;
+  final _NativeViewScope _scope;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get slot => _value.slot;
+  ScopedNativePointer get buffer => ScopedNativePointer(
+    _value.buffer.address,
+    checkValid: _scope.checkActive,
+    debugName: 'AndroidHardwareBufferFrame.buffer',
+  );
 }
 
 /// A `MetalTextureFrame` whose native objects are readable only while the

@@ -494,6 +494,24 @@ pub const MLN_WEB_GL_CONTEXT_EXISTING: mln_web_gl_context_kind = 0;
 pub const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS: mln_web_gl_context_kind = 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_android_hardware_buffer_frame {
+    pub size: u32,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub slot: u32,
+    pub buffer: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_android_hardware_buffer_ring_descriptor {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub buffer_count: u32,
+    pub usage: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_android_surface_descriptor {
     pub size: u32,
     pub logical_size: mln_logical_size,
@@ -2072,6 +2090,11 @@ unsafe extern "C" {
         frame: mln_acquired_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_acquired_frame_get_android_hardware_buffer(
+        frame: mln_acquired_frame,
+        out_frame: *mut mln_android_hardware_buffer_frame,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_acquired_frame_get_metal_texture(
         frame: mln_acquired_frame,
         out_frame: *mut mln_metal_texture_frame,
@@ -2235,6 +2258,15 @@ unsafe extern "C" {
     pub fn mln_map_apply_camera_delta(
         map: mln_map,
         delta: *const mln_camera_delta,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_android_hardware_buffer_ring(
+        map: mln_map,
+        descriptor: *const mln_android_hardware_buffer_ring_descriptor,
+        device: mln_vulkan_device,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

@@ -24,6 +24,17 @@
 #include "render/vulkan/vulkan_handle.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
+#if defined(__ANDROID__)
+#include <bit>
+#include <stdexcept>
+
+#include <android/hardware_buffer.h>
+
+#include "platform/android/hardware_buffer.hpp"
+#include "render/android_hardware_buffer_session.hpp"
+#include "render/vulkan_device.hpp"
+#endif
+
 namespace {
 
 using mln::core::VulkanBorrowedTarget;
@@ -250,6 +261,13 @@ class VulkanTextureSessionBackend final
   )
       : backend_(target, size, std::move(queue_lock)) {}
 
+  VulkanTextureSessionBackend(
+    const mln_vulkan_context_descriptor& context,
+    mln::core::VulkanExportedRing ring, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
+  )
+      : backend_(context, std::move(ring), size, std::move(queue_lock)) {}
+
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
@@ -345,6 +363,19 @@ class VulkanTextureSessionBackend final
         "rendered Vulkan image is not available"
       );
     }
+#if defined(__ANDROID__)
+    if (resources.buffer != nullptr) {
+      out_metadata = mln_android_hardware_buffer_frame{
+        .size = sizeof(mln_android_hardware_buffer_frame),
+        .width = frame.physical_width,
+        .height = frame.physical_height,
+        .scale_factor = frame.scale_factor,
+        .slot = frame.slot,
+        .buffer = resources.buffer,
+      };
+      return MLN_STATUS_OK;
+    }
+#endif
     out_metadata = mln_vulkan_texture_frame{
       .size = sizeof(mln_vulkan_texture_frame),
       .width = frame.physical_width,
@@ -487,5 +518,161 @@ auto vulkan_borrowed_texture_set_target_start(
       &mln_render_session_set_vulkan_borrowed_texture_target>()
   );
 }
+
+#if defined(__ANDROID__)
+namespace {
+
+// A slot's image over an Android hardware buffer that the ring allocated.
+class HardwareBufferImage final : public VulkanSlotImage {
+ public:
+  HardwareBufferImage(
+    const vk::UniqueDevice& device,
+    const mln::vulkan::DispatchLoaderDynamic& dispatcher, vk::Extent2D extent,
+    uint64_t usage
+  )
+      : buffer_(
+          platform::android::allocate_render_buffer(
+            extent.width, extent.height, usage
+          )
+        ) {
+    auto format = VkAndroidHardwareBufferFormatPropertiesANDROID{};
+    format.sType =
+      VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID;
+    auto properties = VkAndroidHardwareBufferPropertiesANDROID{};
+    properties.sType =
+      VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
+    properties.pNext = &format;
+    const auto result = dispatcher.vkGetAndroidHardwareBufferPropertiesANDROID(
+      device.get(), buffer_.get(), &properties
+    );
+    if (result != VK_SUCCESS || properties.memoryTypeBits == 0) {
+      throw std::runtime_error(
+        "Vulkan can't import the Android hardware buffer"
+      );
+    }
+    const auto external = vk::ExternalMemoryImageCreateInfo().setHandleTypes(
+      vk::ExternalMemoryHandleTypeFlagBits::eAndroidHardwareBufferANDROID
+    );
+    image_ = device->createImageUnique(
+      vk::ImageCreateInfo()
+        .setPNext(&external)
+        .setImageType(vk::ImageType::e2D)
+        .setFormat(vk::Format::eR8G8B8A8Unorm)
+        .setExtent({extent.width, extent.height, 1})
+        .setMipLevels(1)
+        .setArrayLayers(1)
+        .setSamples(vk::SampleCountFlagBits::e1)
+        .setTiling(vk::ImageTiling::eOptimal)
+        .setUsage(
+          vk::ImageUsageFlags{vk::ImageUsageFlagBits::eColorAttachment} |
+          vk::ImageUsageFlagBits::eSampled
+        )
+        .setSharingMode(vk::SharingMode::eExclusive)
+        .setInitialLayout(vk::ImageLayout::eUndefined),
+      nullptr, dispatcher
+    );
+    // Vulkan imports a hardware buffer only into a dedicated allocation.
+    const auto dedicated = vk::MemoryDedicatedAllocateInfo().setImage(*image_);
+    const auto imported = vk::ImportAndroidHardwareBufferInfoANDROID()
+                            .setPNext(&dedicated)
+                            .setBuffer(buffer_.get());
+    memory_ = device->allocateMemoryUnique(
+      vk::MemoryAllocateInfo()
+        .setPNext(&imported)
+        .setAllocationSize(properties.allocationSize)
+        .setMemoryTypeIndex(
+          static_cast<uint32_t>(std::countr_zero(properties.memoryTypeBits))
+        ),
+      nullptr, dispatcher
+    );
+    device->bindImageMemory(*image_, *memory_, 0, dispatcher);
+    view_ = device->createImageViewUnique(
+      vk::ImageViewCreateInfo()
+        .setImage(*image_)
+        .setViewType(vk::ImageViewType::e2D)
+        .setFormat(vk::Format::eR8G8B8A8Unorm)
+        .setComponents(vk::ComponentMapping())
+        .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}),
+      nullptr, dispatcher
+    );
+  }
+
+  [[nodiscard]] auto image() const -> vk::Image override { return *image_; }
+  [[nodiscard]] auto view() const -> vk::ImageView override { return *view_; }
+  [[nodiscard]] auto buffer() const -> void* override { return buffer_.get(); }
+
+ private:
+  // Declared in reverse of the order they must be destroyed in.
+  platform::android::HardwareBuffer buffer_;
+  vk::UniqueDeviceMemory memory_;
+  vk::UniqueImage image_;
+  vk::UniqueImageView view_;
+};
+
+}  // namespace
+
+auto configure_android_hardware_buffer_session(
+  const AndroidHardwareBufferRing& ring, mln_vulkan_device device,
+  mln_render_session_object& session
+) -> mln_status {
+  auto context = std::shared_ptr<const mln_vulkan_context_descriptor>{};
+  const auto device_status = texture_ring_device(device, context);
+  if (device_status != MLN_STATUS_OK) return device_status;
+  if (context == nullptr) {
+    const auto shared_status = shared_presentation_device(context);
+    if (shared_status != MLN_STATUS_OK) return shared_status;
+  }
+  auto dispatcher = vulkan_dispatch_loader(*context);
+  vulkan_init_instance_dispatch(dispatcher, *context);
+  vulkan_init_device_dispatch(
+    dispatcher, static_cast<VkDevice>(context->device), *context
+  );
+  // A device resolves an extension's commands only once it enables it.
+  if (dispatcher.vkGetAndroidHardwareBufferPropertiesANDROID == nullptr) {
+    set_thread_error(
+      "the Vulkan device can't import Android hardware buffers, because it "
+      "lacks VK_ANDROID_external_memory_android_hardware_buffer"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  // The buffers' readers work outside this device, so a frame hands over as a
+  // sync file or as completed work.
+  session.probe_sync_kinds = [context] {
+    auto support = vulkan_sync_support(*context);
+    support.producer &= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+    support.consumer &= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+    return support;
+  };
+  session.initialize_backend = [context,
+                                ring](mln_render_session_object& live) {
+    // Each frame leaves its image to readers outside Vulkan, such as Android's
+    // UI renderer, for which the foreign queue family stands.
+    auto exported = VulkanExportedRing{
+      .depth = ring.buffer_count,
+      .format = VK_FORMAT_R8G8B8A8_UNORM,
+      .final_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .owner = MLN_VULKAN_IMAGE_OWNER_FOREIGN,
+      .allocate = [usage = ring.usage](
+                    const vk::UniqueDevice& device,
+                    const mln::vulkan::DispatchLoaderDynamic& dispatcher,
+                    vk::Extent2D extent
+                  ) -> std::unique_ptr<VulkanSlotImage> {
+        return std::make_unique<HardwareBufferImage>(
+          device, dispatcher, extent, usage
+        );
+      },
+    };
+    auto backend = std::make_unique<VulkanTextureSessionBackend>(
+      *context, std::move(exported),
+      mln::Size{live.physical_width, live.physical_height}, live.queue_lock
+    );
+    backend->set_producer_sync_kind(live.producer_sync_kind);
+    backend->retain(context);
+    live.texture.backend = std::move(backend);
+    return MLN_STATUS_OK;
+  };
+  return MLN_STATUS_OK;
+}
+#endif
 
 }  // namespace mln::core

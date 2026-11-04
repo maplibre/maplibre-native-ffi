@@ -14,6 +14,16 @@ static jint mln_acquired_frame_discard_jni(
   );
 }
 
+static jint mln_acquired_frame_get_android_hardware_buffer_jni(
+  JNIEnv* env, jclass type, jlong frame, jlong out_frame, jlong out_diagnostic
+) {
+  return (jint)mln_acquired_frame_get_android_hardware_buffer(
+    (mln_acquired_frame)frame,
+    MLN_JNI_POINTER(mln_android_hardware_buffer_frame*, out_frame),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_acquired_frame_get_metal_texture_jni(
   JNIEnv* env, jclass type, jlong frame, jlong out_frame, jlong out_diagnostic
 ) {
@@ -320,6 +330,23 @@ static jint mln_map_apply_camera_delta_jni(
 ) {
   return (jint)mln_map_apply_camera_delta(
     (mln_map)map, MLN_JNI_POINTER(const mln_camera_delta*, delta),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_attach_android_hardware_buffer_ring_jni(
+  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
+  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_attach_android_hardware_buffer_ring(
+    (mln_map)map,
+    MLN_JNI_POINTER(
+      const mln_android_hardware_buffer_ring_descriptor*, descriptor
+    ),
+    (mln_vulkan_device)device,
+    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
+    MLN_JNI_POINTER(mln_render_session*, out_session),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2242,6 +2269,8 @@ static void mln_vulkan_device_release_jni(
 const JNINativeMethod mln_jni_methods[] = {
   {"mln_acquired_frame_discard", "(JJ)I",
    (void*)mln_acquired_frame_discard_jni},
+  {"mln_acquired_frame_get_android_hardware_buffer", "(JJJ)I",
+   (void*)mln_acquired_frame_get_android_hardware_buffer_jni},
   {"mln_acquired_frame_get_metal_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_metal_texture_jni},
   {"mln_acquired_frame_get_open_gl_texture", "(JJJ)I",
@@ -2298,6 +2327,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_style_source_json_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
+  {"mln_map_attach_android_hardware_buffer_ring", "(JJJJJJJ)I",
+   (void*)mln_map_attach_android_hardware_buffer_ring_jni},
   {"mln_map_attach_android_surface", "(JJJJJJJ)I",
    (void*)mln_map_attach_android_surface_jni},
   {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
@@ -2617,6 +2648,8 @@ const size_t mln_jni_method_count =
 const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_acquired_frame_discard", "(JJ)I",
    (void*)mln_acquired_frame_discard_jni},
+  {"mln_acquired_frame_get_android_hardware_buffer", "(JJJ)I",
+   (void*)mln_acquired_frame_get_android_hardware_buffer_jni},
   {"mln_acquired_frame_get_metal_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_metal_texture_jni},
   {"mln_acquired_frame_get_open_gl_texture", "(JJJ)I",
@@ -2673,6 +2706,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_add_style_source_json_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
+  {"mln_map_attach_android_hardware_buffer_ring", "(JJJJJJJ)I",
+   (void*)mln_map_attach_android_hardware_buffer_ring_jni},
   {"mln_map_attach_android_surface", "(JJJJJJJ)I",
    (void*)mln_map_attach_android_surface_jni},
   {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",

@@ -572,6 +572,37 @@ void mln_ts_dispatch_wake_callback(void* user_data) {
   (void)received;
 }
 
+napi_value mln_ts_read_android_hardware_buffer_frame(
+  napi_env env, const mln_android_hardware_buffer_frame* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "width", mln_ts_number(env, (double)(source->width))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "height", mln_ts_number(env, (double)(source->height))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "scaleFactor",
+        mln_ts_number(env, (double)(source->scale_factor))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "slot", mln_ts_number(env, (double)(source->slot))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "buffer",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->buffer))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_camera(
   napi_env env, const mln_camera* source, size_t size
 ) {
@@ -2977,6 +3008,39 @@ napi_value mln_ts_read_web_gpu_texture_frame(
       ))
     return NULL;
   return result;
+}
+
+bool mln_ts_write_android_hardware_buffer_ring_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_android_hardware_buffer_ring_descriptor* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "bufferCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bufferCount");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->buffer_count = (uint32_t)number;
+  }
+  if (!mln_ts_member(call, value, "usage", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "usage");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->usage = (uint64_t)number;
+    }
+  }
+  return true;
 }
 
 bool mln_ts_write_android_surface_descriptor(

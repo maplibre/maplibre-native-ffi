@@ -35,6 +35,8 @@ from ._generated_owners import (
     VulkanDeviceHandle,
 )
 from ._generated_values import (
+    AndroidHardwareBufferFrame,
+    AndroidHardwareBufferRingDescriptor,
     AndroidSurfaceDescriptor,
     AndroidSurfaceReplacement,
     AnimationOptions,
@@ -264,6 +266,8 @@ from ._generated_values import (
 
 __all__ = [
     "AcquiredFrameHandle",
+    "AndroidHardwareBufferFrame",
+    "AndroidHardwareBufferRingDescriptor",
     "AndroidSurfaceDescriptor",
     "AndroidSurfaceReplacement",
     "AnimationOptions",

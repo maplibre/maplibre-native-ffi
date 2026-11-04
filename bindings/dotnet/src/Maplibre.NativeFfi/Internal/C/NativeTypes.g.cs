@@ -31,6 +31,24 @@ internal readonly record struct MlnStyleExpression(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnVulkanDevice(ulong Value) : IMlnHandle;
 
+internal unsafe struct mln_android_hardware_buffer_frame
+{
+    public uint size;
+    public uint width;
+    public uint height;
+    public double scale_factor;
+    public uint slot;
+    public void* buffer;
+}
+
+internal unsafe struct mln_android_hardware_buffer_ring_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint buffer_count;
+    public ulong usage;
+}
+
 internal unsafe struct mln_android_surface_descriptor
 {
     public uint size;

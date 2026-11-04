@@ -581,7 +581,8 @@ impl RenderSessionHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::Unsupported` when the session renders offscreen.
+    /// - `Status::Unsupported` when the session renders offscreen or into
+    ///   Android hardware buffers that it allocates.
     /// - `Status::Unsupported` when the target is a WebGL canvas.
     /// - `Status::TargetLost` when the session loses its target before the
     ///   release runs.

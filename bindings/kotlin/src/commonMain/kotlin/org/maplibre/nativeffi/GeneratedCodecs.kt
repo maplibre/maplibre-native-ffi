@@ -324,19 +324,19 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
   allocate(w(168, 176, 160), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
-internal fun NativeArena.putAndroidSurfaceDescriptor(
+internal fun NativeArena.putAndroidHardwareBufferRingDescriptor(
   target: Long,
-  value: AndroidSurfaceDescriptor,
+  value: AndroidHardwareBufferRingDescriptor,
 ) {
-  writeU32(target, w(24, 40).toUInt())
+  writeU32(target, 24.toUInt())
   putLogicalSize(target + 4, value.logicalSize)
-  writeAddress(target + w(12, 16), value.window.address)
-  writeAddress(target + w(16, 24), value.jniEnv.address)
-  writeAddress(target + w(20, 32), value.surface.address)
+  writeU32(target + 12, value.bufferCount)
+  writeU64(target + 16, value.usage)
 }
 
-internal fun NativeArena.writeAndroidSurfaceDescriptor(value: AndroidSurfaceDescriptor): Long =
-  allocate(w(24, 40), w(4, 8)).also { putAndroidSurfaceDescriptor(it, value) }
+internal fun NativeArena.writeAndroidHardwareBufferRingDescriptor(
+  value: AndroidHardwareBufferRingDescriptor,
+): Long = allocate(24, w(8, 8, 4)).also { putAndroidHardwareBufferRingDescriptor(it, value) }
 
 internal fun NativeCall.putRenderSessionAttachOptions(
   target: Long,
@@ -353,6 +353,20 @@ internal fun NativeCall.putRenderSessionAttachOptions(
 
 internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
   allocate(w(104, 144, 88), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
+
+internal fun NativeArena.putAndroidSurfaceDescriptor(
+  target: Long,
+  value: AndroidSurfaceDescriptor,
+) {
+  writeU32(target, w(24, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.window.address)
+  writeAddress(target + w(16, 24), value.jniEnv.address)
+  writeAddress(target + w(20, 32), value.surface.address)
+}
+
+internal fun NativeArena.writeAndroidSurfaceDescriptor(value: AndroidSurfaceDescriptor): Long =
+  allocate(w(24, 40), w(4, 8)).also { putAndroidSurfaceDescriptor(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
@@ -1196,6 +1210,22 @@ internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) 
 
 internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
   allocate(w(28, 48), w(4, 8)).also { putHttpHeaderRule(it, value) }
+
+internal fun readAndroidHardwareBufferFrame(
+  source: Long,
+  scope: ViewScope? = null,
+): AndroidHardwareBufferFrame =
+  AndroidHardwareBufferFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      buffer =
+        readAddress(source + w(28, 32, 24)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+    )
+    .also { it.bindingScope = scope }
 
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(

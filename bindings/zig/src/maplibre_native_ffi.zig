@@ -58,6 +58,26 @@ pub const AcquiredFrame = struct {
         self.closed = true;
     }
 
+    /// Gets the Android hardware buffer of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrame.getProducerSync()` before you read the buffer. Once
+    /// you release or discard the frame, the session may render into the buffer
+    /// again. A reference that you take with `AHardwareBuffer_acquire` keeps the
+    /// buffer's memory, but not its contents.
+    ///
+    /// See `mln_acquired_frame_get_android_hardware_buffer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
+    pub const getAndroidHardwareBuffer = if (builtin.abi.isAndroid()) struct {
+        fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+            return call.scopedView("mln_acquired_frame_get_android_hardware_buffer", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", AndroidHardwareBufferFrame, self, context, use, diagnostic);
+        }
+    }.function else {};
+
     /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
@@ -374,6 +394,44 @@ pub const Map = struct {
     pub fn applyCameraDelta(self: Map, delta: CameraDelta, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_apply_camera_delta", .handle, self, call.command, null, diagnostic, .{delta});
     }
+
+    /// Creates a session that renders the map into a ring of Android hardware
+    /// buffers that the library allocates.
+    ///
+    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its buffer
+    /// with `AcquiredFrame.getAndroidHardwareBuffer()`. `RenderSession.resize()`
+    /// gives the ring new buffers of the new size.
+    ///
+    /// A Vulkan build renders with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on the
+    /// default display, and `device` must be null. Attach with
+    /// `RenderDriverKind.core_worker`.
+    ///
+    /// To show the buffers through Android's UI, such as with
+    /// `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag.sync_fd` in
+    /// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Keep each frame acquired until the next one
+    /// replaces it on screen, then release it with `GpuSyncKind.cpu_complete`. Give
+    /// the ring 3 buffers, so the session can render while you hold two frames.
+    ///
+    /// See `mln_map_attach_android_hardware_buffer_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when Android is older than 8.0, API level 26, or when
+    ///   the graphics context can't render into hardware buffers: the Vulkan device
+    ///   lacks VK_ANDROID_external_memory_android_hardware_buffer, or the EGL
+    ///   display lacks EGL_ANDROID_get_native_client_buffer or
+    ///   EGL_ANDROID_image_native_buffer.
+    /// - `error.NativeError` when the library can't create its Vulkan device or
+    ///   initialize the default EGL display.
+    pub const attachAndroidHardwareBufferRing = if (builtin.abi.isAndroid()) struct {
+        fn function(self: Map, descriptor: AndroidHardwareBufferRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_android_hardware_buffer_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
 
     /// Creates a session that presents the map to an Android window, with a
     /// graphics context that the library creates.
@@ -2034,7 +2092,8 @@ pub const RenderSession = struct {
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` when the session renders offscreen.
+    /// - `error.Unsupported` when the session renders offscreen or into Android
+    ///   hardware buffers that it allocates.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -2834,6 +2893,63 @@ pub const VulkanDevice = struct {
         if (self.closed) return;
         c.mln_vulkan_device_release(self.raw);
         self.closed = true;
+    }
+};
+
+/// The Android hardware buffer of an acquired frame.
+///
+/// See `mln_android_hardware_buffer_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+pub const AndroidHardwareBufferFrame = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    scale_factor: f64 = 0,
+    /// The buffer's index in the ring.
+    slot: u32 = 0,
+    /// The `AHardwareBuffer*`.
+    buffer: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_android_hardware_buffer_frame) AndroidHardwareBufferFrame {
+        return .{
+            .width = raw.width,
+            .height = raw.height,
+            .scale_factor = raw.scale_factor,
+            .slot = raw.slot,
+            .buffer = raw.buffer,
+        };
+    }
+};
+
+/// A ring of Android hardware buffers that the library allocates, for
+/// `Map.attachAndroidHardwareBufferRing()`.
+///
+/// Each buffer has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
+/// usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+/// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+///
+/// See `mln_android_hardware_buffer_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+pub const AndroidHardwareBufferRingDescriptor = struct {
+    logical_size: LogicalSize,
+    /// How many buffers the ring has, from 1 to 8.
+    buffer_count: u32,
+    /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+    /// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+    usage: u64 = 0,
+    pub fn toNative(self: AndroidHardwareBufferRingDescriptor) c.mln_android_hardware_buffer_ring_descriptor {
+        var raw = std.mem.zeroes(c.mln_android_hardware_buffer_ring_descriptor);
+        raw.size = @sizeOf(c.mln_android_hardware_buffer_ring_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.buffer_count = self.buffer_count;
+        raw.usage = self.usage;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_android_hardware_buffer_ring_descriptor) AndroidHardwareBufferRingDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .buffer_count = raw.buffer_count,
+            .usage = raw.usage,
+        };
     }
 };
 
@@ -5996,7 +6112,8 @@ pub const RenderSessionAttachOptions = struct {
     ///   EGL or WGL context, an existing WebGL context, or a browser's WebGPU
     ///   device.
     /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
-    ///   Android or OpenHarmony window, or an offscreen session.
+    ///   Android or OpenHarmony window, a ring of Android hardware buffers, or
+    ///   an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.

@@ -8,6 +8,34 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
+ * Gets the Android hardware buffer of an acquired frame.
+ *
+ * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the buffer. Once you release or
+ * discard the frame, the session may render into the buffer again. A reference that you take with
+ * `AHardwareBuffer_acquire` keeps the buffer's memory, but not its contents.
+ *
+ * See `mln_acquired_frame_get_android_hardware_buffer` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
+ */
+public fun <T> AcquiredFrameHandle.withAndroidHardwareBuffer(
+  block: (AndroidHardwareBufferFrame) -> T,
+): T =
+  nativeCall(this, binding) {
+    borrowView(
+      { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+      { C.mln_acquired_frame_view_end(it) },
+    ) { scope ->
+      val out = sized(w(32, 40, 28), w(8, 8, 4))
+      check(C.mln_acquired_frame_get_android_hardware_buffer(handle, out, diagnostic))
+      block(readAndroidHardwareBufferFrame(out, scope))
+    }
+  }
+
+/**
  * Creates a frame pacer that follows the display through the calling thread's `AChoreographer`.
  *
  * Call it on a thread with an `ALooper`, such as the app's main thread, and keep that thread
@@ -31,6 +59,63 @@ public fun androidFramePacerCreate(options: FramePacerOptions? = null): FramePac
       ),
     )
     adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle(it) }
+  }
+
+/**
+ * Creates a session that renders the map into a ring of Android hardware buffers that the library
+ * allocates.
+ *
+ * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its buffer with
+ * `AcquiredFrameHandle.withAndroidHardwareBuffer()`. `RenderSessionHandle.resize()` gives the ring
+ * new buffers of the new size.
+ *
+ * A Vulkan build renders with `device`, or, when `device` is null, with a device that the library
+ * creates. An OpenGL build uses an EGL context on the default display, and `device` must be null.
+ * Attach with `RenderDriverKind.CORE_WORKER`.
+ *
+ * To show the buffers through Android's UI, such as with `Bitmap.wrapHardwareBuffer`, attach
+ * without `GpuSyncKindFlag.SYNC_FD` in `RenderSessionAttachOptions.producerSyncKinds`, so that each
+ * frame finishes before you acquire it. Keep each frame acquired until the next one replaces it on
+ * screen, then release it with `GpuSyncKind.CPU_COMPLETE`. Give the ring 3 buffers, so the session
+ * can render while you hold two frames.
+ *
+ * See `mln_map_attach_android_hardware_buffer_ring` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when Android is older than 8.0, API level 26, or when the graphics context
+ *   can't render into hardware buffers: the Vulkan device lacks
+ *   VK_ANDROID_external_memory_android_hardware_buffer, or the EGL display lacks
+ *   EGL_ANDROID_get_native_client_buffer or EGL_ANDROID_image_native_buffer.
+ * - `Status.NATIVE_ERROR` when the library can't create its Vulkan device or initialize the default
+ *   EGL display.
+ */
+public fun MapHandle.attachAndroidHardwareBufferRing(
+  descriptor: AndroidHardwareBufferRingDescriptor,
+  device: VulkanDeviceHandle? = null,
+  options: RenderSessionAttachOptions,
+): RenderSessionHandle =
+  nativeCall(this, binding) {
+    attach(
+      { out, completion ->
+        C.mln_map_attach_android_hardware_buffer_ring(
+          handle,
+          writeAndroidHardwareBufferRingDescriptor(descriptor),
+          device?.let { argument(it, it.binding) } ?: 0L,
+          writeRenderSessionAttachOptions(options),
+          out,
+          completion,
+          diagnostic,
+        )
+      },
+      GeneratedOwnerDisposal::renderSession,
+      { created, ready ->
+        RenderSessionHandle(created, this@attachAndroidHardwareBufferRing, ready)
+      },
+      { it.bindingCallbacks },
+      { it.dispose() },
+    )
   }
 
 /**

@@ -12,6 +12,13 @@ internal actual object C {
   @JvmStatic actual external fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int
 
   @JvmStatic
+  actual external fun mln_acquired_frame_get_android_hardware_buffer(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -202,6 +209,17 @@ internal actual object C {
   actual external fun mln_map_apply_camera_delta(
     map: Long,
     delta: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_attach_android_hardware_buffer_ring(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

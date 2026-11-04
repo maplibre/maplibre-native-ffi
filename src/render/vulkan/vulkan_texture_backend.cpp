@@ -88,7 +88,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     extent = size;
     if (!renderPass) {
       colorFormat =
-        owner_.uses_borrowed_texture_
+        owner_.has_ring_descriptor()
           ? static_cast<vk::Format>(owner_.borrowed_descriptor_.format)
           : vk::Format::eR8G8B8A8Unorm;
       build_depth(size);
@@ -99,7 +99,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 
     auto& current = slots_.at(slot);
     if (current.extent != size || !current.image) {
-      current = Slot{};
+      reset(current);
       if (owner_.uses_borrowed_texture_) {
         const auto& texture = owner_.borrowed_images_.at(slot);
         current.image =
@@ -107,6 +107,12 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
         current.view = vk::ImageView(
           mln::core::vulkan_handle_from_abi<VkImageView>(texture.image_view)
         );
+      } else if (owner_.allocate_slot_image_) {
+        current.exported = owner_.allocate_slot_image_(
+          backend.getDevice(), backend.getDispatcher(), size
+        );
+        current.image = current.exported->image();
+        current.view = current.exported->view();
       } else {
         allocate_color(current, slot, size);
       }
@@ -120,14 +126,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   // Forgets every slot's image, so each one takes its replacement when it is
   // next selected. The caller has waited for the GPU to finish with them.
   void drop_slots() {
-    for (auto& slot : slots_) {
-      if (slot.release) {
-        backend.getDevice()->freeCommandBuffers(
-          owner_.sync_pool_.get(), slot.release, backend.getDispatcher()
-        );
-      }
-      slot = Slot{};
-    }
+    for (auto& slot : slots_) reset(slot);
   }
 
   void swap() override {
@@ -163,9 +162,15 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     return static_cast<VkFormat>(colorFormat);
   }
 
+  [[nodiscard]] auto buffer() const -> void* {
+    const auto& exported = slots_.at(selected_).exported;
+    return exported ? exported->buffer() : nullptr;
+  }
+
  private:
   struct Slot {
     // Declared in reverse of the order they must be destroyed in.
+    std::unique_ptr<VulkanSlotImage> exported;
     mln::vulkan::UniqueImageAllocation allocation;
     vk::UniqueImageView owned_view;
     vk::Image image;
@@ -177,6 +182,17 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     // render takes the image back without a transfer, since it clears it.
     vk::CommandBuffer release;
   };
+
+  // Frees what the slot holds. An exported ring rebuilds a slot whose size
+  // changed, and frees its old image with it.
+  void reset(Slot& slot) {
+    if (slot.release) {
+      backend.getDevice()->freeCommandBuffers(
+        owner_.sync_pool_.get(), slot.release, backend.getDispatcher()
+      );
+    }
+    slot = Slot{};
+  }
 
   // Every slot's framebuffer names the depth attachment, so replacing it drops
   // each one; a slot builds its framebuffer again when it is next selected.
@@ -387,6 +403,23 @@ VulkanTextureBackend::VulkanTextureBackend(
   initSharedDevice();
 }
 
+VulkanTextureBackend::VulkanTextureBackend(
+  const mln_vulkan_context_descriptor& context, VulkanExportedRing ring,
+  mln::Size size, std::shared_ptr<const QueueLock> queue_lock
+)
+    : VulkanQueueAccess(std::move(queue_lock)),
+      mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+      mln::gfx::HeadlessBackend(size),
+      context_(context),
+      allocate_slot_image_(std::move(ring.allocate)),
+      slot_count_(ring.depth) {
+  borrowed_descriptor_.format = static_cast<uint32_t>(ring.format);
+  borrowed_descriptor_.final_layout = static_cast<uint32_t>(ring.final_layout);
+  borrowed_descriptor_.owner = ring.owner;
+  slot_fds_.fill(-1);
+  initSharedDevice();
+}
+
 VulkanTextureBackend::~VulkanTextureBackend() {
   // A queue-ordered frame may still render, and the host's reads of one it
   // released may still run, so the ring's images wait for the shared queue.
@@ -520,7 +553,7 @@ auto VulkanTextureBackend::begin_sync_commands() -> vk::CommandBuffer {
 }
 
 auto VulkanTextureBackend::handoff_family() const -> std::optional<uint32_t> {
-  if (!uses_borrowed_texture_) return std::nullopt;
+  if (!has_ring_descriptor()) return std::nullopt;
   switch (borrowed_descriptor_.owner) {
     case MLN_VULKAN_IMAGE_OWNER_EXTERNAL:
       return VK_QUEUE_FAMILY_EXTERNAL;
@@ -793,7 +826,7 @@ void VulkanTextureBackend::wait_sync_fd(int fd) {
 }
 
 auto VulkanTextureBackend::frame_layout() const -> VkImageLayout {
-  return uses_borrowed_texture_
+  return has_ring_descriptor()
            ? static_cast<VkImageLayout>(borrowed_descriptor_.final_layout)
            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
@@ -961,6 +994,7 @@ auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
     .image_view = rendered.image_view(),
     .device = device.get(),
     .format = rendered.format(),
+    .buffer = rendered.buffer(),
   };
 }
 

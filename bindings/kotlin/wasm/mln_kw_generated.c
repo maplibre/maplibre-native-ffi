@@ -17,6 +17,15 @@ int32_t mln_kw_mln_acquired_frame_discard(
   );
 }
 
+int32_t mln_kw_mln_acquired_frame_get_android_hardware_buffer(
+  int64_t frame, uintptr_t out_frame, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_acquired_frame_get_android_hardware_buffer(
+    (mln_acquired_frame)frame, (mln_android_hardware_buffer_frame*)out_frame,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_acquired_frame_get_metal_texture(
   int64_t frame, uintptr_t out_frame, uintptr_t out_diagnostic
 ) {
@@ -286,6 +295,20 @@ int32_t mln_kw_mln_map_apply_camera_delta(
   return (int32_t)mln_map_apply_camera_delta(
     (mln_map)map, (const mln_camera_delta*)delta,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_attach_android_hardware_buffer_ring(
+  int64_t map, uintptr_t descriptor, int64_t device, uintptr_t options,
+  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_attach_android_hardware_buffer_ring(
+    (mln_map)map,
+    (const mln_android_hardware_buffer_ring_descriptor*)descriptor,
+    (mln_vulkan_device)device,
+    (const mln_render_session_attach_options*)options,
+    (mln_render_session*)out_session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

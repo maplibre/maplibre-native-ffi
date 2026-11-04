@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -25,6 +27,42 @@ struct VulkanTextureFrameResources {
   VkImageView image_view = VK_NULL_HANDLE;
   VkDevice device = nullptr;
   VkFormat format = VK_FORMAT_UNDEFINED;
+  // The platform buffer that an exported ring's image imports, or null.
+  void* buffer = nullptr;
+};
+
+// The image that an exported ring made for one of its slots, with what backs
+// it. Destroying it destroys the image.
+class VulkanSlotImage {
+ public:
+  VulkanSlotImage() = default;
+  VulkanSlotImage(const VulkanSlotImage&) = delete;
+  auto operator=(const VulkanSlotImage&) -> VulkanSlotImage& = delete;
+  VulkanSlotImage(VulkanSlotImage&&) = delete;
+  auto operator=(VulkanSlotImage&&) -> VulkanSlotImage& = delete;
+  virtual ~VulkanSlotImage() = default;
+
+  [[nodiscard]] virtual auto image() const -> vk::Image = 0;
+  [[nodiscard]] virtual auto view() const -> vk::ImageView = 0;
+  // The platform buffer that the image imports, which the host reads.
+  [[nodiscard]] virtual auto buffer() const -> void* = 0;
+};
+
+// A ring of images that the backend allocates and hands to the host, such as
+// images over Android hardware buffers.
+struct VulkanExportedRing {
+  std::size_t depth = 1;
+  VkFormat format = VK_FORMAT_UNDEFINED;
+  // The layout and queue family that each frame hands its image over in.
+  VkImageLayout final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  mln_vulkan_image_owner owner = MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE;
+  // Makes a slot's color attachment of `extent`, in `format`, on the device.
+  // Throws on failure.
+  std::function<std::unique_ptr<VulkanSlotImage>(
+    const vk::UniqueDevice&, const mln::vulkan::DispatchLoaderDynamic&,
+    vk::Extent2D
+  )>
+    allocate;
 };
 
 // VulkanQueueAccess comes first so that it outlives mbgl's teardown.
@@ -43,6 +81,11 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   VulkanTextureBackend(
     const VulkanBorrowedTarget& target, mln::Size size,
     std::shared_ptr<const QueueLock> queue_lock
+  );
+  // An exported ring's backend, which renders into the images it allocates.
+  VulkanTextureBackend(
+    const mln_vulkan_context_descriptor& context, VulkanExportedRing ring,
+    mln::Size size, std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(const VulkanTextureBackend&) = delete;
   auto operator=(const VulkanTextureBackend&) -> VulkanTextureBackend& = delete;
@@ -106,12 +149,19 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
  private:
   void initSharedDevice();
   mln_vulkan_context_descriptor context_;
-  // The borrowed format, final layout, and owner. Its textures array is null;
-  // the images are in borrowed_images_.
+  // The borrowed or exported format, final layout, and owner. Its textures
+  // array is null; borrowed images are in borrowed_images_.
   mln_vulkan_borrowed_texture_descriptor borrowed_descriptor_{};
   // The caller's image for each slot, or empty for an offscreen session.
   std::vector<mln_vulkan_borrowed_texture> borrowed_images_;
   bool uses_borrowed_texture_ = false;
+  // Allocates each slot's image for an exported ring, or is empty.
+  decltype(VulkanExportedRing::allocate) allocate_slot_image_;
+  // Whether a borrowed or exported ring sets the format, the final layout,
+  // and the owner in borrowed_descriptor_.
+  [[nodiscard]] auto has_ring_descriptor() const -> bool {
+    return uses_borrowed_texture_ || allocate_slot_image_ != nullptr;
+  }
   mln_gpu_sync_kind producer_sync_kind_ = MLN_GPU_SYNC_CPU_COMPLETE;
   // The producer timeline, made when the first frame signals it, and the value
   // its last frame signaled.

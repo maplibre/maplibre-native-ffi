@@ -11,6 +11,51 @@ import {
 } from "./internal/native_registrations.ts";
 
 /**
+ * The Android hardware buffer of an acquired frame.
+ *
+ * See `mln_android_hardware_buffer_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+export interface AndroidHardwareBufferFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  /**
+   * The buffer's index in the ring.
+   */
+  readonly slot: number;
+  /**
+   * The `AHardwareBuffer*`.
+   */
+  readonly buffer: bigint;
+}
+
+/**
+ * A ring of Android hardware buffers that the library allocates, for
+ * `MapHandle.attachAndroidHardwareBufferRing()`.
+ *
+ * Each buffer has the map's size in pixels, `logical_size` times the map's
+ * scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage
+ * is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+ * AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+ *
+ * See `mln_android_hardware_buffer_ring_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+export interface AndroidHardwareBufferRingDescriptor {
+  logicalSize: LogicalSize;
+  /**
+   * How many buffers the ring has, from 1 to 8.
+   */
+  bufferCount: number;
+  /**
+   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+   * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   */
+  usage?: bigint;
+}
+
+/**
  * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
  *
  * Name the window by `window`, or by `jni_env` and `surface`. The session takes
@@ -2179,7 +2224,8 @@ export interface RenderSessionAttachOptions {
    * - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
    *   WGL context, an existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
-   *   or OpenHarmony window, or an offscreen session.
+   *   or OpenHarmony window, a ring of Android hardware buffers, or an
+   *   offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.unsupported`.

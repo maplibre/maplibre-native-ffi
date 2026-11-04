@@ -12,6 +12,32 @@ package maplibre
 import "C"
 import "unsafe"
 
+// WithAndroidHardwareBuffer gets the Android hardware buffer of an acquired
+// frame.
+//
+// Wait for AcquiredFrameHandle.WithProducerSync() before you read the buffer.
+// Once you release or discard the frame, the session may render into the buffer
+// again. A reference that you take with AHardwareBuffer_acquire keeps the
+// buffer's memory, but not its contents.
+//
+// See mln_acquired_frame_get_android_hardware_buffer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+//
+// Errors:
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
+func (receiver *AcquiredFrameHandle) WithAndroidHardwareBuffer(callback func(AndroidHardwareBufferFrameView) error) error {
+	var outFrame C.mln_android_hardware_buffer_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_android_hardware_buffer(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) AndroidHardwareBufferFrameView {
+		return AndroidHardwareBufferFrameView{value: copyAndroidHardwareBufferFrame(outFrame), scope: scope}
+	})
+}
+
 // AndroidFramePacerCreate creates a frame pacer that follows the display
 // through the calling thread's AChoreographer.
 //
@@ -45,6 +71,53 @@ func InitAndroid(jniEnv uintptr, context uintptr) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
+}
+
+// AttachAndroidHardwareBufferRing creates a session that renders the map into a
+// ring of Android hardware buffers that the library allocates.
+//
+// Acquire each frame with RenderSessionHandle.AcquireFrame(), and get its
+// buffer with AcquiredFrameHandle.WithAndroidHardwareBuffer().
+// RenderSessionHandle.Resize() gives the ring new buffers of the new size.
+//
+// A Vulkan build renders with device, or, when device is null, with a device
+// that the library creates. An OpenGL build uses an EGL context on the default
+// display, and device must be null. Attach with RenderDriverKindCoreWorker.
+//
+// To show the buffers through Android's UI, such as with
+// Bitmap.wrapHardwareBuffer, attach without GPUSyncKindFlagSyncFd in
+// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
+// before you acquire it. Keep each frame acquired until the next one replaces
+// it on screen, then release it with GPUSyncKindCPUComplete. Give the ring 3
+// buffers, so the session can render while you hold two frames.
+//
+// See mln_map_attach_android_hardware_buffer_ring in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+//
+// Errors:
+//   - StatusUnsupported when Android is older than 8.0, API level 26, or when
+//     the graphics context can't render into hardware buffers: the Vulkan
+//     device lacks VK_ANDROID_external_memory_android_hardware_buffer, or the
+//     EGL display lacks EGL_ANDROID_get_native_client_buffer or
+//     EGL_ANDROID_image_native_buffer.
+//   - StatusNativeError when the library can't create its Vulkan device or
+//     initialize the default EGL display.
+func (receiver *MapHandle) AttachAndroidHardwareBufferRing(descriptor AndroidHardwareBufferRingDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+	var outSession C.mln_render_session
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_android_hardware_buffer_ring(C.mln_map(raw), bindingStore(nativeAndroidHardwareBufferRingDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		session *RenderSessionHandle
+		ready   *Future[struct{}]
+	} {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return struct {
+			session *RenderSessionHandle
+			ready   *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.session, result.ready, err
 }
 
 // AttachAndroidSurface creates a session that presents the map to an Android

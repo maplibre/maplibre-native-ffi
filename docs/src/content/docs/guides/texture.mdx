@@ -1,7 +1,8 @@
 ---
 title: Render to a texture
 description: Share rendered frames with your renderer.
-# Scope: rings of your textures, acquiring frames, and replacing the ring.
+# Scope: rings of your textures or of Android hardware buffers, acquiring
+# frames, and replacing the ring.
 # Reading pixels back belongs in Render images. Running driver work on your
 # graphics thread belongs in Render to a window.
 ---
@@ -49,6 +50,16 @@ queue, and the textures' size in device pixels. Keep the textures alive until
 you replace them, or until the session detaches.
 
 <Snippet page="texture" region="attach-borrowed" />
+
+### Android hardware buffers
+
+On Android 8.0 and later, the library can allocate the ring itself, as hardware
+buffers that your UI draws, such as through `Bitmap.wrapHardwareBuffer`. Attach
+with [](api:mln_map_attach_android_hardware_buffer_ring) and the library's
+thread as the driver, and get each frame's buffer with
+[](api:mln_acquired_frame_get_android_hardware_buffer). To resize the ring, use
+[](api:mln_render_session_resize) instead of replacing it. Attach with three
+buffers, and keep each frame acquired until the next one replaces it on screen.
 
 ## Draw each frame
 

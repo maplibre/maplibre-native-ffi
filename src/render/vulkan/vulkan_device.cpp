@@ -608,6 +608,30 @@ auto find_vulkan_device(const void* device)
   return {owner, &owner->context()};
 }
 
+auto shared_presentation_device(
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status {
+  struct Shared {
+    std::mutex mutex;
+    std::weak_ptr<const mln_vulkan_context_descriptor> device;
+  };
+  // Leaked, so a session that lets go of the device while the process exits
+  // never finds this destroyed.
+  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+  static auto* const shared = new Shared();
+  const auto lock = std::scoped_lock{shared->mutex};
+  if (auto device = shared->device.lock()) {
+    out_context = std::move(device);
+    return MLN_STATUS_OK;
+  }
+  auto selection = VulkanDeviceSelection{};
+  selection.presentation = true;
+  const auto status =
+    create_vulkan_device(selection, std::nullopt, out_context);
+  if (status == MLN_STATUS_OK) shared->device = out_context;
+  return status;
+}
+
 auto create_backend_vulkan_device(
   const VulkanDeviceSelection& selection,
   std::shared_ptr<const mln_vulkan_context_descriptor>& out_context

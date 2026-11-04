@@ -66,6 +66,12 @@ internal object Jni {
     diagnostic: Long,
   ): Int
 
+  /**
+   * Returns an `android.hardware.HardwareBuffer` that holds its own reference to the
+   * `AHardwareBuffer*` at [buffer], or null below API level 26.
+   */
+  @JvmStatic external fun hardwareBuffer(buffer: Long): Any?
+
   /** Calls [release], an `mln_user_data_release` function pointer, with [userData]. */
   @JvmStatic external fun callUserDataRelease(release: Long, userData: Long)
 }

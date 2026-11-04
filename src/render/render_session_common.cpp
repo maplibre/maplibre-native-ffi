@@ -1966,12 +1966,15 @@ auto retarget_kind_status(
       "session does not render into a caller-owned texture"
     );
   }
-  return session.texture.mode == TextureSessionMode::Borrowed
-           ? MLN_STATUS_OK
-           : unsupported_retarget(
-               "an offscreen session has no target to replace; resize it "
-               "instead"
-             );
+  if (session.texture.mode == TextureSessionMode::Borrowed) {
+    return MLN_STATUS_OK;
+  }
+  return unsupported_retarget(
+    session.texture.mode == TextureSessionMode::Offscreen
+      ? "an offscreen session has no target to replace; resize it instead"
+      : "the session allocates its textures, so it has no target to "
+        "replace; resize it instead"
+  );
 }
 
 }  // namespace
@@ -2274,7 +2277,10 @@ auto render_session_release_target_start(
             live.texture.mode != TextureSessionMode::Borrowed
           ) {
             set_thread_error(
-              "an offscreen session has no target for the host to release"
+              live.texture.mode == TextureSessionMode::Offscreen
+                ? "an offscreen session has no target for the host to release"
+                : "the session allocates its textures, so it has no target "
+                  "for the host to release"
             );
             return MLN_STATUS_UNSUPPORTED;
           }

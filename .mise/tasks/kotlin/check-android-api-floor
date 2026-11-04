@@ -103,6 +103,9 @@ ALLOWED_ABOVE_FLOOR = frozenset(
         # BindingKeepAlive uses this only when SDK_INT >= 28; API 24-27 use
         # an AtomicReference publication and compare-and-set fence instead.
         "java/lang/ref/Reference#reachabilityFence(Ljava/lang/Object;)V",
+        # Only AcquiredFrameHandle.getHardwareBuffer() names it, for a frame of
+        # a hardware buffer ring, which the C library attaches only on API 26+.
+        "android/hardware/HardwareBuffer",
     }
 )
 

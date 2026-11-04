@@ -1928,6 +1928,61 @@ func (RuntimeEventPayloadSpriteVariant) bindingTag() uint32 {
 }
 func (RuntimeEventPayloadSpriteVariant) isRuntimeEventPayload() {}
 
+// AndroidHardwareBufferFrame corresponds to mln_android_hardware_buffer_frame.
+// The Android hardware buffer of an acquired frame.
+//
+// See mln_android_hardware_buffer_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+type AndroidHardwareBufferFrame struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	// The buffer's index in the ring.
+	Slot uint32
+	// The AHardwareBuffer*.
+	Buffer uintptr
+}
+
+func copyAndroidHardwareBufferFrame(raw C.mln_android_hardware_buffer_frame) AndroidHardwareBufferFrame {
+	var result AndroidHardwareBufferFrame
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.Slot = uint32(raw.slot)
+	result.Buffer = uintptr(unsafe.Pointer(raw.buffer))
+	return result
+}
+
+// AndroidHardwareBufferRingDescriptor corresponds to
+// mln_android_hardware_buffer_ring_descriptor. A ring of Android hardware
+// buffers that the library allocates, for
+// MapHandle.AttachAndroidHardwareBufferRing().
+//
+// Each buffer has the map's size in pixels, logical_size times the map's scale
+// factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage is
+// AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of usage.
+//
+// See mln_android_hardware_buffer_ring_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+type AndroidHardwareBufferRingDescriptor struct {
+	LogicalSize LogicalSize
+	// How many buffers the ring has, from 1 to 8.
+	BufferCount uint32
+	// More AHARDWAREBUFFER_USAGE_* bits that your reads need, such as
+	// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+	Usage uint64
+}
+
+func nativeAndroidHardwareBufferRingDescriptor(input AndroidHardwareBufferRingDescriptor, arena *bindingArena) C.mln_android_hardware_buffer_ring_descriptor {
+	raw := C.mln_android_hardware_buffer_ring_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.buffer_count = C.uint32_t(input.BufferCount)
+	raw.usage = C.uint64_t(input.Usage)
+	return raw
+}
+
 // AndroidSurfaceDescriptor corresponds to mln_android_surface_descriptor. An
 // Android window to present to, for MapHandle.AttachAndroidSurface().
 //
@@ -4148,7 +4203,8 @@ type RenderSessionAttachOptions struct {
 	//   - RenderDriverKindCallerGraphicsThread for a shared or dedicated EGL or WGL
 	//     context, an existing WebGL context, or a browser's WebGPU device.
 	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android or
-	//     OpenHarmony window, or an offscreen session.
+	//     OpenHarmony window, a ring of Android hardware buffers, or an offscreen
+	//     session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.
@@ -5887,6 +5943,28 @@ func nativeWGLContextDescriptor(input WGLContextDescriptor, arena *bindingArena)
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
 	return raw
+}
+
+type AndroidHardwareBufferFrameView struct {
+	value AndroidHardwareBufferFrame
+	scope *bindingScope
+}
+
+func (view AndroidHardwareBufferFrameView) Width() uint32 { return view.value.Width }
+
+func (view AndroidHardwareBufferFrameView) Height() uint32 { return view.value.Height }
+
+func (view AndroidHardwareBufferFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
+
+func (view AndroidHardwareBufferFrameView) Slot() uint32 { return view.value.Slot }
+
+func (view AndroidHardwareBufferFrameView) UnsafeBuffer() (uintptr, error) {
+	return bindingCall(func() uintptr {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Buffer
+	})
 }
 
 type MetalTextureFrameView struct {
@@ -8680,7 +8758,8 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the session renders offscreen.
+//   - StatusUnsupported when the session renders offscreen or into Android
+//     hardware buffers that it allocates.
 //   - StatusUnsupported when the target is a WebGL canvas.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.

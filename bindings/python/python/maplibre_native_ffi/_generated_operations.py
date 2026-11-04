@@ -11,6 +11,8 @@ from . import _native
 from ._completion import CommandCompletion
 from ._future import map_future
 from ._generated_values import (
+    AndroidHardwareBufferFrame,
+    AndroidHardwareBufferRingDescriptor,
     AndroidSurfaceDescriptor,
     AndroidSurfaceReplacement,
     BoundOptions,
@@ -140,6 +142,33 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native.discard()
+
+    def android_hardware_buffer(
+        self,
+    ) -> AbstractContextManager[AndroidHardwareBufferFrame]:
+        """Gets the Android hardware buffer of an acquired frame.
+
+        Wait for `AcquiredFrameHandle.producer_sync()` before you read the
+        buffer. Once you release or discard the frame, the session may render
+        into the buffer again. A reference that you take with
+        `AHardwareBuffer_acquire` keeps the buffer's memory, but not its
+        contents.
+
+        Native resources remain valid only inside the `with` block.
+
+        See `mln_acquired_frame_get_android_hardware_buffer` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
+        """
+        return _view(
+            self,
+            lambda: self._native.android_hardware_buffer(),
+            lambda raw: AndroidHardwareBufferFrame._from_native(raw),
+        )
 
     def metal_texture(self) -> AbstractContextManager[MetalTextureFrame]:
         """Gets the Metal texture of an acquired frame.
@@ -442,6 +471,52 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.apply_camera_delta(delta)
+
+    def attach_android_hardware_buffer_ring(
+        self,
+        descriptor: AndroidHardwareBufferRingDescriptor,
+        device: VulkanDeviceHandle | None,
+        options: RenderSessionAttachOptions,
+    ) -> RenderSessionHandle:
+        """Creates a session that renders the map into a ring of Android
+        hardware buffers that the library allocates.
+
+        Acquire each frame with `RenderSessionHandle.acquire_frame()`, and
+        get its buffer with `AcquiredFrameHandle.android_hardware_buffer()`.
+        `RenderSessionHandle.resize()` gives the ring new buffers of the new
+        size.
+
+        A Vulkan build renders with `device`, or, when `device` is null, with
+        a device that the library creates. An OpenGL build uses an EGL
+        context on the default display, and `device` must be null. Attach
+        with `RenderDriverKind.CORE_WORKER`.
+
+        To show the buffers through Android's UI, such as with
+        `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag.SYNC_FD`
+        in `RenderSessionAttachOptions.producer_sync_kinds`, so that each
+        frame finishes before you acquire it. Keep each frame acquired until
+        the next one replaces it on screen, then release it with
+        `GpuSyncKind.CPU_COMPLETE`. Give the ring 3 buffers, so the session
+        can render while you hold two frames.
+
+        See `mln_map_attach_android_hardware_buffer_ring` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when Android is older than 8.0, API level 26,
+          or when the graphics context can't render into hardware buffers:
+          the Vulkan device lacks
+          VK_ANDROID_external_memory_android_hardware_buffer, or the EGL
+          display lacks EGL_ANDROID_get_native_client_buffer or
+          EGL_ANDROID_image_native_buffer.
+        - `Status.NATIVE_ERROR` when the library can't create its Vulkan
+          device or initialize the default EGL display.
+        """
+        raw = self._native.attach_android_hardware_buffer_ring(
+            descriptor, None if device is None else device._native, options
+        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_android_surface(
         self,
@@ -2224,7 +2299,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.UNSUPPORTED` when the session renders offscreen.
+        - `Status.UNSUPPORTED` when the session renders offscreen or into
+          Android hardware buffers that it allocates.
         - `Status.UNSUPPORTED` when the target is a WebGL canvas.
         - `Status.TARGET_LOST` when the session loses its target before the
           release runs.

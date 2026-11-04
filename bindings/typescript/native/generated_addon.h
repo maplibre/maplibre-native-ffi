@@ -129,6 +129,9 @@ void mln_ts_dispatch_runtime_event_callback(
   void* user_data, const mln_event_batch_view* events
 );
 void mln_ts_dispatch_wake_callback(void* user_data);
+napi_value mln_ts_read_android_hardware_buffer_frame(
+  napi_env env, const mln_android_hardware_buffer_frame* source, size_t size
+);
 napi_value mln_ts_read_camera(
   napi_env env, const mln_camera* source, size_t size
 );
@@ -365,6 +368,10 @@ napi_value mln_ts_read_vulkan_texture_frame(
 );
 napi_value mln_ts_read_web_gpu_texture_frame(
   napi_env env, const mln_web_gpu_texture_frame* source, size_t size
+);
+bool mln_ts_write_android_hardware_buffer_ring_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_android_hardware_buffer_ring_descriptor* out, const char* path
 );
 bool mln_ts_write_android_surface_descriptor(
   mln_ts_call* call, napi_value value, mln_android_surface_descriptor* out,

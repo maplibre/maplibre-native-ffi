@@ -696,32 +696,6 @@ auto create_window_vulkan_surface(
   return MLN_STATUS_OK;
 }
 
-// The device that window sessions without a device of their own share.
-// It lasts while one of them does, and the next one creates it again.
-auto shared_presentation_device(
-  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
-) -> mln_status {
-  struct Shared {
-    std::mutex mutex;
-    std::weak_ptr<const mln_vulkan_context_descriptor> device;
-  };
-  // Leaked, so a session that lets go of the device while the process exits
-  // never finds this destroyed.
-  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-  static auto* const shared = new Shared();
-  const auto lock = std::scoped_lock{shared->mutex};
-  if (auto device = shared->device.lock()) {
-    out_context = std::move(device);
-    return MLN_STATUS_OK;
-  }
-  auto selection = mln::core::VulkanDeviceSelection{};
-  selection.presentation = true;
-  const auto status =
-    mln::core::create_vulkan_device(selection, std::nullopt, out_context);
-  if (status == MLN_STATUS_OK) shared->device = out_context;
-  return status;
-}
-
 // Presents to an Android or OpenHarmony window through a VkSurfaceKHR that it
 // creates for each window and destroys once the swapchain no longer uses it.
 class WindowVulkanSurfaceSessionBackend final
@@ -835,7 +809,7 @@ auto create_window_backend(
   mln_render_session_object& target
 ) -> mln_status {
   if (device == nullptr) {
-    const auto device_status = shared_presentation_device(device);
+    const auto device_status = mln::core::shared_presentation_device(device);
     if (device_status != MLN_STATUS_OK) return device_status;
   }
   auto surface = OwnedVulkanSurface{};

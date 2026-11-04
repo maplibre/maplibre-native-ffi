@@ -14,6 +14,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_acquired_frame_get_android_hardware_buffer(
+        MlnAcquiredFrame frame,
+        mln_android_hardware_buffer_frame* out_frame,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_metal_texture(
         MlnAcquiredFrame frame,
         mln_metal_texture_frame* out_frame,
@@ -202,6 +209,17 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_apply_camera_delta(
         MlnMap map,
         mln_camera_delta* delta,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_android_hardware_buffer_ring(
+        MlnMap map,
+        mln_android_hardware_buffer_ring_descriptor* descriptor,
+        MlnVulkanDevice device,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
