@@ -8962,6 +8962,31 @@ fn init_android(
 }
 
 #[pyfunction]
+#[pyo3(signature = (options=None))]
+fn apple_frame_pacer_create(
+    py: Python<'_>,
+    options: Option<Bound<'_, PyAny>>,
+) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py);
+    let storage = &mut call.storage;
+    let options = options.unwrap_or_else(|| py.None().into_bound(py));
+    let options_value = generated_maybe(&options, |options| {
+        generated_input_mln_frame_pacer_options(&options, storage)
+    })?;
+    let mut out_pacer: sys::mln_frame_pacer = unsafe { std::mem::zeroed() };
+    unsafe {
+        call.status(|diagnostic| {
+            sys::mln_apple_frame_pacer_create(
+                generated_pointer(&options_value),
+                &mut out_pacer,
+                diagnostic,
+            )
+        })
+    }?;
+    unsafe { FramePacerHandle::adopt(py, out_pacer, Vec::new()) }
+}
+
+#[pyfunction]
 #[pyo3(signature = ())]
 fn c_version(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py);
@@ -9137,6 +9162,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<VulkanDeviceHandle>()?;
     module.add_function(wrap_pyfunction!(android_frame_pacer_create, module)?)?;
     module.add_function(wrap_pyfunction!(init_android, module)?)?;
+    module.add_function(wrap_pyfunction!(apple_frame_pacer_create, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(camera_for_tile, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;

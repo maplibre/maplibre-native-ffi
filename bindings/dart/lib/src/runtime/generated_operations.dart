@@ -3162,6 +3162,41 @@ void initAndroid(NativePointer jniEnv, NativePointer context) {
   );
 }
 
+/// Creates a frame pacer that follows the display through a `CADisplayLink`.
+///
+/// You can call it on any thread. The pacer needs no run loop of yours. On
+/// macOS, it follows the main display, the one with the menu bar.
+///
+/// With `FramePacerOptions.maximumFramesPerSecond`, the pacer also asks the
+/// system for that refresh rate. On iPhone, a rate above 60 needs
+/// `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+///
+/// See `mln_apple_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+///
+/// Errors:
+///
+/// - `Status.nativeError` when the system has no display to follow.
+FramePacerHandle appleFramePacerCreate({FramePacerOptions? options}) =>
+    withNativeArena((arena) {
+      ensureAbiVersion();
+      final outPacer = arena<Uint64>();
+      _check(
+        raw.mln_apple_frame_pacer_create(
+          options == null ? nullptr : _writeFramePacerOptions(options, arena),
+          outPacer,
+          nativeDiagnostic,
+        ),
+      );
+      return _adoptOwned(
+        outPacer.value,
+        () => FramePacerHandle._(_NativeFramePacer(outPacer.value)),
+        (handle) {
+          raw.mln_frame_pacer_release(handle);
+        },
+      );
+    });
+
 /// Returns the API epoch of the library.
 ///
 /// Headers and a library with different epochs aren't compatible.

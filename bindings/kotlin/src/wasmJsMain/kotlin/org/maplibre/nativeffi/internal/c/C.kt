@@ -76,6 +76,9 @@ internal actual object C {
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_kw_mln_android_init(word(jniEnv), word(context), word(outDiagnostic))
 
+  actual fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_apple_frame_pacer_create(word(options), word(outPacer), word(outDiagnostic))
+
   actual fun mln_c_version(): Int = mln_kw_mln_c_version()
 
   actual fun mln_camera_for_tile(
@@ -2078,6 +2081,11 @@ private fun mln_kw_mln_android_frame_pacer_create(p0: Int, p1: Int, p2: Int): In
 
 private fun mln_kw_mln_android_init(p0: Int, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_android_init(p0, p1, p2)")
+
+private fun mln_kw_mln_apple_frame_pacer_create(p0: Int, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_apple_frame_pacer_create(p0, p1, p2)",
+  )
 
 private fun mln_kw_mln_c_version(): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_c_version()")

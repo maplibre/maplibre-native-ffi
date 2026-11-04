@@ -329,6 +329,37 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_apple_frame_pacer_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_frame_pacer_options arg_options;
+  const void* present_options = NULL;
+  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_frame_pacer_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_apple_frame_pacer_create(present_options, &arg_out_pacer, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_c_version(
   napi_env env, napi_callback_info info
 ) {
@@ -7372,6 +7403,7 @@ static const mln_ts_export exports[] = {
   {"mln_android_frame_pacer_create",
    mln_ts_export_mln_android_frame_pacer_create},
   {"mln_android_init", mln_ts_export_mln_android_init},
+  {"mln_apple_frame_pacer_create", mln_ts_export_mln_apple_frame_pacer_create},
   {"mln_c_version", mln_ts_export_mln_c_version},
   {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
   {"mln_frame_pacer_release", mln_ts_export_mln_frame_pacer_release},

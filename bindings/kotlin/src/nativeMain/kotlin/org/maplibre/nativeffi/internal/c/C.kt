@@ -129,6 +129,13 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_apple_frame_pacer_create(
+      options.toCPointer(),
+      outPacer.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_c_version(): Int = org.maplibre.nativeffi.internal.cinterop.mln_c_version().toInt()
 
   actual fun mln_camera_for_tile(

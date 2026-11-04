@@ -3074,6 +3074,32 @@ def init_android(jni_env: int, context: int) -> None:
     return _native.init_android(jni_env, context)
 
 
+def apple_frame_pacer_create(
+    options: FramePacerOptions | None = None,
+) -> FramePacerHandle:
+    """Creates a frame pacer that follows the display through a
+    `CADisplayLink`.
+
+    You can call it on any thread. The pacer needs no run loop of yours.
+    On macOS, it follows the main display, the one with the menu bar.
+
+    With `FramePacerOptions.maximum_frames_per_second`, the pacer also
+    asks the system for that refresh rate. On iPhone, a rate above 60
+    needs `CADisableMinimumFrameDurationOnPhone` in the app's
+    `Info.plist`.
+
+    See `mln_apple_frame_pacer_create` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+
+    Errors:
+
+    - `Status.NATIVE_ERROR` when the system has no display to follow.
+    """
+    return _adopt_value(
+        _native.apple_frame_pacer_create(options), "FramePacerHandle", None
+    )
+
+
 def c_version() -> int:
     """Returns the API epoch of the library.
 

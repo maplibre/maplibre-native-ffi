@@ -37,6 +37,8 @@ internal expect object C {
 
   fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
+  fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int
+
   fun mln_c_version(): Int
 
   fun mln_camera_for_tile(tile: Long, logicalSize: Long, outCamera: Long, outDiagnostic: Long): Int

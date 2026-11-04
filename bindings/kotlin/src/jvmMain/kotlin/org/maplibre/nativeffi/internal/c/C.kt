@@ -50,6 +50,8 @@ internal actual object C {
     Ffm.downcall("mln_android_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_android_init =
     Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_apple_frame_pacer_create =
+    Ffm.downcall("mln_apple_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_c_version = Ffm.downcall("mln_c_version", JAVA_INT)
   private val mln_camera_for_tile =
     Ffm.downcall(
@@ -1394,6 +1396,9 @@ internal actual object C {
 
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_android_init.invokeExact(jniEnv, context, outDiagnostic) as Int
+
+  actual fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
+    mln_apple_frame_pacer_create.invokeExact(options, outPacer, outDiagnostic) as Int
 
   actual fun mln_c_version(): Int = mln_c_version.invokeExact() as Int
 

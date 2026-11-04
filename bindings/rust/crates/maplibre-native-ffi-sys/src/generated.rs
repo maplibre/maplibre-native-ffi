@@ -2146,6 +2146,11 @@ unsafe extern "C" {
         context: *mut std::ffi::c_void,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_apple_frame_pacer_create(
+        options: *const mln_frame_pacer_options,
+        out_pacer: *mut mln_frame_pacer,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_binding_dart_wake_create(
         post_cobject: *mut std::ffi::c_void,
         port: i64,

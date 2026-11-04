@@ -129,6 +129,7 @@ endfunction()
 function(mln_ffi_configure_c_api_implementation target)
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/apple.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/binding_support.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/camera.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/delivery.cpp

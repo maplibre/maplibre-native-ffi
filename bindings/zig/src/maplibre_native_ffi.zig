@@ -8727,6 +8727,27 @@ pub const initAndroid = if (builtin.abi.isAndroid()) struct {
     }
 }.function else {};
 
+/// Creates a frame pacer that follows the display through a `CADisplayLink`.
+///
+/// You can call it on any thread. The pacer needs no run loop of yours. On
+/// macOS, it follows the main display, the one with the menu bar.
+///
+/// With `FramePacerOptions.maximum_frames_per_second`, the pacer also asks the
+/// system for that refresh rate. On iPhone, a rate above 60 needs
+/// `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+///
+/// See `mln_apple_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+///
+/// Errors:
+///
+/// - `error.NativeError` when the system has no display to follow.
+pub const appleFramePacerCreate = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
+    fn function(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
+        return call.invoke("mln_apple_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
+    }
+}.function else {};
+
 /// Returns the API epoch of the library.
 ///
 /// Headers and a library with different epochs aren't compatible.

@@ -30,6 +30,36 @@ public fun <T> AcquiredFrameHandle.withMetalTexture(block: (MetalTextureFrame) -
   }
 
 /**
+ * Creates a frame pacer that follows the display through a `CADisplayLink`.
+ *
+ * You can call it on any thread. The pacer needs no run loop of yours. On macOS, it follows the
+ * main display, the one with the menu bar.
+ *
+ * With `FramePacerOptions.maximumFramesPerSecond`, the pacer also asks the system for that refresh
+ * rate. On iPhone, a rate above 60 needs `CADisableMinimumFrameDurationOnPhone` in the app's
+ * `Info.plist`.
+ *
+ * See `mln_apple_frame_pacer_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.NATIVE_ERROR` when the system has no display to follow.
+ */
+public fun appleFramePacerCreate(options: FramePacerOptions? = null): FramePacerHandle =
+  nativeCall(null, null) {
+    val out = allocate(8, w(8, 8, 4))
+    check(
+      C.mln_apple_frame_pacer_create(
+        options?.let { writeFramePacerOptions(it) } ?: 0L,
+        out,
+        diagnostic,
+      ),
+    )
+    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle(it) }
+  }
+
+/**
  * Creates a session that renders the map into a ring of your Metal textures.
  *
  * See `mln_map_attach_metal_borrowed_texture` in the
