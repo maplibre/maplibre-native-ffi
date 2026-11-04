@@ -114,11 +114,12 @@ final class MapController {
   }
 
   private func applyChanges() async throws {
-    guard started, !failed, let size, let scaleFactor else { return }
+    guard started, let size, let scaleFactor else { return }
 
     // The platform takes the surface away, as when the app goes to the
     // background or the view leaves its window. Release it from the session,
-    // and keep the session and its tiles for when the view shows again.
+    // and keep the session and its tiles for when the view shows again. This
+    // runs even after a failure, since the session can still render.
     guard visible, let layer else {
       if let session, hasTarget {
         hasTarget = false
@@ -126,6 +127,7 @@ final class MapController {
       }
       return
     }
+    guard !failed else { return }
 
     // A map renders at one scale factor for its life, so a move to a display
     // of another density takes a new map and session. The new map keeps the
