@@ -1,6 +1,7 @@
 packages:
   - bindings/typescript
   - docs
+  - docs/demo
 
 pnpmfile: .config/pnpmfile.cjs
 

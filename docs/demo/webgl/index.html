@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MapLibre Native FFI demo · WebGL</title>
+    <link
+      rel="icon"
+      href="/maplibre-native-ffi/favicon.svg"
+      type="image/svg+xml"
+    />
+    <!-- Makes the page cross-origin isolated on hosts that can't set headers. -->
+    <script vite-ignore src="%BASE_URL%coi-serviceworker.min.js"></script>
+    <script type="module" src="../src/webgl.ts"></script>
+  </head>
+  <body>
+    <canvas id="map" tabindex="0" aria-label="Map"></canvas>
+    <header class="panel">
+      <h1>
+        <a href="/maplibre-native-ffi/">MapLibre Native FFI</a>
+      </h1>
+      <nav aria-label="Graphics backend">
+        <a href="../webgl/" data-backend="webgl">WebGL</a>
+        <a href="../webgpu/" data-backend="webgpu">WebGPU</a>
+      </nav>
+      <p id="status" role="status">Loading…</p>
+    </header>
+    <footer class="attribution">
+      <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a>
+      <a href="https://www.openmaptiles.org/" target="_blank">© OpenMapTiles</a>
+      Data from
+      <a href="https://www.openstreetmap.org/copyright" target="_blank"
+      >OpenStreetMap</a>
+    </footer>
+  </body>
+</html>

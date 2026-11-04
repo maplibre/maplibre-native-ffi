@@ -1,0 +1,9 @@
+{
+  "name": "demo",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@maplibre/native-ffi": "workspace:*",
+    "coi-serviceworker": "0.1.7"
+  }
+}

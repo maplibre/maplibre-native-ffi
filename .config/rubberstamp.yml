@@ -543,9 +543,10 @@ ci:
     web:
       covers: >-
         The browser, built with Emscripten for WebGL and WebGPU. Runs the C,
-        Rust, and Kotlin/Wasm tests in a browser. Catches Emscripten, wasm32,
-        and browser rendering problems. Platform-independent code that Linux x64
-        tests doesn't need it.
+        Rust, and Kotlin/Wasm tests in a browser, and adds the docs site's live
+        demo to its preview. Catches Emscripten, wasm32, and browser rendering
+        problems. Platform-independent code that Linux x64 tests doesn't need
+        it.
       rules:
         - if:
             files:
@@ -558,6 +559,7 @@ ci:
               - bindings/kotlin/src/wasmJs*/**
               - bindings/kotlin/wasm/**
               - bindings/kotlin/karma.config.d/**
+              - docs/demo/**
               - third_party/maplibre-native
           then: apply
     maven:
