@@ -957,6 +957,11 @@ pub unsafe extern "C" fn mln_render_session_dispose(
                 }
                 return Ok(());
             }
+            // Abandoned as mln_render_session_abandon() does: the map is free
+            // for another session, or its release, once this returns.
+            if attached {
+                shared.map.session.compare_exchange(session.0, 0, Ordering::SeqCst, Ordering::SeqCst).ok();
+            }
             let runtime = shared.map.runtime.clone();
             if runtime.is_released() {
                 if let Some(completion) = completion {
