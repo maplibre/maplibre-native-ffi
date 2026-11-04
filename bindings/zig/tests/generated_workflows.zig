@@ -8,7 +8,7 @@ test "discarded commands are fenced and synchronous rejection returns an error" 
     defer fixture.destroy();
     try fixture.map.discarding().setDebugFlags(.{ .tile_borders = true }, null);
     // A later command on the same map completes after the discarded one.
-    _ = try support.resolve(try fixture.map.requestRepaint(null));
+    _ = try (try fixture.map.requestRepaint(null)).await(null);
     const snapshot = try fixture.map.getSnapshot(null);
     try testing.expect(snapshot.debug_flags.tile_borders);
     try testing.expectError(error.InvalidArgument, fixture.map.discarding().resize(.{ .width = 0, .height = 8 }, null));

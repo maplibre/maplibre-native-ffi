@@ -32,10 +32,9 @@ fn createAMap() !void {
         .map_mode = .continuous,
     };
 
-    var created = try runtime.createMap(map_options, null);
-    defer created.ready.deinit();
+    const created = try runtime.createMap(map_options, null);
     var map = created.map;
-    try created.ready.wait(null);
+    try created.ready.await(null);
     // #endregion map
 
     // #region style
@@ -51,9 +50,7 @@ fn createAMap() !void {
     };
 
     // #region wait
-    var moved = try map.updateCamera(update, null);
-    defer moved.deinit();
-    _ = try moved.wait(null);
+    _ = try (try map.updateCamera(update, null)).await(null);
 
     // Use the discarding variant to ignore the result.
     try map.discarding().updateCamera(update, null);
@@ -61,13 +58,12 @@ fn createAMap() !void {
 
     // #region errors
     var diagnostic: maplibre.Diagnostic = .{};
-    var jumped = map.updateCamera(update, &diagnostic) catch |err| {
+    const jumped = map.updateCamera(update, &diagnostic) catch |err| {
         // The call failed right away.
         reportFailure(diagnostic.message());
         return err;
     };
-    defer jumped.deinit();
-    _ = jumped.wait(&diagnostic) catch |err| {
+    _ = jumped.await(&diagnostic) catch |err| {
         // The result reports a failure.
         reportFailure(diagnostic.message());
         return err;
@@ -79,8 +75,6 @@ fn createAMap() !void {
     // #region close
     try session.dispose(null);
     try map.dispose(null);
-    var runtime_released = try runtime.release(null);
-    defer runtime_released.deinit();
-    try runtime_released.wait(null);
+    try (try runtime.release(null)).await(null);
     // #endregion close
 }

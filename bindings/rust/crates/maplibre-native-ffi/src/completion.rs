@@ -68,11 +68,25 @@ impl<T> NativeFuture<T> {
         lock(&self.state.result).is_some()
     }
 
+    /// Blocks the calling thread until native delivers the result. An
+    /// operation that completes only while this thread services it, such as a
+    /// caller-driven render session's release, needs `wait_timeout` or an
+    /// executor instead.
+    pub fn wait(self) -> Result<T> {
+        let result = lock(&self.state.result);
+        self.state
+            .ready
+            .wait_while(result, |result| result.is_none())
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .expect("the wait ends once a result is present")
+    }
+
     /// Blocks the calling thread for at most `timeout` and returns the result,
     /// or gives the future back when the timeout ends first. This serves hosts
     /// that must pump another service loop between waits rather than run an
     /// async executor.
-    pub fn wait(self, timeout: Duration) -> std::result::Result<Result<T>, Self> {
+    pub fn wait_timeout(self, timeout: Duration) -> std::result::Result<Result<T>, Self> {
         let result = {
             let result = lock(&self.state.result);
             self.state
@@ -345,7 +359,7 @@ mod tests {
 
     fn completed<T>(future: NativeFuture<T>) -> Result<T> {
         future
-            .wait(Duration::ZERO)
+            .wait_timeout(Duration::ZERO)
             .expect("the future has completed")
     }
 
@@ -436,7 +450,7 @@ mod tests {
     fn a_wait_gives_the_future_back_until_native_completes_it() {
         let (future, accepted) = accept(unit);
 
-        let future = future.wait(Duration::ZERO).unwrap_err();
+        let future = future.wait_timeout(Duration::ZERO).unwrap_err();
 
         accepted.deliver(sys::MLN_STATUS_OK);
         completed(future).unwrap();
@@ -487,10 +501,21 @@ mod tests {
     }
 
     #[test]
+    fn an_untimed_wait_returns_once_native_completes_the_future() {
+        let (future, accepted) = accept(unit);
+
+        let waiter = std::thread::spawn(move || future.wait());
+        accepted.deliver(sys::MLN_STATUS_OK);
+
+        waiter.join().unwrap().unwrap();
+        accepted.release();
+    }
+
+    #[test]
     fn a_wait_times_out_and_a_dropped_future_accepts_a_late_completion() {
         let (future, accepted) = accept(unit);
 
-        let future = future.wait(Duration::ZERO).unwrap_err();
+        let future = future.wait_timeout(Duration::ZERO).unwrap_err();
 
         // Dropping the future is how a caller stops waiting. Native still owns
         // the bridge, so the late completion lands in it.

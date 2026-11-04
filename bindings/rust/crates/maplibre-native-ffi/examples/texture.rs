@@ -40,7 +40,7 @@ fn draw_frame(session: &RenderSessionHandle) -> Result<()> {
         ..GpuSync::default()
     };
     // SAFETY: a CPU-complete sync names no graphics object.
-    unsafe { frame.release(&done) }.map_err(|(_, error)| error)?;
+    unsafe { frame.release(&done) }?;
     // #endregion acquire
 
     Ok(())

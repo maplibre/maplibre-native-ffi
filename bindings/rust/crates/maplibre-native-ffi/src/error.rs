@@ -85,6 +85,52 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// A consuming call that native refused, such as a release while a child
+/// handle is still live, which hands the handle back so the caller can retry
+/// or drop it.
+///
+/// It converts into its [`Error`], so `?` works where the handle isn't needed:
+///
+/// ```no_run
+/// # async fn run(runtime: maplibre_native_ffi::RuntimeHandle) -> maplibre_native_ffi::Result<()> {
+/// runtime.release()?.await?;
+/// # Ok(())
+/// # }
+/// ```
+pub struct ReleaseError<H> {
+    /// The handle, still live and owned by the caller.
+    pub handle: H,
+    /// Why native refused.
+    pub error: Error,
+}
+
+impl<H: fmt::Debug> fmt::Debug for ReleaseError<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ReleaseError")
+            .field("handle", &self.handle)
+            .field("error", &self.error)
+            .finish()
+    }
+}
+
+impl<H: fmt::Debug> fmt::Display for ReleaseError<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "native refused to end {:?}", self.handle)
+    }
+}
+
+impl<H: fmt::Debug> std::error::Error for ReleaseError<H> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+impl<H> From<ReleaseError<H>> for Error {
+    fn from(error: ReleaseError<H>) -> Self {
+        error.error
+    }
+}
+
 /// Calls a status-returning C function with a diagnostic for its final
 /// `out_diagnostic` parameter, and converts a failed status and that diagnostic
 /// into an error.

@@ -186,8 +186,7 @@ async fn render_to_window(
     drop(graphics_thread_options);
 
     window.paused = true;
-    let (released, _retiring) =
-        window.session.release().map_err(|(_, error)| error)?;
+    let (released, _retiring) = window.session.release()?;
     released.await?;
     destroy_surface(); // For example, with vkDestroySurfaceKHR.
 

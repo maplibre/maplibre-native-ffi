@@ -68,7 +68,7 @@ async fn create_a_map() -> Result<()> {
     // #region close
     drop(session);
     drop(map);
-    runtime.release().map_err(|(_, error)| error)?.await?;
+    runtime.release()?.await?;
     // #endregion close
 
     Ok(())

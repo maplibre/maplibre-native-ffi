@@ -182,7 +182,7 @@ impl RenderSessionHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(
         self,
-    ) -> std::result::Result<(NativeFuture<()>, RetiringRenderSession), (Self, Error)> {
+    ) -> std::result::Result<(NativeFuture<()>, RetiringRenderSession), ReleaseError<Self>> {
         self.consume(|session| {
             let call = Call::new(session);
             call.complete(
@@ -208,7 +208,7 @@ impl RenderSessionHandle {
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn dispose(self) -> std::result::Result<RetiringRenderSession, (Self, Error)> {
+    pub fn dispose(self) -> std::result::Result<RetiringRenderSession, ReleaseError<Self>> {
         self.consume(|session| {
             let call = Call::new(session);
             call.discard(|session, completion, out_diagnostic| unsafe {

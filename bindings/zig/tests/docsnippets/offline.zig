@@ -54,16 +54,13 @@ fn offline(allocator: std.mem.Allocator) !void {
 
     // #region ambient
     // 50 MiB
-    var resized = try runtime.setMaximumAmbientCacheSize(
+    const resized = try runtime.setMaximumAmbientCacheSize(
         50 * 1024 * 1024,
         null,
     );
-    defer resized.deinit();
-    try resized.wait(null);
+    try resized.await(null);
 
-    var cleared = try runtime.runCacheDatabaseOperation(.clear, null);
-    defer cleared.deinit();
-    try cleared.wait(null);
+    try (try runtime.runCacheDatabaseOperation(.clear, null)).await(null);
     // #endregion ambient
 
     // #region download
@@ -71,7 +68,7 @@ fn offline(allocator: std.mem.Allocator) !void {
         .southwest = .{ .latitude = 47.5, .longitude = -122.5 },
         .northeast = .{ .latitude = 47.8, .longitude = -122.2 },
     };
-    var created = try runtime.createOfflineRegion(allocator, .{
+    const created = try runtime.createOfflineRegion(allocator, .{
         .tile_pyramid = .{
             .style_url = "https://demotiles.maplibre.org/style.json",
             .bounds = bounds,
@@ -80,59 +77,49 @@ fn offline(allocator: std.mem.Allocator) !void {
             .pixel_ratio = 1,
         },
     }, "Seattle", null);
-    defer created.deinit();
-    var region = try created.wait(null);
+    var region = try created.await(null);
     defer region.deinit();
 
-    var activated = try runtime.setOfflineRegionDownloadState(
+    const activated = try runtime.setOfflineRegionDownloadState(
         region.value.id,
         .active,
         null,
     );
-    defer activated.deinit();
-    try activated.wait(null);
+    try activated.await(null);
     // #endregion download
 
     // #region progress
-    var observed = try runtime.setOfflineRegionObserved(
+    const observed = try runtime.setOfflineRegionObserved(
         region.value.id,
         maplibre.RuntimeEventFlag.all_runtime_events,
         null,
     );
-    defer observed.deinit();
-    try observed.wait(null);
+    try observed.await(null);
     // #endregion progress
 
     // #region manage
-    var listed = try runtime.listOfflineRegions(allocator, null);
-    defer listed.deinit();
-    var regions = try listed.wait(null);
+    var regions = try (try runtime.listOfflineRegions(allocator, null)).await(null);
     defer regions.deinit();
     for (regions.value) |stored| {
         recordRegion(stored.id, stored.metadata);
     }
 
     // Resume a download that stopped when the runtime closed.
-    var resumed = try runtime.setOfflineRegionDownloadState(
+    const resumed = try runtime.setOfflineRegionDownloadState(
         region.value.id,
         .active,
         null,
     );
-    defer resumed.deinit();
-    try resumed.wait(null);
+    try resumed.await(null);
 
-    var invalidated =
+    const invalidated =
         try runtime.invalidateOfflineRegion(region.value.id, null);
-    defer invalidated.deinit();
-    try invalidated.wait(null);
+    try invalidated.await(null);
 
-    var deleted =
+    const deleted =
         try runtime.deleteOfflineRegion(region.value.id, null);
-    defer deleted.deinit();
-    try deleted.wait(null);
+    try deleted.await(null);
     // #endregion manage
 
-    var released = try runtime.release(null);
-    defer released.deinit();
-    try released.wait(null);
+    try (try runtime.release(null)).await(null);
 }

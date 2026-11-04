@@ -6,7 +6,7 @@ use crate::convert::{
     self, FromNative, InputArena, ToNative, from_native, native_enum, native_flags, to_native,
 };
 use crate::handle::native_owner;
-use crate::{Error, Result};
+use crate::{Error, ReleaseError, Result};
 use maplibre_native_ffi_sys as sys;
 
 mod values;

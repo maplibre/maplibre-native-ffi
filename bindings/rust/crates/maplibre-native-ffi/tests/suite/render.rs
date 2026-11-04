@@ -126,7 +126,7 @@ fn a_released_caller_driven_session_retires_while_the_host_services_it() {
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
 
     let Session { handle, wakes } = session;
-    let (released, retiring) = handle.release().map_err(|(_, error)| error).unwrap();
+    let (released, retiring) = handle.release().unwrap();
     let mut serviced = 0;
     drive(&wakes.signal, released, || {
         if retiring.service_driver_work().is_ok() {
@@ -180,7 +180,7 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     // the completion still resolves and nothing leaks.
     drop(session);
     let _ = attached
-        .wait(timeout())
+        .wait_timeout(timeout())
         .expect("the attachment never completed");
     let (runtime, map) = fixture.into_parts();
     drop(map);

@@ -118,7 +118,7 @@ def module_index(owners: dict[str, HandlePlan], modules: list[str]) -> str:
         "use crate::completion::{self, CommandCompletion, NativeFuture};\n"
         "use crate::convert::{self, FromNative, InputArena, ToNative, from_native, native_enum, native_flags, to_native};\n"
         "use crate::handle::native_owner;\n"
-        "use crate::{Error, Result};\n"
+        "use crate::{Error, ReleaseError, Result};\n"
         "use maplibre_native_ffi_sys as sys;\n\n"
         + "".join(f"mod {module};\npub use {module}::*;\n" for module in modules)
         + "\n"
