@@ -14,6 +14,8 @@
 - The relocatable CMake package links shared and complete static consumers.
 - A complete ELF archive keeps no COMDAT group, since a consumer's link would
   discard its private copy of a runtime in favor of the consumer's own.
+- A Windows DLL carries each Visual C++ runtime DLL it imports, since a host
+  need not have the redistributable installed.
 """
 
 from __future__ import annotations
@@ -53,6 +55,9 @@ MACHO_COMMAND = re.compile(r"^\s*cmd (?P<command>LC_\w+)$")
 MACHO_UUID = re.compile(r"^\s*uuid (?P<uuid>[0-9A-F-]+)$")
 ELF_ENTRY = re.compile(r"^\s*0x[0-9a-f]+\s+\((?P<tag>\w+)\)\s+.*\[(?P<value>[^\]]*)\]")
 PE_EXPORT = re.compile(r"^\s*Name: (?P<name>\S+)$")
+PE_IMPORT = PE_EXPORT
+# The Visual C++ redistributable's DLLs, which an MSVC package carries.
+MSVC_RUNTIME_DLL = re.compile(r"^(vcruntime|msvcp|concrt|vccorlib)140", re.IGNORECASE)
 
 # Loader names without the `lib` prefix, version, or extension.
 LOADER_NAMES = frozenset(
@@ -96,6 +101,7 @@ VENDORED_HEADER = "carries a header that is not the C API's"
 UNSTRIPPED = "keeps local symbols"
 MISSING_DSYM = "has no matching dSYM"
 COMDAT_GROUPS = "keeps COMDAT groups"
+MISSING_RUNTIME = "imports a runtime DLL it doesn't carry"
 REMEDIES = {
     BUILD_HOST_PATH: (
         "The package only loads where these paths exist. Resolve the "
@@ -132,6 +138,12 @@ REMEDIES = {
         "A consumer that links its own copy of a bundled runtime would have "
         "one copy's members discarded. mln_ffi_elf_archive_commands removes "
         "the groups when it localizes the archive's symbols."
+    ),
+    MISSING_RUNTIME: (
+        "A host without the Visual C++ redistributable can't load the DLL. "
+        "Build on a Windows host, where mln_ffi_bundle_msvc_runtime installs "
+        "the runtime DLLs beside it, and add any new one to "
+        "MLN_FFI_MSVC_RUNTIME_DLLS."
     ),
 }
 
@@ -208,13 +220,28 @@ def elf_problems(binary: pathlib.Path, links_loader: bool) -> list[tuple[str, st
 
 
 def pe_problems(binary: pathlib.Path) -> list[tuple[str, str]]:
-    """Exports from a Windows library's PE export directory."""
+    """Exports from a Windows library's PE export directory, and runtime DLLs
+    it imports without carrying them beside it."""
     exports = (
         match.group("name")
         for line in run(["llvm-readobj", "--coff-exports", str(binary)]).splitlines()
         if (match := PE_EXPORT.match(line))
     )
-    return [(PRIVATE_EXPORT, name) for name in exports if not name.startswith("mln_")]
+    problems = [
+        (PRIVATE_EXPORT, name) for name in exports if not name.startswith("mln_")
+    ]
+    carried = {path.name.lower() for path in binary.parent.iterdir()}
+    imports = {
+        match.group("name")
+        for line in run(["llvm-readobj", "--coff-imports", str(binary)]).splitlines()
+        if (match := PE_IMPORT.match(line))
+    }
+    problems.extend(
+        (MISSING_RUNTIME, name)
+        for name in sorted(imports)
+        if MSVC_RUNTIME_DLL.match(name) and name.lower() not in carried
+    )
+    return problems
 
 
 def dsym_problems(binary: pathlib.Path, root: pathlib.Path) -> list[tuple[str, str]]:
@@ -370,6 +397,12 @@ def main() -> int:
                 preset.startswith("mingw-")
                 and image == "pe"
                 and binary.name in MINGW_RUNTIME_DLLS[preset.split("-")[1]]
+            ):
+                continue
+            if (
+                preset.startswith("windows-")
+                and image == "pe"
+                and MSVC_RUNTIME_DLL.match(binary.name)
             ):
                 continue
             if (

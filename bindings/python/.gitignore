@@ -4,5 +4,6 @@ dist/
 /LICENSE
 /runtimes/*/LICENSE
 /runtimes/*/licenses/
+/runtimes/*/python/*/*.dll
 
 /runtimes/*/sbom.cdx.json

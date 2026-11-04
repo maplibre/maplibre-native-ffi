@@ -1,3 +1,54 @@
+# The DLL links the dynamic CRT that MSVC toolchains default to, so the static
+# archive links into hosts that do the same, such as Swift. The runtime DLLs
+# that it imports install beside it, as Microsoft allows an application to
+# carry them, so a host needs no Visual C++ redistributable installed.
+#
+# VsDevCmd names the redistributable's directory in VCToolsRedistDir. Another
+# host's /winsysroot tree has none, so a cross build installs no runtime unless
+# that variable names a copy, and the package check refuses its package.
+set(MLN_FFI_MSVC_RUNTIME_DLLS vcruntime140.dll vcruntime140_1.dll msvcp140.dll
+    msvcp140_codecvt_ids.dll)
+
+function(mln_ffi_bundle_msvc_runtime target)
+  # Read on every configure, so that a later environment takes effect.
+  set(redist "$ENV{VCToolsRedistDir}")
+  if(NOT IS_DIRECTORY "${redist}")
+    if(CMAKE_HOST_WIN32)
+      message(FATAL_ERROR "VsDevCmd set no VCToolsRedistDir")
+    endif()
+    message(STATUS "No Visual C++ redistributable to install beside the DLL")
+    return()
+  endif()
+  # VsDevCmd ends the directory with a separator, which would leave the
+  # version, its last component, empty.
+  file(TO_CMAKE_PATH "${redist}" redist)
+  string(REGEX REPLACE "/+$" "" redist "${redist}")
+  file(GLOB crt_dirs LIST_DIRECTORIES true
+       "${redist}/${MLN_FFI_TARGET_ARCHITECTURE}/Microsoft.VC*.CRT")
+  list(LENGTH crt_dirs crt_dir_count)
+  if(NOT crt_dir_count EQUAL 1)
+    message(
+      FATAL_ERROR
+        "Expected one Microsoft.VC*.CRT directory under "
+        "${redist}/${MLN_FFI_TARGET_ARCHITECTURE}")
+  endif()
+  set(runtime_dlls "")
+  foreach(dll IN LISTS MLN_FFI_MSVC_RUNTIME_DLLS)
+    if(EXISTS "${crt_dirs}/${dll}")
+      list(APPEND runtime_dlls "${crt_dirs}/${dll}")
+    endif()
+  endforeach()
+  set_property(
+    TARGET ${target}
+    APPEND
+    PROPERTY MLN_FFI_INSTALL_RUNTIME_FILES ${runtime_dlls})
+  get_filename_component(version "${redist}" NAME)
+  mln_ffi_add_component(
+    ${target} msvc-runtime
+    https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files
+    LicenseRef-Microsoft-Visual-Cpp-Redistributable VERSION "${version}")
+endfunction()
+
 function(mln_ffi_configure_platform_dependencies target)
   include(FetchContent)
   # The Windows presets set CMAKE_TRY_COMPILE_TARGET_TYPE to STATIC_LIBRARY so
@@ -115,6 +166,8 @@ function(mln_ffi_configure_platform_dependencies target)
           "${package}-exception.txt")
       endif()
     endforeach()
+  else()
+    mln_ffi_bundle_msvc_runtime(${target})
   endif()
   set_target_properties(
     ${target}

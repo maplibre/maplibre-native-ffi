@@ -25,17 +25,17 @@ exe.root_module.addImport("maplibre_native_ffi", maplibre.module("maplibre_nativ
 When it builds, the package downloads the C library for your target.
 
 Your executable loads the library at run time, from its own directory on
-Windows, and from `../lib` elsewhere. Install the library from the package's
-`prefix` beside your executable:
+Windows, and from `../lib` elsewhere. Install the shared libraries from the
+package's `prefix` there:
 
 ```zig title="build.zig"
-const library = switch (target.result.os.tag) {
-    .windows => "bin/maplibre-native-c.dll",
-    .macos, .maccatalyst => "lib/libmaplibre-native-c.dylib",
-    else => "lib/libmaplibre-native-c.so",
-};
-const prefix = maplibre.namedLazyPath("prefix");
-b.getInstallStep().dependOn(&b.addInstallFile(prefix.path(b, library), library).step);
+const libraries = if (target.result.os.tag == .windows) "bin" else "lib";
+b.installDirectory(.{
+    .source_dir = maplibre.namedLazyPath("prefix").path(b, libraries),
+    .install_dir = .{ .custom = libraries },
+    .install_subdir = "",
+    .include_extensions = &.{ ".dll", ".so", ".dylib" },
+});
 ```
 
 ## Choose a backend

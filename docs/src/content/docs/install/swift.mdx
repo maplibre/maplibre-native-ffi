@@ -48,8 +48,8 @@ On Linux, SwiftPM ignores the rpath that pkg-config adds, so pass the prefix's
 swift build -Xlinker -rpath -Xlinker <prefix>/lib
 ```
 
-On Windows, put the prefix's `bin` directory on `PATH`, or copy
-`maplibre-native-c.dll` next to the executable.
+On Windows, put the prefix's `bin` directory on `PATH`, or copy the DLLs in it
+next to the executable.
 
 ## Android
 

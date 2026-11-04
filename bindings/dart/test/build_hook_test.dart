@@ -246,6 +246,21 @@ void main() {
     );
   });
 
+  test('serves a local MSVC build and its Visual C++ runtime DLLs', () async {
+    _writePrefix(
+      temporary.uri.resolve('build/windows-x64-vulkan/install/'),
+      'vulkan',
+      platform: 'windows-x64',
+      defaultBackend: 'vulkan',
+      libraries: ['maplibre-native-c.dll', 'msvcp140.dll', 'vcruntime140.dll'],
+    );
+    final output = await runHook(_windows, {
+      'local_build': 'build/windows-x64-vulkan/install',
+    });
+    expect(await bundled(output), 'windows-x64-vulkan');
+    expect(output.assets.code, hasLength(3));
+  });
+
   group('a published package', () {
     late HttpServer server;
     final served = <String, List<int>>{};
@@ -353,9 +368,11 @@ List<File> _writePrefix(
         'backend': backend,
       }),
     ),
+    // An MSVC install carries its runtime DLLs beside the library in bin, and
+    // a MinGW install in lib.
     for (final library in libraries)
       write(
-        '${platform.startsWith('windows-') && library == 'maplibre-native-c.dll' ? 'bin' : 'lib'}/$library',
+        '${platform.startsWith('windows-') && (library == 'maplibre-native-c.dll' || !platform.startsWith('windows-mingw-')) ? 'bin' : 'lib'}/$library',
         '$platform-$backend',
       ),
   ];

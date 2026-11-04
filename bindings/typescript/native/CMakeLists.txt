@@ -104,10 +104,14 @@ if(WIN32)
     PATHS "${MLN_FFI_NATIVE_PREFIX}/bin" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
     REQUIRED)
   set(MLN_FFI_WINDOWS_DLLS "${MLN_FFI_NATIVE_DLL}")
+  # The C++ runtime DLLs that the C library carries load from beside it too.
   if(MINGW)
     file(GLOB runtime_dlls "${MLN_FFI_NATIVE_PREFIX}/lib/*.dll")
-    list(APPEND MLN_FFI_WINDOWS_DLLS ${runtime_dlls})
+  else()
+    file(GLOB runtime_dlls "${MLN_FFI_NATIVE_PREFIX}/bin/vcruntime140*.dll"
+         "${MLN_FFI_NATIVE_PREFIX}/bin/msvcp140*.dll")
   endif()
+  list(APPEND MLN_FFI_WINDOWS_DLLS ${runtime_dlls})
 endif()
 
 function(mln_ffi_node_module target)

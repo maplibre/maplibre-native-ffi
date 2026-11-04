@@ -374,6 +374,16 @@ function(mln_ffi_install_c_api_library target)
         DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
+    # DLLs that the loader finds only beside the library that imports them.
+    get_target_property(MLN_FFI_INSTALL_RUNTIME_FILES ${dependencies}
+                        MLN_FFI_INSTALL_RUNTIME_FILES)
+    if(MLN_FFI_INSTALL_RUNTIME_FILES
+       AND NOT MLN_FFI_INSTALL_RUNTIME_FILES MATCHES "-NOTFOUND$")
+      install(
+        FILES ${MLN_FFI_INSTALL_RUNTIME_FILES}
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+    endif()
   endforeach()
   # The host supplies the graphics implementation and its headers, so this
   # component stays out of the package. The build task installs it for tests.

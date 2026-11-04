@@ -41,9 +41,9 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
-On Windows, put `<prefix>/bin` on `PATH`, or copy `maplibre-native-c.dll` next
-to the executable. On other platforms, the executable finds the library through
-the rpath that pkg-config adds.
+On Windows, put `<prefix>/bin` on `PATH`, or copy the DLLs in it next to the
+executable. On other platforms, the executable finds the library through the
+rpath that pkg-config adds.
 
 ## Package managers
 
@@ -112,8 +112,7 @@ conan install --requires="maplibre-native-c/{{version}}" --build=missing \
 ```
 
 `backend` takes `metal`, `opengl`, `vulkan`, `webgpu`, or `default`. For musl on
-Linux, add `-o "maplibre-native-c/*:libc=musl"`. On Windows, pass
-`-s compiler.runtime=static`.
+Linux, add `-o "maplibre-native-c/*:libc=musl"`.
 
 ### Swift Package Manager
 
