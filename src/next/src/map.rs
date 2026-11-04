@@ -172,9 +172,19 @@ impl MapObserver for FfiMapObserver {
             self.shared.emit(MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED, |_| {});
         }
     }
-    fn on_did_fail_loading_map(&self, _error: MapLoadError, what: &str) {
+    fn on_did_fail_loading_map(&self, error: MapLoadError, what: &str) {
         *self.load_error.borrow_mut() = Some(what.to_owned());
-        self.shared.emit(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, |e| e.message = what.to_owned());
+        // The code is the core's MapLoadError, as C++ `static_cast<uint32_t>(error)`.
+        let code = match error {
+            MapLoadError::StyleParseError => 0,
+            MapLoadError::StyleLoadError => 1,
+            MapLoadError::NotFoundError => 2,
+            MapLoadError::UnknownError => 3,
+        };
+        self.shared.emit(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, |e| {
+            e.code = code;
+            e.message = what.to_owned();
+        });
     }
     fn on_will_start_rendering_frame(&self) {
         if self.continuous() {
