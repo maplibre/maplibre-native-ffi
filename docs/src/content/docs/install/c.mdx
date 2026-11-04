@@ -116,19 +116,9 @@ Linux, add `-o "maplibre-native-c/*:libc=musl"`.
 
 ### Swift Package Manager
 
-The [Swift package](/maplibre-native-ffi/install/swift/) has a `MaplibreNativeC`
-product, which links the library with the backend that its traits select. C code
-includes `<MaplibreNativeC/maplibre_native_c.h>`. On Windows, where the product
-links the library statically, define `MLN_STATIC` in the targets that include
-it:
-
-```swift title="Package.swift"
-cSettings: [.define("MLN_STATIC", .when(platforms: [.windows]))]
-```
-
-For Apple platforms alone, `MaplibreNativeC.xcframework.zip` holds the library
-as the framework `MaplibreNativeC`. Add it to a Swift package as a binary
-target, with the zip's checksum from the release's `SHA256SUMS`:
+For Apple platforms, `MaplibreNativeC.xcframework.zip` holds the library as the
+framework `MaplibreNativeC`. Add it to a Swift package as a binary target, with
+the zip's checksum from the release's `SHA256SUMS`:
 
 ```swift title="Package.swift"
 .binaryTarget(
@@ -137,6 +127,8 @@ target, with the zip's checksum from the release's `SHA256SUMS`:
   checksum: "<checksum>"
 )
 ```
+
+C code includes `<MaplibreNativeC/maplibre_native_c.h>`.
 
 ### Gradle
 

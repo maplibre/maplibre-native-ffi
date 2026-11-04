@@ -25,16 +25,11 @@ Then depend on its `MaplibreNativeFFI` product:
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi-distribution")
 ```
 
-The package takes the C library from the release: on Apple platforms, its
-[XCFramework](/maplibre-native-ffi/install/c/#swift-package-manager), and
-elsewhere an artifact bundle that links it statically. SwiftPM downloads the
-XCFramework and both bundles, about 350 MB, whichever platform you build for.
-
 ## Choose a backend
 
-On Apple platforms, the package renders with Metal. Elsewhere it uses your
-platform's [default backend](/maplibre-native-ffi/install/#choose-a-backend). To
-choose another, enable one trait, `OpenGL` or `Vulkan`, in place of the default:
+The package uses your platform's
+[default backend](/maplibre-native-ffi/install/#choose-a-backend). To choose
+another, enable the `OpenGL` or `Vulkan` trait:
 
 ```swift title="Package.swift"
 .package(
@@ -57,7 +52,9 @@ try initAndroid(
 
 ## Snapshots
 
-Depend on this repository at `main`. SwiftPM names the package after the
+Depend on this repository at `main`, and install the C library from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
+This applies to Apple platforms too. SwiftPM names the package after the
 repository:
 
 ```swift title="Package.swift"
@@ -68,16 +65,13 @@ repository:
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
 ```
 
-This package finds the C library with pkg-config, on Apple platforms too.
-Download and unpack the C library for your preset from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
-and point pkg-config at it before you build:
+Point pkg-config at the C library before you build:
 
 ```bash frame="terminal"
 export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 ```
 
-SwiftPM ignores the rpath that pkg-config adds, so on Linux, pass the prefix's
+On Linux, SwiftPM ignores the rpath that pkg-config adds, so pass the prefix's
 `lib` directory to the linker:
 
 ```bash frame="terminal"
