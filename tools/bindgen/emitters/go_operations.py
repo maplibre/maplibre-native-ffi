@@ -4,20 +4,15 @@ from dataclasses import replace
 
 from ..model import Unsupported
 from ..semantic import output_member
-from .go import GO_KEYWORDS, documented_operation, name, native_call
+from .go import GO_KEYWORDS, camel, documented_operation, name, native_call
 from .go_values import Values, is_text, public
 
 # Members every handle owner declares, which no operation may take.
-OWNER_MEMBERS = {"Close", "Dispose", "Id", "IsClosed", "String"}
+OWNER_MEMBERS = {"Close", "Dispose", "ID", "IsClosed", "String"}
 
 
 def element(value):
     return value.unwrapped
-
-
-def camel(value):
-    first, *rest = value.split("_")
-    return first + "".join(name(part) for part in rest)
 
 
 def method_name(plan, receiver, handle):

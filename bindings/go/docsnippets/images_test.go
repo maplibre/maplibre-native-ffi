@@ -27,7 +27,7 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #endregion map
 
 	// #region style
-	err = m.Discarding().SetStyleUrl(
+	err = m.Discarding().SetStyleURL(
 		"https://demotiles.maplibre.org/style.json",
 	)
 	if err != nil {
@@ -56,11 +56,12 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #endregion attach
 
 	// #region image
-	center := maplibre.LatLng{Latitude: 48.8566, Longitude: 2.3522}
-	zoom := 4.0
 	err = m.Discarding().UpdateCamera(maplibre.CameraUpdate{
-		Mode:   maplibre.CameraUpdateModeJump,
-		Camera: maplibre.CameraOptions{Center: &center, Zoom: &zoom},
+		Mode: maplibre.CameraUpdateModeJump,
+		Camera: maplibre.CameraOptions{
+			Center: &maplibre.LatLng{Latitude: 48.8566, Longitude: 2.3522},
+			Zoom:   new(4.0),
+		},
 	})
 	if err != nil {
 		return err
@@ -117,7 +118,7 @@ func imagesTile(ctx context.Context, runtime *maplibre.RuntimeHandle, z, x, y ui
 	}
 
 	camera, err := maplibre.CameraForTile(
-		maplibre.CanonicalTileId{Z: z, X: x, Y: y},
+		maplibre.CanonicalTileID{Z: z, X: x, Y: y},
 		maplibre.LogicalSize{Width: 512, Height: 512},
 	)
 	if err != nil {

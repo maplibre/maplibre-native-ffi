@@ -15,10 +15,10 @@ func TestCallsAfterCloseFailWithInvalidState(t *testing.T) {
 	if _, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("second map close: %v, want native invalid state", err)
 	}
-	_, err := f.m.SetStyleJson(emptyStyle)
+	_, err := f.m.SetStyleJSON(emptyStyle)
 	var closed *Error
 	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic == "" {
-		t.Fatalf("SetStyleJson after close = %v, want native invalid state", err)
+		t.Fatalf("SetStyleJSON after close = %v, want native invalid state", err)
 	}
 	if err := f.m.Dispose(); err != nil {
 		t.Fatalf("Dispose after close: %v, want a no-op", err)
@@ -26,20 +26,20 @@ func TestCallsAfterCloseFailWithInvalidState(t *testing.T) {
 }
 
 type handleMembers interface {
-	Id() uint64
+	ID() uint64
 	IsClosed() bool
 	String() string
 }
 
 func checkHandleMembers(t *testing.T, handle handleMembers, typeName string, closed bool) {
 	t.Helper()
-	if handle.Id() == 0 {
-		t.Errorf("%s.Id() = 0, want the native handle value", typeName)
+	if handle.ID() == 0 {
+		t.Errorf("%s.ID() = 0, want the native handle value", typeName)
 	}
 	if got := handle.IsClosed(); got != closed {
 		t.Errorf("%s.IsClosed() = %t, want %t", typeName, got, closed)
 	}
-	want := fmt.Sprintf("%s(id=%#x, closed=%t)", typeName, handle.Id(), closed)
+	want := fmt.Sprintf("%s(id=%#x, closed=%t)", typeName, handle.ID(), closed)
 	if got := handle.String(); got != want {
 		t.Errorf("%s.String() = %q, want %q", typeName, got, want)
 	}
@@ -62,17 +62,17 @@ func TestDisposeAndReleaseCloseOnce(t *testing.T) {
 	checkHandleMembers(t, f.m, "MapHandle", true)
 	checkHandleMembers(t, f.runtime, "RuntimeHandle", true)
 
-	data, err := NewGeoJsonSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
+	data, err := NewGeoJSONSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkHandleMembers(t, data, "GeoJsonSourceDataHandle", false)
+	checkHandleMembers(t, data, "GeoJSONSourceDataHandle", false)
 	for range 2 {
 		if err := data.Close(); err != nil {
-			t.Fatalf("GeoJsonSourceDataHandle.Close: %v", err)
+			t.Fatalf("GeoJSONSourceDataHandle.Close: %v", err)
 		}
 	}
-	checkHandleMembers(t, data, "GeoJsonSourceDataHandle", true)
+	checkHandleMembers(t, data, "GeoJSONSourceDataHandle", true)
 }
 
 // A runtime refuses to close while its map is live. The refusal leaves the
@@ -94,17 +94,17 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 
 // A handle's id is the source that its events carry, and it stays readable
 // after close, so a host can route events that it drains later.
-func TestHandleIdNamesItsEventsAndOutlivesClose(t *testing.T) {
+func TestHandleIDNamesItsEventsAndOutlivesClose(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
+	await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
 	event := f.awaitEvent(t, "the style load", isStyleLoaded)
-	id := f.m.Id()
+	id := f.m.ID()
 	if event.Source != id {
 		t.Fatalf("event source = %#x, want the map id %#x", event.Source, id)
 	}
 	await(t, submitted(f.m.Close()))
-	if got := f.m.Id(); got != id {
-		t.Fatalf("Id() after close = %#x, want %#x", got, id)
+	if got := f.m.ID(); got != id {
+		t.Fatalf("ID() after close = %#x, want %#x", got, id)
 	}
 }
 
@@ -118,7 +118,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 		}
 	}
 	for _, frame := range []*AcquiredFrameHandle{nil, {}} {
-		err := frame.WithProducerSync(func(GpuSyncView) error {
+		err := frame.WithProducerSync(func(GPUSyncView) error {
 			t.Fatal("a view callback ran for an invalid frame")
 			return nil
 		})
@@ -128,19 +128,19 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	}
 
 	f := newFixture(t)
-	for _, input := range []*GeoJsonSourceDataHandle{nil, {}} {
-		if future, err := f.m.AddGeoJsonSourceData("source", input); future != nil || !errors.Is(err, StatusInvalidArgument) {
+	for _, input := range []*GeoJSONSourceDataHandle{nil, {}} {
+		if future, err := f.m.AddGeoJSONSourceData("source", input); future != nil || !errors.Is(err, StatusInvalidArgument) {
 			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
 		}
 	}
-	data, err := NewGeoJsonSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
+	data, err := NewGeoJSONSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := data.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if future, err := f.m.AddGeoJsonSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
+	if future, err := f.m.AddGeoJSONSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("closed input: (%v, %v), want nil and StatusInvalidState", future, err)
 	}
 }
@@ -175,6 +175,6 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	runtime = nil
 
 	stdruntime.GC()
-	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
+	await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
 	f.awaitEvent(t, "the style load", isStyleLoaded)
 }

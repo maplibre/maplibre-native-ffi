@@ -39,7 +39,7 @@ func createAMap(ctx context.Context) error {
 	// #endregion map
 
 	// #region style
-	err = m.Discarding().SetStyleUrl(
+	err = m.Discarding().SetStyleURL(
 		"https://demotiles.maplibre.org/style.json",
 	)
 	if err != nil {
@@ -47,10 +47,9 @@ func createAMap(ctx context.Context) error {
 	}
 	// #endregion style
 
-	zoom := 3.0
 	update := maplibre.CameraUpdate{
 		Mode:   maplibre.CameraUpdateModeJump,
-		Camera: maplibre.CameraOptions{Zoom: &zoom},
+		Camera: maplibre.CameraOptions{Zoom: new(3.0)},
 	}
 
 	// #region wait

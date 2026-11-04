@@ -11,16 +11,16 @@ import (
 // native-lent strings decode from terminated storage.
 func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.m.SetStyleUrl("custom://style\x00.json"); !errors.Is(err, StatusInvalidArgument) {
-		t.Fatalf("SetStyleUrl with a NUL = %v, want StatusInvalidArgument", err)
+	if _, err := f.m.SetStyleURL("custom://style\x00.json"); !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("SetStyleURL with a NUL = %v, want StatusInvalidArgument", err)
 	}
 	const url = "custom://named-style.json"
 	f.serveStyle(t, url)
-	if _, err := f.m.SetStyleUrl(url); err != nil {
+	if _, err := f.m.SetStyleURL(url); err != nil {
 		t.Fatal(err)
 	}
-	if got := await(t, submitted(f.m.GetStyleUrl())); got != url {
-		t.Fatalf("GetStyleUrl() = %q, want %q", got, url)
+	if got := await(t, submitted(f.m.GetStyleURL())); got != url {
+		t.Fatalf("GetStyleURL() = %q, want %q", got, url)
 	}
 }
 
@@ -28,12 +28,11 @@ func TestHostStringsUseViewsAndNativeLentStringsDecode(t *testing.T) {
 // when native reports them absent.
 func TestPresenceFieldsRoundTrip(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
-	fit := StyleImageTextFitProportional
+	await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
 	await(t, submitted(f.m.SetStyleImage("patch", PremultipliedRgba8Image{Width: 2, Height: 2, Stride: 8, Pixels: make([]byte, 16)}, &StyleImageOptions{
 		StretchX:      []ImageStretch{{From: 0, To: 1}},
 		Content:       &ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5},
-		TextFitHeight: &fit,
+		TextFitHeight: new(StyleImageTextFitProportional),
 	})))
 	image := await(t, submitted(f.m.GetStyleImage("patch")))
 	if image == nil {
@@ -45,7 +44,7 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 	if image.TextFitWidth != nil {
 		t.Fatalf("TextFitWidth = %v, want absent", *image.TextFitWidth)
 	}
-	if image.TextFitHeight == nil || *image.TextFitHeight != fit {
+	if image.TextFitHeight == nil || *image.TextFitHeight != StyleImageTextFitProportional {
 		t.Fatalf("TextFitHeight = %v, want proportional", image.TextFitHeight)
 	}
 	if missing := await(t, submitted(f.m.GetStyleImage("missing"))); missing != nil {
@@ -69,7 +68,7 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 // them afterwards leaves what native received alone.
 func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.SetStyleJson(emptyStyle)))
+	await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
 	coordinates := []LatLng{
 		{Latitude: 1, Longitude: 1},
 		{Latitude: 1, Longitude: 2},
@@ -180,7 +179,7 @@ func TestFlagsPrintTheirNames(t *testing.T) {
 	cases := map[RenderBackendFlag]string{
 		0:                      "0",
 		RenderBackendFlagMetal: "RenderBackendFlagMetal",
-		RenderBackendFlagOpenGl | RenderBackendFlagMetal | 0x100: "RenderBackendFlagMetal|RenderBackendFlagOpenGl|0x100",
+		RenderBackendFlagOpenGL | RenderBackendFlagMetal | 0x100: "RenderBackendFlagMetal|RenderBackendFlagOpenGL|0x100",
 	}
 	for flags, want := range cases {
 		if got := flags.String(); got != want {

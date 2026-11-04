@@ -42,11 +42,11 @@ func exitWithLiveHandles(t *testing.T) {
 	// The process exits before the fixture's cleanups can close anything.
 	f := newFixture(t)
 	f.serveStyle(t, "custom://style.json")
-	if _, err := f.m.SetStyleUrl("custom://style.json"); err != nil {
+	if _, err := f.m.SetStyleURL("custom://style.json"); err != nil {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
-	await(t, submitted(f.m.AddCustomGeometrySource("live", CustomGeometrySourceOptions{FetchTile: func(*MapHandle, string, CanonicalTileId) {}})))
+	await(t, submitted(f.m.AddCustomGeometrySource("live", CustomGeometrySourceOptions{FetchTile: func(*MapHandle, string, CanonicalTileID) {}})))
 	_, _ = os.Stdout.WriteString("exiting with live handles\n")
 	os.Exit(0)
 }

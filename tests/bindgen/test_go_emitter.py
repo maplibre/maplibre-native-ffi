@@ -103,7 +103,7 @@ class GoEmitterTests(unittest.TestCase):
     def test_a_summary_names_the_go_symbols_of_the_c_identifiers(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn("MapHandle.CancelCameraTransitions()", source)
-        self.assertIn("MapHandle.CancelCameraTransitionsWithId()", source)
+        self.assertIn("MapHandle.CancelCameraTransitionsWithID()", source)
         self.assertIn("GesturePhaseCancel, MapHandle.SetFreeCameraOptions()", source)
         self.assertNotIn("// mln_map_cancel_camera_transitions()", source)
 
@@ -118,7 +118,7 @@ class GoEmitterTests(unittest.TestCase):
     def test_an_absent_json_result_is_an_empty_string(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
-            "GetStyleLayerProperty(layerId string, propertyName string) "
+            "GetStyleLayerProperty(layerID string, propertyName string) "
             "(*Future[string], error) {",
             source,
         )
@@ -130,7 +130,7 @@ class GoEmitterTests(unittest.TestCase):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn(
             "Callback func(kind ResourceKind, url string, "
-            "outResponse *HttpHeaderTransformResponseScope) error",
+            "outResponse *HTTPHeaderTransformResponseScope) error",
             source,
         )
         self.assertIn(
@@ -195,11 +195,11 @@ mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, 
         ]
         self.assertEqual(len(owners), 10)
         for owner in owners:
-            for member in ("Id() uint64", "IsClosed() bool", "String() string"):
+            for member in ("ID() uint64", "IsClosed() bool", "String() string"):
                 self.assertIn(f"func (handle *{owner}) {member}", source)
         sources = re.findall(
-            r"// Id returns the native handle value, which runtime events report"
-            r" as their\n(?://.*\n)*func \(handle \*(\w+)\) Id\(\)",
+            r"// ID returns the native handle value, which runtime events report"
+            r" as their\n(?://.*\n)*func \(handle \*(\w+)\) ID\(\)",
             source,
         )
         self.assertEqual(set(sources), {"MapHandle", "RuntimeHandle"})

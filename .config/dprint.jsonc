@@ -72,7 +72,7 @@
     ],
   },
   "gofumpt": {
-    "langVersion": "go1.24",
+    "langVersion": "go1.26",
     "modulePath": "github.com/maplibre/maplibre-native-ffi/bindings/go",
   },
   "clangFormat": {

@@ -23,8 +23,8 @@ type Backend uint32
 const (
 	BackendMetal  Backend = C.MLN_TEST_GRAPHICS_BACKEND_METAL
 	BackendVulkan Backend = C.MLN_TEST_GRAPHICS_BACKEND_VULKAN
-	BackendEgl    Backend = C.MLN_TEST_GRAPHICS_BACKEND_EGL
-	BackendWgl    Backend = C.MLN_TEST_GRAPHICS_BACKEND_WGL
+	BackendEGL    Backend = C.MLN_TEST_GRAPHICS_BACKEND_EGL
+	BackendWGL    Backend = C.MLN_TEST_GRAPHICS_BACKEND_WGL
 )
 
 // Context holds the handles that a backend's context descriptor takes. Only
@@ -39,11 +39,11 @@ type Context struct {
 	VulkanQueueFamilyIndex    uint32
 	VulkanGetInstanceProcAddr uintptr
 	VulkanGetDeviceProcAddr   uintptr
-	EglDisplay                uintptr
-	EglConfig                 uintptr
-	EglContext                uintptr
-	WglDeviceContext          uintptr
-	WglContext                uintptr
+	EGLDisplay                uintptr
+	EGLConfig                 uintptr
+	EGLContext                uintptr
+	WGLDeviceContext          uintptr
+	WGLContext                uintptr
 }
 
 // Graphics is a device or context that stands in for the host's. The handles
@@ -84,11 +84,11 @@ func NewGraphics(backend Backend) (*Graphics, error) {
 			VulkanQueueFamilyIndex:    uint32(context.vulkan_queue_family_index),
 			VulkanGetInstanceProcAddr: uintptr(unsafe.Pointer(context.vulkan_get_instance_proc_addr)),
 			VulkanGetDeviceProcAddr:   uintptr(unsafe.Pointer(context.vulkan_get_device_proc_addr)),
-			EglDisplay:                uintptr(unsafe.Pointer(context.egl_display)),
-			EglConfig:                 uintptr(unsafe.Pointer(context.egl_config)),
-			EglContext:                uintptr(unsafe.Pointer(context.egl_context)),
-			WglDeviceContext:          uintptr(unsafe.Pointer(context.wgl_device_context)),
-			WglContext:                uintptr(unsafe.Pointer(context.wgl_context)),
+			EGLDisplay:                uintptr(unsafe.Pointer(context.egl_display)),
+			EGLConfig:                 uintptr(unsafe.Pointer(context.egl_config)),
+			EGLContext:                uintptr(unsafe.Pointer(context.egl_context)),
+			WGLDeviceContext:          uintptr(unsafe.Pointer(context.wgl_device_context)),
+			WGLContext:                uintptr(unsafe.Pointer(context.wgl_context)),
 		},
 	}, nil
 }
@@ -114,8 +114,8 @@ type TextureInfo struct {
 	Height            uint32
 	Format            uint32
 	VulkanFinalLayout uint32
-	OpenGlTexture     uint32
-	OpenGlTarget      uint32
+	OpenGLTexture     uint32
+	OpenGLTarget      uint32
 }
 
 // Texture is a color texture that stands in for one the host owns.
@@ -149,8 +149,8 @@ func (g *Graphics) NewTexture(width, height uint32) (*Texture, error) {
 			Height:            uint32(info.height),
 			Format:            uint32(info.format),
 			VulkanFinalLayout: uint32(info.vulkan_final_layout),
-			OpenGlTexture:     uint32(info.opengl_texture),
-			OpenGlTarget:      uint32(info.opengl_target),
+			OpenGLTexture:     uint32(info.opengl_texture),
+			OpenGLTarget:      uint32(info.opengl_target),
 		},
 	}, nil
 }

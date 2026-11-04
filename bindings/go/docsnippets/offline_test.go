@@ -31,13 +31,13 @@ func offline(ctx context.Context) error {
 			case maplibre.RuntimeEventPayloadOfflineRegionStatusVariant:
 				status := payload.Value.Status
 				recordProgress(
-					payload.Value.RegionId,
+					payload.Value.RegionID,
 					status.CompletedResourceCount,
 					status.RequiredResourceCount,
 					status.Complete,
 				)
 			case maplibre.RuntimeEventPayloadOfflineRegionResponseErrorVariant:
-				recordError(payload.Value.RegionId, event.Message)
+				recordError(payload.Value.RegionID, event.Message)
 			}
 		}
 	}
@@ -73,7 +73,7 @@ func offline(ctx context.Context) error {
 	// #region download
 	definition := maplibre.OfflineRegionDefinitionTilePyramidVariant{
 		Value: maplibre.OfflineTilePyramidRegionDefinition{
-			StyleUrl: "https://demotiles.maplibre.org/style.json",
+			StyleURL: "https://demotiles.maplibre.org/style.json",
 			Bounds: maplibre.LatLngBounds{
 				Southwest: maplibre.LatLng{Latitude: 47.5, Longitude: -122.5},
 				Northeast: maplibre.LatLng{Latitude: 47.8, Longitude: -122.2},
@@ -96,7 +96,7 @@ func offline(ctx context.Context) error {
 	}
 
 	activated, err := runtime.SetOfflineRegionDownloadState(
-		region.Id, maplibre.OfflineRegionDownloadStateActive,
+		region.ID, maplibre.OfflineRegionDownloadStateActive,
 	)
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func offline(ctx context.Context) error {
 	// #endregion download
 
 	// #region progress
-	observed, err := runtime.SetOfflineRegionObserved(region.Id, maplibre.RuntimeEventFlagAllRuntimeEvents)
+	observed, err := runtime.SetOfflineRegionObserved(region.ID, maplibre.RuntimeEventFlagAllRuntimeEvents)
 	if err != nil {
 		return err
 	}
@@ -126,12 +126,12 @@ func offline(ctx context.Context) error {
 		return err
 	}
 	for _, stored := range regions {
-		recordRegion(stored.Id, stored.Metadata)
+		recordRegion(stored.ID, stored.Metadata)
 	}
 
 	// Resume a download that stopped when the runtime closed.
 	resumed, err := runtime.SetOfflineRegionDownloadState(
-		region.Id, maplibre.OfflineRegionDownloadStateActive,
+		region.ID, maplibre.OfflineRegionDownloadStateActive,
 	)
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ func offline(ctx context.Context) error {
 		return err
 	}
 
-	invalidated, err := runtime.InvalidateOfflineRegion(region.Id)
+	invalidated, err := runtime.InvalidateOfflineRegion(region.ID)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func offline(ctx context.Context) error {
 		return err
 	}
 
-	deleted, err := runtime.DeleteOfflineRegion(region.Id)
+	deleted, err := runtime.DeleteOfflineRegion(region.ID)
 	if err != nil {
 		return err
 	}

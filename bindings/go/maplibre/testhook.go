@@ -73,17 +73,17 @@ func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFrame
 }
 
 func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) runtimeEventForTest {
-	sourceID := C.CBytes([]byte(payload.SourceId))
+	sourceID := C.CBytes([]byte(payload.SourceID))
 	event.payloadText = append(event.payloadText, sourceID)
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION, C.mln_runtime_event_tile_action{
-		source_id: C.mln_buffer_view{data: sourceID, size: C.size_t(len(payload.SourceId))},
+		source_id: C.mln_buffer_view{data: sourceID, size: C.size_t(len(payload.SourceID))},
 		operation: C.mln_tile_operation(payload.Operation),
 		tile_id: C.mln_tile_id{
-			overscaled_z: C.uint32_t(payload.TileId.OverscaledZ),
-			wrap:         C.int32_t(payload.TileId.Wrap),
-			canonical_z:  C.uint32_t(payload.TileId.CanonicalZ),
-			canonical_x:  C.uint32_t(payload.TileId.CanonicalX),
-			canonical_y:  C.uint32_t(payload.TileId.CanonicalY),
+			overscaled_z: C.uint32_t(payload.TileID.OverscaledZ),
+			wrap:         C.int32_t(payload.TileID.Wrap),
+			canonical_z:  C.uint32_t(payload.TileID.CanonicalZ),
+			canonical_x:  C.uint32_t(payload.TileID.CanonicalX),
+			canonical_y:  C.uint32_t(payload.TileID.CanonicalY),
 		},
 	})
 }

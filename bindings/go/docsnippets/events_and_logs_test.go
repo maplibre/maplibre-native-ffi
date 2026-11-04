@@ -21,7 +21,7 @@ func eventsAndLogs(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// Runs on a library thread.
 	handleEvents := func(events []maplibre.RuntimeEvent) {
 		for _, event := range events {
-			if event.Source != m.Id() {
+			if event.Source != m.ID() {
 				continue
 			}
 
@@ -43,13 +43,12 @@ func eventsAndLogs(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #endregion handler
 
 	// #region mask
-	mask := maplibre.RuntimeEventFlagMapStyleLoaded |
-		maplibre.RuntimeEventFlagMapLoadingFailed
 	m, created, err := runtime.CreateMap(maplibre.MapOptions{
 		InitialExtent: maplibre.LogicalExtent{
 			Width: 512, Height: 512, ScaleFactor: 1,
 		},
-		EventMask: &mask,
+		EventMask: new(maplibre.RuntimeEventFlagMapStyleLoaded |
+			maplibre.RuntimeEventFlagMapLoadingFailed),
 	})
 	if err != nil {
 		return err

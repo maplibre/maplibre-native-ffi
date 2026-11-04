@@ -21,7 +21,7 @@ func drawImage(imageID string) maplibre.PremultipliedRgba8Image {
 // pixels holds 16 x 16 premultiplied RGBA pixels.
 func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	// #region load
-	loaded, err := m.SetStyleUrl(
+	loaded, err := m.SetStyleURL(
 		"https://demotiles.maplibre.org/style.json",
 	)
 	if err != nil {
@@ -33,7 +33,7 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	// #endregion load
 
 	// #region add
-	err = m.Discarding().AddStyleSourceJson("satellite", `{
+	err = m.Discarding().AddStyleSourceJSON("satellite", `{
 		"type": "raster",
 		"tileSize": 256,
 		"tiles": ["https://tiles.example.com/{z}/{x}/{y}.png"]
@@ -43,7 +43,7 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	}
 
 	// Draw the layer under the "countries-label" layer.
-	err = m.Discarding().AddStyleLayerJson(
+	err = m.Discarding().AddStyleLayerJSON(
 		`{"id": "satellite", "type": "raster", "source": "satellite"}`,
 		"countries-label",
 	)
@@ -53,7 +53,7 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	// #endregion add
 
 	// #region geojson
-	data, err := maplibre.NewGeoJsonSourceData(
+	data, err := maplibre.NewGeoJSONSourceData(
 		`{"type": "Point", "coordinates": [-122.4, 37.8]}`, nil,
 	)
 	if err != nil {
@@ -61,20 +61,20 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	}
 	// The source keeps its own reference to the data.
 	defer data.Close()
-	err = m.Discarding().AddGeoJsonSourceData("points", data)
+	err = m.Discarding().AddGeoJSONSourceData("points", data)
 	if err != nil {
 		return err
 	}
 
 	// Later, prepare new data with the same options, and set it.
-	next, err := maplibre.NewGeoJsonSourceData(
+	next, err := maplibre.NewGeoJSONSourceData(
 		`{"type": "Point", "coordinates": [2.35, 48.86]}`, nil,
 	)
 	if err != nil {
 		return err
 	}
 	defer next.Close()
-	err = m.Discarding().SetGeoJsonSourceData("points", next)
+	err = m.Discarding().SetGeoJSONSourceData("points", next)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	}
 
 	// An empty layer ID draws the layer on top.
-	err = m.Discarding().AddStyleLayerJson(`{
+	err = m.Discarding().AddStyleLayerJSON(`{
 		"id": "markers",
 		"type": "symbol",
 		"source": "points",
@@ -132,14 +132,14 @@ func styleEvents(runtime *maplibre.RuntimeHandle, m *maplibre.MapHandle) error {
 	// Runs on a library thread.
 	handleEvents := func(events []maplibre.RuntimeEvent) {
 		for _, event := range events {
-			if event.Source != m.Id() {
+			if event.Source != m.ID() {
 				continue
 			}
 			missing, ok := event.Payload.(maplibre.RuntimeEventPayloadStyleImageVariant)
 			if !ok {
 				continue
 			}
-			id := missing.Value.ImageId
+			id := missing.Value.ImageID
 			err := m.Discarding().SetStyleImage(id, drawImage(id), nil)
 			if err != nil {
 				log.Print(err)

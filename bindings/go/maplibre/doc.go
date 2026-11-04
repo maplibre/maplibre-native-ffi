@@ -6,7 +6,7 @@
 // session and hold it for the session's lifetime.
 //
 // Acquired frames expose their texture only inside a callback such as
-// [AcquiredFrameHandle.WithOpenGlTexture], on the callback's OS thread. Keep
+// [AcquiredFrameHandle.WithOpenGLTexture], on the callback's OS thread. Keep
 // servicing a caller-driver render session while its attachment or detachment
 // is pending.
 //
@@ -14,7 +14,7 @@
 // [StatusInvalidState]. A callback may wait for a submission's acceptance but
 // not for its completion, which can deadlock native work that needs the
 // callback to return. A scoped response such as
-// [HttpHeaderTransformResponseScope] works only during its callback, on the
+// [HTTPHeaderTransformResponseScope] works only during its callback, on the
 // callback's thread.
 //
 // Each call of a Go callback enters the Go runtime from a native thread. A host

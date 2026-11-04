@@ -5,8 +5,8 @@ package maplibre
 import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/testsupport"
 
 const (
-	buildBackend    = RenderBackendFlagOpenGl
-	graphicsBackend = testsupport.BackendWgl
+	buildBackend    = RenderBackendFlagOpenGL
+	graphicsBackend = testsupport.BackendWGL
 	// Only Vulkan sessions take a queue lock.
 	queueLockSupported = false
 )
@@ -17,32 +17,32 @@ func attachBorrowedTexture(
 	m *MapHandle, context testsupport.Context, size LogicalSize, textures []*testsupport.Texture,
 	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	ring := make([]OpenGlBorrowedTexture, len(textures))
+	ring := make([]OpenGLBorrowedTexture, len(textures))
 	for index, texture := range textures {
-		ring[index] = OpenGlBorrowedTexture{Texture: texture.Info.OpenGlTexture}
+		ring[index] = OpenGLBorrowedTexture{Texture: texture.Info.OpenGLTexture}
 	}
 	info := textures[0].Info
-	return m.AttachOpenGlBorrowedTexture(OpenGlBorrowedTextureDescriptor{
+	return m.AttachOpenGLBorrowedTexture(OpenGLBorrowedTextureDescriptor{
 		LogicalSize:    size,
 		PhysicalWidth:  info.Width,
 		PhysicalHeight: info.Height,
 		Textures:       ring,
-		Target:         info.OpenGlTarget,
-		Context: OpenGlContextDescriptor{
-			Ownership: OpenGlContextOwnershipShared,
-			Data: OpenGlContextDescriptorDataWglVariant{Value: WglContextDescriptor{
-				DeviceContext: context.WglDeviceContext,
-				ShareContext:  context.WglContext,
+		Target:         info.OpenGLTarget,
+		Context: OpenGLContextDescriptor{
+			Ownership: OpenGLContextOwnershipShared,
+			Data: OpenGLContextDescriptorDataWGLVariant{Value: WGLContextDescriptor{
+				DeviceContext: context.WGLDeviceContext,
+				ShareContext:  context.WGLContext,
 			}},
 		},
 	}, options)
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
-	return frame.WithOpenGlTexture(func(view OpenGlTextureFrameView) error { return use(view) })
+	return frame.WithOpenGLTexture(func(view OpenGLTextureFrameView) error { return use(view) })
 }
 
 func readTexture(view frameView) error {
-	_, err := view.(OpenGlTextureFrameView).Texture()
+	_, err := view.(OpenGLTextureFrameView).Texture()
 	return err
 }

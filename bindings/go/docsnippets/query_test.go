@@ -21,7 +21,7 @@ func query(ctx context.Context, session *maplibre.RenderSessionHandle, point map
 	rendered, err := session.QueryRenderedFeatures(
 		box,
 		&maplibre.RenderedFeatureQueryOptions{
-			LayerIds: []string{"poi"},
+			LayerIDs: []string{"poi"},
 		},
 	)
 	if err != nil {
@@ -41,7 +41,7 @@ func query(ctx context.Context, session *maplibre.RenderSessionHandle, point map
 	source, err := session.QuerySourceFeatures(
 		"openmaptiles",
 		&maplibre.SourceFeatureQueryOptions{
-			SourceLayerIds: []string{"transportation"},
+			SourceLayerIDs: []string{"transportation"},
 			// A filter from the MapLibre style spec, as JSON.
 			Filter: `["==", ["get", "class"], "motorway"]`,
 		},
