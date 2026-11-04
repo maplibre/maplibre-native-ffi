@@ -40,9 +40,6 @@ val packagedNativePlatforms =
     .map { it.lineSequence().toSet() }
 
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
-// plugin.h includes upstream's mln/plugin/plugin_api.h from the submodule.
-val upstreamPluginHeaders =
-  rootProject.layout.projectDirectory.dir("third_party/maplibre-native/include")
 val androidBackend =
   AndroidTarget.parseBackend(
     providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
@@ -194,7 +191,7 @@ kotlin {
         create("maplibreNativeC") {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
           includeDirs.headerFilterOnly(checkedInCHeaders.asFile)
-          compilerOpts("-I${checkedInCHeaders.asFile}", "-I${upstreamPluginHeaders.asFile}")
+          compilerOpts("-I${checkedInCHeaders.asFile}")
         }
       }
     }

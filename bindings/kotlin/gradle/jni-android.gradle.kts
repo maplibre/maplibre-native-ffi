@@ -46,9 +46,6 @@ val androidSdkPackages =
   }
 
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
-// plugin.h includes upstream's mln/plugin/plugin_api.h from the submodule.
-val upstreamPluginHeaders =
-  rootProject.layout.projectDirectory.dir("third_party/maplibre-native/include")
 // The JNI shim: the hand-written runtime and the declarations tools/bindgen generates.
 val jniSources = layout.projectDirectory.dir("src/androidMain/jni")
 // The C API library ships in the backend runtime AARs; the JNI shim is private to this
@@ -124,7 +121,6 @@ androidTargets.forEach { target ->
         "-Wall",
         "-Werror",
         "-I${checkedInCHeaders.asFile}",
-        "-I${upstreamPluginHeaders.asFile}",
         "-I${jniSources.asFile}",
         jniSources.file("mln_jni.c").asFile,
         jniSources.file("mln_jni_generated.c").asFile,

@@ -92,7 +92,7 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     PATTERN "*.h"
     PATTERN "binding_support.h" EXCLUDE)
   install(
-    FILES "${MLN_FFI_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
+    FILES "${PROJECT_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
     DESTINATION "${content}/Headers/mln/plugin"
     COMPONENT "${component}")
   install(

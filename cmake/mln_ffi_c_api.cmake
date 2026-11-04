@@ -235,13 +235,10 @@ endfunction()
 
 function(mln_ffi_configure_c_api_wrapper target implementation_target)
   mln_ffi_link_c_api_implementation(${target} ${implementation_target})
-  # The plugin header includes upstream's mln/plugin/plugin_api.h, which the
-  # install copies next to this library's headers.
   target_include_directories(
     ${target}
     PUBLIC
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-      $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/third_party/maplibre-native/include>
       $<INSTALL_INTERFACE:include>)
   mln_ffi_set_c_api_output_properties(${target})
 endfunction()

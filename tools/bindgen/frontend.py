@@ -105,6 +105,11 @@ def _compiler_arguments(clang: str, sdk: str | None) -> tuple[str, ...]:
         raise ModelError([f"cannot discover compiler headers: {error}"]) from error
 
 
+# Upstream's headers that include/ carries beside the C API's own, as MapLibre
+# Native's plugin ABI. They declare no part of the C API.
+UPSTREAM_DIRECTORY = "mln"
+
+
 class Extractor:
     def __init__(self, include_directory: Path):
         self.include_directory = include_directory.resolve()
@@ -163,11 +168,11 @@ class Extractor:
         return "\n".join(reversed(lines))
 
     def owned(self, cursor: cindex.Cursor) -> bool:
-        return bool(
-            cursor.location.file
-            and Path(cursor.location.file.name)
-            .resolve()
-            .is_relative_to(self.include_directory)
+        if not cursor.location.file:
+            return False
+        path = Path(cursor.location.file.name).resolve()
+        return path.is_relative_to(self.include_directory) and not path.is_relative_to(
+            self.include_directory / UPSTREAM_DIRECTORY
         )
 
     def metadata(self, cursor: cindex.Cursor) -> dict[str, str]:
@@ -472,6 +477,7 @@ def extract_headers(
         found = {
             path.relative_to(include_directory)
             for path in include_directory.rglob("*.h")
+            if not path.is_relative_to(include_directory / UPSTREAM_DIRECTORY)
         }
         headers = tuple(path.as_posix() for path in sorted(found))
     if not headers:

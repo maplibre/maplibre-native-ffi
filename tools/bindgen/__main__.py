@@ -21,6 +21,7 @@ from .schema import validate
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = "bindings/generated-files.json"
+PLUGIN_HEADER = "mln/plugin/plugin_api.h"
 LANGUAGES = (
     "dart",
     "dotnet",
@@ -89,6 +90,17 @@ def format_files(paths: list[str], root: Path) -> None:
     )
 
 
+def sync_plugin_header(native_include: Path, root: Path = ROOT) -> None:
+    """Copies MapLibre Native's plugin ABI header into include/, which plugin.h
+    includes, so that the C API's headers build without the engine checkout.
+
+    It comes before parsing, which reads the copy.
+    """
+    target = root / "include" / PLUGIN_HEADER
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes((native_include / PLUGIN_HEADER).read_bytes())
+
+
 def previous_outputs(root: Path) -> set[str]:
     manifest = root / MANIFEST
     if not manifest.is_file():
@@ -141,6 +153,8 @@ def main() -> int:
         parser.error("--out goes with render, and render requires it")
 
     try:
+        if args.command == "generate":
+            sync_plugin_header(args.native_include)
         api = parse_headers(
             args.include,
             clang=args.clang,

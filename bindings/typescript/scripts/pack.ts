@@ -299,10 +299,6 @@ cpSync(join(root, "include"), join(facade, "native/include"), {
   recursive: true,
 });
 cpSync(
-  join(root, "third_party/maplibre-native/include/mln/plugin/plugin_api.h"),
-  join(facade, "native/include/mln/plugin/plugin_api.h"),
-);
-cpSync(
   join(binding, "node_modules/node-api-headers/include"),
   join(facade, "native/node-api-headers"),
   { recursive: true },
