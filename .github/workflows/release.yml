@@ -79,11 +79,11 @@ jobs:
       MISE_NO_HOOKS: "1"
       PUBLISH_SHA: ${{ needs.source.outputs.sha }}
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: false
           install_args: python
@@ -228,7 +228,7 @@ jobs:
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: false
           install_args: core:node
@@ -304,11 +304,11 @@ jobs:
       OHPM_TOOLS_URL: https://repo.huaweicloud.com/harmonyos/ohpm/5.1.0/commandline-tools-linux-x64-5.1.0.840.zip
       OHPM_TOOLS_SHA256: 1dcefa4741dc289277560b2802040e0c45b433898d8db453d711d5376e0478f1
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: false
           install_args: core:node
@@ -392,11 +392,11 @@ jobs:
       PUBLISH_SHA: ${{ needs.source.outputs.sha }}
       PUBLISH_TAG: ${{ github.ref_name }}
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: false
           install_args: python
@@ -473,11 +473,11 @@ jobs:
       PUBLISH_SHA: ${{ needs.source.outputs.sha }}
       PUBLISH_VERSION: ${{ needs.source.outputs.version }}
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: false
           install_args: core:dotnet
@@ -592,7 +592,7 @@ jobs:
       RELEASE_SHA: ${{ needs.source.outputs.sha }}
       DOCS_VERSION: ${{ needs.source.outputs.version }}
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.RELEASE_SHA }}
           persist-credentials: false

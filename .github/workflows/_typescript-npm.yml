@@ -38,11 +38,11 @@ jobs:
       PACKAGE_TAG: ${{ inputs.tag }}
       PACKAGE_VERSION: ${{ inputs.version }}
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.PACKAGE_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: false
           install_args: core:node aqua:pnpm/pnpm python
