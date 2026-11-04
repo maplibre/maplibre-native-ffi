@@ -23,6 +23,45 @@ run = "pnpm exec astro dev"
 depends = ["prepare"]
 run = "pnpm exec astro build"
 
+# The live demo in demo/, which the site serves at /demo/. Its pages load the
+# binding's browser modules, so build those first, with the Emscripten SDK:
+#
+#   mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl
+#   mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgpu
+#
+# Then run demo-dev, or run demo-build before build to put the demo in the
+# site.
+[tasks.demo-modules]
+hide = true
+dir = "{{config_root}}/demo"
+run = '''
+for backend in webgl webgpu; do
+  install="$MISE_MONOREPO_ROOT/bindings/typescript/native/build/emscripten-wasm32-$backend/install"
+  if [[ ! -f "$install/maplibre_native_ffi.wasm" ]]; then
+    echo "error: the $backend browser module isn't built. Build it with:" >&2
+    echo "  mise -E emscripten run //bindings/typescript:build emscripten-wasm32-$backend" >&2
+    exit 1
+  fi
+  rm -rf "public/$backend"
+  mkdir -p "public/$backend"
+  cp -R "$install/maplibre_native_ffi.mjs" "$install/maplibre_native_ffi.wasm" \
+    "$install/licenses" "public/$backend/"
+done
+cp node_modules/coi-serviceworker/coi-serviceworker.min.js public/
+'''
+
+[tasks.demo-dev]
+description = "Serve the live demo with the binding's browser modules"
+depends = ["demo-modules"]
+dir = "{{config_root}}/demo"
+run = "pnpm exec vp dev"
+
+[tasks.demo-build]
+description = "Build the live demo into public/demo, where the site's build picks it up"
+depends = ["demo-modules"]
+dir = "{{config_root}}/demo"
+run = "pnpm exec vp build"
+
 [tasks.package-cloudflare]
 description = "Package the built site under its base path for Cloudflare Pages"
 dir = ".."

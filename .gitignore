@@ -5,6 +5,8 @@ bindings/*/bin/
 docs/doxygen/gen/
 docs/src/generated/
 docs/public/reference/
+docs/public/demo/
+docs/demo/public/
 .build/
 .swiftpm/
 .zig-cache/

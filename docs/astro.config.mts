@@ -89,7 +89,8 @@ export default defineConfig({
       plugins: [
         starlightCopyButton(),
         starlightLinksValidator({
-          exclude: [`${base}/reference/**`],
+          // The reference and the demo are built outside the site.
+          exclude: [`${base}/reference/**`, `${base}/demo/`, `${base}/demo/**`],
         }),
       ],
       social: [
