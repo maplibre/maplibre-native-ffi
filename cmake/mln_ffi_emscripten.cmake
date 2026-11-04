@@ -48,8 +48,18 @@ math(
 )
 set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "${_mln_pool_default}"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
+# The heap starts at the initial size and grows up to the maximum: a map on a
+# large HiDPI canvas can hold several hundred megabytes of tiles and GPU
+# uploads. Growth replaces the buffer behind JavaScript's views of the heap.
+# The module checks its own views before each access, so JavaScript outside the
+# module reads the heap only through the module, never through a view it keeps.
+# A growable SharedArrayBuffer would remove those checks, but needs Chrome 144,
+# Firefox 154, or Safari 26.2, so the link silences Emscripten's warning about
+# their cost.
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
     CACHE STRING "Initial WASM linear memory")
+set(MLN_FFI_EMSCRIPTEN_MAXIMUM_MEMORY "2GB"
+    CACHE STRING "Maximum WASM linear memory")
 set(MLN_FFI_EMSCRIPTEN_STACK_SIZE "1MB"
     CACHE STRING "WASM stack size for native rendering code")
 
