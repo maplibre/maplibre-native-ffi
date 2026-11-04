@@ -147,15 +147,21 @@ jobs:
           if-no-files-found: error
           name: docs-cloudflare-${{ github.sha }}
           path: build/cloudflare-pages.tar
+  # A pull request's preview goes up without the live demo, which follows once
+  # the targets finish. The main preview waits to deploy with the demo when it
+  # follows, so that a newer push, which cancels the demo, never leaves the main
+  # preview linking to a missing demo.
   docs-preview:
     name: docs preview
-    needs: docs
+    needs: [plan, docs]
     if: >-
-      github.event_name == 'push'
-      || (github.event_name == 'pull_request'
+      (github.event_name == 'pull_request'
       && github.event.pull_request.user.login != 'dependabot[bot]'
       && github.event.pull_request.head.repo.full_name == github.repository)
-      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      || ((github.event_name == 'push'
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+      && !(contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgl"')
+      && contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgpu"')))
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     environment:
@@ -189,13 +195,17 @@ jobs:
         run: mise run --no-deps //docs:deploy-cloudflare "$CLOUDFLARE_BRANCH"
   # The live demo loads the browser modules that the web unit's targets build,
   # so the preview gains the demo only when both ran. It waits for the targets
-  # instead of holding up the preview above.
+  # instead of holding up a pull request's preview above.
   docs-demo-preview:
     name: docs demo preview
-    needs: [plan, docs-preview, target]
+    needs: [plan, docs, docs-preview, target]
     if: >-
       !cancelled()
-      && needs.docs-preview.result == 'success'
+      && needs.docs.result == 'success'
+      && (needs.docs-preview.result == 'success'
+      || (needs.docs-preview.result == 'skipped'
+      && (github.event_name == 'push'
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))))
       && needs.target.result == 'success'
       && contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgl"')
       && contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgpu"')
