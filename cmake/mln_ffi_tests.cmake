@@ -42,6 +42,7 @@ set(MLN_NATIVE_FILE_TAGS
     webgl
     emscripten
     android
+    ohos
     icu)
 
 function(mln_native_active_file_tags out_var)
@@ -54,6 +55,9 @@ function(mln_native_active_file_tags out_var)
   endif()
   if(ANDROID)
     list(APPEND tags android)
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    list(APPEND tags ohos)
   endif()
   # Linux, FreeBSD, OpenHarmony, and Windows evaluate locale expressions with
   # ICU: ICU4X on Linux and FreeBSD and the system's ICU4C on OpenHarmony and

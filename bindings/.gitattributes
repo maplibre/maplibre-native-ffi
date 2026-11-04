@@ -238,6 +238,7 @@
 /go/maplibre/generated_api.go linguist-generated=true
 /go/maplibre/generated_api_android.go linguist-generated=true
 /go/maplibre/generated_api_macos.go linguist-generated=true
+/go/maplibre/generated_api_ohos.go linguist-generated=true
 /go/maplibre/generated_callbacks.c linguist-generated=true
 /go/maplibre/generated_callbacks.h linguist-generated=true
 /go/maplibre/generated_native.go linguist-generated=true

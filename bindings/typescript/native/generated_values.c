@@ -3860,6 +3860,28 @@ bool mln_ts_write_frame_demand(
   return true;
 }
 
+bool mln_ts_write_frame_pacer_options(
+  mln_ts_call* call, napi_value value, mln_frame_pacer_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "maximumFramesPerSecond", &member))
+    return false;
+  mln_ts_path(child, sizeof child, path, "maximumFramesPerSecond");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->maximum_frames_per_second = (uint32_t)number;
+    }
+    out->fields |= MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  }
+  return true;
+}
+
 bool mln_ts_write_free_camera_options(
   mln_ts_call* call, napi_value value, mln_free_camera_options* out,
   const char* path

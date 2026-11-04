@@ -16,6 +16,7 @@
 #include "maplibre_native_c/logging.h"           // IWYU pragma: export
 #include "maplibre_native_c/map.h"               // IWYU pragma: export
 #include "maplibre_native_c/offscreen.h"         // IWYU pragma: export
+#include "maplibre_native_c/ohos.h"              // IWYU pragma: export
 #include "maplibre_native_c/projection.h"        // IWYU pragma: export
 #include "maplibre_native_c/query.h"             // IWYU pragma: export
 #include "maplibre_native_c/render_session.h"    // IWYU pragma: export

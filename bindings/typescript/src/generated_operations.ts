@@ -15,6 +15,7 @@ import type {
   CustomVectorSourceOptions,
   FeatureStateSelector,
   FrameDemand,
+  FramePacerOptions,
   FreeCameraOptions,
   GeoJsonSourceOptions,
   GpuSync,
@@ -227,6 +228,33 @@ export function logicalExtentPhysicalSize(extent: LogicalExtent): {
   readonly height: number;
 } {
   return native.mln_logical_extent_physical_size(extent);
+}
+
+/**
+ * Creates a frame pacer that follows the display through OpenHarmony's native
+ * VSync.
+ *
+ * You can call it on any thread. The pacer demands frames from a system thread
+ * at the display refreshes that `OH_NativeVSync` reports, so it needs no event
+ * loop of yours.
+ *
+ * See `mln_ohos_frame_pacer_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.nativeError` when the system can't report the display's refreshes
+ *   to the process.
+ */
+export function ohosFramePacerCreate(
+  options?: FramePacerOptions,
+): FramePacerHandle {
+  const handle = native.mln_ohos_frame_pacer_create(options);
+  return adopt(
+    handle,
+    () => new FramePacerHandle(ADOPT, handle),
+    (disposed) => native.mln_frame_pacer_release(disposed, undefined),
+  );
 }
 
 /**

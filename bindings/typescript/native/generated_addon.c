@@ -4343,6 +4343,37 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_ohos_frame_pacer_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_frame_pacer_options arg_options;
+  const void* present_options = NULL;
+  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_frame_pacer_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_ohos_frame_pacer_create(present_options, &arg_out_pacer, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_open_gl_supported_context_provider_mask(
   napi_env env, napi_callback_info info
 ) {
@@ -7031,6 +7062,7 @@ static const mln_ts_export exports[] = {
   {"mln_network_set_status", mln_ts_export_mln_network_set_status},
   {"mln_offscreen_device_create", mln_ts_export_mln_offscreen_device_create},
   {"mln_offscreen_device_release", mln_ts_export_mln_offscreen_device_release},
+  {"mln_ohos_frame_pacer_create", mln_ts_export_mln_ohos_frame_pacer_create},
   {"mln_open_gl_supported_context_provider_mask",
    mln_ts_export_mln_open_gl_supported_context_provider_mask},
   {"mln_plugin_get_register_function_v1",

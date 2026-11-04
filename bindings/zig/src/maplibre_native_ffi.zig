@@ -8599,6 +8599,26 @@ pub fn setNetworkStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.D
     return call.invoke("mln_network_set_status", .none, {}, null, diagnostic, .{status_input});
 }
 
+/// Creates a frame pacer that follows the display through OpenHarmony's native
+/// VSync.
+///
+/// You can call it on any thread. The pacer demands frames from a system thread
+/// at the display refreshes that `OH_NativeVSync` reports, so it needs no event
+/// loop of yours.
+///
+/// See `mln_ohos_frame_pacer_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+///
+/// Errors:
+///
+/// - `error.NativeError` when the system can't report the display's refreshes
+///   to the process.
+pub const ohosFramePacerCreate = if (builtin.abi.isOpenHarmony()) struct {
+    fn function(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
+        return call.invoke("mln_ohos_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
+    }
+}.function else {};
+
 /// Reports the OpenGL context platforms that this build of the library has.
 ///
 /// See `mln_open_gl_supported_context_provider_mask` in the
