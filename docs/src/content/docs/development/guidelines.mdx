@@ -153,8 +153,7 @@ typedef struct mln_lat_lng { // No size: this type never changes.
   Its container's `size` versions it.
 - A struct that is also passed by pointer on its own keeps its `size` when
   another struct embeds it, as `mln_camera_update` embeds `mln_camera_options`.
-  Native ignores the embedded `size`, because the container's `size` versions
-  it.
+  Native ignores the embedded `size`.
 - A small value type that is not intended to grow, such as a coordinate or an
   ID, does not need `size`.
 
