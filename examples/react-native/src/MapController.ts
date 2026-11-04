@@ -33,6 +33,9 @@ export class MapController {
   readonly #onStatus: (status: Status) => void;
   #failed = false;
   #disposed = false;
+  // Fast Refresh disposes and starts the same controller again, so a start
+  // that finishes after a later dispose drops what it made.
+  #epoch = 0;
 
   #runtime: RuntimeHandle | undefined;
   #map: MapHandle | undefined;
@@ -55,26 +58,32 @@ export class MapController {
   }
 
   start(): void {
-    this.#start().catch((error: unknown) => this.#fail(error));
+    this.#disposed = this.#failed = false;
+    this.#start(++this.#epoch).catch((error: unknown) => this.#fail(error));
   }
 
   dispose(): void {
     this.#disposed = true;
+    this.#epoch++;
     const session = this.#session;
     const map = this.#map;
     const runtime = this.#runtime;
     const target = this.#target;
     this.#session = this.#map = this.#runtime = this.#target = undefined;
-    try {
-      session?.dispose();
-      map?.dispose();
-      runtime?.dispose();
-    } catch (error) {
-      // On a reload, React Native has the host clean the binding up before
-      // React unmounts the app, and that cleanup already ended these objects.
-      console.log("The binding was already cleaned up:", error);
-    }
-    if (target !== undefined) surfaces.release(target);
+    // After any target change in flight, release the session while its wakes
+    // still service it, and only then let go of the surface it used.
+    this.#targets = this.#targets.then(async () => {
+      try {
+        await session?.release();
+        map?.dispose();
+        runtime?.dispose();
+      } catch (error) {
+        // On a reload, React Native has the host clean the binding up before
+        // React unmounts the app, and that cleanup already ended these objects.
+        console.log("The binding was already cleaned up:", error);
+      }
+      if (target !== undefined) surfaces.release(target);
+    });
   }
 
   setSize(size: LogicalSize): void {
@@ -105,10 +114,10 @@ export class MapController {
     });
   }
 
-  async #start(): Promise<void> {
+  async #start(epoch: number): Promise<void> {
     this.#showStatus("Loading the library…");
     const runtime = await RuntimeHandle.create();
-    if (this.#disposed) return runtime.dispose();
+    if (epoch !== this.#epoch) return runtime.dispose();
     this.#runtime = runtime;
 
     const map = runtime.createMap({
@@ -142,6 +151,7 @@ export class MapController {
       },
     });
     await map.ready;
+    if (epoch !== this.#epoch) return;
     map.discarding.updateCamera({
       mode: CameraUpdateMode.jump,
       camera: {
@@ -177,13 +187,14 @@ export class MapController {
       const previous = this.#target;
       this.#target = surface;
       if (this.#session === undefined) {
-        this.#session = attach(map, size, handles, {
+        // The session keeps servicing its driver work after the controller
+        // lets go of it, until its release completes.
+        const session: RenderSessionHandle = attach(map, size, handles, {
           frameWake: { callback: () => this.#drainFrameResults() },
-          driverWorkWake: {
-            callback: () => this.#session?.serviceDriverWork(),
-          },
+          driverWorkWake: { callback: () => session.serviceDriverWork() },
         });
-        await this.#session.ready;
+        this.#session = session;
+        await session.ready;
       } else {
         await setTarget(this.#session, size, handles);
       }
