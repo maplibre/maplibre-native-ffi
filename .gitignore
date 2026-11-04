@@ -7,6 +7,7 @@ docs/src/generated/
 docs/public/reference/
 docs/public/demo/
 docs/demo/public/
+bindings/typescript/native/MaplibreNativeC.xcframework/
 .build/
 .swiftpm/
 .zig-cache/
