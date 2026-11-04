@@ -879,6 +879,24 @@ final class mln_offscreen_device_options extends Struct {
   external int client_api;
 }
 
+final class mln_ohos_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+  @Uint64()
+  external int surface_id;
+}
+
+final class mln_ohos_surface_replacement extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+  @Uint64()
+  external int surface_id;
+}
+
 final class mln_open_gl_borrowed_texture extends Struct {
   @Uint32()
   external int texture;

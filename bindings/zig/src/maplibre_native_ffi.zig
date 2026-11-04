@@ -463,6 +463,41 @@ pub const Map = struct {
         return .{ .session = started.outputs, .ready = started.ready };
     }
 
+    /// Creates a session that presents the map to an OpenHarmony window, with a
+    /// graphics context that the library creates.
+    ///
+    /// The build's render backend decides the context. A Vulkan build presents with
+    /// `device`, or, when `device` is null, with a device that the library creates
+    /// with presentation and shares between these sessions. An OpenGL build creates
+    /// an EGL context on the default display, and `device` must be null. Attach
+    /// with `RenderDriverKind.core_worker`, since the context belongs to the
+    /// library.
+    ///
+    /// Before the platform destroys the window, such as in an `XComponent`'s
+    /// `onSurfaceDestroyed` callback, release the target with
+    /// `RenderSession.releaseTarget()` and wait for that to complete. The session's
+    /// reference keeps the window, but not its buffers.
+    ///
+    /// See `mln_map_attach_ohos_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when no surface in this process has
+    ///   `OhosSurfaceDescriptor.surface_id`, such as after the platform destroyed
+    ///   it.
+    /// - `error.Unsupported` when `device` can't present, because you created it
+    ///   without `VulkanDeviceOptions.presentation`.
+    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
+    /// - `error.NativeError` when the library can't create the graphics context or
+    ///   the window's surface.
+    pub const attachOhosSurface = if (builtin.abi.isOpenHarmony()) struct {
+        fn function(self: Map, descriptor: OhosSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_ohos_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
     /// Creates a session that renders the map into a ring of your OpenGL textures.
     ///
     /// See `mln_map_attach_open_gl_borrowed_texture` in the
@@ -2075,6 +2110,32 @@ pub const RenderSession = struct {
     pub const setMetalSurfaceTarget = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
         fn function(self: RenderSession, replacement: MetalSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
             return call.submit("mln_render_session_set_metal_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
+        }
+    }.function else {};
+
+    /// Replaces the OpenHarmony window that the session presents to.
+    ///
+    /// Use it to give the session a window again after
+    /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// window. A replacement with the window and logical size that the session
+    /// presents to already changes nothing.
+    ///
+    /// See `mln_render_session_set_ohos_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when no surface in this process has
+    ///   `OhosSurfaceReplacement.surface_id`, such as after the platform destroyed
+    ///   it.
+    /// - `error.Unsupported` when, in a Vulkan build, the new window needs a
+    ///   different color format or pre-rotation support than the old one. Attach a
+    ///   new session instead.
+    /// - `error.NativeError` when the library can't create the window's surface.
+    pub const setOhosSurfaceTarget = if (builtin.abi.isOpenHarmony()) struct {
+        fn function(self: RenderSession, replacement: OhosSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_ohos_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
         }
     }.function else {};
 
@@ -5188,6 +5249,74 @@ pub const OffscreenDeviceOptions = struct {
     }
 };
 
+/// An OpenHarmony window to present to, for `Map.attachOhosSurface()`.
+///
+/// Name the window by `window` or by `surface_id`. The session takes its own
+/// reference to the window, so you can release yours once the call returns. It
+/// uses the window until a replacement or release of the target completes, a
+/// detach or release of the session completes, or an abandon of it returns.
+///
+/// See `mln_ohos_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+pub const OhosSurfaceDescriptor = struct {
+    logical_size: LogicalSize,
+    /// Your `OHNativeWindow*`, or null to name the window by `surface_id`.
+    window: ?*anyopaque = null,
+    /// The surface ID of a surface in this process, such as the one that
+    /// `XComponentController.getXComponentSurfaceId()` reports, or 0 to name
+    /// the window by `window`.
+    surface_id: u64 = 0,
+    pub fn toNative(self: OhosSurfaceDescriptor) c.mln_ohos_surface_descriptor {
+        var raw = std.mem.zeroes(c.mln_ohos_surface_descriptor);
+        raw.size = @sizeOf(c.mln_ohos_surface_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.window = self.window;
+        raw.surface_id = self.surface_id;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_ohos_surface_descriptor) OhosSurfaceDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .window = raw.window,
+            .surface_id = raw.surface_id,
+        };
+    }
+};
+
+/// A new OpenHarmony window for `RenderSession.setOhosSurfaceTarget()`.
+///
+/// Name the window by `window` or by `surface_id`. The session takes its own
+/// reference to the window, so you can release yours once the call returns. It
+/// uses the window until a replacement or release of the target completes, a
+/// detach or release of the session completes, or an abandon of it returns.
+///
+/// See `mln_ohos_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+pub const OhosSurfaceReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your `OHNativeWindow*`, or null to name the window by `surface_id`.
+    window: ?*anyopaque = null,
+    /// The surface ID of a surface in this process, such as the one that
+    /// `XComponentController.getXComponentSurfaceId()` reports, or 0 to name
+    /// the window by `window`.
+    surface_id: u64 = 0,
+    pub fn toNative(self: OhosSurfaceReplacement) c.mln_ohos_surface_replacement {
+        var raw = std.mem.zeroes(c.mln_ohos_surface_replacement);
+        raw.size = @sizeOf(c.mln_ohos_surface_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.window = self.window;
+        raw.surface_id = self.surface_id;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_ohos_surface_replacement) OhosSurfaceReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .window = raw.window,
+            .surface_id = raw.surface_id,
+        };
+    }
+};
+
 /// An OpenGL texture of a borrowed ring.
 ///
 /// See `mln_open_gl_borrowed_texture` in the
@@ -5840,8 +5969,8 @@ pub const RenderSessionAttachOptions = struct {
     ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
     ///   a browser's WebGPU device.
     /// - `RenderDriverKind.core_worker` for a target whose context the library
-    ///   owns: a transferred WebGL canvas, an Android window, or an offscreen
-    ///   session.
+    ///   owns: a transferred WebGL canvas, an Android or OpenHarmony window, or
+    ///   an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.

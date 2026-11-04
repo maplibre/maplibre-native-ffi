@@ -702,6 +702,50 @@ impl RenderSessionHandle {
         )
     }
 
+    /// Replaces the OpenHarmony window that the session presents to.
+    ///
+    /// Use it to give the session a window again after
+    /// `RenderSessionHandle::release_target()`, to move it to another window,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old window. A replacement with the window and logical size that
+    /// the session presents to already changes nothing.
+    ///
+    /// See `mln_render_session_set_ohos_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when no surface in this process has
+    ///   `OhosSurfaceReplacement::surface_id`, such as after the platform
+    ///   destroyed it.
+    /// - `Status::Unsupported` when, in a Vulkan build, the new window needs a
+    ///   different color format or pre-rotation support than the old one.
+    ///   Attach a new session instead.
+    /// - `Status::NativeError` when the library can't create the window's
+    ///   surface.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_env = "ohos")]
+    pub unsafe fn set_ohos_surface_target(
+        &self,
+        replacement: &OhosSurfaceReplacement,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self.inner.call();
+        let replacement = call.reference(&replacement)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_ohos_surface_target(
+                    session,
+                    replacement,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
     /// Replaces the OpenGL textures that a borrowed ring renders into.
     ///
     /// Use it to resize the ring, or to give the session textures again after

@@ -5269,6 +5269,74 @@ bool mln_ts_write_offscreen_device_options(
   return true;
 }
 
+bool mln_ts_write_ohos_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_ohos_surface_descriptor* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "window", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "window");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->window = (void*)(uintptr_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "surfaceId", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "surfaceId");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->surface_id = (uint64_t)number;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_ohos_surface_replacement(
+  mln_ts_call* call, napi_value value, mln_ohos_surface_replacement* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "window", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "window");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->window = (void*)(uintptr_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "surfaceId", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "surfaceId");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->surface_id = (uint64_t)number;
+    }
+  }
+  return true;
+}
+
 bool mln_ts_write_open_gl_borrowed_texture(
   mln_ts_call* call, napi_value value, mln_open_gl_borrowed_texture* out,
   const char* path

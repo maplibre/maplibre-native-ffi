@@ -41,32 +41,6 @@ auto acquire_window(
   return MLN_STATUS_OK;
 }
 
-// The Vulkan device that `device` names, or null for the shared one. A build
-// without Vulkan presents through a context of its own.
-auto presentation_device(
-  mln_vulkan_device device,
-  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
-) -> mln_status {
-  if (device == MLN_HANDLE_NULL) return MLN_STATUS_OK;
-#if defined(MLN_RENDER_BACKEND_VULKAN)
-  const auto object = handle_table<VulkanDeviceObject>().lease(device);
-  if (object == nullptr) return recorded_handle_fault_status();
-  if (!object->presentation) {
-    set_thread_error(
-      "the Vulkan device can't present, because it was created without "
-      "presentation"
-    );
-    return MLN_STATUS_UNSUPPORTED;
-  }
-  out_context = object->context;
-  return MLN_STATUS_OK;
-#else
-  static_cast<void>(out_context);
-  set_thread_error("a build without Vulkan presents with no Vulkan device");
-  return MLN_STATUS_INVALID_ARGUMENT;
-#endif
-}
-
 }  // namespace
 
 auto android_surface_attach_start(
@@ -81,7 +55,7 @@ auto android_surface_attach_start(
     validate_android_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) return descriptor_status;
   auto context = std::shared_ptr<const mln_vulkan_context_descriptor>{};
-  const auto device_status = presentation_device(device, context);
+  const auto device_status = window_presentation_device(device, context);
   if (device_status != MLN_STATUS_OK) return device_status;
 
   auto session = std::make_shared<mln_render_session_object>();

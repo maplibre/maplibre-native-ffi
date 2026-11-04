@@ -41,6 +41,8 @@ import type {
   OfflineRegionDownloadState,
   OffscreenDescriptor,
   OffscreenDeviceOptions,
+  OhosSurfaceDescriptor,
+  OhosSurfaceReplacement,
   OpenGlBorrowedTextureDescriptor,
   OpenGlBorrowedTextureReplacement,
   OpenGlContextProviderFlag,
@@ -184,6 +186,13 @@ export interface NativeOperations {
     descriptor: OffscreenDescriptor,
     options: RenderSessionAttachOptions,
     device: bigint | undefined,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_ohos_surface(
+    map: bigint,
+    descriptor: OhosSurfaceDescriptor,
+    device: bigint | undefined,
+    options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;
   mln_map_attach_open_gl_borrowed_texture(
@@ -699,6 +708,11 @@ export interface NativeOperations {
   mln_render_session_set_metal_surface_target(
     session: bigint,
     replacement: MetalSurfaceReplacement,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_set_ohos_surface_target(
+    session: bigint,
+    replacement: OhosSurfaceReplacement,
     completion: NativeCompletion,
   ): void;
   mln_render_session_set_open_gl_borrowed_texture_target(

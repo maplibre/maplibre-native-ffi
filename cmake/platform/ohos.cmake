@@ -17,6 +17,7 @@ function(mln_ffi_configure_platform_dependencies target)
     pixelmap
     hilog_ndk.z
     native_vsync
+    native_window
     net_http
     uv
     z)
@@ -69,7 +70,8 @@ function(mln_ffi_configure_platform target)
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OHOS_SOURCES})
   mln_ffi_target_project_sources(
     ${target} ${PROJECT_SOURCE_DIR}/src/platform/ohos/frame_pacer.cpp
-    ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp)
+    ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp
+    ${PROJECT_SOURCE_DIR}/src/render/ohos_surface_session.cpp)
 
   # Only Native's bidi and character classes use the ICU it vendors. Its headers
   # rename every symbol for ICU 61, so they reach only those sources and do not

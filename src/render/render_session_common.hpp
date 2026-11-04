@@ -49,6 +49,8 @@
 struct mln_render_session_object;
 // The NDK's window type, which only Android builds define.
 struct ANativeWindow;
+// OpenHarmony's OHNativeWindow, which only OpenHarmony builds define.
+struct NativeWindow;
 
 namespace mln {
 class UpdateParameters;
@@ -279,6 +281,17 @@ class SurfaceSessionBackend : public RenderSessionBackend {
     (void)physical_size;
     return unsupported_retarget(
       "session does not render through an Android window"
+    );
+  }
+  // Presents to a new OpenHarmony window, keeping `window`'s reference while
+  // the backend uses it.
+  virtual auto set_ohos_target(
+    const std::shared_ptr<NativeWindow>& window, mln::Size physical_size
+  ) -> mln_status {
+    (void)window;
+    (void)physical_size;
+    return unsupported_retarget(
+      "session does not render through an OpenHarmony window"
     );
   }
 

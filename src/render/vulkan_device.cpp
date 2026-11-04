@@ -131,4 +131,28 @@ auto vulkan_device_release(mln_vulkan_device device) -> void {
   vulkan_device_table().remove(device);
 }
 
+auto window_presentation_device(
+  mln_vulkan_device device,
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status {
+  if (device == MLN_HANDLE_NULL) return MLN_STATUS_OK;
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+  const auto object = vulkan_device_table().lease(device);
+  if (object == nullptr) return recorded_handle_fault_status();
+  if (!object->presentation) {
+    set_thread_error(
+      "the Vulkan device can't present, because it was created without "
+      "presentation"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  out_context = object->context;
+  return MLN_STATUS_OK;
+#else
+  static_cast<void>(out_context);
+  set_thread_error("a build without Vulkan presents with no Vulkan device");
+  return MLN_STATUS_INVALID_ARGUMENT;
+#endif
+}
+
 }  // namespace mln::core

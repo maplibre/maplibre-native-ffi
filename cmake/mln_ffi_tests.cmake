@@ -479,6 +479,13 @@ function(mln_native_configure_suite target registry_dir)
   if(ANDROID)
     target_link_libraries(${target} PRIVATE android mediandk)
   endif()
+  # The OpenHarmony cases present to a consumer surface's window in place of an
+  # app's, and read its buffers back.
+  if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    target_link_libraries(
+      ${target}
+      PRIVATE native_buffer native_image native_window)
+  endif()
   # The Metal test support defines an Objective-C class, which the iOS and
   # tvOS test app links against the runtime and Foundation directly.
   if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
