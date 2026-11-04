@@ -1,19 +1,19 @@
 /**
- * @file maplibre_native_c/ohos.h
+ * @file maplibre_native_c/platform/ohos.h
  * Present the map to an OpenHarmony app's windows, and pace its frames to the
  * display.
  */
 
-#ifndef MAPLIBRE_NATIVE_C_OHOS_H
-#define MAPLIBRE_NATIVE_C_OHOS_H
+#ifndef MAPLIBRE_NATIVE_C_PLATFORM_OHOS_H
+#define MAPLIBRE_NATIVE_C_PLATFORM_OHOS_H
 
 #include <stdint.h>
 
-#include "base.h"
-#include "completion.h"
-#include "map.h"
-#include "render_session.h"
-#include "render_target.h"
+#include "../base.h"
+#include "../completion.h"
+#include "../map.h"
+#include "../render_session.h"
+#include "../render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -138,4 +138,4 @@ MLN_API mln_status mln_render_session_set_ohos_surface_target(
 }
 #endif
 
-#endif  // MAPLIBRE_NATIVE_C_OHOS_H
+#endif  // MAPLIBRE_NATIVE_C_PLATFORM_OHOS_H

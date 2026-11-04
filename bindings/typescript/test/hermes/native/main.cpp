@@ -19,7 +19,7 @@
 
 #ifdef __ANDROID__
 #include <fbjni/fbjni.h>
-#include <maplibre_native_c/android.h>
+#include <maplibre_native_c/platform/android.h>
 #endif
 
 namespace jsi = facebook::jsi;

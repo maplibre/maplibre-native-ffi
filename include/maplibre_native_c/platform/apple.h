@@ -1,13 +1,13 @@
 /**
- * @file maplibre_native_c/apple.h
+ * @file maplibre_native_c/platform/apple.h
  * Pace the library's frames to the display on Apple platforms.
  */
 
-#ifndef MAPLIBRE_NATIVE_C_APPLE_H
-#define MAPLIBRE_NATIVE_C_APPLE_H
+#ifndef MAPLIBRE_NATIVE_C_PLATFORM_APPLE_H
+#define MAPLIBRE_NATIVE_C_PLATFORM_APPLE_H
 
-#include "base.h"
-#include "render_session.h"
+#include "../base.h"
+#include "../render_session.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,4 +37,4 @@ MLN_API mln_status mln_apple_frame_pacer_create(
 }
 #endif
 
-#endif  // MAPLIBRE_NATIVE_C_APPLE_H
+#endif  // MAPLIBRE_NATIVE_C_PLATFORM_APPLE_H
