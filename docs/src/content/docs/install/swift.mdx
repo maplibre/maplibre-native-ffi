@@ -70,8 +70,7 @@ Point pkg-config at the C library before you build:
 export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 ```
 
-On Linux, SwiftPM ignores the rpath that pkg-config adds, so pass the prefix's
-`lib` directory to the linker:
+On Linux, add the prefix's `lib` directory to the rpath:
 
 ```bash frame="terminal"
 swift build -Xlinker -rpath -Xlinker <prefix>/lib
