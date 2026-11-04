@@ -97,6 +97,12 @@ mln_status mln_map_zoom(
   (void)map, (void)completion;
   return unsupported(out_diagnostic);
 }
+mln_status mln_map_tile_count(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+) {
+  (void)map, (void)completion;
+  return unsupported(out_diagnostic);
+}
 mln_status mln_map_list_names(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) {

@@ -385,6 +385,21 @@ napi_value mln_ts_decode_texture_readback_result(
   );
 }
 
+napi_value mln_ts_decode_uint32_t(
+  napi_env env, const mln_completion_result* result
+) {
+  if (result->value == NULL || result->value_count == 0)
+    return mln_ts_missing_value(env);
+  if (result->value_size < sizeof(uint32_t)) {
+    napi_throw_range_error(env, NULL, "native completion stride is too small");
+    return NULL;
+  }
+  const char* value = (const char*)result->value;
+  size_t stride = result->value_size;
+  (void)stride;
+  return mln_ts_number(env, (double)(*(const uint32_t*)value));
+}
+
 void mln_ts_dispatch_camera_transition_end_callback(
   void* user_data, const mln_camera_transition_end* end
 ) {

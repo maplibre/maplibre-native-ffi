@@ -93,6 +93,9 @@ napi_value mln_ts_decode_style_transition_options(
 napi_value mln_ts_decode_texture_readback_result(
   napi_env env, const mln_completion_result* result
 );
+napi_value mln_ts_decode_uint32_t(
+  napi_env env, const mln_completion_result* result
+);
 void mln_ts_dispatch_camera_transition_end_callback(
   void* user_data, const mln_camera_transition_end* end
 );

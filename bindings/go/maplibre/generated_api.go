@@ -2617,9 +2617,10 @@ func nativeFreeCameraOptions(input FreeCameraOptions, arena *bindingArena) C.mln
 // See mln_geo_json_source_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type GeoJSONSourceOptions struct {
-	MinZoom        *float64
-	MaxZoom        *float64
-	Tolerance      *float64
+	MinZoom   *float64
+	MaxZoom   *float64
+	Tolerance *float64
+	// The last zoom level that has clusters, at most 30.
 	ClusterMaxZoom *float64
 	// The clusterProperties object, or empty for none.
 	ClusterProperties string
@@ -8259,6 +8260,101 @@ func (receiver *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, 
 	})
 }
 
+// GetClusterChildren reads the children of a cluster in a clustered GeoJSON
+// source.
+//
+// clusterID is the value of the "cluster_id" property of a cluster feature that
+// a query found. The children are the clusters and points that the cluster
+// splits into one zoom level closer. The result is a GeoJSON feature
+// collection.
+//
+// The query reads the clustered index of the source's data in the session's
+// most recent render attempt. Data that changes after that attempt shows from
+// the next one, and before the first attempt there is no source.
+//
+// A feature query, such as RenderSessionHandle.QuerySourceFeatures(), returns
+// what the source's loaded tiles hold. After the source's data, URL, or options
+// change, or the style changes, those tiles can hold the older data until they
+// reload. Until then, a cluster ID that a feature query found can name a
+// cluster of the older data. Cluster IDs repeat across versions of the data, so
+// this query can then complete with StatusNotFound or read the newer data's
+// cluster with that ID. Treat StatusNotFound as a cluster that is gone, and
+// query the features again.
+//
+// When a source's data fails to load, its earlier tiles can stay until new data
+// loads, so feature queries can keep finding the earlier clusters while this
+// query completes with StatusNotFound.
+//
+// See mln_render_session_get_cluster_children in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+//
+// Errors:
+//   - StatusInvalidState when you detached, abandoned, released, or disposed
+//     the session.
+//   - StatusNotFound when that data has no source named sourceID, or the source
+//     has no cluster clusterID.
+//   - StatusInvalidArgument when the source isn't a GeoJSON source with
+//     clustering turned on.
+func (receiver *RenderSessionHandle) GetClusterChildren(sourceID string, clusterID uint32) (*Future[string], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_get_cluster_children(C.mln_render_session(raw), bindingView(sourceID, arena), C.uint32_t(clusterID), completion, diagnostic))
+	}, completionOf(copyViewText))
+}
+
+// GetClusterExpansionZoom reads the zoom level at which a cluster of a
+// clustered GeoJSON source splits.
+//
+// clusterID is the value of the "cluster_id" property of a cluster feature that
+// a query found. At the result's zoom level, the cluster's points no longer
+// form this cluster, but two or more clusters or points.
+//
+// The query reads its data as RenderSessionHandle.GetClusterChildren()
+// describes, including when a cluster ID that a feature query found names a
+// cluster of older data.
+//
+// See mln_render_session_get_cluster_expansion_zoom in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+//
+// Errors:
+//   - StatusInvalidState when you detached, abandoned, released, or disposed
+//     the session.
+//   - StatusNotFound when that data has no source named sourceID, or the source
+//     has no cluster clusterID.
+//   - StatusInvalidArgument when the source isn't a GeoJSON source with
+//     clustering turned on.
+func (receiver *RenderSessionHandle) GetClusterExpansionZoom(sourceID string, clusterID uint32) (*Future[uint32], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_get_cluster_expansion_zoom(C.mln_render_session(raw), bindingView(sourceID, arena), C.uint32_t(clusterID), completion, diagnostic))
+	}, completionOf(func(raw C.uint32_t) uint32 { return uint32(raw) }))
+}
+
+// GetClusterLeaves reads the points in a cluster of a clustered GeoJSON source.
+//
+// clusterID is the value of the "cluster_id" property of a cluster feature that
+// a query found. The result is a GeoJSON feature collection of the original
+// point features. It skips the first offset points and then holds up to limit
+// of them, so a limit of 0 gives an empty collection.
+//
+// The query reads its data as RenderSessionHandle.GetClusterChildren()
+// describes, including when a cluster ID that a feature query found names a
+// cluster of older data.
+//
+// See mln_render_session_get_cluster_leaves in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
+//
+// Errors:
+//   - StatusInvalidState when you detached, abandoned, released, or disposed
+//     the session.
+//   - StatusNotFound when that data has no source named sourceID, or the source
+//     has no cluster clusterID.
+//   - StatusInvalidArgument when the source isn't a GeoJSON source with
+//     clustering turned on.
+func (receiver *RenderSessionHandle) GetClusterLeaves(sourceID string, clusterID uint32, limit uint32, offset uint32) (*Future[string], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_get_cluster_leaves(C.mln_render_session(raw), bindingView(sourceID, arena), C.uint32_t(clusterID), C.uint32_t(limit), C.uint32_t(offset), completion, diagnostic))
+	}, completionOf(copyViewText))
+}
+
 // GetFailure reads the message of the error that made the session fail.
 //
 // RenderSessionSnapshot.FailureStatus reports the error's status. The message
@@ -8289,25 +8385,6 @@ func (receiver *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 	}, func(arena *bindingArena) RenderSessionSnapshot {
 		return copyRenderSessionSnapshot(outSnapshot)
 	})
-}
-
-// QueryFeatureExtensions reads a value that a source computes for one of its
-// features.
-//
-// A clustered GeoJSON source answers the supercluster extension for a cluster
-// feature. Its extensionField is children for the cluster's child features,
-// leaves for the points in the cluster, or expansion-zoom for the zoom level
-// where the cluster splits. For leaves, arguments can set limit and offset.
-// Without limit, the result has up to 10 points and ignores offset. The result
-// is JSON: a GeoJSON feature collection, a number, or null when the source has
-// no answer.
-//
-// See mln_render_session_query_feature_extensions in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
-func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature string, extension string, extensionField string, arguments string) (*Future[string], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceID, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingView(arguments, arena), completion, diagnostic))
-	}, completionOf(copyViewText))
 }
 
 // QueryRenderedFeatures finds the features that the session drew in an area of

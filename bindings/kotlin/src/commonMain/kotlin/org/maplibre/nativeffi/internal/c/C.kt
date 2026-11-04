@@ -706,6 +706,32 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_render_session_get_cluster_children(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_get_cluster_expansion_zoom(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_get_cluster_leaves(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    limit: Int,
+    offset: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_render_session_get_failure(
     session: Long,
     outMessage: Long,
@@ -715,17 +741,6 @@ internal expect object C {
   ): Int
 
   fun mln_render_session_get_snapshot(session: Long, outSnapshot: Long, outDiagnostic: Long): Int
-
-  fun mln_render_session_query_feature_extensions(
-    session: Long,
-    sourceId: Long,
-    feature: Long,
-    extension: Long,
-    extensionField: Long,
-    arguments: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_render_session_query_rendered_features(
     session: Long,

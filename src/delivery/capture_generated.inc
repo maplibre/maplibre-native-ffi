@@ -385,6 +385,18 @@ constexpr auto element_owns_handles(const mln_texture_readback_result*) noexcept
   -> bool {
   return false;
 }
+template <bool Writing>
+auto capture_element(
+  [[maybe_unused]] Arena<Writing>& arena, const uint32_t& source
+) -> uint32_t {
+  auto result = source;
+  return result;
+}
+inline auto discard_element([[maybe_unused]] const uint32_t& value) noexcept
+  -> void {}
+constexpr auto element_owns_handles(const uint32_t*) noexcept -> bool {
+  return false;
+}
 struct CameraTransitionEndArguments {
   const mln_camera_transition_end* end;
 };

@@ -836,6 +836,25 @@ def enum_member_prefix(constants, native: str | None = None) -> str:
     return shared.rsplit("_", 1)[0] + "_"
 
 
+# Integer typedefs whose width every target shares, kept by name rather than
+# by Clang's host ABI expansion.
+PORTABLE_SCALARS = frozenset(
+    {
+        "bool",
+        "_Bool",
+        "float",
+        "double",
+        "void",
+        "char",
+        "size_t",
+        "ptrdiff_t",
+        "intptr_t",
+        "uintptr_t",
+        *(f"{sign}int{bits}_t" for sign in ("", "u") for bits in (8, 16, 32, 64)),
+    }
+)
+
+
 SCALAR_CANONICAL_TYPES = frozenset(
     {
         "void",
@@ -948,23 +967,10 @@ class Binder:
 
     def scalar_carrier(self, type_: CType) -> str:
         """Preserve portable integer typedefs before Clang's host ABI expansion."""
-        portable = {
-            "bool",
-            "_Bool",
-            "float",
-            "double",
-            "void",
-            "char",
-            "size_t",
-            "ptrdiff_t",
-            "intptr_t",
-            "uintptr_t",
-            *(f"{sign}int{bits}_t" for sign in ("", "u") for bits in (8, 16, 32, 64)),
-        }
         seen = set()
         while True:
             spelling = type_.spelling.removeprefix("const ")
-            if spelling in portable:
+            if spelling in PORTABLE_SCALARS:
                 return spelling
             if spelling in seen or spelling not in self.typedefs:
                 return type_.canonical.removeprefix("const ")
@@ -1250,9 +1256,12 @@ class Binder:
                 self.resolving.remove(name)
         if resolved.kind == "function":
             return ValuePlan(kind="callback", **common)
-        if resolved.canonical.removeprefix(
-            "const "
-        ) in SCALAR_CANONICAL_TYPES or resolved.kind in {
+        # A result annotation names its type without a declaration, so a
+        # portable typedef such as `result=uint32_t` arrives unexpanded.
+        if (
+            resolved.canonical.removeprefix("const ") in SCALAR_CANONICAL_TYPES
+            or resolved.spelling.removeprefix("const ") in PORTABLE_SCALARS
+        ) or resolved.kind in {
             "void",
             "bool",
             "char_s",

@@ -707,6 +707,9 @@ export interface GeoJsonSourceOptions {
   minZoom?: number;
   maxZoom?: number;
   tolerance?: number;
+  /**
+   * The last zoom level that has clusters, at most 30.
+   */
   clusterMaxZoom?: number;
   /**
    * The `clusterProperties` object, or empty for none.

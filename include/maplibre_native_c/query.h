@@ -159,22 +159,99 @@ MLN_API mln_status mln_render_session_query_source_features(
 ) MLN_NOEXCEPT;
 
 /**
- * Reads a value that a source computes for one of its features.
+ * Reads the children of a cluster in a clustered GeoJSON source.
  *
- * A clustered GeoJSON source answers the `supercluster` extension for a cluster
- * feature. Its `extension_field` is `children` for the cluster's child
- * features, `leaves` for the points in the cluster, or `expansion-zoom` for the
- * zoom level where the cluster splits. For `leaves`, `arguments` can set
- * `limit` and `offset`. Without `limit`, the result has up to 10 points and
- * ignores `offset`. The result is JSON: a GeoJSON feature collection, a number,
- * or null when the source has no answer.
+ * `cluster_id` is the value of the "cluster_id" property of a cluster feature
+ * that a query found. The children are the clusters and points that the cluster
+ * splits into one zoom level closer. The result is a GeoJSON feature
+ * collection.
+ *
+ * The query reads the clustered index of the source's data in the session's
+ * most recent render attempt. Data that changes after that attempt shows from
+ * the next one, and before the first attempt there is no source.
+ *
+ * A feature query, such as mln_render_session_query_source_features(),
+ * returns what the source's loaded tiles hold. After the source's data, URL,
+ * or options change, or the style changes, those tiles can hold the older
+ * data until they reload. Until then, a cluster ID that a feature query found
+ * can name a cluster of the older data. Cluster IDs repeat across versions of
+ * the data, so this query can then complete with MLN_STATUS_NOT_FOUND or read
+ * the newer data's cluster with that ID. Treat MLN_STATUS_NOT_FOUND as a
+ * cluster that is gone, and query the features again.
+ *
+ * When a source's data fails to load, its earlier tiles can stay until new
+ * data loads, so feature queries can keep finding the earlier clusters while
+ * this query completes with MLN_STATUS_NOT_FOUND.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
+ *   disposed the session.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when that data has no source named `source_id`, or
+ *   the source has no cluster `cluster_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source isn't a GeoJSON source with
+ *   clustering turned on.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
-MLN_API mln_status mln_render_session_query_feature_extensions(
-  mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view feature MLN_BINDING("encoding=json"),
-  mln_buffer_view extension, mln_buffer_view extension_field,
-  mln_buffer_view arguments MLN_BINDING("encoding=json"),
+MLN_API mln_status mln_render_session_get_cluster_children(
+  mln_render_session session, mln_buffer_view source_id, uint32_t cluster_id,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Reads the points in a cluster of a clustered GeoJSON source.
+ *
+ * `cluster_id` is the value of the "cluster_id" property of a cluster feature
+ * that a query found. The result is a GeoJSON feature collection of the
+ * original point features. It skips the first `offset` points and then holds up
+ * to `limit` of them, so a `limit` of 0 gives an empty collection.
+ *
+ * The query reads its data as mln_render_session_get_cluster_children()
+ * describes, including when a cluster ID that a feature query found names a
+ * cluster of older data.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
+ *   disposed the session.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when that data has no source named `source_id`, or
+ *   the source has no cluster `cluster_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source isn't a GeoJSON source with
+ *   clustering turned on.
+ */
+MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
+MLN_API mln_status mln_render_session_get_cluster_leaves(
+  mln_render_session session, mln_buffer_view source_id, uint32_t cluster_id,
+  uint32_t limit, uint32_t offset, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Reads the zoom level at which a cluster of a clustered GeoJSON source splits.
+ *
+ * `cluster_id` is the value of the "cluster_id" property of a cluster feature
+ * that a query found. At the result's zoom level, the cluster's points no
+ * longer form this cluster, but two or more clusters or points.
+ *
+ * The query reads its data as mln_render_session_get_cluster_children()
+ * describes, including when a cluster ID that a feature query found names a
+ * cluster of older data.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
+ *   disposed the session.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when that data has no source named `source_id`, or
+ *   the source has no cluster `cluster_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source isn't a GeoJSON source with
+ *   clustering turned on.
+ */
+MLN_BINDING("execution=query;result=uint32_t")
+MLN_API mln_status mln_render_session_get_cluster_expansion_zoom(
+  mln_render_session session, mln_buffer_view source_id, uint32_t cluster_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

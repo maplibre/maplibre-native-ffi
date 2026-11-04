@@ -1509,6 +1509,40 @@ static jint mln_render_session_get_capabilities_jni(
   );
 }
 
+static jint mln_render_session_get_cluster_children_jni(
+  JNIEnv* env, jclass type, jlong session, jlong source_id, jint cluster_id,
+  jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_render_session_get_cluster_children(
+    (mln_render_session)session, MLN_JNI_RECORD(mln_buffer_view, source_id),
+    (uint32_t)cluster_id, MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_render_session_get_cluster_expansion_zoom_jni(
+  JNIEnv* env, jclass type, jlong session, jlong source_id, jint cluster_id,
+  jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_render_session_get_cluster_expansion_zoom(
+    (mln_render_session)session, MLN_JNI_RECORD(mln_buffer_view, source_id),
+    (uint32_t)cluster_id, MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_render_session_get_cluster_leaves_jni(
+  JNIEnv* env, jclass type, jlong session, jlong source_id, jint cluster_id,
+  jint limit, jint offset, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_render_session_get_cluster_leaves(
+    (mln_render_session)session, MLN_JNI_RECORD(mln_buffer_view, source_id),
+    (uint32_t)cluster_id, (uint32_t)limit, (uint32_t)offset,
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_render_session_get_failure_jni(
   JNIEnv* env, jclass type, jlong session, jlong out_message,
   jlong message_capacity, jlong out_message_length, jlong out_diagnostic
@@ -1536,22 +1570,6 @@ static jint mln_render_session_get_snapshot_jni(
 ) {
   return mln_render_session_get_snapshot_critical(
     session, out_snapshot, out_diagnostic
-  );
-}
-
-static jint mln_render_session_query_feature_extensions_jni(
-  JNIEnv* env, jclass type, jlong session, jlong source_id, jlong feature,
-  jlong extension, jlong extension_field, jlong arguments, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_query_feature_extensions(
-    (mln_render_session)session, MLN_JNI_RECORD(mln_buffer_view, source_id),
-    MLN_JNI_RECORD(mln_buffer_view, feature),
-    MLN_JNI_RECORD(mln_buffer_view, extension),
-    MLN_JNI_RECORD(mln_buffer_view, extension_field),
-    MLN_JNI_RECORD(mln_buffer_view, arguments),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
@@ -2376,12 +2394,16 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_dump_debug_logs_jni},
   {"mln_render_session_get_capabilities", "(JJJ)I",
    (void*)mln_render_session_get_capabilities_jni},
+  {"mln_render_session_get_cluster_children", "(JJIJJ)I",
+   (void*)mln_render_session_get_cluster_children_jni},
+  {"mln_render_session_get_cluster_expansion_zoom", "(JJIJJ)I",
+   (void*)mln_render_session_get_cluster_expansion_zoom_jni},
+  {"mln_render_session_get_cluster_leaves", "(JJIIIJJ)I",
+   (void*)mln_render_session_get_cluster_leaves_jni},
   {"mln_render_session_get_failure", "(JJJJJ)I",
    (void*)mln_render_session_get_failure_jni},
   {"mln_render_session_get_snapshot", "(JJJ)I",
    (void*)mln_render_session_get_snapshot_jni},
-  {"mln_render_session_query_feature_extensions", "(JJJJJJJJ)I",
-   (void*)mln_render_session_query_feature_extensions_jni},
   {"mln_render_session_query_rendered_features", "(JJJJJ)I",
    (void*)mln_render_session_query_rendered_features_jni},
   {"mln_render_session_query_source_features", "(JJJJJ)I",
@@ -2732,12 +2754,16 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_dump_debug_logs_jni},
   {"mln_render_session_get_capabilities", "(JJJ)I",
    (void*)mln_render_session_get_capabilities_jni},
+  {"mln_render_session_get_cluster_children", "(JJIJJ)I",
+   (void*)mln_render_session_get_cluster_children_jni},
+  {"mln_render_session_get_cluster_expansion_zoom", "(JJIJJ)I",
+   (void*)mln_render_session_get_cluster_expansion_zoom_jni},
+  {"mln_render_session_get_cluster_leaves", "(JJIIIJJ)I",
+   (void*)mln_render_session_get_cluster_leaves_jni},
   {"mln_render_session_get_failure", "(JJJJJ)I",
    (void*)mln_render_session_get_failure_jni},
   {"mln_render_session_get_snapshot", "(JJJ)I",
    (void*)mln_render_session_get_snapshot_critical},
-  {"mln_render_session_query_feature_extensions", "(JJJJJJJJ)I",
-   (void*)mln_render_session_query_feature_extensions_jni},
   {"mln_render_session_query_rendered_features", "(JJJJJ)I",
    (void*)mln_render_session_query_rendered_features_jni},
   {"mln_render_session_query_source_features", "(JJJJJ)I",

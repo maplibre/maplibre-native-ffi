@@ -4668,6 +4668,162 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_render_session_get_cluster_children(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_buffer_view arg_source_id = {0};
+  uint32_t arg_cluster_id;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
+    goto done;
+  memset(&arg_cluster_id, 0, sizeof arg_cluster_id);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(
+          call, call->argv[2], 0LL, 4294967295LL, &number, "clusterId"
+        ))
+      goto done;
+    arg_cluster_id = (uint32_t)number;
+  }
+  if (!mln_ts_read_completion(
+        call, call->argv[3], false, mln_ts_decode_buffer_view_json,
+        &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_render_session_get_cluster_children(
+    arg_session, arg_source_id, arg_cluster_id, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_render_session_get_cluster_expansion_zoom(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_buffer_view arg_source_id = {0};
+  uint32_t arg_cluster_id;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
+    goto done;
+  memset(&arg_cluster_id, 0, sizeof arg_cluster_id);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(
+          call, call->argv[2], 0LL, 4294967295LL, &number, "clusterId"
+        ))
+      goto done;
+    arg_cluster_id = (uint32_t)number;
+  }
+  if (!mln_ts_read_completion(
+        call, call->argv[3], false, mln_ts_decode_uint32_t, &arg_completion,
+        &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_render_session_get_cluster_expansion_zoom(
+    arg_session, arg_source_id, arg_cluster_id, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_render_session_get_cluster_leaves(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_buffer_view arg_source_id = {0};
+  uint32_t arg_cluster_id;
+  uint32_t arg_limit;
+  uint32_t arg_offset;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 6)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
+    goto done;
+  memset(&arg_cluster_id, 0, sizeof arg_cluster_id);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(
+          call, call->argv[2], 0LL, 4294967295LL, &number, "clusterId"
+        ))
+      goto done;
+    arg_cluster_id = (uint32_t)number;
+  }
+  memset(&arg_limit, 0, sizeof arg_limit);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(
+          call, call->argv[3], 0LL, 4294967295LL, &number, "limit"
+        ))
+      goto done;
+    arg_limit = (uint32_t)number;
+  }
+  memset(&arg_offset, 0, sizeof arg_offset);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(
+          call, call->argv[4], 0LL, 4294967295LL, &number, "offset"
+        ))
+      goto done;
+    arg_offset = (uint32_t)number;
+  }
+  if (!mln_ts_read_completion(
+        call, call->argv[5], false, mln_ts_decode_buffer_view_json,
+        &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_render_session_get_cluster_leaves(
+    arg_session, arg_source_id, arg_cluster_id, arg_limit, arg_offset,
+    present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_render_session_get_failure(
   napi_env env, napi_callback_info info
 ) {
@@ -4734,58 +4890,6 @@ static napi_value mln_ts_export_mln_render_session_get_snapshot(
   call->result = mln_ts_read_render_session_snapshot(
     env, &(arg_out_snapshot), sizeof(arg_out_snapshot)
   );
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_query_feature_extensions(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_buffer_view arg_source_id = {0};
-  mln_buffer_view arg_feature = {0};
-  mln_buffer_view arg_extension = {0};
-  mln_buffer_view arg_extension_field = {0};
-  mln_buffer_view arg_arguments = {0};
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 7)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
-    goto done;
-  if (!mln_ts_read_json_view(call, call->argv[2], &arg_feature, "feature"))
-    goto done;
-  if (!mln_ts_read_text_view(call, call->argv[3], &arg_extension, "extension"))
-    goto done;
-  if (!mln_ts_read_text_view(
-        call, call->argv[4], &arg_extension_field, "extensionField"
-      ))
-    goto done;
-  if (!mln_ts_read_json_view(
-        call, call->argv[5], &arg_arguments, "argumentsValue"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[6], false, mln_ts_decode_buffer_view_json,
-        &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_query_feature_extensions(
-    arg_session, arg_source_id, arg_feature, arg_extension, arg_extension_field,
-    arg_arguments, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
 }
@@ -6927,12 +7031,16 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_render_session_dump_debug_logs},
   {"mln_render_session_get_capabilities",
    mln_ts_export_mln_render_session_get_capabilities},
+  {"mln_render_session_get_cluster_children",
+   mln_ts_export_mln_render_session_get_cluster_children},
+  {"mln_render_session_get_cluster_expansion_zoom",
+   mln_ts_export_mln_render_session_get_cluster_expansion_zoom},
+  {"mln_render_session_get_cluster_leaves",
+   mln_ts_export_mln_render_session_get_cluster_leaves},
   {"mln_render_session_get_failure",
    mln_ts_export_mln_render_session_get_failure},
   {"mln_render_session_get_snapshot",
    mln_ts_export_mln_render_session_get_snapshot},
-  {"mln_render_session_query_feature_extensions",
-   mln_ts_export_mln_render_session_query_feature_extensions},
   {"mln_render_session_query_rendered_features",
    mln_ts_export_mln_render_session_query_rendered_features},
   {"mln_render_session_query_source_features",

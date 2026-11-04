@@ -225,6 +225,7 @@ typedef struct mln_geo_json_source_options {
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM");
   double tolerance
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE");
+  /** The last zoom level that has clusters, at most 30. */
   double cluster_max_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM");
   /** The `clusterProperties` object, or empty for none. */

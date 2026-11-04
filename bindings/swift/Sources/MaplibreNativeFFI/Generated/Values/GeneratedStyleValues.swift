@@ -288,6 +288,7 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
   public var minZoom: Double?
   public var maxZoom: Double?
   public var tolerance: Double?
+  /// The last zoom level that has clusters, at most 30.
   public var clusterMaxZoom: Double?
   /// The `clusterProperties` object, or empty for none.
   public var clusterProperties: String

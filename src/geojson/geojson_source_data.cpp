@@ -315,7 +315,9 @@ auto validate_and_resolve_geojson_source_options(
   }
   for (const auto& [zoom, maximum, name] : {
          std::tuple{effective.min_zoom, 24.0, "min_zoom"},
-         std::tuple{effective.cluster_max_zoom, 255.0, "cluster_max_zoom"},
+         // Supercluster stores a cluster's zoom level plus one in five bits
+         // of its ID.
+         std::tuple{effective.cluster_max_zoom, 30.0, "cluster_max_zoom"},
        }) {
     if (
       !std::isfinite(zoom) || zoom < 0.0 || zoom > maximum ||

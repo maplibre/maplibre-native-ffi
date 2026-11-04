@@ -2224,6 +2224,7 @@ public data class GeoJsonSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val tolerance: Double? = null,
+  /** The last zoom level that has clusters, at most 30. */
   public val clusterMaxZoom: Double? = null,
   /** The `clusterProperties` object, or empty for none. */
   public val clusterProperties: String = "",

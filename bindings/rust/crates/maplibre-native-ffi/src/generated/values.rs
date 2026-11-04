@@ -1220,6 +1220,7 @@ pub struct GeoJsonSourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub tolerance: Option<f64>,
+    /// The last zoom level that has clusters, at most 30.
     pub cluster_max_zoom: Option<f64>,
     /// The `clusterProperties` object, or empty for none.
     pub cluster_properties: String,

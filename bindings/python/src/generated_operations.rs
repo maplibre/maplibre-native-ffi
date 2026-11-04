@@ -7067,6 +7067,100 @@ impl RenderSessionHandle {
         }?;
         generated_copy_mln_render_session_capabilities(py, &out_capabilities)
     }
+    #[pyo3(signature = (source_id, cluster_id))]
+    fn get_cluster_children(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        cluster_id: u32,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let handle = self.input();
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            let value = completion_value::<sys::mln_buffer_view>(result)?;
+            generated_json(py, value)
+        };
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_get_cluster_children(
+                        handle,
+                        source_id_value,
+                        cluster_id,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }
+    }
+    #[pyo3(signature = (source_id, cluster_id))]
+    fn get_cluster_expansion_zoom(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        cluster_id: u32,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let handle = self.input();
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            let value = completion_value::<u32>(result)?;
+            generated_value(py, value)
+        };
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_get_cluster_expansion_zoom(
+                        handle,
+                        source_id_value,
+                        cluster_id,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }
+    }
+    #[pyo3(signature = (source_id, cluster_id, limit, offset))]
+    fn get_cluster_leaves(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        cluster_id: u32,
+        limit: u32,
+        offset: u32,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let handle = self.input();
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            let value = completion_value::<sys::mln_buffer_view>(result)?;
+            generated_json(py, value)
+        };
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_get_cluster_leaves(
+                        handle,
+                        source_id_value,
+                        cluster_id,
+                        limit,
+                        offset,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }
+    }
     #[pyo3(signature = ())]
     fn get_failure(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -7108,46 +7202,6 @@ impl RenderSessionHandle {
             })
         }?;
         generated_copy_mln_render_session_snapshot(py, &out_snapshot)
-    }
-    #[pyo3(signature = (source_id, feature, extension, extension_field, arguments))]
-    fn query_feature_extensions(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-        feature: &Bound<'_, PyAny>,
-        extension: &Bound<'_, PyAny>,
-        extension_field: &Bound<'_, PyAny>,
-        arguments: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let feature_value = storage.json(feature.clone(), false)?;
-        let extension_value = storage.buffer(extension.clone(), true)?;
-        let extension_field_value = storage.buffer(extension_field.clone(), true)?;
-        let arguments_value = storage.json(arguments.clone(), false)?;
-        let handle = self.input();
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_json(py, value)
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_query_feature_extensions(
-                        handle,
-                        source_id_value,
-                        feature_value,
-                        extension_value,
-                        extension_field_value,
-                        arguments_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
     }
     #[pyo3(signature = (geometry, options=None))]
     fn query_rendered_features(

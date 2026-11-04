@@ -123,6 +123,12 @@ static void cluster_zoom_out_of_range(mln_geo_json_source_options* options) {
   every_option(options);
   options->cluster_max_zoom = 300.0;
 }
+static void cluster_zoom_past_cluster_ids(
+  mln_geo_json_source_options* options
+) {
+  every_option(options);
+  options->cluster_max_zoom = 31.0;
+}
 
 static const char trailing_bytes[] = EMPTY_COLLECTION "garbage";
 static const char embedded_nul[] = EMPTY_COLLECTION "\0garbage";
@@ -190,6 +196,12 @@ static const geojson_data_case geojson_data_cases[] = {
    0,
    cluster_zoom_out_of_range,
    {"cluster_max_zoom"}},
+  // A cluster ID holds its zoom level plus one in five bits.
+  {"cluster zoom past what cluster IDs hold",
+   POINT_COLLECTION("a"),
+   0,
+   cluster_zoom_past_cluster_ids,
+   {"cluster_max_zoom must be an integer within [0, 30]"}},
   // Supercluster reads every feature geometry as a point, and MapLibre Native
   // clusters feature collections only, so clustering refuses anything else up
   // front, naming the feature and the constraint.

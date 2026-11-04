@@ -1318,6 +1318,55 @@ internal actual object C {
   ): Int =
     mln_kw_mln_render_session_get_capabilities(session, word(outCapabilities), word(outDiagnostic))
 
+  actual fun mln_render_session_get_cluster_children(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_render_session_get_cluster_children(
+      session,
+      word(sourceId),
+      clusterId,
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_render_session_get_cluster_expansion_zoom(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_render_session_get_cluster_expansion_zoom(
+      session,
+      word(sourceId),
+      clusterId,
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_render_session_get_cluster_leaves(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    limit: Int,
+    offset: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_render_session_get_cluster_leaves(
+      session,
+      word(sourceId),
+      clusterId,
+      limit,
+      offset,
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_render_session_get_failure(
     session: Long,
     outMessage: Long,
@@ -1338,27 +1387,6 @@ internal actual object C {
     outSnapshot: Long,
     outDiagnostic: Long,
   ): Int = mln_kw_mln_render_session_get_snapshot(session, word(outSnapshot), word(outDiagnostic))
-
-  actual fun mln_render_session_query_feature_extensions(
-    session: Long,
-    sourceId: Long,
-    feature: Long,
-    extension: Long,
-    extensionField: Long,
-    arguments: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_query_feature_extensions(
-      session,
-      word(sourceId),
-      word(feature),
-      word(extension),
-      word(extensionField),
-      word(arguments),
-      word(completion),
-      word(outDiagnostic),
-    )
 
   actual fun mln_render_session_query_rendered_features(
     session: Long,
@@ -2839,6 +2867,41 @@ private fun mln_kw_mln_render_session_get_capabilities(p0: Long, p1: Int, p2: In
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_capabilities(p0, p1, p2)",
   )
 
+private fun mln_kw_mln_render_session_get_cluster_children(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_cluster_children(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_render_session_get_cluster_expansion_zoom(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_cluster_expansion_zoom(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_render_session_get_cluster_leaves(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+  p6: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_cluster_leaves(p0, p1, p2, p3, p4, p5, p6)",
+  )
+
 private fun mln_kw_mln_render_session_get_failure(
   p0: Long,
   p1: Int,
@@ -2853,20 +2916,6 @@ private fun mln_kw_mln_render_session_get_failure(
 private fun mln_kw_mln_render_session_get_snapshot(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_snapshot(p0, p1, p2)",
-  )
-
-private fun mln_kw_mln_render_session_query_feature_extensions(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-  p7: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_query_feature_extensions(p0, p1, p2, p3, p4, p5, p6, p7)",
   )
 
 private fun mln_kw_mln_render_session_query_rendered_features(
