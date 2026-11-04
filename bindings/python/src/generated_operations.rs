@@ -2700,6 +2700,7 @@ fn generated_input_mln_render_session_attach_options<'py>(
         .getattr("producer_sync_kinds")?
         .extract::<sys::mln_gpu_sync_kind_flags>()?;
     raw.frame_wake = generated_input_mln_wake(&value.getattr("frame_wake")?, storage)?;
+    raw.redraw_wake = generated_input_mln_wake(&value.getattr("redraw_wake")?, storage)?;
     raw.driver_work_wake = generated_input_mln_wake(&value.getattr("driver_work_wake")?, storage)?;
     raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;
     Ok(raw)

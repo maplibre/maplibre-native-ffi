@@ -973,6 +973,7 @@ struct mln_render_session_object
   std::function<mln_status(mln_render_session_object&)> initialize_backend;
   std::shared_ptr<mln::core::Wake> frame_wake;
   std::shared_ptr<mln::core::Wake> driver_wake;
+  std::shared_ptr<mln::core::Wake> redraw_wake;
   // The host's lock on the queue the backend submits to. initialize_backend
   // shares it with a backend that takes it around its queue calls. Null when
   // the host passed no lock.
@@ -991,6 +992,8 @@ struct mln_render_session_object
   std::function<mln::core::GpuSyncSupport()> probe_sync_kinds;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
+  // Set when the redraw wake is called, and cleared by the host's next demand.
+  bool redraw_wake_pending = false;
   bool scheduler_service_queued = false;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer

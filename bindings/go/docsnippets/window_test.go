@@ -26,13 +26,9 @@ var session *maplibre.RenderSessionHandle
 // #endregion attach
 
 // #region frame-loop
-// Set while the window has no surface, and when it closes.
-var paused bool
-
+// Draws the map if it changed since the last frame.
 func demandFrame() error {
-	return session.DemandFrame(maplibre.FrameDemand{
-		Flags: maplibre.FrameDemandFlagWaitForUpdate,
-	})
+	return session.DemandFrame(maplibre.FrameDemand{})
 }
 
 func drainFrameResults() error {
@@ -49,16 +45,17 @@ func drainFrameResults() error {
 			return replaceSession() // Release the session and attach a new one.
 		}
 	}
-	if !paused {
-		runAtNextRefresh(demandFrame)
-	}
 	return nil
 }
 
 // #endregion frame-loop
 
 // #region frame-wake
-// Runs on a library thread.
+// Both run on a library thread.
+func onRedrawWake() {
+	runAtNextRefresh(demandFrame)
+}
+
 func onFrameWake() {
 	runOnEventLoop(drainFrameResults)
 }
@@ -91,7 +88,6 @@ func onDriverWorkWake() {
 
 func surfaceLost(ctx context.Context) error {
 	// #region lost-surface
-	paused = true
 	released, err := session.ReleaseTarget()
 	if err != nil {
 		return err
@@ -116,9 +112,8 @@ func surfaceRestored(ctx context.Context, newSurface uint64) error {
 	if _, err := restored.Await(ctx); err != nil {
 		return err
 	}
-	paused = false
-	return demandFrame()
 	// #endregion lost-surface
+	return nil
 }
 
 func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.VulkanContextDescriptor, windowSurface uint64) error {
@@ -134,8 +129,9 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 		Surface: windowSurface,
 	}
 	options := maplibre.RenderSessionAttachOptions{
-		Driver:    maplibre.RenderDriverKindCoreWorker,
-		FrameWake: maplibre.Wake{Callback: onFrameWake},
+		Driver:     maplibre.RenderDriverKindCoreWorker,
+		RedrawWake: maplibre.Wake{Callback: onRedrawWake},
+		FrameWake:  maplibre.Wake{Callback: onFrameWake},
 	}
 
 	attached, ready, err := m.AttachVulkanSurface(surface, options)
@@ -148,9 +144,6 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	}
 	// #endregion attach
 
-	if err := demandFrame(); err != nil {
-		return err
-	}
 	if err := onWindowResized(1024, 768); err != nil {
 		return err
 	}
@@ -158,13 +151,13 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	// #region service
 	graphicsThreadOptions := maplibre.RenderSessionAttachOptions{
 		Driver:         maplibre.RenderDriverKindCallerGraphicsThread,
+		RedrawWake:     maplibre.Wake{Callback: onRedrawWake},
 		FrameWake:      maplibre.Wake{Callback: onFrameWake},
 		DriverWorkWake: maplibre.Wake{Callback: onDriverWorkWake},
 	}
 	// #endregion service
 	_ = graphicsThreadOptions
 
-	paused = true
 	released, err := session.Release()
 	if err != nil {
 		return err

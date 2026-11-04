@@ -5657,6 +5657,28 @@ bool mln_ts_write_render_session_attach_options(
       }
     }
   }
+  if (!mln_ts_member(call, value, "redrawWake", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "redrawWake");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t fields[3];
+      bool native = false;
+      if (!mln_ts_read_native_registration(
+            call, member, "Wake", 1, fields, &native, child
+          ))
+        return false;
+      if (native) {
+        out->redraw_wake.callback = (mln_wake_callback)(uintptr_t)fields[0];
+        out->redraw_wake.user_data = (void*)(uintptr_t)fields[1];
+        out->redraw_wake.release_user_data =
+          (mln_user_data_release)(uintptr_t)fields[2];
+      } else {
+        if (!mln_ts_read_record(call, member, child)) return false;
+        if (!mln_ts_write_wake(call, member, &out->redraw_wake, child))
+          return false;
+      }
+    }
+  }
   if (!mln_ts_member(call, value, "driverWorkWake", &member)) return false;
   mln_ts_path(child, sizeof child, path, "driverWorkWake");
   if (!mln_ts_is_absent(call, member)) {

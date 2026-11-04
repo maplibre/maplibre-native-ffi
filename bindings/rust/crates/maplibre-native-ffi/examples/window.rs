@@ -24,18 +24,14 @@ impl MapWindow {
 // #region attach
 struct MapWindow {
     session: RenderSessionHandle,
-    // Set while the window has no surface, and when it closes.
-    paused: bool,
 }
 // #endregion attach
 
 // #region frame-loop
 impl MapWindow {
+    // Draws the map if it changed since the last frame.
     fn demand_frame(&mut self) -> Result<()> {
-        self.session.demand_frame(&FrameDemand {
-            flags: FrameDemandFlag::WAIT_FOR_UPDATE,
-            ..Default::default()
-        })
+        self.session.demand_frame(&FrameDemand::default())
     }
 
     fn drain_frame_results(&mut self) -> Result<()> {
@@ -49,8 +45,6 @@ impl MapWindow {
         {
             // Release the session and attach a new one.
             self.replace_session();
-        } else if !self.paused {
-            run_at_next_refresh(MapWindow::demand_frame);
         }
         Ok(())
     }
@@ -58,7 +52,11 @@ impl MapWindow {
 // #endregion frame-loop
 
 // #region frame-wake
-// Runs on a library thread.
+// Both run on a library thread.
+fn on_redraw_wake() {
+    run_at_next_refresh(MapWindow::demand_frame);
+}
+
 fn on_frame_wake() {
     run_on_event_loop(MapWindow::drain_frame_results);
 }
@@ -94,7 +92,6 @@ fn on_driver_work_wake() {
 
 async fn surface_lost(window: &mut MapWindow) -> Result<()> {
     // #region lost-surface
-    window.paused = true;
     window.session.release_target()?.await?;
     // #endregion lost-surface
 
@@ -122,9 +119,6 @@ async fn surface_restored(
         window.session.set_vulkan_surface_target(&replacement)?
     }
     .await?;
-
-    window.paused = false;
-    window.demand_frame()?;
     // #endregion lost-surface
 
     Ok(())
@@ -154,6 +148,7 @@ async fn render_to_window(
         surface: window_surface,
     };
     let options = RenderSessionAttachOptions {
+        redraw_wake: Wake::new(on_redraw_wake),
         frame_wake: Wake::new(on_frame_wake),
         ..RenderSessionAttachOptions::new(
             RenderDriverKind::CoreWorker,
@@ -165,17 +160,14 @@ async fn render_to_window(
         unsafe { map.attach_vulkan_surface(&surface, &options)? };
     attached.await?;
 
-    let mut window = MapWindow {
-        session,
-        paused: false,
-    };
+    let mut window = MapWindow { session };
     // #endregion attach
 
-    window.demand_frame()?;
     window.on_window_resized(1024, 768)?;
 
     // #region service
     let graphics_thread_options = RenderSessionAttachOptions {
+        redraw_wake: Wake::new(on_redraw_wake),
         frame_wake: Wake::new(on_frame_wake),
         driver_work_wake: Wake::new(on_driver_work_wake),
         ..RenderSessionAttachOptions::new(
@@ -185,7 +177,6 @@ async fn render_to_window(
     // #endregion service
     drop(graphics_thread_options);
 
-    window.paused = true;
     let (released, _retiring) = window.session.release()?;
     released.await?;
     destroy_surface(); // For example, with vkDestroySurfaceKHR.

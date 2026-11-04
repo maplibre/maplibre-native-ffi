@@ -405,6 +405,12 @@ public struct RenderSessionAttachOptions: Sendable {
   /// `RenderSessionHandle.drainFrameResults()`. It isn't called again until a
   /// drain takes them.
   public var frameWake: Wake
+  /// Called when the session has something new to draw, because the map or the
+  /// target changed since its last frame, or the target couldn't take that
+  /// frame. Demand a frame at your next display refresh. It isn't called again
+  /// until you demand a frame, and isn't called while the session has no
+  /// target.
+  public var redrawWake: Wake
   /// Called when a session driven by `RenderDriverKind.callerGraphicsThread`
   /// has work for `RenderSessionHandle.serviceDriverWork()`. It isn't called
   /// again until a service runs.
@@ -415,12 +421,14 @@ public struct RenderSessionAttachOptions: Sendable {
     driver: RenderDriverKind,
     producerSyncKinds: GpuSyncKindFlag = .init(rawValue: 0),
     frameWake: Wake = .init(),
+    redrawWake: Wake = .init(),
     driverWorkWake: Wake = .init(),
     queueLock: QueueLock = .init()
   ) {
     self.driver = driver
     self.producerSyncKinds = producerSyncKinds
     self.frameWake = frameWake
+    self.redrawWake = redrawWake
     self.driverWorkWake = driverWorkWake
     self.queueLock = queueLock
   }
@@ -433,6 +441,7 @@ public struct RenderSessionAttachOptions: Sendable {
     raw.driver = mln_render_driver_kind(rawValue: driver.rawValue)
     raw.producer_sync_kinds = producerSyncKinds.rawValue
     raw.frame_wake = try frameWake.nativeValue(arena: arena)
+    raw.redraw_wake = try redrawWake.nativeValue(arena: arena)
     raw.driver_work_wake = try driverWorkWake.nativeValue(arena: arena)
     raw.queue_lock = try queueLock.nativeValue(arena: arena)
     return raw

@@ -809,6 +809,7 @@ internal unsafe struct mln_render_session_attach_options
     public mln_render_driver_kind driver;
     public uint producer_sync_kinds;
     public mln_wake frame_wake;
+    public mln_wake redraw_wake;
     public mln_wake driver_work_wake;
     public mln_queue_lock queue_lock;
 }

@@ -2486,6 +2486,13 @@ public data class RenderSessionAttachOptions(
    */
   public val frameWake: Wake = Wake(),
   /**
+   * Called when the session has something new to draw, because the map or the target changed since
+   * its last frame, or the target couldn't take that frame. Demand a frame at your next display
+   * refresh. It isn't called again until you demand a frame, and isn't called while the session has
+   * no target.
+   */
+  public val redrawWake: Wake = Wake(),
+  /**
    * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
    * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
    */

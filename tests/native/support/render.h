@@ -172,7 +172,18 @@ bool mln_test_webgpu_read_ring_texture(
 bool mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 );
+// mln_test_dedicated_egl_surface_create() with the caller's attach options,
+// whose driver it replaces with the fixture's.
+bool mln_test_dedicated_egl_surface_create_with_options(
+  mln_map map, const mln_render_session_attach_options* options,
+  mln_test_render_fixture* fixture
+);
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture);
+// Gives the fixture's session its pbuffer again, as after
+// mln_render_session_release_target(), and waits for the replacement.
+mln_status mln_test_dedicated_egl_surface_restore(
+  const mln_test_render_fixture* fixture
+);
 bool mln_test_egl_context_is_current(void);
 // Whether the calling thread has a context current on the fixture's pbuffer.
 bool mln_test_dedicated_egl_surface_is_current(

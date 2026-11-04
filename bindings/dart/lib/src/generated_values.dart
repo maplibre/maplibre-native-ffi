@@ -2840,6 +2840,7 @@ final class RenderSessionAttachOptions extends _Value {
     required this.driver,
     this.producerSyncKinds = GpuSyncKindFlag.none,
     this.frameWake = const Wake(),
+    this.redrawWake = const Wake(),
     this.driverWorkWake = const Wake(),
     this.queueLock,
   });
@@ -2873,6 +2874,13 @@ final class RenderSessionAttachOptions extends _Value {
   /// drain takes them.
   final Wake frameWake;
 
+  /// Called when the session has something new to draw, because the map or the
+  /// target changed since its last frame, or the target couldn't take that
+  /// frame. Demand a frame at your next display refresh. It isn't called again
+  /// until you demand a frame, and isn't called while the session has no
+  /// target.
+  final Wake redrawWake;
+
   /// Called when a session driven by `RenderDriverKind.callerGraphicsThread`
   /// has work for `mln_render_session_service_driver_work()`. It isn't called
   /// again until a service runs.
@@ -2886,12 +2894,14 @@ final class RenderSessionAttachOptions extends _Value {
     RenderDriverKind? driver,
     GpuSyncKindFlag? producerSyncKinds,
     Wake? frameWake,
+    Wake? redrawWake,
     Wake? driverWorkWake,
     QueueLock? queueLock,
   }) => RenderSessionAttachOptions(
     driver: driver ?? this.driver,
     producerSyncKinds: producerSyncKinds ?? this.producerSyncKinds,
     frameWake: frameWake ?? this.frameWake,
+    redrawWake: redrawWake ?? this.redrawWake,
     driverWorkWake: driverWorkWake ?? this.driverWorkWake,
     queueLock: queueLock ?? this.queueLock,
   );
@@ -2901,6 +2911,7 @@ final class RenderSessionAttachOptions extends _Value {
     driver,
     producerSyncKinds,
     frameWake,
+    redrawWake,
     driverWorkWake,
     queueLock,
   ];
@@ -2909,6 +2920,7 @@ final class RenderSessionAttachOptions extends _Value {
     'driver',
     'producerSyncKinds',
     'frameWake',
+    'redrawWake',
     'driverWorkWake',
     'queueLock',
   ]);

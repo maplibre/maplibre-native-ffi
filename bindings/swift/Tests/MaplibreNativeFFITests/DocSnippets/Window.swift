@@ -12,8 +12,8 @@
     _: @escaping @Sendable @MainActor () throws -> Void
   ) {}
 
-  @MainActor private func atNextRefresh(
-    _: @escaping @MainActor () throws -> Void
+  private func atNextRefresh(
+    _: @escaping @Sendable @MainActor () throws -> Void
   ) {}
 
   private func runOnGraphicsThread(_: @escaping @Sendable () throws
@@ -30,11 +30,9 @@
 
   // #region frame-loop
 
-  /// Set while the window has no surface, and when it closes.
-  @MainActor private var paused = false
-
+  /// Draws the map if it changed since the last frame.
   @MainActor private func demandFrame() throws {
-    try session.demandFrame(FrameDemand(flags: [.waitForUpdate]))
+    try session.demandFrame(FrameDemand())
   }
 
   @MainActor private func drainFrameResults() throws {
@@ -45,8 +43,6 @@
 
     if results.contains(where: { $0.disposition == .failed }) {
       replaceSession() // Release the session and attach a new one.
-    } else if !paused {
-      atNextRefresh(demandFrame)
     }
   }
 
@@ -54,7 +50,11 @@
 
   // #region frame-wake
 
-  /// Runs on a library thread.
+  /// Both run on a library thread.
+  private func onRedrawWake() {
+    atNextRefresh(demandFrame)
+  }
+
   private func onFrameWake() {
     runOnEventLoop(drainFrameResults)
   }
@@ -93,7 +93,6 @@
 
   @MainActor private func surfaceLost() async throws {
     // #region lost-surface
-    paused = true
     try await session.releaseTarget()
     // #endregion lost-surface
   }
@@ -108,8 +107,6 @@
         surface: newSurface
       )
     )
-    paused = false
-    try demandFrame()
     // #endregion lost-surface
   }
 
@@ -132,25 +129,25 @@
       ),
       options: RenderSessionAttachOptions(
         driver: .coreWorker,
-        frameWake: Wake(callback: onFrameWake)
+        frameWake: Wake(callback: onFrameWake),
+        redrawWake: Wake(callback: onRedrawWake)
       )
     )
     try await session.ready
     // #endregion attach
 
-    try demandFrame()
     try onWindowResized(width: 1024, height: 768)
 
     // #region service
     let graphicsThreadOptions = RenderSessionAttachOptions(
       driver: .callerGraphicsThread,
       frameWake: Wake(callback: onFrameWake),
+      redrawWake: Wake(callback: onRedrawWake),
       driverWorkWake: Wake(callback: onDriverWorkWake)
     )
     // #endregion service
     _ = graphicsThreadOptions
 
-    paused = true
     try await session.release()
     destroySurface() // For example, with vkDestroySurfaceKHR.
   }

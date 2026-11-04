@@ -16,6 +16,7 @@ public readonly partial record struct RenderSessionAttachOptions
         RenderDriverKind Driver,
         GpuSyncKindFlag ProducerSyncKinds,
         Wake FrameWake,
+        Wake RedrawWake,
         Wake DriverWorkWake,
         QueueLock QueueLock
     )
@@ -23,6 +24,7 @@ public readonly partial record struct RenderSessionAttachOptions
         this.Driver = Driver;
         this.ProducerSyncKinds = ProducerSyncKinds;
         this.FrameWake = FrameWake;
+        this.RedrawWake = RedrawWake;
         this.DriverWorkWake = DriverWorkWake;
         this.QueueLock = QueueLock;
     }
@@ -61,6 +63,15 @@ public readonly partial record struct RenderSessionAttachOptions
     /// until a drain takes them.
     /// </summary>
     public Wake FrameWake { get; init; }
+
+    /// <summary>
+    /// Called when the session has something new to draw, because the map or
+    /// the target changed since its last frame, or the target couldn't take
+    /// that frame. Demand a frame at your next display refresh. It isn't called
+    /// again until you demand a frame, and isn't called while the session has
+    /// no target.
+    /// </summary>
+    public Wake RedrawWake { get; init; }
 
     /// <summary>
     /// Called when a session driven by
