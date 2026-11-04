@@ -134,6 +134,18 @@ static void destroy_dedicated_fixture(mln_test_render_fixture* fixture) {
 bool mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
+  const mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  return mln_test_dedicated_egl_surface_create_with_options(
+    map, &options, fixture
+  );
+}
+
+bool mln_test_dedicated_egl_surface_create_with_options(
+  mln_map map, const mln_render_session_attach_options* attach_options,
+  mln_test_render_fixture* fixture
+) {
   dedicated_state* state = create_dedicated_state();
   if (state == NULL) {
     return false;
@@ -150,9 +162,7 @@ bool mln_test_dedicated_egl_surface_create(
 
   fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   fixture->backend_state = state;
-  mln_render_session_attach_options options = {
-    .size = sizeof(mln_render_session_attach_options)
-  };
+  mln_render_session_attach_options options = *attach_options;
   options.driver = fixture->driver;
   mln_test_completion attach = mln_test_completion_default(0);
   const mln_status attach_status = mln_map_attach_open_gl_surface(
@@ -164,6 +174,32 @@ bool mln_test_dedicated_egl_surface_create(
 
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
   destroy_dedicated_fixture(fixture);
+}
+
+mln_status mln_test_dedicated_egl_surface_restore(
+  const mln_test_render_fixture* fixture
+) {
+  const dedicated_state* state = fixture->backend_state;
+  mln_test_graphics_surface_info surface = {0};
+  (void)mln_test_graphics_surface_get_info(state->surface, &surface);
+  const mln_open_gl_surface_replacement replacement = {
+    .size = sizeof(mln_open_gl_surface_replacement),
+    .logical_size = {.width = surface.width, .height = surface.height},
+    .surface = surface.opengl_surface,
+  };
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status submitted = mln_render_session_set_open_gl_surface_target(
+    fixture->session, &replacement, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  );
+  if (submitted != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
+    return submitted;
+  }
+  const mln_status finished =
+    mln_test_render_fixture_finish_operation(fixture, &completion);
+  mln_test_completion_destroy(&completion);
+  return finished;
 }
 
 bool mln_test_egl_context_is_current(void) {

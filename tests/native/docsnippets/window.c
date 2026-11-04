@@ -43,14 +43,9 @@ static mln_render_session session = MLN_HANDLE_NULL;
 // #endregion attach
 
 // #region frame-loop
-// Set while the window has no surface, and when it closes.
-static bool paused = false;
-
+// Draws the map if it changed since the last frame.
 static void demand_frame(void) {
-  const mln_frame_demand demand = {
-    .size = sizeof(mln_frame_demand),
-    .flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
-  };
+  const mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
   mln_render_session_demand_frame(session, &demand, NULL);
 }
 
@@ -80,14 +75,17 @@ static void drain_frame_results(void) {
 
   if (failed) {
     replace_session();  // Dispose the session and attach a new one.
-  } else if (!paused) {
-    run_at_next_refresh(demand_frame);
   }
 }
 // #endregion frame-loop
 
 // #region frame-wake
-// Runs on a library thread.
+// Both run on a library thread.
+static void on_redraw_wake(void* user_data) {
+  (void)user_data;
+  run_at_next_refresh(demand_frame);
+}
+
 static void on_frame_wake(void* user_data) {
   (void)user_data;
   run_on_event_loop(drain_frame_results);
@@ -119,7 +117,6 @@ void mln_doc_window_surface_lost(void);
 
 void mln_doc_window_surface_lost(void) {
   // #region lost-surface
-  paused = true;
   mln_render_session_release_target(session, &done, NULL);
   // #endregion lost-surface
   wait_for_done();
@@ -143,10 +140,6 @@ void mln_doc_window_surface_restored(
   );
   // #endregion lost-surface
   wait_for_done();
-  // #region lost-surface
-  paused = false;
-  demand_frame();
-  // #endregion lost-surface
 }
 
 void mln_doc_window(
@@ -173,6 +166,7 @@ void mln_doc_window(
   const mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
     .driver = MLN_RENDER_DRIVER_CORE_WORKER,
+    .redraw_wake = {.callback = on_redraw_wake},
     .frame_wake = {.callback = on_frame_wake},
   };
 
@@ -182,20 +176,19 @@ void mln_doc_window(
   // #endregion attach
   wait_for_done();
 
-  demand_frame();
   on_window_resized(1024, 768);
 
   // #region service
   const mln_render_session_attach_options graphics_thread_options = {
     .size = sizeof(mln_render_session_attach_options),
     .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    .redraw_wake = {.callback = on_redraw_wake},
     .frame_wake = {.callback = on_frame_wake},
     .driver_work_wake = {.callback = on_driver_work_wake},
   };
   // #endregion service
   (void)graphics_thread_options;
 
-  paused = true;
   mln_render_session_release(session, &done, NULL);
   wait_for_done();
 

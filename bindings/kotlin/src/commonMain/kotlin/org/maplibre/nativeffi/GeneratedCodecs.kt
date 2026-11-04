@@ -314,16 +314,17 @@ internal fun NativeCall.putRenderSessionAttachOptions(
   target: Long,
   value: RenderSessionAttachOptions,
 ) {
-  writeU32(target, w(80, 112, 68).toUInt())
+  writeU32(target, w(104, 144, 88).toUInt())
   writeU32(target + 4, value.driver.rawValue)
   writeU32(target + 8, value.producerSyncKinds.rawValue)
   putWake(target + w(16, 16, 12), value.frameWake)
-  putWake(target + w(40, 48, 32), value.driverWorkWake)
-  putQueueLock(target + w(64, 80, 52), value.queueLock)
+  putWake(target + w(40, 48, 32), value.redrawWake)
+  putWake(target + w(64, 80, 52), value.driverWorkWake)
+  putQueueLock(target + w(88, 112, 72), value.queueLock)
 }
 
 internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
-  allocate(w(80, 112, 68), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
+  allocate(w(104, 144, 88), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
 
 internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
   writeU32(target, w(20, 32).toUInt())

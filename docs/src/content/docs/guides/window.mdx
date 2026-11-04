@@ -48,7 +48,8 @@ surface handle for your backend:
 Attach the surface to the map at the window's size in logical pixels. The
 session renders at the scale factor that you created the map with. To move the
 window to a display of another density, create a new map and attach a new
-session. You also pass a frame wake callback here, covered in the next section.
+session. You also pass a redraw wake and a frame wake here, covered in the next
+section.
 
 The [](api:mln_render_session_attach_options.driver) picks which thread runs the
 session's graphics work. Usually that's the library's own thread. If the surface
@@ -63,36 +64,36 @@ The map updates on the runtime's thread whenever something changes, like the
 camera moving or a tile loading. Your app decides when to show those updates, at
 most once per display refresh.
 
-When you're ready for a frame, call [](api:mln_render_session_demand_frame) with
-[](api:MLN_FRAME_DEMAND_WAIT_FOR_UPDATE). You can start as soon as the attach
-call returns. The session waits until the map has something new to show, then
-draws and presents it. After the frame's result arrives, demand the next frame
-at the next display refresh.
+The [](api:mln_render_session_attach_options.redraw_wake) tells you that the
+session has something new to draw. At your next display refresh, call
+[](api:mln_render_session_demand_frame) without flags. The session draws the
+change and presents it. The redraw wake isn't called again until you demand a
+frame, so a map that doesn't change costs nothing.
 
 ```mermaid
 sequenceDiagram
   accTitle: The frame loop
   participant App as Your event loop
   participant Session as Render session
-  loop Until you stop
-    App->>Session: Ready for a frame
-    Note over Session: Waits for a map update
-    Session->>Session: Draw and present the update
+  loop Whenever the map changes
+    Session-->>App: Redraw wake
+    Note over App: Wait for the next display refresh
+    App->>Session: Demand a frame
+    Session->>Session: Draw and present the change
     Session-->>App: Frame wake
     App->>Session: Drain the frame results
-    Note over App: Wait for the next display refresh
   end
 ```
 
 The [](api:mln_render_session_attach_options.frame_wake) tells you that results
-are ready. It can run on a library thread, so have it schedule a drain of the
-results on your event loop with [](api:mln_render_session_drain_frame_results).
+are ready. Both wakes can run on a library thread, so have them schedule work on
+your event loop: the demand at the next refresh, and a drain of the results with
+[](api:mln_render_session_drain_frame_results).
 
 <Snippet page="window" region="frame-wake" />
 
 If a result is [](api:MLN_RENDER_RESULT_FAILED), release the session and attach
-a new one. To end the loop, such as before you release the session, stop
-demanding frames.
+a new one.
 
 <Snippet page="window" region="frame-loop" />
 
@@ -109,11 +110,11 @@ Platforms can take the surface away, for example when your app goes to the
 background. Rather than releasing the session, release its target, so the map
 keeps its tiles and renderer state for when the surface comes back.
 
-Stop the frame loop and release the target with
-[](api:mln_render_session_release_target) before the platform destroys the
-surface. When the platform gives you a surface again, set it and its size as the
-session's target, and restart the frame loop. The session keeps the graphics
-context that it attached with.
+Release the target with [](api:mln_render_session_release_target) before the
+platform destroys the surface. The session doesn't call the redraw wake while it
+has no target. When the platform gives you a surface again, set it and its size
+as the session's target, and the redraw wake asks for a frame again. The session
+keeps the graphics context that it attached with.
 
 <Snippet page="window" region="lost-surface" />
 

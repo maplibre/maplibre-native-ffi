@@ -905,6 +905,9 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   result.ref.frame_wake = registrations
       .add(_prepareWake(value.frameWake, registrations.roots))
       .ref;
+  result.ref.redraw_wake = registrations
+      .add(_prepareWake(value.redrawWake, registrations.roots))
+      .ref;
   result.ref.driver_work_wake = registrations
       .add(_prepareWake(value.driverWorkWake, registrations.roots))
       .ref;

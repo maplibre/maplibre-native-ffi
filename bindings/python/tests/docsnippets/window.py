@@ -31,15 +31,11 @@ def destroy_surface() -> None:
 session: mln.RenderSessionHandle
 # #endregion attach
 
+
 # #region frame-loop
-# Set while the window has no surface, and when it closes.
-paused = False
-
-
+# Draws the map if it changed since the last frame.
 def demand_frame() -> None:
-    session.demand_frame(
-        mln.FrameDemand(flags=mln.FrameDemandFlag.WAIT_FOR_UPDATE)
-    )
+    session.demand_frame(mln.FrameDemand())
 
 
 def drain_frame_results() -> None:
@@ -51,15 +47,17 @@ def drain_frame_results() -> None:
         for result in results
     ):
         replace_session()  # Release the session and attach a new one.
-    elif not paused:
-        run_at_next_refresh(demand_frame)
 
 
 # #endregion frame-loop
 
 
 # #region frame-wake
-# Runs on the binding's dispatcher thread.
+# Both run on the binding's dispatcher thread.
+def on_redraw_wake() -> None:
+    run_at_next_refresh(demand_frame)
+
+
 def on_frame_wake() -> None:
     run_on_event_loop(drain_frame_results)
 
@@ -93,15 +91,12 @@ def on_driver_work_wake() -> None:
 
 
 def surface_lost() -> None:
-    global paused
     # #region lost-surface
-    paused = True
     session.release_target().result()
     # #endregion lost-surface
 
 
 def surface_restored(new_surface: int) -> None:
-    global paused
     # #region lost-surface
     session.set_vulkan_surface_target(
         mln.VulkanSurfaceReplacement(
@@ -109,8 +104,6 @@ def surface_restored(new_surface: int) -> None:
             surface=new_surface,
         )
     ).result()
-    paused = False
-    demand_frame()
     # #endregion lost-surface
 
 
@@ -119,7 +112,7 @@ def render_to_window(
     vulkan: mln.VulkanContextDescriptor,
     window_surface: int,
 ) -> None:
-    global session, paused
+    global session
     # #region attach
     session = map_handle.attach_vulkan_surface(
         mln.VulkanSurfaceDescriptor(
@@ -134,24 +127,24 @@ def render_to_window(
         ),
         mln.RenderSessionAttachOptions(
             driver=mln.RenderDriverKind.CORE_WORKER,
+            redraw_wake=mln.Wake(on_redraw_wake),
             frame_wake=mln.Wake(on_frame_wake),
         ),
     )
     session.ready.result()
     # #endregion attach
 
-    demand_frame()
     on_window_resized(1024, 768)
 
     # #region service
     graphics_thread_options = mln.RenderSessionAttachOptions(
         driver=mln.RenderDriverKind.CALLER_GRAPHICS_THREAD,
+        redraw_wake=mln.Wake(on_redraw_wake),
         frame_wake=mln.Wake(on_frame_wake),
         driver_work_wake=mln.Wake(on_driver_work_wake),
     )
     # #endregion service
     del graphics_thread_options
 
-    paused = True
     session.release().result()
     destroy_surface()  # For example, with vkDestroySurfaceKHR.

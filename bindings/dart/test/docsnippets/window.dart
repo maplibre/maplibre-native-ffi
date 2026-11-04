@@ -17,13 +17,9 @@ late RenderSessionHandle session;
 // #endregion attach
 
 // #region frame-loop
-// Set while the window has no surface, and when it closes.
-var paused = false;
-
+// Draws the map if it changed since the last frame.
 void demandFrame() {
-  session.demandFrame(
-    FrameDemand(flags: FrameDemandFlag.waitForUpdate),
-  );
+  session.demandFrame(const FrameDemand());
 }
 
 void drainFrameResults() {
@@ -35,15 +31,17 @@ void drainFrameResults() {
     (result) => result.disposition == RenderResult.failed,
   )) {
     replaceSession(); // Release the session and attach a new one.
-  } else if (!paused) {
-    atNextRefresh(demandFrame);
   }
 }
 // #endregion frame-loop
 
 // #region frame-wake
-// The binding calls the wake in this
-// isolate, so it can drain right away.
+// The binding calls both wakes in this isolate,
+// so the frame wake can drain right away.
+void onRedrawWake() {
+  atNextRefresh(demandFrame);
+}
+
 void onFrameWake() {
   drainFrameResults();
 }
@@ -60,7 +58,6 @@ void onWindowResized(int width, int height) {
 
 Future<void> surfaceLost() async {
   // #region lost-surface
-  paused = true;
   await session.releaseTarget();
   // #endregion lost-surface
 }
@@ -73,8 +70,6 @@ Future<void> surfaceRestored(int newSurface) async {
       surface: newSurface,
     ),
   );
-  paused = false;
-  demandFrame();
   // #endregion lost-surface
 }
 
@@ -98,13 +93,13 @@ Future<void> renderToWindow(
     ),
     const RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
+      redrawWake: Wake(callback: onRedrawWake),
       frameWake: Wake(callback: onFrameWake),
     ),
   );
   await session.ready;
   // #endregion attach
 
-  demandFrame();
   onWindowResized(1024, 768);
 
   // #region service
@@ -114,12 +109,12 @@ Future<void> renderToWindow(
   // with the session's id.
   final graphicsThreadOptions = RenderSessionAttachOptions(
     driver: RenderDriverKind.callerGraphicsThread,
+    redrawWake: const Wake(callback: onRedrawWake),
     frameWake: const Wake(callback: onFrameWake),
     driverWorkWake: Wake.native(callback: onDriverWorkWake),
   );
   // #endregion service
 
-  paused = true;
   await session.release();
   destroySurface();
 }

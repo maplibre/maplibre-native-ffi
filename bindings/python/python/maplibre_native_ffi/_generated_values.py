@@ -3237,6 +3237,14 @@ class RenderSessionAttachOptions:
     a drain takes them.
     """
 
+    redraw_wake: Wake | NativeWake = field(default_factory=lambda: Wake())
+    """Called when the session has something new to draw, because the map or the
+    target changed since its last frame, or the target couldn't take that
+    frame. Demand a frame at your next display refresh. It isn't called again
+    until you demand a frame, and isn't called while the session has no
+    target.
+    """
+
     driver_work_wake: Wake | NativeWake = field(default_factory=lambda: Wake())
     """Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`
     has work for `RenderSessionHandle.service_driver_work()`. It isn't called
@@ -3252,6 +3260,7 @@ class RenderSessionAttachOptions:
             driver=RenderDriverKind(raw["driver"]),
             producer_sync_kinds=GpuSyncKindFlag(raw["producer_sync_kinds"]),
             frame_wake=Wake(),
+            redraw_wake=Wake(),
             driver_work_wake=Wake(),
             queue_lock=QueueLock(),
         )

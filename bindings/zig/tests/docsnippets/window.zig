@@ -37,13 +37,9 @@ var session: maplibre.RenderSession = undefined;
 // #endregion attach
 
 // #region frame-loop
-// Set while the window has no surface, and when it closes.
-var paused = false;
-
+// Draws the map if it changed since the last frame.
 fn demandFrame() !void {
-    try session.demandFrame(.{
-        .flags = .{ .wait_for_update = true },
-    }, null);
+    try session.demandFrame(.{}, null);
 }
 
 fn drainFrameResults() !void {
@@ -57,12 +53,15 @@ fn drainFrameResults() !void {
             return replaceSession();
         }
     }
-    if (!paused) runAtNextRefresh(demandFrame);
 }
 // #endregion frame-loop
 
 // #region frame-wake
-// Runs on a library thread.
+// Both run on a library thread.
+fn onRedrawWake(_: ?*anyopaque) anyerror!void {
+    runAtNextRefresh(demandFrame);
+}
+
 fn onFrameWake(_: ?*anyopaque) anyerror!void {
     runOnEventLoop(drainFrameResults);
 }
@@ -92,8 +91,6 @@ fn onDriverWorkWake(_: ?*anyopaque) anyerror!void {
 
 fn surfaceLost() !void {
     // #region lost-surface
-    paused = true;
-
     try (try session.releaseTarget(null)).await(null);
     // #endregion lost-surface
 }
@@ -105,9 +102,6 @@ fn surfaceRestored(new_surface: u64) !void {
         .surface = new_surface,
     }, null);
     try replaced.await(null);
-
-    paused = false;
-    try demandFrame();
     // #endregion lost-surface
 }
 
@@ -124,26 +118,25 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
         .surface = window_surface,
     }, .{
         .driver = .core_worker,
+        .redraw_wake = .{ .callback = onRedrawWake },
         .frame_wake = .{ .callback = onFrameWake },
     }, null);
     session = attached.session;
     try attached.ready.await(null);
     // #endregion attach
 
-    try demandFrame();
     try onWindowResized(1024, 768);
 
     // #region service
     const graphics_thread_options =
         maplibre.RenderSessionAttachOptions{
             .driver = .caller_graphics_thread,
+            .redraw_wake = .{ .callback = onRedrawWake },
             .frame_wake = .{ .callback = onFrameWake },
             .driver_work_wake = .{ .callback = onDriverWorkWake },
         };
     // #endregion service
     _ = graphics_thread_options;
-
-    paused = true;
 
     try (try session.release(null)).await(null);
 

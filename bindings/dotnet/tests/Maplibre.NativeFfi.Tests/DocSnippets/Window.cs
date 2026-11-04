@@ -28,13 +28,9 @@ internal static class Window
     // #endregion attach
 
     // #region frame-loop
-    // Set while the window has no surface, and when it closes.
-    private static bool paused;
-
+    // Draws the map if it changed since the last frame.
     private static void DemandFrame() =>
-        session.DemandFrame(
-            new FrameDemand { Flags = FrameDemandFlag.WaitForUpdate }
-        );
+        session.DemandFrame(new FrameDemand());
 
     private static void DrainFrameResults()
     {
@@ -49,14 +45,15 @@ internal static class Window
         )
             // Release the session and attach a new one.
             ReplaceSession();
-        else if (!paused)
-            RunAtNextRefresh(DemandFrame);
     }
 
     // #endregion frame-loop
 
     // #region frame-wake
-    // Runs on a library thread.
+    // Both run on a library thread.
+    private static void OnRedrawWake() =>
+        RunAtNextRefresh(DemandFrame);
+
     private static void OnFrameWake() =>
         RunOnEventLoop(DrainFrameResults);
 
@@ -85,7 +82,6 @@ internal static class Window
     internal static async Task SurfaceLost()
     {
         // #region lost-surface
-        paused = true;
         await session.ReleaseTargetAsync();
         // #endregion lost-surface
     }
@@ -100,8 +96,6 @@ internal static class Window
                 Surface = newSurface,
             }
         );
-        paused = false;
-        DemandFrame();
         // #endregion lost-surface
     }
 
@@ -128,26 +122,26 @@ internal static class Window
             new RenderSessionAttachOptions
             {
                 Driver = RenderDriverKind.CoreWorker,
+                RedrawWake = new Wake(OnRedrawWake),
                 FrameWake = new Wake(OnFrameWake),
             }
         );
         await session.Ready;
         // #endregion attach
 
-        DemandFrame();
         OnWindowResized(1024, 768);
 
         // #region service
         var graphicsThreadOptions = new RenderSessionAttachOptions
         {
             Driver = RenderDriverKind.CallerGraphicsThread,
+            RedrawWake = new Wake(OnRedrawWake),
             FrameWake = new Wake(OnFrameWake),
             DriverWorkWake = new Wake(OnDriverWorkWake),
         };
         // #endregion service
         _ = graphicsThreadOptions;
 
-        paused = true;
         await session.ReleaseAsync();
         DestroySurface(); // For example, with vkDestroySurfaceKHR.
     }

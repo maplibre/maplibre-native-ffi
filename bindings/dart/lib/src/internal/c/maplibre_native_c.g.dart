@@ -1040,6 +1040,7 @@ final class mln_render_session_attach_options extends Struct {
   @Uint32()
   external int producer_sync_kinds;
   external mln_wake frame_wake;
+  external mln_wake redraw_wake;
   external mln_wake driver_work_wake;
   external mln_queue_lock queue_lock;
 }

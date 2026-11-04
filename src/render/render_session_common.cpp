@@ -918,6 +918,7 @@ class DeferredWakes final {
       frame_->notify();
     }
     if (driver_ != nullptr) driver_->notify();
+    if (redraw_ != nullptr) redraw_->notify();
   }
 
   auto frame(const std::shared_ptr<Wake>& wake) noexcept -> void {
@@ -926,20 +927,26 @@ class DeferredWakes final {
   auto driver(const std::shared_ptr<Wake>& wake) noexcept -> void {
     driver_ = wake;
   }
+  auto redraw(const std::shared_ptr<Wake>& wake) noexcept -> void {
+    redraw_ = wake;
+  }
 
  private:
   std::shared_ptr<Wake> frame_;
   std::shared_ptr<Wake> driver_;
+  std::shared_ptr<Wake> redraw_;
 };
 
 // Called once the session has moved its wakes out. Another thread can still
 // hold a copy that it took under the lock and has yet to fire; closing makes
 // that late notify do nothing, so no wake starts after the session lets go.
 auto close_wakes(
-  const std::shared_ptr<Wake>& frame, const std::shared_ptr<Wake>& driver
+  const std::shared_ptr<Wake>& frame, const std::shared_ptr<Wake>& driver,
+  const std::shared_ptr<Wake>& redraw
 ) noexcept -> void {
   if (frame != nullptr) frame->close();
   if (driver != nullptr) driver->close();
+  if (redraw != nullptr) redraw->close();
 }
 
 auto frame_waits_for_gpu_locked(
@@ -1099,6 +1106,29 @@ auto arm_still_image_demand_locked(
   session.still_image_demand_generation = image;
 }
 
+// Calls the redraw wake when the session has something that its last frame
+// doesn't show, as a demand without flags would find, and a target to draw it
+// to. Called wherever that can start to hold: a map update, a new or resized
+// target, attachment, and a frame that the target couldn't take.
+auto request_redraw_locked(
+  mln_render_session_object& session, DeferredWakes& wakes
+) noexcept -> void {
+  if (
+    session.redraw_wake == nullptr || session.redraw_wake_pending ||
+    session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
+    session.target_released || session.map_object == nullptr
+  )
+    return;
+  const auto changed =
+    session.pending_changes ||
+    session.rendered_target_generation != session.generation ||
+    map_latest_update_generation(*session.map_object) !=
+      session.rendered_update_generation;
+  if (!changed) return;
+  session.redraw_wake_pending = true;
+  wakes.redraw(session.redraw_wake);
+}
+
 // Runs every demand that waits for a map update again. Called wherever an
 // if-needed demand can become renderable without a newer map update reaching
 // it first: the update itself, a target replacement, and an applied resize.
@@ -1108,9 +1138,10 @@ auto resume_update_waiting_demands_locked(
   const auto count = requeue_update_waiting_demands_locked(session);
   for (auto index = std::size_t{0}; index < count; ++index) {
     if (!queue_frame_demand_work_locked(session, wakes, session.demands[index]))
-      return;
+      break;
   }
   arm_still_image_demand_locked(session, wakes);
+  request_redraw_locked(session, wakes);
 }
 
 auto publish_frame_result_locked(
@@ -1133,6 +1164,10 @@ auto publish_frame_result_locked(
     session.frame_wake_pending = true;
     wakes.frame(session.frame_wake);
   }
+  // A target that couldn't take a frame, such as a hidden window's, may take
+  // one again without telling the session.
+  if (result.disposition == MLN_RENDER_RESULT_TARGET_NOT_READY)
+    request_redraw_locked(session, wakes);
 }
 
 // Publishes `disposition` for a demand that ends without starting.
@@ -1659,6 +1694,10 @@ auto start_attach_render_session(
   const auto driver_wake_status =
     resolve_wake(&options->driver_work_wake, driver_wake_queue);
   if (driver_wake_status != MLN_STATUS_OK) return driver_wake_status;
+  auto redraw_wake_queue = std::shared_ptr<delivery::DeliveryQueueState>{};
+  const auto redraw_wake_status =
+    resolve_wake(&options->redraw_wake, redraw_wake_queue);
+  if (redraw_wake_status != MLN_STATUS_OK) return redraw_wake_status;
   const auto queue_lock_status = validate_queue_lock(&options->queue_lock);
   if (queue_lock_status != MLN_STATUS_OK) return queue_lock_status;
   if (options->queue_lock.lock != nullptr && !session->accepts_queue_lock) {
@@ -1686,6 +1725,8 @@ auto start_attach_render_session(
   auto driver_wake = std::make_shared<Wake>(
     options->driver_work_wake, std::move(driver_wake_queue)
   );
+  auto redraw_wake =
+    std::make_shared<Wake>(options->redraw_wake, std::move(redraw_wake_queue));
   auto queue_lock = options->queue_lock.lock == nullptr
                       ? std::shared_ptr<QueueLock>{}
                       : std::make_shared<QueueLock>(options->queue_lock);
@@ -1708,6 +1749,7 @@ auto start_attach_render_session(
   session->capabilities.driver = options->driver;
   session->frame_wake = frame_wake;
   session->driver_wake = driver_wake;
+  session->redraw_wake = redraw_wake;
   session->queue_lock = queue_lock;
   session->state = MLN_RENDER_SESSION_STATE_ATTACHING;
   const auto attach_status = map_attach_render_target_session(
@@ -1843,6 +1885,7 @@ auto start_attach_render_session(
         session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
         ++session->generation;
         arm_still_image_demand_locked(*session, wakes);
+        request_redraw_locked(*session, wakes);
       }
       attach_operation->complete(MLN_STATUS_OK, {}, {});
     },
@@ -1860,6 +1903,7 @@ auto start_attach_render_session(
     *out_session = session->self;
     frame_wake->accept();
     driver_wake->accept();
+    redraw_wake->accept();
     if (queue_lock != nullptr) queue_lock->accept();
     async.completion->accept();
     publish_driver_work_locked(*session, wakes);
@@ -2554,6 +2598,7 @@ auto destroy_render_session(
 ) -> mln_status {
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
+  auto redraw_wake = std::shared_ptr<Wake>{};
   auto queue_lock = std::shared_ptr<QueueLock>{};
   {
     auto lock = std::unique_lock{live->control_mutex};
@@ -2604,16 +2649,18 @@ auto destroy_render_session(
     live->stop_worker = true;
     frame_wake = std::move(live->frame_wake);
     driver_wake = std::move(live->driver_wake);
+    redraw_wake = std::move(live->redraw_wake);
     queue_lock = std::move(live->queue_lock);
     live->worker_condition.notify_all();
   }
-  close_wakes(frame_wake, driver_wake);
+  close_wakes(frame_wake, driver_wake, redraw_wake);
   static_cast<void>(
     handle_table<mln_render_session_object>().remove(live->self)
   );
   reap_core_worker(*live);
   frame_wake.reset();
   driver_wake.reset();
+  redraw_wake.reset();
   queue_lock.reset();
   return MLN_STATUS_OK;
 }
@@ -3473,6 +3520,7 @@ auto render_session_demand_frame(
     throw;
   }
   ++live->unfinished_demands;
+  live->redraw_wake_pending = false;
   return MLN_STATUS_OK;
 }
 
@@ -4528,6 +4576,7 @@ auto abandon_render_session(
   auto discarded = std::deque<RenderDriverWork>{};
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
+  auto redraw_wake = std::shared_ptr<Wake>{};
   auto queue_lock = std::shared_ptr<QueueLock>{};
   auto objects = AbandonedObjects{};
   {
@@ -4626,11 +4675,12 @@ auto abandon_render_session(
     objects.texture = std::move(live->texture.backend);
     frame_wake = std::move(live->frame_wake);
     driver_wake = std::move(live->driver_wake);
+    redraw_wake = std::move(live->redraw_wake);
     queue_lock = std::move(live->queue_lock);
     ++live->generation;
     live->worker_condition.notify_all();
   }
-  close_wakes(frame_wake, driver_wake);
+  close_wakes(frame_wake, driver_wake, redraw_wake);
   static_cast<void>(map_set_render_session_notices(live->map, {}));
   for (auto& item : discarded) {
     item.complete_failure();
@@ -4660,6 +4710,7 @@ auto abandon_render_session(
   }
   frame_wake.reset();
   driver_wake.reset();
+  redraw_wake.reset();
   // Retirement took the lock out of the backend's queue registration, by
   // destroying or keeping the backend, so this drops the last reference and
   // runs its release.

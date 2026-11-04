@@ -5568,6 +5568,12 @@ pub const RenderSessionAttachOptions = struct {
     /// `RenderSession.drainFrameResults()`. It isn't called again until a drain
     /// takes them.
     frame_wake: Wake = .{},
+    /// Called when the session has something new to draw, because the map or
+    /// the target changed since its last frame, or the target couldn't take
+    /// that frame. Demand a frame at your next display refresh. It isn't called
+    /// again until you demand a frame, and isn't called while the session has
+    /// no target.
+    redraw_wake: Wake = .{},
     /// Called when a session driven by
     /// `RenderDriverKind.caller_graphics_thread` has work for
     /// `RenderSession.serviceDriverWork()`. It isn't called again until a
@@ -5581,6 +5587,7 @@ pub const RenderSessionAttachOptions = struct {
         raw.driver = self.driver.toNative();
         raw.producer_sync_kinds = self.producer_sync_kinds.toNative();
         raw.frame_wake = try self.frame_wake.toNative(roots);
+        raw.redraw_wake = try self.redraw_wake.toNative(roots);
         raw.driver_work_wake = try self.driver_work_wake.toNative(roots);
         raw.queue_lock = try self.queue_lock.toNative(roots);
         return raw;
@@ -5592,6 +5599,7 @@ pub const RenderSessionAttachOptions = struct {
             .driver = RenderDriverKind.fromNative(raw.driver),
             .producer_sync_kinds = GpuSyncKindFlag.fromNative(raw.producer_sync_kinds),
             .frame_wake = .{},
+            .redraw_wake = .{},
             .driver_work_wake = .{},
             .queue_lock = .{},
         };

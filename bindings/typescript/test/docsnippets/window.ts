@@ -2,7 +2,6 @@
 // with the tests, which never run them.
 
 import {
-  FrameDemandFlag,
   type MapHandle,
   RenderDriverKind,
   RenderResult,
@@ -23,13 +22,9 @@ let session: RenderSessionHandle;
 // #endregion attach
 
 // #region frame-loop
-// Set while the window has no surface, and when it closes.
-let paused = false;
-
+// Draws the map if it changed since the last frame.
 function demandFrame(): void {
-  session.demandFrame({
-    flags: FrameDemandFlag.waitForUpdate,
-  });
+  session.demandFrame({});
 }
 
 function drainFrameResults(): void {
@@ -43,15 +38,17 @@ function drainFrameResults(): void {
     )
   ) {
     replaceSession(); // Release the session and attach a new one.
-  } else if (!paused) {
-    atNextRefresh(demandFrame);
   }
 }
 // #endregion frame-loop
 
 // #region frame-wake
-// The binding calls the wake on the JS
-// thread, so it can drain right away.
+// The binding calls both wakes on the JS thread,
+// so the frame wake can drain right away.
+function onRedrawWake(): void {
+  atNextRefresh(demandFrame);
+}
+
 function onFrameWake(): void {
   drainFrameResults();
 }
@@ -74,7 +71,6 @@ function onDriverWorkWake(): void {
 
 export async function surfaceLost(): Promise<void> {
   // #region lost-surface
-  paused = true;
   await session.releaseTarget();
   // #endregion lost-surface
 }
@@ -87,8 +83,6 @@ export async function surfaceRestored(
     logicalSize: { width: 800, height: 600 },
     surface: newSurface,
   });
-  paused = false;
-  demandFrame();
   // #endregion lost-surface
 }
 
@@ -111,25 +105,25 @@ export async function renderToWindow(
     },
     {
       driver: RenderDriverKind.coreWorker,
+      redrawWake: { callback: onRedrawWake },
       frameWake: { callback: onFrameWake },
     },
   );
   await session.ready;
   // #endregion attach
 
-  demandFrame();
   onWindowResized(1024, 768);
 
   // #region service
   const graphicsThreadOptions: RenderSessionAttachOptions = {
     driver: RenderDriverKind.callerGraphicsThread,
+    redrawWake: { callback: onRedrawWake },
     frameWake: { callback: onFrameWake },
     driverWorkWake: { callback: onDriverWorkWake },
   };
   // #endregion service
   void graphicsThreadOptions;
 
-  paused = true;
   await session.release();
   destroySurface();
 }

@@ -1559,6 +1559,7 @@ internal static unsafe class GeneratedValues
         native.driver = (mln_render_driver_kind)value.Driver;
         native.producer_sync_kinds = (uint)value.ProducerSyncKinds;
         native.frame_wake = NativeWake(value.FrameWake, scope);
+        native.redraw_wake = NativeWake(value.RedrawWake, scope);
         native.driver_work_wake = NativeWake(value.DriverWorkWake, scope);
         native.queue_lock = NativeQueueLock(value.QueueLock, scope);
         return native;

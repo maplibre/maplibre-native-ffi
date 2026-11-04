@@ -4,7 +4,6 @@
 package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.FrameDemand
-import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.RenderDriverKind
@@ -34,18 +33,13 @@ private fun useOptions(options: RenderSessionAttachOptions) {}
 
 // #region attach
 private lateinit var session: RenderSessionHandle
+
 // #endregion attach
 
 // #region frame-loop
-// Set while the window has no surface, and when it closes.
-private var paused = false
-
+// Draws the map if it changed since the last frame.
 private fun demandFrame() {
-  session.demandFrame(
-    FrameDemand(
-      flags = FrameDemandFlag.WAIT_FOR_UPDATE,
-    ),
-  )
+  session.demandFrame(FrameDemand())
 }
 
 private fun drainFrameResults() {
@@ -54,15 +48,17 @@ private fun drainFrameResults() {
 
   if (results.any { it.disposition == RenderResult.FAILED }) {
     replaceSession() // Release the session and attach a new one.
-  } else if (!paused) {
-    runAtNextRefresh(::demandFrame)
   }
 }
 
 // #endregion frame-loop
 
 // #region frame-wake
-// Runs on a library thread.
+// Both run on a library thread.
+private fun onRedrawWake() {
+  runAtNextRefresh(::demandFrame)
+}
+
 private fun onFrameWake() {
   runOnEventLoop(::drainFrameResults)
 }
@@ -94,7 +90,6 @@ private fun onDriverWorkWake() {
 
 private suspend fun surfaceLost() {
   // #region lost-surface
-  paused = true
   session.releaseTarget().await()
   // #endregion lost-surface
 }
@@ -109,8 +104,6 @@ private suspend fun surfaceRestored(newSurface: ULong) {
       ),
     )
     .await()
-  paused = false
-  demandFrame()
   // #endregion lost-surface
 }
 
@@ -134,26 +127,26 @@ private suspend fun renderToWindow(
       ),
       RenderSessionAttachOptions(
         driver = RenderDriverKind.CORE_WORKER,
+        redrawWake = Wake(::onRedrawWake),
         frameWake = Wake(::onFrameWake),
       ),
     )
   session.ready.await()
   // #endregion attach
 
-  demandFrame()
   onWindowResized(1024u, 768u)
 
   // #region service
   val graphicsThreadOptions =
     RenderSessionAttachOptions(
       driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+      redrawWake = Wake(::onRedrawWake),
       frameWake = Wake(::onFrameWake),
       driverWorkWake = Wake(::onDriverWorkWake),
     )
   // #endregion service
   useOptions(graphicsThreadOptions)
 
-  paused = true
   session.release().await()
   destroySurface() // For example, with vkDestroySurfaceKHR.
 }

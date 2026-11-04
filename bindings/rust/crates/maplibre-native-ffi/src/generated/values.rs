@@ -3614,6 +3614,12 @@ pub struct RenderSessionAttachOptions {
     /// `RenderSessionHandle::drain_frame_results()`. It isn't called again
     /// until a drain takes them.
     pub frame_wake: Wake,
+    /// Called when the session has something new to draw, because the map or
+    /// the target changed since its last frame, or the target couldn't take
+    /// that frame. Demand a frame at your next display refresh. It isn't called
+    /// again until you demand a frame, and isn't called while the session has
+    /// no target.
+    pub redraw_wake: Wake,
     /// Called when a session driven by `RenderDriverKind::CallerGraphicsThread`
     /// has work for `RenderSessionHandle::service_driver_work()`. It isn't
     /// called again until a service runs.
@@ -3627,6 +3633,7 @@ impl RenderSessionAttachOptions {
             driver,
             producer_sync_kinds: Default::default(),
             frame_wake: Default::default(),
+            redraw_wake: Default::default(),
             driver_work_wake: Default::default(),
             queue_lock: Default::default(),
         }
@@ -3639,6 +3646,7 @@ impl ToNative<sys::mln_render_session_attach_options> for RenderSessionAttachOpt
         raw.driver = to_native(&self.driver, arena)?;
         raw.producer_sync_kinds = to_native(&self.producer_sync_kinds, arena)?;
         raw.frame_wake = to_native(&self.frame_wake, arena)?;
+        raw.redraw_wake = to_native(&self.redraw_wake, arena)?;
         raw.driver_work_wake = to_native(&self.driver_work_wake, arena)?;
         raw.queue_lock = to_native(&self.queue_lock, arena)?;
         Ok(raw)

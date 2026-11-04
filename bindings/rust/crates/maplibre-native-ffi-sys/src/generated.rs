@@ -1221,6 +1221,7 @@ pub struct mln_render_session_attach_options {
     pub driver: mln_render_driver_kind,
     pub producer_sync_kinds: mln_gpu_sync_kind_flags,
     pub frame_wake: mln_wake,
+    pub redraw_wake: mln_wake,
     pub driver_work_wake: mln_wake,
     pub queue_lock: mln_queue_lock,
 }
