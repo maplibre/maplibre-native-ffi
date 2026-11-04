@@ -1157,6 +1157,31 @@ pub struct FrameDemandFlag: u32 {
 }
 }
 
+/// Options for creating a frame pacer.
+///
+/// See `mln_frame_pacer_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct FramePacerOptions {
+    /// The most times per second that the pacer demands frames, greater than
+    /// zero. The pacer skips a display refresh that comes too soon after its
+    /// last demands, and a limit at the display's refresh rate or above skips
+    /// none. By default, it can demand frames at every refresh.
+    pub maximum_frames_per_second: Option<u32>,
+}
+impl ToNative<sys::mln_frame_pacer_options> for FramePacerOptions {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_frame_pacer_options> {
+        let mut raw: sys::mln_frame_pacer_options = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_frame_pacer_options>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.maximum_frames_per_second {
+            raw.fields |= sys::MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+            raw.maximum_frames_per_second = *item;
+        }
+        Ok(raw)
+    }
+}
+
 /// A map camera's whole position and orientation in three dimensions.
 ///
 /// Its members mean the same as those of `FreeCameraOptions`.

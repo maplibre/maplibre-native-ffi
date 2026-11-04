@@ -66,6 +66,13 @@ internal static unsafe partial class NativeMethods
     internal static partial void mln_acquired_frame_view_end(void* scope);
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_android_frame_pacer_create(
+        mln_frame_pacer_options* options,
+        MlnFramePacer* out_pacer,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_android_init(
         void* jni_env,
         void* context,
@@ -82,6 +89,9 @@ internal static unsafe partial class NativeMethods
         mln_camera_options* out_camera,
         mln_diagnostic* out_diagnostic
     );
+
+    [LibraryImport(LibraryName)]
+    internal static partial void mln_frame_pacer_release(MlnFramePacer pacer);
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_geo_json_source_data_create(
@@ -1120,6 +1130,13 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_service_driver_work(
         MlnRenderSession session,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_frame_pacer(
+        MlnRenderSession session,
+        MlnFramePacer pacer,
         mln_diagnostic* out_diagnostic
     );
 

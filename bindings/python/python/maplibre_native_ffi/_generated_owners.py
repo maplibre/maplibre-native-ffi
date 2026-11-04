@@ -5,6 +5,7 @@ from concurrent.futures import Future
 from ._future import completed_future
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
+    _FramePacerHandleOperations,
     _GeoJsonSourceDataHandleOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
@@ -28,6 +29,32 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "AcquiredFrameHandle"
+
+    def __init__(self):
+        raise TypeError("native handles are returned by their owning operations")
+
+    @classmethod
+    def _from_native(cls, native, parent=None):
+        owner = cls.__new__(cls)
+        owner._native = native
+        owner._parent = parent
+        return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after release."""
+        return int(self._native.id)
+
+
+class FramePacerHandle(_FramePacerHandleOperations, ScopedHandleMixin):
+    """Demands render sessions' frames in step with a display's refreshes.
+
+    See `mln_frame_pacer` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
+    __module__ = "maplibre_native_ffi"
+    _handle_name = "FramePacerHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

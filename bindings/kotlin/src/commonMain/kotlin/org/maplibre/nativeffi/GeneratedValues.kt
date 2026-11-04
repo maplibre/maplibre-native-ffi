@@ -2189,6 +2189,21 @@ public class WebGpuTextureFrame(
 }
 
 /**
+ * Options for creating a frame pacer.
+ *
+ * See `mln_frame_pacer_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class FramePacerOptions(
+  /**
+   * The most times per second that the pacer demands frames, greater than zero. The pacer skips a
+   * display refresh that comes too soon after its last demands, and a limit at the display's
+   * refresh rate or above skips none. By default, it can demand frames at every refresh.
+   */
+  public val maximumFramesPerSecond: UInt? = null,
+)
+
+/**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
  *
  * See `mln_canonical_tile_id` in the

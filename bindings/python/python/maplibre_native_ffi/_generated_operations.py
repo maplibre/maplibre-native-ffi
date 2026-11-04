@@ -24,6 +24,7 @@ from ._generated_values import (
     CustomVectorSourceOptions,
     FeatureStateSelector,
     FrameDemand,
+    FramePacerOptions,
     FreeCameraOptions,
     GeoJsonSourceOptions,
     GpuSync,
@@ -106,6 +107,7 @@ from ._operation import GeneratedOperations, _adopt_value, _answer, _view
 if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
+        FramePacerHandle,
         GeoJsonSourceDataHandle,
         MapHandle,
         MapProjectionHandle,
@@ -245,6 +247,21 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
           `consumer_completion`.
         """
         return self._native.release(consumer_completion)
+
+
+class _FramePacerHandleOperations(GeneratedOperations):
+    _native: _native._FramePacerHandle
+
+    def release(self) -> None:
+        """Releases a frame pacer.
+
+        Render sessions that use the pacer stay paced until you release them
+        or set another pacer.
+
+        See `mln_frame_pacer_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return self._native.release()
 
 
 class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
@@ -2159,6 +2176,28 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.service_driver_work()
 
+    def set_frame_pacer(self, pacer: FramePacerHandle | None = None) -> None:
+        """Sets the frame pacer that demands the session's frames.
+
+        At the first display refresh after the session has something new to
+        draw, `pacer` demands a frame without flags and with token 0. Take
+        the results through the frame wake as usual. One pacer can serve many
+        sessions. When `pacer` is null, the session stops being paced. You
+        can call it once the attach call returns.
+
+        See `mln_render_session_set_frame_pacer` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+
+        Errors:
+
+        - `RenderSessionSnapshot.failure_status`, `Status.TARGET_LOST` or
+          `Status.NATIVE_ERROR`, when the session has failed. The diagnostic
+          carries the failure's message.
+        - `Status.INVALID_STATE` when you attached the session with a redraw
+          wake, or detached, abandoned, released, or disposed it.
+        """
+        return self._native.set_frame_pacer(None if pacer is None else pacer._native)
+
     def set_metal_borrowed_texture_target(
         self, replacement: MetalBorrowedTextureReplacement
     ) -> Future[None]:
@@ -2804,6 +2843,29 @@ class _VulkanDeviceHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
         """
         return self._native.release()
+
+
+def android_frame_pacer_create(
+    options: FramePacerOptions | None = None,
+) -> FramePacerHandle:
+    """Creates a frame pacer that follows the display through the calling
+    thread's looper.
+
+    Call it on a thread with an `ALooper`, such as the app's main thread.
+    The pacer demands frames from that thread at the display refreshes
+    that the looper's `AChoreographer` reports, so keep the thread
+    running its looper while sessions use the pacer.
+
+    See `mln_android_frame_pacer_create` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+
+    Errors:
+
+    - `Status.INVALID_STATE` when the calling thread has no `ALooper`.
+    """
+    return _adopt_value(
+        _native.android_frame_pacer_create(options), "FramePacerHandle", None
+    )
 
 
 def init_android(jni_env: int, context: int) -> None:

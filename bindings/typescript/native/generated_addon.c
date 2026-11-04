@@ -286,6 +286,25 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_frame_pacer_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_frame_pacer arg_pacer = 0;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "pacer")) goto done;
+    arg_pacer = (mln_frame_pacer)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  mln_frame_pacer_release(arg_pacer);
+  mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_geo_json_source_data_create(
   napi_env env, napi_callback_info info
 ) {
@@ -5075,6 +5094,33 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_render_session_set_frame_pacer(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  uint64_t arg_pacer = 0;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  if (!mln_ts_is_absent(call, call->argv[1])) {
+    if (!mln_ts_read_u64(call, call->argv[1], &arg_pacer, "pacer")) goto done;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_render_session_set_frame_pacer(arg_session, arg_pacer, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value
 mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
   napi_env env, napi_callback_info info
@@ -6819,6 +6865,7 @@ static const mln_ts_export exports[] = {
   {"mln_acquired_frame_view_end", mln_ts_export_mln_acquired_frame_view_end},
   {"mln_c_version", mln_ts_export_mln_c_version},
   {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
+  {"mln_frame_pacer_release", mln_ts_export_mln_frame_pacer_release},
   {"mln_geo_json_source_data_create",
    mln_ts_export_mln_geo_json_source_data_create},
   {"mln_geo_json_source_data_release",
@@ -7026,6 +7073,8 @@ static const mln_ts_export exports[] = {
   {"mln_render_session_resize", mln_ts_export_mln_render_session_resize},
   {"mln_render_session_service_driver_work",
    mln_ts_export_mln_render_session_service_driver_work},
+  {"mln_render_session_set_frame_pacer",
+   mln_ts_export_mln_render_session_set_frame_pacer},
   {"mln_render_session_set_metal_borrowed_texture_target",
    mln_ts_export_mln_render_session_set_metal_borrowed_texture_target},
   {"mln_render_session_set_metal_surface_target",

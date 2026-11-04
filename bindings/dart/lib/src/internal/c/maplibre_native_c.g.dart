@@ -11,6 +11,7 @@ const int MLN_C_VERSION = 0;
 
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_queue = Uint64;
+typedef mln_frame_pacer = Uint64;
 typedef mln_geo_json_source_data = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
@@ -436,6 +437,15 @@ final class mln_frame_demand extends Struct {
   external int flags;
   @Uint64()
   external int token;
+}
+
+final class mln_frame_pacer_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Uint32()
+  external int maximum_frames_per_second;
 }
 
 final class mln_free_camera extends Struct {
@@ -1912,6 +1922,9 @@ const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1;
 const MLN_FRAME_DEMAND_FORCE = 1;
 const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
+// mln_frame_pacer_option_field
+const MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1;
+
 // mln_free_camera_option_field
 const MLN_FREE_CAMERA_OPTION_POSITION = 1;
 const MLN_FREE_CAMERA_OPTION_ORIENTATION = 2;
@@ -2488,6 +2501,19 @@ external int mln_acquired_frame_view_begin(
 @Native<Void Function(Pointer<Void>)>()
 external void mln_acquired_frame_view_end(Pointer<Void> scope);
 
+@Native<
+  Int32 Function(
+    Pointer<mln_frame_pacer_options>,
+    Pointer<mln_frame_pacer>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_android_frame_pacer_create(
+  Pointer<mln_frame_pacer_options> options,
+  Pointer<mln_frame_pacer> out_pacer,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
 @Native<Int32 Function(Pointer<Void>, Pointer<Void>, Pointer<mln_diagnostic>)>()
 external int mln_android_init(
   Pointer<Void> jni_env,
@@ -2571,6 +2597,9 @@ external int mln_delivery_queue_dispatch(
 
 @Native<Void Function(mln_delivery_queue)>()
 external void mln_delivery_queue_release(int queue);
+
+@Native<Void Function(mln_frame_pacer)>()
+external void mln_frame_pacer_release(int pacer);
 
 @Native<
   Int32 Function(
@@ -4411,6 +4440,15 @@ external int mln_render_session_resize(
 @Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
 external int mln_render_session_service_driver_work(
   int session,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(mln_render_session, mln_frame_pacer, Pointer<mln_diagnostic>)
+>()
+external int mln_render_session_set_frame_pacer(
+  int session,
+  int pacer,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

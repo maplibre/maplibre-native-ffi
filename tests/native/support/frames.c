@@ -102,6 +102,45 @@ void mln_test_render_wait_for_result_list(
   TEST_ASSERT_EQUAL_size_t(count, wait.received);
 }
 
+typedef struct update_wait {
+  const mln_test_render_fixture* fixture;
+  uint64_t generation;
+  bool failed;
+} update_wait;
+
+static bool update_rendered(void* context) {
+  update_wait* wait = context;
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  const mln_status status =
+    mln_test_drain_frame_results(wait->fixture->session, &batch, NULL);
+  if (status != MLN_STATUS_OK) {
+    wait->failed = true;
+    return true;
+  }
+  if (batch == MLN_HANDLE_NULL) return false;
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
+  bool rendered = false;
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    const mln_render_frame_result* result =
+      mln_test_render_view_result(&view, index);
+    rendered = rendered || (result->disposition == MLN_RENDER_RESULT_RENDERED &&
+                            result->map_update_generation >= wait->generation);
+  }
+  mln_render_frame_batch_release(batch);
+  return rendered;
+}
+
+void mln_test_render_wait_for_update(
+  const mln_test_render_fixture* fixture, uint64_t generation
+) {
+  update_wait wait = {.fixture = fixture, .generation = generation};
+  MLN_TEST_OK(mln_test_render_step_until(
+    fixture, update_rendered, &wait, mln_test_deadline_default(),
+    "a frame of the map update"
+  ));
+  TEST_ASSERT_FALSE(wait.failed);
+}
+
 // The views of recent drains, by batch. A case holds few batches at once.
 static struct {
   mln_render_frame_batch batch;

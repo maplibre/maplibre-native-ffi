@@ -215,6 +215,61 @@ MLN_API mln_status mln_render_session_demand_frame(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
+/** The optional settings of a frame pacer. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_frame_pacer_option_field : uint32_t {
+  MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1U << 0U,
+} mln_frame_pacer_option_field;
+
+/** A set of mln_frame_pacer_option_field bits. */
+typedef uint32_t mln_frame_pacer_option_fields;
+
+/** Options for creating a frame pacer. */
+typedef struct mln_frame_pacer_options {
+  uint32_t size;
+  mln_frame_pacer_option_fields fields;
+  /**
+   * The most times per second that the pacer demands frames, greater than
+   * zero. The pacer skips a display refresh that comes too soon after its last
+   * demands, and a limit at the display's refresh rate or above skips none. By
+   * default, it can demand frames at every refresh.
+   */
+  uint32_t maximum_frames_per_second MLN_BINDING(
+    "mask=fields;bit=MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND"
+  );
+} mln_frame_pacer_options;
+
+/**
+ * Sets the frame pacer that demands the session's frames.
+ *
+ * At the first display refresh after the session has something new to draw,
+ * `pacer` demands a frame without flags and with token 0. Take the results
+ * through the frame wake as usual. One pacer can serve many sessions. When
+ * `pacer` is null, the session stops being paced. You can call it once the
+ * attach call returns.
+ *
+ * Returns:
+ * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
+ *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
+ *   carries the failure's message.
+ * - MLN_STATUS_INVALID_STATE when you attached the session with a redraw
+ *   wake, or detached, abandoned, released, or disposed it.
+ */
+MLN_API mln_status mln_render_session_set_frame_pacer(
+  mln_render_session session,
+  mln_frame_pacer pacer MLN_BINDING("nullable=true"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a frame pacer.
+ *
+ * Render sessions that use the pacer stay paced until you release them or set
+ * another pacer.
+ */
+MLN_API void mln_frame_pacer_release(mln_frame_pacer pacer) MLN_NOEXCEPT;
+
 /**
  * Takes the frame results that the session has queued.
  *

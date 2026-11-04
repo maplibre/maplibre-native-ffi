@@ -5,10 +5,10 @@ package maplibre
 
 /*
 #cgo CPPFLAGS: -I${SRCDIR}/../../../include
-extern const char mln_go_preset_b2321c05b569d812;
+extern const char mln_go_preset_99aed1a1b2c30d89;
 */
 import "C"
 
 // Each preset module defines the symbol for the headers it was built with, so
 // a preset from another release fails to link.
-var _ = &C.mln_go_preset_b2321c05b569d812
+var _ = &C.mln_go_preset_99aed1a1b2c30d89

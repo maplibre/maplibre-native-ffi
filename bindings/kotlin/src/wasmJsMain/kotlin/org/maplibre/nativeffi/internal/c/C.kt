@@ -56,6 +56,12 @@ internal actual object C {
     mln_kw_mln_acquired_frame_view_end(word(scope))
   }
 
+  actual fun mln_android_frame_pacer_create(
+    options: Long,
+    outPacer: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_android_frame_pacer_create(word(options), word(outPacer), word(outDiagnostic))
+
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_kw_mln_android_init(word(jniEnv), word(context), word(outDiagnostic))
 
@@ -77,6 +83,10 @@ internal actual object C {
 
   actual fun mln_delivery_queue_release(queue: Long) {
     mln_kw_mln_delivery_queue_release(queue)
+  }
+
+  actual fun mln_frame_pacer_release(pacer: Long) {
+    mln_kw_mln_frame_pacer_release(pacer)
   }
 
   actual fun mln_geo_json_source_data_create(
@@ -1428,6 +1438,12 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_service_driver_work(session, word(outDiagnostic))
 
+  actual fun mln_render_session_set_frame_pacer(
+    session: Long,
+    pacer: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_render_session_set_frame_pacer(session, pacer, word(outDiagnostic))
+
   actual fun mln_render_session_set_metal_borrowed_texture_target(
     session: Long,
     replacement: Long,
@@ -1945,6 +1961,11 @@ private fun mln_kw_mln_acquired_frame_view_begin(p0: Long, p1: Int, p2: Int): In
 private fun mln_kw_mln_acquired_frame_view_end(p0: Int): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_view_end(p0)")
 
+private fun mln_kw_mln_android_frame_pacer_create(p0: Int, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_android_frame_pacer_create(p0, p1, p2)",
+  )
+
 private fun mln_kw_mln_android_init(p0: Int, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_android_init(p0, p1, p2)")
 
@@ -1968,6 +1989,9 @@ private fun mln_kw_mln_delivery_queue_dispatch(p0: Long, p1: Int): Int =
 
 private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_release(p0)")
+
+private fun mln_kw_mln_frame_pacer_release(p0: Long): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_frame_pacer_release(p0)")
 
 private fun mln_kw_mln_geo_json_source_data_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
@@ -2932,6 +2956,11 @@ private fun mln_kw_mln_render_session_resize(p0: Long, p1: Int, p2: Int, p3: Int
 private fun mln_kw_mln_render_session_service_driver_work(p0: Long, p1: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_service_driver_work(p0, p1)",
+  )
+
+private fun mln_kw_mln_render_session_set_frame_pacer(p0: Long, p1: Long, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_frame_pacer(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_set_metal_borrowed_texture_target(

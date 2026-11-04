@@ -515,6 +515,35 @@ internal constructor(
     }
 
   /**
+   * Sets the frame pacer that demands the session's frames.
+   *
+   * At the first display refresh after the session has something new to draw, `pacer` demands a
+   * frame without flags and with token 0. Take the results through the frame wake as usual. One
+   * pacer can serve many sessions. When `pacer` is null, the session stops being paced. You can
+   * call it once the attach call returns.
+   *
+   * See `mln_render_session_set_frame_pacer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `RenderSessionSnapshot.failureStatus`, `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, when
+   *   the session has failed. The diagnostic carries the failure's message.
+   * - `Status.INVALID_STATE` when you attached the session with a redraw wake, or detached,
+   *   abandoned, released, or disposed it.
+   */
+  public fun setFramePacer(pacer: FramePacerHandle? = null): Unit =
+    nativeCall(this, binding) {
+      check(
+        C.mln_render_session_set_frame_pacer(
+          handle,
+          pacer?.let { argument(it, it.binding) } ?: 0L,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Replaces the OpenGL textures that a borrowed ring renders into.
    *
    * Use it to resize the ring, or to give the session textures again after

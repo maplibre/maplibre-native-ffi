@@ -70,6 +70,13 @@ internal actual object C {
   @JvmStatic actual external fun mln_acquired_frame_view_end(scope: Long): Unit
 
   @JvmStatic
+  actual external fun mln_android_frame_pacer_create(
+    options: Long,
+    outPacer: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
   @JvmStatic actual external fun mln_c_version(): Int
@@ -92,6 +99,8 @@ internal actual object C {
   @JvmStatic actual external fun mln_delivery_queue_dispatch(queue: Long, outDiagnostic: Long): Int
 
   @JvmStatic actual external fun mln_delivery_queue_release(queue: Long): Unit
+
+  @JvmStatic actual external fun mln_frame_pacer_release(pacer: Long): Unit
 
   @JvmStatic
   actual external fun mln_geo_json_source_data_create(
@@ -1102,6 +1111,13 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_render_session_service_driver_work(
     session: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_render_session_set_frame_pacer(
+    session: Long,
+    pacer: Long,
     outDiagnostic: Long,
   ): Int
 

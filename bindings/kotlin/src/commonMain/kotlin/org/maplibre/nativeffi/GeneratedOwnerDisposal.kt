@@ -9,6 +9,10 @@ internal object GeneratedOwnerDisposal {
     NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_discard(handle, diagnostic) }
   }
 
+  fun framePacer(handle: Long) {
+    C.mln_frame_pacer_release(handle)
+  }
+
   fun geoJsonSourceData(handle: Long) {
     C.mln_geo_json_source_data_release(handle)
   }

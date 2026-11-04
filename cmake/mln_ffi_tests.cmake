@@ -32,8 +32,17 @@ set(MLN_NATIVE_BROWSER_SHARDS
 
 # Tags a test file can end its name with to build only on matching targets,
 # such as backend/dedicated_egl.c or platform/browser_http_emscripten.c.
-set(MLN_NATIVE_FILE_TAGS metal opengl vulkan webgpu egl wgl webgl emscripten icu
-)
+set(MLN_NATIVE_FILE_TAGS
+    metal
+    opengl
+    vulkan
+    webgpu
+    egl
+    wgl
+    webgl
+    emscripten
+    android
+    icu)
 
 function(mln_native_active_file_tags out_var)
   set(tags ${MLN_FFI_RENDER_BACKEND})
@@ -42,6 +51,9 @@ function(mln_native_active_file_tags out_var)
   endif()
   if(EMSCRIPTEN)
     list(APPEND tags emscripten)
+  endif()
+  if(ANDROID)
+    list(APPEND tags android)
   endif()
   # Linux, FreeBSD, OpenHarmony, and Windows evaluate locale expressions with
   # ICU: ICU4X on Linux and FreeBSD and the system's ICU4C on OpenHarmony and
@@ -457,6 +469,10 @@ function(mln_native_configure_suite target registry_dir)
   if(NOT WIN32)
     find_package(Threads REQUIRED)
     target_link_libraries(${target} PRIVATE Threads::Threads)
+  endif()
+  # The Android cases run an ALooper of their own, as an app's main thread does.
+  if(ANDROID)
+    target_link_libraries(${target} PRIVATE android)
   endif()
   # The Metal test support defines an Objective-C class, which the iOS and
   # tvOS test app links against the runtime and Foundation directly.

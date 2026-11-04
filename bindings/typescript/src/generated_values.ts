@@ -662,6 +662,18 @@ export const FrameDemandFlag = {
 export type FrameDemandFlag = number;
 
 /**
+ * The optional settings of a frame pacer.
+ *
+ * See `mln_frame_pacer_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+export const FramePacerOptionField = {
+  maximumFramesPerSecond: 1,
+} as const;
+/** A bitwise OR of FramePacerOptionField flags. */
+export type FramePacerOptionField = number;
+
+/**
  * A map camera's whole position and orientation in three dimensions.
  *
  * Its members mean the same as those of `FreeCameraOptions`.

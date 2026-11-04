@@ -716,6 +716,41 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Sets the frame pacer that demands the session's frames.
+    /// </summary>
+    /// <remarks>
+    /// <para>At the first display refresh after the session has something new
+    /// to draw, <c>pacer</c> demands a frame without flags and with token 0.
+    /// Take the results through the frame wake as usual. One pacer can serve
+    /// many sessions. When <c>pacer</c> is null, the session stops being paced.
+    /// You can call it once the attach call returns.</para>
+    /// <para>See <c>mln_render_session_set_frame_pacer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>RenderSessionSnapshot.FailureStatus</c>,
+    /// <c>Status.TargetLost</c> or <c>Status.NativeError</c>, when the session
+    /// has failed. The diagnostic carries the failure's
+    /// message.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when you attached the
+    /// session with a redraw wake, or detached, abandoned, released, or
+    /// disposed it.</description></item>
+    /// </list>
+    /// </remarks>
+    public void SetFramePacer(FramePacerHandle? pacer = null)
+    {
+        using var scope = new NativeCallScope(this);
+        Check(
+            NativeMethods.mln_render_session_set_frame_pacer(
+                Handle,
+                scope.UseOptional(pacer),
+                Diagnostic
+            )
+        );
+        scope.Accept();
+    }
+
+    /// <summary>
     /// Replaces the Metal textures that a borrowed ring renders into.
     /// </summary>
     /// <remarks>

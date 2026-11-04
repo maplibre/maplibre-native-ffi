@@ -100,6 +100,17 @@ internal actual object C {
     )
   }
 
+  actual fun mln_android_frame_pacer_create(
+    options: Long,
+    outPacer: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_android_frame_pacer_create(
+      options.toCPointer(),
+      outPacer.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_android_init(
       jniEnv.toCPointer<CPointed>(),
@@ -137,6 +148,10 @@ internal actual object C {
 
   actual fun mln_delivery_queue_release(queue: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_release(queue.toULong())
+  }
+
+  actual fun mln_frame_pacer_release(pacer: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_release(pacer.toULong())
   }
 
   actual fun mln_geo_json_source_data_create(
@@ -1767,6 +1782,17 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_service_driver_work(
       session.toULong(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_set_frame_pacer(
+    session: Long,
+    pacer: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_frame_pacer(
+      session.toULong(),
+      pacer.toULong(),
       outDiagnostic.toCPointer(),
     )
 

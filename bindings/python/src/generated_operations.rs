@@ -2028,6 +2028,21 @@ fn generated_input_mln_frame_demand<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_frame_pacer_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_frame_pacer_options> {
+    let _ = storage;
+    let mut raw: sys::mln_frame_pacer_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_frame_pacer_options>() as _;
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "maximum_frames_per_second")? {
+        raw.maximum_frames_per_second = field.extract::<u32>()?;
+        raw.fields |= sys::MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_free_camera_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3402,6 +3417,13 @@ unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     unsafe { sys::mln_acquired_frame_discard(handle, std::ptr::null_mut()) }
 }
 
+unsafe extern "C" fn generated_dispose_mln_frame_pacer(
+    handle: sys::mln_frame_pacer,
+) -> sys::mln_status {
+    unsafe { sys::mln_frame_pacer_release(handle) };
+    sys::MLN_STATUS_OK
+}
+
 unsafe extern "C" fn generated_dispose_mln_geo_json_source_data(
     handle: sys::mln_geo_json_source_data,
 ) -> sys::mln_status {
@@ -3569,6 +3591,32 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_release(handle, &consumer_completion_value, diagnostic)
             })
         }?;
+        reservation.commit();
+        Ok(py.None())
+    }
+}
+
+#[pymethods]
+impl FramePacerHandle {
+    #[pyo3(signature = ())]
+    fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_frame_pacer_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_frame_pacer_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -7398,6 +7446,22 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
+    #[pyo3(signature = (pacer=None))]
+    fn set_frame_pacer(
+        &self,
+        py: Python<'_>,
+        pacer: Option<&FramePacerHandle>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let pacer_handle = pacer.map_or(sys::mln_frame_pacer(0), |handle| handle.input());
+        let handle = self.input();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_render_session_set_frame_pacer(handle, pacer_handle, diagnostic)
+            })
+        }?;
+        Ok(py.None())
+    }
     #[pyo3(signature = (replacement))]
     fn set_metal_borrowed_texture_target(
         &self,
@@ -8503,6 +8567,12 @@ generated_owner!(
     )
 );
 generated_owner!(
+    FramePacerHandle,
+    "_FramePacerHandle",
+    mln_frame_pacer,
+    Some(generated_dispose_mln_frame_pacer)
+);
+generated_owner!(
     GeoJsonSourceDataHandle,
     "_GeoJsonSourceDataHandle",
     mln_geo_json_source_data,
@@ -8562,6 +8632,31 @@ generated_owner!(
     mln_vulkan_device,
     Some(generated_dispose_mln_vulkan_device)
 );
+#[pyfunction]
+#[pyo3(signature = (options=None))]
+fn android_frame_pacer_create(
+    py: Python<'_>,
+    options: Option<Bound<'_, PyAny>>,
+) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py);
+    let storage = &mut call.storage;
+    let options = options.unwrap_or_else(|| py.None().into_bound(py));
+    let options_value = generated_maybe(&options, |options| {
+        generated_input_mln_frame_pacer_options(&options, storage)
+    })?;
+    let mut out_pacer: sys::mln_frame_pacer = unsafe { std::mem::zeroed() };
+    unsafe {
+        call.status(|diagnostic| {
+            sys::mln_android_frame_pacer_create(
+                generated_pointer(&options_value),
+                &mut out_pacer,
+                diagnostic,
+            )
+        })
+    }?;
+    unsafe { FramePacerHandle::adopt(py, out_pacer, Vec::new()) }
+}
+
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]
 fn init_android(
@@ -8741,6 +8836,7 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
+    module.add_class::<FramePacerHandle>()?;
     module.add_class::<GeoJsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
@@ -8751,6 +8847,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<StyleExpressionHandle>()?;
     module.add_class::<VulkanDeviceHandle>()?;
+    module.add_function(wrap_pyfunction!(android_frame_pacer_create, module)?)?;
     module.add_function(wrap_pyfunction!(init_android, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(camera_for_tile, module)?)?;

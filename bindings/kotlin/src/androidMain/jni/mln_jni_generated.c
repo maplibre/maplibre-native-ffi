@@ -99,6 +99,16 @@ static void mln_acquired_frame_view_end_jni(
   mln_acquired_frame_view_end(MLN_JNI_POINTER(void*, scope));
 }
 
+static jint mln_android_frame_pacer_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_pacer, jlong out_diagnostic
+) {
+  return (jint)mln_android_frame_pacer_create(
+    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
+    MLN_JNI_POINTER(mln_frame_pacer*, out_pacer),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_android_init_jni(
   JNIEnv* env, jclass type, jlong jni_env, jlong context, jlong out_diagnostic
 ) {
@@ -146,6 +156,10 @@ static void mln_delivery_queue_release_jni(
   JNIEnv* env, jclass type, jlong queue
 ) {
   mln_delivery_queue_release((mln_delivery_queue)queue);
+}
+
+static void mln_frame_pacer_release_jni(JNIEnv* env, jclass type, jlong pacer) {
+  mln_frame_pacer_release((mln_frame_pacer)pacer);
 }
 
 static jint mln_geo_json_source_data_create_jni(
@@ -1644,6 +1658,15 @@ static jint mln_render_session_service_driver_work_jni(
   );
 }
 
+static jint mln_render_session_set_frame_pacer_jni(
+  JNIEnv* env, jclass type, jlong session, jlong pacer, jlong out_diagnostic
+) {
+  return (jint)mln_render_session_set_frame_pacer(
+    (mln_render_session)session, (mln_frame_pacer)pacer,
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_render_session_set_metal_borrowed_texture_target_jni(
   JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
   jlong out_diagnostic
@@ -2180,6 +2203,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_view_begin_jni},
   {"mln_acquired_frame_view_end", "(J)V",
    (void*)mln_acquired_frame_view_end_jni},
+  {"mln_android_frame_pacer_create", "(JJJ)I",
+   (void*)mln_android_frame_pacer_create_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
@@ -2187,6 +2212,7 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
+  {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
   {"mln_geo_json_source_data_create", "(JJJJ)I",
    (void*)mln_geo_json_source_data_create_jni},
   {"mln_geo_json_source_data_release", "(J)V",
@@ -2425,6 +2451,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
+  {"mln_render_session_set_frame_pacer", "(JJJ)I",
+   (void*)mln_render_session_set_frame_pacer_jni},
   {"mln_render_session_set_metal_borrowed_texture_target", "(JJJJ)I",
    (void*)mln_render_session_set_metal_borrowed_texture_target_jni},
   {"mln_render_session_set_metal_surface_target", "(JJJJ)I",
@@ -2540,6 +2568,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_acquired_frame_view_begin_jni},
   {"mln_acquired_frame_view_end", "(J)V",
    (void*)mln_acquired_frame_view_end_jni},
+  {"mln_android_frame_pacer_create", "(JJJ)I",
+   (void*)mln_android_frame_pacer_create_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
@@ -2547,6 +2577,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
+  {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
   {"mln_geo_json_source_data_create", "(JJJJ)I",
    (void*)mln_geo_json_source_data_create_jni},
   {"mln_geo_json_source_data_release", "(J)V",
@@ -2785,6 +2816,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
+  {"mln_render_session_set_frame_pacer", "(JJJ)I",
+   (void*)mln_render_session_set_frame_pacer_jni},
   {"mln_render_session_set_metal_borrowed_texture_target", "(JJJJ)I",
    (void*)mln_render_session_set_metal_borrowed_texture_target_jni},
   {"mln_render_session_set_metal_surface_target", "(JJJJ)I",

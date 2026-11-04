@@ -39,6 +39,7 @@ function(mln_ffi_configure_platform target)
   set(MLN_FFI_ANDROID_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/android/file_sources.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/frame_pacer.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/i18n.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/java_vm.cpp

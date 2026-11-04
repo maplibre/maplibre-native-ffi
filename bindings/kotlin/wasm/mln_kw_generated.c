@@ -93,6 +93,15 @@ void mln_kw_mln_acquired_frame_view_end(uintptr_t scope) {
   mln_acquired_frame_view_end((void*)scope);
 }
 
+int32_t mln_kw_mln_android_frame_pacer_create(
+  uintptr_t options, uintptr_t out_pacer, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_android_frame_pacer_create(
+    (const mln_frame_pacer_options*)options, (mln_frame_pacer*)out_pacer,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_android_init(
   uintptr_t jni_env, uintptr_t context, uintptr_t out_diagnostic
 ) {
@@ -133,6 +142,10 @@ int32_t mln_kw_mln_delivery_queue_dispatch(
 
 void mln_kw_mln_delivery_queue_release(int64_t queue) {
   mln_delivery_queue_release((mln_delivery_queue)queue);
+}
+
+void mln_kw_mln_frame_pacer_release(int64_t pacer) {
+  mln_frame_pacer_release((mln_frame_pacer)pacer);
 }
 
 int32_t mln_kw_mln_geo_json_source_data_create(
@@ -1439,6 +1452,15 @@ int32_t mln_kw_mln_render_session_service_driver_work(
 ) {
   return (int32_t)mln_render_session_service_driver_work(
     (mln_render_session)session, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_render_session_set_frame_pacer(
+  int64_t session, int64_t pacer, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_set_frame_pacer(
+    (mln_render_session)session, (mln_frame_pacer)pacer,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

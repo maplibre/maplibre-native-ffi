@@ -17,6 +17,19 @@ internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
 internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
   allocate(24, w(8, 8, 4)).also { putGpuSync(it, value) }
 
+internal fun NativeArena.putFramePacerOptions(target: Long, value: FramePacerOptions) {
+  writeU32(target, 12.toUInt())
+  var fields = 0u
+  value.maximumFramesPerSecond?.let {
+    fields = fields or 1u
+    writeU32(target + 8, it)
+  }
+  writeU32(target + 4, fields)
+}
+
+internal fun NativeArena.writeFramePacerOptions(value: FramePacerOptions): Long =
+  allocate(12, 4).also { putFramePacerOptions(it, value) }
+
 internal fun NativeArena.putCanonicalTileId(target: Long, value: CanonicalTileId) {
   writeU32(target, value.z)
   writeU32(target + 4, value.x)
