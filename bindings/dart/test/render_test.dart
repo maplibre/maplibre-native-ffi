@@ -148,11 +148,15 @@ void main() {
         'layer add',
       );
       final worker = await WorkerSession.attach(map);
-      // The map asks for its tiles as it renders.
-      for (var frame = 0; frame < 32 && calls.isEmpty; frame++) {
+      // The map asks for its tiles as it renders, and the source fetches them
+      // on a worker thread in its own time.
+      final deadline = DateTime.now().add(waitDeadline);
+      while (calls.isEmpty) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail('timed out waiting for the source to fetch a tile');
+        }
         await worker.renderFrame();
       }
-      expect(calls, isNotEmpty, reason: 'the source fetched no tile');
       final (id, sourceId, refusal) = calls.first;
       expect(id, map.id);
       expect(sourceId, 'custom');
