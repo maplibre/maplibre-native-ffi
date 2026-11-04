@@ -375,125 +375,131 @@ pack(
 
 // The React Native package, whose podspec and Gradle module compile the
 // binding's native sources beside the package's own against the C library.
-const reactNative = join(binding, "react-native");
-const reactNativeSource = JSON.parse(
-  readFileSync(join(reactNative, "package.json"), "utf8"),
-);
-const reactNativeStaging = join(staging, "react-native");
-for (const name of [
-  "README.md",
-  "MaplibreNativeFfiReactNative.podspec",
-  "react-native.config.js",
-  "src",
-  "cpp",
-  "android/build.gradle",
-  "android/CMakeLists.txt",
-  "android/src",
-]) {
-  cpSync(join(reactNative, name), join(reactNativeStaging, name), {
-    recursive: true,
-  });
-}
-for (const name of readdirSync(join(reactNative, "ios"))) {
-  if (/\.(h|mm)$/.test(name)) {
-    cpSync(
-      join(reactNative, "ios", name),
-      join(reactNativeStaging, "ios", name),
-    );
+// A desktop or browser build has no native libraries to put in it.
+function packReactNative(): void {
+  const reactNative = join(binding, "react-native");
+  const reactNativeSource = JSON.parse(
+    readFileSync(join(reactNative, "package.json"), "utf8"),
+  );
+  const reactNativeStaging = join(staging, "react-native");
+  for (const name of [
+    "README.md",
+    "MaplibreNativeFfiReactNative.podspec",
+    "react-native.config.js",
+    "src",
+    "cpp",
+    "android/build.gradle",
+    "android/CMakeLists.txt",
+    "android/src",
+  ]) {
+    cpSync(join(reactNative, name), join(reactNativeStaging, name), {
+      recursive: true,
+    });
   }
-}
-copyNativeSources(reactNativeStaging);
-const reactNativeInventories: string[] = [];
-if (values.xcframework) {
-  const xcframework = join(
-    reactNativeStaging,
-    "ios/MaplibreNativeC.xcframework",
-  );
-  cpSync(resolve(values.xcframework), xcframework, {
-    recursive: true,
-    dereference: true,
-  });
-  execFileSync(
-    "python3",
-    [
-      join(root, "tools/release/binding_sbom.py"),
-      "framework",
-      xcframework,
-      version,
-    ],
-    { stdio: "inherit" },
-  );
-  reactNativeInventories.push(
-    ...readdirSync(xcframework, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name === "sbom.cdx.json")
-      .map((entry) => join(entry.parentPath, entry.name)),
-  );
-}
-if (values.android) {
-  // The native archives of the Android EGL presets, as the release publishes
-  // them.
-  const archives = readdirSync(resolve(values.android), {
-    recursive: true,
-    withFileTypes: true,
-  }).flatMap((entry) => {
-    const match =
-      /^maplibre-native-c-android-(arm|arm64|x86|x64)-egl\.tar\.gz$/.exec(
-        entry.name,
+  for (const name of readdirSync(join(reactNative, "ios"))) {
+    if (/\.(h|mm)$/.test(name)) {
+      cpSync(
+        join(reactNative, "ios", name),
+        join(reactNativeStaging, "ios", name),
       );
-    return entry.isFile() && match !== null
-      ? [{ arch: match[1]!, path: join(entry.parentPath, entry.name) }]
-      : [];
-  });
-  if (archives.length === 0) {
-    throw new Error(`${values.android} holds no Android EGL native archive`);
+    }
   }
-  for (const { arch, path } of archives) {
-    const extracted = join(staging, "android-archives", arch);
-    mkdirSync(extracted, { recursive: true });
-    execFileSync("tar", ["-xzf", path, "-C", extracted]);
-    const prefix = join(extracted, `maplibre-native-c-android-${arch}-egl`);
-    cpSync(
-      join(prefix, "lib/libmaplibre-native-c.so"),
-      join(
-        reactNativeStaging,
-        "android/libs",
-        androidAbis[arch]!,
-        "libmaplibre-native-c.so",
-      ),
+  copyNativeSources(reactNativeStaging);
+  const reactNativeInventories: string[] = [];
+  if (values.xcframework) {
+    const xcframework = join(
+      reactNativeStaging,
+      "ios/MaplibreNativeC.xcframework",
     );
-    cpSync(
-      join(prefix, "share/maplibre-native-c/licenses"),
-      join(reactNativeStaging, "licenses"),
-      { recursive: true },
+    cpSync(resolve(values.xcframework), xcframework, {
+      recursive: true,
+      dereference: true,
+    });
+    execFileSync(
+      "python3",
+      [
+        join(root, "tools/release/binding_sbom.py"),
+        "framework",
+        xcframework,
+        version,
+      ],
+      { stdio: "inherit" },
     );
     reactNativeInventories.push(
-      join(prefix, "share/maplibre-native-c/sbom.cdx.json"),
+      ...readdirSync(xcframework, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name === "sbom.cdx.json")
+        .map((entry) => join(entry.parentPath, entry.name)),
     );
   }
-}
-pack(
-  reactNativeStaging,
-  {
-    name: reactNativeSource.name,
-    ...shared,
-    repository: {
-      ...source.repository,
-      directory: "bindings/typescript/react-native",
+  if (values.android) {
+    // The native archives of the Android EGL presets, as the release publishes
+    // them.
+    const archives = readdirSync(resolve(values.android), {
+      recursive: true,
+      withFileTypes: true,
+    }).flatMap((entry) => {
+      const match =
+        /^maplibre-native-c-android-(arm|arm64|x86|x64)-egl\.tar\.gz$/.exec(
+          entry.name,
+        );
+      return entry.isFile() && match !== null
+        ? [{ arch: match[1]!, path: join(entry.parentPath, entry.name) }]
+        : [];
+    });
+    if (archives.length === 0) {
+      throw new Error(`${values.android} holds no Android EGL native archive`);
+    }
+    for (const { arch, path } of archives) {
+      const extracted = join(staging, "android-archives", arch);
+      mkdirSync(extracted, { recursive: true });
+      execFileSync("tar", ["-xzf", path, "-C", extracted]);
+      const prefix = join(extracted, `maplibre-native-c-android-${arch}-egl`);
+      cpSync(
+        join(prefix, "lib/libmaplibre-native-c.so"),
+        join(
+          reactNativeStaging,
+          "android/libs",
+          androidAbis[arch]!,
+          "libmaplibre-native-c.so",
+        ),
+      );
+      cpSync(
+        join(prefix, "share/maplibre-native-c/licenses"),
+        join(reactNativeStaging, "licenses"),
+        { recursive: true },
+      );
+      reactNativeInventories.push(
+        join(prefix, "share/maplibre-native-c/sbom.cdx.json"),
+      );
+    }
+  }
+  pack(
+    reactNativeStaging,
+    {
+      name: reactNativeSource.name,
+      ...shared,
+      repository: {
+        ...source.repository,
+        directory: "bindings/typescript/react-native",
+      },
+      description: reactNativeSource.description,
+      main: "src/index.ts",
+      dependencies: { [source.name]: version },
+      peerDependencies: reactNativeSource.peerDependencies,
+      codegenConfig: reactNativeSource.codegenConfig,
+      files: [
+        "src",
+        "cpp",
+        "ios",
+        "android",
+        "native",
+        "MaplibreNativeFfiReactNative.podspec",
+        "react-native.config.js",
+      ],
     },
-    description: reactNativeSource.description,
-    main: "src/index.ts",
-    dependencies: { [source.name]: version },
-    peerDependencies: reactNativeSource.peerDependencies,
-    codegenConfig: reactNativeSource.codegenConfig,
-    files: [
-      "src",
-      "cpp",
-      "ios",
-      "android",
-      "native",
-      "MaplibreNativeFfiReactNative.podspec",
-      "react-native.config.js",
-    ],
-  },
-  reactNativeInventories,
-);
+    reactNativeInventories,
+  );
+}
+if (values.xcframework !== undefined || values.android !== undefined) {
+  packReactNative();
+}
