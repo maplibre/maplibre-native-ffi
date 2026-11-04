@@ -112,6 +112,24 @@ typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
 
+final class mln_android_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+  external Pointer<Void> jni_env;
+  external Pointer<Void> surface;
+}
+
+final class mln_android_surface_replacement extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+  external Pointer<Void> jni_env;
+  external Pointer<Void> surface;
+}
+
 final class mln_animation_options extends Struct {
   @Uint32()
   external int fields;
@@ -2801,6 +2819,27 @@ external int mln_map_apply_camera_delta(
 @Native<
   Int32 Function(
     mln_map,
+    Pointer<mln_android_surface_descriptor>,
+    mln_vulkan_device,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_android_surface(
+  int map,
+  Pointer<mln_android_surface_descriptor> descriptor,
+  int device,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
     Pointer<mln_metal_borrowed_texture_descriptor>,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
@@ -4440,6 +4479,21 @@ external int mln_render_session_resize(
 @Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
 external int mln_render_session_service_driver_work(
   int session,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_android_surface_replacement>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_android_surface_target(
+  int session,
+  Pointer<mln_android_surface_replacement> replacement,
+  Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

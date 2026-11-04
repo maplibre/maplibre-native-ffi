@@ -4,6 +4,13 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#if defined(__ANDROID__)
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <mutex>
+#include <vector>
+#endif
 
 #include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/renderable.hpp>
@@ -27,6 +34,9 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
+#if defined(__ANDROID__)
+#include "render/android_surface_session.hpp"
+#endif
 #include "render/opengl/context_mode.hpp"
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
@@ -477,9 +487,268 @@ class OpenGLSurfaceSessionBackend final
   OpenGLSurfaceBackend backend_;
 };
 
+#if defined(__ANDROID__) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+auto egl_failure(const char* what) -> mln_status {
+  const auto message =
+    std::string{what} + " (EGL error " + std::to_string(eglGetError()) + ")";
+  mln::core::set_thread_error(message.c_str());
+  return MLN_STATUS_NATIVE_ERROR;
+}
+
+struct AndroidEglConfig {
+  EGLDisplay display = EGL_NO_DISPLAY;
+  EGLConfig config = nullptr;
+};
+
+auto has_rgba8(EGLDisplay display, EGLConfig config) -> bool {
+  for (const auto attribute :
+       {EGL_RED_SIZE, EGL_GREEN_SIZE, EGL_BLUE_SIZE, EGL_ALPHA_SIZE}) {
+    auto value = EGLint{};
+    if (
+      eglGetConfigAttrib(display, config, attribute, &value) == EGL_FALSE ||
+      value != 8
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The default display and an OpenGL ES 3 config for RGBA8888 windows, with
+// pbuffers for a session without a window. The display stays initialized for
+// the rest of the process: EGL returns this one display to the app's own code
+// too, so terminating it would end the app's use of it.
+auto android_egl_config(AndroidEglConfig& out_config) -> mln_status {
+  struct Chosen {
+    std::mutex mutex;
+    std::optional<AndroidEglConfig> config;
+  };
+  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+  static auto* const chosen = new Chosen();
+  const auto lock = std::scoped_lock{chosen->mutex};
+  if (chosen->config) {
+    out_config = *chosen->config;
+    return MLN_STATUS_OK;
+  }
+  auto* const display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  if (
+    display == EGL_NO_DISPLAY ||
+    eglInitialize(display, nullptr, nullptr) == EGL_FALSE
+  ) {
+    return egl_failure("initializing the default EGL display failed");
+  }
+  const auto attributes = std::array<EGLint, 17>{
+    EGL_SURFACE_TYPE,
+    EGL_WINDOW_BIT | EGL_PBUFFER_BIT,
+    EGL_RENDERABLE_TYPE,
+    EGL_OPENGL_ES3_BIT,
+    EGL_RED_SIZE,
+    8,
+    EGL_GREEN_SIZE,
+    8,
+    EGL_BLUE_SIZE,
+    8,
+    EGL_ALPHA_SIZE,
+    8,
+    EGL_DEPTH_SIZE,
+    24,
+    EGL_STENCIL_SIZE,
+    8,
+    EGL_NONE,
+  };
+  auto count = EGLint{};
+  if (
+    eglChooseConfig(display, attributes.data(), nullptr, 0, &count) == EGL_FALSE
+  ) {
+    return egl_failure("choosing an EGL config failed");
+  }
+  auto configs = std::vector<EGLConfig>(static_cast<std::size_t>(count));
+  if (
+    count > 0 && eglChooseConfig(
+                   display, attributes.data(), configs.data(), count, &count
+                 ) == EGL_FALSE
+  ) {
+    return egl_failure("choosing an EGL config failed");
+  }
+  configs.resize(static_cast<std::size_t>(count));
+  // EGL sorts deeper colors first, so a match can have more than 8 bits.
+  const auto found = std::ranges::find_if(configs, [display](auto* config) {
+    return has_rgba8(display, config);
+  });
+  if (found == configs.end()) {
+    mln::core::set_thread_error(
+      "the default EGL display has no OpenGL ES 3 config for RGBA8888 windows"
+    );
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  chosen->config = AndroidEglConfig{.display = display, .config = *found};
+  out_config = *chosen->config;
+  return MLN_STATUS_OK;
+}
+
+// An EGL window surface that the library made for an Android window.
+class AndroidEglWindowSurface final {
+ public:
+  AndroidEglWindowSurface() = default;
+  AndroidEglWindowSurface(EGLDisplay display, EGLSurface surface)
+      : display_(display), surface_(surface) {}
+  AndroidEglWindowSurface(const AndroidEglWindowSurface&) = delete;
+  auto operator=(const AndroidEglWindowSurface&)
+    -> AndroidEglWindowSurface& = delete;
+  AndroidEglWindowSurface(AndroidEglWindowSurface&& other) noexcept
+      : display_(other.display_),
+        surface_(std::exchange(other.surface_, EGL_NO_SURFACE)) {}
+  auto operator=(AndroidEglWindowSurface&& other) noexcept
+    -> AndroidEglWindowSurface& {
+    if (this != &other) {
+      reset();
+      display_ = other.display_;
+      surface_ = std::exchange(other.surface_, EGL_NO_SURFACE);
+    }
+    return *this;
+  }
+  ~AndroidEglWindowSurface() { reset(); }
+
+  void reset() noexcept {
+    if (surface_ != EGL_NO_SURFACE) eglDestroySurface(display_, surface_);
+    surface_ = EGL_NO_SURFACE;
+  }
+
+  [[nodiscard]] auto get() const noexcept -> EGLSurface { return surface_; }
+
+ private:
+  EGLDisplay display_ = EGL_NO_DISPLAY;
+  EGLSurface surface_ = EGL_NO_SURFACE;
+};
+
+auto create_window_surface(
+  const AndroidEglConfig& egl, ANativeWindow* window,
+  AndroidEglWindowSurface& out_surface
+) -> mln_status {
+  auto* const surface =
+    eglCreateWindowSurface(egl.display, egl.config, window, nullptr);
+  if (surface == EGL_NO_SURFACE) {
+    return egl_failure("creating the EGL window surface failed");
+  }
+  out_surface = AndroidEglWindowSurface{egl.display, surface};
+  return MLN_STATUS_OK;
+}
+
+// Presents to an Android window through an EGL window surface that it creates
+// for each window, with a dedicated context that it creates.
+class AndroidEglSurfaceSessionBackend final
+    : public mln::core::SurfaceSessionBackend {
+ public:
+  AndroidEglSurfaceSessionBackend(
+    const AndroidEglConfig& egl, mln::core::AndroidWindow window,
+    AndroidEglWindowSurface surface,
+    const mln_open_gl_surface_descriptor& descriptor, mln::Size size
+  )
+      : egl_(egl),
+        window_(std::move(window)),
+        surface_(std::move(surface)),
+        session_(descriptor, size) {}
+
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
+    return session_.renderer_backend();
+  }
+
+  void resize(uint32_t physical_width, uint32_t physical_height) override {
+    session_.resize(physical_width, physical_height);
+  }
+
+  auto prepare_frame(bool& out_ready) -> mln_status override {
+    return session_.prepare_frame(out_ready);
+  }
+
+  auto set_android_target(
+    const mln::core::AndroidWindow& window, mln::Size physical_size
+  ) -> mln_status override {
+    if (window == window_) {
+      session_.resize(physical_size.width, physical_size.height);
+      return MLN_STATUS_OK;
+    }
+    auto next = AndroidEglWindowSurface{};
+    const auto create_status = create_window_surface(egl_, window.get(), next);
+    if (create_status != MLN_STATUS_OK) return create_status;
+    // The context stays current on its surface between renders, so it moves
+    // off the old one before that goes.
+    if (window_ != nullptr) {
+      const auto release_status = release_target();
+      if (release_status != MLN_STATUS_OK) return release_status;
+    }
+    const auto replacement = mln_open_gl_surface_replacement{
+      .size = sizeof(mln_open_gl_surface_replacement),
+      .logical_size = {},
+      .surface = next.get(),
+    };
+    const auto status = session_.set_opengl_target(replacement, physical_size);
+    if (status != MLN_STATUS_OK) return status;
+    surface_ = std::move(next);
+    window_ = window;
+    return MLN_STATUS_OK;
+  }
+
+  auto release_target() -> mln_status override {
+    const auto status = session_.release_target();
+    if (status != MLN_STATUS_OK) return status;
+    surface_.reset();
+    window_.reset();
+    return MLN_STATUS_OK;
+  }
+
+ private:
+  AndroidEglConfig egl_;
+  mln::core::AndroidWindow window_;
+  AndroidEglWindowSurface surface_;
+  // Destroyed first, so the context goes before the surface and the window.
+  OpenGLSurfaceSessionBackend session_;
+};
+#endif
+
 }  // namespace
 
 namespace mln::core {
+
+#if defined(__ANDROID__) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+auto create_android_surface_backend(
+  AndroidSurfaceAttach attach, mln_render_session_object& target
+) -> mln_status {
+  auto egl = AndroidEglConfig{};
+  const auto config_status = android_egl_config(egl);
+  if (config_status != MLN_STATUS_OK) return config_status;
+  auto surface = AndroidEglWindowSurface{};
+  const auto surface_status =
+    create_window_surface(egl, attach.window.get(), surface);
+  if (surface_status != MLN_STATUS_OK) return surface_status;
+  const auto descriptor = mln_open_gl_surface_descriptor{
+    .size = sizeof(mln_open_gl_surface_descriptor),
+    .logical_size = {.width = target.width, .height = target.height},
+    .context =
+      {
+        .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
+        .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
+        .data =
+          {
+            .egl =
+              {
+                .display = egl.display,
+                .config = egl.config,
+                .share_context = nullptr,
+                .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
+                .get_proc_address = nullptr,
+              },
+          },
+      },
+    .surface = surface.get(),
+  };
+  target.surface.backend = std::make_unique<AndroidEglSurfaceSessionBackend>(
+    egl, std::move(attach.window), std::move(surface), descriptor,
+    mln::Size{target.physical_width, target.physical_height}
+  );
+  return MLN_STATUS_OK;
+}
+#endif
 
 auto opengl_surface_attach_start(
   mln_map map, const mln_open_gl_surface_descriptor* descriptor,

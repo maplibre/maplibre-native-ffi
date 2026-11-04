@@ -47,6 +47,8 @@
 #include "wake/wake.hpp"
 
 struct mln_render_session_object;
+// The NDK's window type, which only Android builds define.
+struct ANativeWindow;
 
 namespace mln {
 class UpdateParameters;
@@ -266,6 +268,17 @@ class SurfaceSessionBackend : public RenderSessionBackend {
     (void)physical_size;
     return unsupported_retarget(
       "session does not render through a WebGPU surface"
+    );
+  }
+  // Presents to a new Android window, keeping `window`'s reference while the
+  // backend uses it.
+  virtual auto set_android_target(
+    const std::shared_ptr<ANativeWindow>& window, mln::Size physical_size
+  ) -> mln_status {
+    (void)window;
+    (void)physical_size;
+    return unsupported_retarget(
+      "session does not render through an Android window"
     );
   }
 

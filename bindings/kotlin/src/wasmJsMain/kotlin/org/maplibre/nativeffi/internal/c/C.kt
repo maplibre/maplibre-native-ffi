@@ -250,6 +250,25 @@ internal actual object C {
   ): Int =
     mln_kw_mln_map_apply_camera_delta(map, word(delta), word(completion), word(outDiagnostic))
 
+  actual fun mln_map_attach_android_surface(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_attach_android_surface(
+      map,
+      word(descriptor),
+      device,
+      word(options),
+      word(outSession),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_attach_metal_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -1438,6 +1457,19 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_service_driver_work(session, word(outDiagnostic))
 
+  actual fun mln_render_session_set_android_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_render_session_set_android_surface_target(
+      session,
+      word(replacement),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_render_session_set_frame_pacer(
     session: Long,
     pacer: Long,
@@ -2099,6 +2131,19 @@ private fun mln_kw_mln_map_add_style_source_json(
 private fun mln_kw_mln_map_apply_camera_delta(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_apply_camera_delta(p0, p1, p2, p3)",
+  )
+
+private fun mln_kw_mln_map_attach_android_surface(
+  p0: Long,
+  p1: Int,
+  p2: Long,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+  p6: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_android_surface(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_attach_metal_borrowed_texture(
@@ -2956,6 +3001,16 @@ private fun mln_kw_mln_render_session_resize(p0: Long, p1: Int, p2: Int, p3: Int
 private fun mln_kw_mln_render_session_service_driver_work(p0: Long, p1: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_service_driver_work(p0, p1)",
+  )
+
+private fun mln_kw_mln_render_session_set_android_surface_target(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_android_surface_target(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_render_session_set_frame_pacer(p0: Long, p1: Long, p2: Int): Int =

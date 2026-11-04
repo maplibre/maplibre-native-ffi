@@ -324,6 +324,36 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
   allocate(w(168, 176, 160), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
+internal fun NativeArena.putAndroidSurfaceDescriptor(
+  target: Long,
+  value: AndroidSurfaceDescriptor,
+) {
+  writeU32(target, w(24, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.window.address)
+  writeAddress(target + w(16, 24), value.jniEnv.address)
+  writeAddress(target + w(20, 32), value.surface.address)
+}
+
+internal fun NativeArena.writeAndroidSurfaceDescriptor(value: AndroidSurfaceDescriptor): Long =
+  allocate(w(24, 40), w(4, 8)).also { putAndroidSurfaceDescriptor(it, value) }
+
+internal fun NativeCall.putRenderSessionAttachOptions(
+  target: Long,
+  value: RenderSessionAttachOptions,
+) {
+  writeU32(target, w(104, 144, 88).toUInt())
+  writeU32(target + 4, value.driver.rawValue)
+  writeU32(target + 8, value.producerSyncKinds.rawValue)
+  putWake(target + w(16, 16, 12), value.frameWake)
+  putWake(target + w(40, 48, 32), value.redrawWake)
+  putWake(target + w(64, 80, 52), value.driverWorkWake)
+  putQueueLock(target + w(88, 112, 72), value.queueLock)
+}
+
+internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
+  allocate(w(104, 144, 88), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
+
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
   value: MetalBorrowedTextureDescriptor,
@@ -343,22 +373,6 @@ internal fun NativeArena.putMetalBorrowedTextureDescriptor(
 internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
   value: MetalBorrowedTextureDescriptor,
 ): Long = allocate(w(32, 48), w(4, 8)).also { putMetalBorrowedTextureDescriptor(it, value) }
-
-internal fun NativeCall.putRenderSessionAttachOptions(
-  target: Long,
-  value: RenderSessionAttachOptions,
-) {
-  writeU32(target, w(104, 144, 88).toUInt())
-  writeU32(target + 4, value.driver.rawValue)
-  writeU32(target + 8, value.producerSyncKinds.rawValue)
-  putWake(target + w(16, 16, 12), value.frameWake)
-  putWake(target + w(40, 48, 32), value.redrawWake)
-  putWake(target + w(64, 80, 52), value.driverWorkWake)
-  putQueueLock(target + w(88, 112, 72), value.queueLock)
-}
-
-internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
-  allocate(w(104, 144, 88), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
 
 internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
   writeU32(target, w(20, 32).toUInt())
@@ -859,6 +873,20 @@ internal fun NativeArena.putSourceFeatureQueryOptions(
 
 internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQueryOptions): Long =
   allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
+
+internal fun NativeArena.putAndroidSurfaceReplacement(
+  target: Long,
+  value: AndroidSurfaceReplacement,
+) {
+  writeU32(target, w(24, 40).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.window.address)
+  writeAddress(target + w(16, 24), value.jniEnv.address)
+  writeAddress(target + w(20, 32), value.surface.address)
+}
+
+internal fun NativeArena.writeAndroidSurfaceReplacement(value: AndroidSurfaceReplacement): Long =
+  allocate(w(24, 40), w(4, 8)).also { putAndroidSurfaceReplacement(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTextureReplacement(
   target: Long,
@@ -1524,13 +1552,6 @@ internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOption
 internal fun NativeCall.writeAnimationOptions(value: AnimationOptions): Long =
   allocate(w(96, 104, 88), w(8, 8, 4)).also { putAnimationOptions(it, value) }
 
-internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
-  writeAddress(target, value.texture.address)
-}
-
-internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
-  allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
-
 internal fun NativeCall.putWake(target: Long, value: Wake) {
   val native = value.bindingNative
   if (native != null) {
@@ -1569,6 +1590,13 @@ internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
 
 internal fun NativeCall.writeQueueLock(value: QueueLock): Long =
   allocate(w(16, 32), w(4, 8)).also { putQueueLock(it, value) }
+
+internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
+  writeAddress(target, value.texture.address)
+}
+
+internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
+  allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
 
 internal fun NativeArena.putMetalContextDescriptor(target: Long, value: MetalContextDescriptor) {
   writeAddress(target, value.device.address)

@@ -392,7 +392,8 @@ public struct RenderSessionAttachOptions: Sendable {
   ///   dedicated EGL or WGL context, an existing WebGL context, or a browser's
   ///   WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a target whose context the library
-  ///   owns: a transferred WebGL canvas, or an offscreen session.
+  ///   owns: a transferred WebGL canvas, an Android window, or an offscreen
+  ///   session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.

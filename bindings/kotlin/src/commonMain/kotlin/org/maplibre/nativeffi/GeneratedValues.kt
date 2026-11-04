@@ -2466,6 +2466,75 @@ public data class CameraDelta(
 )
 
 /**
+ * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
+ *
+ * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
+ * to the window, so you can release yours once the call returns. It uses the window until a
+ * replacement or release of the target completes, a detach or release of the session completes, or
+ * an abandon of it returns.
+ *
+ * See `mln_android_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+public data class AndroidSurfaceDescriptor(
+  public val logicalSize: LogicalSize,
+  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
+  public val window: NativePointer,
+  /** The calling thread's `JNIEnv*`, with `surface`. */
+  public val jniEnv: NativePointer,
+  /** An `android.view.Surface`, with `jni_env`. */
+  public val surface: NativePointer,
+)
+
+/**
+ * Options for attaching a render session to a map.
+ *
+ * See `mln_render_session_attach_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class RenderSessionAttachOptions(
+  /**
+   * The thread that runs the session's graphics work. Whoever owns the target's graphics context
+   * drives it:
+   *
+   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for an OpenGL or WebGPU target that you pass, since
+   *   its context belongs to your thread: a shared or dedicated EGL or WGL context, an existing
+   *   WebGL context, or a browser's WebGPU device.
+   * - `RenderDriverKind.CORE_WORKER` for a target whose context the library owns: a transferred
+   *   WebGL canvas, an Android window, or an offscreen session.
+   * - Either one for a Metal or Vulkan target.
+   *
+   * An attach with another driver fails with `Status.UNSUPPORTED`.
+   */
+  public val driver: RenderDriverKind,
+  /**
+   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
+   * one of them that its target supports. Zero lets the session pick a kind that names no object to
+   * wait on.
+   */
+  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
+  /**
+   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
+   * called again until a drain takes them.
+   */
+  public val frameWake: Wake = Wake(),
+  /**
+   * Called when the session has something new to draw, because the map or the target changed since
+   * its last frame, or the target couldn't take that frame. Demand a frame at your next display
+   * refresh. It isn't called again until you demand a frame, and isn't called while the session has
+   * no target.
+   */
+  public val redrawWake: Wake = Wake(),
+  /**
+   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
+   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
+   */
+  public val driverWorkWake: Wake = Wake(),
+  /** Your lock on the Vulkan queue, when you submit to it yourself. */
+  public val queueLock: QueueLock = QueueLock(),
+)
+
+/**
  * A Metal texture of a borrowed ring.
  *
  * See `mln_metal_borrowed_texture` in the
@@ -2499,54 +2568,6 @@ public data class MetalBorrowedTextureDescriptor(
    * your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
    */
   public val commandQueue: NativePointer,
-)
-
-/**
- * Options for attaching a render session to a map.
- *
- * See `mln_render_session_attach_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class RenderSessionAttachOptions(
-  /**
-   * The thread that runs the session's graphics work. Whoever owns the target's graphics context
-   * drives it:
-   *
-   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for an OpenGL or WebGPU target that you pass, since
-   *   its context belongs to your thread: a shared or dedicated EGL or WGL context, an existing
-   *   WebGL context, or a browser's WebGPU device.
-   * - `RenderDriverKind.CORE_WORKER` for a target whose context the library owns: a transferred
-   *   WebGL canvas, or an offscreen session.
-   * - Either one for a Metal or Vulkan target.
-   *
-   * An attach with another driver fails with `Status.UNSUPPORTED`.
-   */
-  public val driver: RenderDriverKind,
-  /**
-   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
-   * one of them that its target supports. Zero lets the session pick a kind that names no object to
-   * wait on.
-   */
-  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
-  /**
-   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
-   * called again until a drain takes them.
-   */
-  public val frameWake: Wake = Wake(),
-  /**
-   * Called when the session has something new to draw, because the map or the target changed since
-   * its last frame, or the target couldn't take that frame. Demand a frame at your next display
-   * refresh. It isn't called again until you demand a frame, and isn't called while the session has
-   * no target.
-   */
-  public val redrawWake: Wake = Wake(),
-  /**
-   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
-   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
-   */
-  public val driverWorkWake: Wake = Wake(),
-  /** Your lock on the Vulkan queue, when you submit to it yourself. */
-  public val queueLock: QueueLock = QueueLock(),
 )
 
 /**
@@ -3557,6 +3578,27 @@ public data class TextureReadbackResult(
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
+
+/**
+ * A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
+ *
+ * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
+ * to the window, so you can release yours once the call returns. It uses the window until a
+ * replacement or release of the target completes, a detach or release of the session completes, or
+ * an abandon of it returns.
+ *
+ * See `mln_android_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+public data class AndroidSurfaceReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
+  public val window: NativePointer,
+  /** The calling thread's `JNIEnv*`, with `surface`. */
+  public val jniEnv: NativePointer,
+  /** An `android.view.Surface`, with `jni_env`. */
+  public val surface: NativePointer,
+)
 
 /**
  * New Metal textures for a borrowed ring, for

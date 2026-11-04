@@ -376,6 +376,40 @@ pub const Map = struct {
         return call.submit("mln_map_apply_camera_delta", .handle, self, call.command, null, diagnostic, .{delta});
     }
 
+    /// Creates a session that presents the map to an Android window, with a
+    /// graphics context that the library creates.
+    ///
+    /// The build's render backend decides the context. A Vulkan build presents with
+    /// `device`, or, when `device` is null, with a device that the library creates
+    /// with presentation and shares between these sessions. An OpenGL build creates
+    /// an EGL context on the default display, and `device` must be null. Attach
+    /// with `RenderDriverKind.core_worker`, since the context belongs to the
+    /// library.
+    ///
+    /// Before the platform destroys the window, such as in
+    /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+    /// `RenderSession.releaseTarget()` and wait for that to complete. The session's
+    /// reference keeps the window, but not its buffers.
+    ///
+    /// See `mln_map_attach_android_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when `surface` has no window, such as after the
+    ///   platform destroyed it.
+    /// - `error.Unsupported` when `device` can't present, because you created it
+    ///   without `VulkanDeviceOptions.presentation`.
+    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
+    /// - `error.NativeError` when the library can't create the graphics context or
+    ///   the window's surface.
+    pub const attachAndroidSurface = if (builtin.abi.isAndroid()) struct {
+        fn function(self: Map, descriptor: AndroidSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_android_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
     /// Creates a session that renders the map into a ring of your Metal textures.
     ///
     /// See `mln_map_attach_metal_borrowed_texture` in the
@@ -1960,6 +1994,31 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_service_driver_work", .handle, self, null, diagnostic, .{});
     }
 
+    /// Replaces the Android window that the session presents to.
+    ///
+    /// Use it to give the session a window again after
+    /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// window. A replacement with the window and logical size that the session
+    /// presents to already changes nothing.
+    ///
+    /// See `mln_render_session_set_android_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when `surface` has no window, such as after the
+    ///   platform destroyed it.
+    /// - `error.Unsupported` when, in a Vulkan build, the new window needs a
+    ///   different color format or pre-rotation support than the old one. Attach a
+    ///   new session instead.
+    /// - `error.NativeError` when the library can't create the window's surface.
+    pub const setAndroidSurfaceTarget = if (builtin.abi.isAndroid()) struct {
+        fn function(self: RenderSession, replacement: AndroidSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_android_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
+        }
+    }.function else {};
+
     /// Sets the frame pacer that demands the session's frames.
     ///
     /// At the first display refresh after the session has something new to draw,
@@ -2669,6 +2728,80 @@ pub const VulkanDevice = struct {
         if (self.closed) return;
         c.mln_vulkan_device_release(self.raw);
         self.closed = true;
+    }
+};
+
+/// An Android window to present to, for `Map.attachAndroidSurface()`.
+///
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns. It uses the window until a replacement or release of the
+/// target completes, a detach or release of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_android_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+pub const AndroidSurfaceDescriptor = struct {
+    logical_size: LogicalSize,
+    /// Your `ANativeWindow*`, or null to name the window by `surface`.
+    window: ?*anyopaque = null,
+    /// The calling thread's `JNIEnv*`, with `surface`.
+    jni_env: ?*anyopaque = null,
+    /// An `android.view.Surface`, with `jni_env`.
+    surface: ?*anyopaque = null,
+    pub fn toNative(self: AndroidSurfaceDescriptor) c.mln_android_surface_descriptor {
+        var raw = std.mem.zeroes(c.mln_android_surface_descriptor);
+        raw.size = @sizeOf(c.mln_android_surface_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.window = self.window;
+        raw.jni_env = self.jni_env;
+        raw.surface = self.surface;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_android_surface_descriptor) AndroidSurfaceDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .window = raw.window,
+            .jni_env = raw.jni_env,
+            .surface = raw.surface,
+        };
+    }
+};
+
+/// A new Android window for `RenderSession.setAndroidSurfaceTarget()`.
+///
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns. It uses the window until a replacement or release of the
+/// target completes, a detach or release of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_android_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+pub const AndroidSurfaceReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your `ANativeWindow*`, or null to name the window by `surface`.
+    window: ?*anyopaque = null,
+    /// The calling thread's `JNIEnv*`, with `surface`.
+    jni_env: ?*anyopaque = null,
+    /// An `android.view.Surface`, with `jni_env`.
+    surface: ?*anyopaque = null,
+    pub fn toNative(self: AndroidSurfaceReplacement) c.mln_android_surface_replacement {
+        var raw = std.mem.zeroes(c.mln_android_surface_replacement);
+        raw.size = @sizeOf(c.mln_android_surface_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.window = self.window;
+        raw.jni_env = self.jni_env;
+        raw.surface = self.surface;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_android_surface_replacement) AndroidSurfaceReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .window = raw.window,
+            .jni_env = raw.jni_env,
+            .surface = raw.surface,
+        };
     }
 };
 
@@ -5707,7 +5840,8 @@ pub const RenderSessionAttachOptions = struct {
     ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
     ///   a browser's WebGPU device.
     /// - `RenderDriverKind.core_worker` for a target whose context the library
-    ///   owns: a transferred WebGL canvas, or an offscreen session.
+    ///   owns: a transferred WebGL canvas, an Android window, or an offscreen
+    ///   session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.

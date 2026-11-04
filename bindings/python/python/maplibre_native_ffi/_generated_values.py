@@ -1074,6 +1074,78 @@ class WebGlContextKind(UnknownIntEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AndroidSurfaceDescriptor:
+    """An Android window to present to, for
+    `MapHandle.attach_android_surface()`.
+
+    Name the window by `window`, or by `jni_env` and `surface`. The session
+    takes its own reference to the window, so you can release yours once the
+    call returns. It uses the window until a replacement or release of the
+    target completes, a detach or release of the session completes, or an
+    abandon of it returns.
+
+    See `mln_android_surface_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    window: int = 0
+    """Your `ANativeWindow*`, or null to name the window by `surface`."""
+
+    jni_env: int = 0
+    """The calling thread's `JNIEnv*`, with `surface`."""
+
+    surface: int = 0
+    """An `android.view.Surface`, with `jni_env`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            window=raw["window"],
+            jni_env=raw["jni_env"],
+            surface=raw["surface"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AndroidSurfaceReplacement:
+    """A new Android window for
+    `RenderSessionHandle.set_android_surface_target()`.
+
+    Name the window by `window`, or by `jni_env` and `surface`. The session
+    takes its own reference to the window, so you can release yours once the
+    call returns. It uses the window until a replacement or release of the
+    target completes, a detach or release of the session completes, or an
+    abandon of it returns.
+
+    See `mln_android_surface_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    window: int = 0
+    """Your `ANativeWindow*`, or null to name the window by `surface`."""
+
+    jni_env: int = 0
+    """The calling thread's `JNIEnv*`, with `surface`."""
+
+    surface: int = 0
+    """An `android.view.Surface`, with `jni_env`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            window=raw["window"],
+            jni_env=raw["jni_env"],
+            surface=raw["surface"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class AnimationOptions:
     """How a camera change animates.
 
@@ -3237,7 +3309,8 @@ class RenderSessionAttachOptions:
       shared or dedicated EGL or WGL context, an existing WebGL context, or a
       browser's WebGPU device.
     - `RenderDriverKind.CORE_WORKER` for a target whose context the library
-      owns: a transferred WebGL canvas, or an offscreen session.
+      owns: a transferred WebGL canvas, an Android window, or an offscreen
+      session.
     - Either one for a Metal or Vulkan target.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.

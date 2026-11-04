@@ -321,6 +321,65 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that presents the map to an Android window, with a
+    /// graphics context that the library creates.
+    /// </summary>
+    /// <remarks>
+    /// <para>The build's render backend decides the context. A Vulkan build
+    /// presents with <c>device</c>, or, when <c>device</c> is null, with a
+    /// device that the library creates with presentation and shares between
+    /// these sessions. An OpenGL build creates an EGL context on the default
+    /// display, and <c>device</c> must be null. Attach with
+    /// <c>RenderDriverKind.CoreWorker</c>, since the context belongs to the
+    /// library.</para>
+    /// <para>Before the platform destroys the window, such as in
+    /// <c>SurfaceHolder.Callback.surfaceDestroyed</c>, release the target with
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c> and wait for that to
+    /// complete. The session's reference keeps the window, but not its
+    /// buffers.</para>
+    /// <para>See <c>mln_map_attach_android_surface</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>surface</c> has
+    /// no window, such as after the platform destroyed it.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when <c>device</c> can't
+    /// present, because you created it without
+    /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
+    /// loader can't present.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create the graphics context or the window's
+    /// surface.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    public RenderSessionHandle AttachAndroidSurface(
+        AndroidSurfaceDescriptor descriptor,
+        VulkanDeviceHandle? device,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeAndroidSurfaceDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_android_surface(
+            Handle,
+            &nativeDescriptor,
+            scope.UseOptional(device),
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     /// </summary>

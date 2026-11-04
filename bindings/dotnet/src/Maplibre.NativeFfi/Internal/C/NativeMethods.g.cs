@@ -207,6 +207,17 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_android_surface(
+        MlnMap map,
+        mln_android_surface_descriptor* descriptor,
+        MlnVulkanDevice device,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_attach_metal_borrowed_texture(
         MlnMap map,
         mln_metal_borrowed_texture_descriptor* descriptor,
@@ -1130,6 +1141,14 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_service_driver_work(
         MlnRenderSession session,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_android_surface_target(
+        MlnRenderSession session,
+        mln_android_surface_replacement* replacement,
+        mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 

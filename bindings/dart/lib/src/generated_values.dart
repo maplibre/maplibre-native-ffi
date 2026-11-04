@@ -2696,86 +2696,55 @@ final class CameraDelta extends _Value {
   ]);
 }
 
-/// A Metal texture of a borrowed ring.
+/// An Android window to present to, for `MapHandle.attachAndroidSurface()`.
 ///
-/// See `mln_metal_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTexture extends _Value {
-  const MetalBorrowedTexture({required this.texture});
-
-  /// Your MTLTexture.
-  final NativePointer texture;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
-      MetalBorrowedTexture(texture: texture ?? this.texture);
-
-  @override
-  List<Object?> get _members => [texture];
-  @override
-  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
-}
-
-/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns. It uses the window until a replacement or release of the
+/// target completes, a detach or release of the session completes, or an
+/// abandon of it returns.
 ///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The textures must all have that size, one device, one
-/// pixel format, one sample, and MTLTextureUsageRenderTarget.
-///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_metal_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTextureDescriptor extends _Value {
-  MetalBorrowedTextureDescriptor({
+/// See `mln_android_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+final class AndroidSurfaceDescriptor extends _Value {
+  const AndroidSurfaceDescriptor({
     required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<MetalBorrowedTexture> textures,
-    this.commandQueue = NativePointer.nullPointer,
-  }) : textures = List.unmodifiable(textures);
+    this.window = NativePointer.nullPointer,
+    this.jniEnv = NativePointer.nullPointer,
+    this.surface = NativePointer.nullPointer,
+  });
   final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final List<MetalBorrowedTexture> textures;
 
-  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
-  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
-  final NativePointer commandQueue;
+  /// Your `ANativeWindow*`, or null to name the window by `surface`.
+  final NativePointer window;
+
+  /// The calling thread's `JNIEnv*`, with `surface`.
+  final NativePointer jniEnv;
+
+  /// An `android.view.Surface`, with `jni_env`.
+  final NativePointer surface;
 
   /// A copy of this value with the given members replaced.
-  MetalBorrowedTextureDescriptor copyWith({
+  AndroidSurfaceDescriptor copyWith({
     LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<MetalBorrowedTexture>? textures,
-    NativePointer? commandQueue,
-  }) => MetalBorrowedTextureDescriptor(
+    NativePointer? window,
+    NativePointer? jniEnv,
+    NativePointer? surface,
+  }) => AndroidSurfaceDescriptor(
     logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-    commandQueue: commandQueue ?? this.commandQueue,
+    window: window ?? this.window,
+    jniEnv: jniEnv ?? this.jniEnv,
+    surface: surface ?? this.surface,
   );
 
   @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    textures,
-    commandQueue,
-  ];
+  List<Object?> get _members => [logicalSize, window, jniEnv, surface];
   @override
-  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
+  String toString() => _describe('AndroidSurfaceDescriptor', const [
     'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-    'commandQueue',
+    'window',
+    'jniEnv',
+    'surface',
   ]);
 }
 
@@ -2880,7 +2849,8 @@ final class RenderSessionAttachOptions extends _Value {
   ///   dedicated EGL or WGL context, an existing WebGL context, or a browser's
   ///   WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a target whose context the library
-  ///   owns: a transferred WebGL canvas, or an offscreen session.
+  ///   owns: a transferred WebGL canvas, an Android window, or an offscreen
+  ///   session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
@@ -2950,6 +2920,89 @@ final class RenderSessionAttachOptions extends _Value {
     'redrawWake',
     'driverWorkWake',
     'queueLock',
+  ]);
+}
+
+/// A Metal texture of a borrowed ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTexture extends _Value {
+  const MetalBorrowedTexture({required this.texture});
+
+  /// Your MTLTexture.
+  final NativePointer texture;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
+      MetalBorrowedTexture(texture: texture ?? this.texture);
+
+  @override
+  List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
+}
+
+/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
+///
+/// `logical_size` sets the map's size. `physical_width` and `physical_height`
+/// give the textures' size in pixels, which is usually `logical_size` times the
+/// map's scale factor. The textures must all have that size, one device, one
+/// pixel format, one sample, and MTLTextureUsageRenderTarget.
+///
+/// The session uses the textures until a replacement or release of the target
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
+///
+/// See `mln_metal_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTextureDescriptor extends _Value {
+  MetalBorrowedTextureDescriptor({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<MetalBorrowedTexture> textures,
+    this.commandQueue = NativePointer.nullPointer,
+  }) : textures = List.unmodifiable(textures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<MetalBorrowedTexture> textures;
+
+  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
+  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
+  final NativePointer commandQueue;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTextureDescriptor copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+    NativePointer? commandQueue,
+  }) => MetalBorrowedTextureDescriptor(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    commandQueue: commandQueue ?? this.commandQueue,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    commandQueue,
+  ];
+  @override
+  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'commandQueue',
   ]);
 }
 
@@ -5172,6 +5225,58 @@ final class TextureReadbackResult extends _Value {
   @override
   String toString() =>
       _describe('TextureReadbackResult', const ['data', 'info']);
+}
+
+/// A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
+///
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns. It uses the window until a replacement or release of the
+/// target completes, a detach or release of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_android_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+final class AndroidSurfaceReplacement extends _Value {
+  const AndroidSurfaceReplacement({
+    required this.logicalSize,
+    this.window = NativePointer.nullPointer,
+    this.jniEnv = NativePointer.nullPointer,
+    this.surface = NativePointer.nullPointer,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `ANativeWindow*`, or null to name the window by `surface`.
+  final NativePointer window;
+
+  /// The calling thread's `JNIEnv*`, with `surface`.
+  final NativePointer jniEnv;
+
+  /// An `android.view.Surface`, with `jni_env`.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  AndroidSurfaceReplacement copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? window,
+    NativePointer? jniEnv,
+    NativePointer? surface,
+  }) => AndroidSurfaceReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    window: window ?? this.window,
+    jniEnv: jniEnv ?? this.jniEnv,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, window, jniEnv, surface];
+  @override
+  String toString() => _describe('AndroidSurfaceReplacement', const [
+    'logicalSize',
+    'window',
+    'jniEnv',
+    'surface',
+  ]);
 }
 
 /// New Metal textures for a borrowed ring, for

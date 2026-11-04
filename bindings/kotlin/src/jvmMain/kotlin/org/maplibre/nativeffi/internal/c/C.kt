@@ -165,6 +165,18 @@ internal actual object C {
     )
   private val mln_map_apply_camera_delta =
     Ffm.downcall("mln_map_apply_camera_delta", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_attach_android_surface =
+    Ffm.downcall(
+      "mln_map_attach_android_surface",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_attach_metal_borrowed_texture =
     Ffm.downcall(
       "mln_map_attach_metal_borrowed_texture",
@@ -951,6 +963,15 @@ internal actual object C {
     )
   private val mln_render_session_service_driver_work =
     Ffm.downcall("mln_render_session_service_driver_work", JAVA_INT, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_set_android_surface_target =
+    Ffm.downcall(
+      "mln_render_session_set_android_surface_target",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_render_session_set_frame_pacer =
     Ffm.downcall("mln_render_session_set_frame_pacer", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_set_metal_borrowed_texture_target =
@@ -1509,6 +1530,25 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int = mln_map_apply_camera_delta.invokeExact(map, delta, completion, outDiagnostic) as Int
+
+  actual fun mln_map_attach_android_surface(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_android_surface.invokeExact(
+      map,
+      descriptor,
+      device,
+      options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_map_attach_metal_borrowed_texture(
     map: Long,
@@ -2733,6 +2773,19 @@ internal actual object C {
 
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_render_session_service_driver_work.invokeExact(session, outDiagnostic) as Int
+
+  actual fun mln_render_session_set_android_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_render_session_set_android_surface_target.invokeExact(
+      session,
+      replacement,
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_render_session_set_frame_pacer(
     session: Long,

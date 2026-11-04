@@ -470,9 +470,10 @@ function(mln_native_configure_suite target registry_dir)
     find_package(Threads REQUIRED)
     target_link_libraries(${target} PRIVATE Threads::Threads)
   endif()
-  # The Android cases run an ALooper of their own, as an app's main thread does.
+  # The Android cases run an ALooper of their own, as an app's main thread does,
+  # and present to an AImageReader's window in place of an app's.
   if(ANDROID)
-    target_link_libraries(${target} PRIVATE android)
+    target_link_libraries(${target} PRIVATE android mediandk)
   endif()
   # The Metal test support defines an Objective-C class, which the iOS and
   # tvOS test app links against the runtime and Foundation directly.

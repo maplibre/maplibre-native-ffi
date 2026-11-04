@@ -494,6 +494,24 @@ pub const MLN_WEB_GL_CONTEXT_EXISTING: mln_web_gl_context_kind = 0;
 pub const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS: mln_web_gl_context_kind = 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_android_surface_descriptor {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub window: *mut std::ffi::c_void,
+    pub jni_env: *mut std::ffi::c_void,
+    pub surface: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_android_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub window: *mut std::ffi::c_void,
+    pub jni_env: *mut std::ffi::c_void,
+    pub surface: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_animation_options {
     pub fields: mln_animation_option_fields,
     pub duration_ms: f64,
@@ -2204,6 +2222,15 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_attach_android_surface(
+        map: mln_map,
+        descriptor: *const mln_android_surface_descriptor,
+        device: mln_vulkan_device,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_attach_metal_borrowed_texture(
         map: mln_map,
         descriptor: *const mln_metal_borrowed_texture_descriptor,
@@ -2911,6 +2938,12 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_service_driver_work(
         session: mln_render_session,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_android_surface_target(
+        session: mln_render_session,
+        replacement: *const mln_android_surface_replacement,
+        completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_frame_pacer(

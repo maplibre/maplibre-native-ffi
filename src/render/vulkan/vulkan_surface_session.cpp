@@ -4,6 +4,11 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#if defined(__ANDROID__)
+#include <mutex>
+#include <optional>
+#include <string>
+#endif
 
 #include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/renderable.hpp>
@@ -20,6 +25,9 @@
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/surface.h"
+#if defined(__ANDROID__)
+#include "render/android_surface_session.hpp"
+#endif
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 #include "render/vulkan/vulkan_device.hpp"
@@ -593,9 +601,233 @@ class VulkanSurfaceSessionBackend final
   VulkanSurfaceBackend backend_;
 };
 
+#if defined(__ANDROID__)
+// A VkSurfaceKHR that the library made for an Android window.
+class OwnedVulkanSurface final {
+ public:
+  OwnedVulkanSurface() = default;
+  OwnedVulkanSurface(
+    VkInstance instance, VkSurfaceKHR surface, PFN_vkDestroySurfaceKHR destroy
+  )
+      : instance_(instance), surface_(surface), destroy_(destroy) {}
+  OwnedVulkanSurface(const OwnedVulkanSurface&) = delete;
+  auto operator=(const OwnedVulkanSurface&) -> OwnedVulkanSurface& = delete;
+  OwnedVulkanSurface(OwnedVulkanSurface&& other) noexcept
+      : instance_(other.instance_),
+        surface_(std::exchange(other.surface_, VK_NULL_HANDLE)),
+        destroy_(other.destroy_) {}
+  auto operator=(OwnedVulkanSurface&& other) noexcept -> OwnedVulkanSurface& {
+    if (this != &other) {
+      reset();
+      instance_ = other.instance_;
+      surface_ = std::exchange(other.surface_, VK_NULL_HANDLE);
+      destroy_ = other.destroy_;
+    }
+    return *this;
+  }
+  ~OwnedVulkanSurface() { reset(); }
+
+  void reset() noexcept {
+    if (surface_ != VK_NULL_HANDLE) destroy_(instance_, surface_, nullptr);
+    surface_ = VK_NULL_HANDLE;
+  }
+
+  [[nodiscard]] auto handle() const noexcept
+    -> mln_vulkan_non_dispatchable_handle {
+    return mln::core::vulkan_handle_to_abi(surface_);
+  }
+
+ private:
+  VkInstance instance_ = VK_NULL_HANDLE;
+  VkSurfaceKHR surface_ = VK_NULL_HANDLE;
+  PFN_vkDestroySurfaceKHR destroy_ = nullptr;
+};
+
+auto create_android_vulkan_surface(
+  const mln_vulkan_context_descriptor& context, ANativeWindow* window,
+  OwnedVulkanSurface& out_surface
+) -> mln_status {
+  auto dispatcher = mln::core::vulkan_dispatch_loader(context);
+  mln::core::vulkan_init_instance_dispatch(dispatcher, context);
+  if (
+    dispatcher.vkCreateAndroidSurfaceKHR == nullptr ||
+    dispatcher.vkDestroySurfaceKHR == nullptr
+  ) {
+    mln::core::set_thread_error(
+      "the Vulkan instance can't present to Android windows"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  auto* const instance = static_cast<VkInstance>(context.instance);
+  const auto info = VkAndroidSurfaceCreateInfoKHR{
+    .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+    .pNext = nullptr,
+    .flags = 0,
+    .window = window,
+  };
+  auto surface = VkSurfaceKHR{VK_NULL_HANDLE};
+  const auto result =
+    dispatcher.vkCreateAndroidSurfaceKHR(instance, &info, nullptr, &surface);
+  if (result != VK_SUCCESS) {
+    const auto message = "vkCreateAndroidSurfaceKHR failed with VkResult " +
+                         std::to_string(result);
+    mln::core::set_thread_error(message.c_str());
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  out_surface =
+    OwnedVulkanSurface{instance, surface, dispatcher.vkDestroySurfaceKHR};
+  return MLN_STATUS_OK;
+}
+
+// The device that Android surface sessions without a device of their own share.
+// It lasts while one of them does, and the next one creates it again.
+auto shared_presentation_device(
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status {
+  struct Shared {
+    std::mutex mutex;
+    std::weak_ptr<const mln_vulkan_context_descriptor> device;
+  };
+  // Leaked, so a session that lets go of the device while the process exits
+  // never finds this destroyed.
+  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+  static auto* const shared = new Shared();
+  const auto lock = std::scoped_lock{shared->mutex};
+  if (auto device = shared->device.lock()) {
+    out_context = std::move(device);
+    return MLN_STATUS_OK;
+  }
+  auto selection = mln::core::VulkanDeviceSelection{};
+  selection.presentation = true;
+  const auto status =
+    mln::core::create_vulkan_device(selection, std::nullopt, out_context);
+  if (status == MLN_STATUS_OK) shared->device = out_context;
+  return status;
+}
+
+// Presents to an Android window through a VkSurfaceKHR that it creates for
+// each window and destroys once the swapchain no longer uses it.
+class AndroidVulkanSurfaceSessionBackend final
+    : public mln::core::SurfaceSessionBackend {
+ public:
+  AndroidVulkanSurfaceSessionBackend(
+    mln::core::AndroidWindow window, OwnedVulkanSurface surface,
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
+  )
+      : context_(descriptor.context),
+        window_(std::move(window)),
+        surface_(std::move(surface)),
+        session_(descriptor, size, std::move(queue_lock)) {}
+
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
+    return session_.renderer_backend();
+  }
+
+  void resize(uint32_t physical_width, uint32_t physical_height) override {
+    session_.resize(physical_width, physical_height);
+  }
+
+  auto prepare_frame(bool& out_ready) -> mln_status override {
+    return session_.prepare_frame(out_ready);
+  }
+
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return session_.allows_off_thread_teardown();
+  }
+
+  auto prepare_off_thread_teardown() noexcept -> bool override {
+    return session_.prepare_off_thread_teardown();
+  }
+
+  void quarantine() noexcept override { session_.quarantine(); }
+
+  auto set_android_target(
+    const mln::core::AndroidWindow& window, mln::Size physical_size
+  ) -> mln_status override {
+    if (window == window_) {
+      session_.resize(physical_size.width, physical_size.height);
+      return MLN_STATUS_OK;
+    }
+    auto next = OwnedVulkanSurface{};
+    const auto create_status =
+      create_android_vulkan_surface(context_, window.get(), next);
+    if (create_status != MLN_STATUS_OK) return create_status;
+    const auto replacement = mln_vulkan_surface_replacement{
+      .size = sizeof(mln_vulkan_surface_replacement),
+      .logical_size = {},
+      .surface = next.handle(),
+    };
+    auto status = MLN_STATUS_OK;
+    try {
+      status = session_.set_vulkan_target(replacement, physical_size);
+    } catch (...) {
+      // The swapchain may use either surface now, so both last as long as it.
+      abandoned_.push_back(std::move(next));
+      throw;
+    }
+    if (status != MLN_STATUS_OK) return status;
+    // The swapchain no longer uses the old surface, which goes before its
+    // window.
+    surface_ = std::move(next);
+    window_ = window;
+    return MLN_STATUS_OK;
+  }
+
+  auto release_target() -> mln_status override {
+    const auto status = session_.release_target();
+    if (status != MLN_STATUS_OK) return status;
+    surface_.reset();
+    window_.reset();
+    return MLN_STATUS_OK;
+  }
+
+ private:
+  mln_vulkan_context_descriptor context_;
+  mln::core::AndroidWindow window_;
+  OwnedVulkanSurface surface_;
+  // Surfaces that a failed replacement left the swapchain possibly using.
+  std::vector<OwnedVulkanSurface> abandoned_;
+  // Destroyed first, so the swapchain goes before the surfaces and windows.
+  VulkanSurfaceSessionBackend session_;
+};
+#endif
+
 }  // namespace
 
 namespace mln::core {
+
+#if defined(__ANDROID__)
+auto create_android_surface_backend(
+  AndroidSurfaceAttach attach, mln_render_session_object& target
+) -> mln_status {
+  auto device = std::move(attach.device);
+  if (device == nullptr) {
+    const auto device_status = shared_presentation_device(device);
+    if (device_status != MLN_STATUS_OK) return device_status;
+  }
+  auto surface = OwnedVulkanSurface{};
+  const auto surface_status =
+    create_android_vulkan_surface(*device, attach.window.get(), surface);
+  if (surface_status != MLN_STATUS_OK) return surface_status;
+  const auto descriptor = mln_vulkan_surface_descriptor{
+    .size = sizeof(mln_vulkan_surface_descriptor),
+    .logical_size = {.width = target.width, .height = target.height},
+    .context = *device,
+    .surface = surface.handle(),
+  };
+  const auto handles_status = validate_vulkan_handles(descriptor);
+  if (handles_status != MLN_STATUS_OK) return handles_status;
+  auto backend = std::make_unique<AndroidVulkanSurfaceSessionBackend>(
+    std::move(attach.window), std::move(surface), descriptor,
+    mln::Size{target.physical_width, target.physical_height}, target.queue_lock
+  );
+  backend->retain(std::move(device));
+  target.surface.backend = std::move(backend);
+  return MLN_STATUS_OK;
+}
+#endif
 
 auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,

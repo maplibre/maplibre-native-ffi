@@ -332,14 +332,51 @@ static jlong mln_jni_upcall_stub(JNIEnv* env, jclass type, jstring name) {
   return stub;
 }
 
-// mln_android_init takes the calling JNIEnv and the Context object, the one C
-// call whose arguments are Java references.
+// mln_android_init takes the calling JNIEnv and the Context object, and an
+// Android surface's descriptor and replacement can name their window by the
+// calling JNIEnv and a Surface object. These are the C calls whose arguments
+// are Java references, which are valid only during the JNI call.
 static jint mln_jni_android_init(
   JNIEnv* env, jclass type, jobject context, jlong diagnostic
 ) {
   (void)type;
   return (jint)mln_android_init(
     env, context, MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
+  );
+}
+
+static jint mln_jni_map_attach_android_surface(
+  JNIEnv* env, jclass type, jlong map, jlong descriptor, jobject surface,
+  jlong device, jlong options, jlong out_session, jlong completion,
+  jlong diagnostic
+) {
+  (void)type;
+  mln_android_surface_descriptor* named =
+    MLN_JNI_POINTER(mln_android_surface_descriptor*, descriptor);
+  named->jni_env = env;
+  named->surface = surface;
+  return (jint)mln_map_attach_android_surface(
+    (mln_map)map, named, (mln_vulkan_device)device,
+    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
+    MLN_JNI_POINTER(mln_render_session*, out_session),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
+  );
+}
+
+static jint mln_jni_render_session_set_android_surface_target(
+  JNIEnv* env, jclass type, jlong session, jlong replacement, jobject surface,
+  jlong completion, jlong diagnostic
+) {
+  (void)type;
+  mln_android_surface_replacement* named =
+    MLN_JNI_POINTER(mln_android_surface_replacement*, replacement);
+  named->jni_env = env;
+  named->surface = surface;
+  return (jint)mln_render_session_set_android_surface_target(
+    (mln_render_session)session, named,
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
   );
 }
 
@@ -357,6 +394,10 @@ static void mln_jni_call_user_data_release(
 static const JNINativeMethod mln_jni_runtime_methods[] = {
   {"upcallStub", "(Ljava/lang/String;)J", (void*)mln_jni_upcall_stub},
   {"androidInit", "(Ljava/lang/Object;J)I", (void*)mln_jni_android_init},
+  {"mapAttachAndroidSurface", "(JJLjava/lang/Object;JJJJJ)I",
+   (void*)mln_jni_map_attach_android_surface},
+  {"renderSessionSetAndroidSurfaceTarget", "(JJLjava/lang/Object;JJ)I",
+   (void*)mln_jni_render_session_set_android_surface_target},
   {"callUserDataRelease", "(JJ)V", (void*)mln_jni_call_user_data_release},
 };
 
