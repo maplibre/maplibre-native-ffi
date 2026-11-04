@@ -2,6 +2,7 @@
 #include <any>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -957,12 +958,24 @@ auto validate_custom_geometry_source_options(
     mln::core::set_thread_error("tolerance must be finite and non-negative");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
-    mln::core::set_thread_error("tile_size must be within [1, 65535]");
+  // The engine scales a tile's geometry to util::EXTENT by the whole number
+  // EXTENT / tile_size, and stores the scaled buffer in a uint16_t.
+  constexpr auto extent = static_cast<uint32_t>(mln::util::EXTENT);
+  if (
+    !std::has_single_bit(effective.tile_size) || effective.tile_size > extent
+  ) {
+    mln::core::set_thread_error(
+      "tile_size must be a power of two within [1, 8192]"
+    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (effective.buffer > 65535U) {
-    mln::core::set_thread_error("buffer must be at most 65535");
+  const auto max_buffer =
+    std::numeric_limits<uint16_t>::max() / (extent / effective.tile_size);
+  if (effective.buffer > max_buffer) {
+    const auto message = "buffer must be at most " +
+                         std::to_string(max_buffer) + " for a tile_size of " +
+                         std::to_string(effective.tile_size);
+    mln::core::set_thread_error(message.c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
@@ -1335,6 +1348,21 @@ auto add_callback_source(
   }
 }
 
+// The engine's custom geometry tile draws only a feature collection, and an
+// empty tile for anything else.
+auto to_feature_collection(mln::GeoJSON geojson) -> mln::FeatureCollection {
+  if (geojson.is<mln::FeatureCollection>()) {
+    return std::move(geojson.get<mln::FeatureCollection>());
+  }
+  auto features = mln::FeatureCollection{};
+  if (geojson.is<mln::GeoJSONFeature>()) {
+    features.push_back(std::move(geojson.get<mln::GeoJSONFeature>()));
+  } else {
+    features.emplace_back(std::move(geojson.get<mln::Geometry<double>>()));
+  }
+  return features;
+}
+
 }  // namespace
 
 auto map_add_custom_geometry_source(
@@ -1396,7 +1424,10 @@ auto map_set_custom_geometry_source_tile_data(
   if (source_status != MLN_STATUS_OK) {
     return source_status;
   }
-  custom_source->setTileData(to_native_canonical_tile_id(tile_id), *geojson);
+  custom_source->setTileData(
+    to_native_canonical_tile_id(tile_id),
+    to_feature_collection(std::move(*geojson))
+  );
   return MLN_STATUS_OK;
 }
 

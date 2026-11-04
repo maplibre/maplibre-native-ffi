@@ -29,7 +29,8 @@ public sealed record CustomGeometrySourceOptions
 
     /// <summary>
     /// The width in pixels of the margin around a tile that holds geometry from
-    /// beyond its edges.
+    /// beyond its edges. <c>buffer</c> times 8192 / <c>tile_size</c> must be at
+    /// most 65535.
     /// </summary>
     public uint? Buffer { get; init; }
 

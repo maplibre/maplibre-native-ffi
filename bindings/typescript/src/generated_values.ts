@@ -502,7 +502,7 @@ export interface CustomGeometrySourceOptions {
   tileSize?: number;
   /**
    * The width in pixels of the margin around a tile that holds geometry from
-   * beyond its edges.
+   * beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
    */
   buffer?: number;
   /**

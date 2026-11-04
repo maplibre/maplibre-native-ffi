@@ -988,8 +988,8 @@ pub const Map = struct {
 
     /// Sets the data of a tile in a custom geometry source.
     ///
-    /// `data` is a GeoJSON feature collection. The source ignores data for a tile
-    /// that it hasn't asked for, or has since cancelled.
+    /// `data` is a GeoJSON feature collection, feature, or geometry. The source
+    /// ignores data for a tile that it hasn't asked for, or has since cancelled.
     ///
     /// See `mln_map_set_custom_geometry_source_tile_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3215,7 +3215,8 @@ pub const CustomGeometrySourceOptions = struct {
     /// The width of a tile in pixels, a power of two no larger than 8192.
     tile_size: ?u32 = null,
     /// The width in pixels of the margin around a tile that holds geometry from
-    /// beyond its edges.
+    /// beyond its edges. `buffer` times 8192 / `tile_size` must be at most
+    /// 65535.
     buffer: ?u32 = null,
     /// Whether to cut geometry at the outer edge of a tile's margin.
     clip: ?bool = null,

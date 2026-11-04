@@ -608,8 +608,8 @@ public extension MapHandle {
 
   /// Sets the data of a tile in a custom geometry source.
   ///
-  /// `data` is a GeoJSON feature collection. The source ignores data for a tile
-  /// that it hasn't asked for, or has since cancelled.
+  /// `data` is a GeoJSON feature collection, feature, or geometry. The source
+  /// ignores data for a tile that it hasn't asked for, or has since cancelled.
   ///
   /// See `mln_map_set_custom_geometry_source_tile_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

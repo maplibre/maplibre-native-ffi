@@ -1822,8 +1822,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Sets the data of a tile in a custom geometry source.
     /// </summary>
     /// <remarks>
-    /// <para><c>data</c> is a GeoJSON feature collection. The source ignores
-    /// data for a tile that it hasn't asked for, or has since cancelled.</para>
+    /// <para><c>data</c> is a GeoJSON feature collection, feature, or geometry.
+    /// The source ignores data for a tile that it hasn't asked for, or has
+    /// since cancelled.</para>
     /// <para>See <c>mln_map_set_custom_geometry_source_tile_data</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>

@@ -4314,7 +4314,10 @@ public data class CustomGeometrySourceOptions(
   public val tolerance: Double? = null,
   /** The width of a tile in pixels, a power of two no larger than 8192. */
   public val tileSize: UInt? = null,
-  /** The width in pixels of the margin around a tile that holds geometry from beyond its edges. */
+  /**
+   * The width in pixels of the margin around a tile that holds geometry from beyond its edges.
+   * `buffer` times 8192 / `tile_size` must be at most 65535.
+   */
   public val buffer: UInt? = null,
   /** Whether to cut geometry at the outer edge of a tile's margin. */
   public val clip: Boolean? = null,
