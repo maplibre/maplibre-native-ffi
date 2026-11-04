@@ -192,6 +192,9 @@ pub struct FfiMapObserver {
     shared: Arc<MapShared>,
     /// The last style load failure, for set_style_json's completion.
     pub load_error: RefCell<Option<String>>,
+    /// The runtime style images that stay while no layer uses them
+    /// (style_images.rs).
+    pub kept_style_images: RefCell<std::collections::HashSet<String>>,
 }
 
 impl FfiMapObserver {
@@ -267,6 +270,8 @@ impl MapObserver for FfiMapObserver {
         }
     }
     fn on_did_finish_loading_style(&self) {
+        // The new style dropped every runtime image.
+        self.kept_style_images.borrow_mut().clear();
         self.shared.emit(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, |_| {});
     }
     fn on_did_become_idle(&self) {
@@ -276,6 +281,9 @@ impl MapObserver for FfiMapObserver {
     }
     fn on_style_image_missing(&self, id: &str) {
         self.shared.emit(MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, |e| e.message = id.to_owned());
+    }
+    fn on_can_remove_unused_style_image(&self, id: &str) -> bool {
+        !self.kept_style_images.borrow().contains(id)
     }
 }
 
@@ -359,8 +367,8 @@ pub unsafe extern "C" fn mln_runtime_create_map(
                 return Err(Failure::invalid_argument("options.fields has unknown bits"));
             }
             let event_mask = if options.fields & MLN_MAP_OPTION_EVENT_MASK != 0 {
-                if options.event_mask & !MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS != 0 {
-                    return Err(Failure::invalid_argument("event_mask has bits that aren't map events"));
+                if options.event_mask & !MLN_RUNTIME_EVENT_FLAG_ALL != 0 {
+                    return Err(Failure::invalid_argument("mln_map_options.event_mask contains unknown bits"));
                 }
                 options.event_mask
             } else {
@@ -386,7 +394,11 @@ pub unsafe extern "C" fn mln_runtime_create_map(
 
             let fast_pfor = options.fast_pfor_enabled;
             runtime.clone().post(move || {
-                let observer = Rc::new(FfiMapObserver { shared: shared.clone(), load_error: RefCell::new(None) });
+                let observer = Rc::new(FfiMapObserver {
+                    shared: shared.clone(),
+                    load_error: RefCell::new(None),
+                    kept_style_images: RefCell::default(),
+                });
                 let size = Size::new(extent.width, extent.height);
                 let frontend = ProxyFrontend::new(mode_of(shared.mode), extent.scale_factor as f32);
                 let map = Map::with_resource_options(

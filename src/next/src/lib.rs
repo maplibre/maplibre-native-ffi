@@ -11,8 +11,10 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod base;
+mod custom_sources;
 mod delivery;
 mod diagnostics;
+mod geojson_data;
 mod handles;
 mod logging;
 mod map;
@@ -20,5 +22,7 @@ mod plugin;
 mod runtime;
 mod session;
 mod stubs;
+mod style_images;
+mod style_sources;
 mod surface_session;
 mod types;

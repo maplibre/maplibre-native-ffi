@@ -127,6 +127,34 @@ pub enum Value {
     Readback { pixels: Vec<u8>, info: mln_texture_image_info },
     /// An `mln_camera_query_result`.
     Camera(mln_camera_query_result),
+    /// C structs that point into storage they own (see `Lent`).
+    Lent(Lent),
+}
+
+/// C structs that a completion lends, with the storage their views point
+/// into: `count` structs of `size` bytes at `ptr`.
+pub struct Lent {
+    ptr: *const c_void,
+    size: usize,
+    count: usize,
+    _storage: Box<dyn std::any::Any>,
+}
+
+// SAFETY: `ptr` and the views in the structs point into `_storage`, which
+// moves with them and which nothing else references.
+unsafe impl Send for Lent {}
+
+impl Lent {
+    /// Lends `structs`, keeping `storage` alive with them.
+    ///
+    /// # Safety
+    /// Every pointer in `structs` points at static data or into heap memory
+    /// that `storage` owns, which moving `storage` doesn't relocate.
+    pub unsafe fn new<T: 'static, S: 'static>(structs: Vec<T>, storage: S) -> Lent {
+        let ptr = structs.as_ptr().cast();
+        let count = structs.len();
+        Lent { ptr, size: size_of::<T>(), count, _storage: Box::new((structs, storage)) }
+    }
 }
 
 impl Completion {
@@ -203,6 +231,7 @@ impl Completion {
                     ((&raw const readback).cast(), size_of::<mln_texture_readback_result>(), 1)
                 }
                 Value::Camera(ref camera) => ((&raw const *camera).cast(), size_of::<mln_camera_query_result>(), 1),
+                Value::Lent(ref lent) => (lent.ptr, lent.size, lent.count),
             };
             let disposition = if status == MLN_STATUS_OK {
                 MLN_COMMAND_DISPOSITION_COMMITTED

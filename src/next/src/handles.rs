@@ -26,6 +26,7 @@ pub enum Kind {
     Map = 2,
     RenderSession = 4,
     RenderFrameBatch = 21,
+    GeoJsonSourceData = 22,
     DeliveryQueue = 23,
     OffscreenDevice = 26,
 }
@@ -79,6 +80,7 @@ pub enum Object {
     // Held so the batch's results stay valid until its release.
     #[allow(dead_code)]
     FrameBatch(Arc<FrameBatch>),
+    GeoJsonSourceData(Arc<crate::geojson_data::PreparedGeoJson>),
     OffscreenDevice,
 }
 
@@ -90,6 +92,7 @@ impl Object {
             Object::Session(_) => Kind::RenderSession,
             Object::Queue(_) => Kind::DeliveryQueue,
             Object::FrameBatch(_) => Kind::RenderFrameBatch,
+            Object::GeoJsonSourceData(_) => Kind::GeoJsonSourceData,
             Object::OffscreenDevice => Kind::OffscreenDevice,
         }
     }
