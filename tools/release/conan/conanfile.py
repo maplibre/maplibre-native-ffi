@@ -86,13 +86,6 @@ class MaplibreNativeC(ConanFile):
             raise ConanInvalidConfiguration(f"No native archive for {key}") from None
 
     def validate(self):
-        if (
-            self.settings.os == "Windows"
-            and self.settings.get_safe("compiler.runtime") == "static"
-        ):
-            raise ConanInvalidConfiguration(
-                "Windows archives link the dynamic CRT; use compiler.runtime=dynamic"
-            )
         self._source()
 
     def _libraries(self):

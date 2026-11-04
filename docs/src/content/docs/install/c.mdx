@@ -42,9 +42,8 @@ cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
 On Windows, put `<prefix>/bin` on `PATH`, or copy the DLLs in it next to the
-executable. With MSVC, they include the Visual C++ runtime, which the static
-library needs too. On other platforms, the executable finds the library through
-the rpath that pkg-config adds.
+executable. On other platforms, the executable finds the library through the
+rpath that pkg-config adds.
 
 ## Package managers
 

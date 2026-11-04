@@ -23,10 +23,6 @@
 //! `DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND` and the install prefix from
 //! `DEP_MAPLIBRE_NATIVE_C_PREFIX`.
 //!
-//! On MSVC targets, the archive links the dynamic CRT, so `+crt-static` fails to
-//! link. The executable imports the Visual C++ runtime, whose DLLs the install
-//! prefix's `bin` directory carries.
-//!
 //! On `x86_64-pc-windows-gnu`, link with MSYS2's MINGW64 Clang and LLD
 //! (`-C link-arg=-fuse-ld=lld`). Its MSVCRT and libstdc++ must match the native
 //! artifact. Keep MINGW64's `bin` directory on `PATH` for the runtime DLLs.
