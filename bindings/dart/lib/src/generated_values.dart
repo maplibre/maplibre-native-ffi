@@ -1496,6 +1496,64 @@ final class AndroidHardwareBufferFrame extends _Value {
   ]);
 }
 
+/// The dmabuf of an acquired frame.
+///
+/// See `mln_dma_buf_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+final class DmaBufFrame extends _Value {
+  const DmaBufFrame({
+    this.width = 0,
+    this.height = 0,
+    this.scaleFactor = 0,
+    this.slot = 0,
+    this.fourcc = 0,
+    this.modifier = 0,
+    this.fd = 0,
+    this.offset = 0,
+    this.stride = 0,
+  });
+  final int width;
+  final int height;
+  final double scaleFactor;
+
+  /// The buffer's index in the ring.
+  final int slot;
+  final int fourcc;
+  final int modifier;
+  final int fd;
+
+  /// The bytes from the start of the buffer to its first pixel.
+  final int offset;
+
+  /// The bytes from the start of one row to the start of the next.
+  final int stride;
+
+  @override
+  List<Object?> get _members => [
+    width,
+    height,
+    scaleFactor,
+    slot,
+    fourcc,
+    modifier,
+    fd,
+    offset,
+    stride,
+  ];
+  @override
+  String toString() => _describe('DmaBufFrame', const [
+    'width',
+    'height',
+    'scaleFactor',
+    'slot',
+    'fourcc',
+    'modifier',
+    'fd',
+    'offset',
+    'stride',
+  ]);
+}
+
 /// The Metal texture of an acquired frame.
 ///
 /// See `mln_metal_texture_frame` in the
@@ -2835,7 +2893,7 @@ final class RenderSessionAttachOptions extends _Value {
   ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
   ///   or OpenHarmony window, a Wayland surface, a ring of Android hardware
-  ///   buffers, or an offscreen session.
+  ///   buffers or dmabufs, or an offscreen session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
@@ -2953,6 +3011,76 @@ final class AndroidSurfaceDescriptor extends _Value {
     'window',
     'jniEnv',
     'surface',
+  ]);
+}
+
+/// A DRM format and modifier that you can import.
+///
+/// See `mln_dma_buf_format` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+final class DmaBufFormat extends _Value {
+  const DmaBufFormat({this.fourcc = 0, this.modifier = 0});
+
+  /// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+  final int fourcc;
+
+  /// A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+  final int modifier;
+
+  /// A copy of this value with the given members replaced.
+  DmaBufFormat copyWith({int? fourcc, int? modifier}) => DmaBufFormat(
+    fourcc: fourcc ?? this.fourcc,
+    modifier: modifier ?? this.modifier,
+  );
+
+  @override
+  List<Object?> get _members => [fourcc, modifier];
+  @override
+  String toString() => _describe('DmaBufFormat', const ['fourcc', 'modifier']);
+}
+
+/// A ring of dmabufs that the library allocates, for
+/// `MapHandle.attachDmaBufRing()`.
+///
+/// Each buffer has the map's size in pixels and a format and modifier from
+/// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
+/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+///
+/// See `mln_dma_buf_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+final class DmaBufRingDescriptor extends _Value {
+  DmaBufRingDescriptor({
+    required this.logicalSize,
+    required this.bufferCount,
+    required List<DmaBufFormat> formats,
+  }) : formats = List.unmodifiable(formats);
+  final LogicalSize logicalSize;
+
+  /// How many buffers the ring has, from 1 to 8.
+  final int bufferCount;
+
+  /// The formats and modifiers that your reader imports, most preferred first,
+  /// such as those that eglQueryDmaBufModifiersEXT() reports.
+  final List<DmaBufFormat> formats;
+
+  /// A copy of this value with the given members replaced.
+  DmaBufRingDescriptor copyWith({
+    LogicalSize? logicalSize,
+    int? bufferCount,
+    List<DmaBufFormat>? formats,
+  }) => DmaBufRingDescriptor(
+    logicalSize: logicalSize ?? this.logicalSize,
+    bufferCount: bufferCount ?? this.bufferCount,
+    formats: formats ?? this.formats,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, bufferCount, formats];
+  @override
+  String toString() => _describe('DmaBufRingDescriptor', const [
+    'logicalSize',
+    'bufferCount',
+    'formats',
   ]);
 }
 

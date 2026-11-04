@@ -35,6 +35,9 @@ auto validate_webgpu_borrowed_texture_descriptor(
 auto validate_android_hardware_buffer_ring_descriptor(
   const mln_android_hardware_buffer_ring_descriptor* descriptor
 ) -> mln_status;
+auto validate_dma_buf_ring_descriptor(
+  const mln_dma_buf_ring_descriptor* descriptor
+) -> mln_status;
 auto validate_metal_borrowed_texture_replacement(
   const mln_metal_borrowed_texture_replacement* replacement
 ) -> mln_status;
@@ -104,6 +107,9 @@ auto acquired_frame_get_webgpu_texture(
 ) -> mln_status;
 auto acquired_frame_get_android_hardware_buffer(
   mln_acquired_frame frame, mln_android_hardware_buffer_frame* out_frame
+) -> mln_status;
+auto acquired_frame_get_dma_buf(
+  mln_acquired_frame frame, mln_dma_buf_frame* out_frame
 ) -> mln_status;
 
 }  // namespace mln::core

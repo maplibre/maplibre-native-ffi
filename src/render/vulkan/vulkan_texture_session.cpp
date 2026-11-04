@@ -1,3 +1,4 @@
+#include <any>
 #include <cstdint>
 #include <exception>
 #include <memory>
@@ -23,6 +24,18 @@
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
+
+// Linux and FreeBSD sessions can render into dmabufs that they allocate.
+// Android and OpenHarmony define __linux__ too.
+#if (defined(__linux__) || defined(__FreeBSD__)) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+#define MLN_FFI_VULKAN_DMA_BUFS 1
+#include <algorithm>
+#include <bit>
+#include <stdexcept>
+
+#include "render/dma_buf_session.hpp"
+#endif
 
 #if defined(__ANDROID__)
 #include <bit>
@@ -363,19 +376,10 @@ class VulkanTextureSessionBackend final
         "rendered Vulkan image is not available"
       );
     }
-#if defined(__ANDROID__)
-    if (resources.buffer != nullptr) {
-      out_metadata = mln_android_hardware_buffer_frame{
-        .size = sizeof(mln_android_hardware_buffer_frame),
-        .width = frame.physical_width,
-        .height = frame.physical_height,
-        .scale_factor = frame.scale_factor,
-        .slot = frame.slot,
-        .buffer = resources.buffer,
-      };
+    if (resources.exported != nullptr) {
+      out_metadata = resources.exported->frame_metadata(frame);
       return MLN_STATUS_OK;
     }
-#endif
     out_metadata = mln_vulkan_texture_frame{
       .size = sizeof(mln_vulkan_texture_frame),
       .width = frame.physical_width,
@@ -599,7 +603,17 @@ class HardwareBufferImage final : public VulkanSlotImage {
 
   [[nodiscard]] auto image() const -> vk::Image override { return *image_; }
   [[nodiscard]] auto view() const -> vk::ImageView override { return *view_; }
-  [[nodiscard]] auto buffer() const -> void* override { return buffer_.get(); }
+  [[nodiscard]] auto frame_metadata(const RenderFrameMetadata& frame) const
+    -> std::any override {
+    return mln_android_hardware_buffer_frame{
+      .size = sizeof(mln_android_hardware_buffer_frame),
+      .width = frame.physical_width,
+      .height = frame.physical_height,
+      .scale_factor = frame.scale_factor,
+      .slot = frame.slot,
+      .buffer = buffer_.get(),
+    };
+  }
 
  private:
   // Declared in reverse of the order they must be destroyed in.
@@ -671,6 +685,318 @@ auto configure_android_hardware_buffer_session(
     live.texture.backend = std::move(backend);
     return MLN_STATUS_OK;
   };
+  return MLN_STATUS_OK;
+}
+#endif
+
+#if defined(MLN_FFI_VULKAN_DMA_BUFS)
+namespace {
+
+constexpr auto dma_buf_usage =
+  vk::ImageUsageFlags{vk::ImageUsageFlagBits::eColorAttachment} |
+  vk::ImageUsageFlagBits::eSampled;
+
+auto dma_buf_vk_format(uint32_t fourcc) -> vk::Format {
+  return fourcc == drm_format_argb8888 ? vk::Format::eB8G8R8A8Unorm
+                                       : vk::Format::eR8G8B8A8Unorm;
+}
+
+// What a ring's images take: a format, the modifiers that the device may pick
+// from for each image, and the device's memory types.
+struct VulkanDmaBufFormat {
+  uint32_t fourcc = 0;
+  vk::Format format = vk::Format::eUndefined;
+  std::vector<uint64_t> modifiers;
+  std::vector<vk::MemoryPropertyFlags> memory_types;
+};
+
+// The memory type of an image that `bits` allows. A linear image goes where
+// the CPU can map it, so that a reader can map its dmabuf.
+auto dma_buf_memory_type(
+  uint32_t bits, const std::vector<vk::MemoryPropertyFlags>& types, bool linear
+) -> uint32_t {
+  const auto mappable =
+    vk::MemoryPropertyFlags{vk::MemoryPropertyFlagBits::eHostVisible};
+  const auto local =
+    vk::MemoryPropertyFlags{vk::MemoryPropertyFlagBits::eDeviceLocal};
+  const auto preferred =
+    linear ? std::vector{local | mappable, mappable} : std::vector{local};
+  for (const auto flags : preferred) {
+    for (auto index = uint32_t{0}; index < types.size(); ++index) {
+      if (((bits >> index) & 1U) != 0 && (types[index] & flags) == flags) {
+        return index;
+      }
+    }
+  }
+  return static_cast<uint32_t>(std::countr_zero(bits));
+}
+
+// The modifiers that lay `format` out in one plane, which the device renders
+// and samples.
+auto device_modifiers(
+  vk::PhysicalDevice physical_device,
+  const mln::vulkan::DispatchLoaderDynamic& dispatcher, vk::Format format
+) -> std::vector<vk::DrmFormatModifierPropertiesEXT> {
+  auto list = vk::DrmFormatModifierPropertiesListEXT{};
+  auto properties = vk::FormatProperties2{};
+  properties.pNext = &list;
+  physical_device.getFormatProperties2(format, &properties, dispatcher);
+  auto modifiers = std::vector<vk::DrmFormatModifierPropertiesEXT>(
+    list.drmFormatModifierCount
+  );
+  list.pDrmFormatModifierProperties = modifiers.data();
+  physical_device.getFormatProperties2(format, &properties, dispatcher);
+  modifiers.resize(list.drmFormatModifierCount);
+  const auto features =
+    vk::FormatFeatureFlags{vk::FormatFeatureFlagBits::eColorAttachment} |
+    vk::FormatFeatureFlagBits::eSampledImage;
+  std::erase_if(modifiers, [features](const auto& modifier) {
+    return modifier.drmFormatModifierPlaneCount != 1 ||
+           (modifier.drmFormatModifierTilingFeatures & features) != features;
+  });
+  return modifiers;
+}
+
+// Whether the device exports a dmabuf of an image in `format` with
+// `modifier`.
+auto exports_dma_buf(
+  vk::PhysicalDevice physical_device,
+  const mln::vulkan::DispatchLoaderDynamic& dispatcher, vk::Format format,
+  uint64_t modifier
+) -> bool {
+  const auto modifier_info = vk::PhysicalDeviceImageDrmFormatModifierInfoEXT()
+                               .setDrmFormatModifier(modifier)
+                               .setSharingMode(vk::SharingMode::eExclusive);
+  const auto external_info =
+    vk::PhysicalDeviceExternalImageFormatInfo()
+      .setPNext(&modifier_info)
+      .setHandleType(vk::ExternalMemoryHandleTypeFlagBits::eDmaBufEXT);
+  const auto info = vk::PhysicalDeviceImageFormatInfo2()
+                      .setPNext(&external_info)
+                      .setFormat(format)
+                      .setType(vk::ImageType::e2D)
+                      .setTiling(vk::ImageTiling::eDrmFormatModifierEXT)
+                      .setUsage(dma_buf_usage);
+  auto external = vk::ExternalImageFormatProperties{};
+  auto properties = vk::ImageFormatProperties2{};
+  properties.pNext = &external;
+  return physical_device.getImageFormatProperties2(
+           &info, &properties, dispatcher
+         ) == vk::Result::eSuccess &&
+         (external.externalMemoryProperties.externalMemoryFeatures &
+          vk::ExternalMemoryFeatureFlagBits::eExportable);
+}
+
+// A slot's image in memory that it exports as a dmabuf.
+class DmaBufImage final : public VulkanSlotImage {
+ public:
+  DmaBufImage(
+    const vk::UniqueDevice& device,
+    const mln::vulkan::DispatchLoaderDynamic& dispatcher, vk::Extent2D extent,
+    const VulkanDmaBufFormat& format
+  ) {
+    const auto modifiers =
+      vk::ImageDrmFormatModifierListCreateInfoEXT().setDrmFormatModifiers(
+        format.modifiers
+      );
+    const auto external =
+      vk::ExternalMemoryImageCreateInfo()
+        .setPNext(&modifiers)
+        .setHandleTypes(vk::ExternalMemoryHandleTypeFlagBits::eDmaBufEXT);
+    image_ = device->createImageUnique(
+      vk::ImageCreateInfo()
+        .setPNext(&external)
+        .setImageType(vk::ImageType::e2D)
+        .setFormat(format.format)
+        .setExtent({extent.width, extent.height, 1})
+        .setMipLevels(1)
+        .setArrayLayers(1)
+        .setSamples(vk::SampleCountFlagBits::e1)
+        .setTiling(vk::ImageTiling::eDrmFormatModifierEXT)
+        .setUsage(dma_buf_usage)
+        .setSharingMode(vk::SharingMode::eExclusive)
+        .setInitialLayout(vk::ImageLayout::eUndefined),
+      nullptr, dispatcher
+    );
+    auto chosen = vk::ImageDrmFormatModifierPropertiesEXT{};
+    if (
+      device->getImageDrmFormatModifierPropertiesEXT(
+        *image_, &chosen, dispatcher
+      ) != vk::Result::eSuccess
+    ) {
+      throw std::runtime_error("Vulkan can't report the dmabuf's modifier");
+    }
+    layout_.fourcc = format.fourcc;
+    layout_.modifier = chosen.drmFormatModifier;
+
+    const auto requirements =
+      device->getImageMemoryRequirements(*image_, dispatcher);
+    // An exported image takes memory of its own, which the dmabuf names.
+    const auto dedicated = vk::MemoryDedicatedAllocateInfo().setImage(*image_);
+    const auto exported =
+      vk::ExportMemoryAllocateInfo()
+        .setPNext(&dedicated)
+        .setHandleTypes(vk::ExternalMemoryHandleTypeFlagBits::eDmaBufEXT);
+    memory_ = device->allocateMemoryUnique(
+      vk::MemoryAllocateInfo()
+        .setPNext(&exported)
+        .setAllocationSize(requirements.size)
+        .setMemoryTypeIndex(dma_buf_memory_type(
+          requirements.memoryTypeBits, format.memory_types,
+          layout_.modifier == drm_format_mod_linear
+        )),
+      nullptr, dispatcher
+    );
+    device->bindImageMemory(*image_, *memory_, 0, dispatcher);
+    fd_ = OwnedFd{device->getMemoryFdKHR(
+      vk::MemoryGetFdInfoKHR().setMemory(*memory_).setHandleType(
+        vk::ExternalMemoryHandleTypeFlagBits::eDmaBufEXT
+      ),
+      dispatcher
+    )};
+    const auto plane = device->getImageSubresourceLayout(
+      *image_,
+      vk::ImageSubresource().setAspectMask(
+        vk::ImageAspectFlagBits::eMemoryPlane0EXT
+      ),
+      dispatcher
+    );
+    layout_.fd = fd_.get();
+    layout_.offset = static_cast<uint32_t>(plane.offset);
+    layout_.stride = static_cast<uint32_t>(plane.rowPitch);
+    view_ = device->createImageViewUnique(
+      vk::ImageViewCreateInfo()
+        .setImage(*image_)
+        .setViewType(vk::ImageViewType::e2D)
+        .setFormat(format.format)
+        .setComponents(vk::ComponentMapping())
+        .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}),
+      nullptr, dispatcher
+    );
+  }
+
+  [[nodiscard]] auto image() const -> vk::Image override { return *image_; }
+  [[nodiscard]] auto view() const -> vk::ImageView override { return *view_; }
+  [[nodiscard]] auto frame_metadata(const RenderFrameMetadata& frame) const
+    -> std::any override {
+    return dma_buf_frame(layout_, frame);
+  }
+
+ private:
+  // Declared in reverse of the order they must be destroyed in.
+  OwnedFd fd_;
+  vk::UniqueDeviceMemory memory_;
+  vk::UniqueImage image_;
+  vk::UniqueImageView view_;
+  DmaBufLayout layout_;
+};
+
+}  // namespace
+
+auto configure_dma_buf_session(
+  const DmaBufRing& ring, mln_vulkan_device device,
+  mln_render_session_object& session
+) -> mln_status {
+  auto context = std::shared_ptr<const mln_vulkan_context_descriptor>{};
+  const auto device_status = texture_ring_device(device, context);
+  if (device_status != MLN_STATUS_OK) return device_status;
+  if (context == nullptr) {
+    const auto shared_status = shared_rendering_device(context);
+    if (shared_status != MLN_STATUS_OK) return shared_status;
+  }
+  auto dispatcher = vulkan_dispatch_loader(*context);
+  vulkan_init_instance_dispatch(dispatcher, *context);
+  vulkan_init_device_dispatch(
+    dispatcher, static_cast<VkDevice>(context->device), *context
+  );
+  // A device resolves an extension's commands only once it enables it, and
+  // the library's devices enable VK_EXT_external_memory_dma_buf, which has
+  // none, whenever the GPU offers it.
+  if (
+    dispatcher.vkGetPhysicalDeviceFormatProperties2 == nullptr ||
+    dispatcher.vkGetPhysicalDeviceImageFormatProperties2 == nullptr ||
+    dispatcher.vkGetMemoryFdKHR == nullptr ||
+    dispatcher.vkGetImageDrmFormatModifierPropertiesEXT == nullptr
+  ) {
+    set_thread_error(
+      "the Vulkan device can't export dmabufs, because it lacks "
+      "VK_KHR_external_memory_fd or VK_EXT_image_drm_format_modifier"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  const auto physical_device =
+    vk::PhysicalDevice(static_cast<VkPhysicalDevice>(context->physical_device));
+  auto format = VulkanDmaBufFormat{};
+  auto choice = DmaBufChoice{};
+  const auto chosen = choose_dma_buf_format(
+    ring.formats,
+    [&](const mln_dma_buf_format& candidate) {
+      const auto vk_format = dma_buf_vk_format(candidate.fourcc);
+      const auto modifiers =
+        device_modifiers(physical_device, dispatcher, vk_format);
+      return std::ranges::any_of(
+               modifiers,
+               [&candidate](const auto& modifier) {
+                 return modifier.drmFormatModifier == candidate.modifier;
+               }
+             ) &&
+             exports_dma_buf(
+               physical_device, dispatcher, vk_format, candidate.modifier
+             );
+    },
+    choice
+  );
+  if (!chosen) {
+    set_thread_error(
+      "the Vulkan device can export a dmabuf of none of the formats"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  session.accepts_queue_lock = true;
+  format.fourcc = choice.fourcc;
+  format.format = dma_buf_vk_format(choice.fourcc);
+  format.modifiers = std::move(choice.modifiers);
+  const auto memory = physical_device.getMemoryProperties(dispatcher);
+  for (auto index = uint32_t{0}; index < memory.memoryTypeCount; ++index) {
+    format.memory_types.push_back(memory.memoryTypes.at(index).propertyFlags);
+  }
+  // The buffers' readers work outside this device, so a frame hands over as a
+  // sync file or as completed work.
+  session.probe_sync_kinds = [context] {
+    auto support = vulkan_sync_support(*context);
+    support.producer &= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+    support.consumer &= MLN_GPU_SYNC_KIND_FLAG_SYNC_FD;
+    return support;
+  };
+  session.initialize_backend =
+    [context, depth = ring.buffer_count,
+     format = std::move(format)](mln_render_session_object& live) {
+      // Each frame leaves its image to readers outside Vulkan, for which the
+      // foreign queue family stands.
+      auto exported = VulkanExportedRing{
+        .depth = depth,
+        .format = static_cast<VkFormat>(format.format),
+        .final_layout = VK_IMAGE_LAYOUT_GENERAL,
+        .owner = MLN_VULKAN_IMAGE_OWNER_FOREIGN,
+        .allocate = [format](
+                      const vk::UniqueDevice& device,
+                      const mln::vulkan::DispatchLoaderDynamic& dispatcher,
+                      vk::Extent2D extent
+                    ) -> std::unique_ptr<VulkanSlotImage> {
+          return std::make_unique<DmaBufImage>(
+            device, dispatcher, extent, format
+          );
+        },
+      };
+      auto backend = std::make_unique<VulkanTextureSessionBackend>(
+        *context, std::move(exported),
+        mln::Size{live.physical_width, live.physical_height}, live.queue_lock
+      );
+      backend->set_producer_sync_kind(live.producer_sync_kind);
+      backend->retain(context);
+      live.texture.backend = std::move(backend);
+      return MLN_STATUS_OK;
+    };
   return MLN_STATUS_OK;
 }
 #endif

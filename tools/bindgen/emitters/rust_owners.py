@@ -11,6 +11,11 @@ def owner_name(native: str) -> str:
     return pascal(native) + "Handle"
 
 
+def view_name(native: str) -> str:
+    """The guard of a handle's view scope, which holds its view getters."""
+    return pascal(native) + "View"
+
+
 def module_name(native: str) -> str:
     return native.removeprefix("mln_")
 
@@ -74,7 +79,7 @@ def view_guard(bound: BoundApi, handle: HandlePlan, getters: list[str]) -> str:
     be consumed while it lives."""
     assert handle.view_begin and handle.view_end
     owner = owner_name(handle.native)
-    guard = pascal(handle.native) + "View"
+    guard = view_name(handle.native)
     return (
         f"\n/// A view scope of [`{owner}`], which ends when it drops. Its\n"
         "/// getters lend values that stay valid until then, and its owner can't\n"

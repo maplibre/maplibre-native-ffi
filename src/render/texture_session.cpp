@@ -309,6 +309,37 @@ auto validate_android_hardware_buffer_ring_descriptor(
   return MLN_STATUS_OK;
 }
 
+auto validate_dma_buf_ring_descriptor(
+  const mln_dma_buf_ring_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("dmabuf ring descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_dma_buf_ring_descriptor)) {
+    set_thread_error("mln_dma_buf_ring_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto size_status = validate_logical_size(
+    descriptor->logical_size, "dmabuf dimensions must be positive"
+  );
+  if (size_status != MLN_STATUS_OK) return size_status;
+  if (
+    descriptor->buffer_count == 0 ||
+    descriptor->buffer_count > max_texture_ring_depth
+  ) {
+    set_thread_error(
+      "buffer_count must be from 1 to MLN_TEXTURE_RING_MAX_DEPTH"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->formats == nullptr || descriptor->format_count == 0) {
+    set_thread_error("formats must name at least one format");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 // A borrowed target must share objects with the host context that owns its
 // texture. Dedicated ownership names no share group.
 auto validate_borrowed_texture_ownership(
@@ -616,6 +647,12 @@ auto acquired_frame_get_webgpu_texture(
 
 auto acquired_frame_get_android_hardware_buffer(
   mln_acquired_frame frame, mln_android_hardware_buffer_frame* out_frame
+) -> mln_status {
+  return acquired_frame_get_backend(frame, out_frame);
+}
+
+auto acquired_frame_get_dma_buf(
+  mln_acquired_frame frame, mln_dma_buf_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }

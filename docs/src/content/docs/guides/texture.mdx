@@ -1,8 +1,8 @@
 ---
 title: Render to a texture
 description: Share rendered frames with your renderer.
-# Scope: rings of your textures or of Android hardware buffers, acquiring
-# frames, and replacing the ring.
+# Scope: rings of your textures, of Android hardware buffers, or of dmabufs,
+# acquiring frames, and replacing the ring.
 # Reading pixels back belongs in Render images. Running driver work on your
 # graphics thread belongs in Render to a window.
 ---
@@ -60,6 +60,17 @@ thread as the driver, and get each frame's buffer with
 [](api:mln_acquired_frame_get_android_hardware_buffer). To resize the ring, use
 [](api:mln_render_session_resize) instead of replacing it. Attach with three
 buffers, and keep each frame acquired until the next one replaces it on screen.
+
+### Linux dmabufs
+
+On Linux and FreeBSD, the library can allocate the ring itself, as dmabufs that
+your compositor or renderer imports, such as through
+`EGL_EXT_image_dma_buf_import` or `zwp_linux_dmabuf_v1`. Attach with
+[](api:mln_map_attach_dma_buf_ring) and the library's thread as the driver, and
+list the formats and modifiers that your importer takes. Get each frame's buffer
+with [](api:mln_acquired_frame_get_dma_buf). To resize the ring, use
+[](api:mln_render_session_resize) instead of replacing it. Attach with three
+buffers, and keep each frame acquired until your importer is done with it.
 
 ## Draw each frame
 

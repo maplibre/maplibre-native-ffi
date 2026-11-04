@@ -133,6 +133,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/binding_support.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/camera.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/delivery.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/linux.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/offscreen.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/ohos.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp

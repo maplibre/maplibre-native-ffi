@@ -121,6 +121,48 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
+    /// Gets the dmabuf of an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
+    /// read the buffer. Once you release or discard the frame, the session may
+    /// render into the buffer again. You can map a buffer with
+    /// DRM_FORMAT_MOD_LINEAR with <c>mmap</c>, and bracket your reads with
+    /// DMA_BUF_IOCTL_SYNC.</para>
+    /// <para>The session owns the file descriptor, so don't close it. To keep
+    /// the buffer after you release the frame, duplicate the file descriptor
+    /// with <c>dup</c>. A duplicate keeps the buffer's memory, but not its
+    /// contents.</para>
+    /// <para>See <c>mln_acquired_frame_get_dma_buf</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public void WithDmaBuf(Action<DmaBufFrameView> callback)
+    {
+        using var call = Enter(this);
+        var outFrame = new mln_dma_buf_frame { size = (uint)sizeof(mln_dma_buf_frame) };
+        ArgumentNullException.ThrowIfNull(callback);
+        var viewScope = new NativeViewScope();
+        void* token = null;
+        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        try
+        {
+            Check(NativeMethods.mln_acquired_frame_get_dma_buf(Handle, &outFrame, Diagnostic));
+            callback(new DmaBufFrameView(CopyDmaBufFrame(outFrame), viewScope));
+        }
+        finally
+        {
+            viewScope.Expire();
+            NativeMethods.mln_acquired_frame_view_end(token);
+        }
+    }
+
+    /// <summary>
     /// Gets the Metal texture of an acquired frame.
     /// </summary>
     /// <remarks>

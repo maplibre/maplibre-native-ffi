@@ -26,6 +26,8 @@ from ._generated_values import (
     CanonicalTileId,
     CustomGeometrySourceOptions,
     CustomVectorSourceOptions,
+    DmaBufFrame,
+    DmaBufRingDescriptor,
     FeatureStateSelector,
     FrameDemand,
     FramePacerOptions,
@@ -170,6 +172,36 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             self,
             lambda: self._native.android_hardware_buffer(),
             lambda raw: AndroidHardwareBufferFrame._from_native(raw),
+        )
+
+    def dma_buf(self) -> AbstractContextManager[DmaBufFrame]:
+        """Gets the dmabuf of an acquired frame.
+
+        Wait for `AcquiredFrameHandle.producer_sync()` before you read the
+        buffer. Once you release or discard the frame, the session may render
+        into the buffer again. You can map a buffer with
+        DRM_FORMAT_MOD_LINEAR with `mmap`, and bracket your reads with
+        DMA_BUF_IOCTL_SYNC.
+
+        The session owns the file descriptor, so don't close it. To keep the
+        buffer after you release the frame, duplicate the file descriptor
+        with `dup`. A duplicate keeps the buffer's memory, but not its
+        contents.
+
+        Native resources remain valid only inside the `with` block.
+
+        See `mln_acquired_frame_get_dma_buf` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
+        """
+        return _view(
+            self,
+            lambda: self._native.dma_buf(),
+            lambda raw: DmaBufFrame._from_native(raw),
         )
 
     def metal_texture(self) -> AbstractContextManager[MetalTextureFrame]:
@@ -553,6 +585,48 @@ class _MapHandleOperations(GeneratedOperations):
           context or the window's surface.
         """
         raw = self._native.attach_android_surface(
+            descriptor, None if device is None else device._native, options
+        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
+
+    def attach_dma_buf_ring(
+        self,
+        descriptor: DmaBufRingDescriptor,
+        device: VulkanDeviceHandle | None,
+        options: RenderSessionAttachOptions,
+    ) -> RenderSessionHandle:
+        """Creates a session that renders the map into a ring of dmabufs that
+        the library allocates.
+
+        Acquire each frame with `RenderSessionHandle.acquire_frame()`, and
+        get its buffer with `AcquiredFrameHandle.dma_buf()`.
+        `RenderSessionHandle.resize()` gives the ring new buffers of the new
+        size.
+
+        A Vulkan build renders with `device`, or, when `device` is null, with
+        a device that the library creates. An OpenGL build uses an EGL
+        context of its own, and `device` must be null. Attach with
+        `RenderDriverKind.CORE_WORKER`.
+
+        For a reader that waits on no sync file, such as a Wayland compositor
+        without explicit synchronization, attach without
+        `GpuSyncKindFlag.SYNC_FD` in
+        `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+        finishes before you acquire it. Keep each frame acquired until its
+        reader is done with the buffer. Give the ring 3 buffers, so the
+        session can render while you hold two frames.
+
+        See `mln_map_attach_dma_buf_ring` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the graphics context can't render into a
+          dmabuf of any of `formats`.
+        - `Status.NATIVE_ERROR` when the library can't create its Vulkan
+          device or initialize an EGL display.
+        """
+        raw = self._native.attach_dma_buf_ring(
             descriptor, None if device is None else device._native, options
         )
         return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
@@ -2341,7 +2415,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.UNSUPPORTED` when the session renders offscreen or into
-          Android hardware buffers that it allocates.
+          Android hardware buffers or dmabufs that it allocates.
         - `Status.UNSUPPORTED` when the target is a WebGL canvas.
         - `Status.TARGET_LOST` when the session loses its target before the
           release runs.

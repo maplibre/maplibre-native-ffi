@@ -104,7 +104,7 @@ def symbols(bound: BoundApi) -> docs.Symbol:
 
 
 def _symbols(bound: BoundApi) -> docs.Symbol:
-    from .rust_owners import owned_handles, owner_name
+    from .rust_owners import owned_handles, owner_name, view_name
     from .rust_values import Values, enum_member
 
     values = Values(bound)
@@ -134,6 +134,8 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         owner = receiver_native(plan) or plan.factory
         if owner is None:
             return method_name(plan)
+        if plan.shape == "view" and plan.view and owner in owners:
+            return f"{view_name(owner)}::{method_name(plan)}"
         typ = type_(owner)
         return f"{typ}::{method_name(plan)}" if typ else None
 

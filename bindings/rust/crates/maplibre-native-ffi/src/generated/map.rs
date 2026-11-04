@@ -234,7 +234,7 @@ impl MapHandle {
     /// buffers that the library allocates.
     ///
     /// Acquire each frame with `RenderSessionHandle::acquire_frame()`, and get
-    /// its buffer with `AcquiredFrameHandle::get_android_hardware_buffer()`.
+    /// its buffer with `AcquiredFrameView::get_android_hardware_buffer()`.
     /// `RenderSessionHandle::resize()` gives the ring new buffers of the new
     /// size.
     ///
@@ -335,6 +335,68 @@ impl MapHandle {
         let future = call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_attach_android_surface(
+                    map,
+                    descriptor,
+                    device,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
+    /// Creates a session that renders the map into a ring of dmabufs that the
+    /// library allocates.
+    ///
+    /// Acquire each frame with `RenderSessionHandle::acquire_frame()`, and get
+    /// its buffer with `AcquiredFrameView::get_dma_buf()`.
+    /// `RenderSessionHandle::resize()` gives the ring new buffers of the new
+    /// size.
+    ///
+    /// A Vulkan build renders with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context of
+    /// its own, and `device` must be null. Attach with
+    /// `RenderDriverKind::CoreWorker`.
+    ///
+    /// For a reader that waits on no sync file, such as a Wayland compositor
+    /// without explicit synchronization, attach without
+    /// `GpuSyncKindFlag::SYNC_FD` in
+    /// `RenderSessionAttachOptions::producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Keep each frame acquired until its
+    /// reader is done with the buffer. Give the ring 3 buffers, so the session
+    /// can render while you hold two frames.
+    ///
+    /// See `mln_map_attach_dma_buf_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when the graphics context can't render into a
+    ///   dmabuf of any of `formats`.
+    /// - `Status::NativeError` when the library can't create its Vulkan device
+    ///   or initialize an EGL display.
+    #[cfg(any(
+        target_os = "freebsd",
+        all(target_os = "linux", not(target_env = "ohos"))
+    ))]
+    pub fn attach_dma_buf_ring(
+        &self,
+        descriptor: &DmaBufRingDescriptor,
+        device: Option<&VulkanDeviceHandle>,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_vulkan_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_dma_buf_ring(
                     map,
                     descriptor,
                     device,

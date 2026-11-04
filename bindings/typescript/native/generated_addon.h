@@ -6,6 +6,7 @@
 #include "maplibre_native_c/apple.h"
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
+#include "maplibre_native_c/linux.h"
 #include "maplibre_native_c/logging.h"
 #include "maplibre_native_c/map.h"
 #include "maplibre_native_c/offscreen.h"
@@ -151,6 +152,9 @@ napi_value mln_ts_read_camera_transition_end(
 );
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
+);
+napi_value mln_ts_read_dma_buf_frame(
+  napi_env env, const mln_dma_buf_frame* source, size_t size
 );
 napi_value mln_ts_read_edge_insets(
   napi_env env, const mln_edge_insets* source, size_t size
@@ -426,6 +430,13 @@ bool mln_ts_write_custom_vector_source_options(
   mln_ts_call* call, napi_value value, mln_custom_vector_source_options* out,
   const char* path
 );
+bool mln_ts_write_dma_buf_format(
+  mln_ts_call* call, napi_value value, mln_dma_buf_format* out, const char* path
+);
+bool mln_ts_write_dma_buf_ring_descriptor(
+  mln_ts_call* call, napi_value value, mln_dma_buf_ring_descriptor* out,
+  const char* path
+);
 bool mln_ts_write_edge_insets(
   mln_ts_call* call, napi_value value, mln_edge_insets* out, const char* path
 );
@@ -483,6 +494,10 @@ bool mln_ts_write_lat_lng_bounds(
 );
 bool mln_ts_write_list_buffer_view(
   mln_ts_call* call, napi_value value, size_t maximum, mln_buffer_view** out,
+  size_t* out_count, const char* path
+);
+bool mln_ts_write_list_dma_buf_format(
+  mln_ts_call* call, napi_value value, size_t maximum, mln_dma_buf_format** out,
   size_t* out_count, const char* path
 );
 bool mln_ts_write_list_http_header(

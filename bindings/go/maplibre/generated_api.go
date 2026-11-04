@@ -2519,6 +2519,93 @@ func nativeCustomVectorSourceOptions(input CustomVectorSourceOptions, arena *bin
 	return raw
 }
 
+// DmaBufFormat corresponds to mln_dma_buf_format. A DRM format and modifier
+// that you can import.
+//
+// See mln_dma_buf_format in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+type DmaBufFormat struct {
+	// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+	Fourcc uint32
+	// A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+	Modifier uint64
+}
+
+func nativeDmaBufFormat(input DmaBufFormat, arena *bindingArena) C.mln_dma_buf_format {
+	raw := C.mln_dma_buf_format{}
+	raw.fourcc = C.uint32_t(input.Fourcc)
+	raw.modifier = C.uint64_t(input.Modifier)
+	return raw
+}
+
+// DmaBufFrame corresponds to mln_dma_buf_frame. The dmabuf of an acquired
+// frame.
+//
+// See mln_dma_buf_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+type DmaBufFrame struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	// The buffer's index in the ring.
+	Slot     uint32
+	Fourcc   uint32
+	Modifier uint64
+	Fd       int32
+	// The bytes from the start of the buffer to its first pixel.
+	Offset uint32
+	// The bytes from the start of one row to the start of the next.
+	Stride uint32
+}
+
+func copyDmaBufFrame(raw C.mln_dma_buf_frame) DmaBufFrame {
+	var result DmaBufFrame
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.Slot = uint32(raw.slot)
+	result.Fourcc = uint32(raw.fourcc)
+	result.Modifier = uint64(raw.modifier)
+	result.Fd = int32(raw.fd)
+	result.Offset = uint32(raw.offset)
+	result.Stride = uint32(raw.stride)
+	return result
+}
+
+// DmaBufRingDescriptor corresponds to mln_dma_buf_ring_descriptor. A ring of
+// dmabufs that the library allocates, for MapHandle.AttachDmaBufRing().
+//
+// Each buffer has the map's size in pixels and a format and modifier from
+// formats. The library renders only DRM_FORMAT_ABGR8888 and
+// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+//
+// See mln_dma_buf_ring_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+type DmaBufRingDescriptor struct {
+	LogicalSize LogicalSize
+	// How many buffers the ring has, from 1 to 8.
+	BufferCount uint32
+	// The formats and modifiers that your reader imports, most preferred first,
+	// such as those that eglQueryDmaBufModifiersEXT() reports.
+	Formats []DmaBufFormat
+}
+
+func nativeDmaBufRingDescriptor(input DmaBufRingDescriptor, arena *bindingArena) C.mln_dma_buf_ring_descriptor {
+	raw := C.mln_dma_buf_ring_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.buffer_count = C.uint32_t(input.BufferCount)
+	{
+		raw.formats = (*C.mln_dma_buf_format)(arena.array(len(input.Formats), unsafe.Sizeof(*raw.formats)))
+		items := unsafe.Slice(raw.formats, len(input.Formats))
+		raw.format_count = bindingCountLike(raw.format_count, len(input.Formats))
+		for i, item := range input.Formats {
+			items[i] = nativeDmaBufFormat(item, arena)
+		}
+	}
+	return raw
+}
+
 // EdgeInsets corresponds to mln_edge_insets. Distances in logical pixels from
 // each edge of the map.
 //
@@ -4203,8 +4290,8 @@ type RenderSessionAttachOptions struct {
 	//   - RenderDriverKindCallerGraphicsThread for a shared or dedicated EGL or WGL
 	//     context, an existing WebGL context, or a browser's WebGPU device.
 	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android or
-	//     OpenHarmony window, a Wayland surface, a ring of Android hardware
-	//     buffers, or an offscreen session.
+	//     OpenHarmony window, a Wayland surface, a ring of Android hardware buffers
+	//     or dmabufs, or an offscreen session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.
@@ -6007,6 +6094,36 @@ func (view AndroidHardwareBufferFrameView) UnsafeBuffer() (uintptr, error) {
 		return view.value.Buffer
 	})
 }
+
+type DmaBufFrameView struct {
+	value DmaBufFrame
+	scope *bindingScope
+}
+
+func (view DmaBufFrameView) Width() uint32 { return view.value.Width }
+
+func (view DmaBufFrameView) Height() uint32 { return view.value.Height }
+
+func (view DmaBufFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
+
+func (view DmaBufFrameView) Slot() uint32 { return view.value.Slot }
+
+func (view DmaBufFrameView) Fourcc() uint32 { return view.value.Fourcc }
+
+func (view DmaBufFrameView) Modifier() uint64 { return view.value.Modifier }
+
+func (view DmaBufFrameView) Fd() (int32, error) {
+	return bindingCall(func() int32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Fd
+	})
+}
+
+func (view DmaBufFrameView) Offset() uint32 { return view.value.Offset }
+
+func (view DmaBufFrameView) Stride() uint32 { return view.value.Stride }
 
 type MetalTextureFrameView struct {
 	value MetalTextureFrame
@@ -8800,7 +8917,7 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 //
 // Errors:
 //   - StatusUnsupported when the session renders offscreen or into Android
-//     hardware buffers that it allocates.
+//     hardware buffers or dmabufs that it allocates.
 //   - StatusUnsupported when the target is a WebGL canvas.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.

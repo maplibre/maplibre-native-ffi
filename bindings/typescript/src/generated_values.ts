@@ -635,6 +635,74 @@ export interface CustomVectorSourceOptions {
 }
 
 /**
+ * A DRM format and modifier that you can import.
+ *
+ * See `mln_dma_buf_format` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+export interface DmaBufFormat {
+  /**
+   * A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+   */
+  fourcc?: number;
+  /**
+   * A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+   */
+  modifier?: bigint;
+}
+
+/**
+ * The dmabuf of an acquired frame.
+ *
+ * See `mln_dma_buf_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+export interface DmaBufFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  /**
+   * The buffer's index in the ring.
+   */
+  readonly slot: number;
+  readonly fourcc: number;
+  readonly modifier: bigint;
+  readonly fd: number;
+  /**
+   * The bytes from the start of the buffer to its first pixel.
+   */
+  readonly offset: number;
+  /**
+   * The bytes from the start of one row to the start of the next.
+   */
+  readonly stride: number;
+}
+
+/**
+ * A ring of dmabufs that the library allocates, for
+ * `MapHandle.attachDmaBufRing()`.
+ *
+ * Each buffer has the map's size in pixels and a format and modifier from
+ * `formats`. The library renders only DRM_FORMAT_ABGR8888 and
+ * DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+ *
+ * See `mln_dma_buf_ring_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+export interface DmaBufRingDescriptor {
+  logicalSize: LogicalSize;
+  /**
+   * How many buffers the ring has, from 1 to 8.
+   */
+  bufferCount: number;
+  /**
+   * The formats and modifiers that your reader imports, most preferred first,
+   * such as those that eglQueryDmaBufModifiersEXT() reports.
+   */
+  formats: readonly DmaBufFormat[];
+}
+
+/**
  * Distances in logical pixels from each edge of the map.
  *
  * See `mln_edge_insets` in the
@@ -2225,7 +2293,7 @@ export interface RenderSessionAttachOptions {
    *   WGL context, an existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
    *   or OpenHarmony window, a Wayland surface, a ring of Android hardware
-   *   buffers, or an offscreen session.
+   *   buffers or dmabufs, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.unsupported`.

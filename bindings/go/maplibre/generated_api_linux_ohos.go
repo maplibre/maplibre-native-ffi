@@ -10,6 +10,80 @@ package maplibre
 #include "generated_callbacks.h"
 */
 import "C"
+import "unsafe"
+
+// WithDmaBuf gets the dmabuf of an acquired frame.
+//
+// Wait for AcquiredFrameHandle.WithProducerSync() before you read the buffer.
+// Once you release or discard the frame, the session may render into the buffer
+// again. You can map a buffer with DRM_FORMAT_MOD_LINEAR with mmap, and bracket
+// your reads with DMA_BUF_IOCTL_SYNC.
+//
+// The session owns the file descriptor, so don't close it. To keep the buffer
+// after you release the frame, duplicate the file descriptor with dup. A
+// duplicate keeps the buffer's memory, but not its contents.
+//
+// See mln_acquired_frame_get_dma_buf in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+//
+// Errors:
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
+func (receiver *AcquiredFrameHandle) WithDmaBuf(callback func(DmaBufFrameView) error) error {
+	var outFrame C.mln_dma_buf_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_dma_buf(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) DmaBufFrameView {
+		return DmaBufFrameView{value: copyDmaBufFrame(outFrame), scope: scope}
+	})
+}
+
+// AttachDmaBufRing creates a session that renders the map into a ring of
+// dmabufs that the library allocates.
+//
+// Acquire each frame with RenderSessionHandle.AcquireFrame(), and get its
+// buffer with AcquiredFrameHandle.WithDmaBuf(). RenderSessionHandle.Resize()
+// gives the ring new buffers of the new size.
+//
+// A Vulkan build renders with device, or, when device is null, with a device
+// that the library creates. An OpenGL build uses an EGL context of its own, and
+// device must be null. Attach with RenderDriverKindCoreWorker.
+//
+// For a reader that waits on no sync file, such as a Wayland compositor without
+// explicit synchronization, attach without GPUSyncKindFlagSyncFd in
+// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
+// before you acquire it. Keep each frame acquired until its reader is done with
+// the buffer. Give the ring 3 buffers, so the session can render while you hold
+// two frames.
+//
+// See mln_map_attach_dma_buf_ring in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+//
+// Errors:
+//   - StatusUnsupported when the graphics context can't render into a dmabuf of
+//     any of formats.
+//   - StatusNativeError when the library can't create its Vulkan device or
+//     initialize an EGL display.
+func (receiver *MapHandle) AttachDmaBufRing(descriptor DmaBufRingDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+	var outSession C.mln_render_session
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_dma_buf_ring(C.mln_map(raw), bindingStore(nativeDmaBufRingDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		session *RenderSessionHandle
+		ready   *Future[struct{}]
+	} {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return struct {
+			session *RenderSessionHandle
+			ready   *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.session, result.ready, err
+}
 
 // AttachOhosSurface creates a session that presents the map to an OpenHarmony
 // window, with a graphics context that the library creates.

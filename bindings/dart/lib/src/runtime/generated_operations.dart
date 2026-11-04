@@ -11,6 +11,18 @@ AndroidHardwareBufferFrame _readAndroidHardwareBufferFrame(
   buffer: NativePointer(source.buffer.address),
 );
 
+DmaBufFrame _readDmaBufFrame(raw.mln_dma_buf_frame source) => DmaBufFrame(
+  width: source.width,
+  height: source.height,
+  scaleFactor: source.scale_factor,
+  slot: source.slot,
+  fourcc: source.fourcc,
+  modifier: source.modifier,
+  fd: source.fd,
+  offset: source.offset,
+  stride: source.stride,
+);
+
 MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
     MetalTextureFrame(
       width: source.width,
@@ -927,6 +939,40 @@ Pointer<raw.mln_android_surface_descriptor> _writeAndroidSurfaceDescriptor(
   result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
   result.ref.jni_env = Pointer<Void>.fromAddress(value.jniEnv.address).cast();
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_dma_buf_format> _writeDmaBufFormat(
+  DmaBufFormat value,
+  Allocator arena, {
+  Pointer<raw.mln_dma_buf_format>? into,
+}) {
+  final result = into ?? arena<raw.mln_dma_buf_format>();
+  result.ref.fourcc = _nativeInteger(value.fourcc, 0, 4294967295);
+  result.ref.modifier = value.modifier;
+  return result;
+}
+
+Pointer<raw.mln_dma_buf_ring_descriptor> _writeDmaBufRingDescriptor(
+  DmaBufRingDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_dma_buf_ring_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_dma_buf_ring_descriptor>();
+  result.ref.size = sizeOf<raw.mln_dma_buf_ring_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.buffer_count = _nativeInteger(value.bufferCount, 0, 4294967295);
+  result.ref.formats = arena<raw.mln_dma_buf_format>(
+    value.formats.isEmpty ? 1 : value.formats.length,
+  );
+  result.ref.format_count = value.formats.length;
+  for (var index = 0; index < value.formats.length; index++) {
+    _writeDmaBufFormat(
+      value.formats[index],
+      arena,
+      into: result.ref.formats + index,
+    );
+  }
   return result;
 }
 
@@ -3511,6 +3557,43 @@ final class AcquiredFrameHandle implements Finalizable {
         return _readAndroidHardwareBufferFrame(outFrame.ref);
       });
 
+  /// Gets the dmabuf of an acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// buffer. Once you release or discard the frame, the session may render into
+  /// the buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR with
+  /// `mmap`, and bracket your reads with DMA_BUF_IOCTL_SYNC.
+  ///
+  /// The session owns the file descriptor, so don't close it. To keep the
+  /// buffer after you release the frame, duplicate the file descriptor with
+  /// `dup`. A duplicate keeps the buffer's memory, but not its contents.
+  ///
+  /// See `mln_acquired_frame_get_dma_buf` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+  T withDmaBuf<T>(T Function(ScopedDmaBufFrame view) use) => _NativeViewScope(
+    _state,
+    raw.mln_acquired_frame_view_begin,
+    raw.mln_acquired_frame_view_end,
+  ).use((scope) => use(ScopedDmaBufFrame._(scope, _getDmaBuf())));
+
+  DmaBufFrame _getDmaBuf() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_dma_buf_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_dma_buf_frame>();
+    _check(
+      raw.mln_acquired_frame_get_dma_buf(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
+    return _readDmaBufFrame(outFrame.ref);
+  });
+
   /// Gets the Metal texture of an acquired frame.
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
@@ -4727,6 +4810,64 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         () => raw.mln_map_attach_android_surface(
           _handle.raw,
           _writeAndroidSurfaceDescriptor(descriptor, arena),
+          (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
+
+  /// Creates a session that renders the map into a ring of dmabufs that the
+  /// library allocates.
+  ///
+  /// Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+  /// buffer with `AcquiredFrameHandle.withDmaBuf()`.
+  /// `RenderSessionHandle.resize()` gives the ring new buffers of the new size.
+  ///
+  /// A Vulkan build renders with `device`, or, when `device` is null, with a
+  /// device that the library creates. An OpenGL build uses an EGL context of
+  /// its own, and `device` must be null. Attach with
+  /// `RenderDriverKind.coreWorker`.
+  ///
+  /// For a reader that waits on no sync file, such as a Wayland compositor
+  /// without explicit synchronization, attach without `GpuSyncKindFlag.syncFd`
+  /// in `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+  /// finishes before you acquire it. Keep each frame acquired until its reader
+  /// is done with the buffer. Give the ring 3 buffers, so the session can
+  /// render while you hold two frames.
+  ///
+  /// See `mln_map_attach_dma_buf_ring` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the graphics context can't render into a
+  ///   dmabuf of any of `formats`.
+  /// - `Status.nativeError` when the library can't create its Vulkan device or
+  ///   initialize an EGL display.
+  RenderSessionHandle attachDmaBufRing(
+    DmaBufRingDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    VulkanDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_dma_buf_ring(
+          _handle.raw,
+          _writeDmaBufRingDescriptor(descriptor, arena),
           (device?._handle.raw ?? 0),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
@@ -7422,7 +7563,7 @@ final class RenderSessionHandle implements Finalizable {
   /// Errors:
   ///
   /// - `Status.unsupported` when the session renders offscreen or into Android
-  ///   hardware buffers that it allocates.
+  ///   hardware buffers or dmabufs that it allocates.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
@@ -8687,6 +8828,24 @@ final class ScopedAndroidHardwareBufferFrame {
     checkValid: _scope.checkActive,
     debugName: 'AndroidHardwareBufferFrame.buffer',
   );
+}
+
+/// A `DmaBufFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withDmaBuf` runs. Its
+/// other members stay readable after the callback returns.
+final class ScopedDmaBufFrame {
+  ScopedDmaBufFrame._(this._scope, this._value);
+  final DmaBufFrame _value;
+  final _NativeViewScope _scope;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get slot => _value.slot;
+  int get fourcc => _value.fourcc;
+  int get modifier => _value.modifier;
+  int get fd => _scope.active(_value).fd;
+  int get offset => _value.offset;
+  int get stride => _value.stride;
 }
 
 /// A `MetalTextureFrame` whose native objects are readable only while the

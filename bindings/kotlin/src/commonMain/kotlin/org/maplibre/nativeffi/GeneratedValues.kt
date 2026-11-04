@@ -1838,6 +1838,35 @@ public class AndroidHardwareBufferFrame(
 }
 
 /**
+ * The dmabuf of an acquired frame.
+ *
+ * See `mln_dma_buf_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+public class DmaBufFrame(
+  public val width: UInt,
+  public val height: UInt,
+  public val scaleFactor: Double,
+  /** The buffer's index in the ring. */
+  public val slot: UInt,
+  public val fourcc: UInt,
+  public val modifier: ULong,
+  fd: Int,
+  /** The bytes from the start of the buffer to its first pixel. */
+  public val offset: UInt,
+  /** The bytes from the start of one row to the start of the next. */
+  public val stride: UInt,
+) {
+  internal var bindingScope: ViewScope? = null
+  private val storedFd: Int = fd
+  public val fd: Int
+    get() {
+      bindingScope?.ensureActive()
+      return storedFd
+    }
+}
+
+/**
  * The Metal texture of an acquired frame.
  *
  * See `mln_metal_texture_frame` in the
@@ -2491,7 +2520,8 @@ public data class RenderSessionAttachOptions(
    * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL or WGL context, an
    *   existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android or OpenHarmony
-   *   window, a Wayland surface, a ring of Android hardware buffers, or an offscreen session.
+   *   window, a Wayland surface, a ring of Android hardware buffers or dmabufs, or an offscreen
+   *   session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.
@@ -2539,6 +2569,40 @@ public data class AndroidSurfaceDescriptor(
   public val jniEnv: NativePointer,
   /** An `android.view.Surface`, with `jni_env`. */
   public val surface: NativePointer,
+)
+
+/**
+ * A DRM format and modifier that you can import.
+ *
+ * See `mln_dma_buf_format` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+public data class DmaBufFormat(
+  /** A DRM fourcc code, such as DRM_FORMAT_ABGR8888. */
+  public val fourcc: UInt = 0u,
+  /** A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR. */
+  public val modifier: ULong = 0uL,
+)
+
+/**
+ * A ring of dmabufs that the library allocates, for `MapHandle.attachDmaBufRing()`.
+ *
+ * Each buffer has the map's size in pixels and a format and modifier from `formats`. The library
+ * renders only DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888, and only with modifiers that keep one
+ * plane.
+ *
+ * See `mln_dma_buf_ring_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ */
+public data class DmaBufRingDescriptor(
+  public val logicalSize: LogicalSize,
+  /** How many buffers the ring has, from 1 to 8. */
+  public val bufferCount: UInt,
+  /**
+   * The formats and modifiers that your reader imports, most preferred first, such as those that
+   * eglQueryDmaBufModifiersEXT() reports.
+   */
+  public val formats: List<DmaBufFormat>,
 )
 
 /**

@@ -439,6 +439,64 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that renders the map into a ring of dmabufs that the
+    /// library allocates.
+    /// </summary>
+    /// <remarks>
+    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
+    /// and get its buffer with <c>AcquiredFrameHandle.WithDmaBuf()</c>.
+    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new buffers of
+    /// the new size.</para>
+    /// <para>A Vulkan build renders with <c>device</c>, or, when <c>device</c>
+    /// is null, with a device that the library creates. An OpenGL build uses an
+    /// EGL context of its own, and <c>device</c> must be null. Attach with
+    /// <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>For a reader that waits on no sync file, such as a Wayland
+    /// compositor without explicit synchronization, attach without
+    /// <c>GpuSyncKindFlag.SyncFd</c> in
+    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
+    /// finishes before you acquire it. Keep each frame acquired until its
+    /// reader is done with the buffer. Give the ring 3 buffers, so the session
+    /// can render while you hold two frames.</para>
+    /// <para>See <c>mln_map_attach_dma_buf_ring</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the graphics context
+    /// can't render into a dmabuf of any of
+    /// <c>formats</c>.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create its Vulkan device or initialize an EGL
+    /// display.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public RenderSessionHandle AttachDmaBufRing(
+        DmaBufRingDescriptor descriptor,
+        VulkanDeviceHandle? device,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeDmaBufRingDescriptor(descriptor, scope);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_dma_buf_ring(
+            Handle,
+            &nativeDescriptor,
+            scope.UseOptional(device),
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     /// </summary>

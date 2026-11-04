@@ -17,6 +17,8 @@ import type {
   CanonicalTileId,
   CustomGeometrySourceOptions,
   CustomVectorSourceOptions,
+  DmaBufFrame,
+  DmaBufRingDescriptor,
   FeatureStateSelector,
   FrameDemand,
   FramePacerOptions,
@@ -503,6 +505,43 @@ export class AcquiredFrameHandle extends Owner {
           ADOPT,
           scope,
           native.mln_acquired_frame_get_android_hardware_buffer(this.id),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Gets the dmabuf of an acquired frame.
+   *
+   * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+   * buffer. Once you release or discard the frame, the session may render into
+   * the buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR with
+   * `mmap`, and bracket your reads with DMA_BUF_IOCTL_SYNC.
+   *
+   * The session owns the file descriptor, so don't close it. To keep the buffer
+   * after you release the frame, duplicate the file descriptor with `dup`. A
+   * duplicate keeps the buffer's memory, but not its contents.
+   *
+   * See `mln_acquired_frame_get_dma_buf` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
+   */
+  withDmaBuf<T>(use: (view: ScopedDmaBufFrame) => T): T {
+    return new ViewScope(
+      ADOPT,
+      this,
+      (handle) => native.mln_acquired_frame_view_begin(handle),
+      (scope) => native.mln_acquired_frame_view_end(scope),
+    ).use((scope) =>
+      use(
+        new ScopedDmaBufFrame(
+          ADOPT,
+          scope,
+          native.mln_acquired_frame_get_dma_buf(this.id),
         ),
       ),
     );
@@ -1124,6 +1163,68 @@ export class MapHandle extends Owner {
       attach(
         (completion) =>
           native.mln_map_attach_android_surface(
+            this.id,
+            descriptor,
+            device?.id,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
+    );
+  }
+
+  /**
+   * Creates a session that renders the map into a ring of dmabufs that the
+   * library allocates.
+   *
+   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+   * buffer with `AcquiredFrameHandle.withDmaBuf()`.
+   * `RenderSessionHandle.resize()` gives the ring new buffers of the new size.
+   *
+   * A Vulkan build renders with `device`, or, when `device` is null, with a
+   * device that the library creates. An OpenGL build uses an EGL context of its
+   * own, and `device` must be null. Attach with `RenderDriverKind.coreWorker`.
+   *
+   * For a reader that waits on no sync file, such as a Wayland compositor
+   * without explicit synchronization, attach without `GpuSyncKindFlag.syncFd`
+   * in `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+   * finishes before you acquire it. Keep each frame acquired until its reader
+   * is done with the buffer. Give the ring 3 buffers, so the session can render
+   * while you hold two frames.
+   *
+   * See `mln_map_attach_dma_buf_ring` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the graphics context can't render into a dmabuf
+   *   of any of `formats`.
+   * - `Status.nativeError` when the library can't create its Vulkan device or
+   *   initialize an EGL display.
+   */
+  attachDmaBufRing(
+    descriptor: DmaBufRingDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_dma_buf_ring(
             this.id,
             descriptor,
             device?.id,
@@ -4827,7 +4928,7 @@ export class RenderSessionHandle extends Owner {
    * Errors:
    *
    * - `Status.unsupported` when the session renders offscreen or into Android
-   *   hardware buffers that it allocates.
+   *   hardware buffers or dmabufs that it allocates.
    * - `Status.unsupported` when the target is a WebGL canvas.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
@@ -6280,6 +6381,63 @@ export class ScopedAndroidHardwareBufferFrame {
 
   get buffer(): AndroidHardwareBufferFrame["buffer"] {
     return this.#scope.active(this.#value).buffer;
+  }
+}
+
+/**
+ * A `DmaBufFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withDmaBuf} runs. Its other members stay
+ * readable after the callback returns.
+ */
+export class ScopedDmaBufFrame {
+  readonly #value: DmaBufFrame;
+  readonly #scope: ViewScope;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, scope: ViewScope, value: DmaBufFrame) {
+    checkKey(key);
+    this.#value = value;
+    this.#scope = scope;
+  }
+
+  get width(): DmaBufFrame["width"] {
+    return this.#value.width;
+  }
+
+  get height(): DmaBufFrame["height"] {
+    return this.#value.height;
+  }
+
+  get scaleFactor(): DmaBufFrame["scaleFactor"] {
+    return this.#value.scaleFactor;
+  }
+
+  get slot(): DmaBufFrame["slot"] {
+    return this.#value.slot;
+  }
+
+  get fourcc(): DmaBufFrame["fourcc"] {
+    return this.#value.fourcc;
+  }
+
+  get modifier(): DmaBufFrame["modifier"] {
+    return this.#value.modifier;
+  }
+
+  get fd(): DmaBufFrame["fd"] {
+    return this.#scope.active(this.#value).fd;
+  }
+
+  get offset(): DmaBufFrame["offset"] {
+    return this.#value.offset;
+  }
+
+  get stride(): DmaBufFrame["stride"] {
+    return this.#value.stride;
   }
 }
 

@@ -285,6 +285,35 @@ internal unsafe struct mln_diagnostic
     }
 }
 
+internal unsafe struct mln_dma_buf_format
+{
+    public uint fourcc;
+    public ulong modifier;
+}
+
+internal unsafe struct mln_dma_buf_frame
+{
+    public uint size;
+    public uint width;
+    public uint height;
+    public double scale_factor;
+    public uint slot;
+    public uint fourcc;
+    public ulong modifier;
+    public int fd;
+    public uint offset;
+    public uint stride;
+}
+
+internal unsafe struct mln_dma_buf_ring_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint buffer_count;
+    public mln_dma_buf_format* formats;
+    public nuint format_count;
+}
+
 internal unsafe struct mln_edge_insets
 {
     public double top;

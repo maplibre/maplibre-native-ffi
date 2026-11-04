@@ -248,4 +248,10 @@ function(mln_ffi_configure_renderer target)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
+  # The dmabufs that an EGL session renders into on these systems.
+  if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl"
+     AND CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
+    mln_ffi_target_project_sources(
+      ${target} ${PROJECT_SOURCE_DIR}/src/platform/dma_buf/allocator.cpp)
+  endif()
 endfunction()

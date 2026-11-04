@@ -45,6 +45,7 @@ set(MLN_NATIVE_FILE_TAGS
     ohos
     apple
     wayland
+    linux
     icu)
 
 function(mln_native_active_file_tags out_var)
@@ -66,6 +67,9 @@ function(mln_native_active_file_tags out_var)
   endif()
   if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
     list(APPEND tags wayland)
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND tags linux)
   endif()
   # Linux, FreeBSD, OpenHarmony, and Windows evaluate locale expressions with
   # ICU: ICU4X on Linux and FreeBSD and the system's ICU4C on OpenHarmony and

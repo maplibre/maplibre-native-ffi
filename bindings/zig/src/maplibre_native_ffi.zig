@@ -78,6 +78,30 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
+    /// Gets the dmabuf of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrame.getProducerSync()` before you read the buffer. Once
+    /// you release or discard the frame, the session may render into the buffer
+    /// again. You can map a buffer with DRM_FORMAT_MOD_LINEAR with `mmap`, and
+    /// bracket your reads with DMA_BUF_IOCTL_SYNC.
+    ///
+    /// The session owns the file descriptor, so don't close it. To keep the buffer
+    /// after you release the frame, duplicate the file descriptor with `dup`. A
+    /// duplicate keeps the buffer's memory, but not its contents.
+    ///
+    /// See `mln_acquired_frame_get_dma_buf` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
+    pub const getDmaBuf = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
+        fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+            return call.scopedView("mln_acquired_frame_get_dma_buf", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", DmaBufFrame, self, context, use, diagnostic);
+        }
+    }.function else {};
+
     /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
@@ -460,6 +484,40 @@ pub const Map = struct {
     pub const attachAndroidSurface = if (builtin.abi.isAndroid()) struct {
         fn function(self: Map, descriptor: AndroidSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_android_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
+    /// Creates a session that renders the map into a ring of dmabufs that the
+    /// library allocates.
+    ///
+    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its buffer
+    /// with `AcquiredFrame.getDmaBuf()`. `RenderSession.resize()` gives the ring
+    /// new buffers of the new size.
+    ///
+    /// A Vulkan build renders with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context of its
+    /// own, and `device` must be null. Attach with `RenderDriverKind.core_worker`.
+    ///
+    /// For a reader that waits on no sync file, such as a Wayland compositor
+    /// without explicit synchronization, attach without `GpuSyncKindFlag.sync_fd`
+    /// in `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Keep each frame acquired until its reader is
+    /// done with the buffer. Give the ring 3 buffers, so the session can render
+    /// while you hold two frames.
+    ///
+    /// See `mln_map_attach_dma_buf_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when the graphics context can't render into a dmabuf
+    ///   of any of `formats`.
+    /// - `error.NativeError` when the library can't create its Vulkan device or
+    ///   initialize an EGL display.
+    pub const attachDmaBufRing = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
+        fn function(self: Map, allocator: std.mem.Allocator, descriptor: DmaBufRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_dma_buf_ring", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
         }
     }.function else {};
@@ -2127,7 +2185,7 @@ pub const RenderSession = struct {
     /// Errors:
     ///
     /// - `error.Unsupported` when the session renders offscreen or into Android
-    ///   hardware buffers that it allocates.
+    ///   hardware buffers or dmabufs that it allocates.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -3836,6 +3894,103 @@ pub const CustomVectorSourceOptions = struct {
                     return cancel_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
+        };
+    }
+};
+
+/// A DRM format and modifier that you can import.
+///
+/// See `mln_dma_buf_format` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+pub const DmaBufFormat = struct {
+    /// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+    fourcc: u32 = 0,
+    /// A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+    modifier: u64 = 0,
+    pub fn toNative(self: DmaBufFormat) c.mln_dma_buf_format {
+        var raw = std.mem.zeroes(c.mln_dma_buf_format);
+        raw.fourcc = self.fourcc;
+        raw.modifier = self.modifier;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_dma_buf_format) DmaBufFormat {
+        return .{
+            .fourcc = raw.fourcc,
+            .modifier = raw.modifier,
+        };
+    }
+};
+
+/// The dmabuf of an acquired frame.
+///
+/// See `mln_dma_buf_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+pub const DmaBufFrame = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    scale_factor: f64 = 0,
+    /// The buffer's index in the ring.
+    slot: u32 = 0,
+    fourcc: u32 = 0,
+    modifier: u64 = 0,
+    fd: i32 = 0,
+    /// The bytes from the start of the buffer to its first pixel.
+    offset: u32 = 0,
+    /// The bytes from the start of one row to the start of the next.
+    stride: u32 = 0,
+    pub fn fromNative(raw: c.mln_dma_buf_frame) DmaBufFrame {
+        return .{
+            .width = raw.width,
+            .height = raw.height,
+            .scale_factor = raw.scale_factor,
+            .slot = raw.slot,
+            .fourcc = raw.fourcc,
+            .modifier = raw.modifier,
+            .fd = raw.fd,
+            .offset = raw.offset,
+            .stride = raw.stride,
+        };
+    }
+};
+
+/// A ring of dmabufs that the library allocates, for `Map.attachDmaBufRing()`.
+///
+/// Each buffer has the map's size in pixels and a format and modifier from
+/// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
+/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+///
+/// See `mln_dma_buf_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+pub const DmaBufRingDescriptor = struct {
+    logical_size: LogicalSize,
+    /// How many buffers the ring has, from 1 to 8.
+    buffer_count: u32,
+    /// The formats and modifiers that your reader imports, most preferred
+    /// first, such as those that eglQueryDmaBufModifiersEXT() reports.
+    formats: []const DmaBufFormat,
+    pub fn toNative(self: DmaBufRingDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_dma_buf_ring_descriptor {
+        var raw = std.mem.zeroes(c.mln_dma_buf_ring_descriptor);
+        raw.size = @sizeOf(c.mln_dma_buf_ring_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.buffer_count = self.buffer_count;
+        raw.formats = blk: {
+            const items = try allocator.alloc(c.mln_dma_buf_format, self.formats.len);
+            for (self.formats, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.format_count = std.math.cast(@TypeOf(raw.format_count), self.formats.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_dma_buf_ring_descriptor) status.Error!DmaBufRingDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .buffer_count = raw.buffer_count,
+            .formats = blk: {
+                const copied = try allocator.alloc(DmaBufFormat, raw.format_count);
+                for (try marshal.nativeSlice(c.mln_dma_buf_format, raw.formats, raw.format_count), 0..) |item, index| copied[index] = DmaBufFormat.fromNative(item);
+                break :blk copied;
+            },
         };
     }
 };
@@ -6168,7 +6323,7 @@ pub const RenderSessionAttachOptions = struct {
     ///   device.
     /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
     ///   Android or OpenHarmony window, a Wayland surface, a ring of Android
-    ///   hardware buffers, or an offscreen session.
+    ///   hardware buffers or dmabufs, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.

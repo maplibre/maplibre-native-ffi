@@ -162,9 +162,8 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     return static_cast<VkFormat>(colorFormat);
   }
 
-  [[nodiscard]] auto buffer() const -> void* {
-    const auto& exported = slots_.at(selected_).exported;
-    return exported ? exported->buffer() : nullptr;
+  [[nodiscard]] auto exported() const -> const VulkanSlotImage* {
+    return slots_.at(selected_).exported.get();
   }
 
  private:
@@ -994,7 +993,7 @@ auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
     .image_view = rendered.image_view(),
     .device = device.get(),
     .format = rendered.format(),
-    .buffer = rendered.buffer(),
+    .exported = rendered.exported(),
   };
 }
 
