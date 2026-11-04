@@ -184,6 +184,9 @@ napi_value mln_ts_read_image_content(
 napi_value mln_ts_read_image_stretch(
   napi_env env, const mln_image_stretch* source, size_t size
 );
+napi_value mln_ts_read_io_surface_frame(
+  napi_env env, const mln_io_surface_frame* source, size_t size
+);
 napi_value mln_ts_read_items_lat_lng(
   napi_env env, const mln_lat_lng* items, size_t count
 );
@@ -493,6 +496,10 @@ bool mln_ts_write_image_content(
 );
 bool mln_ts_write_image_stretch(
   mln_ts_call* call, napi_value value, mln_image_stretch* out, const char* path
+);
+bool mln_ts_write_io_surface_ring_descriptor(
+  mln_ts_call* call, napi_value value, mln_io_surface_ring_descriptor* out,
+  const char* path
 );
 bool mln_ts_write_lat_lng(
   mln_ts_call* call, napi_value value, mln_lat_lng* out, const char* path

@@ -509,9 +509,12 @@ function(mln_native_configure_suite target registry_dir)
       PRIVATE native_buffer native_image native_window)
   endif()
   # The Metal test support defines an Objective-C class, which the iOS and
-  # tvOS test app links against the runtime and Foundation directly.
+  # tvOS test app links against the runtime and Foundation directly. The
+  # IOSurface cases lock surfaces to read them.
   if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
-    target_link_libraries(${target} PRIVATE "-framework Foundation" objc)
+    target_link_libraries(
+      ${target}
+      PRIVATE "-framework Foundation" "-framework IOSurface" objc)
   endif()
 
   get_target_property(test_link_options mln_ffi_platform_dependencies

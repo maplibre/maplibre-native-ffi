@@ -126,6 +126,28 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
+    /// Gets the IOSurface of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrame.getProducerSync()` before you read the surface. Once
+    /// you release or discard the frame, the session may render into the surface
+    /// again. For an API that takes a `CVPixelBuffer`, wrap the surface with
+    /// `CVPixelBufferCreateWithIOSurface`. A reference that you take with
+    /// `CFRetain`, or a pixel buffer that wraps the surface, keeps the surface's
+    /// memory, but not its contents.
+    ///
+    /// See `mln_acquired_frame_get_io_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
+    pub const getIoSurface = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
+        fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+            return call.scopedView("mln_acquired_frame_get_io_surface", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", IoSurfaceFrame, self, context, use, diagnostic);
+        }
+    }.function else {};
+
     /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
@@ -580,6 +602,36 @@ pub const Map = struct {
     pub const attachDxgiSharedTextureRing = if (builtin.os.tag == .windows) struct {
         fn function(self: Map, descriptor: DxgiSharedTextureRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
             const started = try call.submit("mln_map_attach_dxgi_shared_texture_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
+    /// Creates a session that renders the map into a ring of IOSurfaces that the
+    /// library allocates.
+    ///
+    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its surface
+    /// with `AcquiredFrame.getIoSurface()`. `RenderSession.resize()` gives the ring
+    /// new surfaces of the new size. Attach with `RenderDriverKind.core_worker`.
+    ///
+    /// To hand frames to a reader that can't wait on an event, such as Flutter's
+    /// `copyPixelBuffer`, attach without `GpuSyncKindFlag.metal_shared_event` in
+    /// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// `GpuSyncKind.cpu_complete` only once the reader has finished with its
+    /// surface.
+    ///
+    /// See `mln_map_attach_io_surface_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.metal`.
+    /// - `error.NativeError` when `context` names no device and the system has no
+    ///   Metal device.
+    pub const attachIoSurfaceRing = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
+        fn function(self: Map, descriptor: IoSurfaceRingDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_io_surface_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
             return .{ .session = started.outputs, .ready = started.ready };
         }
     }.function else {};
@@ -2284,7 +2336,8 @@ pub const RenderSession = struct {
     /// Errors:
     ///
     /// - `error.Unsupported` when the session renders offscreen or into Android
-    ///   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
+    ///   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
+    ///   allocates.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -4805,6 +4858,61 @@ pub const ImageStretch = struct {
     }
 };
 
+/// The IOSurface of an acquired frame.
+///
+/// See `mln_io_surface_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+pub const IoSurfaceFrame = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    scale_factor: f64 = 0,
+    /// The surface's index in the ring.
+    slot: u32 = 0,
+    /// The `IOSurfaceRef`.
+    surface: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_io_surface_frame) IoSurfaceFrame {
+        return .{
+            .width = raw.width,
+            .height = raw.height,
+            .scale_factor = raw.scale_factor,
+            .slot = raw.slot,
+            .surface = raw.surface,
+        };
+    }
+};
+
+/// A ring of IOSurfaces that the library allocates, for
+/// `Map.attachIoSurfaceRing()`.
+///
+/// Each surface has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
+/// names MTLPixelFormatBGRA8Unorm.
+///
+/// See `mln_io_surface_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+pub const IoSurfaceRingDescriptor = struct {
+    logical_size: LogicalSize,
+    /// How many surfaces the ring has, from 1 to 8.
+    buffer_count: u32,
+    /// The MTLDevice to render with. A null device picks the system's default.
+    context: MetalContextDescriptor = .{},
+    pub fn toNative(self: IoSurfaceRingDescriptor) c.mln_io_surface_ring_descriptor {
+        var raw = std.mem.zeroes(c.mln_io_surface_ring_descriptor);
+        raw.size = @sizeOf(c.mln_io_surface_ring_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.buffer_count = self.buffer_count;
+        raw.context = self.context.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_io_surface_ring_descriptor) IoSurfaceRingDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .buffer_count = raw.buffer_count,
+            .context = MetalContextDescriptor.fromNative(raw.context),
+        };
+    }
+};
+
 /// A geographic coordinate, in degrees.
 ///
 /// See `mln_lat_lng` in the
@@ -6502,9 +6610,9 @@ pub const RenderSessionAttachOptions = struct {
     ///   device.
     /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
     ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-    ///   Android hardware buffers, dmabufs, or DXGI shared textures, or an
-    ///   offscreen session.
-    /// - Either one for a Metal or Vulkan target.
+    ///   Android hardware buffers, dmabufs, DXGI shared textures, or
+    ///   IOSurfaces, or an offscreen session.
+    /// - Either one for another Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.
     driver: RenderDriverKind,

@@ -1129,6 +1129,49 @@ export interface ImageStretch {
 }
 
 /**
+ * The IOSurface of an acquired frame.
+ *
+ * See `mln_io_surface_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ */
+export interface IoSurfaceFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  /**
+   * The surface's index in the ring.
+   */
+  readonly slot: number;
+  /**
+   * The `IOSurfaceRef`.
+   */
+  readonly surface: bigint;
+}
+
+/**
+ * A ring of IOSurfaces that the library allocates, for
+ * `MapHandle.attachIoSurfaceRing()`.
+ *
+ * Each surface has the map's size in pixels, `logical_size` times the map's
+ * scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
+ * names MTLPixelFormatBGRA8Unorm.
+ *
+ * See `mln_io_surface_ring_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ */
+export interface IoSurfaceRingDescriptor {
+  logicalSize: LogicalSize;
+  /**
+   * How many surfaces the ring has, from 1 to 8.
+   */
+  bufferCount: number;
+  /**
+   * The MTLDevice to render with. A null device picks the system's default.
+   */
+  context?: MetalContextDescriptor;
+}
+
+/**
  * A geographic coordinate, in degrees.
  *
  * See `mln_lat_lng` in the
@@ -2336,9 +2379,9 @@ export interface RenderSessionAttachOptions {
    *   WGL context, an existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android,
    *   OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
-   *   hardware buffers, dmabufs, or DXGI shared textures, or an offscreen
-   *   session.
-   * - Either one for a Metal or Vulkan target.
+   *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces, or an
+   *   offscreen session.
+   * - Either one for another Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.unsupported`.
    */

@@ -1097,6 +1097,37 @@ napi_value mln_ts_read_image_stretch(
   return result;
 }
 
+napi_value mln_ts_read_io_surface_frame(
+  napi_env env, const mln_io_surface_frame* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "width", mln_ts_number(env, (double)(source->width))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "height", mln_ts_number(env, (double)(source->height))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "scaleFactor",
+        mln_ts_number(env, (double)(source->scale_factor))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "slot", mln_ts_number(env, (double)(source->slot))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "surface",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->surface))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_items_lat_lng(
   napi_env env, const mln_lat_lng* items, size_t count
 ) {
@@ -4524,6 +4555,40 @@ bool mln_ts_write_image_stretch(
     double number = 0;
     if (!mln_ts_read_double(call, member, &number, child)) return false;
     out->to = (float)number;
+  }
+  return true;
+}
+
+bool mln_ts_write_io_surface_ring_descriptor(
+  mln_ts_call* call, napi_value value, mln_io_surface_ring_descriptor* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "bufferCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bufferCount");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->buffer_count = (uint32_t)number;
+  }
+  if (!mln_ts_member(call, value, "context", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "context");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->context, 0, sizeof out->context);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_metal_context_descriptor(
+          call, member, &out->context, child
+        ))
+      return false;
   }
   return true;
 }

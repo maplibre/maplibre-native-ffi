@@ -492,6 +492,24 @@ internal unsafe struct mln_image_stretch
     public float to;
 }
 
+internal unsafe struct mln_io_surface_frame
+{
+    public uint size;
+    public uint width;
+    public uint height;
+    public double scale_factor;
+    public uint slot;
+    public void* surface;
+}
+
+internal unsafe struct mln_io_surface_ring_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint buffer_count;
+    public mln_metal_context_descriptor context;
+}
+
 internal unsafe struct mln_lat_lng
 {
     public double latitude;

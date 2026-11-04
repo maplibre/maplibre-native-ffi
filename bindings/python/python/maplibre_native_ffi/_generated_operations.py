@@ -37,6 +37,8 @@ from ._generated_values import (
     GeoJsonSourceOptions,
     GpuSync,
     HttpHeaderTransform,
+    IoSurfaceFrame,
+    IoSurfaceRingDescriptor,
     LatLng,
     LatLngBounds,
     LogHandler,
@@ -235,6 +237,33 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             self,
             lambda: self._native.dxgi_shared_texture(),
             lambda raw: DxgiSharedTextureFrame._from_native(raw),
+        )
+
+    def io_surface(self) -> AbstractContextManager[IoSurfaceFrame]:
+        """Gets the IOSurface of an acquired frame.
+
+        Wait for `AcquiredFrameHandle.producer_sync()` before you read the
+        surface. Once you release or discard the frame, the session may
+        render into the surface again. For an API that takes a
+        `CVPixelBuffer`, wrap the surface with
+        `CVPixelBufferCreateWithIOSurface`. A reference that you take with
+        `CFRetain`, or a pixel buffer that wraps the surface, keeps the
+        surface's memory, but not its contents.
+
+        Native resources remain valid only inside the `with` block.
+
+        See `mln_acquired_frame_get_io_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+
+        Errors:
+
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
+        """
+        return _view(
+            self,
+            lambda: self._native.io_surface(),
+            lambda raw: IoSurfaceFrame._from_native(raw),
         )
 
     def metal_texture(self) -> AbstractContextManager[MetalTextureFrame]:
@@ -707,6 +736,38 @@ class _MapHandleOperations(GeneratedOperations):
         raw = self._native.attach_dxgi_shared_texture_ring(
             descriptor, None if device is None else device._native, options
         )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
+
+    def attach_io_surface_ring(
+        self, descriptor: IoSurfaceRingDescriptor, options: RenderSessionAttachOptions
+    ) -> RenderSessionHandle:
+        """Creates a session that renders the map into a ring of IOSurfaces that
+        the library allocates.
+
+        Acquire each frame with `RenderSessionHandle.acquire_frame()`, and
+        get its surface with `AcquiredFrameHandle.io_surface()`.
+        `RenderSessionHandle.resize()` gives the ring new surfaces of the new
+        size. Attach with `RenderDriverKind.CORE_WORKER`.
+
+        To hand frames to a reader that can't wait on an event, such as
+        Flutter's `copyPixelBuffer`, attach without
+        `GpuSyncKindFlag.METAL_SHARED_EVENT` in
+        `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+        finishes before you acquire it. Release a frame with
+        `GpuSyncKind.CPU_COMPLETE` only once the reader has finished with its
+        surface.
+
+        See `mln_map_attach_io_surface_ring` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.METAL`.
+        - `Status.NATIVE_ERROR` when `context` names no device and the system
+          has no Metal device.
+        """
+        raw = self._native.attach_io_surface_ring(descriptor, options)
         return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_metal_borrowed_texture(
@@ -2540,8 +2601,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.UNSUPPORTED` when the session renders offscreen or into
-          Android hardware buffers, dmabufs, or DXGI shared textures that it
-          allocates.
+          Android hardware buffers, dmabufs, DXGI shared textures, or
+          IOSurfaces that it allocates.
         - `Status.UNSUPPORTED` when the target is a WebGL canvas.
         - `Status.TARGET_LOST` when the session loses its target before the
           release runs.

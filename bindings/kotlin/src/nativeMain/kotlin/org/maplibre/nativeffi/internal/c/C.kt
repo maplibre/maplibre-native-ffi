@@ -43,6 +43,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_acquired_frame_get_io_surface(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_io_surface(
+      frame.toULong(),
+      outFrame.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -436,6 +447,23 @@ internal actual object C {
       map.toULong(),
       descriptor.toCPointer(),
       device.toULong(),
+      options.toCPointer(),
+      outSession.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_attach_io_surface_ring(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_io_surface_ring(
+      map.toULong(),
+      descriptor.toCPointer(),
       options.toCPointer(),
       outSession.toCPointer(),
       completion.toCPointer(),

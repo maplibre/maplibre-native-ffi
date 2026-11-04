@@ -35,6 +35,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_acquired_frame_get_io_surface(
+        MlnAcquiredFrame frame,
+        mln_io_surface_frame* out_frame,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_metal_texture(
         MlnAcquiredFrame frame,
         mln_metal_texture_frame* out_frame,
@@ -272,6 +279,16 @@ internal static unsafe partial class NativeMethods
         MlnMap map,
         mln_dxgi_shared_texture_ring_descriptor* descriptor,
         MlnVulkanDevice device,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_io_surface_ring(
+        MlnMap map,
+        mln_io_surface_ring_descriptor* descriptor,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,

@@ -2247,6 +2247,69 @@ class ImageStretch:
 
 
 @dataclass(frozen=True, slots=True)
+class IoSurfaceFrame:
+    """The IOSurface of an acquired frame.
+
+    See `mln_io_surface_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    """
+
+    width: int
+
+    height: int
+
+    scale_factor: float
+
+    slot: int
+    """The surface's index in the ring."""
+
+    surface: int
+    """The `IOSurfaceRef`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            slot=raw["slot"],
+            surface=raw["surface"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class IoSurfaceRingDescriptor:
+    """A ring of IOSurfaces that the library allocates, for
+    `MapHandle.attach_io_surface_ring()`.
+
+    Each surface has the map's size in pixels, `logical_size` times the map's
+    scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
+    names MTLPixelFormatBGRA8Unorm.
+
+    See `mln_io_surface_ring_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    buffer_count: int
+    """How many surfaces the ring has, from 1 to 8."""
+
+    context: MetalContextDescriptor = field(
+        default_factory=lambda: MetalContextDescriptor()
+    )
+    """The MTLDevice to render with. A null device picks the system's default."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            buffer_count=raw["buffer_count"],
+            context=MetalContextDescriptor._from_native(raw["context"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class LatLng:
     """A geographic coordinate, in degrees.
 
@@ -3515,9 +3578,9 @@ class RenderSessionAttachOptions:
       device.
     - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an
       Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-      Android hardware buffers, dmabufs, or DXGI shared textures, or an
-      offscreen session.
-    - Either one for a Metal or Vulkan target.
+      Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces,
+      or an offscreen session.
+    - Either one for another Metal or Vulkan target.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.
     """

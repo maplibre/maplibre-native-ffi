@@ -3087,6 +3087,58 @@ func nativeImageStretch(input ImageStretch, arena *bindingArena) C.mln_image_str
 	return raw
 }
 
+// IoSurfaceFrame corresponds to mln_io_surface_frame. The IOSurface of an
+// acquired frame.
+//
+// See mln_io_surface_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+type IoSurfaceFrame struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	// The surface's index in the ring.
+	Slot uint32
+	// The IOSurfaceRef.
+	Surface uintptr
+}
+
+func copyIoSurfaceFrame(raw C.mln_io_surface_frame) IoSurfaceFrame {
+	var result IoSurfaceFrame
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.Slot = uint32(raw.slot)
+	result.Surface = uintptr(unsafe.Pointer(raw.surface))
+	return result
+}
+
+// IoSurfaceRingDescriptor corresponds to mln_io_surface_ring_descriptor. A ring
+// of IOSurfaces that the library allocates, for
+// MapHandle.AttachIoSurfaceRing().
+//
+// Each surface has the map's size in pixels, logical_size times the map's scale
+// factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal names
+// MTLPixelFormatBGRA8Unorm.
+//
+// See mln_io_surface_ring_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+type IoSurfaceRingDescriptor struct {
+	LogicalSize LogicalSize
+	// How many surfaces the ring has, from 1 to 8.
+	BufferCount uint32
+	// The MTLDevice to render with. A null device picks the system's default.
+	Context MetalContextDescriptor
+}
+
+func nativeIoSurfaceRingDescriptor(input IoSurfaceRingDescriptor, arena *bindingArena) C.mln_io_surface_ring_descriptor {
+	raw := C.mln_io_surface_ring_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.buffer_count = C.uint32_t(input.BufferCount)
+	raw.context = nativeMetalContextDescriptor(input.Context, arena)
+	return raw
+}
+
 // LatLng corresponds to mln_lat_lng. A geographic coordinate, in degrees.
 //
 // See mln_lat_lng in the C API reference:
@@ -4343,9 +4395,9 @@ type RenderSessionAttachOptions struct {
 	//     context, an existing WebGL context, or a browser's WebGPU device.
 	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android,
 	//     OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
-	//     hardware buffers, dmabufs, or DXGI shared textures, or an offscreen
-	//     session.
-	//   - Either one for a Metal or Vulkan target.
+	//     hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces, or an
+	//     offscreen session.
+	//   - Either one for another Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.
 	Driver RenderDriverKind
@@ -6237,6 +6289,28 @@ func (view DxgiSharedTextureFrameView) UnsafeHandle() (uintptr, error) {
 		defer runtime.UnlockOSThread()
 		view.scope.check()
 		return view.value.Handle
+	})
+}
+
+type IoSurfaceFrameView struct {
+	value IoSurfaceFrame
+	scope *bindingScope
+}
+
+func (view IoSurfaceFrameView) Width() uint32 { return view.value.Width }
+
+func (view IoSurfaceFrameView) Height() uint32 { return view.value.Height }
+
+func (view IoSurfaceFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
+
+func (view IoSurfaceFrameView) Slot() uint32 { return view.value.Slot }
+
+func (view IoSurfaceFrameView) UnsafeSurface() (uintptr, error) {
+	return bindingCall(func() uintptr {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Surface
 	})
 }
 
@@ -9032,7 +9106,8 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 //
 // Errors:
 //   - StatusUnsupported when the session renders offscreen or into Android
-//     hardware buffers, dmabufs, or DXGI shared textures that it allocates.
+//     hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
+//     allocates.
 //   - StatusUnsupported when the target is a WebGL canvas.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.

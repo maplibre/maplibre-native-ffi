@@ -473,6 +473,65 @@ impl MapHandle {
         Ok((RenderSessionHandle::adopt(out_session)?, future))
     }
 
+    /// Creates a session that renders the map into a ring of IOSurfaces that
+    /// the library allocates.
+    ///
+    /// Acquire each frame with `RenderSessionHandle::acquire_frame()`, and get
+    /// its surface with `AcquiredFrameView::get_io_surface()`.
+    /// `RenderSessionHandle::resize()` gives the ring new surfaces of the new
+    /// size. Attach with `RenderDriverKind::CoreWorker`.
+    ///
+    /// To hand frames to a reader that can't wait on an event, such as
+    /// Flutter's `copyPixelBuffer`, attach without
+    /// `GpuSyncKindFlag::METAL_SHARED_EVENT` in
+    /// `RenderSessionAttachOptions::producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// `GpuSyncKind::CpuComplete` only once the reader has finished with its
+    /// surface.
+    ///
+    /// See `mln_map_attach_io_surface_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when `supported_render_backend_mask()` lacks
+    ///   `RenderBackendFlag::METAL`.
+    /// - `Status::NativeError` when `context` names no device and the system
+    ///   has no Metal device.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "visionos"
+    ))]
+    pub unsafe fn attach_io_surface_ring(
+        &self,
+        descriptor: &IoSurfaceRingDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_io_surface_ring(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     ///

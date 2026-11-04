@@ -2022,6 +2022,69 @@ impl FromNative<sys::mln_image_stretch> for ImageStretch {
     }
 }
 
+/// The IOSurface of an acquired frame.
+///
+/// See `mln_io_surface_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct IoSurfaceFrame {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    /// The surface's index in the ring.
+    pub slot: u32,
+    /// The `IOSurfaceRef`.
+    pub surface: *mut std::ffi::c_void,
+}
+impl FromNative<sys::mln_io_surface_frame> for IoSurfaceFrame {
+    unsafe fn from_native(raw: sys::mln_io_surface_frame) -> Result<Self> {
+        Ok(Self {
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            slot: raw.slot,
+            surface: raw.surface,
+        })
+    }
+}
+
+/// A ring of IOSurfaces that the library allocates, for
+/// `MapHandle::attach_io_surface_ring()`.
+///
+/// Each surface has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
+/// names MTLPixelFormatBGRA8Unorm.
+///
+/// See `mln_io_surface_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct IoSurfaceRingDescriptor {
+    pub logical_size: LogicalSize,
+    /// How many surfaces the ring has, from 1 to 8.
+    pub buffer_count: u32,
+    /// The MTLDevice to render with. A null device picks the system's default.
+    pub context: MetalContextDescriptor,
+}
+impl IoSurfaceRingDescriptor {
+    pub fn new(logical_size: LogicalSize, buffer_count: u32) -> Self {
+        Self {
+            logical_size,
+            buffer_count,
+            context: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_io_surface_ring_descriptor> for IoSurfaceRingDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_io_surface_ring_descriptor> {
+        let mut raw: sys::mln_io_surface_ring_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_io_surface_ring_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.buffer_count = self.buffer_count;
+        raw.context = to_native(&self.context, arena)?;
+        Ok(raw)
+    }
+}
+
 /// A geographic coordinate, in degrees.
 ///
 /// See `mln_lat_lng` in the
@@ -4008,9 +4071,9 @@ pub struct RenderSessionAttachOptions {
     ///   device.
     /// - `RenderDriverKind::CoreWorker` for a transferred WebGL canvas, an
     ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-    ///   Android hardware buffers, dmabufs, or DXGI shared textures, or an
-    ///   offscreen session.
-    /// - Either one for a Metal or Vulkan target.
+    ///   Android hardware buffers, dmabufs, DXGI shared textures, or
+    ///   IOSurfaces, or an offscreen session.
+    /// - Either one for another Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.
     pub driver: RenderDriverKind,

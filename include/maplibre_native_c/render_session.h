@@ -425,7 +425,8 @@ MLN_API mln_status mln_render_session_resize(
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android
- *   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
+ *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
+ *   allocates.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas.

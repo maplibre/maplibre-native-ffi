@@ -1600,6 +1600,40 @@ final class DxgiSharedTextureFrame extends _Value {
   ]);
 }
 
+/// The IOSurface of an acquired frame.
+///
+/// See `mln_io_surface_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+final class IoSurfaceFrame extends _Value {
+  const IoSurfaceFrame({
+    this.width = 0,
+    this.height = 0,
+    this.scaleFactor = 0,
+    this.slot = 0,
+    this.surface = NativePointer.nullPointer,
+  });
+  final int width;
+  final int height;
+  final double scaleFactor;
+
+  /// The surface's index in the ring.
+  final int slot;
+
+  /// The `IOSurfaceRef`.
+  final NativePointer surface;
+
+  @override
+  List<Object?> get _members => [width, height, scaleFactor, slot, surface];
+  @override
+  String toString() => _describe('IoSurfaceFrame', const [
+    'width',
+    'height',
+    'scaleFactor',
+    'slot',
+    'surface',
+  ]);
+}
+
 /// The Metal texture of an acquired frame.
 ///
 /// See `mln_metal_texture_frame` in the
@@ -2939,9 +2973,9 @@ final class RenderSessionAttachOptions extends _Value {
   ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an
   ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-  ///   Android hardware buffers, dmabufs, or DXGI shared textures, or an
-  ///   offscreen session.
-  /// - Either one for a Metal or Vulkan target.
+  ///   Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces,
+  ///   or an offscreen session.
+  /// - Either one for another Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
   ///
@@ -3168,6 +3202,70 @@ final class DxgiSharedTextureRingDescriptor extends _Value {
   ]);
 }
 
+/// The Metal device that a render session uses.
+///
+/// See `mln_metal_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class MetalContextDescriptor extends _Value {
+  const MetalContextDescriptor({this.device = NativePointer.nullPointer});
+
+  /// An `MTLDevice`.
+  final NativePointer device;
+
+  /// A copy of this value with the given members replaced.
+  MetalContextDescriptor copyWith({NativePointer? device}) =>
+      MetalContextDescriptor(device: device ?? this.device);
+
+  @override
+  List<Object?> get _members => [device];
+  @override
+  String toString() => _describe('MetalContextDescriptor', const ['device']);
+}
+
+/// A ring of IOSurfaces that the library allocates, for
+/// `MapHandle.attachIoSurfaceRing()`.
+///
+/// Each surface has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
+/// names MTLPixelFormatBGRA8Unorm.
+///
+/// See `mln_io_surface_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+final class IoSurfaceRingDescriptor extends _Value {
+  const IoSurfaceRingDescriptor({
+    required this.logicalSize,
+    required this.bufferCount,
+    this.context = const MetalContextDescriptor(),
+  });
+  final LogicalSize logicalSize;
+
+  /// How many surfaces the ring has, from 1 to 8.
+  final int bufferCount;
+
+  /// The MTLDevice to render with. A null device picks the system's default.
+  final MetalContextDescriptor context;
+
+  /// A copy of this value with the given members replaced.
+  IoSurfaceRingDescriptor copyWith({
+    LogicalSize? logicalSize,
+    int? bufferCount,
+    MetalContextDescriptor? context,
+  }) => IoSurfaceRingDescriptor(
+    logicalSize: logicalSize ?? this.logicalSize,
+    bufferCount: bufferCount ?? this.bufferCount,
+    context: context ?? this.context,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, bufferCount, context];
+  @override
+  String toString() => _describe('IoSurfaceRingDescriptor', const [
+    'logicalSize',
+    'bufferCount',
+    'context',
+  ]);
+}
+
 /// A Metal texture of a borrowed ring.
 ///
 /// See `mln_metal_borrowed_texture` in the
@@ -3249,26 +3347,6 @@ final class MetalBorrowedTextureDescriptor extends _Value {
     'textures',
     'commandQueue',
   ]);
-}
-
-/// The Metal device that a render session uses.
-///
-/// See `mln_metal_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class MetalContextDescriptor extends _Value {
-  const MetalContextDescriptor({this.device = NativePointer.nullPointer});
-
-  /// An `MTLDevice`.
-  final NativePointer device;
-
-  /// A copy of this value with the given members replaced.
-  MetalContextDescriptor copyWith({NativePointer? device}) =>
-      MetalContextDescriptor(device: device ?? this.device);
-
-  @override
-  List<Object?> get _members => [device];
-  @override
-  String toString() => _describe('MetalContextDescriptor', const ['device']);
 }
 
 /// A Metal layer to render to, for `MapHandle.attachMetalSurface()`.

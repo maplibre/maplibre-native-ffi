@@ -12,6 +12,33 @@ package maplibre
 import "C"
 import "unsafe"
 
+// WithIoSurface gets the IOSurface of an acquired frame.
+//
+// Wait for AcquiredFrameHandle.WithProducerSync() before you read the surface.
+// Once you release or discard the frame, the session may render into the
+// surface again. For an API that takes a CVPixelBuffer, wrap the surface with
+// CVPixelBufferCreateWithIOSurface. A reference that you take with CFRetain, or
+// a pixel buffer that wraps the surface, keeps the surface's memory, but not
+// its contents.
+//
+// See mln_acquired_frame_get_io_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+//
+// Errors:
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
+func (receiver *AcquiredFrameHandle) WithIoSurface(callback func(IoSurfaceFrameView) error) error {
+	var outFrame C.mln_io_surface_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_io_surface(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) IoSurfaceFrameView {
+		return IoSurfaceFrameView{value: copyIoSurfaceFrame(outFrame), scope: scope}
+	})
+}
+
 // WithMetalTexture gets the Metal texture of an acquired frame.
 //
 // See mln_acquired_frame_get_metal_texture in the C API reference:
@@ -55,6 +82,46 @@ func AppleFramePacerCreate(options *FramePacerOptions) (*FramePacerHandle, error
 		adopted := adoptFramePacerHandle(uint64(outPacer), nil)
 		return adopted
 	})
+}
+
+// AttachIoSurfaceRing creates a session that renders the map into a ring of
+// IOSurfaces that the library allocates.
+//
+// Acquire each frame with RenderSessionHandle.AcquireFrame(), and get its
+// surface with AcquiredFrameHandle.WithIoSurface().
+// RenderSessionHandle.Resize() gives the ring new surfaces of the new size.
+// Attach with RenderDriverKindCoreWorker.
+//
+// To hand frames to a reader that can't wait on an event, such as Flutter's
+// copyPixelBuffer, attach without GPUSyncKindFlagMetalSharedEvent in
+// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
+// before you acquire it. Release a frame with GPUSyncKindCPUComplete only once
+// the reader has finished with its surface.
+//
+// See mln_map_attach_io_surface_ring in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagMetal.
+//   - StatusNativeError when context names no device and the system has no
+//     Metal device.
+func (receiver *MapHandle) AttachIoSurfaceRing(descriptor IoSurfaceRingDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+	var outSession C.mln_render_session
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_io_surface_ring(C.mln_map(raw), bindingStore(nativeIoSurfaceRingDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		session *RenderSessionHandle
+		ready   *Future[struct{}]
+	} {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return struct {
+			session *RenderSessionHandle
+			ready   *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.session, result.ready, err
 }
 
 // AttachMetalBorrowedTexture creates a session that renders the map into a ring

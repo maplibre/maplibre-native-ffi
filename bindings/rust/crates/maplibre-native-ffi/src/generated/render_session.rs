@@ -582,8 +582,8 @@ impl RenderSessionHandle {
     /// # Errors
     ///
     /// - `Status::Unsupported` when the session renders offscreen or into
-    ///   Android hardware buffers, dmabufs, or DXGI shared textures that it
-    ///   allocates.
+    ///   Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces
+    ///   that it allocates.
     /// - `Status::Unsupported` when the target is a WebGL canvas.
     /// - `Status::TargetLost` when the session loses its target before the
     ///   release runs.

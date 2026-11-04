@@ -659,6 +659,29 @@ final class mln_image_stretch extends Struct {
   external double to;
 }
 
+final class mln_io_surface_frame extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int width;
+  @Uint32()
+  external int height;
+  @Double()
+  external double scale_factor;
+  @Uint32()
+  external int slot;
+  external Pointer<Void> surface;
+}
+
+final class mln_io_surface_ring_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  @Uint32()
+  external int buffer_count;
+  external mln_metal_context_descriptor context;
+}
+
 final class mln_lat_lng extends Struct {
   @Double()
   external double latitude;
@@ -2603,6 +2626,19 @@ external int mln_acquired_frame_get_dxgi_shared_texture(
 @Native<
   Int32 Function(
     mln_acquired_frame,
+    Pointer<mln_io_surface_frame>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_acquired_frame_get_io_surface(
+  int frame,
+  Pointer<mln_io_surface_frame> out_frame,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_acquired_frame,
     Pointer<mln_metal_texture_frame>,
     Pointer<mln_diagnostic>,
   )
@@ -3082,6 +3118,25 @@ external int mln_map_attach_dxgi_shared_texture_ring(
   int map,
   Pointer<mln_dxgi_shared_texture_ring_descriptor> descriptor,
   int device,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_io_surface_ring_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_io_surface_ring(
+  int map,
+  Pointer<mln_io_surface_ring_descriptor> descriptor,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
