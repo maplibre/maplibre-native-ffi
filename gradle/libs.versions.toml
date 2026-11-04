@@ -10,11 +10,20 @@ java-toolchain = "25"
 java-release = "25"
 java-android-release = "17"
 androidx-test-runner = "1.7.0"
+androidx-activity = "1.13.0"
+androidx-compose-bom = "2026.09.00"
+androidx-lifecycle = "2.11.0"
 
 [libraries]
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "androidx-compose-bom" }
+androidx-compose-foundation = { module = "androidx.compose.foundation:foundation" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 
 [plugins]
+# The Kotlin Gradle plugin comes from buildSrc, and this plugin must match its version.
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
