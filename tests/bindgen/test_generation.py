@@ -369,10 +369,13 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 self.assertRegex(source, r"ViewOptions(`|</c>)? that set each of its")
 
     def test_an_input_record_converts_its_absent_members_to_zero(self):
-        # A TypeScript input record may omit a member, which native reads as
-        # zero, so its conversion sets the zero rather than leaving it unset.
+        # A TypeScript record that native never returns may omit a member,
+        # which native reads as zero, so its conversion sets the zero rather
+        # than leaving it unset.
+        read = 'mln_status mln_read_view(mln_view *out_view BIND("direction=out"), mln_diagnostic *out_diagnostic);\n'
+        self.assertIn(read, OPTIONS_SOURCE)
         api = parse(
-            OPTIONS_SOURCE
+            OPTIONS_SOURCE.replace(read, "")
             + "mln_status mln_check_view(mln_view view, mln_diagnostic *out_diagnostic);\n",
             defines=("MLN_PROTOCOL_STANDARD_TYPES",),
             header="view.h",

@@ -60,6 +60,13 @@ assert.deepEqual(probeBatchScores(batch), [7, 18, 14]);
 assert.deepEqual(probeBatchPoints([]), []);
 assert.deepEqual(probeBatchScores([]), []);
 
+// Native also returns these points, so an input must spell out their plain
+// members, and the addon names the one it leaves out.
+assert.throws(() => probeBatchPoints([{ x: 2 } as (typeof batch)[number]]), {
+  name: "TypeError",
+  message: "points[0].y: expected a number",
+});
+
 // Parameters that are TypeScript keywords keep their order.
 assert.deepEqual(keywordCombine(5, 2, 7, 11), { type: 3, defer: 7, raw: 11 });
 

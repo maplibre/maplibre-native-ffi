@@ -108,32 +108,32 @@ export type CacheDatabaseOperation =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface Camera {
-  center?: LatLng;
+  center: LatLng;
   /**
    * The altitude of the center, in meters above sea level.
    */
-  centerAltitude?: number;
+  centerAltitude: number;
   /**
    * Insets from the map's edges. The camera centers within the rest.
    */
-  padding?: EdgeInsets;
-  zoom?: number;
+  padding: EdgeInsets;
+  zoom: number;
   /**
    * The rotation from north, in degrees.
    */
-  bearing?: number;
+  bearing: number;
   /**
    * The tilt toward the horizon, in degrees. 0 looks straight down.
    */
-  pitch?: number;
+  pitch: number;
   /**
    * The roll, in degrees.
    */
-  roll?: number;
+  roll: number;
   /**
    * The vertical field of view, in degrees.
    */
-  fieldOfView?: number;
+  fieldOfView: number;
 }
 
 /**
@@ -141,14 +141,14 @@ export interface Camera {
  */
 export function cameraToOptions(camera: Camera): CameraOptions {
   return {
-    center: camera.center ?? {},
-    centerAltitude: camera.centerAltitude ?? 0,
-    padding: camera.padding ?? {},
-    zoom: camera.zoom ?? 0,
-    bearing: camera.bearing ?? 0,
-    pitch: camera.pitch ?? 0,
-    roll: camera.roll ?? 0,
-    fieldOfView: camera.fieldOfView ?? 0,
+    center: camera.center,
+    centerAltitude: camera.centerAltitude,
+    padding: camera.padding,
+    zoom: camera.zoom,
+    bearing: camera.bearing,
+    pitch: camera.pitch,
+    roll: camera.roll,
+    fieldOfView: camera.fieldOfView,
   };
 }
 
@@ -438,9 +438,9 @@ export type CameraUpdateMode =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface CanonicalTileId {
-  z?: number;
-  x?: number;
-  y?: number;
+  z: number;
+  x: number;
+  y: number;
 }
 
 /**
@@ -543,10 +543,10 @@ export interface CustomVectorSourceOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface EdgeInsets {
-  top?: number;
-  left?: number;
-  bottom?: number;
-  right?: number;
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
 }
 
 /**
@@ -763,12 +763,12 @@ export type GesturePhase =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface GpuSync {
-  kind?: GpuSyncKind;
+  kind: GpuSyncKind;
   /**
    * The object to wait on, for the kinds that name one.
    */
-  handle?: bigint;
-  value?: bigint;
+  handle: bigint;
+  value: bigint;
 }
 
 /**
@@ -886,10 +886,10 @@ export interface HttpHeaderTransform {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface ImageContent {
-  left?: number;
-  top?: number;
-  right?: number;
-  bottom?: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 /**
@@ -899,8 +899,8 @@ export interface ImageContent {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 export interface ImageStretch {
-  from?: number;
-  to?: number;
+  from: number;
+  to: number;
 }
 
 /**
@@ -910,8 +910,8 @@ export interface ImageStretch {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface LatLng {
-  latitude?: number;
-  longitude?: number;
+  latitude: number;
+  longitude: number;
 }
 
 /**
@@ -921,8 +921,8 @@ export interface LatLng {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface LatLngBounds {
-  southwest?: LatLng;
-  northeast?: LatLng;
+  southwest: LatLng;
+  northeast: LatLng;
 }
 
 /**
@@ -1023,9 +1023,9 @@ export type LogSeverityFlag = number;
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface LogicalExtent {
-  width?: number;
-  height?: number;
-  scaleFactor?: number;
+  width: number;
+  height: number;
+  scaleFactor: number;
 }
 
 /**
@@ -1237,10 +1237,10 @@ export interface MapTileSettings {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapView {
-  camera?: Camera;
-  extent?: LogicalExtent;
-  projectionMode?: ProjectionMode;
-  viewport?: MapViewport;
+  camera: Camera;
+  extent: LogicalExtent;
+  projectionMode: ProjectionMode;
+  viewport: MapViewport;
 }
 
 /**
@@ -1252,10 +1252,10 @@ export interface MapView {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapViewport {
-  northOrientation?: NorthOrientation;
-  constrainMode?: ConstrainMode;
-  viewportMode?: ViewportMode;
-  frustumOffset?: EdgeInsets;
+  northOrientation: NorthOrientation;
+  constrainMode: ConstrainMode;
+  viewportMode: ViewportMode;
+  frustumOffset: EdgeInsets;
 }
 
 /**
@@ -1455,12 +1455,12 @@ export type NorthOrientation =
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface OfflineGeometryRegionDefinition {
-  styleUrl?: string;
-  geometry: unknown;
-  minZoom?: number;
-  maxZoom?: number;
-  pixelRatio?: number;
-  includeIdeographs?: boolean;
+  styleUrl: string;
+  geometry?: unknown;
+  minZoom: number;
+  maxZoom: number;
+  pixelRatio: number;
+  includeIdeographs: boolean;
 }
 
 /**
@@ -1556,21 +1556,21 @@ export interface OfflineTilePyramidRegionDefinition {
    * The style whose resources the region holds. Maps use the region when they
    * load the same style URL.
    */
-  styleUrl?: string;
-  bounds?: LatLngBounds;
-  minZoom?: number;
+  styleUrl: string;
+  bounds: LatLngBounds;
+  minZoom: number;
   /**
    * INFINITY covers every zoom level that the style's sources have.
    */
-  maxZoom?: number;
+  maxZoom: number;
   /**
    * The pixel ratio of the images to download, such as 2 for dense screens.
    */
-  pixelRatio?: number;
+  pixelRatio: number;
   /**
    * Whether the region holds the glyphs of CJK ideographs.
    */
-  includeIdeographs?: boolean;
+  includeIdeographs: boolean;
 }
 
 /**
@@ -1832,8 +1832,8 @@ export interface PremultipliedRgba8Image {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface ProjectedMeters {
-  northing?: number;
-  easting?: number;
+  northing: number;
+  easting: number;
 }
 
 /**
@@ -1845,9 +1845,9 @@ export interface ProjectedMeters {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface ProjectionMode {
-  axonometric?: boolean;
-  xSkew?: number;
-  ySkew?: number;
+  axonometric: boolean;
+  xSkew: number;
+  ySkew: number;
 }
 
 /**
@@ -1872,10 +1872,10 @@ export interface ProjectionModeOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface Quaternion {
-  x?: number;
-  y?: number;
-  z?: number;
-  w?: number;
+  x: number;
+  y: number;
+  z: number;
+  w: number;
 }
 
 /**
@@ -3056,8 +3056,8 @@ export interface ScreenLineString {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface ScreenPoint {
-  x?: number;
-  y?: number;
+  x: number;
+  y: number;
 }
 
 /**
@@ -3653,9 +3653,9 @@ export interface UrlQueryParameter {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface Vec3 {
-  x?: number;
-  y?: number;
-  z?: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 /**

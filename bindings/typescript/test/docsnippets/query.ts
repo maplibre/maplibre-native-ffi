@@ -1,13 +1,16 @@
 // Snippets for the docs site's Query page. They are type-checked with the
 // tests, which never run them.
 
-import type { RenderSessionHandle } from "../../src/index.ts";
+import type {
+  RenderSessionHandle,
+  ScreenPoint,
+} from "../../src/index.ts";
 
 function useFeature(_feature: unknown): void {}
 
 export async function query(
   session: RenderSessionHandle,
-  point: { x: number; y: number },
+  point: ScreenPoint,
 ): Promise<void> {
   // #region rendered
   const hits = await session.queryRenderedFeatures(

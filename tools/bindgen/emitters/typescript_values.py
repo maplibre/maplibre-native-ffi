@@ -540,12 +540,20 @@ class Values:
         return bool(value.nullable)
 
     def omittable(self, record: ValuePlan, field: FieldPlan) -> bool:
-        """Whether an input may leave a member out and keep its zero default."""
+        """Whether an input may leave a member out and keep its zero default.
+
+        One interface serves both directions, and native fills every member of
+        a record that it returns, so an input may leave out only a masked or
+        nullable member of such a record, or JSON, which this binding reads and
+        writes as undefined when it is empty.
+        """
         if field.presence and field.presence.mask:
             return True
         if self.absent(field.value):
             return True
-        return not required_member(field)
+        if field.value.kind == "buffer" and field.value.encoding == "json":
+            return True
+        return record.native not in self.bound.returned and not required_member(field)
 
     def all_omittable(self, value: ValuePlan) -> bool:
         return value.kind == "record" and all(

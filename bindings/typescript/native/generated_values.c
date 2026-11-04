@@ -3047,72 +3047,56 @@ bool mln_ts_write_camera(
   (void)child;
   if (!mln_ts_member(call, value, "center", &member)) return false;
   mln_ts_path(child, sizeof child, path, "center");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->center, 0, sizeof out->center);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_lat_lng(call, member, &out->center, child)) return false;
-  }
+  memset(&out->center, 0, sizeof out->center);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_lat_lng(call, member, &out->center, child)) return false;
   if (!mln_ts_member(call, value, "centerAltitude", &member)) return false;
   mln_ts_path(child, sizeof child, path, "centerAltitude");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->center_altitude = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->center_altitude = (double)number;
   }
   if (!mln_ts_member(call, value, "padding", &member)) return false;
   mln_ts_path(child, sizeof child, path, "padding");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->padding, 0, sizeof out->padding);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_edge_insets(call, member, &out->padding, child))
-      return false;
-  }
+  memset(&out->padding, 0, sizeof out->padding);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_edge_insets(call, member, &out->padding, child))
+    return false;
   if (!mln_ts_member(call, value, "zoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "zoom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->zoom = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->zoom = (double)number;
   }
   if (!mln_ts_member(call, value, "bearing", &member)) return false;
   mln_ts_path(child, sizeof child, path, "bearing");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->bearing = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->bearing = (double)number;
   }
   if (!mln_ts_member(call, value, "pitch", &member)) return false;
   mln_ts_path(child, sizeof child, path, "pitch");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->pitch = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->pitch = (double)number;
   }
   if (!mln_ts_member(call, value, "roll", &member)) return false;
   mln_ts_path(child, sizeof child, path, "roll");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->roll = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->roll = (double)number;
   }
   if (!mln_ts_member(call, value, "fieldOfView", &member)) return false;
   mln_ts_path(child, sizeof child, path, "fieldOfView");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->field_of_view = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->field_of_view = (double)number;
   }
   return true;
 }
@@ -3418,33 +3402,27 @@ bool mln_ts_write_canonical_tile_id(
   (void)child;
   if (!mln_ts_member(call, value, "z", &member)) return false;
   mln_ts_path(child, sizeof child, path, "z");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->z = (uint32_t)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->z = (uint32_t)number;
   }
   if (!mln_ts_member(call, value, "x", &member)) return false;
   mln_ts_path(child, sizeof child, path, "x");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->x = (uint32_t)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->x = (uint32_t)number;
   }
   if (!mln_ts_member(call, value, "y", &member)) return false;
   mln_ts_path(child, sizeof child, path, "y");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->y = (uint32_t)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->y = (uint32_t)number;
   }
   return true;
 }
@@ -3599,39 +3577,31 @@ bool mln_ts_write_edge_insets(
   (void)child;
   if (!mln_ts_member(call, value, "top", &member)) return false;
   mln_ts_path(child, sizeof child, path, "top");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->top = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->top = (double)number;
   }
   if (!mln_ts_member(call, value, "left", &member)) return false;
   mln_ts_path(child, sizeof child, path, "left");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->left = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->left = (double)number;
   }
   if (!mln_ts_member(call, value, "bottom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "bottom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->bottom = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->bottom = (double)number;
   }
   if (!mln_ts_member(call, value, "right", &member)) return false;
   mln_ts_path(child, sizeof child, path, "right");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->right = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->right = (double)number;
   }
   return true;
 }
@@ -3951,31 +3921,25 @@ bool mln_ts_write_gpu_sync(
   (void)child;
   if (!mln_ts_member(call, value, "kind", &member)) return false;
   mln_ts_path(child, sizeof child, path, "kind");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->kind = (mln_gpu_sync_kind)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->kind = (mln_gpu_sync_kind)number;
   }
   if (!mln_ts_member(call, value, "handle", &member)) return false;
   mln_ts_path(child, sizeof child, path, "handle");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->handle = (uint64_t)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->handle = (uint64_t)number;
   }
   if (!mln_ts_member(call, value, "value", &member)) return false;
   mln_ts_path(child, sizeof child, path, "value");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->value = (uint64_t)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->value = (uint64_t)number;
   }
   return true;
 }
@@ -4078,39 +4042,31 @@ bool mln_ts_write_image_content(
   (void)child;
   if (!mln_ts_member(call, value, "left", &member)) return false;
   mln_ts_path(child, sizeof child, path, "left");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->left = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->left = (float)number;
   }
   if (!mln_ts_member(call, value, "top", &member)) return false;
   mln_ts_path(child, sizeof child, path, "top");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->top = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->top = (float)number;
   }
   if (!mln_ts_member(call, value, "right", &member)) return false;
   mln_ts_path(child, sizeof child, path, "right");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->right = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->right = (float)number;
   }
   if (!mln_ts_member(call, value, "bottom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "bottom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->bottom = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->bottom = (float)number;
   }
   return true;
 }
@@ -4123,21 +4079,17 @@ bool mln_ts_write_image_stretch(
   (void)child;
   if (!mln_ts_member(call, value, "from", &member)) return false;
   mln_ts_path(child, sizeof child, path, "from");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->from = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->from = (float)number;
   }
   if (!mln_ts_member(call, value, "to", &member)) return false;
   mln_ts_path(child, sizeof child, path, "to");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->to = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->to = (float)number;
   }
   return true;
 }
@@ -4150,21 +4102,17 @@ bool mln_ts_write_lat_lng(
   (void)child;
   if (!mln_ts_member(call, value, "latitude", &member)) return false;
   mln_ts_path(child, sizeof child, path, "latitude");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->latitude = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->latitude = (double)number;
   }
   if (!mln_ts_member(call, value, "longitude", &member)) return false;
   mln_ts_path(child, sizeof child, path, "longitude");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->longitude = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->longitude = (double)number;
   }
   return true;
 }
@@ -4177,20 +4125,14 @@ bool mln_ts_write_lat_lng_bounds(
   (void)child;
   if (!mln_ts_member(call, value, "southwest", &member)) return false;
   mln_ts_path(child, sizeof child, path, "southwest");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->southwest, 0, sizeof out->southwest);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_lat_lng(call, member, &out->southwest, child))
-      return false;
-  }
+  memset(&out->southwest, 0, sizeof out->southwest);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_lat_lng(call, member, &out->southwest, child)) return false;
   if (!mln_ts_member(call, value, "northeast", &member)) return false;
   mln_ts_path(child, sizeof child, path, "northeast");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->northeast, 0, sizeof out->northeast);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_lat_lng(call, member, &out->northeast, child))
-      return false;
-  }
+  memset(&out->northeast, 0, sizeof out->northeast);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_lat_lng(call, member, &out->northeast, child)) return false;
   return true;
 }
 
@@ -4542,32 +4484,26 @@ bool mln_ts_write_logical_extent(
   (void)child;
   if (!mln_ts_member(call, value, "width", &member)) return false;
   mln_ts_path(child, sizeof child, path, "width");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->width = (uint32_t)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->width = (uint32_t)number;
   }
   if (!mln_ts_member(call, value, "height", &member)) return false;
   mln_ts_path(child, sizeof child, path, "height");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->height = (uint32_t)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->height = (uint32_t)number;
   }
   if (!mln_ts_member(call, value, "scaleFactor", &member)) return false;
   mln_ts_path(child, sizeof child, path, "scaleFactor");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->scale_factor = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->scale_factor = (double)number;
   }
   return true;
 }
@@ -4735,37 +4671,27 @@ bool mln_ts_write_map_view(
   (void)child;
   if (!mln_ts_member(call, value, "camera", &member)) return false;
   mln_ts_path(child, sizeof child, path, "camera");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->camera, 0, sizeof out->camera);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_camera(call, member, &out->camera, child)) return false;
-  }
+  memset(&out->camera, 0, sizeof out->camera);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_camera(call, member, &out->camera, child)) return false;
   if (!mln_ts_member(call, value, "extent", &member)) return false;
   mln_ts_path(child, sizeof child, path, "extent");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->extent, 0, sizeof out->extent);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
-      return false;
-  }
+  memset(&out->extent, 0, sizeof out->extent);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_extent(call, member, &out->extent, child))
+    return false;
   if (!mln_ts_member(call, value, "projectionMode", &member)) return false;
   mln_ts_path(child, sizeof child, path, "projectionMode");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->projection_mode, 0, sizeof out->projection_mode);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_projection_mode(
-          call, member, &out->projection_mode, child
-        ))
-      return false;
-  }
+  memset(&out->projection_mode, 0, sizeof out->projection_mode);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_projection_mode(call, member, &out->projection_mode, child))
+    return false;
   if (!mln_ts_member(call, value, "viewport", &member)) return false;
   mln_ts_path(child, sizeof child, path, "viewport");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->viewport, 0, sizeof out->viewport);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_map_viewport(call, member, &out->viewport, child))
-      return false;
-  }
+  memset(&out->viewport, 0, sizeof out->viewport);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_map_viewport(call, member, &out->viewport, child))
+    return false;
   return true;
 }
 
@@ -4777,42 +4703,34 @@ bool mln_ts_write_map_viewport(
   (void)child;
   if (!mln_ts_member(call, value, "northOrientation", &member)) return false;
   mln_ts_path(child, sizeof child, path, "northOrientation");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->north_orientation = (mln_north_orientation)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->north_orientation = (mln_north_orientation)number;
   }
   if (!mln_ts_member(call, value, "constrainMode", &member)) return false;
   mln_ts_path(child, sizeof child, path, "constrainMode");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->constrain_mode = (mln_constrain_mode)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->constrain_mode = (mln_constrain_mode)number;
   }
   if (!mln_ts_member(call, value, "viewportMode", &member)) return false;
   mln_ts_path(child, sizeof child, path, "viewportMode");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->viewport_mode = (mln_viewport_mode)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->viewport_mode = (mln_viewport_mode)number;
   }
   if (!mln_ts_member(call, value, "frustumOffset", &member)) return false;
   mln_ts_path(child, sizeof child, path, "frustumOffset");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->frustum_offset, 0, sizeof out->frustum_offset);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_edge_insets(call, member, &out->frustum_offset, child))
-      return false;
-  }
+  memset(&out->frustum_offset, 0, sizeof out->frustum_offset);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_edge_insets(call, member, &out->frustum_offset, child))
+    return false;
   return true;
 }
 
@@ -5066,48 +4984,38 @@ bool mln_ts_write_offline_geometry_region_definition(
   (void)child;
   if (!mln_ts_member(call, value, "styleUrl", &member)) return false;
   mln_ts_path(child, sizeof child, path, "styleUrl");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->style_url, child))
-      return false;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->style_url, child))
+    return false;
   if (!mln_ts_member(call, value, "geometry", &member)) return false;
   mln_ts_path(child, sizeof child, path, "geometry");
   if (!mln_ts_read_json_view(call, member, &out->geometry, child)) return false;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->min_zoom = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->min_zoom = (double)number;
   }
   if (!mln_ts_member(call, value, "maxZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "maxZoom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->max_zoom = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->max_zoom = (double)number;
   }
   if (!mln_ts_member(call, value, "pixelRatio", &member)) return false;
   mln_ts_path(child, sizeof child, path, "pixelRatio");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->pixel_ratio = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->pixel_ratio = (float)number;
   }
   if (!mln_ts_member(call, value, "includeIdeographs", &member)) return false;
   mln_ts_path(child, sizeof child, path, "includeIdeographs");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      bool flag = false;
-      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
-      out->include_ideographs = flag;
-    }
+  {
+    bool flag = false;
+    if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+    out->include_ideographs = flag;
   }
   return true;
 }
@@ -5162,53 +5070,41 @@ bool mln_ts_write_offline_tile_pyramid_region_definition(
   (void)child;
   if (!mln_ts_member(call, value, "styleUrl", &member)) return false;
   mln_ts_path(child, sizeof child, path, "styleUrl");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->style_url, child))
-      return false;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->style_url, child))
+    return false;
   if (!mln_ts_member(call, value, "bounds", &member)) return false;
   mln_ts_path(child, sizeof child, path, "bounds");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->bounds, 0, sizeof out->bounds);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_lat_lng_bounds(call, member, &out->bounds, child))
-      return false;
-  }
+  memset(&out->bounds, 0, sizeof out->bounds);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_lat_lng_bounds(call, member, &out->bounds, child))
+    return false;
   if (!mln_ts_member(call, value, "minZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minZoom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->min_zoom = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->min_zoom = (double)number;
   }
   if (!mln_ts_member(call, value, "maxZoom", &member)) return false;
   mln_ts_path(child, sizeof child, path, "maxZoom");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->max_zoom = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->max_zoom = (double)number;
   }
   if (!mln_ts_member(call, value, "pixelRatio", &member)) return false;
   mln_ts_path(child, sizeof child, path, "pixelRatio");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->pixel_ratio = (float)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->pixel_ratio = (float)number;
   }
   if (!mln_ts_member(call, value, "includeIdeographs", &member)) return false;
   mln_ts_path(child, sizeof child, path, "includeIdeographs");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      bool flag = false;
-      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
-      out->include_ideographs = flag;
-    }
+  {
+    bool flag = false;
+    if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+    out->include_ideographs = flag;
   }
   return true;
 }
@@ -5571,21 +5467,17 @@ bool mln_ts_write_projected_meters(
   (void)child;
   if (!mln_ts_member(call, value, "northing", &member)) return false;
   mln_ts_path(child, sizeof child, path, "northing");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->northing = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->northing = (double)number;
   }
   if (!mln_ts_member(call, value, "easting", &member)) return false;
   mln_ts_path(child, sizeof child, path, "easting");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->easting = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->easting = (double)number;
   }
   return true;
 }
@@ -5599,30 +5491,24 @@ bool mln_ts_write_projection_mode(
   (void)child;
   if (!mln_ts_member(call, value, "axonometric", &member)) return false;
   mln_ts_path(child, sizeof child, path, "axonometric");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      bool flag = false;
-      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
-      out->axonometric = flag;
-    }
+  {
+    bool flag = false;
+    if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+    out->axonometric = flag;
   }
   if (!mln_ts_member(call, value, "xSkew", &member)) return false;
   mln_ts_path(child, sizeof child, path, "xSkew");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->x_skew = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->x_skew = (double)number;
   }
   if (!mln_ts_member(call, value, "ySkew", &member)) return false;
   mln_ts_path(child, sizeof child, path, "ySkew");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->y_skew = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->y_skew = (double)number;
   }
   return true;
 }
@@ -5675,39 +5561,31 @@ bool mln_ts_write_quaternion(
   (void)child;
   if (!mln_ts_member(call, value, "x", &member)) return false;
   mln_ts_path(child, sizeof child, path, "x");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->x = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->x = (double)number;
   }
   if (!mln_ts_member(call, value, "y", &member)) return false;
   mln_ts_path(child, sizeof child, path, "y");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->y = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->y = (double)number;
   }
   if (!mln_ts_member(call, value, "z", &member)) return false;
   mln_ts_path(child, sizeof child, path, "z");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->z = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->z = (double)number;
   }
   if (!mln_ts_member(call, value, "w", &member)) return false;
   mln_ts_path(child, sizeof child, path, "w");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->w = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->w = (double)number;
   }
   return true;
 }
@@ -6249,21 +6127,17 @@ bool mln_ts_write_screen_point(
   (void)child;
   if (!mln_ts_member(call, value, "x", &member)) return false;
   mln_ts_path(child, sizeof child, path, "x");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->x = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->x = (double)number;
   }
   if (!mln_ts_member(call, value, "y", &member)) return false;
   mln_ts_path(child, sizeof child, path, "y");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->y = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->y = (double)number;
   }
   return true;
 }
@@ -6636,30 +6510,24 @@ bool mln_ts_write_vec3(
   (void)child;
   if (!mln_ts_member(call, value, "x", &member)) return false;
   mln_ts_path(child, sizeof child, path, "x");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->x = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->x = (double)number;
   }
   if (!mln_ts_member(call, value, "y", &member)) return false;
   mln_ts_path(child, sizeof child, path, "y");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->y = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->y = (double)number;
   }
   if (!mln_ts_member(call, value, "z", &member)) return false;
   mln_ts_path(child, sizeof child, path, "z");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->z = (double)number;
-    }
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->z = (double)number;
   }
   return true;
 }
