@@ -1103,6 +1103,22 @@ pub struct mln_offscreen_device_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_ohos_surface_descriptor {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub window: *mut std::ffi::c_void,
+    pub surface_id: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_ohos_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub window: *mut std::ffi::c_void,
+    pub surface_id: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_open_gl_borrowed_texture {
     pub texture: u32,
 }
@@ -2256,6 +2272,15 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_attach_ohos_surface(
+        map: mln_map,
+        descriptor: *const mln_ohos_surface_descriptor,
+        device: mln_vulkan_device,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_attach_open_gl_borrowed_texture(
         map: mln_map,
         descriptor: *const mln_open_gl_borrowed_texture_descriptor,
@@ -2985,6 +3010,12 @@ unsafe extern "C" {
     pub fn mln_render_session_set_metal_surface_target(
         session: mln_render_session,
         replacement: *const mln_metal_surface_replacement,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_ohos_surface_target(
+        session: mln_render_session,
+        replacement: *const mln_ohos_surface_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

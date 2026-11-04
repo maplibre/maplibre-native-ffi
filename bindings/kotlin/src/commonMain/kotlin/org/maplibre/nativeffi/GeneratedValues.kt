@@ -2502,7 +2502,7 @@ public data class RenderSessionAttachOptions(
    *   its context belongs to your thread: a shared or dedicated EGL or WGL context, an existing
    *   WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.CORE_WORKER` for a target whose context the library owns: a transferred
-   *   WebGL canvas, an Android window, or an offscreen session.
+   *   WebGL canvas, an Android or OpenHarmony window, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.

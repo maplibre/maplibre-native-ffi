@@ -2976,6 +2976,85 @@ impl ToNative<sys::mln_offscreen_device_options> for OffscreenDeviceOptions {
     }
 }
 
+/// An OpenHarmony window to present to, for `MapHandle::attach_ohos_surface()`.
+///
+/// Name the window by `window` or by `surface_id`. The session takes its own
+/// reference to the window, so you can release yours once the call returns. It
+/// uses the window until a replacement or release of the target completes, a
+/// detach or release of the session completes, or an abandon of it returns.
+///
+/// See `mln_ohos_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OhosSurfaceDescriptor {
+    pub logical_size: LogicalSize,
+    /// Your `OHNativeWindow*`, or null to name the window by `surface_id`.
+    pub window: *mut std::ffi::c_void,
+    /// The surface ID of a surface in this process, such as the one that
+    /// `XComponentController.getXComponentSurfaceId()` reports, or 0 to name
+    /// the window by `window`.
+    pub surface_id: u64,
+}
+impl OhosSurfaceDescriptor {
+    pub fn new(logical_size: LogicalSize) -> Self {
+        Self {
+            logical_size,
+            window: Default::default(),
+            surface_id: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_ohos_surface_descriptor> for OhosSurfaceDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_ohos_surface_descriptor> {
+        let mut raw: sys::mln_ohos_surface_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_ohos_surface_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.window = self.window;
+        raw.surface_id = self.surface_id;
+        Ok(raw)
+    }
+}
+
+/// A new OpenHarmony window for
+/// `RenderSessionHandle::set_ohos_surface_target()`.
+///
+/// Name the window by `window` or by `surface_id`. The session takes its own
+/// reference to the window, so you can release yours once the call returns. It
+/// uses the window until a replacement or release of the target completes, a
+/// detach or release of the session completes, or an abandon of it returns.
+///
+/// See `mln_ohos_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OhosSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your `OHNativeWindow*`, or null to name the window by `surface_id`.
+    pub window: *mut std::ffi::c_void,
+    /// The surface ID of a surface in this process, such as the one that
+    /// `XComponentController.getXComponentSurfaceId()` reports, or 0 to name
+    /// the window by `window`.
+    pub surface_id: u64,
+}
+impl OhosSurfaceReplacement {
+    pub fn new(logical_size: LogicalSize) -> Self {
+        Self {
+            logical_size,
+            window: Default::default(),
+            surface_id: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_ohos_surface_replacement> for OhosSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_ohos_surface_replacement> {
+        let mut raw: sys::mln_ohos_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_ohos_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.window = self.window;
+        raw.surface_id = self.surface_id;
+        Ok(raw)
+    }
+}
+
 /// An OpenGL texture of a borrowed ring.
 ///
 /// See `mln_open_gl_borrowed_texture` in the
@@ -3713,8 +3792,8 @@ pub struct RenderSessionAttachOptions {
     ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
     ///   a browser's WebGPU device.
     /// - `RenderDriverKind::CoreWorker` for a target whose context the library
-    ///   owns: a transferred WebGL canvas, an Android window, or an offscreen
-    ///   session.
+    ///   owns: a transferred WebGL canvas, an Android or OpenHarmony window, or
+    ///   an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.

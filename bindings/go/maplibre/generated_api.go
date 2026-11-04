@@ -3688,6 +3688,64 @@ func nativeOffscreenDeviceOptions(input OffscreenDeviceOptions, arena *bindingAr
 	return raw
 }
 
+// OhosSurfaceDescriptor corresponds to mln_ohos_surface_descriptor. An
+// OpenHarmony window to present to, for MapHandle.AttachOhosSurface().
+//
+// Name the window by window or by surface_id. The session takes its own
+// reference to the window, so you can release yours once the call returns. It
+// uses the window until a replacement or release of the target completes, a
+// detach or release of the session completes, or an abandon of it returns.
+//
+// See mln_ohos_surface_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
+type OhosSurfaceDescriptor struct {
+	LogicalSize LogicalSize
+	// Your OHNativeWindow*, or null to name the window by surface_id.
+	Window uintptr
+	// The surface ID of a surface in this process, such as the one that
+	// XComponentController.getXComponentSurfaceId() reports, or 0 to name the
+	// window by window.
+	SurfaceID uint64
+}
+
+func nativeOhosSurfaceDescriptor(input OhosSurfaceDescriptor, arena *bindingArena) C.mln_ohos_surface_descriptor {
+	raw := C.mln_ohos_surface_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
+	raw.surface_id = C.uint64_t(input.SurfaceID)
+	return raw
+}
+
+// OhosSurfaceReplacement corresponds to mln_ohos_surface_replacement. A new
+// OpenHarmony window for RenderSessionHandle.SetOhosSurfaceTarget().
+//
+// Name the window by window or by surface_id. The session takes its own
+// reference to the window, so you can release yours once the call returns. It
+// uses the window until a replacement or release of the target completes, a
+// detach or release of the session completes, or an abandon of it returns.
+//
+// See mln_ohos_surface_replacement in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
+type OhosSurfaceReplacement struct {
+	LogicalSize LogicalSize
+	// Your OHNativeWindow*, or null to name the window by surface_id.
+	Window uintptr
+	// The surface ID of a surface in this process, such as the one that
+	// XComponentController.getXComponentSurfaceId() reports, or 0 to name the
+	// window by window.
+	SurfaceID uint64
+}
+
+func nativeOhosSurfaceReplacement(input OhosSurfaceReplacement, arena *bindingArena) C.mln_ohos_surface_replacement {
+	raw := C.mln_ohos_surface_replacement{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
+	raw.surface_id = C.uint64_t(input.SurfaceID)
+	return raw
+}
+
 // OpenGLBorrowedTexture corresponds to mln_open_gl_borrowed_texture. An OpenGL
 // texture of a borrowed ring.
 //
@@ -4138,7 +4196,8 @@ type RenderSessionAttachOptions struct {
 	//     EGL or WGL context, an existing WebGL context, or a browser's WebGPU
 	//     device.
 	//   - RenderDriverKindCoreWorker for a target whose context the library owns: a
-	//     transferred WebGL canvas, an Android window, or an offscreen session.
+	//     transferred WebGL canvas, an Android or OpenHarmony window, or an
+	//     offscreen session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.

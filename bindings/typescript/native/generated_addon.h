@@ -585,6 +585,14 @@ bool mln_ts_write_offscreen_device_options(
   mln_ts_call* call, napi_value value, mln_offscreen_device_options* out,
   const char* path
 );
+bool mln_ts_write_ohos_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_ohos_surface_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_ohos_surface_replacement(
+  mln_ts_call* call, napi_value value, mln_ohos_surface_replacement* out,
+  const char* path
+);
 bool mln_ts_write_open_gl_borrowed_texture(
   mln_ts_call* call, napi_value value, mln_open_gl_borrowed_texture* out,
   const char* path

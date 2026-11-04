@@ -45,6 +45,8 @@ import type {
   OfflineRegionStatus,
   OffscreenDescriptor,
   OffscreenDeviceOptions,
+  OhosSurfaceDescriptor,
+  OhosSurfaceReplacement,
   OpenGlBorrowedTextureDescriptor,
   OpenGlBorrowedTextureReplacement,
   OpenGlContextProviderFlag,
@@ -1036,6 +1038,69 @@ export class MapHandle extends Owner {
             descriptor,
             options,
             device?.id,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
+    );
+  }
+
+  /**
+   * Creates a session that presents the map to an OpenHarmony window, with a
+   * graphics context that the library creates.
+   *
+   * The build's render backend decides the context. A Vulkan build presents
+   * with `device`, or, when `device` is null, with a device that the library
+   * creates with presentation and shares between these sessions. An OpenGL
+   * build creates an EGL context on the default display, and `device` must be
+   * null. Attach with `RenderDriverKind.coreWorker`, since the context belongs
+   * to the library.
+   *
+   * Before the platform destroys the window, such as in an `XComponent`'s
+   * `onSurfaceDestroyed` callback, release the target with
+   * `RenderSessionHandle.releaseTarget()` and wait for that to complete. The
+   * session's reference keeps the window, but not its buffers.
+   *
+   * See `mln_map_attach_ohos_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when no surface in this process has
+   *   `OhosSurfaceDescriptor.surfaceId`, such as after the platform destroyed
+   *   it.
+   * - `Status.unsupported` when `device` can't present, because you created it
+   *   without `VulkanDeviceOptions.presentation`.
+   * - `Status.unsupported` when the GPU or the Vulkan loader can't present.
+   * - `Status.nativeError` when the library can't create the graphics context
+   *   or the window's surface.
+   */
+  attachOhosSurface(
+    descriptor: OhosSurfaceDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_ohos_surface(
+            this.id,
+            descriptor,
+            device?.id,
+            options,
             completion,
           ),
         (handle, ready) =>
@@ -4636,6 +4701,38 @@ export class RenderSessionHandle extends Owner {
   setMetalSurfaceTarget(replacement: MetalSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_metal_surface_target(
+        this.id,
+        replacement,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Replaces the OpenHarmony window that the session presents to.
+   *
+   * Use it to give the session a window again after
+   * `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old window. A replacement with the window and logical size that the session
+   * presents to already changes nothing.
+   *
+   * See `mln_render_session_set_ohos_surface_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when no surface in this process has
+   *   `OhosSurfaceReplacement.surfaceId`, such as after the platform destroyed
+   *   it.
+   * - `Status.unsupported` when, in a Vulkan build, the new window needs a
+   *   different color format or pre-rotation support than the old one. Attach a
+   *   new session instead.
+   * - `Status.nativeError` when the library can't create the window's surface.
+   */
+  setOhosSurfaceTarget(replacement: OhosSurfaceReplacement): Promise<void> {
+    return run((completion) =>
+      native.mln_render_session_set_ohos_surface_target(
         this.id,
         replacement,
         completion,

@@ -682,6 +682,22 @@ internal unsafe struct mln_offscreen_device_options
     public mln_open_gl_client_api client_api;
 }
 
+internal unsafe struct mln_ohos_surface_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* window;
+    public ulong surface_id;
+}
+
+internal unsafe struct mln_ohos_surface_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* window;
+    public ulong surface_id;
+}
+
 internal unsafe struct mln_open_gl_borrowed_texture
 {
     public uint texture;

@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__OHOS__)
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -36,6 +36,8 @@
 #include "map/map.hpp"
 #if defined(__ANDROID__)
 #include "render/android_surface_session.hpp"
+#elif defined(__OHOS__)
+#include "render/ohos_surface_session.hpp"
 #endif
 #include "render/opengl/context_mode.hpp"
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
@@ -487,7 +489,14 @@ class OpenGLSurfaceSessionBackend final
   OpenGLSurfaceBackend backend_;
 };
 
-#if defined(__ANDROID__) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+#if (defined(__ANDROID__) || defined(__OHOS__)) && \
+  defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+#if defined(__ANDROID__)
+using PlatformWindow = mln::core::AndroidWindow;
+#else
+using PlatformWindow = mln::core::OhosWindow;
+#endif
+
 auto egl_failure(const char* what) -> mln_status {
   const auto message =
     std::string{what} + " (EGL error " + std::to_string(eglGetError()) + ")";
@@ -495,7 +504,7 @@ auto egl_failure(const char* what) -> mln_status {
   return MLN_STATUS_NATIVE_ERROR;
 }
 
-struct AndroidEglConfig {
+struct WindowEglConfig {
   EGLDisplay display = EGL_NO_DISPLAY;
   EGLConfig config = nullptr;
 };
@@ -518,10 +527,10 @@ auto has_rgba8(EGLDisplay display, EGLConfig config) -> bool {
 // pbuffers for a session without a window. The display stays initialized for
 // the rest of the process: EGL returns this one display to the app's own code
 // too, so terminating it would end the app's use of it.
-auto android_egl_config(AndroidEglConfig& out_config) -> mln_status {
+auto window_egl_config(WindowEglConfig& out_config) -> mln_status {
   struct Chosen {
     std::mutex mutex;
-    std::optional<AndroidEglConfig> config;
+    std::optional<WindowEglConfig> config;
   };
   // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
   static auto* const chosen = new Chosen();
@@ -581,25 +590,23 @@ auto android_egl_config(AndroidEglConfig& out_config) -> mln_status {
     );
     return MLN_STATUS_NATIVE_ERROR;
   }
-  chosen->config = AndroidEglConfig{.display = display, .config = *found};
+  chosen->config = WindowEglConfig{.display = display, .config = *found};
   out_config = *chosen->config;
   return MLN_STATUS_OK;
 }
 
-// An EGL window surface that the library made for an Android window.
-class AndroidEglWindowSurface final {
+// An EGL window surface that the library made for a platform window.
+class EglWindowSurface final {
  public:
-  AndroidEglWindowSurface() = default;
-  AndroidEglWindowSurface(EGLDisplay display, EGLSurface surface)
+  EglWindowSurface() = default;
+  EglWindowSurface(EGLDisplay display, EGLSurface surface)
       : display_(display), surface_(surface) {}
-  AndroidEglWindowSurface(const AndroidEglWindowSurface&) = delete;
-  auto operator=(const AndroidEglWindowSurface&)
-    -> AndroidEglWindowSurface& = delete;
-  AndroidEglWindowSurface(AndroidEglWindowSurface&& other) noexcept
+  EglWindowSurface(const EglWindowSurface&) = delete;
+  auto operator=(const EglWindowSurface&) -> EglWindowSurface& = delete;
+  EglWindowSurface(EglWindowSurface&& other) noexcept
       : display_(other.display_),
         surface_(std::exchange(other.surface_, EGL_NO_SURFACE)) {}
-  auto operator=(AndroidEglWindowSurface&& other) noexcept
-    -> AndroidEglWindowSurface& {
+  auto operator=(EglWindowSurface&& other) noexcept -> EglWindowSurface& {
     if (this != &other) {
       reset();
       display_ = other.display_;
@@ -607,7 +614,7 @@ class AndroidEglWindowSurface final {
     }
     return *this;
   }
-  ~AndroidEglWindowSurface() { reset(); }
+  ~EglWindowSurface() { reset(); }
 
   void reset() noexcept {
     if (surface_ != EGL_NO_SURFACE) eglDestroySurface(display_, surface_);
@@ -622,26 +629,25 @@ class AndroidEglWindowSurface final {
 };
 
 auto create_window_surface(
-  const AndroidEglConfig& egl, ANativeWindow* window,
-  AndroidEglWindowSurface& out_surface
+  const WindowEglConfig& egl, EGLNativeWindowType window,
+  EglWindowSurface& out_surface
 ) -> mln_status {
   auto* const surface =
     eglCreateWindowSurface(egl.display, egl.config, window, nullptr);
   if (surface == EGL_NO_SURFACE) {
     return egl_failure("creating the EGL window surface failed");
   }
-  out_surface = AndroidEglWindowSurface{egl.display, surface};
+  out_surface = EglWindowSurface{egl.display, surface};
   return MLN_STATUS_OK;
 }
 
-// Presents to an Android window through an EGL window surface that it creates
-// for each window, with a dedicated context that it creates.
-class AndroidEglSurfaceSessionBackend final
+// Presents to an Android or OpenHarmony window through an EGL window surface
+// that it creates for each window, with a dedicated context that it creates.
+class WindowEglSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
-  AndroidEglSurfaceSessionBackend(
-    const AndroidEglConfig& egl, mln::core::AndroidWindow window,
-    AndroidEglWindowSurface surface,
+  WindowEglSurfaceSessionBackend(
+    const WindowEglConfig& egl, PlatformWindow window, EglWindowSurface surface,
     const mln_open_gl_surface_descriptor& descriptor, mln::Size size
   )
       : egl_(egl),
@@ -661,14 +667,34 @@ class AndroidEglSurfaceSessionBackend final
     return session_.prepare_frame(out_ready);
   }
 
-  auto set_android_target(
-    const mln::core::AndroidWindow& window, mln::Size physical_size
-  ) -> mln_status override {
+#if defined(__ANDROID__)
+  auto set_android_target(const PlatformWindow& window, mln::Size physical_size)
+    -> mln_status override {
+    return set_window(window, physical_size);
+  }
+#else
+  auto set_ohos_target(const PlatformWindow& window, mln::Size physical_size)
+    -> mln_status override {
+    return set_window(window, physical_size);
+  }
+#endif
+
+  auto release_target() -> mln_status override {
+    const auto status = session_.release_target();
+    if (status != MLN_STATUS_OK) return status;
+    surface_.reset();
+    window_.reset();
+    return MLN_STATUS_OK;
+  }
+
+ private:
+  auto set_window(const PlatformWindow& window, mln::Size physical_size)
+    -> mln_status {
     if (window == window_) {
       session_.resize(physical_size.width, physical_size.height);
       return MLN_STATUS_OK;
     }
-    auto next = AndroidEglWindowSurface{};
+    auto next = EglWindowSurface{};
     const auto create_status = create_window_surface(egl_, window.get(), next);
     if (create_status != MLN_STATUS_OK) return create_status;
     // The context stays current on its surface between renders, so it moves
@@ -689,18 +715,9 @@ class AndroidEglSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
-  auto release_target() -> mln_status override {
-    const auto status = session_.release_target();
-    if (status != MLN_STATUS_OK) return status;
-    surface_.reset();
-    window_.reset();
-    return MLN_STATUS_OK;
-  }
-
- private:
-  AndroidEglConfig egl_;
-  mln::core::AndroidWindow window_;
-  AndroidEglWindowSurface surface_;
+  WindowEglConfig egl_;
+  PlatformWindow window_;
+  EglWindowSurface surface_;
   // Destroyed first, so the context goes before the surface and the window.
   OpenGLSurfaceSessionBackend session_;
 };
@@ -710,16 +727,18 @@ class AndroidEglSurfaceSessionBackend final
 
 namespace mln::core {
 
-#if defined(__ANDROID__) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-auto create_android_surface_backend(
-  AndroidSurfaceAttach attach, mln_render_session_object& target
+#if (defined(__ANDROID__) || defined(__OHOS__)) && \
+  defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+namespace {
+
+auto create_window_backend(
+  PlatformWindow window, mln_render_session_object& target
 ) -> mln_status {
-  auto egl = AndroidEglConfig{};
-  const auto config_status = android_egl_config(egl);
+  auto egl = WindowEglConfig{};
+  const auto config_status = window_egl_config(egl);
   if (config_status != MLN_STATUS_OK) return config_status;
-  auto surface = AndroidEglWindowSurface{};
-  const auto surface_status =
-    create_window_surface(egl, attach.window.get(), surface);
+  auto surface = EglWindowSurface{};
+  const auto surface_status = create_window_surface(egl, window.get(), surface);
   if (surface_status != MLN_STATUS_OK) return surface_status;
   const auto descriptor = mln_open_gl_surface_descriptor{
     .size = sizeof(mln_open_gl_surface_descriptor),
@@ -742,12 +761,28 @@ auto create_android_surface_backend(
       },
     .surface = surface.get(),
   };
-  target.surface.backend = std::make_unique<AndroidEglSurfaceSessionBackend>(
-    egl, std::move(attach.window), std::move(surface), descriptor,
+  target.surface.backend = std::make_unique<WindowEglSurfaceSessionBackend>(
+    egl, std::move(window), std::move(surface), descriptor,
     mln::Size{target.physical_width, target.physical_height}
   );
   return MLN_STATUS_OK;
 }
+
+}  // namespace
+
+#if defined(__ANDROID__)
+auto create_android_surface_backend(
+  AndroidSurfaceAttach attach, mln_render_session_object& target
+) -> mln_status {
+  return create_window_backend(std::move(attach.window), target);
+}
+#else
+auto create_ohos_surface_backend(
+  OhosSurfaceAttach attach, mln_render_session_object& target
+) -> mln_status {
+  return create_window_backend(std::move(attach.window), target);
+}
+#endif
 #endif
 
 auto opengl_surface_attach_start(

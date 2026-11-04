@@ -16,6 +16,10 @@ struct CompletionResult<&mln_map_attach_offscreen> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_map_attach_ohos_surface> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_map_attach_open_gl_borrowed_texture> {
   static constexpr bool has_value = false;
 };
@@ -260,6 +264,10 @@ struct CompletionResult<&mln_render_session_set_metal_borrowed_texture_target> {
 };
 template <>
 struct CompletionResult<&mln_render_session_set_metal_surface_target> {
+  static constexpr bool has_value = false;
+};
+template <>
+struct CompletionResult<&mln_render_session_set_ohos_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>

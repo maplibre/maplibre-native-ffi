@@ -47,4 +47,13 @@ auto vulkan_device_get_context(
 ) -> mln_status;
 auto vulkan_device_release(mln_vulkan_device device) -> void;
 
+// The context of the presenting Vulkan device that `device` names, for a
+// session that presents to a platform window, or null for the device that
+// these sessions share. A build without Vulkan presents through a context of
+// its own, so it takes only null.
+auto window_presentation_device(
+  mln_vulkan_device device,
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status;
+
 }  // namespace mln::core
