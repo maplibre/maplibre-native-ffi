@@ -348,5 +348,6 @@
 /typescript/src/generated_native.ts linguist-generated=true
 /typescript/src/generated_operations.ts linguist-generated=true
 /typescript/src/generated_values.ts linguist-generated=true
+/zig/src/generated_abi.zig linguist-generated=true
 /zig/src/generated_status.zig linguist-generated=true
 /zig/src/maplibre_native_ffi.zig linguist-generated=true

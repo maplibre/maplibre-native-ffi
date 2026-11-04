@@ -3,6 +3,9 @@
 
 const std = @import("std");
 
+const builtin = @import("builtin");
+
+const abi = @import("generated_abi.zig");
 const c = @import("c.zig").raw;
 const callback = @import("callback.zig");
 const completion = @import("completion.zig");
@@ -14,6 +17,13 @@ const Diagnostic = diagnostics.Diagnostic;
 const Error = status.Error;
 
 pub const Access = enum { none, handle, scoped };
+
+/// The native function `name` to call. On LoongArch, a function that takes a
+/// small struct of integers by value goes through its generated_abi.zig wrapper.
+fn nativeFunction(comptime name: []const u8) *const @TypeOf(@field(c, name)) {
+    if (builtin.cpu.arch == .loongarch64 and @hasDecl(abi, name)) return &@field(abi, name);
+    return &@field(c, name);
+}
 
 const CString = struct { bytes: []const u8 };
 
@@ -402,7 +412,7 @@ fn invokeInner(
     var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     var native = try op.arguments(args);
-    try status.call(@field(c, name), native, diagnostic);
+    try status.call(nativeFunction(name), native, diagnostic);
     try op.fitText(&native, diagnostic);
     op.roots.accept();
     return op.outputs(allocator);
@@ -437,7 +447,7 @@ fn invokeNullableInner(
     var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
-    try status.call(@field(c, name), native, diagnostic);
+    try status.call(nativeFunction(name), native, diagnostic);
     op.roots.accept();
     if (op.held[indices[0]] == 0) return null;
     return try op.outputs(allocator);
@@ -526,7 +536,7 @@ fn invokeDeclinableInner(
     var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
-    try status.call(@field(c, name), native, diagnostic);
+    try status.call(nativeFunction(name), native, diagnostic);
     const declined = try op.outputs(allocator);
     if (!declined) op.roots.accept();
     return declined;
@@ -545,11 +555,11 @@ pub fn direct(
     defer op.end();
     const native = try op.arguments(args);
     if (T == void) {
-        @call(.auto, @field(c, name), native);
+        @call(.auto, nativeFunction(name), native);
         op.roots.accept();
         return;
     }
-    const raw = @call(.auto, @field(c, name), native);
+    const raw = @call(.auto, nativeFunction(name), native);
     op.roots.accept();
     if (comptime marshal.decodeAllocates(T) and @TypeOf(allocator) != std.mem.Allocator) @compileError(name ++ ": the result needs an allocator parameter");
     return marshal.decode(T, raw, .{ .allocator = if (@TypeOf(allocator) == std.mem.Allocator) allocator else null });
@@ -594,7 +604,7 @@ fn submitInner(
     var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
-    const function = @field(c, name);
+    const function = comptime nativeFunction(name);
     const allocates = comptime marshal.decodeAllocates(Copy.Value);
     if (allocates and Allocator != std.mem.Allocator) @compileError(name ++ ": the result needs an allocator parameter");
     var ready = if (allocates) try completion.submitWithCopyContext(Copy.Value, CopyContext, diagnostic, struct {
@@ -638,7 +648,7 @@ fn discardInner(
     var op = try Op.begin(receiver, allocator, diagnostic);
     defer op.end();
     const native = try op.arguments(args);
-    try status.call(@field(c, name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);
+    try status.call(nativeFunction(name), native ++ .{@as(?*const c.mln_completion, null)}, diagnostic);
     op.roots.accept();
 }
 
@@ -686,7 +696,7 @@ fn scopedViewInner(
     const Raw = @typeInfo(Param(@field(c, name), 1)).pointer.child;
     var raw: Raw = std.mem.zeroes(Raw);
     raw.size = @sizeOf(Raw);
-    try status.call(@field(c, name), .{ receiver.raw, &raw }, diagnostic);
+    try status.call(nativeFunction(name), .{ receiver.raw, &raw }, diagnostic);
     return use(context, Value.fromNative(raw));
 }
 
