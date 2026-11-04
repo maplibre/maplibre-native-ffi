@@ -182,6 +182,13 @@ static void missing_style_ids_report_not_found(void) {
       &completion.descriptor, NULL
     )
   );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_NOT_FOUND, missing_source,
+    mln_map_invalidate_custom_vector_source_region(
+      map, source, (mln_lat_lng_bounds){{-1, -1}, {1, 1}},
+      &completion.descriptor, NULL
+    )
+  );
 
   // A query of one attribute of a missing layer completes with
   // MLN_STATUS_NOT_FOUND too.

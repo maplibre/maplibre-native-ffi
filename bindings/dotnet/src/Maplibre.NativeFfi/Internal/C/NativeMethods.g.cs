@@ -488,6 +488,15 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_invalidate_custom_vector_source_region(
+        MlnMap map,
+        mln_buffer_view source_id,
+        mln_lat_lng_bounds bounds,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_invalidate_custom_vector_source_tile(
         MlnMap map,
         mln_buffer_view source_id,

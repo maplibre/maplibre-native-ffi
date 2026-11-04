@@ -19,6 +19,9 @@ typedef struct custom_probe {
   atomic_size_t fetch_count;
   atomic_size_t root_fetches;
   atomic_size_t root_cancels;
+  // The tiles at zoom 1, indexed by y * 2 + x.
+  atomic_size_t zoom_one_fetches[4];
+  atomic_size_t zoom_one_cancels[4];
   atomic_size_t misnamed;
 } custom_probe;
 
@@ -43,6 +46,8 @@ static void probe_fetch_tile(
   atomic_fetch_add(&probe->fetch_count, 1);
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_fetches, 1);
+  } else if (tile_id.z == 1) {
+    atomic_fetch_add(&probe->zoom_one_fetches[tile_id.y * 2 + tile_id.x], 1);
   }
   mln_test_pulse();
 }
@@ -55,6 +60,8 @@ static void probe_cancel_tile(
   probe_check_names(probe, map, source_id);
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_cancels, 1);
+  } else if (tile_id.z == 1) {
+    atomic_fetch_add(&probe->zoom_one_cancels[tile_id.y * 2 + tile_id.x], 1);
   }
   mln_test_pulse();
 }
@@ -73,6 +80,10 @@ enum add_variant {
 };
 
 static const mln_canonical_tile_id root_tile = {.z = 0, .x = 0, .y = 0};
+
+// Northeast of the origin, so of the tiles at zoom 1 it intersects only 1/1/0.
+static const mln_lat_lng_bounds northeast_region = {{10.0, 10.0}, {20.0, 20.0}};
+static const size_t northeast_tile = 1;
 
 static mln_status add_geometry_source(
   mln_map map, custom_probe* probe, enum add_variant variant,
@@ -171,13 +182,12 @@ static mln_status invalidate_geometry_tile(
   );
 }
 
-// A region well inside the root tile, which any region touches.
 static mln_status invalidate_geometry_region(
   mln_map map, const mln_completion* completion
 ) {
   return mln_map_invalidate_custom_geometry_source_region(
-    map, MLN_BUFFER_LITERAL("custom-geometry"),
-    (mln_lat_lng_bounds){{10.0, 10.0}, {20.0, 20.0}}, completion, NULL
+    map, MLN_BUFFER_LITERAL("custom-geometry"), northeast_region, completion,
+    NULL
   );
 }
 
@@ -198,6 +208,14 @@ static mln_status invalidate_vector_tile(
   );
 }
 
+static mln_status invalidate_vector_region(
+  mln_map map, const mln_completion* completion
+) {
+  return mln_map_invalidate_custom_vector_source_region(
+    map, MLN_BUFFER_LITERAL("custom-vector"), northeast_region, completion, NULL
+  );
+}
+
 typedef struct custom_kind {
   const char* name;
   const char* source_id;
@@ -213,8 +231,7 @@ typedef struct custom_kind {
   // Fails the root tile with the message "provider failed".
   mln_status (*fail_root)(mln_map map, const mln_completion* completion);
   mln_status (*invalidate_root)(mln_map map, const mln_completion* completion);
-  // Invalidates a region inside the root tile, or null for a kind without
-  // region invalidation.
+  // Invalidates northeast_region.
   mln_status (*invalidate_region)(
     mln_map map, const mln_completion* completion
   );
@@ -243,6 +260,7 @@ static const custom_kind kinds[] = {
     .deliver_point = deliver_mvt_point,
     .fail_root = fail_vector_tile,
     .invalidate_root = invalidate_vector_tile,
+    .invalidate_region = invalidate_vector_region,
   },
 };
 
@@ -257,6 +275,10 @@ static void init_probe(custom_probe* probe) {
   atomic_init(&probe->fetch_count, 0);
   atomic_init(&probe->root_fetches, 0);
   atomic_init(&probe->root_cancels, 0);
+  for (size_t index = 0; index < 4; index += 1) {
+    atomic_init(&probe->zoom_one_fetches[index], 0);
+    atomic_init(&probe->zoom_one_cancels[index], 0);
+  }
   atomic_init(&probe->misnamed, 0);
 }
 
@@ -500,21 +522,99 @@ static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
       cancels + 1, atomic_load(&probe.root_cancels), kind->name
     );
 
-    if (kind->invalidate_region != NULL) {
-      MLN_TEST_OK_MESSAGE(
-        submit_and_settle(kind, map, kind->invalidate_region), kind->name
-      );
-      refetched.root_fetches += 1;
-      refetched.root_cancels += 1;
-      TEST_ASSERT_TRUE_MESSAGE(
-        mln_test_style_render_until(
-          &fixture, probe_reached, &refetched, "the invalidated region's fetch"
-        ),
+    // Every fetch and cancel named this map and the source's ID.
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(
+      0, atomic_load(&probe.misnamed), kind->name
+    );
+
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
+}
+
+typedef struct zoom_one_target {
+  const custom_probe* probe;
+  size_t fetches[4];
+} zoom_one_target;
+
+static bool zoom_one_fetches_reached(void* context) {
+  const zoom_one_target* target = context;
+  for (size_t index = 0; index < 4; index += 1) {
+    if (
+      atomic_load(&target->probe->zoom_one_fetches[index]) <
+      target->fetches[index]
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Centers the map on the origin at zoom 1, where it shows all four tiles of
+// that zoom.
+static void center_at_zoom_one(mln_map map) {
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = 1.0;
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+}
+
+static void a_region_invalidation_refetches_the_tiles_it_intersects(void) {
+  FOR_EACH_KIND(kind) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    custom_probe probe;
+    init_probe(&probe);
+    mln_test_load_style_and_wait(map, mln_test_background_style_json);
+    add_source(kind, map, &probe);
+    draw_source(kind, map);
+    center_at_zoom_one(map);
+    mln_test_render_fixture fixture = {0};
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_render_fixture_create_offscreen(map, &fixture), kind->name
+    );
+    zoom_one_target target = {.probe = &probe, .fetches = {1, 1, 1, 1}};
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_style_render_until(
+        &fixture, zoom_one_fetches_reached, &target, "the zoom 1 tiles' fetches"
+      ),
+      kind->name
+    );
+
+    size_t cancels[4];
+    for (size_t index = 0; index < 4; index += 1) {
+      target.fetches[index] = atomic_load(&probe.zoom_one_fetches[index]);
+      cancels[index] = atomic_load(&probe.zoom_one_cancels[index]);
+    }
+    MLN_TEST_OK_MESSAGE(
+      submit_and_settle(kind, map, kind->invalidate_region), kind->name
+    );
+    target.fetches[northeast_tile] += 1;
+    cancels[northeast_tile] += 1;
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_style_render_until(
+        &fixture, zoom_one_fetches_reached, &target,
+        "the invalidated tile's fetch"
+      ),
+      kind->name
+    );
+    // The tile loader cancels every tile the invalidation reaches before it
+    // runs the refetch, so only the tile in the region was invalidated.
+    for (size_t index = 0; index < 4; index += 1) {
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(
+        target.fetches[index], atomic_load(&probe.zoom_one_fetches[index]),
         kind->name
       );
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(
+        cancels[index], atomic_load(&probe.zoom_one_cancels[index]), kind->name
+      );
     }
-
-    // Every fetch and cancel named this map and the source's ID.
     TEST_ASSERT_EQUAL_size_t_MESSAGE(
       0, atomic_load(&probe.misnamed), kind->name
     );
@@ -742,6 +842,14 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
     map, vector, root_tile, missing, &completion.descriptor, NULL
   ));
   MLN_TEST_OK(submit_and_settle(&kinds[1], map, kinds[1].invalidate_root));
+  MLN_TEST_OK(submit_and_settle(&kinds[1], map, kinds[1].invalidate_region));
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "southwest must be less than or equal",
+    mln_map_invalidate_custom_vector_source_region(
+      map, vector, (mln_lat_lng_bounds){{1, 1}, {-1, -1}},
+      &completion.descriptor, NULL
+    )
+  );
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "within zoom bounds",
@@ -781,6 +889,13 @@ static void tile_operations_check_their_tile_and_source_kind(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_invalidate_custom_vector_source_tile(
       map, geometry, root_tile, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_invalidate_custom_vector_source_region(
+      map, geometry, (mln_lat_lng_bounds){{-1, -1}, {1, 1}},
+      &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
@@ -1056,6 +1171,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_explicit_removal_releases_once);
   RUN_TEST(accepted_adds_release_their_callback_state);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
+  RUN_TEST(a_region_invalidation_refetches_the_tiles_it_intersects);
   RUN_TEST(sources_that_share_a_callback_answer_their_own_tiles);
   RUN_TEST(a_failed_tile_is_reported_and_invalidation_refetches_it);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);

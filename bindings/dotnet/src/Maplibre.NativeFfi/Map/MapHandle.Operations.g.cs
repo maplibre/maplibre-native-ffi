@@ -1437,6 +1437,39 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Makes a custom vector source ask again for the tiles in <c>bounds</c>
+    /// that the map still needs.
+    /// </summary>
+    /// <remarks>
+    /// <para>See <c>mln_map_invalidate_custom_vector_source_region</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.NotFound</c> when the style has no source
+    /// named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidArgument</c> when the source named
+    /// <c>sourceId</c> isn't a custom vector source.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> InvalidateCustomVectorSourceRegionAsync(
+        string sourceId,
+        LatLngBounds bounds
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_invalidate_custom_vector_source_region(
+            Handle,
+            scope.Utf8(sourceId),
+            NativeLatLngBounds(bounds),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Makes a custom vector source ask for a tile again when the map needs it.
     /// </summary>
     /// <remarks>
@@ -2940,6 +2973,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     receiverHandle,
                     scope.Utf8(sourceId),
                     NativeCanonicalTileId(tileId),
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void InvalidateCustomVectorSourceRegion(string sourceId, LatLngBounds bounds)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_map_invalidate_custom_vector_source_region(
+                    receiverHandle,
+                    scope.Utf8(sourceId),
+                    NativeLatLngBounds(bounds),
                     null,
                     Diagnostic
                 )

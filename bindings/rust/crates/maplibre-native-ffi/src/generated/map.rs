@@ -1241,6 +1241,36 @@ impl MapHandle {
         })
     }
 
+    /// Makes a custom vector source ask again for the tiles in `bounds` that
+    /// the map still needs.
+    ///
+    /// See `mln_map_invalidate_custom_vector_source_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   custom vector source.
+    pub fn invalidate_custom_vector_source_region(
+        &self,
+        source_id: &str,
+        bounds: LatLngBounds,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let source_id = call.input(&source_id)?;
+        let bounds = call.input(&bounds)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_invalidate_custom_vector_source_region(
+                map,
+                source_id,
+                bounds,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
     /// Makes a custom vector source ask for a tile again when the map needs it.
     ///
     /// See `mln_map_invalidate_custom_vector_source_tile` in the
@@ -2584,6 +2614,30 @@ impl MapHandleDiscarding<'_> {
                 map,
                 source_id,
                 tile_id,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Makes a custom vector source ask again for the tiles in `bounds` that
+    /// the map still needs.
+    ///
+    /// See `mln_map_invalidate_custom_vector_source_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn invalidate_custom_vector_source_region(
+        &self,
+        source_id: &str,
+        bounds: LatLngBounds,
+    ) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let source_id = call.input(&source_id)?;
+        let bounds = call.input(&bounds)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_invalidate_custom_vector_source_region(
+                map,
+                source_id,
+                bounds,
                 completion,
                 out_diagnostic,
             )

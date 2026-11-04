@@ -448,6 +448,33 @@ public extension MapHandle {
     }
   }
 
+  /// Makes a custom vector source ask again for the tiles in `bounds` that the
+  /// map still needs.
+  ///
+  /// See `mln_map_invalidate_custom_vector_source_region` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   vector source.
+  @discardableResult
+  func invalidateCustomVectorSourceRegion(
+    _ bindingArg0: String,
+    bounds bindingArg1: LatLngBounds
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      mln_map_invalidate_custom_vector_source_region(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Makes a custom vector source ask for a tile again when the map needs it.
   ///
   /// See `mln_map_invalidate_custom_vector_source_tile` in the
@@ -1217,6 +1244,22 @@ public extension MapHandleDiscarding {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
         mln_map_invalidate_custom_geometry_source_tile(
+          raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          nil,
+          diagnostic
+        )
+      }
+  }
+
+  func invalidateCustomVectorSourceRegion(
+    _ bindingArg0: String,
+    bounds bindingArg1: LatLngBounds
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in
+        mln_map_invalidate_custom_vector_source_region(
           raw,
           arena.view(bindingArg0),
           bindingArg1.nativeValue(),

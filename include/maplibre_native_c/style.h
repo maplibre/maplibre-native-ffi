@@ -818,6 +818,21 @@ MLN_API mln_status mln_map_invalidate_custom_vector_source_tile(
 ) MLN_NOEXCEPT;
 
 /**
+ * Makes a custom vector source ask again for the tiles in `bounds` that the map
+ * still needs.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   custom vector source.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_invalidate_custom_vector_source_region(
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Adds an image to the map's style, or replaces the image named `image_id`.
  *
  * Completes with:

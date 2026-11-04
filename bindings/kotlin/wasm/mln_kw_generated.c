@@ -659,6 +659,17 @@ int32_t mln_kw_mln_map_invalidate_custom_geometry_source_tile(
   );
 }
 
+int32_t mln_kw_mln_map_invalidate_custom_vector_source_region(
+  int64_t map, uintptr_t source_id, uintptr_t bounds, uintptr_t completion,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_invalidate_custom_vector_source_region(
+    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
+    *(const mln_lat_lng_bounds*)(uintptr_t)bounds,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_invalidate_custom_vector_source_tile(
   int64_t map, uintptr_t source_id, uintptr_t tile_id, uintptr_t completion,
   uintptr_t out_diagnostic

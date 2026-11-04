@@ -493,6 +493,15 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_invalidate_custom_vector_source_region(
+    map: Long,
+    sourceId: Long,
+    bounds: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_invalidate_custom_vector_source_tile(
     map: Long,
     sourceId: Long,

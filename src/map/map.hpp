@@ -381,6 +381,9 @@ auto map_set_custom_vector_source_tile_error(
 auto map_invalidate_custom_vector_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
+auto map_invalidate_custom_vector_source_region(
+  MapObject& live, mln_buffer_view source_id, mln_lat_lng_bounds bounds
+) -> mln_status;
 auto map_set_style_image(
   MapObject& live, mln::style::Image&& image, bool keep_unused
 ) -> mln_status;

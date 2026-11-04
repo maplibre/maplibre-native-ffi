@@ -2247,6 +2247,45 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_map_invalidate_custom_vector_source_region(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_buffer_view arg_source_id = {0};
+  mln_lat_lng_bounds arg_bounds;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
+    goto done;
+  memset(&arg_bounds, 0, sizeof arg_bounds);
+  if (!mln_ts_read_record(call, call->argv[2], "bounds")) goto done;
+  if (!mln_ts_write_lat_lng_bounds(call, call->argv[2], &arg_bounds, "bounds"))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_invalidate_custom_vector_source_region(
+    arg_map, arg_source_id, arg_bounds, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_map_invalidate_custom_vector_source_tile(
   napi_env env, napi_callback_info info
 ) {
@@ -6925,6 +6964,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_invalidate_custom_geometry_source_region},
   {"mln_map_invalidate_custom_geometry_source_tile",
    mln_ts_export_mln_map_invalidate_custom_geometry_source_tile},
+  {"mln_map_invalidate_custom_vector_source_region",
+   mln_ts_export_mln_map_invalidate_custom_vector_source_region},
   {"mln_map_invalidate_custom_vector_source_tile",
    mln_ts_export_mln_map_invalidate_custom_vector_source_tile},
   {"mln_map_lat_lng_bounds_for_camera",

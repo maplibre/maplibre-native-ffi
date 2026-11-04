@@ -5020,6 +5020,54 @@ impl MapHandle {
             })
         }
     }
+    #[pyo3(signature = (source_id, bounds))]
+    fn invalidate_custom_vector_source_region(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        bounds: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_invalidate_custom_vector_source_region(
+                    handle,
+                    source_id_value,
+                    bounds_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
+    #[pyo3(signature = (source_id, bounds))]
+    fn _discard_invalidate_custom_vector_source_region(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        bounds: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_invalidate_custom_vector_source_region(
+                    handle,
+                    source_id_value,
+                    bounds_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
     #[pyo3(signature = (source_id, tile_id))]
     fn invalidate_custom_vector_source_tile(
         &self,

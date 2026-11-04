@@ -704,6 +704,27 @@ auto mln_map_invalidate_custom_vector_source_tile(
   });
 }
 
+auto mln_map_invalidate_custom_vector_source_region(
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(source_id, "source_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    return mln::core::submit_map_command(
+      map,
+      [id = std::move(id), bounds](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_invalidate_custom_vector_source_region(
+          live, id.view(), bounds
+        );
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,

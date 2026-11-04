@@ -812,6 +812,21 @@ pub const Map = struct {
         return call.submit("mln_map_invalidate_custom_geometry_source_tile", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id });
     }
 
+    /// Makes a custom vector source ask again for the tiles in `bounds` that the
+    /// map still needs.
+    ///
+    /// See `mln_map_invalidate_custom_vector_source_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.NotFound` when the style has no source named `source_id`.
+    /// - `error.InvalidArgument` when the source named `source_id` isn't a custom
+    ///   vector source.
+    pub fn invalidateCustomVectorSourceRegion(self: Map, source_id: []const u8, bounds: LatLngBounds, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_invalidate_custom_vector_source_region", .handle, self, call.command, null, diagnostic, .{ source_id, bounds });
+    }
+
     /// Makes a custom vector source ask for a tile again when the map needs it.
     ///
     /// See `mln_map_invalidate_custom_vector_source_tile` in the
@@ -8440,6 +8455,11 @@ pub const MapDiscarding = struct {
     pub fn invalidateCustomGeometrySourceTile(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_invalidate_custom_geometry_source_tile", .handle, map, null, diagnostic, .{ source_id, tile_id });
+    }
+
+    pub fn invalidateCustomVectorSourceRegion(self: MapDiscarding, source_id: []const u8, bounds: LatLngBounds, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_invalidate_custom_vector_source_region", .handle, map, null, diagnostic, .{ source_id, bounds });
     }
 
     pub fn invalidateCustomVectorSourceTile(self: MapDiscarding, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

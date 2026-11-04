@@ -740,6 +740,18 @@ static jint mln_map_invalidate_custom_geometry_source_tile_jni(
   );
 }
 
+static jint mln_map_invalidate_custom_vector_source_region_jni(
+  JNIEnv* env, jclass type, jlong map, jlong source_id, jlong bounds,
+  jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_invalidate_custom_vector_source_region(
+    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
+    MLN_JNI_RECORD(mln_lat_lng_bounds, bounds),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_invalidate_custom_vector_source_tile_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong tile_id,
   jlong completion, jlong out_diagnostic
@@ -2270,6 +2282,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_invalidate_custom_geometry_source_region_jni},
   {"mln_map_invalidate_custom_geometry_source_tile", "(JJJJJ)I",
    (void*)mln_map_invalidate_custom_geometry_source_tile_jni},
+  {"mln_map_invalidate_custom_vector_source_region", "(JJJJJ)I",
+   (void*)mln_map_invalidate_custom_vector_source_region_jni},
   {"mln_map_invalidate_custom_vector_source_tile", "(JJJJJ)I",
    (void*)mln_map_invalidate_custom_vector_source_tile_jni},
   {"mln_map_lat_lng_bounds_for_camera", "(JJJJ)I",
@@ -2630,6 +2644,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_invalidate_custom_geometry_source_region_jni},
   {"mln_map_invalidate_custom_geometry_source_tile", "(JJJJJ)I",
    (void*)mln_map_invalidate_custom_geometry_source_tile_jni},
+  {"mln_map_invalidate_custom_vector_source_region", "(JJJJJ)I",
+   (void*)mln_map_invalidate_custom_vector_source_region_jni},
   {"mln_map_invalidate_custom_vector_source_tile", "(JJJJJ)I",
    (void*)mln_map_invalidate_custom_vector_source_tile_jni},
   {"mln_map_lat_lng_bounds_for_camera", "(JJJJ)I",
