@@ -1968,6 +1968,20 @@ pub struct mln_wgl_context_descriptor {
     pub share_context: *mut std::ffi::c_void,
     pub get_proc_address: *mut std::ffi::c_void,
 }
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_win32_window_descriptor {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub window: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_win32_window_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub window: *mut std::ffi::c_void,
+}
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_acquired_frame(pub u64);
@@ -2428,6 +2442,15 @@ unsafe extern "C" {
     pub fn mln_map_attach_web_gpu_surface(
         map: mln_map,
         descriptor: *const mln_web_gpu_surface_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_win32_window(
+        map: mln_map,
+        descriptor: *const mln_win32_window_descriptor,
+        device: mln_vulkan_device,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
@@ -3162,6 +3185,12 @@ unsafe extern "C" {
     pub fn mln_render_session_set_web_gpu_surface_target(
         session: mln_render_session,
         replacement: *const mln_web_gpu_surface_replacement,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_win32_window_target(
+        session: mln_render_session,
+        replacement: *const mln_win32_window_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

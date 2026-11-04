@@ -244,11 +244,14 @@
 /dotnet/src/Maplibre.NativeFfi/Wake/WakeCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wayland/WaylandSurfaceDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wayland/WaylandSurfaceReplacement.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Win32/Win32WindowDescriptor.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Win32/Win32WindowReplacement.g.cs linguist-generated=true
 /generated-files.json linguist-generated=true
 /go/maplibre/generated_api.go linguist-generated=true
 /go/maplibre/generated_api_android.go linguist-generated=true
 /go/maplibre/generated_api_linux_ohos.go linguist-generated=true
 /go/maplibre/generated_api_macos.go linguist-generated=true
+/go/maplibre/generated_api_windows.go linguist-generated=true
 /go/maplibre/generated_callbacks.c linguist-generated=true
 /go/maplibre/generated_callbacks.h linguist-generated=true
 /go/maplibre/generated_native.go linguist-generated=true
@@ -362,6 +365,8 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedVulkanVulkanDeviceOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedWaylandMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedWaylandRenderSessionOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedWin32MapOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedWin32RenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedAndroidValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedBaseValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedLinuxValues.swift linguist-generated=true
@@ -380,6 +385,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedVulkanValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWakeValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWaylandValues.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWin32Values.swift linguist-generated=true
 /typescript/native/generated_addon.c linguist-generated=true
 /typescript/native/generated_addon.h linguist-generated=true
 /typescript/native/generated_values.c linguist-generated=true

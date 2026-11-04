@@ -1303,6 +1303,18 @@ Pointer<raw.mln_wayland_surface_descriptor> _writeWaylandSurfaceDescriptor(
   return result;
 }
 
+Pointer<raw.mln_win32_window_descriptor> _writeWin32WindowDescriptor(
+  Win32WindowDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_win32_window_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_win32_window_descriptor>();
+  result.ref.size = sizeOf<raw.mln_win32_window_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
+  return result;
+}
+
 Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   CameraFitOptions value,
   Allocator arena, {
@@ -2241,6 +2253,18 @@ Pointer<raw.mln_wayland_surface_replacement> _writeWaylandSurfaceReplacement(
   result.ref.size = sizeOf<raw.mln_wayland_surface_replacement>();
   result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_win32_window_replacement> _writeWin32WindowReplacement(
+  Win32WindowReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_win32_window_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_win32_window_replacement>();
+  result.ref.size = sizeOf<raw.mln_win32_window_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
   return result;
 }
 
@@ -5216,6 +5240,66 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   }
 
+  /// Creates a session that presents the map to a Win32 window, with a graphics
+  /// context that the library creates.
+  ///
+  /// A Vulkan build presents with `device`, or, when `device` is null, with a
+  /// device that the library creates. An OpenGL build uses a WGL context, and
+  /// `device` must be null. Attach with `RenderDriverKind.coreWorker`.
+  ///
+  /// An OpenGL build sets the window's pixel format, so don't set one yourself.
+  ///
+  /// The session presents without waiting for the display, so demand at most
+  /// one frame per display refresh. While the window is minimized, frame
+  /// demands finish with `RenderResult.targetNotReady`.
+  ///
+  /// Keep the window until a release or replacement of the target, or a detach
+  /// of the session, completes.
+  ///
+  /// See `mln_map_attach_win32_window` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `window` isn't a window, or, in an OpenGL
+  ///   build, already has another pixel format.
+  /// - `Status.invalidState` when `window` is minimized or has no client area.
+  /// - `Status.unsupported` when you created `device` without
+  ///   `VulkanDeviceOptions.presentation`.
+  /// - `Status.invalidState` when `window` was minimized before the attach ran.
+  /// - `Status.unsupported` when the GPU or the Vulkan loader can't present.
+  /// - `Status.nativeError` when the library can't create the graphics context
+  ///   or present to the window.
+  RenderSessionHandle attachWin32Window(
+    Win32WindowDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    VulkanDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_win32_window(
+          _handle.raw,
+          _writeWin32WindowDescriptor(descriptor, arena),
+          (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
+
   /// Holds back the map's changes from rendering until
   /// `MapHandle.endCommandGroup()`, so they show in the same frame.
   ///
@@ -7807,6 +7891,35 @@ final class RenderSessionHandle implements Finalizable {
               nativeDiagnostic,
             ),
       );
+
+  /// Replaces the Win32 window that the session presents to.
+  ///
+  /// Use it to give the session a window again after
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
+  /// resize it. Once the replacement completes, the session no longer uses the
+  /// old window.
+  ///
+  /// See `mln_render_session_set_win32_window_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `window` isn't a window, or, in an OpenGL
+  ///   build, already has another pixel format.
+  /// - `Status.invalidState` when `window` is minimized or has no client area.
+  /// - `Status.invalidState` when `window` was minimized before the replacement
+  ///   ran.
+  /// - `Status.unsupported` when, in a Vulkan build, the new window needs a
+  ///   different color format than the old one. Attach a new session instead.
+  /// - `Status.nativeError` when the library can't present to the new window.
+  Future<void> setWin32WindowTarget(Win32WindowReplacement replacement) => _run(
+    (arena, completion) => raw.mln_render_session_set_win32_window_target(
+      _handle.raw,
+      _writeWin32WindowReplacement(replacement, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
 }
 
 /// Issued native handle id.

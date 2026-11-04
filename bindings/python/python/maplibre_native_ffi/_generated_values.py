@@ -3453,8 +3453,8 @@ class RenderSessionAttachOptions:
       or WGL context, an existing WebGL context, or a browser's WebGPU
       device.
     - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an
-      Android or OpenHarmony window, a Wayland surface, a ring of Android
-      hardware buffers or dmabufs, or an offscreen session.
+      Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
+      Android hardware buffers or dmabufs, or an offscreen session.
     - Either one for a Metal or Vulkan target.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.
@@ -5392,6 +5392,48 @@ class WglContextDescriptor:
             device_context=raw["device_context"],
             share_context=raw["share_context"],
             get_proc_address=raw["get_proc_address"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Win32WindowDescriptor:
+    """A Win32 window to present to, for `MapHandle.attach_win32_window()`.
+
+    See `mln_win32_window_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    window: int
+    """Your `HWND`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            window=raw["window"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Win32WindowReplacement:
+    """A new Win32 window for `RenderSessionHandle.set_win32_window_target()`.
+
+    See `mln_win32_window_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    window: int
+    """Your `HWND`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            window=raw["window"],
         )
 
 

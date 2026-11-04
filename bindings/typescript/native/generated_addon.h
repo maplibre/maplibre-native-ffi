@@ -23,6 +23,7 @@
 #include "maplibre_native_c/texture.h"
 #include "maplibre_native_c/vulkan.h"
 #include "maplibre_native_c/wayland.h"
+#include "maplibre_native_c/win32.h"
 #include "runtime.h"
 
 /** The realm's callback adapters, by the callback type that each
@@ -829,6 +830,14 @@ bool mln_ts_write_web_gpu_surface_replacement(
 );
 bool mln_ts_write_wgl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_wgl_context_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_win32_window_descriptor(
+  mln_ts_call* call, napi_value value, mln_win32_window_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_win32_window_replacement(
+  mln_ts_call* call, napi_value value, mln_win32_window_replacement* out,
   const char* path
 );
 

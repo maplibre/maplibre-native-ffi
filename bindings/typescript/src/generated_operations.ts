@@ -107,6 +107,8 @@ import type {
   WebGpuSurfaceDescriptor,
   WebGpuSurfaceReplacement,
   WebGpuTextureFrame,
+  Win32WindowDescriptor,
+  Win32WindowReplacement,
 } from "./generated_values.ts";
 import { native } from "./internal/addon.ts";
 import {
@@ -1740,6 +1742,71 @@ export class MapHandle extends Owner {
           native.mln_map_attach_web_gpu_surface(
             this.id,
             descriptor,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
+    );
+  }
+
+  /**
+   * Creates a session that presents the map to a Win32 window, with a graphics
+   * context that the library creates.
+   *
+   * A Vulkan build presents with `device`, or, when `device` is null, with a
+   * device that the library creates. An OpenGL build uses a WGL context, and
+   * `device` must be null. Attach with `RenderDriverKind.coreWorker`.
+   *
+   * An OpenGL build sets the window's pixel format, so don't set one yourself.
+   *
+   * The session presents without waiting for the display, so demand at most one
+   * frame per display refresh. While the window is minimized, frame demands
+   * finish with `RenderResult.targetNotReady`.
+   *
+   * Keep the window until a release or replacement of the target, or a detach
+   * of the session, completes.
+   *
+   * See `mln_map_attach_win32_window` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `window` isn't a window, or, in an OpenGL
+   *   build, already has another pixel format.
+   * - `Status.invalidState` when `window` is minimized or has no client area.
+   * - `Status.unsupported` when you created `device` without
+   *   `VulkanDeviceOptions.presentation`.
+   * - `Status.invalidState` when `window` was minimized before the attach ran.
+   * - `Status.unsupported` when the GPU or the Vulkan loader can't present.
+   * - `Status.nativeError` when the library can't create the graphics context
+   *   or present to the window.
+   */
+  attachWin32Window(
+    descriptor: Win32WindowDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_win32_window(
+            this.id,
+            descriptor,
+            device?.id,
             options,
             completion,
           ),
@@ -5273,6 +5340,38 @@ export class RenderSessionHandle extends Owner {
   setWebGpuSurfaceTarget(replacement: WebGpuSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_web_gpu_surface_target(
+        this.id,
+        replacement,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Replaces the Win32 window that the session presents to.
+   *
+   * Use it to give the session a window again after
+   * `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old window.
+   *
+   * See `mln_render_session_set_win32_window_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `window` isn't a window, or, in an OpenGL
+   *   build, already has another pixel format.
+   * - `Status.invalidState` when `window` is minimized or has no client area.
+   * - `Status.invalidState` when `window` was minimized before the replacement
+   *   ran.
+   * - `Status.unsupported` when, in a Vulkan build, the new window needs a
+   *   different color format than the old one. Attach a new session instead.
+   * - `Status.nativeError` when the library can't present to the new window.
+   */
+  setWin32WindowTarget(replacement: Win32WindowReplacement): Promise<void> {
+    return run((completion) =>
+      native.mln_render_session_set_win32_window_target(
         this.id,
         replacement,
         completion,

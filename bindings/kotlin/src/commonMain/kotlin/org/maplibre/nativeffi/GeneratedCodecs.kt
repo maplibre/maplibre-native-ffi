@@ -529,6 +529,15 @@ internal fun NativeArena.putWebGpuSurfaceDescriptor(target: Long, value: WebGpuS
 internal fun NativeArena.writeWebGpuSurfaceDescriptor(value: WebGpuSurfaceDescriptor): Long =
   allocate(w(32, 56), w(4, 8)).also { putWebGpuSurfaceDescriptor(it, value) }
 
+internal fun NativeArena.putWin32WindowDescriptor(target: Long, value: Win32WindowDescriptor) {
+  writeU32(target, w(16, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.window.address)
+}
+
+internal fun NativeArena.writeWin32WindowDescriptor(value: Win32WindowDescriptor): Long =
+  allocate(w(16, 24), w(4, 8)).also { putWin32WindowDescriptor(it, value) }
+
 internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
   writeU32(target, 56.toUInt())
   var fields = 0u
@@ -1061,6 +1070,15 @@ internal fun NativeArena.putWebGpuSurfaceReplacement(
 
 internal fun NativeArena.writeWebGpuSurfaceReplacement(value: WebGpuSurfaceReplacement): Long =
   allocate(w(16, 24), w(4, 8)).also { putWebGpuSurfaceReplacement(it, value) }
+
+internal fun NativeArena.putWin32WindowReplacement(target: Long, value: Win32WindowReplacement) {
+  writeU32(target, w(16, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeAddress(target + w(12, 16), value.window.address)
+}
+
+internal fun NativeArena.writeWin32WindowReplacement(value: Win32WindowReplacement): Long =
+  allocate(w(16, 24), w(4, 8)).also { putWin32WindowReplacement(it, value) }
 
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
   writeU32(target, w(72, 96, 68).toUInt())

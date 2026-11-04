@@ -56,6 +56,10 @@ struct CompletionResult<&mln_map_attach_web_gpu_surface> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_map_attach_win32_window> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_map_camera_for_geometry> {
   static constexpr bool has_value = true;
   using type = mln_camera_options;
@@ -311,6 +315,10 @@ struct CompletionResult<
 };
 template <>
 struct CompletionResult<&mln_render_session_set_web_gpu_surface_target> {
+  static constexpr bool has_value = false;
+};
+template <>
+struct CompletionResult<&mln_render_session_set_win32_window_target> {
   static constexpr bool has_value = false;
 };
 template <>

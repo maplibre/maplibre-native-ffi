@@ -236,8 +236,10 @@ function(mln_ffi_configure_renderer target)
            ${PROJECT_SOURCE_DIR}/src/render/opengl/wayland_egl.cpp)
     endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
-    list(APPEND MLN_FFI_OPENGL_SOURCES
-         ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_offscreen_device.cpp)
+    list(
+      APPEND MLN_FFI_OPENGL_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_offscreen_device.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_window.cpp)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/webgl_offscreen_device.cpp)

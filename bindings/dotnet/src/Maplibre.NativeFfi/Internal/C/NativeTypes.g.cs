@@ -1592,6 +1592,20 @@ internal unsafe struct mln_wgl_context_descriptor
     public void* get_proc_address;
 }
 
+internal unsafe struct mln_win32_window_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* window;
+}
+
+internal unsafe struct mln_win32_window_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* window;
+}
+
 internal enum mln_animation_option_field : uint
 {
     MLN_ANIMATION_OPTION_DURATION = 1,

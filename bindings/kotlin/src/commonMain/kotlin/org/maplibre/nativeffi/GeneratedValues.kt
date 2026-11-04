@@ -2519,9 +2519,9 @@ public data class RenderSessionAttachOptions(
    *
    * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL or WGL context, an
    *   existing WebGL context, or a browser's WebGPU device.
-   * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android or OpenHarmony
-   *   window, a Wayland surface, a ring of Android hardware buffers or dmabufs, or an offscreen
-   *   session.
+   * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android, OpenHarmony, or
+   *   Win32 window, a Wayland surface, a ring of Android hardware buffers or dmabufs, or an
+   *   offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.
@@ -2975,6 +2975,18 @@ public data class WebGpuSurfaceDescriptor(
   public val surface: NativePointer,
   /** The WGPUTextureFormat to configure the surface with. */
   public val format: UInt,
+)
+
+/**
+ * A Win32 window to present to, for `MapHandle.attachWin32Window()`.
+ *
+ * See `mln_win32_window_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ */
+public data class Win32WindowDescriptor(
+  public val logicalSize: LogicalSize,
+  /** Your `HWND`. */
+  public val window: NativePointer,
 )
 
 /**
@@ -3829,6 +3841,18 @@ public data class WebGpuSurfaceReplacement(
   public val logicalSize: LogicalSize,
   /** Your WGPUSurface. */
   public val surface: NativePointer,
+)
+
+/**
+ * A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
+ *
+ * See `mln_win32_window_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ */
+public data class Win32WindowReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your `HWND`. */
+  public val window: NativePointer,
 )
 
 /**

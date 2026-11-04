@@ -268,6 +268,8 @@ from ._generated_values import (
     WebGlContextDescriptor,
     WebGlContextKind,
     WglContextDescriptor,
+    Win32WindowDescriptor,
+    Win32WindowReplacement,
 )
 
 __all__ = [
@@ -518,6 +520,8 @@ __all__ = [
     "WebGlContextDescriptor",
     "WebGlContextKind",
     "WglContextDescriptor",
+    "Win32WindowDescriptor",
+    "Win32WindowReplacement",
     "android_frame_pacer_create",
     "apple_frame_pacer_create",
     "c_version",

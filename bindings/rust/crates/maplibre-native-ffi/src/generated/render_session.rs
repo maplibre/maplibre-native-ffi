@@ -1078,6 +1078,51 @@ impl RenderSessionHandle {
             completion::unit,
         )
     }
+
+    /// Replaces the Win32 window that the session presents to.
+    ///
+    /// Use it to give the session a window again after
+    /// `RenderSessionHandle::release_target()`, to move it to another window,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old window.
+    ///
+    /// See `mln_render_session_set_win32_window_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `window` isn't a window, or, in an
+    ///   OpenGL build, already has another pixel format.
+    /// - `Status::InvalidState` when `window` is minimized or has no client
+    ///   area.
+    /// - `Status::InvalidState` when `window` was minimized before the
+    ///   replacement ran.
+    /// - `Status::Unsupported` when, in a Vulkan build, the new window needs a
+    ///   different color format than the old one. Attach a new session instead.
+    /// - `Status::NativeError` when the library can't present to the new
+    ///   window.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "windows")]
+    pub unsafe fn set_win32_window_target(
+        &self,
+        replacement: &Win32WindowReplacement,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self.inner.call();
+        let replacement = call.reference(&replacement)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_win32_window_target(
+                    session,
+                    replacement,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
 }
 
 /// What a release of [`RenderSessionHandle`] leaves while native retires the

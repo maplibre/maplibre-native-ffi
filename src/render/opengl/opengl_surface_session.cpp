@@ -40,6 +40,8 @@
 #include "render/ohos_surface_session.hpp"
 #elif defined(MLN_FFI_WAYLAND)
 #include "render/wayland_surface_session.hpp"
+#elif defined(_WIN32)
+#include "render/win32_window_session.hpp"
 #endif
 #include "render/opengl/context_mode.hpp"
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
@@ -50,6 +52,7 @@
 #endif
 #include "render/opengl/webgl_worker.hpp"
 #include "render/opengl/wgl_common.hpp"
+#include "render/opengl/wgl_window.hpp"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 
@@ -170,17 +173,17 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     // reads its device_context.
     descriptor_.surface = surface;
     fallback_drawable_ = false;
-#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) || defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     swap_interval_pending_ = swap_interval_.has_value();
 #endif
     setRenderableSize(size);
   }
 
-#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) || defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   // Sets the swap interval of each surface that the context renders to from
-  // here on. EGL keeps the interval with the surface, so each one gets it once
-  // the context is first current on it.
-  void set_swap_interval(EGLint interval) {
+  // here on. EGL and some WGL drivers keep the interval with the surface, so
+  // each one gets it once the context is first current on it.
+  void set_swap_interval(int interval) {
     swap_interval_ = interval;
     swap_interval_pending_ = true;
   }
@@ -392,9 +395,11 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
       fallback_drawable_
         ? static_cast<HDC>(descriptor_.context.data.wgl.device_context)
         : static_cast<HDC>(descriptor_.surface);
+    const auto needs_swap_interval =
+      swap_interval_pending_ && !fallback_drawable_;
     if (
       render_context_ != nullptr && wglGetCurrentContext() == render_context_ &&
-      wglGetCurrentDC() == draw_surface
+      wglGetCurrentDC() == draw_surface && !needs_swap_interval
     ) {
       return;
     }
@@ -413,6 +418,16 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     } catch (...) {
       (void)wglMakeCurrent(nullptr, nullptr);
       throw;
+    }
+    if (needs_swap_interval) {
+      using SwapInterval = BOOL(WINAPI*)(int);
+      auto* const swap_interval = reinterpret_cast<SwapInterval>(
+        getExtensionFunctionPointer("wglSwapIntervalEXT")
+      );
+      if (swap_interval != nullptr && swap_interval(*swap_interval_) == FALSE) {
+        throw std::runtime_error("Setting the WGL swap interval failed");
+      }
+      swap_interval_pending_ = false;
     }
   }
 
@@ -471,15 +486,18 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
   // context was created from instead.
   bool fallback_drawable_ = false;
 
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) || defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  std::optional<int> swap_interval_;
+  // Whether the surface still needs swap_interval_.
+  bool swap_interval_pending_ = false;
+#endif
+
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void* render_context_ = nullptr;
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   std::optional<mln::core::opengl::EglSharedContext> egl_context_;
-  std::optional<EGLint> swap_interval_;
-  // Whether the surface still needs swap_interval_.
-  bool swap_interval_pending_ = false;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous_webgl_context_ = 0;
 #endif
@@ -508,10 +526,8 @@ class OpenGLSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
-#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-  void set_swap_interval(EGLint interval) {
-    backend_.set_swap_interval(interval);
-  }
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) || defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  void set_swap_interval(int interval) { backend_.set_swap_interval(interval); }
 #endif
 
   auto release_target() -> mln_status override {
@@ -775,6 +791,90 @@ class WindowEglSurfaceSessionBackend final
 };
 #endif
 
+#if defined(_WIN32) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+using mln::core::opengl::acquire_wgl_window_device_context;
+using mln::core::opengl::HiddenWindow;
+using mln::core::opengl::WglWindowDeviceContext;
+
+// Presents to a Win32 window through its device context, with a dedicated
+// context that it creates on a hidden window of the same pixel format.
+class WindowWglSurfaceSessionBackend final
+    : public mln::core::SurfaceSessionBackend {
+ public:
+  WindowWglSurfaceSessionBackend(
+    std::unique_ptr<HiddenWindow> fallback, mln::core::Win32Window window,
+    WglWindowDeviceContext device_context,
+    const mln_open_gl_surface_descriptor& descriptor, mln::Size size
+  )
+      : fallback_(std::move(fallback)),
+        window_(std::move(window)),
+        device_context_(std::move(device_context)),
+        pixel_format_(device_context_.pixel_format()),
+        session_(descriptor, size) {
+    session_.set_swap_interval(0);
+  }
+
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
+    return session_.renderer_backend();
+  }
+
+  void resize(uint32_t physical_width, uint32_t physical_height) override {
+    session_.resize(physical_width, physical_height);
+  }
+
+  auto prepare_frame(bool& out_ready) -> mln_status override {
+    out_ready = mln::core::win32_window_ready(window_.get());
+    return MLN_STATUS_OK;
+  }
+
+  auto set_win32_target(
+    const mln::core::Win32Window& window, mln::Size physical_size
+  ) -> mln_status override {
+    if (window == window_) {
+      session_.resize(physical_size.width, physical_size.height);
+      return MLN_STATUS_OK;
+    }
+    auto next = WglWindowDeviceContext{};
+    const auto acquire_status =
+      acquire_wgl_window_device_context(window.get(), pixel_format_, next);
+    if (acquire_status != MLN_STATUS_OK) return acquire_status;
+    // The context stays current on its window between renders, so it moves
+    // off the old one before that goes.
+    if (window_ != nullptr) {
+      const auto release_status = release_target();
+      if (release_status != MLN_STATUS_OK) return release_status;
+    }
+    const auto replacement = mln_open_gl_surface_replacement{
+      .size = sizeof(mln_open_gl_surface_replacement),
+      .logical_size = {},
+      .surface = next.get(),
+    };
+    const auto status = session_.set_opengl_target(replacement, physical_size);
+    if (status != MLN_STATUS_OK) return status;
+    device_context_ = std::move(next);
+    window_ = window;
+    return MLN_STATUS_OK;
+  }
+
+  auto release_target() -> mln_status override {
+    const auto status = session_.release_target();
+    if (status != MLN_STATUS_OK) return status;
+    device_context_.reset();
+    window_.reset();
+    return MLN_STATUS_OK;
+  }
+
+ private:
+  // Destroyed last, so the context goes before the window it was created on.
+  std::unique_ptr<HiddenWindow> fallback_;
+  mln::core::Win32Window window_;
+  WglWindowDeviceContext device_context_;
+  int pixel_format_;
+  // Destroyed first, so the context goes before the device contexts.
+  OpenGLSurfaceSessionBackend session_;
+};
+#endif
+
 }  // namespace
 
 namespace mln::core {
@@ -848,6 +948,34 @@ auto create_wayland_surface_backend(
   );
 }
 #endif
+#endif
+
+#if defined(_WIN32) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+auto create_win32_window_backend(
+  Win32WindowAttach attach, mln_render_session_object& target
+) -> mln_status {
+  auto device_context = WglWindowDeviceContext{};
+  const auto acquire_status =
+    acquire_wgl_window_device_context(attach.window.get(), 0, device_context);
+  if (acquire_status != MLN_STATUS_OK) return acquire_status;
+  auto fallback = std::make_unique<HiddenWindow>();
+  const auto fallback_status = fallback->create(device_context.pixel_format());
+  if (fallback_status != MLN_STATUS_OK) return fallback_status;
+  auto descriptor = mln_open_gl_surface_descriptor{
+    .size = sizeof(mln_open_gl_surface_descriptor),
+    .logical_size = {.width = target.width, .height = target.height},
+    .context = {},
+    .surface = device_context.get(),
+  };
+  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
+  descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.wgl.device_context = fallback->device_context();
+  target.surface.backend = std::make_unique<WindowWglSurfaceSessionBackend>(
+    std::move(fallback), std::move(attach.window), std::move(device_context),
+    descriptor, mln::Size{target.physical_width, target.physical_height}
+  );
+  return MLN_STATUS_OK;
+}
 #endif
 
 auto opengl_surface_attach_start(

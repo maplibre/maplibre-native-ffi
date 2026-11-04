@@ -2891,9 +2891,9 @@ final class RenderSessionAttachOptions extends _Value {
   ///
   /// - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
   ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
-  /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
-  ///   or OpenHarmony window, a Wayland surface, a ring of Android hardware
-  ///   buffers or dmabufs, or an offscreen session.
+  /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an
+  ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
+  ///   Android hardware buffers or dmabufs, or an offscreen session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
@@ -3826,6 +3826,36 @@ final class WaylandSurfaceDescriptor extends _Value {
     'display',
     'surface',
   ]);
+}
+
+/// A Win32 window to present to, for `MapHandle.attachWin32Window()`.
+///
+/// See `mln_win32_window_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+final class Win32WindowDescriptor extends _Value {
+  const Win32WindowDescriptor({
+    required this.logicalSize,
+    required this.window,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `HWND`.
+  final NativePointer window;
+
+  /// A copy of this value with the given members replaced.
+  Win32WindowDescriptor copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? window,
+  }) => Win32WindowDescriptor(
+    logicalSize: logicalSize ?? this.logicalSize,
+    window: window ?? this.window,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, window];
+  @override
+  String toString() =>
+      _describe('Win32WindowDescriptor', const ['logicalSize', 'window']);
 }
 
 /// Options for finding the camera that fits an area.
@@ -5758,6 +5788,36 @@ final class WaylandSurfaceReplacement extends _Value {
   @override
   String toString() =>
       _describe('WaylandSurfaceReplacement', const ['logicalSize', 'surface']);
+}
+
+/// A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
+///
+/// See `mln_win32_window_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+final class Win32WindowReplacement extends _Value {
+  const Win32WindowReplacement({
+    required this.logicalSize,
+    required this.window,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `HWND`.
+  final NativePointer window;
+
+  /// A copy of this value with the given members replaced.
+  Win32WindowReplacement copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? window,
+  }) => Win32WindowReplacement(
+    logicalSize: logicalSize ?? this.logicalSize,
+    window: window ?? this.window,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, window];
+  @override
+  String toString() =>
+      _describe('Win32WindowReplacement', const ['logicalSize', 'window']);
 }
 
 /// The answer to a resource request.

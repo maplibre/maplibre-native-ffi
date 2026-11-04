@@ -69,6 +69,11 @@ same way with [](api:mln_map_attach_wayland_surface), and replace it with
 you destroy the surface, and detach the session before you disconnect the
 display.
 
+On Windows, attach a window by its `HWND` the same way with
+[](api:mln_map_attach_win32_window), and replace it with
+[](api:mln_render_session_set_win32_window_target). Release the target before
+you destroy the window.
+
 Attach the surface to the map at the window's size in logical pixels. The
 session renders at the scale factor that you created the map with. To move the
 window to a display of another density, create a new map and attach a new

@@ -343,6 +343,17 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_win32_window(
+        MlnMap map,
+        mln_win32_window_descriptor* descriptor,
+        MlnVulkanDevice device,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_begin_command_group(
         MlnMap map,
         mln_completion* completion,
@@ -1291,6 +1302,14 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_render_session_set_wayland_surface_target(
         MlnRenderSession session,
         mln_wayland_surface_replacement* replacement,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_win32_window_target(
+        MlnRenderSession session,
+        mln_win32_window_replacement* replacement,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

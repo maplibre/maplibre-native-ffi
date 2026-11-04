@@ -703,6 +703,43 @@ pub const Map = struct {
         }
     }.function else {};
 
+    /// Creates a session that presents the map to a Win32 window, with a graphics
+    /// context that the library creates.
+    ///
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses a WGL context, and
+    /// `device` must be null. Attach with `RenderDriverKind.core_worker`.
+    ///
+    /// An OpenGL build sets the window's pixel format, so don't set one yourself.
+    ///
+    /// The session presents without waiting for the display, so demand at most one
+    /// frame per display refresh. While the window is minimized, frame demands
+    /// finish with `RenderResult.target_not_ready`.
+    ///
+    /// Keep the window until a release or replacement of the target, or a detach of
+    /// the session, completes.
+    ///
+    /// See `mln_map_attach_win32_window` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when `window` isn't a window, or, in an OpenGL
+    ///   build, already has another pixel format.
+    /// - `error.InvalidState` when `window` is minimized or has no client area.
+    /// - `error.Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions.presentation`.
+    /// - `error.InvalidState` when `window` was minimized before the attach ran.
+    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
+    /// - `error.NativeError` when the library can't create the graphics context or
+    ///   present to the window.
+    pub const attachWin32Window = if (builtin.os.tag == .windows) struct {
+        fn function(self: Map, descriptor: Win32WindowDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_win32_window", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
     /// Holds back the map's changes from rendering until `Map.endCommandGroup()`,
     /// so they show in the same frame.
     ///
@@ -2409,6 +2446,32 @@ pub const RenderSession = struct {
     pub const setWaylandSurfaceTarget = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
         fn function(self: RenderSession, replacement: WaylandSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
             return call.submit("mln_render_session_set_wayland_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
+        }
+    }.function else {};
+
+    /// Replaces the Win32 window that the session presents to.
+    ///
+    /// Use it to give the session a window again after
+    /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// window.
+    ///
+    /// See `mln_render_session_set_win32_window_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when `window` isn't a window, or, in an OpenGL
+    ///   build, already has another pixel format.
+    /// - `error.InvalidState` when `window` is minimized or has no client area.
+    /// - `error.InvalidState` when `window` was minimized before the replacement
+    ///   ran.
+    /// - `error.Unsupported` when, in a Vulkan build, the new window needs a
+    ///   different color format than the old one. Attach a new session instead.
+    /// - `error.NativeError` when the library can't present to the new window.
+    pub const setWin32WindowTarget = if (builtin.os.tag == .windows) struct {
+        fn function(self: RenderSession, replacement: Win32WindowReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_win32_window_target", .handle, self, call.unit, null, diagnostic, .{replacement});
         }
     }.function else {};
 };
@@ -6322,8 +6385,8 @@ pub const RenderSessionAttachOptions = struct {
     ///   EGL or WGL context, an existing WebGL context, or a browser's WebGPU
     ///   device.
     /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
-    ///   Android or OpenHarmony window, a Wayland surface, a ring of Android
-    ///   hardware buffers or dmabufs, or an offscreen session.
+    ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
+    ///   Android hardware buffers or dmabufs, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.
@@ -8934,6 +8997,52 @@ pub const WglContextDescriptor = struct {
             .device_context = raw.device_context,
             .share_context = raw.share_context,
             .get_proc_address = raw.get_proc_address,
+        };
+    }
+};
+
+/// A Win32 window to present to, for `Map.attachWin32Window()`.
+///
+/// See `mln_win32_window_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+pub const Win32WindowDescriptor = struct {
+    logical_size: LogicalSize,
+    /// Your `HWND`.
+    window: ?*anyopaque,
+    pub fn toNative(self: Win32WindowDescriptor) c.mln_win32_window_descriptor {
+        var raw = std.mem.zeroes(c.mln_win32_window_descriptor);
+        raw.size = @sizeOf(c.mln_win32_window_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.window = self.window;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_win32_window_descriptor) Win32WindowDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .window = raw.window,
+        };
+    }
+};
+
+/// A new Win32 window for `RenderSession.setWin32WindowTarget()`.
+///
+/// See `mln_win32_window_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+pub const Win32WindowReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your `HWND`.
+    window: ?*anyopaque,
+    pub fn toNative(self: Win32WindowReplacement) c.mln_win32_window_replacement {
+        var raw = std.mem.zeroes(c.mln_win32_window_replacement);
+        raw.size = @sizeOf(c.mln_win32_window_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.window = self.window;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_win32_window_replacement) Win32WindowReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .window = raw.window,
         };
     }
 };

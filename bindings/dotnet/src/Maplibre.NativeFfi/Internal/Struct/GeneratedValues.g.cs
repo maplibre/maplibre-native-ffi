@@ -2821,4 +2821,26 @@ internal static unsafe class GeneratedValues
         native.get_proc_address = (void*)value.GetProcAddress.Address;
         return native;
     }
+
+    internal static mln_win32_window_descriptor NativeWin32WindowDescriptor(
+        Win32WindowDescriptor value
+    )
+    {
+        var native = new mln_win32_window_descriptor();
+        native.size = (uint)sizeof(mln_win32_window_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.window = (void*)value.Window.Address;
+        return native;
+    }
+
+    internal static mln_win32_window_replacement NativeWin32WindowReplacement(
+        Win32WindowReplacement value
+    )
+    {
+        var native = new mln_win32_window_replacement();
+        native.size = (uint)sizeof(mln_win32_window_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.window = (void*)value.Window.Address;
+        return native;
+    }
 }

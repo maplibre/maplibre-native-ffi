@@ -31,5 +31,6 @@
 #include "maplibre_native_c/vulkan.h"            // IWYU pragma: export
 #include "maplibre_native_c/wake.h"              // IWYU pragma: export
 #include "maplibre_native_c/wayland.h"           // IWYU pragma: export
+#include "maplibre_native_c/win32.h"             // IWYU pragma: export
 
 #endif  // MAPLIBRE_NATIVE_C_H

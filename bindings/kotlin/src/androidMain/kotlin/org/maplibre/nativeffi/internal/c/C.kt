@@ -363,6 +363,17 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_attach_win32_window(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_begin_command_group(
     map: Long,
     completion: Long,
@@ -1286,6 +1297,14 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_render_session_set_web_gpu_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_render_session_set_win32_window_target(
     session: Long,
     replacement: Long,
     completion: Long,

@@ -3531,6 +3531,28 @@ fn generated_input_mln_wgl_context_descriptor<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_win32_window_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_win32_window_descriptor> {
+    let mut raw: sys::mln_win32_window_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_win32_window_descriptor>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.window = value.getattr("window")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_win32_window_replacement<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_win32_window_replacement> {
+    let mut raw: sys::mln_win32_window_replacement = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_win32_window_replacement>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.window = value.getattr("window")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
 unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     handle: sys::mln_acquired_frame,
 ) -> sys::mln_status {
@@ -4635,6 +4657,51 @@ impl MapHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_map_attach_wayland_surface(
+                        handle,
+                        &descriptor_value,
+                        device_handle,
+                        &options_value,
+                        &mut out_session,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }?;
+        let callback_roots = call.accept_callbacks();
+        let mut out_session_owner =
+            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
+        let out_session_python = unsafe {
+            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
+        }?;
+        let result = PyDict::new(py);
+        result.set_item("session", out_session_python)?;
+        result.set_item("ready", future)?;
+        Ok(result.into_any().unbind())
+    }
+    #[pyo3(signature = (descriptor, device, options))]
+    fn attach_win32_window(
+        &self,
+        py: Python<'_>,
+        descriptor: &Bound<'_, PyAny>,
+        device: Option<&VulkanDeviceHandle>,
+        options: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_win32_window_descriptor(&descriptor.clone(), storage)?;
+        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
+        let options_value =
+            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
+        let handle = self.input();
+        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_map_attach_win32_window(
                         handle,
                         &descriptor_value,
                         device_handle,
@@ -8096,6 +8163,32 @@ impl RenderSessionHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_render_session_set_wayland_surface_target(
+                        handle,
+                        &replacement_value,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }
+    }
+    #[pyo3(signature = (replacement))]
+    fn set_win32_window_target(
+        &self,
+        py: Python<'_>,
+        replacement: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let replacement_value =
+            generated_input_mln_win32_window_replacement(&replacement.clone(), storage)?;
+        let handle = self.input();
+        let convert = py_none;
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_render_session_set_win32_window_target(
                         handle,
                         &replacement_value,
                         completion,

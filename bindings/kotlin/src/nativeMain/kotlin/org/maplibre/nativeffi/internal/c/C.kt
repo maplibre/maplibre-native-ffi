@@ -586,6 +586,25 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_attach_win32_window(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_win32_window(
+      map.toULong(),
+      descriptor.toCPointer(),
+      device.toULong(),
+      options.toCPointer(),
+      outSession.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_begin_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_begin_command_group(
       map.toULong(),
@@ -2064,6 +2083,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_surface_target(
+      session.toULong(),
+      replacement.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_set_win32_window_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_win32_window_target(
       session.toULong(),
       replacement.toCPointer(),
       completion.toCPointer(),
