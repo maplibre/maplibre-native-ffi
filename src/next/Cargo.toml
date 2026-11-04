@@ -15,6 +15,14 @@ crate-type = ["staticlib"]
 
 [dependencies]
 maplibre-native-next = "0.0.6"
+# JSON for queries and feature state; maplibre-native-next's conversions take
+# its serde_json::Value, so this is the same crate.
+serde_json = "1.0.154"
+
+# The CAMetalLayer surfaces of metal_surface.rs. maplibre-native-next doesn't
+# re-export wgpu; this is its version, so Cargo builds one wgpu for both.
+[target.'cfg(target_vendor = "apple")'.dependencies]
+wgpu = { version = "=30.0.1", default-features = false, features = ["metal"] }
 
 # A workspace of its own: the repository's workspace builds without the port.
 [workspace]

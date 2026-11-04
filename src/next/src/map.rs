@@ -61,6 +61,8 @@ pub struct MapEntry {
     pub map: RefCell<Map>,
     pub frontend: ProxyFrontend,
     pub observer: Rc<FfiMapObserver>,
+    /// The map's feature state (feature_state.rs).
+    pub feature_state: crate::feature_state::Store,
 }
 
 impl MapEntry {
@@ -400,7 +402,13 @@ pub unsafe extern "C" fn mln_runtime_create_map(
                     &runtime.resource_options,
                     &maplibre_native_next::mln_storage::ClientOptions::default(),
                 );
-                let entry = Rc::new(MapEntry { shared: shared.clone(), map: RefCell::new(map), frontend, observer });
+                let entry = Rc::new(MapEntry {
+                    shared: shared.clone(),
+                    map: RefCell::new(map),
+                    frontend,
+                    observer,
+                    feature_state: Default::default(),
+                });
                 STATE.with(|state| state.borrow_mut().maps.insert(handle, entry.clone()));
                 entry.publish_snapshot();
                 shared.created.store(true, Ordering::SeqCst);

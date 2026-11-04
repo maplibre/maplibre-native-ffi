@@ -13,10 +13,15 @@
 mod base;
 mod delivery;
 mod diagnostics;
+mod feature_state;
+mod frame_observer;
 mod handles;
 mod logging;
+mod maintenance;
 mod map;
+mod metal_surface;
 mod plugin;
+mod query;
 mod runtime;
 mod session;
 mod stubs;

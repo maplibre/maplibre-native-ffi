@@ -10,10 +10,13 @@
 // "core worker" is the runtime thread. A continuous map renders on frame
 // demands; a static or tile map renders still images as its HeadlessFrontend
 // invalidates, as in C++. A WebGPU surface session renders on the host's
-// thread instead (surface_session.rs): the frontend hands it each update.
+// thread instead (surface_session.rs): the frontend hands it each update. A
+// Metal surface session (metal_surface.rs) renders on the runtime thread with
+// a frontend of its own, which the ProxyFrontend forwards to.
 
 use crate::delivery::{Completion, Value, Wake};
 use crate::diagnostics::{Failure, boundary};
+use crate::frame_observer::{FrameObserver, render_mode_code};
 use crate::handles::{self, Object};
 use crate::map::{self, MapEntry, MapShared};
 use crate::runtime::STATE;
@@ -36,12 +39,18 @@ struct ProxyInner {
     mode: MapMode,
     pixel_ratio: f32,
     attached: RefCell<Option<HeadlessFrontend>>,
+    /// The attached HeadlessFrontend's renderer observer, which forwards to
+    /// `observer`.
+    frame_observer: RefCell<Option<Rc<FrameObserver>>>,
     observer: RefCell<Option<Weak<dyn RendererObserver>>>,
     last_update: RefCell<Option<Arc<UpdateParameters>>>,
     update_generation: Cell<u64>,
     session: Cell<u64>,
     /// A surface session, which renders on the host's thread.
     remote: RefCell<Option<(u64, Arc<SessionShared>)>>,
+    /// A session's frontend on this thread other than a HeadlessFrontend
+    /// (metal_surface.rs).
+    local: RefCell<Option<Rc<dyn RendererFrontend>>>,
 }
 
 /// The map's `RendererFrontend` (see the file comment).
@@ -57,11 +66,13 @@ impl ProxyFrontend {
                 mode,
                 pixel_ratio,
                 attached: RefCell::new(None),
+                frame_observer: RefCell::new(None),
                 observer: RefCell::new(None),
                 last_update: RefCell::new(None),
                 update_generation: Cell::new(0),
                 session: Cell::new(0),
                 remote: RefCell::new(None),
+                local: RefCell::new(None),
             }),
         }
     }
@@ -72,6 +83,11 @@ impl ProxyFrontend {
 
     pub fn has_update(&self) -> bool {
         self.inner.last_update.borrow().is_some()
+    }
+
+    /// The map's last update.
+    pub fn last_update(&self) -> Option<Arc<UpdateParameters>> {
+        self.inner.last_update.borrow().clone()
     }
 
     /// The map's renderer observer.
@@ -87,6 +103,23 @@ impl ProxyFrontend {
         *self.inner.remote.borrow_mut() = Some((session, shared));
     }
 
+    /// Hands the map's renderer observer, its last update and every later
+    /// update to `frontend`, until `detach_local`.
+    pub fn attach_local(&self, frontend: Rc<dyn RendererFrontend>) {
+        if let Some(observer) = self.inner.observer.borrow().clone() {
+            frontend.set_observer(observer);
+        }
+        if let Some(update) = self.inner.last_update.borrow().clone() {
+            frontend.update(update);
+        }
+        *self.inner.local.borrow_mut() = Some(frontend);
+    }
+
+    pub fn detach_local(&self) {
+        let frontend = self.inner.local.borrow_mut().take();
+        drop(frontend);
+    }
+
     pub fn detach_remote(&self, session: u64) {
         let mut remote = self.inner.remote.borrow_mut();
         if remote.as_ref().is_some_and(|(handle, _)| *handle == session) {
@@ -95,8 +128,9 @@ impl ProxyFrontend {
     }
 
     /// Creates the session's HeadlessFrontend (and with it the wgpu device)
-    /// and hands it the map's renderer observer and last update.
-    fn attach(&self, session: u64, size: Size) -> HeadlessFrontend {
+    /// and hands it the map's renderer observer, through the session's own,
+    /// and the map's last update.
+    fn attach(&self, session: u64, size: Size) -> (HeadlessFrontend, Rc<FrameObserver>) {
         // A continuous map renders on frame demands only, so its frontend
         // doesn't render on update; a still image renders as it invalidates.
         let invalidate_on_update = self.inner.mode != MapMode::Continuous;
@@ -107,9 +141,13 @@ impl ProxyFrontend {
             ContextMode::Unique,
             invalidate_on_update,
         );
+        let frame_observer = Rc::new(FrameObserver::default());
         if let Some(observer) = self.inner.observer.borrow().clone() {
-            frontend.set_observer(observer);
+            frame_observer.set_delegate(observer);
         }
+        let weak: Weak<dyn RendererObserver> = Rc::downgrade(&frame_observer) as Weak<dyn RendererObserver>;
+        frontend.set_observer(weak);
+        *self.inner.frame_observer.borrow_mut() = Some(frame_observer.clone());
         *self.inner.attached.borrow_mut() = Some(frontend.clone());
         self.inner.session.set(session);
         if self.inner.mode == MapMode::Continuous {
@@ -117,11 +155,12 @@ impl ProxyFrontend {
                 frontend.update(update);
             }
         }
-        frontend
+        (frontend, frame_observer)
     }
 
     fn detach(&self) {
         self.inner.session.set(0);
+        self.inner.frame_observer.borrow_mut().take();
         let frontend = self.inner.attached.borrow_mut().take();
         if let Some(frontend) = frontend {
             frontend.reset();
@@ -135,13 +174,20 @@ impl RendererFrontend for ProxyFrontend {
         if let Some(frontend) = frontend {
             frontend.reset();
         }
+        let local = self.inner.local.borrow().clone();
+        if let Some(local) = local {
+            local.reset();
+        }
     }
 
     fn set_observer(&self, observer: Weak<dyn RendererObserver>) {
         *self.inner.observer.borrow_mut() = Some(observer.clone());
-        let frontend = self.inner.attached.borrow().clone();
-        if let Some(frontend) = frontend {
-            frontend.set_observer(observer);
+        if let Some(frame_observer) = self.inner.frame_observer.borrow().as_ref() {
+            frame_observer.set_delegate(observer.clone());
+        }
+        let local = self.inner.local.borrow().clone();
+        if let Some(local) = local {
+            local.set_observer(observer);
         }
     }
 
@@ -151,6 +197,10 @@ impl RendererFrontend for ProxyFrontend {
         let frontend = self.inner.attached.borrow().clone();
         if let Some(frontend) = frontend {
             frontend.update(parameters.clone());
+        }
+        let local = self.inner.local.borrow().clone();
+        if let Some(local) = local {
+            local.update(parameters.clone());
         }
         if let Some((_, shared)) = self.inner.remote.borrow().as_ref() {
             crate::surface_session::hand_off(shared, &parameters, self.inner.update_generation.get());
@@ -175,10 +225,16 @@ pub struct SessionShared {
     pub(crate) frame_wake: Option<Wake>,
     pub(crate) frame_wake_armed: AtomicBool,
     pub(crate) frame_generation: AtomicU64,
+    /// The session's generation, which frame results and snapshots report:
+    /// 1 at attach, and one more with each resize, new target, and detach
+    /// (C++ `mln_render_session_object::generation`).
+    pub(crate) generation: AtomicU64,
     /// The thread that renders: MLN_RENDER_DRIVER_CORE_WORKER (offscreen)
     /// or MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD (a WebGPU surface).
     pub(crate) driver: u32,
     pub(crate) caller: Option<crate::surface_session::CallerShared>,
+    /// A Metal surface session's state (metal_surface.rs).
+    pub(crate) metal: Option<crate::metal_surface::MetalShared>,
 }
 
 pub(crate) struct SessionPublic {
@@ -211,7 +267,7 @@ impl SessionShared {
     /// Queues a frame result and wakes the caller, once per drain.
     pub(crate) fn push_result(&self, mut result: mln_render_frame_result) {
         result.size = size_of::<mln_render_frame_result>() as u32;
-        result.generation = self.map.generation.load(Ordering::SeqCst);
+        result.generation = self.generation.load(Ordering::SeqCst);
         self.results.lock().unwrap().push(result);
         if self.frame_wake_armed.swap(false, Ordering::SeqCst) {
             if let Some(wake) = &self.frame_wake {
@@ -220,7 +276,15 @@ impl SessionShared {
         }
     }
 
-    fn check_live(&self) -> Result<(), Failure> {
+    /// Releases the frame wake's user data once the session retires: its
+    /// disposal, after which nothing signals the wake.
+    pub(crate) fn release_wakes(&self) {
+        if let Some(wake) = self.frame_wake {
+            wake.release();
+        }
+    }
+
+    pub(crate) fn check_live(&self) -> Result<(), Failure> {
         let public = self.state.lock().unwrap();
         match public.state {
             MLN_RENDER_SESSION_STATE_FAILED => Err(Failure::new(public.failure_status, public.failure.clone())),
@@ -234,27 +298,34 @@ impl SessionShared {
 pub struct SessionEntry {
     pub shared: Arc<SessionShared>,
     pub frontend: HeadlessFrontend,
+    /// The renderer's observer, which reports how a frame finished.
+    observer: Rc<FrameObserver>,
     rendered_update_generation: Cell<u64>,
     frames_rendered: Cell<u64>,
     waiting: RefCell<Vec<mln_frame_demand>>,
+    /// The map's feature state that the renderer holds.
+    pub(crate) feature_state: RefCell<crate::feature_state::Applied>,
 }
 
 pub struct FrameBatch {
     results: Vec<mln_render_frame_result>,
 }
 
-fn session_entry(handle: u64) -> Option<Rc<SessionEntry>> {
+pub(crate) fn session_entry(handle: u64) -> Option<Rc<SessionEntry>> {
     STATE.with(|state| state.borrow().sessions.get(&handle).cloned())
 }
 
 fn frame_result(entry: &SessionEntry, map: Option<&MapEntry>, disposition: u32, token: u64) -> mln_render_frame_result {
+    // A rendered frame reports how the renderer finished it.
+    let finished = if disposition == MLN_RENDER_RESULT_RENDERED { entry.observer.finished() } else { None };
     mln_render_frame_result {
         disposition,
         token,
         map_update_generation: map.map(|m| m.frontend.update_generation()).unwrap_or(0),
         frame_generation: entry.shared.frame_generation.load(Ordering::SeqCst),
+        needs_repaint: finished.is_some_and(|(_, needs_repaint)| needs_repaint),
         view: map.map(|m| m.view()).unwrap_or_default(),
-        mode: MLN_RENDER_MODE_FULL,
+        mode: finished.map_or(MLN_RENDER_MODE_FULL, |(mode, _)| render_mode_code(mode)),
         ..Default::default()
     }
 }
@@ -263,7 +334,12 @@ fn frame_result(entry: &SessionEntry, map: Option<&MapEntry>, disposition: u32, 
 /// (the session then fails).
 fn render_frame(entry: &SessionEntry, map: &MapEntry) -> bool {
     let generation = map.frontend.update_generation();
-    match catch_unwind(AssertUnwindSafe(|| entry.frontend.render_frame())) {
+    let rendered = catch_unwind(AssertUnwindSafe(|| {
+        push_feature_state(entry, map);
+        entry.observer.begin();
+        entry.frontend.render_frame();
+    }));
+    match rendered {
         Ok(()) => {
             entry.rendered_update_generation.set(generation);
             entry.frames_rendered.set(entry.frames_rendered.get() + 1);
@@ -276,6 +352,22 @@ fn render_frame(entry: &SessionEntry, map: &MapEntry) -> bool {
             false
         }
     }
+}
+
+/// Pushes the map's feature state into the renderer before a frame
+/// (feature_state.rs), with a render that the host never sees first when the
+/// update brings a source that has state.
+fn push_feature_state(entry: &SessionEntry, map: &MapEntry) {
+    let Some(update) = map.frontend.last_update() else {
+        return;
+    };
+    let mut applied = entry.feature_state.borrow_mut();
+    if map.feature_state.needs_warmup(&applied, &update) {
+        entry.observer.suppress_frame_callbacks(true);
+        entry.frontend.render_frame();
+        entry.observer.suppress_frame_callbacks(false);
+    }
+    entry.frontend.with_renderer(|renderer| map.feature_state.push(&mut applied, renderer, &update));
 }
 
 /// Runs the session's pending frame demands (on the runtime thread).
@@ -346,6 +438,9 @@ fn end_session(session: u64, state: u32) {
         map.frontend.detach();
     }
     entry.shared.map.session.compare_exchange(session, 0, Ordering::SeqCst, Ordering::SeqCst).ok();
+    if state == MLN_RENDER_SESSION_STATE_DETACHED {
+        entry.shared.generation.fetch_add(1, Ordering::SeqCst);
+    }
     entry.shared.set_state(state);
 }
 
@@ -354,6 +449,10 @@ pub fn abandon(session: u64) {
     if let Ok(shared) = handles::session(session) {
         if shared.is_caller() {
             crate::surface_session::abandon(session, &shared);
+            return;
+        }
+        if shared.metal.is_some() {
+            crate::metal_surface::abandon(session, &shared);
             return;
         }
         shared.set_state(MLN_RENDER_SESSION_STATE_ABANDONED);
@@ -445,6 +544,9 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
             if options.driver != MLN_RENDER_DRIVER_CORE_WORKER {
                 return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "an offscreen session renders on a core worker"));
             }
+            if options.queue_lock.lock.is_some() {
+                return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "this render target does not take a queue lock"));
+            }
             if device.0 != 0 {
                 handles::resolve(handles::Kind::OffscreenDevice, device)?;
             }
@@ -470,8 +572,10 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
                 frame_wake: Wake::from_c(&options.frame_wake),
                 frame_wake_armed: AtomicBool::new(true),
                 frame_generation: AtomicU64::new(0),
+                generation: AtomicU64::new(1),
                 driver: MLN_RENDER_DRIVER_CORE_WORKER,
                 caller: None,
+                metal: None,
             });
             handles::insert_at(handle, Object::Session(shared.clone()));
             *out_session = handle.into();
@@ -490,13 +594,15 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
                     map.frontend.attach(handle, logical)
                 }));
                 match attached {
-                    Ok(frontend) => {
+                    Ok((frontend, observer)) => {
                         let entry = Rc::new(SessionEntry {
                             shared: shared.clone(),
                             frontend,
+                            observer,
                             rendered_update_generation: Cell::new(0),
                             frames_rendered: Cell::new(0),
                             waiting: RefCell::new(Vec::new()),
+                            feature_state: RefCell::new(Default::default()),
                         });
                         STATE.with(|state| state.borrow_mut().sessions.insert(handle, entry));
                         shared.set_state(MLN_RENDER_SESSION_STATE_ATTACHED);
@@ -535,13 +641,21 @@ pub unsafe extern "C" fn mln_render_session_get_capabilities(
     unsafe {
         boundary(out_diagnostic, || {
             let shared = handles::session(session)?;
+            let offscreen = !shared.is_caller() && shared.metal.is_none();
             let capabilities = mln_render_session_capabilities {
                 size: 0,
                 driver: shared.driver,
-                texture_ring_depth: 0,
-                flags: if shared.is_caller() { 0 } else { MLN_RENDER_SESSION_CAPABILITY_READBACK },
+                // An offscreen session renders into a texture of its own.
+                texture_ring_depth: u32::from(offscreen),
+                flags: if offscreen {
+                    MLN_RENDER_SESSION_CAPABILITY_READBACK
+                } else if shared.metal.is_some() {
+                    MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+                } else {
+                    0
+                },
                 producer_sync_kind: MLN_GPU_SYNC_CPU_COMPLETE,
-                consumer_sync_kinds: MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
+                consumer_sync_kinds: if shared.metal.is_some() { 0 } else { MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE },
             };
             if !write_sized(out_capabilities, capabilities) {
                 return Err(Failure::invalid_argument("out_capabilities must be an mln_render_session_capabilities"));
@@ -569,11 +683,12 @@ pub unsafe extern "C" fn mln_render_session_get_snapshot(
                     size: 0,
                     state: public.state,
                     extent: public.extent,
-                    generation: shared.map.generation.load(Ordering::SeqCst),
+                    generation: shared.generation.load(Ordering::SeqCst),
                     frame_generation: shared.frame_generation.load(Ordering::SeqCst),
                     acquired_frame_count: 0,
                     failure_status: public.failure_status,
-                    has_target: public.state == MLN_RENDER_SESSION_STATE_ATTACHED,
+                    has_target: public.state == MLN_RENDER_SESSION_STATE_ATTACHED
+                        && !shared.metal.as_ref().is_some_and(crate::metal_surface::MetalShared::released),
                 }
             };
             if !write_sized(out_snapshot, snapshot) {
@@ -640,6 +755,8 @@ pub unsafe extern "C" fn mln_render_session_demand_frame(
             shared.demands.lock().unwrap().push(demand);
             if shared.is_caller() {
                 crate::surface_session::wake_driver(&shared);
+            } else if shared.metal.is_some() {
+                shared.map.runtime.post(move || crate::metal_surface::process_demands(session.0));
             } else {
                 shared.map.runtime.post(move || process_demands(session.0));
             }
@@ -724,6 +841,9 @@ pub unsafe extern "C" fn mln_render_session_read_texture(
                     "a WebGPU surface session presents its frames to the surface",
                 ));
             }
+            if shared.metal.is_some() {
+                return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "render session is not a texture session"));
+            }
             let completion = Completion::required(completion)?;
             shared.map.runtime.clone().post(move || {
                 let Some(entry) = session_entry(session.0) else {
@@ -731,7 +851,7 @@ pub unsafe extern "C" fn mln_render_session_read_texture(
                     return;
                 };
                 if entry.frames_rendered.get() == 0 {
-                    completion.fail(MLN_STATUS_INVALID_STATE, "the session hasn't rendered a frame");
+                    completion.fail(MLN_STATUS_INVALID_STATE, "no rendered frame is available for this generation");
                     return;
                 }
                 let image = entry.frontend.read_still_image();
@@ -834,6 +954,10 @@ pub unsafe extern "C" fn mln_render_session_resize(
                 crate::surface_session::resize(&shared, logical_size, completion);
                 return Ok(());
             }
+            if shared.metal.is_some() {
+                crate::metal_surface::resize(session.0, &shared, logical_size, completion);
+                return Ok(());
+            }
             shared.map.runtime.clone().post(move || {
                 let (Some(entry), Some(map)) = (session_entry(session.0), map::entry(shared.map.handle)) else {
                     if let Some(completion) = completion {
@@ -851,6 +975,7 @@ pub unsafe extern "C" fn mln_render_session_resize(
                     extent.width = logical_size.width;
                     extent.height = logical_size.height;
                 }
+                shared.generation.fetch_add(1, Ordering::SeqCst);
                 map.publish_snapshot();
                 if let Some(completion) = completion {
                     completion.ok();
@@ -877,6 +1002,10 @@ pub unsafe extern "C" fn mln_render_session_barrier(
             let completion = Completion::required(completion)?;
             if shared.is_caller() {
                 crate::surface_session::barrier(&shared, completion);
+                return Ok(());
+            }
+            if shared.metal.is_some() {
+                crate::metal_surface::barrier(session.0, &shared, completion);
                 return Ok(());
             }
             shared.map.runtime.clone().post(move || {
@@ -917,6 +1046,10 @@ pub unsafe extern "C" fn mln_render_session_detach(
             let completion = Completion::optional(completion)?;
             if shared.is_caller() {
                 crate::surface_session::detach(session.0, &shared, completion);
+                return Ok(());
+            }
+            if shared.metal.is_some() {
+                crate::metal_surface::detach(session.0, &shared, completion);
                 return Ok(());
             }
             shared.set_state(MLN_RENDER_SESSION_STATE_DETACHING);
@@ -962,8 +1095,13 @@ pub unsafe extern "C" fn mln_render_session_dispose(
             if attached {
                 shared.map.session.compare_exchange(session.0, 0, Ordering::SeqCst, Ordering::SeqCst).ok();
             }
+            if shared.metal.is_some() {
+                crate::metal_surface::dispose(session.0, &shared, attached, completion);
+                return Ok(());
+            }
             let runtime = shared.map.runtime.clone();
             if runtime.is_released() {
+                shared.release_wakes();
                 if let Some(completion) = completion {
                     completion.ok();
                 }
@@ -973,6 +1111,7 @@ pub unsafe extern "C" fn mln_render_session_dispose(
                 if attached {
                     end_session(session.0, MLN_RENDER_SESSION_STATE_DETACHED);
                 }
+                shared.release_wakes();
                 if let Some(completion) = completion {
                     completion.ok();
                 }

@@ -127,6 +127,10 @@ pub enum Value {
     Readback { pixels: Vec<u8>, info: mln_texture_image_info },
     /// An `mln_camera_query_result`.
     Camera(mln_camera_query_result),
+    /// An array of `mln_rendered_feature` (query.rs).
+    RenderedFeatures(Vec<crate::query::RenderedFeature>),
+    /// An array of `mln_source_feature` (query.rs).
+    SourceFeatures(Vec<crate::query::SourceFeature>),
 }
 
 impl Completion {
@@ -191,6 +195,9 @@ impl Completion {
             let text;
             let buffer_view;
             let readback;
+            let feature_texts: Vec<[LentText; 5]>;
+            let rendered_features: Vec<mln_rendered_feature>;
+            let source_features: Vec<mln_source_feature>;
             let (value_ptr, value_size, value_count): (*const c_void, usize, usize) = match value {
                 Value::None => (std::ptr::null(), 0, 0),
                 Value::BufferView(bytes) => {
@@ -203,6 +210,33 @@ impl Completion {
                     ((&raw const readback).cast(), size_of::<mln_texture_readback_result>(), 1)
                 }
                 Value::Camera(ref camera) => ((&raw const *camera).cast(), size_of::<mln_camera_query_result>(), 1),
+                Value::RenderedFeatures(features) => {
+                    feature_texts = features.into_iter().map(crate::query::RenderedFeature::into_texts).collect();
+                    rendered_features = feature_texts
+                        .iter()
+                        .map(|[feature, layer_id, source_id, source_layer_id, state]| mln_rendered_feature {
+                            feature: mln_buffer_view::of_text(feature),
+                            layer_id: mln_buffer_view::of_text(layer_id),
+                            source_id: mln_buffer_view::of_text(source_id),
+                            source_layer_id: mln_buffer_view::of_text(source_layer_id),
+                            state: mln_buffer_view::of_text(state),
+                        })
+                        .collect();
+                    let pointer = if rendered_features.is_empty() { std::ptr::null() } else { rendered_features.as_ptr() };
+                    (pointer.cast(), size_of::<mln_rendered_feature>(), rendered_features.len())
+                }
+                Value::SourceFeatures(features) => {
+                    feature_texts = features.into_iter().map(crate::query::SourceFeature::into_texts).collect();
+                    source_features = feature_texts
+                        .iter()
+                        .map(|[feature, source_layer_id, ..]| mln_source_feature {
+                            feature: mln_buffer_view::of_text(feature),
+                            source_layer_id: mln_buffer_view::of_text(source_layer_id),
+                        })
+                        .collect();
+                    let pointer = if source_features.is_empty() { std::ptr::null() } else { source_features.as_ptr() };
+                    (pointer.cast(), size_of::<mln_source_feature>(), source_features.len())
+                }
             };
             let disposition = if status == MLN_STATUS_OK {
                 MLN_COMMAND_DISPOSITION_COMMITTED

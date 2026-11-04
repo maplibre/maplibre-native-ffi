@@ -391,6 +391,7 @@ pub fn resize(shared: &Arc<SessionShared>, logical_size: mln_logical_size, compl
         public.extent.width = logical_size.width;
         public.extent.height = logical_size.height;
     }
+    shared.generation.fetch_add(1, Ordering::SeqCst);
     *shared.caller.as_ref().expect("a surface session").resize.lock().unwrap() = Some(completion);
     let handle = shared.map.handle;
     let size = Size::new(logical_size.width, logical_size.height);
@@ -487,6 +488,7 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
                 frame_wake: Wake::from_c(&options.frame_wake),
                 frame_wake_armed: AtomicBool::new(true),
                 frame_generation: AtomicU64::new(0),
+                generation: AtomicU64::new(1),
                 driver: MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
                 caller: Some(CallerShared {
                     instance: descriptor.context.instance as usize,
@@ -502,6 +504,7 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
                     ending: Mutex::new(Vec::new()),
                     barriers: Mutex::new(Vec::new()),
                 }),
+                metal: None,
             });
             handles::insert_at(handle, Object::Session(shared.clone()));
             *out_session = handle.into();
