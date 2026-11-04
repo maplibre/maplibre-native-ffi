@@ -2,6 +2,7 @@
 // thread; externals and queued pumps may outlive both cleanup and the VM.
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <deque>
 #include <limits>
@@ -45,7 +46,8 @@ struct Finalizer {
 
 struct napi_env__ : std::enable_shared_from_this<napi_env__> {
   jsi::Runtime& runtime;
-  const std::thread::id jsThread = std::this_thread::get_id();
+  // The only thread that may use the runtime. Cleanup takes it over.
+  std::atomic<std::thread::id> jsThread = std::this_thread::get_id();
   mln::hermes::Schedule schedule;
   napi_handle_scope arena = nullptr;
   std::unique_ptr<jsi::Value> pending;
@@ -302,7 +304,9 @@ jsi::Object Environment::install(napi_value (*module)(napi_env, napi_value)) {
 
 void Environment::cleanup() {
   auto env = env_;
-  env->checkThread();
+  // The caller has the runtime to itself: it's the JavaScript thread, or that
+  // thread has stopped for good. Callbacks that cleanup runs come back here.
+  env->jsThread = std::this_thread::get_id();
   Scope scope(env.get());
   {
     std::lock_guard lock(env->mutex);

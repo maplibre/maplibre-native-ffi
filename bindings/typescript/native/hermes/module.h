@@ -10,12 +10,14 @@ class Runtime;
 namespace mln::hermes {
 
 // Posts work from any thread to the runtime thread, never inline. The host
-// may discard queued work only after cleanup() has run on that thread.
+// may discard queued work only after cleanup() has run.
 using Schedule = std::function<void(std::function<void()>)>;
 class Environment;
 
-// Construct and destroy on the JavaScript thread. The module must be cleaned
-// up or destroyed before its runtime, including when abandoning live work.
+// Construct on the JavaScript thread. Clean up or destroy the module before its
+// runtime, including when abandoning live work: on the JavaScript thread, or on
+// another thread once the JavaScript thread has stopped for good and nothing
+// else uses the runtime.
 class Module {
  public:
   Module(facebook::jsi::Runtime& runtime, mln::hermes::Schedule schedule);

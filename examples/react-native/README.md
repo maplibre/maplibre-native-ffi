@@ -30,9 +30,9 @@ host in `host/`, which React Native autolinks:
 - `host/cpp/Host.cpp` installs `mln::hermes::Module` in the runtime when
   JavaScript first loads the host's module, with a scheduler that posts work to
   the JavaScript thread through React Native's `CallInvoker`. It cleans the
-  module up on the JavaScript thread before React Native destroys the runtime,
-  as on a reload: iOS invalidates the module there, and Android runs a
-  before-destroy listener that waits for the cleanup.
+  module up before React Native destroys the runtime, as on a reload, when React
+  Native invalidates the host's module: on the JavaScript thread on iOS, and
+  after that thread stops on Android.
 - `MapSurfaceView` is a native view that lends its surface to JavaScript: a
   `CAMetalLayer` on iOS, and an EGL window surface of a `SurfaceView` on
   Android. It reports when the platform provides the surface and when it takes

@@ -15,8 +15,9 @@ class Environment {
   Environment(facebook::jsi::Runtime& runtime, mln::hermes::Schedule schedule);
   ~Environment();
   napi_env get() const;
-  // The platform calls this on the installation thread, before runtime
-  // destruction, even for release-mode reloads. No JSI root survives it.
+  // The platform calls this before runtime destruction, even for release-mode
+  // reloads, on the installation thread or once that thread has stopped for
+  // good. No JSI root survives it.
   void cleanup();
   facebook::jsi::Object install(napi_value (*module)(napi_env, napi_value));
 

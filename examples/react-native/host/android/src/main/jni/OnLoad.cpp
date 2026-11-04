@@ -163,7 +163,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_org_maplibre_nativeffi_example_host_MaplibreHostModule_nativeCleanup(
   JNIEnv*, jclass
 ) {
-  mln::example::cleanupOnJavaScriptThread();
+  mln::example::cleanup();
 }
 
 extern "C" JNIEXPORT jint JNICALL
