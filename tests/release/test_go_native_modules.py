@@ -97,11 +97,7 @@ class GoNativeModulesTest(unittest.TestCase):
             "-framework Metal -framework QuartzCore\n",
             native,
         )
-        digest = go.DIGEST.search(
-            (ROOT / "bindings/go/maplibre/generated_native.go").read_text()
-        )
-        assert digest is not None
-        self.assertIn(f"const char mln_go_preset_{digest.group(1)} = 0;", native)
+        self.assertIn('const char mln_go_preset_version[] = "v0.202610.2";', native)
 
     def test_rejects_an_archive_with_other_headers(self) -> None:
         headers = go.binding_headers(ROOT)
