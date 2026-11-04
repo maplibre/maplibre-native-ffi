@@ -174,7 +174,7 @@ class GoEmitterTests(unittest.TestCase):
             for line in source.splitlines()
             if line.endswith("struct { *bindingOwner }")
         ]
-        self.assertEqual(len(owners), 10)
+        self.assertEqual(len(owners), 11)
         for owner in owners:
             for member in ("ID() uint64", "IsClosed() bool", "String() string"):
                 self.assertIn(f"func (handle *{owner}) {member}", source)

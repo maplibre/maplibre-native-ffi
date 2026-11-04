@@ -1114,6 +1114,18 @@ Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   return result;
 }
 
+VulkanContextDescriptor _readVulkanContextDescriptor(
+  raw.mln_vulkan_context_descriptor source,
+) => VulkanContextDescriptor(
+  instance: NativePointer(source.instance.address),
+  physicalDevice: NativePointer(source.physical_device.address),
+  device: NativePointer(source.device.address),
+  graphicsQueue: NativePointer(source.graphics_queue.address),
+  graphicsQueueFamilyIndex: source.graphics_queue_family_index,
+  getInstanceProcAddr: NativePointer(source.get_instance_proc_addr.address),
+  getDeviceProcAddr: NativePointer(source.get_device_proc_addr.address),
+);
+
 Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
   VulkanBorrowedTexture value,
   Allocator arena, {
@@ -2920,6 +2932,34 @@ StyleExpressionInfo _readStyleExpressionInfo(
 ) => StyleExpressionInfo(
   isFeatureConstant: source.is_feature_constant,
   isZoomConstant: source.is_zoom_constant,
+);
+
+Pointer<raw.mln_vulkan_device_options> _writeVulkanDeviceOptions(
+  VulkanDeviceOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_vulkan_device_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_vulkan_device_options>();
+  result.ref.size = sizeOf<raw.mln_vulkan_device_options>();
+  if (value.presentation != null) {
+    result.ref.fields |= raw.MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
+    result.ref.presentation = value.presentation!;
+  }
+  if (value.deviceUuid != null) {
+    result.ref.fields |= raw.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
+    result.ref.device_uuid = nativeBufferView(value.deviceUuid!, arena);
+  }
+  if (value.deviceLuid != null) {
+    result.ref.fields |= raw.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
+    result.ref.device_luid = nativeBufferView(value.deviceLuid!, arena);
+  }
+  return result;
+}
+
+VulkanDeviceContextResult _readVulkanDeviceContextResult(
+  raw.mln_vulkan_device_context_result source,
+) => VulkanDeviceContextResult(
+  context: _readVulkanContextDescriptor(source.context),
 );
 
 final _resultCameraOptions = _CompletionValue(
@@ -8073,6 +8113,110 @@ final class StyleExpressionHandle implements Finalizable {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
   void release() => _state.close((handle) {
     raw.mln_style_expression_release(handle.raw);
+    return nativeStatusOk;
+  });
+}
+
+/// Issued native handle id.
+extension type const _NativeVulkanDevice(int raw) implements NativeHandle {}
+
+/// Owner of one native handle.
+///
+/// A Vulkan instance, device, and queue that the library creates and owns.
+///
+/// See `mln_vulkan_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class VulkanDeviceHandle implements Finalizable {
+  VulkanDeviceHandle._(_NativeVulkanDevice handle)
+    : _state = NativeHandleState(handle, 'VulkanDeviceHandle');
+  final NativeHandleState<_NativeVulkanDevice> _state;
+  _NativeVulkanDevice get _handle => _state.handle;
+
+  /// The native handle id.
+  int get id => _state.handleId;
+
+  /// Whether the binding has accepted a release, dispose, or discard of
+  /// this handle.
+  bool get isClosed => _state.isClosed;
+
+  @override
+  String toString() =>
+      'VulkanDeviceHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+
+  /// Creates a Vulkan instance, device, and graphics queue for render sessions.
+  ///
+  /// Attach sessions with the context from `VulkanDeviceHandle.getContext()`,
+  /// in place of a device of your own. Without `device_uuid` or `device_luid`,
+  /// the device uses a discrete GPU over an integrated one, and an integrated
+  /// GPU over any other. The device enables the features that rendering needs,
+  /// and the external memory and semaphore extensions that the GPU offers.
+  ///
+  /// See `mln_vulkan_device_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+  ///   `RenderBackendFlag.vulkan`, or when `presentation` is true and the
+  ///   Vulkan loader or the GPU can't present.
+  /// - `Status.notFound` when no GPU matches `device_uuid` and `device_luid`.
+  /// - `Status.nativeError` when there is no Vulkan loader, no GPU has a
+  ///   graphics queue, or Vulkan can't create the instance or the device.
+  static VulkanDeviceHandle create({VulkanDeviceOptions? options}) =>
+      withNativeArena((arena) {
+        ensureAbiVersion();
+        final outDevice = arena<Uint64>();
+        _check(
+          raw.mln_vulkan_device_create(
+            options == null
+                ? nullptr
+                : _writeVulkanDeviceOptions(options, arena),
+            outDevice,
+            nativeDiagnostic,
+          ),
+        );
+        return _adoptOwned(
+          outDevice.value,
+          () => VulkanDeviceHandle._(_NativeVulkanDevice(outDevice.value)),
+          (handle) {
+            raw.mln_vulkan_device_release(handle);
+          },
+        );
+      });
+
+  /// Gets the context to attach render sessions to the device with.
+  ///
+  /// Pass it as the context of `MapHandle.attachVulkanSurface()` or
+  /// `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device
+  /// share its one graphics queue, and the library orders their submissions to
+  /// it. To submit to the queue yourself, set
+  /// `RenderSessionAttachOptions.queueLock` on each session.
+  ///
+  /// See `mln_vulkan_device_get_context` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+  VulkanDeviceContextResult getContext() => withNativeArena((arena) {
+    final outResult = arena<raw.mln_vulkan_device_context_result>();
+    outResult.ref.size = sizeOf<raw.mln_vulkan_device_context_result>();
+    _check(
+      raw.mln_vulkan_device_get_context(
+        _handle.raw,
+        outResult,
+        nativeDiagnostic,
+      ),
+    );
+    return _readVulkanDeviceContextResult(outResult.ref);
+  });
+
+  /// Releases a Vulkan device.
+  ///
+  /// Render sessions that attached with the device's context keep using it
+  /// until they detach or retire, and the library destroys the device after the
+  /// last of them.
+  ///
+  /// See `mln_vulkan_device_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+  void release() => _state.close((handle) {
+    raw.mln_vulkan_device_release(handle.raw);
     return nativeStatusOk;
   });
 }

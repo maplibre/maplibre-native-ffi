@@ -2318,6 +2318,39 @@ public data class StyleExpressionOptions(
 )
 
 /**
+ * Options for `VulkanDeviceHandle.create()`.
+ *
+ * See `mln_vulkan_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ */
+public data class VulkanDeviceOptions(
+  /**
+   * Whether the device can present to a window's surface. It enables VK_KHR_surface and the
+   * platform's surface extensions on the instance, and VK_KHR_swapchain on the device. Defaults to
+   * false.
+   */
+  public val presentation: Boolean? = null,
+  /**
+   * The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. Name
+   * a GPU to share textures with another graphics API on it.
+   */
+  public val deviceUuid: ByteArray? = null,
+  /**
+   * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. On
+   * Windows, this is the GPU's DXGI adapter LUID.
+   */
+  public val deviceLuid: ByteArray? = null,
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(presentation, deviceUuid, deviceLuid)
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is VulkanDeviceOptions && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
+
+/**
  * An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
  *
  * See `mln_premultiplied_rgba8_image` in the
@@ -4257,6 +4290,16 @@ public data class StyleExpressionInfo(
   public val isFeatureConstant: Boolean,
   /** True when the result doesn't depend on the zoom level. */
   public val isZoomConstant: Boolean,
+)
+
+/**
+ * A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
+ *
+ * See `mln_vulkan_device_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ */
+public data class VulkanDeviceContextResult(
+  public val context: VulkanContextDescriptor,
 )
 
 public data class LogicalExtentPhysicalSizeResult(

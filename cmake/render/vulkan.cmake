@@ -136,6 +136,7 @@ function(mln_ffi_configure_renderer target)
   )
   set(MLN_FFI_VULKAN_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_d3d12_fence.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_device.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_offscreen_device.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_queue_access.cpp

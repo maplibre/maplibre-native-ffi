@@ -31,6 +31,8 @@ mod runtime;
 pub use runtime::*;
 mod style_expression;
 pub use style_expression::*;
+mod vulkan_device;
+pub use vulkan_device::*;
 mod global;
 pub use global::*;
 
@@ -74,3 +76,7 @@ static_assertions::assert_not_impl_any!(RuntimeHandle: Clone);
 static_assertions::assert_impl_all!(StyleExpressionHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_not_impl_any!(StyleExpressionHandle: Clone);
+#[cfg(test)]
+static_assertions::assert_impl_all!(VulkanDeviceHandle: Send, Sync);
+#[cfg(test)]
+static_assertions::assert_not_impl_any!(VulkanDeviceHandle: Clone);

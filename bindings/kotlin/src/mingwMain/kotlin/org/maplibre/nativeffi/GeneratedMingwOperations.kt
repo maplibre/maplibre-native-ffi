@@ -30,6 +30,40 @@ public fun <T> AcquiredFrameHandle.withVulkanTexture(block: (VulkanTextureFrame)
   }
 
 /**
+ * Creates a Vulkan instance, device, and graphics queue for render sessions.
+ *
+ * Attach sessions with the context from `VulkanDeviceHandle.getContext()`, in place of a device of
+ * your own. Without `device_uuid` or `device_luid`, the device uses a discrete GPU over an
+ * integrated one, and an integrated GPU over any other. The device enables the features that
+ * rendering needs, and the external memory and semaphore extensions that the GPU offers.
+ *
+ * See `mln_vulkan_device_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.VULKAN`, or
+ *   when `presentation` is true and the Vulkan loader or the GPU can't present.
+ * - `Status.NOT_FOUND` when no GPU matches `device_uuid` and `device_luid`.
+ * - `Status.NATIVE_ERROR` when there is no Vulkan loader, no GPU has a graphics queue, or Vulkan
+ *   can't create the instance or the device.
+ */
+public fun VulkanDeviceHandle.Companion.create(
+  options: VulkanDeviceOptions? = null,
+): VulkanDeviceHandle =
+  nativeCall(null, null) {
+    val out = allocate(8, w(8, 8, 4))
+    check(
+      C.mln_vulkan_device_create(
+        options?.let { writeVulkanDeviceOptions(it) } ?: 0L,
+        out,
+        diagnostic,
+      ),
+    )
+    adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle(it) }
+  }
+
+/**
  * Creates a session that renders the map into a ring of your Vulkan images.
  *
  * See `mln_map_attach_vulkan_borrowed_texture` in the
@@ -149,4 +183,22 @@ public fun RenderSessionHandle.setVulkanSurfaceTarget(
         diagnostic,
       ),
     )
+  }
+
+/**
+ * Gets the context to attach render sessions to the device with.
+ *
+ * Pass it as the context of `MapHandle.attachVulkanSurface()` or
+ * `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device share its one graphics
+ * queue, and the library orders their submissions to it. To submit to the queue yourself, set
+ * `RenderSessionAttachOptions.queueLock` on each session.
+ *
+ * See `mln_vulkan_device_get_context` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ */
+public fun VulkanDeviceHandle.getContext(): VulkanDeviceContextResult =
+  nativeCall(this, binding) {
+    val out = sized(w(32, 64), w(4, 8))
+    check(C.mln_vulkan_device_get_context(handle, out, diagnostic))
+    readVulkanDeviceContextResult(out)
   }

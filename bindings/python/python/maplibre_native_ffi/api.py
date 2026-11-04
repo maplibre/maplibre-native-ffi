@@ -30,6 +30,7 @@ from ._generated_owners import (
     ResourceTransformRequestHandle,
     RuntimeHandle,
     StyleExpressionHandle,
+    VulkanDeviceHandle,
 )
 from ._generated_values import (
     AnimationOptions,
@@ -243,6 +244,8 @@ from ._generated_values import (
     VulkanBorrowedTextureDescriptor,
     VulkanBorrowedTextureReplacement,
     VulkanContextDescriptor,
+    VulkanDeviceContextResult,
+    VulkanDeviceOptions,
     VulkanImageOwner,
     VulkanSurfaceDescriptor,
     VulkanSurfaceReplacement,
@@ -479,6 +482,9 @@ __all__ = [
     "VulkanBorrowedTextureDescriptor",
     "VulkanBorrowedTextureReplacement",
     "VulkanContextDescriptor",
+    "VulkanDeviceContextResult",
+    "VulkanDeviceHandle",
+    "VulkanDeviceOptions",
     "VulkanImageOwner",
     "VulkanSurfaceDescriptor",
     "VulkanSurfaceReplacement",

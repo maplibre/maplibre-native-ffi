@@ -6828,6 +6828,85 @@ static napi_value mln_ts_export_mln_supported_render_backend_mask(
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_vulkan_device_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_vulkan_device_options arg_options;
+  const void* present_options = NULL;
+  mln_vulkan_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_vulkan_device_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_vulkan_device_create(present_options, &arg_out_device, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_vulkan_device_get_context(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_vulkan_device arg_device = 0;
+  mln_vulkan_device_context_result arg_out_result;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_vulkan_device)number;
+  }
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_vulkan_device_get_context(arg_device, &arg_out_result, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_vulkan_device_context_result(
+    env, &(arg_out_result), sizeof(arg_out_result)
+  );
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_vulkan_device_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_vulkan_device arg_device = 0;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_vulkan_device)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  mln_vulkan_device_release(arg_device);
+  mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_acquired_frame_view_begin(
   napi_env env, napi_callback_info info
 ) {
@@ -7179,6 +7258,10 @@ static const mln_ts_export exports[] = {
   {"mln_style_expression_release", mln_ts_export_mln_style_expression_release},
   {"mln_supported_render_backend_mask",
    mln_ts_export_mln_supported_render_backend_mask},
+  {"mln_vulkan_device_create", mln_ts_export_mln_vulkan_device_create},
+  {"mln_vulkan_device_get_context",
+   mln_ts_export_mln_vulkan_device_get_context},
+  {"mln_vulkan_device_release", mln_ts_export_mln_vulkan_device_release},
 };
 
 NAPI_MODULE_EXPORT napi_value

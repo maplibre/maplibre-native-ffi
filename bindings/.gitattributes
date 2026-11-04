@@ -225,6 +225,9 @@
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanImageOwner.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Texture/VulkanTextureFrameView.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Vulkan/VulkanDeviceContextResult.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Vulkan/VulkanDeviceHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Vulkan/VulkanDeviceOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/Wake.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Wake/WakeCallback.g.cs linguist-generated=true
 /generated-files.json linguist-generated=true
@@ -253,6 +256,7 @@
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/ResourceTransformRequestHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/RuntimeHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/StyleExpressionHandle.kt linguist-generated=true
+/kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/VulkanDeviceHandle.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/CVersion.kt linguist-generated=true
 /kotlin/src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/RuntimeLayouts.kt linguist-generated=true
@@ -298,6 +302,7 @@
 /rust/crates/maplibre-native-ffi/src/generated/runtime.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/style_expression.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/values.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/vulkan_device.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/status.rs linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true
@@ -329,6 +334,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureAcquiredFrameOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedTextureRenderSessionOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedVulkanVulkanDeviceOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedBaseValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedLoggingValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedMapValues.swift linguist-generated=true
@@ -342,6 +348,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedStyleValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedSurfaceValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedTextureValues.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedVulkanValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWakeValues.swift linguist-generated=true
 /typescript/native/generated_addon.c linguist-generated=true
 /typescript/native/generated_addon.h linguist-generated=true

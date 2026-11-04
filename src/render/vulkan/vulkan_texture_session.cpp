@@ -19,6 +19,7 @@
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
+#include "render/vulkan/vulkan_device.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
@@ -414,9 +415,12 @@ auto vulkan_borrowed_texture_attach_start(
   session->probe_sync_kinds = [context = descriptor->context] {
     return vulkan_sync_support(context);
   };
-  session->initialize_backend = [target = VulkanBorrowedTarget{*descriptor}](
-                                  mln_render_session_object& live
-                                ) {
+  // Taken now, because the host may release a device of the library's as
+  // soon as this call returns.
+  session->initialize_backend = [target = VulkanBorrowedTarget{*descriptor},
+                                 device = find_vulkan_device(
+                                   descriptor->context.device
+                                 )](mln_render_session_object& live) mutable {
     const auto handles_status =
       validate_vulkan_handles(target.descriptor.context);
     if (handles_status != MLN_STATUS_OK) {
@@ -427,6 +431,7 @@ auto vulkan_borrowed_texture_attach_start(
       live.queue_lock
     );
     backend->set_producer_sync_kind(live.producer_sync_kind);
+    if (device != nullptr) backend->retain(std::move(device));
     live.texture.backend = std::move(backend);
     return MLN_STATUS_OK;
   };

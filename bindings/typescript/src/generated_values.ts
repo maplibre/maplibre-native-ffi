@@ -3790,15 +3790,52 @@ export interface VulkanContextDescriptor {
    * you submit to it too, set `RenderSessionAttachOptions.queueLock`.
    */
   graphicsQueue: bigint;
-  graphicsQueueFamilyIndex?: number;
+  graphicsQueueFamilyIndex: number;
   /**
    * Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
    */
-  getInstanceProcAddr?: bigint;
+  getInstanceProcAddr: bigint;
   /**
    * Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
    */
-  getDeviceProcAddr?: bigint;
+  getDeviceProcAddr: bigint;
+}
+
+/**
+ * A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
+ *
+ * See `mln_vulkan_device_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ */
+export interface VulkanDeviceContextResult {
+  readonly context: VulkanContextDescriptor;
+}
+
+/**
+ * Options for `VulkanDeviceHandle.create()`.
+ *
+ * See `mln_vulkan_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ */
+export interface VulkanDeviceOptions {
+  /**
+   * Whether the device can present to a window's surface. It enables
+   * VK_KHR_surface and the platform's surface extensions on the instance, and
+   * VK_KHR_swapchain on the device. Defaults to false.
+   */
+  presentation?: boolean;
+  /**
+   * The 16-byte `deviceUUID` of the GPU to use, as
+   * `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
+   * with another graphics API on it.
+   */
+  deviceUuid?: Uint8Array;
+  /**
+   * The 8-byte `deviceLUID` of the GPU to use, as
+   * `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
+   * DXGI adapter LUID.
+   */
+  deviceLuid?: Uint8Array;
 }
 
 /**

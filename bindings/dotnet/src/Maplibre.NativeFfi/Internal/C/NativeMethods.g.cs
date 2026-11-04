@@ -1467,4 +1467,21 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial uint mln_supported_render_backend_mask();
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_vulkan_device_create(
+        mln_vulkan_device_options* options,
+        MlnVulkanDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_vulkan_device_get_context(
+        MlnVulkanDevice device,
+        mln_vulkan_device_context_result* out_result,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial void mln_vulkan_device_release(MlnVulkanDevice device);
 }

@@ -1028,4 +1028,10 @@ internal expect object C {
   fun mln_style_expression_release(expression: Long): Unit
 
   fun mln_supported_render_backend_mask(): Int
+
+  fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
+
+  fun mln_vulkan_device_get_context(device: Long, outResult: Long, outDiagnostic: Long): Int
+
+  fun mln_vulkan_device_release(device: Long): Unit
 }

@@ -31,8 +31,12 @@ its scale factor.
   other steps are the same.
 </Aside>
 
-On Vulkan, if your renderer submits to the same queue as the session, pass a
-lock in the attach options, and hold it around your own submissions.
+On Vulkan, you can have the library create the device with
+[](api:mln_vulkan_device_create), and create your textures on the context from
+[](api:mln_vulkan_device_get_context). To share the textures with another
+graphics API on the same GPU, name that GPU by its UUID or LUID in the options.
+If your renderer submits to the same queue as the session, pass a lock in the
+attach options, and hold it around your own submissions.
 
 As with a window, use your graphics thread as the driver for OpenGL and WebGPU
 textures, and the library thread otherwise. See

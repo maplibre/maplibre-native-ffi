@@ -547,6 +547,56 @@ public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
+struct NativeVulkanDeviceHandle: NativeHandle {
+  let raw: UInt64; func disposeAbandoned()
+    -> Bool
+  {
+    mln_vulkan_device_release(raw); return true
+  }
+}
+
+/// A Vulkan instance, device, and queue that the library creates and owns.
+///
+/// See `mln_vulkan_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public final class VulkanDeviceHandle: @unchecked Sendable, NativeReceiver,
+  Identifiable, Hashable, CustomStringConvertible
+{
+  let handle: NativeHandleState<NativeVulkanDeviceHandle>
+  init(adopting raw: mln_vulkan_device) throws {
+    handle = try NativeHandleState(
+      typeName: "VulkanDeviceHandle",
+      handle: NativeVulkanDeviceHandle(raw: raw)
+    )
+  }
+
+  /// The native handle, which no later handle in the process reuses.
+  /// It stays valid after the handle is released.
+  public var id: UInt64 {
+    handle.value.raw
+  }
+
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
+  public var isClosed: Bool {
+    handle.isClosed
+  }
+
+  public var description: String {
+    handle.description
+  }
+
+  public static func == (lhs: VulkanDeviceHandle,
+                         rhs: VulkanDeviceHandle) -> Bool
+  {
+    lhs.id == rhs.id
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+}
+
 public struct MapHandleDiscarding { let owner: MapHandle }
 public extension MapHandle {
   var discarding: MapHandleDiscarding {

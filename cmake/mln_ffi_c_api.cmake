@@ -146,6 +146,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/texture.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/vulkan.cpp
       ${PROJECT_SOURCE_DIR}/src/completion/completion.cpp
       ${PROJECT_SOURCE_DIR}/src/delivery/delivery_queue.cpp
       ${PROJECT_SOURCE_DIR}/src/delivery/dispose.cpp
@@ -169,6 +170,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/unsupported_sessions.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/vulkan_device.cpp
       ${PROJECT_SOURCE_DIR}/src/render/worker_condition.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/custom_resource_provider.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/file_source_manager.cpp

@@ -44,4 +44,8 @@ internal object GeneratedOwnerDisposal {
   fun styleExpression(handle: Long) {
     C.mln_style_expression_release(handle)
   }
+
+  fun vulkanDevice(handle: Long) {
+    C.mln_vulkan_device_release(handle)
+  }
 }

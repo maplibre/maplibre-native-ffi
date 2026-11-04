@@ -1,5 +1,5 @@
-// The surface and texture session entry points for the backends this build does
-// not carry.
+// The surface and texture session entry points, and the Vulkan device, for the
+// backends this build does not carry.
 //
 // The validation order is part of what a host sees, so it matches the
 // backend-native paths step for step. An attach checks the map, the
@@ -8,12 +8,15 @@
 // set_target also checks before its session. Only once all of those pass does
 // the caller hear that the backend is missing.
 
+#include <memory>
+
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 #include "render/texture_session.hpp"
+#include "render/vulkan_device.hpp"
 
 namespace mln::core {
 namespace {
@@ -125,6 +128,12 @@ auto metal_surface_set_target_start(
 #endif
 
 #if !defined(MLN_RENDER_BACKEND_VULKAN)
+auto create_backend_vulkan_device(
+  const VulkanDeviceSelection&,
+  std::shared_ptr<const mln_vulkan_context_descriptor>&
+) -> mln_status {
+  return unsupported("Vulkan devices are not supported by this build");
+}
 auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,

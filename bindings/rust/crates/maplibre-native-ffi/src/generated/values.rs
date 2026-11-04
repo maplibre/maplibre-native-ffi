@@ -6041,6 +6041,76 @@ impl ToNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor {
         Ok(raw)
     }
 }
+impl FromNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor {
+    unsafe fn from_native(raw: sys::mln_vulkan_context_descriptor) -> Result<Self> {
+        Ok(Self {
+            instance: raw.instance,
+            physical_device: raw.physical_device,
+            device: raw.device,
+            graphics_queue: raw.graphics_queue,
+            graphics_queue_family_index: raw.graphics_queue_family_index,
+            get_instance_proc_addr: raw.get_instance_proc_addr,
+            get_device_proc_addr: raw.get_device_proc_addr,
+        })
+    }
+}
+
+/// A Vulkan device's context, as `VulkanDeviceHandle::get_context()` reports
+/// it.
+///
+/// See `mln_vulkan_device_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VulkanDeviceContextResult {
+    pub context: VulkanContextDescriptor,
+}
+impl FromNative<sys::mln_vulkan_device_context_result> for VulkanDeviceContextResult {
+    unsafe fn from_native(raw: sys::mln_vulkan_device_context_result) -> Result<Self> {
+        Ok(Self {
+            context: unsafe { from_native(raw.context) }?,
+        })
+    }
+}
+
+/// Options for `VulkanDeviceHandle::create()`.
+///
+/// See `mln_vulkan_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct VulkanDeviceOptions<'a> {
+    /// Whether the device can present to a window's surface. It enables
+    /// VK_KHR_surface and the platform's surface extensions on the instance,
+    /// and VK_KHR_swapchain on the device. Defaults to false.
+    pub presentation: Option<bool>,
+    /// The 16-byte `deviceUUID` of the GPU to use, as
+    /// `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
+    /// with another graphics API on it.
+    pub device_uuid: Option<&'a [u8]>,
+    /// The 8-byte `deviceLUID` of the GPU to use, as
+    /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
+    /// DXGI adapter LUID.
+    pub device_luid: Option<&'a [u8]>,
+}
+impl<'a> ToNative<sys::mln_vulkan_device_options> for VulkanDeviceOptions<'a> {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_vulkan_device_options> {
+        let mut raw: sys::mln_vulkan_device_options = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_vulkan_device_options>() as _;
+        raw.fields = 0;
+        if let Some(item) = &self.presentation {
+            raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
+            raw.presentation = *item;
+        }
+        if let Some(item) = &self.device_uuid {
+            raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
+            raw.device_uuid = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.device_luid {
+            raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
+            raw.device_luid = to_native(&*item, arena)?;
+        }
+        Ok(raw)
+    }
+}
 
 native_enum! {
 /// The queue family that a borrowed image goes to after each frame.

@@ -28,6 +28,7 @@ global using static Maplibre.NativeFfi.Internal.C.mln_style_image_info_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_image_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_source_info_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_transition_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_vulkan_device_option_field;
 global using Maplibre.NativeFfi.Internal.Callback;
 global using Maplibre.NativeFfi.Internal.Memory;
 global using Maplibre.NativeFfi.Internal.Pointer;

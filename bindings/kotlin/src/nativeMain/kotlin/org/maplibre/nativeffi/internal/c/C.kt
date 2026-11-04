@@ -2330,4 +2330,26 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_supported_render_backend_mask().toInt()
+
+  actual fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_create(
+      options.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_vulkan_device_get_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_get_context(
+      device.toULong(),
+      outResult.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_vulkan_device_release(device: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_release(device.toULong())
+  }
 }

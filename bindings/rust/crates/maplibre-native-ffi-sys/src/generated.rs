@@ -479,6 +479,10 @@ pub const MLN_URL_MATCH_GLOB: mln_url_match_flag = 1;
 pub type mln_viewport_mode = u32;
 pub const MLN_VIEWPORT_MODE_DEFAULT: mln_viewport_mode = 0;
 pub const MLN_VIEWPORT_MODE_FLIPPED_Y: mln_viewport_mode = 1;
+pub type mln_vulkan_device_option_field = u32;
+pub const MLN_VULKAN_DEVICE_OPTION_PRESENTATION: mln_vulkan_device_option_field = 1;
+pub const MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID: mln_vulkan_device_option_field = 2;
+pub const MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID: mln_vulkan_device_option_field = 4;
 pub type mln_vulkan_image_owner = u32;
 pub const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE: mln_vulkan_image_owner = 0;
 pub const MLN_VULKAN_IMAGE_OWNER_EXTERNAL: mln_vulkan_image_owner = 1;
@@ -1731,6 +1735,21 @@ pub struct mln_vulkan_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_device_context_result {
+    pub size: u32,
+    pub context: mln_vulkan_context_descriptor,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_device_options {
+    pub size: u32,
+    pub fields: mln_vulkan_device_option_fields,
+    pub presentation: bool,
+    pub device_uuid: mln_buffer_view,
+    pub device_luid: mln_buffer_view,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_surface_descriptor {
     pub size: u32,
     pub logical_size: mln_logical_size,
@@ -1978,6 +1997,10 @@ pub type mln_style_source_info_fields = u32;
 pub type mln_style_transition_option_fields = u32;
 pub type mln_url_match_flags = u32;
 pub type mln_user_data_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_vulkan_device(pub u64);
+pub type mln_vulkan_device_option_fields = u32;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
@@ -1992,7 +2015,8 @@ native_handles!(
     mln_resource_request,
     mln_resource_transform_request,
     mln_runtime,
-    mln_style_expression
+    mln_style_expression,
+    mln_vulkan_device
 );
 
 unsafe extern "C" {
@@ -3132,4 +3156,15 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_style_expression_release(expression: mln_style_expression);
     pub fn mln_supported_render_backend_mask() -> mln_render_backend_flags;
+    pub fn mln_vulkan_device_create(
+        options: *const mln_vulkan_device_options,
+        out_device: *mut mln_vulkan_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_vulkan_device_get_context(
+        device: mln_vulkan_device,
+        out_result: *mut mln_vulkan_device_context_result,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_vulkan_device_release(device: mln_vulkan_device);
 }

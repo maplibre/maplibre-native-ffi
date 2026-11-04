@@ -61,6 +61,8 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_style_expression";
     case HandleKind::OffscreenDevice:
       return "mln_offscreen_device";
+    case HandleKind::VulkanDevice:
+      return "mln_vulkan_device";
   }
   return nullptr;
 }

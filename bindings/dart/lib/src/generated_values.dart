@@ -6824,3 +6824,70 @@ final class StyleExpressionInfo extends _Value {
     'isZoomConstant',
   ]);
 }
+
+/// Options for `VulkanDeviceHandle.create()`.
+///
+/// See `mln_vulkan_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+final class VulkanDeviceOptions extends _Value {
+  VulkanDeviceOptions({
+    this.presentation,
+    Uint8List? deviceUuid,
+    Uint8List? deviceLuid,
+  }) : deviceUuid = deviceUuid == null
+           ? null
+           : Uint8List.fromList(deviceUuid).asUnmodifiableView(),
+       deviceLuid = deviceLuid == null
+           ? null
+           : Uint8List.fromList(deviceLuid).asUnmodifiableView();
+
+  /// Whether the device can present to a window's surface. It enables
+  /// VK_KHR_surface and the platform's surface extensions on the instance, and
+  /// VK_KHR_swapchain on the device. Defaults to false.
+  final bool? presentation;
+
+  /// The 16-byte `deviceUUID` of the GPU to use, as
+  /// `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
+  /// with another graphics API on it.
+  final Uint8List? deviceUuid;
+
+  /// The 8-byte `deviceLUID` of the GPU to use, as
+  /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
+  /// DXGI adapter LUID.
+  final Uint8List? deviceLuid;
+
+  /// A copy of this value with the given members replaced.
+  VulkanDeviceOptions copyWith({
+    bool? presentation,
+    Uint8List? deviceUuid,
+    Uint8List? deviceLuid,
+  }) => VulkanDeviceOptions(
+    presentation: presentation ?? this.presentation,
+    deviceUuid: deviceUuid ?? this.deviceUuid,
+    deviceLuid: deviceLuid ?? this.deviceLuid,
+  );
+
+  @override
+  List<Object?> get _members => [presentation, deviceUuid, deviceLuid];
+  @override
+  String toString() => _describe('VulkanDeviceOptions', const [
+    'presentation',
+    'deviceUuid',
+    'deviceLuid',
+  ]);
+}
+
+/// A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
+///
+/// See `mln_vulkan_device_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+final class VulkanDeviceContextResult extends _Value {
+  const VulkanDeviceContextResult({required this.context});
+  final VulkanContextDescriptor context;
+
+  @override
+  List<Object?> get _members => [context];
+  @override
+  String toString() =>
+      _describe('VulkanDeviceContextResult', const ['context']);
+}

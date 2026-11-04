@@ -17,6 +17,7 @@
 #include "maplibre_native_c/style_expression.h"
 #include "maplibre_native_c/surface.h"
 #include "maplibre_native_c/texture.h"
+#include "maplibre_native_c/vulkan.h"
 #include "runtime.h"
 
 /** The realm's callback adapters, by the callback type that each
@@ -351,6 +352,12 @@ napi_value mln_ts_read_tile_id(
   napi_env env, const mln_tile_id* source, size_t size
 );
 napi_value mln_ts_read_vec3(napi_env env, const mln_vec3* source, size_t size);
+napi_value mln_ts_read_vulkan_context_descriptor(
+  napi_env env, const mln_vulkan_context_descriptor* source, size_t size
+);
+napi_value mln_ts_read_vulkan_device_context_result(
+  napi_env env, const mln_vulkan_device_context_result* source, size_t size
+);
 napi_value mln_ts_read_vulkan_texture_frame(
   napi_env env, const mln_vulkan_texture_frame* source, size_t size
 );
@@ -721,6 +728,10 @@ bool mln_ts_write_vulkan_borrowed_texture_replacement(
 );
 bool mln_ts_write_vulkan_context_descriptor(
   mln_ts_call* call, napi_value value, mln_vulkan_context_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_vulkan_device_options(
+  mln_ts_call* call, napi_value value, mln_vulkan_device_options* out,
   const char* path
 );
 bool mln_ts_write_vulkan_surface_descriptor(

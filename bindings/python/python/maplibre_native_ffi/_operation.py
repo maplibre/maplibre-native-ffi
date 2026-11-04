@@ -19,9 +19,11 @@ class GeneratedOperations:
             if not issubclass(base, GeneratedOperations):
                 continue
             for name, method in vars(base).items():
+                # A classmethod object isn't callable, but a constructor such
+                # as ``create`` belongs on the owner too.
                 if (
                     not name.startswith("_")
-                    and callable(method)
+                    and (callable(method) or isinstance(method, classmethod))
                     and name not in vars(cls)
                 ):
                     setattr(cls, name, method)

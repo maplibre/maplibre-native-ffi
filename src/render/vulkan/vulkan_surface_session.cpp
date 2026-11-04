@@ -22,6 +22,7 @@
 #include "maplibre_native_c/surface.h"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
+#include "render/vulkan/vulkan_device.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
 #include "render/vulkan/vulkan_queue_access.hpp"
@@ -620,17 +621,24 @@ auto vulkan_surface_attach_start(
   session->target_identity = {descriptor->surface};
   session->accepts_queue_lock = true;
   const auto copied = *descriptor;
-  session->initialize_backend = [copied](mln_render_session_object& target) {
-    const auto handles_status = validate_vulkan_handles(copied);
-    if (handles_status != MLN_STATUS_OK) {
-      return handles_status;
-    }
-    target.surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
-      copied, mln::Size{target.physical_width, target.physical_height},
-      target.queue_lock
-    );
-    return MLN_STATUS_OK;
-  };
+  // Taken now, because the host may release a device of the library's as
+  // soon as this call returns.
+  session->initialize_backend =
+    [copied, device = find_vulkan_device(copied.context.device)](
+      mln_render_session_object& target
+    ) mutable {
+      const auto handles_status = validate_vulkan_handles(copied);
+      if (handles_status != MLN_STATUS_OK) {
+        return handles_status;
+      }
+      auto backend = std::make_unique<VulkanSurfaceSessionBackend>(
+        copied, mln::Size{target.physical_width, target.physical_height},
+        target.queue_lock
+      );
+      if (device != nullptr) backend->retain(std::move(device));
+      target.surface.backend = std::move(backend);
+      return MLN_STATUS_OK;
+    };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},

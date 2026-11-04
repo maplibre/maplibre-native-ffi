@@ -27,6 +27,8 @@ internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnStyleExpression(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnVulkanDevice(ulong Value) : IMlnHandle;
+
 internal unsafe struct mln_animation_options
 {
     public mln_animation_option_field fields;
@@ -1355,6 +1357,21 @@ internal unsafe struct mln_vulkan_context_descriptor
     public void* get_device_proc_addr;
 }
 
+internal unsafe struct mln_vulkan_device_context_result
+{
+    public uint size;
+    public mln_vulkan_context_descriptor context;
+}
+
+internal unsafe struct mln_vulkan_device_options
+{
+    public uint size;
+    public mln_vulkan_device_option_field fields;
+    public byte presentation;
+    public mln_buffer_view device_uuid;
+    public mln_buffer_view device_luid;
+}
+
 internal unsafe struct mln_vulkan_surface_descriptor
 {
     public uint size;
@@ -2185,6 +2202,13 @@ internal enum mln_viewport_mode : uint
 {
     MLN_VIEWPORT_MODE_DEFAULT = 0,
     MLN_VIEWPORT_MODE_FLIPPED_Y = 1,
+}
+
+internal enum mln_vulkan_device_option_field : uint
+{
+    MLN_VULKAN_DEVICE_OPTION_PRESENTATION = 1,
+    MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID = 2,
+    MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID = 4,
 }
 
 internal enum mln_vulkan_image_owner : uint

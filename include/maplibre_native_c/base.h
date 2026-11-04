@@ -125,6 +125,11 @@ typedef uint64_t mln_offscreen_device MLN_BINDING(
   "kind=handle;release=mln_offscreen_device_release;"
   "dispose=mln_offscreen_device_release"
 );
+/** A Vulkan instance, device, and queue that the library creates and owns. */
+typedef uint64_t mln_vulkan_device MLN_BINDING(
+  "kind=handle;release=mln_vulkan_device_release;"
+  "dispose=mln_vulkan_device_release"
+);
 /** A camera view for converting between screen points and coordinates. */
 typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_release;"
