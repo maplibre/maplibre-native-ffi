@@ -13,7 +13,7 @@ const log = std.log.scoped(.maplibre_native_ffi);
 /// made before then stays open, and native reports its later calls as stale.
 ///
 /// A value that a callback borrows, and every copy of it, can call native but
-/// can't release or dispose the handle, and deinit leaves it alone.
+/// can't release or dispose the handle. Its deinit does nothing.
 ///
 /// `Self` is the generated handle type, with a `raw: u64` field, a `closed:
 /// bool` field, and a `native_name`; it declares these members as its own. A
@@ -35,8 +35,8 @@ pub fn Handle(comptime Self: type, comptime public_name: []const u8, comptime di
             return if (comptime @hasField(Self, "borrowed")) self.borrowed else false;
         }
 
-        /// Fails, before native sees the call, to release or dispose a value
-        /// that a callback borrows.
+        /// Fails for a value that a callback borrows, so that its release or
+        /// dispose never reaches native.
         pub fn requireOwned(self: Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
             if (!isBorrowed(self)) return;
             status.begin(diagnostic);
@@ -44,7 +44,7 @@ pub fn Handle(comptime Self: type, comptime public_name: []const u8, comptime di
             return error.InvalidState;
         }
 
-        /// Returns the native handle value, which stays in place after release.
+        /// Returns the native handle value, which stays readable after release.
         pub fn id(self: Self) u64 {
             return self.raw;
         }

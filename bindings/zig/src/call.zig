@@ -418,9 +418,9 @@ fn invokeInner(
     return op.outputs(allocator);
 }
 
-/// Calls a status-returning native function like `invoke` whose one output is
-/// a handle that native leaves null when it has nothing to return, which
-/// returns null.
+/// Calls a status-returning native function like `invoke`, for a function
+/// whose one output is a handle. Returns null when native leaves the handle
+/// null because it has nothing to return.
 pub fn invokeNullable(
     comptime name: []const u8,
     comptime access: Access,

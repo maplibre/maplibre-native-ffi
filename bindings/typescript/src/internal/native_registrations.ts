@@ -71,11 +71,9 @@ export function nativeRegistration<Kind extends string>(
 
 /**
  * Takes the fields of a native registration for the call that the addon
- * converts. Returns null for a value that is no native registration, which
- * the addon reads as the registration's host form or rejects, undefined for a
- * registration that an earlier call took, which the addon reports as an
- * invalid state, and throws a TypeError for a native registration of another
- * kind.
+ * converts. Returns null when `value` isn't a native registration, and
+ * undefined when an earlier call took it. Throws a TypeError for a native
+ * registration of another kind.
  */
 export function takeNativeRegistration(
   value: unknown,

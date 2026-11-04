@@ -31,11 +31,10 @@ export interface AwaitableWakeOptions {
  *
  * Pass {@link AwaitableWake.wake} as the callback of any wake, such as a
  * render session's frame wake, or call it from a callback, such as a runtime's
- * event handler. {@link AwaitableWake.next} resolves at the next wake. A wake that
- * arrives while nothing waits is kept for the next call. A pending wait holds
- * the event loop open, as every pending binding Promise does, while the wake
- * callback alone keeps nothing alive. Draining stays explicit: a resolved wait
- * means the receiver has work, which the caller then drains.
+ * event handler. {@link AwaitableWake.next} resolves at the next wake. A wake
+ * that arrives while nothing waits is kept for the next call. A pending wait
+ * holds the event loop open, but the wake callback alone doesn't. A resolved
+ * wait means the receiver has work, which the caller then drains.
  */
 export class AwaitableWake {
   #latched = false;

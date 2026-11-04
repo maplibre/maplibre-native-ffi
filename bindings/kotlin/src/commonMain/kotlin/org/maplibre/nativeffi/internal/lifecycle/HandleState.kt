@@ -19,7 +19,7 @@ internal open class HandleState(
   private val typeName: String,
   val handle: Long,
   private val dispose: (Long) -> Unit,
-  /** Whether a callback borrows the handle, which the binding then never releases or disposes. */
+  /** Whether a callback borrows the handle. The binding never releases or disposes it. */
   val borrowed: Boolean = false,
 ) {
   private val released = AtomicBoolean(false)
@@ -38,8 +38,8 @@ internal open class HandleState(
   }
 
   /**
-   * Runs the answer [call], which ends the handle whatever it returns. Native ends a live handle on
-   * every outcome, and a failure disposes the handle in case it came before native saw the answer.
+   * Runs the answer [call], which ends the handle whatever it returns. A failure disposes the
+   * handle in case it came before native saw the answer.
    */
   fun answer(call: () -> Unit) {
     checkReleasable()

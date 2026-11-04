@@ -15,8 +15,8 @@ class NativeHandleMixin:
 
     @property
     def is_closed(self) -> bool:
-        """Whether the binding has accepted a release, dispose, discard, or
-        ``with`` block exit of the handle."""
+        """Whether a release, dispose, discard, or ``with`` block exit has
+        ended the handle."""
         return bool(self._native._is_closed)
 
     def __repr__(self) -> str:
@@ -38,13 +38,13 @@ class NativeHandleMixin:
 
 
 class ScopedHandleMixin(NativeHandleMixin):
-    """The ``with`` block of a handle whose scope can clean it up.
+    """The ``with`` block of a handle.
 
-    Leaving the block disposes the handle, as ``dispose`` does, and returns
-    without waiting for it to retire, whatever state the handle is in, such as
-    a runtime whose map is still live. To wait until a handle retires, call
-    ``release()`` and wait for its future instead. Leaving the block after an
-    explicit release or dispose does nothing.
+    Leaving the block disposes the handle, as ``dispose`` does, without
+    waiting, whatever state the handle is in, such as a runtime whose map is
+    still live. To wait until the release finishes, call ``release()`` and wait
+    for its future instead. Leaving the block after a release or dispose does
+    nothing.
     """
 
     def __enter__(self) -> Self:

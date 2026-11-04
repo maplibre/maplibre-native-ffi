@@ -37,9 +37,9 @@ def _adopt_value(raw, owner, parent=None, ready=None):
 
 
 def _answer(owner, call):
-    """Runs an answer, which ends the handle whatever it returns. Native ends
-    a live handle on every outcome, and an answer that fails before it reaches
-    native, such as on an argument that fails to convert, releases the handle."""
+    """Run an answer, which ends the handle whatever it returns. An answer
+    that fails before it reaches native, such as on an argument that fails to
+    convert, releases the handle here."""
     try:
         return call()
     except BaseException:

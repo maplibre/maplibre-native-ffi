@@ -2,9 +2,9 @@
 /// arguments borrow, and the native call with the interpreter detached.
 ///
 /// Every native call that a method makes goes through `status`, `run`,
-/// `command`, or `complete`. Each is unsafe with the
-/// contract of `generated_native_call`: the closure only reads the converted
-/// arguments, which this call's storage keeps rooted, and calls native code.
+/// `command`, or `complete`. Each is unsafe with the contract of
+/// `generated_native_call`: the closure only reads the converted arguments,
+/// which this call's storage keeps rooted, and calls native code.
 struct GeneratedCall<'py> {
     py: Python<'py>,
     storage: GeneratedInputStorage<'py>,
@@ -89,8 +89,8 @@ type GeneratedOwnerReservation<O> =
 trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
     const NATIVE: &'static str;
-    /// Disposes a handle that no consuming call took, for a handle type with a
-    /// disposal.
+    /// Disposes a handle that was never released, for a handle type that has
+    /// a disposal.
     const DISPOSE: Option<unsafe extern "C" fn(Self::Native) -> sys::mln_status>;
 
     fn shared(&self) -> &Arc<Mutex<NativeHandleState<Self::Native>>>;
@@ -104,7 +104,8 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         self.state().handle.raw()
     }
 
-    /// Takes the handle for a consuming call; an idempotent teardown skips a retired handle.
+    /// Reserves the handle for a consuming call. Returns `None` for an
+    /// `idempotent` call on a released handle.
     fn reserve(&self, idempotent: bool) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
         let state = self.state();
         if state.borrowed {

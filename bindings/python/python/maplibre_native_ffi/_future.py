@@ -18,8 +18,8 @@ class NativeFuture[T](Future[T]):
     """A native result that the binding's dispatcher thread resolves.
 
     The future stays pending, never running, until its completion claims it,
-    so ``cancel()`` abandons the wait at any point before then. Native work
-    continues to its terminal disposition either way.
+    so ``cancel()`` abandons the wait at any point before then. Cancelling
+    doesn't stop the native work.
 
     Done callbacks for one future run in registration order on host worker
     threads, so a callback can wait for another binding future. Waiting for a
@@ -84,7 +84,7 @@ class NativeFuture[T](Future[T]):
     def cancel(self) -> bool:
         """Abandon the wait, and wake every waiter at once.
 
-        Native work continues to its terminal disposition.
+        The native work continues.
         """
         if not super().cancel():
             return False

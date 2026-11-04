@@ -24,8 +24,8 @@ internal sealed unsafe class NativeHandleState<T>
     private object? retainedParent;
     private bool closed;
 
-    // Whether a callback borrows the handle, which the binding then never
-    // releases or disposes.
+    // Whether a callback borrows the handle. The binding never releases or
+    // disposes a borrowed handle.
     private readonly bool borrowed;
 
     internal NativeHandleState(
@@ -120,9 +120,9 @@ internal sealed unsafe class NativeHandleState<T>
 
     internal void Retire() => Release(disposeAbandoned ?? destroy);
 
-    // Runs an answer, which ends the handle whatever it returns: native ends a
-    // live handle on every outcome. A repeated answer reaches native, which
-    // reports the handle stale.
+    // Runs an answer, which ends the handle whatever it returns. Unlike a
+    // release, a repeated answer still calls native, which reports the handle
+    // stale.
     internal void Answer(StatusDestroy<T> answer)
     {
         CheckReleasable();
@@ -140,8 +140,7 @@ internal sealed unsafe class NativeHandleState<T>
         }
     }
 
-    // Ends a handle whose answer failed before it reached native, as a release
-    // does. Does nothing once the handle is closed, or for a borrowed handle.
+    // Ends a handle whose answer failed before it reached native.
     internal void EndAnswer()
     {
         if (!borrowed)

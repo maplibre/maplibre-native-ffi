@@ -25,9 +25,9 @@ type bindingTarget struct {
 	// consumes reports that native consumes the receiver when the call
 	// succeeds.
 	consumes bool
-	// answers reports a call that ends the receiver whatever it returns. A
-	// call on a receiver already ended reaches native, which reports it, where
-	// a repeated release or dispose does nothing.
+	// answers reports a call that ends the receiver whatever it returns.
+	// Unlike a release, a repeated answer still calls native, which reports
+	// the handle stale.
 	answers bool
 }
 

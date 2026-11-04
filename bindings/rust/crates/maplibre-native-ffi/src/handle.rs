@@ -131,10 +131,9 @@ macro_rules! native_owner {
                 }
             }
 
-            /// Runs an answer, which ends this owner whatever it returns.
-            /// Native ends a live handle on every outcome, and dropping the
-            /// owner after a failure releases a handle that the failure left
-            /// live, as one before native saw the answer does.
+            /// Runs an answer, which ends this owner whatever it returns. A
+            /// failure drops the owner, which releases the handle in case the
+            /// failure came before native saw the answer.
             #[allow(dead_code)]
             pub(crate) fn consume_always<R>(
                 self,
