@@ -1,0 +1,29 @@
+{
+  "name": "react-native-example-host",
+  "private": true,
+  "description": "The example app's native host: it installs the binding in Hermes and lends the map its native surfaces.",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "codegenConfig": {
+    "name": "MaplibreExampleHostSpec",
+    "type": "all",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "org.maplibre.nativeffi.example.host"
+    },
+    "ios": {
+      "componentProvider": {
+        "MapSurfaceView": "MLNExampleMapSurfaceView"
+      },
+      "modulesProvider": {
+        "MaplibreHost": "MLNExampleHost"
+      }
+    }
+  },
+  "dependencies": {
+    "@maplibre/native-ffi": "workspace:*"
+  }
+}
