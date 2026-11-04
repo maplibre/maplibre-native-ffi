@@ -307,6 +307,15 @@ val jvmClassifiers =
     emptyMap(),
   )
 
+// The native library must come from the same release as the binding, so each
+// runtime requires the binding at exactly its own version, as Python's runtime
+// wheels do, and resolving another version of the binding fails.
+dependencies {
+  constraints {
+    add("commonMainApi", "$mavenGroup:maplibre-native-ffi") { version { strictly(mavenVersion) } }
+  }
+}
+
 extensions.configure<KotlinMultiplatformExtension> {
   sourceSets.getByName("commonMain") {
     kotlin.srcDir(rootProject.file("bindings/kotlin/runtimes/common/src/commonMain/kotlin"))
