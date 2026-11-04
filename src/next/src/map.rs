@@ -310,32 +310,41 @@ pub unsafe extern "C" fn mln_runtime_create_map(
     unsafe {
         boundary(out_diagnostic, || {
             let runtime = handles::runtime(runtime)?;
+            if options.is_null() {
+                return Err(Failure::invalid_argument("map options must not be null"));
+            }
             let Some(options) = read_sized(options) else {
-                return Err(Failure::invalid_argument("options must be an mln_map_options"));
+                return Err(Failure::invalid_argument("mln_map_options.size is too small"));
             };
             if out_map.is_null() {
                 return Err(Failure::invalid_argument("out_map must not be null"));
             }
-            let extent = options.initial_extent;
-            if extent.width == 0 || extent.height == 0 {
-                return Err(Failure::invalid_argument("initial_extent must not be empty"));
+            if (*out_map).0 != 0 {
+                return Err(Failure::invalid_argument("out_map must point to the null handle"));
             }
-            if !(extent.scale_factor.is_finite() && extent.scale_factor > 0.0) {
-                return Err(Failure::invalid_argument("initial_extent.scale_factor must be finite and positive"));
+            let extent = options.initial_extent;
+            if extent.width == 0
+                || extent.height == 0
+                || !(extent.scale_factor.is_finite() && extent.scale_factor > 0.0)
+            {
+                return Err(Failure::invalid_argument(
+                    "initial extent dimensions and scale factor must be positive",
+                ));
             }
             if options.map_mode > MLN_MAP_MODE_TILE {
-                return Err(Failure::invalid_argument("map_mode is not an mln_map_mode"));
+                return Err(Failure::invalid_argument("map_mode is invalid"));
             }
             if options.fields & !(MLN_MAP_OPTION_EVENT_MASK | MLN_MAP_OPTION_TILE_CACHE_ENABLED) != 0 {
-                return Err(Failure::invalid_argument("options.fields has unknown bits"));
+                return Err(Failure::invalid_argument("mln_map_options.fields contains unknown bits"));
             }
             let event_mask = if options.fields & MLN_MAP_OPTION_EVENT_MASK != 0 {
-                if options.event_mask & !MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS != 0 {
-                    return Err(Failure::invalid_argument("event_mask has bits that aren't map events"));
+                if options.event_mask & !MLN_RUNTIME_EVENT_FLAG_ALL != 0 {
+                    return Err(Failure::invalid_argument("mln_map_options.event_mask contains unknown bits"));
                 }
                 options.event_mask
             } else {
-                MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS
+                // An absent mask selects every event type.
+                MLN_RUNTIME_EVENT_FLAG_ALL
             };
             let completion = Some(Completion::required(completion)?);
 
@@ -401,6 +410,7 @@ fn release_map(shared: &Arc<MapShared>, completion: Option<Completion>) {
             completion.ok();
         }
     });
+    shared.runtime.map_released();
 }
 
 /// # Safety
@@ -487,7 +497,17 @@ pub unsafe extern "C" fn mln_map_set_style_json(
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
+            // C++ `validate_bytes(json, "style JSON")`.
+            if json.size == 0 {
+                return Err(Failure::invalid_argument("style JSON must not be empty"));
+            }
+            if json.data.is_null() {
+                return Err(Failure::invalid_argument("style JSON data must not be null"));
+            }
             let json = utf8_view(json, "json")?;
+            if json.contains('\0') {
+                return Err(Failure::invalid_argument("style JSON must not contain embedded NUL"));
+            }
             command(map, completion, true, move |entry| {
                 *entry.observer.load_error.borrow_mut() = None;
                 entry.map.borrow_mut().get_style_mut().load_json(&json);
@@ -513,6 +533,9 @@ pub unsafe extern "C" fn mln_map_set_style_url(
     unsafe {
         boundary(out_diagnostic, || {
             let url = utf8_view(url, "url")?;
+            if url.contains('\0') {
+                return Err(Failure::invalid_argument("url contains embedded NUL"));
+            }
             if url.is_empty() {
                 return Err(Failure::invalid_argument("url must not be empty"));
             }
@@ -624,8 +647,10 @@ pub unsafe extern "C" fn mln_map_set_event_mask(
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
-            if mask & !MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS != 0 {
-                return Err(Failure::invalid_argument("mask has bits that aren't map events"));
+            // The whole mask is stored, so a host that reads it, sets one
+            // bit and writes it back keeps the runtime's bits too.
+            if mask & !MLN_RUNTIME_EVENT_FLAG_ALL != 0 {
+                return Err(Failure::invalid_argument("mask must be valid"));
             }
             command(map, completion, true, move |entry| {
                 entry.shared.event_mask.store(mask, Ordering::SeqCst);

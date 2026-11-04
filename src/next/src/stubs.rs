@@ -114,12 +114,6 @@ pub unsafe extern "C" fn mln_geo_json_source_data_create(data: mln_buffer_view, 
 pub unsafe extern "C" fn mln_geo_json_source_data_release(data: mln_geo_json_source_data) {
 }
 
-/// `mln_http_header_transform_response_set_header` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_http_header_transform_response_set_header(response: *mut mln_http_header_transform_response, name: mln_buffer_view, value: mln_buffer_view, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_http_header_transform_response_set_header") }
-}
-
 /// `mln_map_add_custom_geometry_source` (style.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_add_custom_geometry_source(map: mln_map, source_id: mln_buffer_view, options: *const mln_custom_geometry_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
@@ -450,160 +444,6 @@ pub unsafe extern "C" fn mln_render_session_set_web_gpu_surface_target(session: 
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_web_gpu_surface_target") }
 }
 
-/// `mln_resource_request_complete` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_complete(handle: mln_resource_request, response: *const mln_resource_response, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_complete") }
-}
-
-/// `mln_resource_request_is_cancelled` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_is_cancelled(handle: mln_resource_request, out_cancelled: *mut bool, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_is_cancelled") }
-}
-
-/// `mln_resource_request_pass_through` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_pass_through(handle: mln_resource_request, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_pass_through") }
-}
-
-/// `mln_resource_request_release` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_release(handle: mln_resource_request) {
-}
-
-/// `mln_resource_request_set_cancel_callback` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_set_cancel_callback(handle: mln_resource_request, handler: *const mln_resource_request_cancel_handler, out_cancelled: *mut bool, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_set_cancel_callback") }
-}
-
-/// `mln_resource_transform_request_complete` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_transform_request_complete(request: mln_resource_transform_request, url: mln_buffer_view, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_transform_request_complete") }
-}
-
-/// `mln_resource_transform_request_fail` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_transform_request_fail(request: mln_resource_transform_request, error: *const mln_resource_transform_error, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_transform_request_fail") }
-}
-
-/// `mln_resource_transform_request_release` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_transform_request_release(request: mln_resource_transform_request) {
-}
-
-/// `mln_runtime_clear_http_header_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_clear_http_header_transform(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_http_header_transform") }
-}
-
-/// `mln_runtime_clear_resource_provider` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_clear_resource_provider(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_resource_provider") }
-}
-
-/// `mln_runtime_clear_resource_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_clear_resource_transform(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_resource_transform") }
-}
-
-/// `mln_runtime_create_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_create_offline_region(runtime: mln_runtime, definition: *const mln_offline_region_definition, metadata: *const u8, metadata_size: usize, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_create_offline_region") }
-}
-
-/// `mln_runtime_delete_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_delete_offline_region(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_delete_offline_region") }
-}
-
-/// `mln_runtime_get_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_get_offline_region(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_get_offline_region") }
-}
-
-/// `mln_runtime_get_offline_region_status` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_get_offline_region_status(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_get_offline_region_status") }
-}
-
-/// `mln_runtime_invalidate_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_invalidate_offline_region(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_invalidate_offline_region") }
-}
-
-/// `mln_runtime_list_offline_regions` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_list_offline_regions(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_list_offline_regions") }
-}
-
-/// `mln_runtime_merge_offline_regions` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_merge_offline_regions(runtime: mln_runtime, side_database_path: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_merge_offline_regions") }
-}
-
-/// `mln_runtime_run_ambient_cache_operation` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_run_ambient_cache_operation(runtime: mln_runtime, operation: mln_ambient_cache_operation, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_run_ambient_cache_operation") }
-}
-
-/// `mln_runtime_set_http_header_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_http_header_transform(runtime: mln_runtime, transform: *const mln_http_header_transform, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_http_header_transform") }
-}
-
-/// `mln_runtime_set_maximum_ambient_cache_size` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_maximum_ambient_cache_size(runtime: mln_runtime, size: u64, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_maximum_ambient_cache_size") }
-}
-
-/// `mln_runtime_set_offline_region_download_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_offline_region_download_state(runtime: mln_runtime, region_id: mln_offline_region_id, state: mln_offline_region_download_state, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_offline_region_download_state") }
-}
-
-/// `mln_runtime_set_offline_region_observed` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_offline_region_observed(runtime: mln_runtime, region_id: mln_offline_region_id, observed: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_offline_region_observed") }
-}
-
-/// `mln_runtime_set_resource_provider` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_resource_provider(runtime: mln_runtime, provider: *const mln_resource_provider, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_resource_provider") }
-}
-
-/// `mln_runtime_set_resource_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_resource_transform(runtime: mln_runtime, transform: *const mln_resource_transform, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_resource_transform") }
-}
-
-/// `mln_runtime_update_offline_region_metadata` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_update_offline_region_metadata(runtime: mln_runtime, region_id: mln_offline_region_id, metadata: *const u8, metadata_size: usize, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_update_offline_region_metadata") }
-}
-
 // The hand-written exports have the headers' signatures.
 const _: () = {
     let _ = [crate::types::mln_c_version, crate::base::mln_c_version];
@@ -611,6 +451,7 @@ const _: () = {
     let _ = [crate::types::mln_delivery_queue_create, crate::delivery::mln_delivery_queue_create];
     let _ = [crate::types::mln_delivery_queue_dispatch, crate::delivery::mln_delivery_queue_dispatch];
     let _ = [crate::types::mln_delivery_queue_release, crate::delivery::mln_delivery_queue_release];
+    let _ = [crate::types::mln_http_header_transform_response_set_header, crate::http_headers::mln_http_header_transform_response_set_header];
     let _ = [crate::types::mln_lat_lng_for_projected_meters, crate::projection::mln_lat_lng_for_projected_meters];
     let _ = [crate::types::mln_log_clear_callback, crate::logging::mln_log_clear_callback];
     let _ = [crate::types::mln_log_set_async_severity_mask, crate::logging::mln_log_set_async_severity_mask];
@@ -696,14 +537,40 @@ const _: () = {
     let _ = [crate::types::mln_render_session_read_texture, crate::session::mln_render_session_read_texture];
     let _ = [crate::types::mln_render_session_resize, crate::session::mln_render_session_resize];
     let _ = [crate::types::mln_render_session_service_driver_work, crate::surface_session::mln_render_session_service_driver_work];
+    let _ = [crate::types::mln_resource_request_complete, crate::resource_provider::mln_resource_request_complete];
+    let _ = [crate::types::mln_resource_request_is_cancelled, crate::resource_provider::mln_resource_request_is_cancelled];
+    let _ = [crate::types::mln_resource_request_pass_through, crate::resource_provider::mln_resource_request_pass_through];
+    let _ = [crate::types::mln_resource_request_release, crate::resource_provider::mln_resource_request_release];
+    let _ = [crate::types::mln_resource_request_set_cancel_callback, crate::resource_provider::mln_resource_request_set_cancel_callback];
+    let _ = [crate::types::mln_resource_transform_request_complete, crate::resource_transform::mln_resource_transform_request_complete];
+    let _ = [crate::types::mln_resource_transform_request_fail, crate::resource_transform::mln_resource_transform_request_fail];
+    let _ = [crate::types::mln_resource_transform_request_release, crate::resource_transform::mln_resource_transform_request_release];
     let _ = [crate::types::mln_runtime_clear_event_handler, crate::runtime::mln_runtime_clear_event_handler];
+    let _ = [crate::types::mln_runtime_clear_http_header_transform, crate::http_headers::mln_runtime_clear_http_header_transform];
+    let _ = [crate::types::mln_runtime_clear_resource_provider, crate::resource_provider::mln_runtime_clear_resource_provider];
+    let _ = [crate::types::mln_runtime_clear_resource_transform, crate::resource_transform::mln_runtime_clear_resource_transform];
     let _ = [crate::types::mln_runtime_create, crate::runtime::mln_runtime_create];
     let _ = [crate::types::mln_runtime_create_map, crate::map::mln_runtime_create_map];
+    let _ = [crate::types::mln_runtime_create_offline_region, crate::offline::mln_runtime_create_offline_region];
+    let _ = [crate::types::mln_runtime_delete_offline_region, crate::offline::mln_runtime_delete_offline_region];
     let _ = [crate::types::mln_runtime_dispose, crate::runtime::mln_runtime_dispose];
     let _ = [crate::types::mln_runtime_get_event_mask, crate::runtime::mln_runtime_get_event_mask];
+    let _ = [crate::types::mln_runtime_get_offline_region, crate::offline::mln_runtime_get_offline_region];
+    let _ = [crate::types::mln_runtime_get_offline_region_status, crate::offline::mln_runtime_get_offline_region_status];
+    let _ = [crate::types::mln_runtime_invalidate_offline_region, crate::offline::mln_runtime_invalidate_offline_region];
+    let _ = [crate::types::mln_runtime_list_offline_regions, crate::offline::mln_runtime_list_offline_regions];
+    let _ = [crate::types::mln_runtime_merge_offline_regions, crate::offline::mln_runtime_merge_offline_regions];
     let _ = [crate::types::mln_runtime_release, crate::runtime::mln_runtime_release];
+    let _ = [crate::types::mln_runtime_run_ambient_cache_operation, crate::offline::mln_runtime_run_ambient_cache_operation];
     let _ = [crate::types::mln_runtime_set_event_handler, crate::runtime::mln_runtime_set_event_handler];
     let _ = [crate::types::mln_runtime_set_event_mask, crate::runtime::mln_runtime_set_event_mask];
+    let _ = [crate::types::mln_runtime_set_http_header_transform, crate::http_headers::mln_runtime_set_http_header_transform];
+    let _ = [crate::types::mln_runtime_set_maximum_ambient_cache_size, crate::offline::mln_runtime_set_maximum_ambient_cache_size];
+    let _ = [crate::types::mln_runtime_set_offline_region_download_state, crate::offline::mln_runtime_set_offline_region_download_state];
+    let _ = [crate::types::mln_runtime_set_offline_region_observed, crate::offline::mln_runtime_set_offline_region_observed];
+    let _ = [crate::types::mln_runtime_set_resource_provider, crate::resource_provider::mln_runtime_set_resource_provider];
+    let _ = [crate::types::mln_runtime_set_resource_transform, crate::resource_transform::mln_runtime_set_resource_transform];
+    let _ = [crate::types::mln_runtime_update_offline_region_metadata, crate::offline::mln_runtime_update_offline_region_metadata];
     let _ = [crate::types::mln_style_expression_create, crate::style_expression::mln_style_expression_create];
     let _ = [crate::types::mln_style_expression_evaluate, crate::style_expression::mln_style_expression_evaluate];
     let _ = [crate::types::mln_style_expression_get_info, crate::style_expression::mln_style_expression_get_info];

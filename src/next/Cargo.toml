@@ -18,5 +18,10 @@ maplibre-native-next = "0.0.6"
 # The JSON values that the core's Convertible reads; the core's own features.
 serde_json = { version = "1.0.154", features = ["float_roundtrip", "preserve_order"] }
 
+# The HTTP transfers that carry transformed headers (online_file_source.rs);
+# the version that maplibre-native-next builds with, so nothing new compiles.
+[target.'cfg(not(target_os = "emscripten"))'.dependencies]
+ureq = "3.5.1"
+
 # A workspace of its own: the repository's workspace builds without the port.
 [workspace]
