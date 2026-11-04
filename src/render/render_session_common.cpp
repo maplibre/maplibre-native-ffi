@@ -2267,10 +2267,9 @@ auto render_session_release_target_start(
 ) -> mln_status {
   auto [deliver, make_work] = valueless_driver_work(
     [](mln_render_session_object& live) {
-      if (live.kind != RenderSessionKind::Texture)
-        return render_session_release_target(live);
-      // Acquisition resumes once the release has run, whatever it reported,
-      // as it does after a replacement of the ring.
+      // Demands render again once the release has run, whatever it reported.
+      // Acquisition resumes then too, as it does after a replacement of the
+      // ring.
       struct Settle {
         mln_render_session_object& session;
         explicit Settle(mln_render_session_object& target) : session(target) {}
@@ -2280,7 +2279,9 @@ auto render_session_release_target_start(
         auto operator=(Settle&&) -> Settle& = delete;
         ~Settle() {
           const auto lock = std::scoped_lock{session.control_mutex};
-          --session.texture.pending_retargets;
+          --session.pending_target_releases;
+          if (session.kind == RenderSessionKind::Texture)
+            --session.texture.pending_retargets;
         }
       } settle{live};
       return render_session_release_target(live);
@@ -2315,6 +2316,7 @@ auto render_session_release_target_start(
         },
       .commit =
         [](mln_render_session_object& live) {
+          ++live.pending_target_releases;
           if (live.kind != RenderSessionKind::Texture) return;
           invalidate_unacquired_texture_frames_locked(live);
           ++live.texture.pending_retargets;
@@ -2992,6 +2994,7 @@ auto run_frame_demand(
   const std::shared_ptr<const mln_frame_demand>& expected
 ) noexcept -> void {
   auto demand = std::shared_ptr<const mln_frame_demand>{};
+  auto releasing = false;
   {
     const auto lock = std::scoped_lock{session->control_mutex};
     // Work can retry a demand parked ahead of its own, but stops once its own
@@ -3006,6 +3009,7 @@ auto run_frame_demand(
       return;
     demand = session->demands.front();
     session->demands.pop_front();
+    releasing = session->pending_target_releases != 0;
     // Only what arrives while this attempt runs asks for another.
     if (demand->token == MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE)
       session->still_image_rearm = false;
@@ -3030,9 +3034,10 @@ auto run_frame_demand(
     .view = {},
     .mode = MLN_RENDER_MODE_PARTIAL,
   };
-  if (session->target_released) {
-    // No target can take the frame. Tile and placement results still reach
-    // the renderer, so it has the map ready for the next target.
+  if (session->target_released || releasing) {
+    // No target can take the frame, or the host is giving it up, so a frame
+    // rendered to it would only delay the release. Tile and placement results
+    // still reach the renderer, so it has the map ready for the next target.
     const auto ended = deliver_pending_session_work(session);
     result.disposition = ended ? *ended : finish_unready_attempt(session);
     publish_frame_result(session, result);

@@ -418,10 +418,10 @@ MLN_API mln_status mln_render_session_resize(
  * session.
  *
  * Use it when the platform takes a surface away, such as when your app goes to
- * the background. Release every acquired frame first. Until you give the
- * session a new target, frame demands finish with
- * MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes, you can
- * destroy the old target.
+ * the background. Release every acquired frame first. Frame demands that are
+ * still pending, and later ones until you give the session a new target,
+ * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes,
+ * you can destroy the old target.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android

@@ -225,7 +225,18 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
         static_cast<EGLSurface>(descriptor_.surface)
       ) == EGL_FALSE
     ) {
-      throw std::runtime_error("Swapping OpenGL EGL surface buffers failed");
+      // A window whose consumer went away fails each swap but can still be
+      // released or replaced.
+      const auto error = eglGetError();
+      if (error == EGL_BAD_NATIVE_WINDOW || error == EGL_BAD_SURFACE) {
+        throw mln::core::RenderTargetNotReady(
+          "the EGL window surface lost its window"
+        );
+      }
+      throw std::runtime_error(
+        "Swapping OpenGL EGL surface buffers failed (EGL error " +
+        std::to_string(error) + ")"
+      );
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
     // The browser presents a frame drawn into the context's default
