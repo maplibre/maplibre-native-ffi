@@ -93,10 +93,8 @@ export class MapController {
     this.retarget();
   }
 
-  // The platform is about to destroy the surface. Release it from the session,
-  // and keep the session and its tiles for the next surface. ArkTS can't block
-  // the callback until the release completes, so the release starts here and
-  // finishes on the session's thread.
+  // The platform is destroying the surface. Release it from the session, and
+  // keep the session and its tiles for the next surface.
   surfaceLost(surface: bigint): void {
     if (this.surface === surface) {
       this.surface = undefined;

@@ -574,7 +574,10 @@ impl RenderSessionHandle {
     /// goes to the background. Release every acquired frame first. Frame
     /// demands that are still pending, and later ones until you give the
     /// session a new target, finish with `RenderResult::TargetNotReady`. Once
-    /// the release completes, you can destroy the old target.
+    /// the release completes, you can destroy the old target. An Android or
+    /// OpenHarmony window can go away sooner, as
+    /// `MapHandle::attach_android_surface()` and
+    /// `MapHandle::attach_ohos_surface()` say.
     ///
     /// See `mln_render_session_release_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

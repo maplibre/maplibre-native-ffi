@@ -301,9 +301,15 @@ impl MapHandle {
     /// the default display, and `device` must be null. Attach with
     /// `RenderDriverKind::CoreWorker`.
     ///
-    /// Before the platform destroys the window, such as in
+    /// When the platform destroys the window, such as in
     /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-    /// `RenderSessionHandle::release_target()` and wait for that to complete.
+    /// `RenderSessionHandle::release_target()`, or give the session a new
+    /// window with `RenderSessionHandle::set_android_surface_target()`, without
+    /// waiting for that to complete. The session keeps its own reference to the
+    /// window and stays usable for the next window. A frame to the destroyed
+    /// window finishes with `RenderResult::TargetNotReady`, or with
+    /// `RenderResult::Rendered` if the window went away while the frame was
+    /// presenting.
     ///
     /// See `mln_map_attach_android_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -672,9 +678,15 @@ impl MapHandle {
     /// the default display, and `device` must be null. Attach with
     /// `RenderDriverKind::CoreWorker`.
     ///
-    /// Before the platform destroys the window, such as in an `XComponent`'s
+    /// When the platform destroys the window, such as in an `XComponent`'s
     /// `onSurfaceDestroyed` callback, release the target with
-    /// `RenderSessionHandle::release_target()` and wait for that to complete.
+    /// `RenderSessionHandle::release_target()`, or give the session a new
+    /// window with `RenderSessionHandle::set_ohos_surface_target()`, without
+    /// waiting for that to complete. The session keeps its own reference to the
+    /// window and stays usable for the next window. A frame to the destroyed
+    /// window finishes with `RenderResult::TargetNotReady`, or with
+    /// `RenderResult::Rendered` if the window went away while the frame was
+    /// presenting.
     ///
     /// See `mln_map_attach_ohos_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).

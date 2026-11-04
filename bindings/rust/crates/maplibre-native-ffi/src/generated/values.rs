@@ -4064,8 +4064,8 @@ pub enum RenderResult: u32 {
     /// The map had nothing new to draw.
     NoUpdate = 1,
     /// The target couldn't take a frame, such as while a window is hidden or
-    /// after `RenderSessionHandle::release_target()`. Demand a frame again
-    /// later.
+    /// destroyed, or after `RenderSessionHandle::release_target()`. Demand a
+    /// frame again later.
     TargetNotReady = 2,
     /// A later demand with the same flags replaced this one.
     Superseded = 3,

@@ -758,8 +758,9 @@ const (
 	RenderResultRendered RenderResult = RenderResult(C.MLN_RENDER_RESULT_RENDERED)
 	// The map had nothing new to draw.
 	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
-	// The target couldn't take a frame, such as while a window is hidden or after
-	// RenderSessionHandle.ReleaseTarget(). Demand a frame again later.
+	// The target couldn't take a frame, such as while a window is hidden or
+	// destroyed, or after RenderSessionHandle.ReleaseTarget(). Demand a frame again
+	// later.
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
 	// A later demand with the same flags replaced this one.
 	RenderResultSuperseded RenderResult = RenderResult(C.MLN_RENDER_RESULT_SUPERSEDED)
@@ -9158,7 +9159,8 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 // the background. Release every acquired frame first. Frame demands that are
 // still pending, and later ones until you give the session a new target, finish
 // with RenderResultTargetNotReady. Once the release completes, you can destroy
-// the old target.
+// the old target. An Android or OpenHarmony window can go away sooner, as
+// MapHandle.AttachAndroidSurface() and MapHandle.AttachOhosSurface() say.
 //
 // See mln_render_session_release_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html

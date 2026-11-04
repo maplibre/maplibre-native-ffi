@@ -533,9 +533,14 @@ pub const Map = struct {
     /// default display, and `device` must be null. Attach with
     /// `RenderDriverKind.core_worker`.
     ///
-    /// Before the platform destroys the window, such as in
+    /// When the platform destroys the window, such as in
     /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-    /// `RenderSession.releaseTarget()` and wait for that to complete.
+    /// `RenderSession.releaseTarget()`, or give the session a new window with
+    /// `RenderSession.setAndroidSurfaceTarget()`, without waiting for that to
+    /// complete. The session keeps its own reference to the window and stays usable
+    /// for the next window. A frame to the destroyed window finishes with
+    /// `RenderResult.target_not_ready`, or with `RenderResult.rendered` if the
+    /// window went away while the frame was presenting.
     ///
     /// See `mln_map_attach_android_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -719,9 +724,14 @@ pub const Map = struct {
     /// default display, and `device` must be null. Attach with
     /// `RenderDriverKind.core_worker`.
     ///
-    /// Before the platform destroys the window, such as in an `XComponent`'s
+    /// When the platform destroys the window, such as in an `XComponent`'s
     /// `onSurfaceDestroyed` callback, release the target with
-    /// `RenderSession.releaseTarget()` and wait for that to complete.
+    /// `RenderSession.releaseTarget()`, or give the session a new window with
+    /// `RenderSession.setOhosSurfaceTarget()`, without waiting for that to
+    /// complete. The session keeps its own reference to the window and stays usable
+    /// for the next window. A frame to the destroyed window finishes with
+    /// `RenderResult.target_not_ready`, or with `RenderResult.rendered` if the
+    /// window went away while the frame was presenting.
     ///
     /// See `mln_map_attach_ohos_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -2350,7 +2360,8 @@ pub const RenderSession = struct {
     /// the background. Release every acquired frame first. Frame demands that are
     /// still pending, and later ones until you give the session a new target,
     /// finish with `RenderResult.target_not_ready`. Once the release completes, you
-    /// can destroy the old target.
+    /// can destroy the old target. An Android or OpenHarmony window can go away
+    /// sooner, as `Map.attachAndroidSurface()` and `Map.attachOhosSurface()` say.
     ///
     /// See `mln_render_session_release_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6633,7 +6644,8 @@ pub const RenderResult = enum(u32) {
     /// The map had nothing new to draw.
     no_update = 1,
     /// The target couldn't take a frame, such as while a window is hidden or
-    /// after `RenderSession.releaseTarget()`. Demand a frame again later.
+    /// destroyed, or after `RenderSession.releaseTarget()`. Demand a frame
+    /// again later.
     target_not_ready = 2,
     /// A later demand with the same flags replaced this one.
     superseded = 3,

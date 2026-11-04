@@ -103,8 +103,8 @@ class MapController(application: Application) : AndroidViewModel(application) {
   }
 
   // The platform is taking the surface away, as when the app goes to the background or the
-  // activity restarts. The session must let go of it before this returns, so this blocks until the
-  // release completes. That can't deadlock: the session's worker thread completes the release, and
+  // activity restarts. The C API doesn't require waiting for the release, but this example blocks
+  // until it completes. That can't deadlock: the session's worker thread completes the release, and
   // it never waits for the main thread. The session keeps its tiles for the next surface.
   fun surfaceDestroyed(surface: Surface) {
     if (this.surface == surface) this.surface = null

@@ -33,8 +33,8 @@ class MaplibreSurfaceView(private val reactContext: ThemedReactContext) :
     val withdrawn = surface
     surface = 0
     if (withdrawn == 0) return
-    // The registry keeps the window until JavaScript releases it, so a frame
-    // that is still in flight fails instead of using a freed window.
+    // The registry keeps the window until JavaScript releases it, so
+    // JavaScript can still attach a session to a window it acquired.
     nativeWithdraw(withdrawn)
     dispatch("topSurfaceLost", withdrawn)
   }

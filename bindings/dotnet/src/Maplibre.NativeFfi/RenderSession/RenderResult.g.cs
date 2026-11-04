@@ -19,8 +19,8 @@ public enum RenderResult : uint
 
     /// <summary>
     /// The target couldn't take a frame, such as while a window is hidden or
-    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Demand a frame
-    /// again later.
+    /// destroyed, or after <c>RenderSessionHandle.ReleaseTargetAsync()</c>.
+    /// Demand a frame again later.
     /// </summary>
     TargetNotReady = 2,
 

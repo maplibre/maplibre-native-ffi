@@ -2366,8 +2366,9 @@ export const RenderResult = {
    */
   noUpdate: 1,
   /**
-   * The target couldn't take a frame, such as while a window is hidden or after
-   * `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
+   * The target couldn't take a frame, such as while a window is hidden or
+   * destroyed, or after `RenderSessionHandle.releaseTarget()`. Demand a frame
+   * again later.
    */
   targetNotReady: 2,
   /**
