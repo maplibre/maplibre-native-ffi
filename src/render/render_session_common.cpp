@@ -2444,6 +2444,12 @@ auto render_session_render_update_on_driver(
       // recorded nothing, so the host retries with this session.
       *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
       return MLN_STATUS_OK;
+    } catch (const vk::SurfaceLostKHRError&) {
+      // The surface lost its window before the frame recorded anything. mbgl
+      // rebuilds the swapchain before the next frame, so the host can still
+      // release or replace the target.
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+      return MLN_STATUS_OK;
 #endif
     } catch (const RenderTargetNotReady&) {
       *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;

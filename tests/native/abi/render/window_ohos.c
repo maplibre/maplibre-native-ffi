@@ -272,8 +272,8 @@ static void a_session_presents_to_each_window_that_it_gets(void) {
 }
 
 // A host that can't hold the consumer's teardown for the release loses the
-// window first. The session survives, so the host can release the window and
-// attach the next one.
+// window first. Each frame to the lost window ends not ready, and the session
+// survives, so the host can release the window and attach the next one.
 static void a_session_survives_a_window_whose_consumer_went_away(void) {
   const mln_runtime runtime = mln_test_create_runtime();
   const mln_map map = create_red_map(runtime);
@@ -287,9 +287,11 @@ static void a_session_survives_a_window_whose_consumer_went_away(void) {
     expect_red_frame(&first);
 
     consumer_destroy(&first);
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_RENDER_RESULT_TARGET_NOT_READY, demand_frame(&fixture)
-    );
+    for (int frame = 0; frame < 2; frame += 1) {
+      TEST_ASSERT_EQUAL_UINT32(
+        MLN_RENDER_RESULT_TARGET_NOT_READY, demand_frame(&fixture)
+      );
+    }
     MLN_TEST_RENDER_AWAIT(
       MLN_STATUS_OK, &fixture,
       mln_render_session_release_target(

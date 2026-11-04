@@ -192,6 +192,21 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   return MLN_STATUS_OK;
 }
 
+VKAPI_ATTR void VKAPI_CALL
+keep_borrowed_surface(VkInstance, VkSurfaceKHR, const VkAllocationCallbacks*) {}
+
+// Destroys nothing, so a borrowed VkSurfaceKHR outlives every reset of mbgl's
+// wrapper, such as the one that mbgl makes to recreate a lost surface.
+auto borrowed_surface_dispatcher()
+  -> const mln::vulkan::DispatchLoaderDynamic& {
+  static const auto dispatcher = [] {
+    auto loader = mln::vulkan::DispatchLoaderDynamic{};
+    loader.vkDestroySurfaceKHR = keep_borrowed_surface;
+    return loader;
+  }();
+  return dispatcher;
+}
+
 // VulkanQueueAccess comes first so that it outlives mbgl's teardown.
 class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
                                    public mln::vulkan::RendererBackend,
@@ -214,13 +229,10 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
     auto operator=(VulkanSurfaceRenderableResource&&)
       -> VulkanSurfaceRenderableResource& = delete;
 
-    // The VkSurfaceKHR is borrowed from the host, so release the unique wrapper
-    // before base destruction reaches the Vulkan surface deleter.
-    // NOLINTNEXTLINE(modernize-use-equals-default)
-    ~VulkanSurfaceRenderableResource() noexcept override {
-      static_cast<void>(surface.release());
-    }
+    ~VulkanSurfaceRenderableResource() noexcept override = default;
 
+    // The VkSurfaceKHR belongs to the host or to the window session, so the
+    // wrapper never destroys it.
     void createPlatformSurface() override {
       if (surface) {
         return;
@@ -228,7 +240,7 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       surface = vk::UniqueSurfaceKHR(
         vk::SurfaceKHR(borrowed_surface),
         mln::vulkan::ObjectDestroy<vk::Instance>(
-          backend.getInstance().get(), nullptr, backend.getDispatcher()
+          backend.getInstance().get(), nullptr, borrowed_surface_dispatcher()
         )
       );
     }
@@ -343,9 +355,7 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       // another on the same surface.
       swapchain.reset();
 
-      // The outgoing VkSurfaceKHR belongs to the host, so release the wrapper
-      // without running the Vulkan deleter.
-      static_cast<void>(surface.release());
+      surface.reset();
       borrowed_surface = surface_;
       createPlatformSurface();
 
@@ -365,7 +375,7 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       released_transform_support = hasSurfaceTransformSupport();
       // The swapchain goes before the surface it was created from.
       swapchain.reset();
-      static_cast<void>(surface.release());
+      surface.reset();
       borrowed_surface = VK_NULL_HANDLE;
     }
 
