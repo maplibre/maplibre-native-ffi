@@ -16,6 +16,7 @@ mod diagnostics;
 mod handles;
 mod logging;
 mod map;
+mod plugin;
 mod runtime;
 mod session;
 mod stubs;

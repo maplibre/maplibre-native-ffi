@@ -298,10 +298,13 @@ function(mln_ffi_install_c_api_library target)
     "${PROJECT_SOURCE_DIR}/cmake/artifact.json.in" "${artifact_file}.in"
     @ONLY)
   # The commit is read at build time, so that a build after a new commit
-  # records it without a reconfigure.
+  # records it without a reconfigure. It builds with everything else, since an
+  # imported library, such as the one maplibre-native-next's Cargo build
+  # makes, builds nothing that would depend on it.
   find_package(Git QUIET)
   add_custom_target(
     ${target}_artifact_descriptor
+    ALL
     COMMAND
       "${CMAKE_COMMAND}"
       "-DGIT=${GIT_EXECUTABLE}"

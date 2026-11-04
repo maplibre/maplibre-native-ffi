@@ -36,6 +36,9 @@ class Target:
     device: dict[str, str] | None
     mise_env: str
     software_gpu: bool
+    # The implementation of the C API that the target builds, from its
+    # MLN_FFI_IMPLEMENTATION.
+    implementation: str = gaps.DEFAULT_IMPLEMENTATION
 
 
 def packaged(*bindings: str):
@@ -205,6 +208,15 @@ def targets(presets: dict) -> list[Target]:
         backend = variables["MLN_FFI_RENDER_BACKEND"]
         if backend == "opengl":
             backend = variables["MLN_FFI_OPENGL_CONTEXT_PROVIDER"]
+        implementation = variables.get(
+            "MLN_FFI_IMPLEMENTATION", gaps.DEFAULT_IMPLEMENTATION
+        )
+        # The release tools know a preset's implementation only from its name.
+        if gaps.split_implementation(name)[1] != implementation:
+            raise SystemExit(
+                f"error: preset {name!r} builds {implementation}, which its name "
+                "must say; see IMPLEMENTATION_SUFFIXES in tools/ci/gaps.py"
+            )
         result.append(
             Target(
                 preset=name,
@@ -216,18 +228,24 @@ def targets(presets: dict) -> list[Target]:
                 device=device,
                 mise_env=vendor.get("miseEnv", ""),
                 software_gpu=vendor.get("softwareGpu", False),
+                implementation=implementation,
             )
         )
     return result
 
 
 def consumed(job: str, all_targets: list[Target]) -> list[Target]:
-    """Return the targets that a job other than a target job consumes."""
+    """Return the targets that a job other than a target job consumes.
+
+    The packages carry the default implementation's native libraries.
+    """
     _, include = JOBS[job]
     return [
         target
         for target in all_targets
-        if gaps.supported("c", target, "package") and include(target)
+        if target.implementation == gaps.DEFAULT_IMPLEMENTATION
+        and gaps.supported("c", target, "package")
+        and include(target)
     ]
 
 

@@ -13,6 +13,8 @@ import subprocess
 from urllib.parse import quote
 
 REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
+# The Rust platform layer, whose crates a C++ build carries.
+PLATFORM_MANIFEST = REPOSITORY / "src/platform/rust/Cargo.toml"
 SBOM_NAME = "sbom.cdx.json"
 
 
@@ -164,7 +166,7 @@ def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
 def cargo_components(
     about: dict,
     target: str,
-    manifest: pathlib.Path = REPOSITORY / "src/platform/rust/Cargo.toml",
+    manifest: pathlib.Path = PLATFORM_MANIFEST,
     flags: tuple[str, ...] = (),
 ) -> tuple[list[dict], dict[str, set[str]], str]:
     packages = {entry["package"]["id"]: entry for entry in about["crates"]}
@@ -245,6 +247,7 @@ def native(
     output: pathlib.Path,
     about: dict | None = None,
     rust_target: str = "",
+    cargo_manifest: pathlib.Path = PLATFORM_MANIFEST,
 ) -> dict:
     root = component(
         "maplibre-native-c",
@@ -295,7 +298,7 @@ def native(
         dependencies.setdefault(parent, set()).add(refs[record["name"]])
         dependencies.setdefault(refs[record["name"]], set())
     if about is not None:
-        crates, graph, platform = cargo_components(about, rust_target)
+        crates, graph, platform = cargo_components(about, rust_target, cargo_manifest)
         components.extend(crates)
         dependencies.update(graph)
         dependencies[root["bom-ref"]].add(platform)
@@ -335,6 +338,10 @@ def main() -> None:
     native_parser.add_argument("--output", required=True, type=pathlib.Path)
     native_parser.add_argument("--cargo-about", type=pathlib.Path)
     native_parser.add_argument("--rust-target", default="")
+    # The crate whose dependencies the inventory lists.
+    native_parser.add_argument(
+        "--cargo-manifest", type=pathlib.Path, default=PLATFORM_MANIFEST
+    )
     args = parser.parse_args()
     native(
         json.loads(args.records.read_text()),
@@ -342,6 +349,7 @@ def main() -> None:
         args.output,
         json.loads(args.cargo_about.read_text()) if args.cargo_about else None,
         args.rust_target,
+        args.cargo_manifest,
     )
 
 

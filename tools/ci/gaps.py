@@ -17,6 +17,15 @@ if TYPE_CHECKING:
 
 GAPS_PATH = pathlib.Path(__file__).resolve().parents[2] / "docs/support-gaps.toml"
 
+# The implementation of the C API on MapLibre Native's C++ core, which every
+# binding wraps. A preset's MLN_FFI_IMPLEMENTATION can name another, such as
+# maplibre-native-next, that only the C API itself builds on so far.
+DEFAULT_IMPLEMENTATION = "maplibre-native"
+# Another implementation's preset is named for the default implementation's
+# preset of the same target, with the implementation's suffix:
+# emscripten-wasm32-webgpu-next.
+IMPLEMENTATION_SUFFIXES = {"maplibre-native-next": "-next"}
+
 PLATFORM_LABELS = {
     "linux-gnu": "Linux (GNU)",
     "linux-musl": "Linux (musl)",
@@ -86,8 +95,16 @@ class Target:
         )
 
 
+def split_implementation(preset: str) -> tuple[str, str]:
+    """A preset's name without its implementation's suffix, and the implementation."""
+    for implementation, suffix in IMPLEMENTATION_SUFFIXES.items():
+        if preset.endswith(suffix):
+            return preset.removesuffix(suffix), implementation
+    return preset, DEFAULT_IMPLEMENTATION
+
+
 def target_from_name(preset: str) -> Target:
-    platform, arch, backend = preset.rsplit("-", 2)
+    platform, arch, backend = split_implementation(preset)[0].rsplit("-", 2)
     return normalized_target(platform, arch, backend)
 
 
@@ -263,4 +280,6 @@ def gap(binding: str, target: Target, operation: str = "test") -> Entry | None:
 
 
 def supported(binding: str, target: NativeTarget, operation: str = "test") -> bool:
+    if binding != "c" and target.implementation != DEFAULT_IMPLEMENTATION:
+        return False
     return gap(binding, target_from_preset(target), operation) is None

@@ -550,6 +550,14 @@
       "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "webgpu" }
     },
     {
+      "name": "_maplibre-native-next",
+      "hidden": true,
+      "cacheVariables": {
+        "MLN_FFI_IMPLEMENTATION": "maplibre-native-next"
+      },
+      "vendor": { "maplibre-native-ffi": { "unit": "next" } }
+    },
+    {
       "name": "_webgl",
       "hidden": true,
       "cacheVariables": {
@@ -656,6 +664,11 @@
       "name": "emscripten-wasm32-webgpu",
       "displayName": "Browser WASM32 WebGPU",
       "inherits": ["_emscripten-wasm32", "_webgpu"]
+    },
+    {
+      "name": "emscripten-wasm32-webgpu-next",
+      "displayName": "Browser WASM32 WebGPU on maplibre-native-next",
+      "inherits": ["_maplibre-native-next", "_emscripten-wasm32", "_webgpu"]
     },
     {
       "name": "macos-arm64-metal",

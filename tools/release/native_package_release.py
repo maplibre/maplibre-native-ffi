@@ -444,6 +444,17 @@ def prepare_assets(
     root = repository or pathlib.Path(required_env("MISE_MONOREPO_ROOT"))
     sha = required_env("PUBLISH_SHA")
     archives = native_archives(release_dir, package_presets(root))
+    # A package chooses from the index the default implementation's archive for
+    # its platform and backend. Another implementation's archives publish beside
+    # them, outside the index.
+    indexed = [
+        archive
+        for archive in archives
+        if gaps.split_implementation(
+            archive.name.removeprefix(ARCHIVE_PREFIX).removesuffix(ARCHIVE_SUFFIX)
+        )[1]
+        == gaps.DEFAULT_IMPLEMENTATION
+    ]
     for archive in archives:
         rewrite_archive(archive, version, sha)
     xcframework = release_dir / XCFRAMEWORK_NAME
@@ -470,7 +481,7 @@ def prepare_assets(
     root_component["group"] = "org.maplibre.nativeffi"
     publish_inventory(xcframework, compose(root_component, inventories), tag)
     artifacts_path = release_dir / ARTIFACTS_NAME
-    index = write_artifacts(artifacts_path, tag, archives, xcframework)
+    index = write_artifacts(artifacts_path, tag, indexed, xcframework)
     zig_package = release_dir / ZIG_PACKAGE_NAME
     write_zig_package(
         zig_package,
@@ -479,7 +490,7 @@ def prepare_assets(
         index,
         {
             archive.name: (f"{RELEASE_DOWNLOAD_URL}/{tag}/{archive.name}", archive)
-            for archive in archives
+            for archive in indexed
         },
     )
     write_notes(release_dir, channel, sha, version, root)

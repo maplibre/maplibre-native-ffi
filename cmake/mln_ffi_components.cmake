@@ -226,15 +226,32 @@ function(mln_ffi_install_components target artifact_file)
   set(input "${CMAKE_CURRENT_BINARY_DIR}/components.json")
   file(WRITE "${input}" "[${records}]\n")
   set(output "${CMAKE_CURRENT_BINARY_DIR}/components")
+  # The crates of the Rust library that the package carries: the platform
+  # layer's, or maplibre-native-next's.
   set(arguments)
-  if(TARGET mln_ffi_platform_rust)
-    get_target_property(rust_about mln_ffi_platform_rust MLN_FFI_CARGO_ABOUT)
-    list(APPEND arguments --cargo-about "${rust_about}" --rust-target
-         "${MLN_FFI_RUST_TARGET}")
-  endif()
+  foreach(rust_library mln_ffi_platform_rust ${target})
+    if(TARGET ${rust_library})
+      get_target_property(rust_about ${rust_library} MLN_FFI_CARGO_ABOUT)
+      if(rust_about)
+        get_target_property(
+          rust_manifest ${rust_library} MLN_FFI_CARGO_MANIFEST)
+        list(
+          APPEND
+          arguments
+          --cargo-about
+          "${rust_about}"
+          --cargo-manifest
+          "${rust_manifest}"
+          --rust-target
+          "${MLN_FFI_RUST_TARGET}")
+      endif()
+    endif()
+  endforeach()
   find_program(MLN_FFI_PYTHON NAMES python3 REQUIRED)
+  # It builds with everything else, as the artifact descriptor does.
   add_custom_target(
     ${target}_components
+    ALL
     COMMAND
       "${MLN_FFI_PYTHON}"
       "${PROJECT_SOURCE_DIR}/tools/release/sbom.py"

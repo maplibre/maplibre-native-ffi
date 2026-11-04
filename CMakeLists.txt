@@ -70,13 +70,12 @@ include(CTest)
 
 if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
   mln_ffi_add_maplibre_native_next_library(maplibre_native_c)
-  mln_ffi_install_maplibre_native_next_library(maplibre_native_c)
 else()
   mln_ffi_select_render_backend()
   mln_ffi_add_c_api_library(maplibre_native_c)
   mln_ffi_add_core_components(maplibre_native_c)
-  mln_ffi_install_c_api_library(maplibre_native_c)
 endif()
+mln_ffi_install_c_api_library(maplibre_native_c)
 
 # The namespace is the repository, not the target: `maplibre_native_c` is the C
 # component of `maplibre-native-ffi`, the same split the other bindings publish

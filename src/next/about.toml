@@ -1,0 +1,19 @@
+# The licenses that cargo-about accepts for the crate's dependencies, which the
+# native package's SBOM and notices list. As src/platform/rust/about.toml, and
+# BSL-1.0 for xxhash-rust.
+accepted = [
+  "0BSD",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "Unicode-3.0",
+  "Zlib",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+targets = ["wasm32-unknown-emscripten"]
+workarounds = ["ring", "rustls"]

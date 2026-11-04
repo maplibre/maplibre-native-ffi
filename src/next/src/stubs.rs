@@ -641,12 +641,6 @@ pub unsafe extern "C" fn mln_open_gl_supported_context_provider_mask() -> mln_op
     Default::default()
 }
 
-/// `mln_plugin_get_register_function_v1` (plugin.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1 {
-    Default::default()
-}
-
 /// `mln_projected_meters_for_lat_lng` (projection.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_projected_meters_for_lat_lng(coordinate: mln_lat_lng, out_meters: *mut mln_projected_meters, out_diagnostic: *mut mln_diagnostic) -> mln_status {
@@ -955,6 +949,7 @@ const _: () = {
     let _ = [crate::types::mln_network_set_status, crate::runtime::mln_network_set_status];
     let _ = [crate::types::mln_offscreen_device_create, crate::session::mln_offscreen_device_create];
     let _ = [crate::types::mln_offscreen_device_release, crate::session::mln_offscreen_device_release];
+    let _ = [crate::types::mln_plugin_get_register_function_v1, crate::plugin::mln_plugin_get_register_function_v1];
     let _ = [crate::types::mln_render_frame_batch_release, crate::session::mln_render_frame_batch_release];
     let _ = [crate::types::mln_render_session_abandon, crate::session::mln_render_session_abandon];
     let _ = [crate::types::mln_render_session_barrier, crate::session::mln_render_session_barrier];

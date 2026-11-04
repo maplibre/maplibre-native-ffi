@@ -21,6 +21,7 @@ from native_package_release import (
     package_presets,
     prepare_assets,
     sbom_path,
+    sha256,
 )
 from release_version import next_release, require_current_month, validate_tag
 from sbom import SBOM_NAME, component, document
@@ -562,6 +563,40 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
 
         self.assertNotIn("/compare/", notes)
+
+    def test_another_implementations_archive_publishes_outside_the_index(
+        self,
+    ) -> None:
+        # maplibre-native-next builds the same platform and backend, which the
+        # index may name only once, for the packages that choose from it.
+        next_preset = f"{self.preset}-next"
+        self.write_presets(self.preset, next_preset)
+        archive = self.archive()
+        next_archive = self.archive(next_preset)
+        self.prepare("release")
+
+        with tarfile.open(next_archive, "r:gz") as package:
+            stamped = json.load(
+                package.extractfile(
+                    f"maplibre-native-c-{next_preset}/share/maplibre-native-c/artifact.json"
+                )
+            )
+        index = json.loads((self.release_dir / ARTIFACTS_NAME).read_text())
+        checksums = (self.release_dir / "SHA256SUMS").read_text()
+        with tarfile.open(self.release_dir / ZIG_PACKAGE_NAME, "r:gz") as package:
+            manifest = (
+                package.extractfile("maplibre-native-ffi-zig/build.zig.zon")
+                .read()
+                .decode()
+            )
+
+        self.assertEqual(stamped["version"], self.version)
+        self.assertEqual(
+            [artifact["archive"] for artifact in index["artifacts"]], [archive.name]
+        )
+        self.assertNotIn(next_archive.name, manifest)
+        self.assertIn(f"{sha256(next_archive)}  {next_archive.name}", checksums)
+        self.assertTrue(sbom_path(next_archive).is_file())
 
     def test_zig_package_declares_each_native_archive_lazily(self) -> None:
         archive = self.archive()

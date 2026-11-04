@@ -672,10 +672,12 @@ function(mln_ffi_add_native_tests)
   endif()
 
   if(EMSCRIPTEN)
-    mln_native_add_browser_abi_shards()
     if(MLN_FFI_IMPLEMENTATION STREQUAL "maplibre-native-next")
+      # The ABI suite builds against maplibre-native-next, but calls functions
+      # that it leaves unimplemented, so only the crate's own tests run.
       mln_ffi_add_maplibre_native_next_tests(next_tests)
     else()
+      mln_native_add_browser_abi_shards()
       mln_native_add_browser_test(native-internal/browser
                                   mln_native_internal_tests)
     endif()

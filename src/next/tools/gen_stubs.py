@@ -26,8 +26,8 @@ SRC = ROOT / "src" / "next" / "src"
 OUT = SRC / "stubs.rs"
 sys.path.insert(0, str(ROOT))
 
-from tools.bindgen.emitters import rust_sys  # noqa: E402
-from tools.bindgen.frontend import parse_headers  # noqa: E402
+from tools.bindgen.emitters import rust_sys
+from tools.bindgen.frontend import parse_headers
 
 
 def implemented():
@@ -78,7 +78,12 @@ def main():
     stubbed = [function for function in api.functions if function.name not in done]
     for function in stubbed:
         # `pub fn name(parameters) -> result;`, as the -sys crate declares it.
-        signature = declarations.extern(function).strip().removeprefix("pub fn ").removesuffix(";")
+        signature = (
+            declarations.extern(function)
+            .strip()
+            .removeprefix("pub fn ")
+            .removesuffix(";")
+        )
         result = function.return_type
         returns = "" if result.kind == "void" else declarations.type(result)
         header = Path(function.location.path).name
@@ -96,7 +101,9 @@ def main():
     lines.append("const _: () = {")
     for function in api.functions:
         if module := done.get(function.name):
-            lines.append(f"    let _ = [crate::types::{function.name}, crate::{module}::{function.name}];")
+            lines.append(
+                f"    let _ = [crate::types::{function.name}, crate::{module}::{function.name}];"
+            )
     lines.append("};")
     lines.append("")
     OUT.write_text("\n".join(lines))

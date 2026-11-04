@@ -560,6 +560,22 @@ ci:
               - bindings/kotlin/karma.config.d/**
               - third_party/maplibre-native
           then: apply
+    next:
+      covers: >-
+        The C API on maplibre-native-next, the Rust port of MapLibre Native's
+        core in src/next, built for the browser with Emscripten and WebGPU. Runs
+        the crate's own browser tests and checks its native package, which a
+        release publishes beside the C++ ones. Changes to src/next, its CMake,
+        the generated declarations it includes, and the shared Rust build and
+        native packaging that it goes through need it. Changes to the C++
+        implementation in src/ don't.
+      rules:
+        - if:
+            files:
+              - src/next/**
+              - cmake/mln_ffi_maplibre_native_next.cmake
+              - cmake/mln_ffi_rust.cmake
+          then: apply
     maven:
       covers: >-
         Assembles and verifies the Kotlin Maven repository from every target's

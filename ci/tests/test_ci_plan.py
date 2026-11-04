@@ -6,7 +6,7 @@ import collections
 import json
 import unittest
 
-from tools.ci import plan
+from tools.ci import plan, suites
 from tools.ci.plan import ROOT
 
 
@@ -108,6 +108,35 @@ class ResolverTest(unittest.TestCase):
             )
         )
         self.assertEqual(target.backend, "egl")
+
+    def test_a_target_builds_the_implementation_that_its_preset_names(self):
+        for name, variables, implementation in (
+            ("linux-gnu-x64-vulkan", {}, "maplibre-native"),
+            (
+                "linux-gnu-x64-vulkan-next",
+                {"MLN_FFI_IMPLEMENTATION": "maplibre-native-next"},
+                "maplibre-native-next",
+            ),
+        ):
+            with self.subTest(name=name):
+                target = self.only(
+                    presets(preset(name, vendor=RUNS, **TARGET, **variables))
+                )
+                self.assertEqual(target.implementation, implementation)
+
+    def test_an_implementation_that_the_preset_name_does_not_say_fails(self):
+        # The release tools know an archive's implementation from its name.
+        with self.assertRaisesRegex(SystemExit, "which its name must say"):
+            plan.targets(
+                presets(
+                    preset(
+                        "linux-gnu-x64-vulkan",
+                        vendor=RUNS,
+                        MLN_FFI_IMPLEMENTATION="maplibre-native-next",
+                        **TARGET,
+                    )
+                )
+            )
 
     def test_a_missing_parent_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown preset '_gone'"):
@@ -345,6 +374,29 @@ class PresetTest(unittest.TestCase):
             browser_presets,
             {"emscripten-wasm32-webgl", "emscripten-wasm32-webgpu"},
         )
+
+    def test_maplibre_native_next_builds_only_the_c_api_in_its_own_unit(self):
+        # The bindings wrap the C++ implementation, so the port's target runs
+        # no binding suite and no package takes its archive.
+        target = self.targets["emscripten-wasm32-webgpu-next"]
+        self.assertEqual(
+            (target.implementation, target.unit), ("maplibre-native-next", "next")
+        )
+        (row,) = plan.plan(self.presets, False, ["next"])["matrix"]
+        self.assertEqual(
+            (row["preset"], row["addon"], row["python_wheel"]),
+            (target.preset, "", False),
+        )
+        self.assertEqual(
+            [suite.command[2] for suite in suites.target_suites(target)],
+            ["test", "archive-native", "install-native-package"],
+        )
+        for job in plan.JOBS:
+            with self.subTest(job=job):
+                self.assertNotIn(
+                    target,
+                    plan.consumed(job, list(self.targets.values())),
+                )
 
     def test_an_unknown_unit_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown coverage units: nope"):

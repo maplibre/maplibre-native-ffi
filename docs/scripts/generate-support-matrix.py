@@ -13,6 +13,7 @@ from tools.ci import plan
 from tools.ci.gaps import (
     BACKEND_LABELS,
     BINDING_LABELS,
+    DEFAULT_IMPLEMENTATION,
     DEVICE_PLATFORMS,
     GAP_STATUSES,
     OPERATIONS,
@@ -39,7 +40,13 @@ def support_matrix() -> dict[str, Any]:
         if coverage.get((binding, target)) != "tested":
             coverage[(binding, target)] = status
 
-    for preset in plan.targets(presets):
+    # The bindings wrap the default implementation, whose support this shows.
+    native_targets = [
+        preset
+        for preset in plan.targets(presets)
+        if preset.implementation == DEFAULT_IMPLEMENTATION
+    ]
+    for preset in native_targets:
         target = target_from_preset(preset)
         if gap("c", target, "build"):
             continue
@@ -51,7 +58,7 @@ def support_matrix() -> dict[str, Any]:
                 record(binding, target, status)
 
     issue, entries = load_gaps()
-    built = {target_from_preset(preset) for preset in plan.targets(presets)}
+    built = {target_from_preset(preset) for preset in native_targets}
     named = {target for entry in entries for target in entry.rows()}
     targets = sorted(built | named, key=Target.sort_key)
 
