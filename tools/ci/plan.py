@@ -130,6 +130,15 @@ JOBS = {
         "react-native",
         lambda target: target.preset == "ios-simulator-arm64-metal",
     ),
+    # The SwiftUI example builds against one archive per platform.
+    "swiftui-ios": (
+        "swiftui",
+        lambda target: target.preset == "ios-simulator-arm64-metal",
+    ),
+    "swiftui-macos": (
+        "swiftui",
+        lambda target: target.preset == "macos-arm64-metal",
+    ),
     "swift-package": (
         "swiftpm",
         lambda target: (
