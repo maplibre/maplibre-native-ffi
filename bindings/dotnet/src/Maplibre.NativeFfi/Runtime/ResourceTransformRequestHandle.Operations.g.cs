@@ -41,12 +41,12 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     internal MlnResourceTransformRequest Handle => state.Handle;
 
     /// <summary>
-    /// The native handle value. It stays readable after close.
+    /// The native handle value. It stays readable after release.
     /// </summary>
     public ulong Id => state.Handle.Value;
 
     /// <summary>
-    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// Whether a release, dispose, or discard has ended the handle.
     /// </summary>
     public bool IsClosed => state.IsClosed;
 
@@ -55,9 +55,9 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// </summary>
     public override string ToString() => state.ToString();
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
-        state.Retire();
+        state.Close();
     }
 
     /// <summary>
@@ -66,7 +66,7 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// <remarks>
     /// <para><c>url</c> must not be empty. A failed answer fails the request
     /// with <c>ResourceErrorReason.Other</c>, as
-    /// <c>ResourceTransformRequestHandle.Dispose()</c> does.</para>
+    /// <c>ResourceTransformRequestHandle.Release()</c> does.</para>
     /// <para>See <c>mln_resource_transform_request_complete</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -100,7 +100,7 @@ public sealed unsafe partial class ResourceTransformRequestHandle
     /// such as <c>ResourceErrorReason.Connection</c>, and the retry calls the
     /// transform again. When this call fails, the request fails with
     /// <c>ResourceErrorReason.Other</c>, as
-    /// <c>ResourceTransformRequestHandle.Dispose()</c> does.</para>
+    /// <c>ResourceTransformRequestHandle.Release()</c> does.</para>
     /// <para>See <c>mln_resource_transform_request_fail</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -120,5 +120,19 @@ public sealed unsafe partial class ResourceTransformRequestHandle
             state.EndAnswer();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Releases a resource transform request.
+    /// </summary>
+    /// <remarks>
+    /// <para>Releasing a request without an answer fails it with
+    /// <c>ResourceErrorReason.Other</c>.</para>
+    /// <para>See <c>mln_resource_transform_request_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
+    /// </remarks>
+    public void Release()
+    {
+        state.Close();
     }
 }

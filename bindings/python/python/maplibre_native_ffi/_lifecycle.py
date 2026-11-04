@@ -15,8 +15,8 @@ class NativeHandleMixin:
 
     @property
     def is_closed(self) -> bool:
-        """Whether the binding has accepted a release, dispose, close, discard,
-        or ``with`` block exit of the handle."""
+        """Whether the binding has accepted a release, dispose, discard, or
+        ``with`` block exit of the handle."""
         return bool(self._native._is_closed)
 
     def __repr__(self) -> str:
@@ -28,31 +28,24 @@ class NativeHandleMixin:
         # interpreter shutdown when Python globals may be partially torn down.
         with suppress(BaseException):
             native = getattr(self, "_native", None)
-            # A callback's borrowed handle is its owner's to close.
+            # A callback's borrowed handle is its owner's to release.
             if native is not None and not native._is_closed and not native._is_borrowed:
                 warnings.warn(
-                    f"{self._handle_name} was not explicitly closed",
+                    f"{self._handle_name} was not explicitly released",
                     ResourceWarning,
                     stacklevel=1,
                 )
 
 
 class ScopedHandleMixin(NativeHandleMixin):
-    """The ``with`` block of a handle whose scope can clean it up."""
+    """The ``with`` block of a handle whose scope can clean it up.
 
-    def close(self) -> object:
-        """Release the private native handle.
-
-        Synchronous close is idempotent. Repeated asynchronous releases reach
-        native and report an invalid-state error.
-
-        A handle whose release reports asynchronous teardown returns a future
-        here, and a host that must observe teardown calls ``close`` itself and
-        waits. Leaving the ``with`` block disposes such a handle instead, as
-        ``dispose`` does, without observing teardown. Leaving the block after an explicit close
-        does nothing.
-        """
-        return self._native.close()
+    Leaving the block disposes the handle, as ``dispose`` does, and returns
+    without waiting for it to retire, whatever state the handle is in, such as
+    a runtime whose map is still live. To wait until a handle retires, call
+    ``release()`` and wait for its future instead. Leaving the block after an
+    explicit release or dispose does nothing.
+    """
 
     def __enter__(self) -> Self:
         return self
@@ -63,4 +56,6 @@ class ScopedHandleMixin(NativeHandleMixin):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self._native._exit()
+        native = self._native
+        if not native._is_closed:
+            native._dispose()

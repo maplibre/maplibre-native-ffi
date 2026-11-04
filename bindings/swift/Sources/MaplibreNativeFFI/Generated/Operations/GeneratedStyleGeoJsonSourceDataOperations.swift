@@ -40,7 +40,7 @@ public extension GeoJsonSourceDataHandle {
   ///
   /// See `mln_geo_json_source_data_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func close() {
+  func release() {
     nativeClose { raw in mln_geo_json_source_data_release(raw) }
   }
 }

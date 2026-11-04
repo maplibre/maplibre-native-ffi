@@ -50,7 +50,7 @@ def drain_frame_results() -> None:
         result.disposition == mln.RenderResult.FAILED
         for result in results
     ):
-        replace_session()  # Close the session and attach a new one.
+        replace_session()  # Release the session and attach a new one.
     elif not paused:
         run_at_next_refresh(demand_frame)
 
@@ -153,5 +153,5 @@ def render_to_window(
     del graphics_thread_options
 
     paused = True
-    session.close().result()
+    session.release().result()
     destroy_surface()  # For example, with vkDestroySurfaceKHR.

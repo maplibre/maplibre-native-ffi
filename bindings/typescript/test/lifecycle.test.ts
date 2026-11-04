@@ -1,5 +1,5 @@
-// Owner handles: repeated closes, refused closes, IDs, and what keeps an owner
-// reachable.
+// Owner handles: repeated releases, refused releases, scoped cleanup, IDs, and
+// what keeps an owner reachable.
 
 import assert from "node:assert/strict";
 
@@ -33,33 +33,56 @@ test("repeated asynchronous release reaches native", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openMap();
 
-  // A synchronous close is idempotent.
+  // A synchronous release is idempotent.
   const projection = MapProjectionHandle.create(map.getSnapshot().view);
-  projection.close();
-  projection.close();
+  projection.release();
+  projection.release();
 
   // An asynchronous release after an accepted one reaches native code, which
   // reports the handle stale, as it does for any other call on it.
-  await bounded(map.close(), "map close");
-  await assert.rejects(map.close(), isInvalidState);
+  await bounded(map.release(), "map release");
+  await assert.rejects(map.release(), isInvalidState);
   assert.throws(() => map.getSnapshot(), isInvalidState);
   await assert.rejects(map.setStyleJson(emptyStyle()), isInvalidState);
 });
 
 test(
-  "a disposer after an explicit close or dispose does nothing",
+  "a disposer after an explicit release or dispose does nothing",
   async () => {
     const fixture = await openRuntime();
 
-    const closed = await fixture.openMap();
-    await bounded(closed.close(), "map close");
-    await closed[Symbol.asyncDispose]();
-    closed[Symbol.dispose]();
+    const released = await fixture.openMap();
+    await bounded(released.release(), "map release");
+    await released[Symbol.asyncDispose]();
+    released[Symbol.dispose]();
 
     const disposed = await RuntimeHandle.create();
     disposed.dispose();
     await disposed[Symbol.asyncDispose]();
     await disposed[Symbol.asyncDispose]();
+  },
+  { needs: ["disposers"] },
+);
+
+test(
+  "await using waits for the release, and using disposes",
+  async () => {
+    const fixture = await openRuntime();
+    const map = await fixture.openMap();
+    const release = map.release.bind(map);
+    let retired = false;
+    map.release = () =>
+      release().then(() => {
+        retired = true;
+      });
+    await map[Symbol.asyncDispose]();
+    assert.equal(retired, true);
+
+    const disposed = fixture.runtime.createMap(mapOptions);
+    await bounded(disposed.ready, "map creation");
+    disposed.release = () => assert.fail("using released the map");
+    disposed[Symbol.dispose]();
+    assert.equal(disposed.isClosed, true);
   },
   { needs: ["disposers"] },
 );
@@ -75,7 +98,7 @@ test("a handle names its id and whether it is closed", async () => {
     projection.toString(),
     `MapProjectionHandle(id=${projectionId}, closed=false)`,
   );
-  projection.close();
+  projection.release();
   assert.equal(projection.isClosed, true);
   assert.equal(
     projection.toString(),
@@ -93,30 +116,30 @@ test("a handle names its id and whether it is closed", async () => {
   runtime.dispose();
 });
 
-test("a refused close leaves the handle usable for a later close", async () => {
+test("a refused release leaves the handle usable for a later release", async () => {
   const runtime = await RuntimeHandle.create();
   const map = runtime.createMap(mapOptions);
   await bounded(map.ready, "map creation");
 
   // The live map makes native refuse the release before teardown starts.
-  await assert.rejects(runtime.close(), isInvalidState);
+  await assert.rejects(runtime.release(), isInvalidState);
   await bounded(
     runtime.clearResourceTransform(),
     "a call on the refused runtime",
   );
 
-  await bounded(map.close(), "map close");
-  await bounded(runtime.close(), "runtime close");
+  await bounded(map.release(), "map release");
+  await bounded(runtime.release(), "runtime release");
 });
 
-test("a handle id names its events and outlives close", async () => {
+test("a handle id names its events and outlives its release", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();
   const loaded = await fixture.awaitEventType(RuntimeEventType.mapStyleLoaded);
   assert.equal(loaded.source, map.id);
 
-  await bounded(map.close(), "map close");
-  // A host routes events that arrive after close by the ID it kept.
+  await bounded(map.release(), "map release");
+  // A host routes events that arrive after the release by the ID it kept.
   assert.equal(map.id, loaded.source);
 });
 
@@ -134,13 +157,13 @@ test(
     const { map, runtime } = await mapWithoutItsRuntime();
     // A new WeakRef holds its target until the job that made it ends, so the
     // collection waits a turn. Had the collector reclaimed the runtime, its
-    // owner token would have disposed the runtime and the map, and both closes
-    // would fail.
+    // owner token would have disposed the runtime and the map, and both
+    // releases would fail.
     await turn();
     capabilities.forcedGc!();
     await turn();
-    await bounded(map.close(), "map close");
-    await bounded(runtime.deref()!.close(), "runtime close");
+    await bounded(map.release(), "map release");
+    await bounded(runtime.deref()!.release(), "runtime release");
   },
   { needs: ["forcedGc"] },
 );

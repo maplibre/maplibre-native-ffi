@@ -7,7 +7,7 @@ public extension ResourceRequestHandle {
   /// Answers a resource request.
   ///
   /// A failed answer fails the request with `ResourceErrorReason.other`, as
-  /// `ResourceRequestHandle.close()` does.
+  /// `ResourceRequestHandle.release()` does.
   ///
   /// See `mln_resource_request_complete` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -49,7 +49,7 @@ public extension ResourceRequestHandle {
   ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func close() {
+  func release() {
     nativeClose { raw in mln_resource_request_release(raw) }
   }
 
@@ -82,7 +82,7 @@ public extension ResourceRequestHandle {
   /// Hands a resource request back to the library to load as usual.
   ///
   /// A failed call fails the request with `ResourceErrorReason.other`, as
-  /// `ResourceRequestHandle.close()` does.
+  /// `ResourceRequestHandle.release()` does.
   ///
   /// See `mln_resource_request_pass_through` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

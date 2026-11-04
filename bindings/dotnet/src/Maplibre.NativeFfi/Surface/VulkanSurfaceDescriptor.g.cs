@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// <para>The device must have VK_KHR_swapchain enabled, and the queue family of
 /// <c>graphics_queue_family_index</c> must support presenting to the surface.
 /// The session creates the swapchain. It uses the surface until a replacement
-/// or release of the target completes, a detach or disposal of the session
+/// or release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.</para>
 /// <para>See <c>mln_vulkan_surface_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>

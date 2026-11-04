@@ -93,7 +93,7 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
         handle.complete(ok_response())
 
 
-def test_a_refused_answer_closes_its_request(
+def test_a_refused_answer_retires_its_request(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
     handles: list[mln.ResourceRequestHandle] = []
@@ -110,7 +110,7 @@ def test_a_refused_answer_closes_its_request(
     assert provided.wait(TIMEOUT)
     handle = handles.pop()
     # The response fails to convert before native sees the answer, which still
-    # closes the handle and fails the request.
+    # retires the handle and fails the request.
     with pytest.raises(AttributeError):
         handle.complete(typing.cast("mln.ResourceResponse", "not a response"))
     assert handle.is_closed
@@ -128,7 +128,7 @@ def test_a_transform_request_is_answered_from_another_thread_after_its_callback(
         kind: mln.ResourceKind, url: str, request: mln.ResourceTransformRequestHandle
     ) -> None:
         if url != style:
-            request.close()
+            request.release()
             return
         received.append(request)
         taken.set()

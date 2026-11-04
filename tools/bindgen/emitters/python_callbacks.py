@@ -157,7 +157,7 @@ def sources(values, plan):
         callback = values.api.callbacks[field.value.native]
         parameters = list(callback.arguments)
         # A handle the callback owns arrives in its generated owner, which a
-        # callback that raises closes, so native never waits on it.
+        # callback that raises releases, so native never waits on it.
         owned = [
             p
             for p in parameters
@@ -188,8 +188,8 @@ def sources(values, plan):
         )
         invoke = f"return callback({arguments})"
         if owned:
-            closes = "".join(f"            {p.name}.close()\n" for p in owned)
-            invoke = f"try:\n            return callback({arguments})\n        except BaseException:\n{closes}            raise"
+            releases = "".join(f"            {p.name}.release()\n" for p in owned)
+            invoke = f"try:\n            return callback({arguments})\n        except BaseException:\n{releases}            raise"
         methods.append(
             f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n"
             + ("" if required else "        assert callback is not None\n")
@@ -222,7 +222,7 @@ def sources(values, plan):
             for p in owned
         )
         unadopted = "".join(
-            f"if !{rust_field(p.name)}_adopted.get() {{ unsafe {{ {disposal(values.api, p.value.handle, p.value.handle.release, rust_field(p.name))} }}; }} "
+            f"if !{rust_field(p.name)}_adopted.get() {{ unsafe {{ {disposal(values.api, p.value.handle.release, rust_field(p.name))} }}; }} "
             for p in owned
         )
         if len(parameters) == 1:

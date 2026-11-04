@@ -38,7 +38,7 @@ def harness() -> Iterator[Harness]:
     try:
         yield fixture
     finally:
-        fixture.close()
+        fixture.release()
 
 
 @pytest.fixture

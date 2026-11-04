@@ -82,7 +82,7 @@ typedef struct mln_queue_lock {
  * mln_acquired_frame_release() succeeds, the session takes the one you pass. A
  * Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up with
  * each frame, so the one you pass stays yours. Keep it valid until a detach or
- * disposal of the session completes.
+ * release of the session completes.
  */
 typedef enum mln_gpu_sync_kind : uint32_t {
   /** The work has already finished, so there is nothing to wait for. */
@@ -200,7 +200,7 @@ typedef struct mln_metal_context_descriptor {
 /**
  * The Vulkan device and queue that a render session uses.
  *
- * Keep these objects alive until a detach or disposal of the session
+ * Keep these objects alive until a detach or release of the session
  * completes, or an abandon of it returns.
  */
 typedef struct mln_vulkan_context_descriptor {

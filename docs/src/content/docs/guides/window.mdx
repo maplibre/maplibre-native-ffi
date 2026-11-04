@@ -90,9 +90,9 @@ results on your event loop with [](api:mln_render_session_drain_frame_results).
 
 <Snippet page="window" region="frame-wake" />
 
-If a result is [](api:MLN_RENDER_RESULT_FAILED), close the session and attach a
-new one. To end the loop, such as before you close the session, stop demanding
-frames.
+If a result is [](api:MLN_RENDER_RESULT_FAILED), release the session and attach
+a new one. To end the loop, such as before you release the session, stop
+demanding frames.
 
 <Snippet page="window" region="frame-loop" />
 
@@ -106,7 +106,7 @@ When the window's size changes, resize the session with
 ## Handle a lost surface
 
 Platforms can take the surface away, for example when your app goes to the
-background. Rather than closing the session, release its target, so the map
+background. Rather than releasing the session, release its target, so the map
 keeps its tiles and renderer state for when the surface comes back.
 
 Stop the frame loop and release the target with
@@ -125,8 +125,8 @@ graphics thread, with the target's context current.
 
 The [](api:mln_render_session_attach_options.driver_work_wake) tells you when
 there's work to do. Each time it fires, schedule a service on your graphics
-thread, even while the frame loop is stopped, and until the session's disposal
-completes. A disposed session detaches at its next service, which frees its
+thread, even while the frame loop is stopped, and until the session's release
+completes. A released session detaches at its next service, which frees its
 graphics objects on your context. If you release the map before that service,
 the session keeps its graphics objects until the process exits.
 

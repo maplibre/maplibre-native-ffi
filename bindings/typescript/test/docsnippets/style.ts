@@ -47,7 +47,7 @@ export async function style(
   });
   map.discarding.addGeoJsonSourceData("points", data);
   // The source keeps its own reference to the data.
-  data.close();
+  data.release();
 
   // Later, prepare new data with the same options, and set it.
   const next = GeoJsonSourceDataHandle.create({
@@ -55,7 +55,7 @@ export async function style(
     coordinates: [2.35, 48.86],
   });
   map.discarding.setGeoJsonSourceData("points", next);
-  next.close();
+  next.release();
   // #endregion geojson
 
   // #region set-property

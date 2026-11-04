@@ -7,21 +7,21 @@ import (
 	"testing"
 )
 
-// Once a close is accepted, a second close and any other call fail with
+// Once a release is accepted, a second release and any other call fail with
 // StatusInvalidState and a diagnostic, and Dispose does nothing.
-func TestCallsAfterCloseFailWithInvalidState(t *testing.T) {
+func TestCallsAfterReleaseFailWithInvalidState(t *testing.T) {
 	f := newFixture(t)
-	await(t, submitted(f.m.Close()))
-	if _, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("second map close: %v, want native invalid state", err)
+	await(t, submitted(f.m.Release()))
+	if _, err := f.m.Release(); !errors.Is(err, StatusInvalidState) {
+		t.Fatalf("second map release: %v, want native invalid state", err)
 	}
 	_, err := f.m.SetStyleJSON(emptyStyle)
-	var closed *Error
-	if !errors.As(err, &closed) || closed.Status != StatusInvalidState || closed.Diagnostic == "" {
-		t.Fatalf("SetStyleJSON after close = %v, want native invalid state", err)
+	var stale *Error
+	if !errors.As(err, &stale) || stale.Status != StatusInvalidState || stale.Diagnostic == "" {
+		t.Fatalf("SetStyleJSON after release = %v, want native invalid state", err)
 	}
 	if err := f.m.Dispose(); err != nil {
-		t.Fatalf("Dispose after close: %v, want a no-op", err)
+		t.Fatalf("Dispose after release: %v, want a no-op", err)
 	}
 }
 
@@ -45,9 +45,9 @@ func checkHandleMembers(t *testing.T, handle handleMembers, typeName string, clo
 	}
 }
 
-// Dispose and a void release each close their handle once: a second call does
+// Dispose and a void release each retire their handle once: a second call does
 // nothing, and the id and String outlive the handle.
-func TestDisposeAndReleaseCloseOnce(t *testing.T) {
+func TestDisposeAndReleaseRetireOnce(t *testing.T) {
 	f := newFixture(t)
 	checkHandleMembers(t, f.m, "MapHandle", false)
 	checkHandleMembers(t, f.runtime, "RuntimeHandle", false)
@@ -68,33 +68,33 @@ func TestDisposeAndReleaseCloseOnce(t *testing.T) {
 	}
 	checkHandleMembers(t, data, "GeoJSONSourceDataHandle", false)
 	for range 2 {
-		if err := data.Close(); err != nil {
-			t.Fatalf("GeoJSONSourceDataHandle.Close: %v", err)
+		if err := data.Release(); err != nil {
+			t.Fatalf("GeoJSONSourceDataHandle.Release: %v", err)
 		}
 	}
 	checkHandleMembers(t, data, "GeoJSONSourceDataHandle", true)
 }
 
-// A runtime refuses to close while its map is live. The refusal leaves the
-// runtime open and usable, and a close after the map's succeeds.
-func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
+// A runtime refuses a release while its map is live. The refusal leaves the
+// runtime open and usable, and a release after the map's succeeds.
+func TestRefusedReleaseLeavesTheHandleUsable(t *testing.T) {
 	f := newFixture(t)
-	teardown, err := f.runtime.Close()
+	teardown, err := f.runtime.Release()
 	var native *Error
 	if teardown != nil || !errors.As(err, &native) || !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("runtime close with a live map = (%v, %v), want nil and StatusInvalidState", teardown, err)
+		t.Fatalf("runtime release with a live map = (%v, %v), want nil and StatusInvalidState", teardown, err)
 	}
 	if native.Diagnostic == "" {
 		t.Fatal("the refusal carried no diagnostic")
 	}
 	await(t, submitted(f.runtime.ClearResourceTransform()))
-	await(t, submitted(f.m.Close()))
-	await(t, submitted(f.runtime.Close()))
+	await(t, submitted(f.m.Release()))
+	await(t, submitted(f.runtime.Release()))
 }
 
 // A handle's id is the source that its events carry, and it stays readable
-// after close, so a host can route events that it drains later.
-func TestHandleIDNamesItsEventsAndOutlivesClose(t *testing.T) {
+// after its release, so a host can route events that it drains later.
+func TestHandleIDNamesItsEventsAndOutlivesItsRelease(t *testing.T) {
 	f := newFixture(t)
 	await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
 	event := f.awaitEvent(t, "the style load", isStyleLoaded)
@@ -102,9 +102,9 @@ func TestHandleIDNamesItsEventsAndOutlivesClose(t *testing.T) {
 	if event.Source != id {
 		t.Fatalf("event source = %#x, want the map id %#x", event.Source, id)
 	}
-	await(t, submitted(f.m.Close()))
+	await(t, submitted(f.m.Release()))
 	if got := f.m.ID(); got != id {
-		t.Fatalf("ID() after close = %#x, want %#x", got, id)
+		t.Fatalf("ID() after release = %#x, want %#x", got, id)
 	}
 }
 
@@ -137,7 +137,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := data.Close(); err != nil {
+	if err := data.Release(); err != nil {
 		t.Fatal(err)
 	}
 	if future, err := f.m.AddGeoJSONSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
@@ -167,10 +167,10 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	// through it.
 	t.Cleanup(func() {
 		parent := f.m.bindingOwner.parent.(*RuntimeHandle)
-		if future, err := f.m.Close(); !errors.Is(err, StatusInvalidState) {
+		if future, err := f.m.Release(); !errors.Is(err, StatusInvalidState) {
 			await(t, submitted(future, err))
 		}
-		await(t, submitted(parent.Close()))
+		await(t, submitted(parent.Release()))
 	})
 	runtime = nil
 

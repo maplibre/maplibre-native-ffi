@@ -134,7 +134,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
       _leakReporter.attach(
         this,
         'Leaked $typeName native handle 0x${handle.raw.toRadixString(16)}; '
-        'close it explicitly.',
+        'release it explicitly.',
         detach: _finalizerDetachToken,
       );
     } catch (_) {

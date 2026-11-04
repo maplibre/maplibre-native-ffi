@@ -23,9 +23,9 @@ GENERATED = "src/commonMain/kotlin/org/maplibre/nativeffi"
 
 # A handle whose dispose is also its release and takes an optional completion,
 # as the render session's does.
-DISPOSE_WITH_COMPLETION = """
+RELEASE_AND_DISPOSE = """
 typedef unsigned long long mln_lease BIND(
-  "kind=handle;release=mln_lease_dispose;abandon=mln_lease_abandon;"
+  "kind=handle;release=mln_lease_release;abandon=mln_lease_abandon;"
   "dispose=mln_lease_dispose"
 );
 mln_status mln_lease_open(
@@ -33,10 +33,11 @@ mln_status mln_lease_open(
 );
 mln_status mln_lease_abandon(mln_lease lease, mln_diagnostic* out_diagnostic);
 BIND("execution=lifecycle")
-mln_status mln_lease_dispose(
+mln_status mln_lease_release(
   mln_lease lease, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 );
+mln_status mln_lease_dispose(mln_lease lease, mln_diagnostic* out_diagnostic);
 """
 
 # A drain that publishes an owned batch of strided readings with a slice view
@@ -234,41 +235,35 @@ class KotlinLayoutTests(unittest.TestCase):
                 "runtime events report as their source" in owner,
                 handle,
             )
-        # A handle with a dispose closes by disposing, and its suspending
-        # `use` awaits the release.
+        # `use` disposes a handle with a dispose, and `useReleasing` awaits
+        # its release.
         for handle in ("Runtime", "Map"):
             owner = owners[f"{GENERATED}/{handle}Handle.kt"]
             self.assertIn(") : AsyncReleasable, AutoCloseable {", owner)
             self.assertIn("public override fun close() { dispose() }", owner)
-        # A release that completes at once is the handle's only `close()`.
+        # `use` releases a handle that its release frees at once.
         projection = owners[f"{GENERATED}/MapProjectionHandle.kt"]
         self.assertIn(
-            "public override fun close(): Unit = nativeClose(this, binding) "
+            "public fun release(): Unit = nativeClose(this, binding) "
             "{ C.mln_map_projection_release(handle) }",
             projection,
         )
-        self.assertNotIn("fun release(", projection)
+        self.assertIn("public override fun close() { release() }", projection)
+        self.assertNotIn("AsyncReleasable", projection)
 
-    def test_a_dispose_with_a_completion_is_the_release_and_the_dispose(self):
-        outputs = emitted(kotlin, parse(DISPOSE_WITH_COMPLETION))
+    def test_use_releasing_awaits_the_release_and_use_disposes(self):
+        outputs = emitted(kotlin, parse(RELEASE_AND_DISPOSE))
         owner = outputs[f"{GENERATED}/LeaseHandle.kt"]
-        # The release reports retirement through the completion, and the
-        # dispose, like every disposer, passes none.
         self.assertIn(
             "public override fun release(): Deferred<Unit> = nativeRetire(this, binding) "
-            "{ check(C.mln_lease_dispose(handle, completion, diagnostic)) }",
+            "{ check(C.mln_lease_release(handle, completion, diagnostic)) }",
             owner,
         )
         self.assertIn(
             "public fun dispose(): Unit = nativeClose(this, binding) "
-            "{ check(C.mln_lease_dispose(handle, 0L, diagnostic)) }",
+            "{ check(C.mln_lease_dispose(handle, diagnostic)) }",
             owner,
         )
-        self.assertIn(
-            "C.mln_lease_dispose(handle, 0L, diagnostic)",
-            outputs[f"{GENERATED}/GeneratedOwnerDisposal.kt"],
-        )
-        # The suspending `use` awaits the release, and `use` disposes.
         self.assertIn(") : AsyncReleasable, AutoCloseable {", owner)
         self.assertIn("public override val isClosed: Boolean", owner)
         self.assertIn("public override fun close() { dispose() }", owner)

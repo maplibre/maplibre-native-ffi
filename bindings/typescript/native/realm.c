@@ -117,7 +117,7 @@ struct mln_ts_owner {
   mln_ts_owner* next;
   mln_ts_realm* realm;
   // Taken by exchange: the exit path ends session tokens from another thread
-  // while the realm's own thread may close them.
+  // while the realm's own thread may end them.
   void* _Atomic token;
   uint64_t handle;
   bool session;
@@ -688,8 +688,8 @@ static void owner_unlink(mln_ts_owner* owner) {
 }
 
 /**
- * Ends an owner's token: finalizes its handle, or destroys a closed one.
- * Returns whether this call ended it.
+ * Ends an owner's token: finalizes its handle, or destroys a consumed one's
+ * token. Returns whether this call ended it.
  */
 static bool owner_end(mln_ts_owner* owner, bool finalize) {
   void* token = atomic_exchange(&owner->token, NULL);
@@ -724,7 +724,7 @@ static void owner_finalize(napi_env env, void* data, void* hint) {
   // realm may be gone.
   if (owner->linked) {
     owner_unlink(owner);
-    // Collected without close(): dispose the handle, which runs no
+    // Collected without a release or dispose: dispose the handle, which runs no
     // JavaScript, and report the leak on the event loop.
     if (owner_end(owner, true)) {
       mln_ts_leak* leak = calloc(1, sizeof *leak);

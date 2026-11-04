@@ -625,11 +625,7 @@ export interface NativeOperations {
     session: bigint,
     completion: NativeCompletion,
   ): void;
-  mln_render_session_dispose(
-    session: bigint,
-    token: object | undefined,
-    completion: NativeCompletion | undefined,
-  ): void;
+  mln_render_session_dispose(session: bigint, token: object | undefined): void;
   mln_render_session_drain_frame_results(
     session: bigint,
   ): readonly RenderFrameResult[] | undefined;
@@ -669,6 +665,11 @@ export interface NativeOperations {
   ): void;
   mln_render_session_reduce_memory_use(
     session: bigint,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_release(
+    session: bigint,
+    token: object | undefined,
     completion: NativeCompletion,
   ): void;
   mln_render_session_release_target(

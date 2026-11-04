@@ -129,7 +129,7 @@ func offline(ctx context.Context) error {
 		recordRegion(stored.ID, stored.Metadata)
 	}
 
-	// Resume a download that stopped when the runtime closed.
+	// Resume a download that stopped when the runtime was released.
 	resumed, err := runtime.SetOfflineRegionDownloadState(
 		region.ID, maplibre.OfflineRegionDownloadStateActive,
 	)
@@ -157,11 +157,11 @@ func offline(ctx context.Context) error {
 	}
 	// #endregion manage
 
-	closed, err := runtime.Close()
+	released, err := runtime.Release()
 	if err != nil {
 		return err
 	}
-	_, err = closed.Await(ctx)
+	_, err = released.Await(ctx)
 	return err
 }
 

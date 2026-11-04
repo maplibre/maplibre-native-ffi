@@ -52,7 +52,7 @@ export interface OwnerOptions {
 
 /** The owner of one native handle. */
 export abstract class Owner {
-  /** The native handle value. It stays readable after close. */
+  /** The native handle value. It stays readable after release. */
   readonly id: bigint;
   // The state lives on the owner, not in a WeakMap keyed by it: ArkTS keeps
   // a WeakMap value alive while it names its key, so an owner whose callback
@@ -97,7 +97,7 @@ export abstract class Owner {
   }
 
   /**
-   * Whether a release, dispose, close, or discard has ended the handle.
+   * Whether a release, dispose, or discard has ended the handle.
    */
   get isClosed(): boolean {
     return this.#state.released;
@@ -137,7 +137,7 @@ function released(state: OwnerState): void {
 }
 
 /**
- * Releases the handle through a synchronous call. A second close does
+ * Releases the handle through a synchronous call. A second release does
  * nothing, and a release that throws leaves the handle with the owner.
  */
 export function closeSync(
@@ -156,7 +156,7 @@ export function closeSync(
 /**
  * Answers the handle through a synchronous call, which ends the handle
  * whatever it returns. A repeated answer still reaches native code, which
- * reports the handle stale, where a second close does nothing.
+ * reports the handle stale, where a second release does nothing.
  */
 export function answerSync(
   owner: Owner,
@@ -216,12 +216,13 @@ export function adopt<T>(
 
 /**
  * Defines the explicit resource management methods on an owner class, when
- * the host defines their symbols.
+ * the host defines their symbols: `await using` calls `release`, the method
+ * that waits, and `using` calls `dispose`, the one that doesn't.
  */
 export function defineDisposers(
   owner: { prototype: object },
-  asyncClose: string | undefined,
-  syncClose: string | undefined,
+  release: string | undefined,
+  dispose: string | undefined,
 ): void {
   const symbols = Symbol as unknown as {
     asyncDispose?: symbol;
@@ -241,16 +242,16 @@ export function defineDisposers(
       value,
     });
   };
-  const asyncMethod = asyncClose ?? syncClose;
-  // An async disposer returns a Promise even when it falls back to close().
-  // Like the synchronous one, it leaves a released owner as it is.
-  define(symbols.asyncDispose, asyncMethod, async function () {
+  // An async disposer returns a Promise even when the release is
+  // synchronous. Like the synchronous one, it leaves a released owner as it
+  // is.
+  define(symbols.asyncDispose, release, async function () {
     if (!stateOf(this as unknown as Owner).released) {
-      await this[asyncMethod!]!();
+      await this[release!]!();
     }
   });
-  define(symbols.dispose, syncClose, function () {
-    return this[syncClose!]!();
+  define(symbols.dispose, dispose, function () {
+    return this[dispose!]!();
   });
 }
 

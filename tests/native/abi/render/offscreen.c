@@ -121,7 +121,7 @@ static void detach_offscreen_session(mln_test_render_fixture* fixture) {
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
   mln_test_completion_destroy(&detach);
-  MLN_TEST_OK(mln_test_render_session_dispose(fixture->session));
+  MLN_TEST_OK(mln_test_render_session_release(fixture->session));
   *fixture = (mln_test_render_fixture){0};
 }
 
@@ -243,7 +243,7 @@ static void disposing_a_session_without_a_device_ends_it(void) {
   MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   expect_red_pixels(&fixture);
 
-  MLN_TEST_OK(mln_test_render_session_dispose(fixture.session));
+  MLN_TEST_OK(mln_test_render_session_release(fixture.session));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

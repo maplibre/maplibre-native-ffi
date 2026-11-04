@@ -3,5 +3,5 @@
 import { cVersion, RuntimeHandle } from "npm:@maplibre/native-ffi";
 
 const runtime = await RuntimeHandle.create();
-await runtime.close();
+await runtime.release();
 console.log(`loaded C API version ${cVersion()}`);

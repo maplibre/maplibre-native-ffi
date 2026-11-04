@@ -17,9 +17,9 @@ private func expectDescription(
   )
 }
 
-/// A close that is the handle's release is idempotent and marks it closed.
+/// A synchronous release is idempotent and marks the handle closed.
 /// Handles compare by id, so distinct handles key a set apart.
-@Test func aSecondCloseIsANoOpAndTheHandleReportsItIsClosed() async throws {
+@Test func aSecondReleaseIsANoOpAndTheHandleReportsItIsClosed() async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(emptyStyle)
     let data = try GeoJsonSourceDataHandle.create(
@@ -38,11 +38,11 @@ private func expectDescription(
       id: data.id,
       closed: false
     )
-    data.close()
+    data.release()
     #expect(data.isClosed)
-    data.close()
+    data.release()
     #expect(data.isClosed)
-    other.close()
+    other.release()
     expectDescription(
       of: String(describing: data),
       typeName: "GeoJsonSourceDataHandle",
@@ -58,7 +58,7 @@ private func expectDescription(
 
 /// A dispose is idempotent and marks the handle closed, while an asynchronous
 /// release after it reaches native, which reports the stale handle.
-@Test func synchronousCloseIsIdempotentAndAsyncReleaseReachesNative(
+@Test func aDisposeIsIdempotentAndAsyncReleaseReachesNative(
 ) async throws {
   let runtime = try MapFixture.makeRuntime()
   let map = try await MapFixture.makeMap(on: runtime)
@@ -79,7 +79,7 @@ private func expectDescription(
     closed: true
   )
   await expectMaplibreError(.invalidState) {
-    try await map.close()
+    try await map.release()
   }
 
   // The runtime finishes its teardown once the disposed map retires.
@@ -88,9 +88,10 @@ private func expectDescription(
 }
 
 /// A handle's id is the source that its events carry, and it stays readable
-/// after close, so a host can route events that it drains later. The id also
+/// after its release, so a host can route events that it drains later. The id
+/// also
 /// names the handle in its description.
-@Test func aHandleIdNamesItsEventsAndOutlivesClose() async throws {
+@Test func aHandleIdNamesItsEventsAndOutlivesRelease() async throws {
   try await withMapFixture { fixture in
     try await fixture.map.setStyleJson(emptyStyle)
     let loaded = try await fixture.awaitEvent("the style load") {
@@ -99,36 +100,37 @@ private func expectDescription(
     #expect(loaded?.source == fixture.map.id)
     let hex = String(fixture.map.id, radix: 16)
     #expect(fixture.map.description == "MapHandle(id=0x\(hex), closed=false)")
-    try await fixture.map.close()
+    try await fixture.map.release()
     #expect(fixture.map.id == loaded?.source)
     #expect(fixture.map.description == "MapHandle(id=0x\(hex), closed=true)")
   }
 }
 
 /// Native refuses to release a runtime that still has a map, and the refusal
-/// leaves the runtime usable, so the host closes the map and then the runtime.
-@Test func aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds(
+/// leaves the runtime usable, so the host releases the map and then the
+/// runtime.
+@Test func aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds(
 ) async throws {
   let fixture = try await MapFixture.make()
   await expectMaplibreError(.invalidState) {
-    try await fixture.runtime.close()
+    try await fixture.runtime.release()
   }
   try await fixture.runtime.clearResourceTransform()
 
-  try await fixture.map.close()
-  try await fixture.runtime.close()
+  try await fixture.map.release()
+  try await fixture.runtime.release()
 }
 
 /// A map holds its runtime, so a host may drop its own runtime reference
 /// while the map is live, and the map keeps working.
 @Test func aMapKeepsItsRuntimeAlive() async throws {
   var runtime: RuntimeHandle? = try MapFixture.makeRuntime()
-  // Kept only to close the runtime after its map.
+  // Kept only to release the runtime after its map.
   weak let parent = runtime
   let map = try await MapFixture.makeMap(on: #require(runtime))
   runtime = nil
 
   try await map.setStyleJson(emptyStyle)
-  try await map.close()
-  try await #require(parent).close()
+  try await map.release()
+  try await #require(parent).release()
 }

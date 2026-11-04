@@ -151,13 +151,13 @@ class Harness:
 
         return self.events.wait_until(check, event_type.name)
 
-    def close(self) -> None:
+    def release(self) -> None:
         for map_handle in self._maps:
-            close_if_live(map_handle)
-        close_if_live(self.runtime)
+            release_if_live(map_handle)
+        release_if_live(self.runtime)
 
 
-def close_if_live(owner: mln.MapHandle | mln.RuntimeHandle) -> None:
+def release_if_live(owner: mln.MapHandle | mln.RuntimeHandle) -> None:
     try:
         if isinstance(owner, mln.MapHandle):
             owner.get_snapshot()
@@ -167,4 +167,4 @@ def close_if_live(owner: mln.MapHandle | mln.RuntimeHandle) -> None:
         if error.status == mln.Status.INVALID_STATE:
             return
         raise
-    result(owner.close())
+    result(owner.release())

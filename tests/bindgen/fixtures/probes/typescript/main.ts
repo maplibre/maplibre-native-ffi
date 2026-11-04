@@ -78,7 +78,7 @@ probeSettingsCheck({});
 assert.equal(probeTakeParcel(), undefined);
 const parcel = probeTakeParcel();
 assert.equal(parcel?.id, 42n);
-parcel?.close();
+parcel?.release();
 const exhausted = failure(() => probeTakeParcel());
 assert.equal(exhausted.status, -1);
 assert.equal(exhausted.diagnostic, "exhausted");

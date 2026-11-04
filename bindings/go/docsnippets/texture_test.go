@@ -39,7 +39,7 @@ func drawFrame() error {
 		},
 	)
 
-	return errors.Join(err, frame.Close(maplibre.GPUSync{Kind: maplibre.GPUSyncKindCPUComplete}))
+	return errors.Join(err, frame.Release(maplibre.GPUSync{Kind: maplibre.GPUSyncKindCPUComplete}))
 	// #endregion acquire
 }
 

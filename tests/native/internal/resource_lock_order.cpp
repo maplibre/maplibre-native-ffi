@@ -66,7 +66,7 @@ void run_other_runtime(void* argument) {
   static_cast<void>(
     other.sync_points->wait_for_hits(other.point, other.hits.load())
   );
-  other.status = mln_test_runtime_close(runtime);
+  other.status = mln_test_runtime_release(runtime);
   mln_test_flag_set(&other.call_done);
 }
 

@@ -89,7 +89,7 @@ type GeneratedOwnerReservation<O> =
 trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
     const NATIVE: &'static str;
-    /// Disposes a handle that no close consumed, for a handle type with a
+    /// Disposes a handle that no consuming call took, for a handle type with a
     /// disposal.
     const DISPOSE: Option<unsafe extern "C" fn(Self::Native) -> sys::mln_status>;
 
@@ -104,7 +104,7 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         self.state().handle.raw()
     }
 
-    /// Takes the handle for a consuming call; an idempotent close skips a released handle.
+    /// Takes the handle for a consuming call; an idempotent teardown skips a retired handle.
     fn reserve(&self, idempotent: bool) -> PyResult<Option<GeneratedOwnerReservation<Self>>> {
         let state = self.state();
         if state.borrowed {

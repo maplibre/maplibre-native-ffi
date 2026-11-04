@@ -544,7 +544,7 @@ def drained(plan: OperationPlan, call: Call, value_types) -> tuple[str, str | No
         f"value{index[drain.view.name]}",
     )
     release = value_types.bound.source.functions_by_name[handle.release]
-    arguments = disposer_arguments(handle, release, batch)
+    arguments = disposer_arguments(release, batch)
     if release.diagnostic:
         arguments.append("nil")
     released = f"{handle.release}({', '.join(arguments)})"

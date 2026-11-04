@@ -23,7 +23,7 @@ import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.runSuspendTest
-import org.maplibre.nativeffi.use as useAndAwaitRelease
+import org.maplibre.nativeffi.useReleasing
 
 /**
  * Render sessions on the build's backend: an offscreen session where a test only reads pixels back
@@ -170,10 +170,9 @@ class RenderSessionTest {
   }
 
   @Test
-  fun suspendingUseAwaitsTheReleaseOfAnAttachedSession() = runSuspendTest {
+  fun useReleasingAwaitsTheReleaseOfAnAttachedSession() = runSuspendTest {
     withOffscreenSession {
-      // The suspending `use`, imported under another name so `use` stays AutoCloseable's.
-      session.useAndAwaitRelease {
+      session.useReleasing {
         setStyle(RED_BACKGROUND_STYLE)
         renderStill()
       }

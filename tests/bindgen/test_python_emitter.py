@@ -219,7 +219,7 @@ mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
 mln_status mln_host_id(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         result = python.lower(api)
-        # The release alone becomes close.
+        # Only the release lowers, as the owner's `release`.
         self.assertEqual(result.generated, ["mln_host_destroy"])
         self.assertIn("owner member", result.unsupported["mln_host_id"])
 
@@ -256,61 +256,23 @@ mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic)
         self.assertIn("`MapHandle.cancel_camera_transitions_with_id()`", values)
         self.assertNotIn("`mln_map_cancel_camera_transitions_with_id()`", values)
 
-    def test_scoped_exit_disposes_sessions_and_roots_and_skips_a_closed_handle(self):
-        native = emitted(python, real_api())["src/generated_operations.rs"]
+    def test_a_scope_disposes_and_an_explicit_release_reaches_native(self):
+        files = emitted(python, real_api())
+        native = files["src/generated_operations.rs"]
 
         def method(owner, name):
             block = native.split(f"\nimpl {owner} {{\n", 1)[1].split("\n}\n", 1)[0]
             return block.split(f"fn {name}(", 1)[1].split("#[pyo3", 1)[0]
 
-        # A session's dispose is also its release: its explicit close passes
-        # a completion, and its scope passes none.
+        self.assertIn("mln_map_dispose", method("MapHandle", "_dispose"))
+        self.assertIn("mln_map_release", method("MapHandle", "release"))
         self.assertIn(
-            "mln_render_session_dispose(handle, std::ptr::null(), diagnostic)",
-            method("RenderSessionHandle", "_exit"),
+            "mln_render_session_dispose", method("RenderSessionHandle", "_dispose")
         )
-        self.assertIn(
-            "mln_render_session_dispose(handle, completion, diagnostic)",
-            method("RenderSessionHandle", "close"),
-        )
-        # A release that reports teardown through a completion would hand the
-        # scope a future it drops, so the scope disposes the map instead.
-        self.assertIn("mln_map_dispose", method("MapHandle", "_exit"))
-        self.assertIn("mln_runtime_dispose", method("RuntimeHandle", "_exit"))
-        self.assertIn("mln_map_release", method("MapHandle", "close"))
-        # A scope that exits after an explicit asynchronous close does nothing,
-        # while a repeated explicit close still reaches native.
-        self.assertIn("self.reserve(true)", method("MapHandle", "_exit"))
-        self.assertIn("self.reserve(false)", method("MapHandle", "close"))
-
-    def test_a_dispose_that_is_the_release_closes_with_a_completion(self):
-        api = self.parse("""
-typedef unsigned long long mln_lease BIND("kind=handle;release=mln_lease_dispose;dispose=mln_lease_dispose");
-BIND("execution=lifecycle")
-mln_status mln_lease_dispose(mln_lease lease, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-        self.assertEqual(python.lower(api).generated, ["mln_lease_dispose"])
-        files = emitted(python, api)
-        native = files["src/generated_operations.rs"]
-        block = native.split("\nimpl LeaseHandle {\n", 1)[1].split("\n}\n", 1)[0]
-        close = block.split("fn close(", 1)[1].split("#[pyo3", 1)[0]
-        exit = block.split("fn _exit(", 1)[1].split("#[pyo3", 1)[0]
-        # The close returns a future; the scope and every disposer pass a
-        # null completion.
-        self.assertIn("mln_lease_dispose(handle, completion, diagnostic)", close)
-        self.assertIn("mln_lease_dispose(handle, std::ptr::null(), diagnostic)", exit)
-        self.assertIn(
-            "mln_lease_dispose(handle, std::ptr::null(), std::ptr::null_mut())",
-            native.split("fn generated_dispose_mln_lease(", 1)[1].split("\n}", 1)[0],
-        )
-        self.assertIn(
-            "def close(self) -> Future[None]:",
-            files["python/maplibre_native_ffi/_generated_operations.py"],
-        )
-        # The synchronous dispose is the scope's exit.
-        owners = files["python/maplibre_native_ffi/_generated_owners.py"]
-        self.assertIn("def dispose(self) -> None:", owners)
-        self.assertIn("self._native._exit()", owners)
+        # A disposal after an explicit release does nothing, while a repeated
+        # explicit release still reaches native.
+        self.assertIn("self.reserve(true)", method("MapHandle", "_dispose"))
+        self.assertIn("self.reserve(false)", method("MapHandle", "release"))
 
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
         owners = emitted(python, real_api())[

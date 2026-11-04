@@ -42,7 +42,7 @@ public sealed class ResourceProviderTests
 
     // A refused answer still ends the request, which fails as a dispose fails it.
     [Fact]
-    public async Task ARefusedAnswerClosesItsRequestAndFailsIt()
+    public async Task ARefusedAnswerEndsItsRequestAndFailsIt()
     {
         var received = new TaskCompletionSource<ResourceRequestHandle>(
             TaskCreationOptions.RunContinuationsAsynchronously

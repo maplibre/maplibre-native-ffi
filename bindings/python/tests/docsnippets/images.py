@@ -60,7 +60,7 @@ def images(runtime: mln.RuntimeHandle) -> None:
     # #endregion read
 
     session.dispose()
-    map_handle.close().result()
+    map_handle.release().result()
 
 
 def images_tile(
@@ -88,4 +88,4 @@ def images_tile(
     )
     # #endregion tile
 
-    map_handle.close().result()
+    map_handle.release().result()

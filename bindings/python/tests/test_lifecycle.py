@@ -1,4 +1,5 @@
-"""Handle lifetimes: close, dispose, refusal, parents, and shutdown."""
+"""Handle lifetimes: release, dispose, `with` blocks, refusal, parents, and
+shutdown."""
 
 import gc
 import subprocess
@@ -11,7 +12,9 @@ import pytest
 from support import EMPTY_STYLE, TIMEOUT, Harness, ready_map, result
 
 
-def test_a_closed_handle_refuses_use_and_a_synchronous_close_repeats_safely() -> None:
+def test_a_released_handle_refuses_use_and_a_synchronous_release_repeats_safely() -> (
+    None
+):
     with pytest.raises(TypeError):
         mln.MapHandle()
 
@@ -22,7 +25,7 @@ def test_a_closed_handle_refuses_use_and_a_synchronous_close_repeats_safely() ->
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,
         ):
-            result(map_handle.close())
+            result(map_handle.release())
         with pytest.raises(
             mln.MaplibreError,
             check=lambda error: error.status == mln.Status.INVALID_STATE,
@@ -31,14 +34,14 @@ def test_a_closed_handle_refuses_use_and_a_synchronous_close_repeats_safely() ->
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):
-        runtime.close()
+        runtime.release()
 
     data = mln.GeoJsonSourceDataHandle.create(
         {"type": "FeatureCollection", "features": []}
     )
     _check_handle(data, closed=False)
-    data.close()
-    data.close()
+    data.release()
+    data.release()
     with data:
         pass
     _check_handle(data, closed=True)
@@ -55,7 +58,7 @@ def _check_handle(
     assert repr(handle) == f"{name}(id={handle.id:#x}, closed={str(closed).lower()})"
 
 
-def test_dispose_closes_a_handle_once() -> None:
+def test_dispose_retires_a_handle_once() -> None:
     runtime = mln.RuntimeHandle.create()
     map_handle = ready_map(runtime)
     for handle in (map_handle, runtime):
@@ -65,51 +68,53 @@ def test_dispose_closes_a_handle_once() -> None:
         with handle:
             pass
         _check_handle(handle, closed=True)
-    # An asynchronous close after dispose reaches native, which reports the
+    # An asynchronous release after dispose reaches native, which reports the
     # handle stale.
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):
-        map_handle.close()
+        map_handle.release()
 
 
-def test_leaving_a_block_after_an_explicit_close_does_nothing() -> None:
+def test_leaving_a_block_after_an_explicit_release_does_nothing() -> None:
     with mln.RuntimeHandle.create() as runtime:
         with ready_map(runtime) as map_handle:
-            result(map_handle.close())
-        result(runtime.close())
+            result(map_handle.release())
+        result(runtime.release())
 
 
-def test_leaving_a_root_block_disposes_it_without_waiting_for_its_children() -> None:
+def test_leaving_a_block_disposes_without_waiting_even_where_a_release_is_refused() -> (
+    None
+):
     with mln.RuntimeHandle.create() as runtime:
         # Release refuses a runtime with a live map, and dispose accepts it.
         map_handle = ready_map(runtime)
     _check_handle(runtime, closed=True)
     _check_handle(map_handle, closed=False)
-    result(map_handle.close())
+    result(map_handle.release())
 
 
-def test_a_handle_id_names_its_events_and_outlives_close(
+def test_a_handle_id_names_its_events_and_outlives_its_release(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
     result(map_handle.set_style_json(EMPTY_STYLE))
     event = harness.wait_event(mln.RuntimeEventType.MAP_STYLE_LOADED)
     assert event.source == map_handle.id
-    result(map_handle.close())
-    # A host routes events that it drains after close by the id it kept.
+    result(map_handle.release())
+    # A host routes events that it drains after the release by the id it kept.
     assert map_handle.id == event.source
 
 
-def test_a_refused_close_leaves_the_handle_usable(
+def test_a_refused_release_leaves_the_handle_usable(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
     with pytest.raises(mln.MaplibreError) as raised:
-        harness.runtime.close()
+        harness.runtime.release()
     assert raised.value.status == mln.Status.INVALID_STATE
 
     result(harness.runtime.clear_resource_transform())
-    result(map_handle.close())
-    result(harness.runtime.close())
+    result(map_handle.release())
+    result(harness.runtime.release())
     with pytest.raises(
         mln.MaplibreError, check=lambda error: error.status == mln.Status.INVALID_STATE
     ):
@@ -125,7 +130,7 @@ def test_a_child_keeps_its_parent_alive() -> None:
 
     runtime = mln.RuntimeHandle.create()
     runtime.discarding.set_event_handler(mln.RuntimeEventHandler(receive_events))
-    # Kept only to close the runtime after its map.
+    # Kept only to release the runtime after its map.
     parent = weakref.ref(runtime)
     map_handle = ready_map(runtime)
     del runtime, receive_events
@@ -134,10 +139,10 @@ def test_a_child_keeps_its_parent_alive() -> None:
     # The map still works, and so does the event handler its runtime holds.
     result(map_handle.set_style_json(EMPTY_STYLE))
     assert loaded.wait(TIMEOUT)
-    result(map_handle.close())
+    result(map_handle.release())
     runtime = parent()
     assert runtime is not None
-    result(runtime.close())
+    result(runtime.release())
 
 
 _SHUTDOWN_WITH_LIVE_HANDLES = """

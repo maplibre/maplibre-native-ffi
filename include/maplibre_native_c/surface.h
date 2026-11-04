@@ -37,7 +37,7 @@ typedef struct mln_metal_surface_descriptor {
  *
  * The session renders to it with the device that it attached with. It uses the
  * layer until a replacement or release of the target completes, a detach or
- * disposal of the session completes, or an abandon of it returns.
+ * release of the session completes, or an abandon of it returns.
  */
 typedef struct mln_metal_surface_replacement {
   uint32_t size;
@@ -52,7 +52,7 @@ typedef struct mln_metal_surface_replacement {
  * The device must have VK_KHR_swapchain enabled, and the queue family of
  * `graphics_queue_family_index` must support presenting to the surface. The
  * session creates the swapchain. It uses the surface until a replacement or
- * release of the target completes, a detach or disposal of the session
+ * release of the target completes, a detach or release of the session
  * completes, or an abandon of it returns.
  */
 typedef struct mln_vulkan_surface_descriptor {
@@ -69,7 +69,7 @@ typedef struct mln_vulkan_surface_descriptor {
  * The session presents to it with the context that it attached with, so the
  * queue family of that context's `graphics_queue_family_index` must support
  * presenting to the surface. It uses the surface until a replacement or
- * release of the target completes, a detach or disposal of the session
+ * release of the target completes, a detach or release of the session
  * completes, or an abandon of it returns.
  */
 typedef struct mln_vulkan_surface_replacement {
@@ -83,7 +83,7 @@ typedef struct mln_vulkan_surface_replacement {
  * A WebGPU surface to present to, for mln_map_attach_web_gpu_surface().
  *
  * The session configures the surface. It uses the surface until a replacement
- * or release of the target completes, a detach or disposal of the session
+ * or release of the target completes, a detach or release of the session
  * completes, or an abandon of it returns.
  */
 typedef struct mln_web_gpu_surface_descriptor {
@@ -101,7 +101,7 @@ typedef struct mln_web_gpu_surface_descriptor {
  *
  * The session configures it with the context and format that it attached with.
  * It uses the surface until a replacement or release of the target completes,
- * a detach or disposal of the session completes, or an abandon of it returns.
+ * a detach or release of the session completes, or an abandon of it returns.
  */
 typedef struct mln_web_gpu_surface_replacement {
   uint32_t size;
@@ -114,7 +114,7 @@ typedef struct mln_web_gpu_surface_replacement {
  * An OpenGL surface to present to, for mln_map_attach_open_gl_surface().
  *
  * The session uses the surface until a replacement or release of the target
- * completes, a detach or disposal of the session completes, or an abandon of it
+ * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  */
 typedef struct mln_open_gl_surface_descriptor {

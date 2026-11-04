@@ -84,7 +84,7 @@ static void a_queued_frame_wake_runs_once_in_dispatch(void) {
   mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture));
   TEST_ASSERT_EQUAL_INT(0, wake.calls);
 
-  MLN_TEST_OK(mln_test_render_session_dispose(fixture.session));
+  MLN_TEST_OK(mln_test_render_session_release(fixture.session));
   release_wait wait = {
     .queue = queue.handle, .wake = &wake, .failure = MLN_STATUS_OK
   };
@@ -146,7 +146,7 @@ static void releasing_the_queue_reports_an_abandoned_wake(void) {
   mln_test_delivery_queue_release(&queue);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&abandoned_wakes));
 
-  MLN_TEST_OK(mln_test_render_session_dispose(fixture.session));
+  MLN_TEST_OK(mln_test_render_session_release(fixture.session));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

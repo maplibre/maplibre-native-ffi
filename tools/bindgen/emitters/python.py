@@ -62,21 +62,17 @@ def pascal(name: str) -> str:
 
 
 def public_dispose(handle: HandlePlan) -> bool:
-    """Whether a handle has a C dispose besides a void release: a separate
-    dispose, or a release that disposes and also takes a completion."""
-    return bool(
-        handle.dispose
-        and (handle.dispose != handle.release or handle.dispose_completion)
-    )
+    """Whether a handle has a C dispose besides its release."""
+    return bool(handle.dispose and handle.dispose != handle.release)
 
 
 def unsupported(function: Function | Record, reason: str) -> Unsupported:
     return Unsupported(f"{function.location}: Python: {function.name}: {reason}")
 
 
-# Members every handle owner defines. The release operation alone becomes
-# `close`; any other operation with one of these names would shadow a member.
-OWNER_MEMBERS = {"state", "close", "dispose", "id", "is_closed"}
+# Members every handle owner defines, which an operation other than the
+# release would shadow.
+OWNER_MEMBERS = {"state", "dispose", "id", "is_closed"}
 LOCAL_NAMES = {
     "self",
     "py",
@@ -186,7 +182,8 @@ def receiver_input(plan: OperationPlan) -> tuple[ParameterPlan | None, bool]:
 
 
 def releases(plan: OperationPlan) -> bool:
-    """Whether an operation is its receiver's release, which `close` presents."""
+    """Whether an operation is its receiver's release, which the owner's `release`
+    member presents."""
     receiver, _ = receiver_input(plan)
     return bool(
         receiver
@@ -197,7 +194,7 @@ def releases(plan: OperationPlan) -> bool:
 
 def method_name(plan: OperationPlan) -> str:
     """The Python name of an operation: a method, factory, or module function."""
-    name = "close" if releases(plan) else plan.member
+    name = plan.member
     if plan.view:
         name = plan.view.stem
     if iskeyword(name) or name in RUST_KEYWORDS:
@@ -322,14 +319,10 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
 def operation(
     plan: OperationPlan, values: Values, *, discard=False, exit=False
 ) -> tuple[str, str, str, str, str | None]:
-    """Lower one operation. `exit` lowers a handle's scoped release as the
-    private `_exit` that `__exit__` calls, which skips a released handle and
-    passes a null completion to a release that takes an optional one."""
+    """Lower one operation. `exit` lowers a handle's scoped dispose as the
+    private `_dispose` that `dispose` and `__exit__` call, which skips a
+    released handle."""
     function = plan.function
-    dropped_completion = None
-    if exit and plan.completion and plan.completion.optional:
-        dropped_completion = plan.completion.parameter
-        plan = replace(plan, completion=None)
     if plan.role == "support" and not exit:
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
@@ -350,7 +343,7 @@ def operation(
     if not safe_identifier(name):
         raise unsupported(function, f"method identifier {name!r} is not safe")
     if exit:
-        name = "_exit"
+        name = "_dispose"
     elif name in OWNER_MEMBERS and not release:
         raise unsupported(
             function, f"method identifier {name!r} collides with an owner member"
@@ -684,8 +677,6 @@ def operation(
             if converted != "value":
                 expression = f"map_future({expression}, lambda value: {converted})"
     else:
-        if dropped_completion:
-            arguments[dropped_completion] = "std::ptr::null()"
         call = native_call(function, [arguments[p.name] for p in function.parameters])
         if text:
             call = f"generated_caller_sized_text(&mut {text.name}, |{text.name}, {text.value.length}, {text.result_length}| {call})"
@@ -867,7 +858,7 @@ def operation(
     # A form that passes no completion reports none of its errors.
     documentation = docs.docstring(
         docs.discarding(values.api.doc(function.name))
-        if discard or dropped_completion
+        if discard
         else values.api.doc(function.name),
         symbols(values.api),
         "        ",
@@ -913,29 +904,13 @@ def operation(
     return owner, rust, facade, stub, product
 
 
-def scoped_release(handle: HandlePlan, bound: BoundApi) -> str:
-    """The operation that `__exit__` calls.
-
-    A release that reports teardown through a completion would return a future
-    that leaving the block drops, so the block disposes the handle instead, as
-    it does a handle whose release refuses some states. A dispose that is also
-    the release disposes with a null completion.
-    """
-    release = bound.operations_by_name.get(handle.release)
-    if handle.dispose and release is not None and release.completion is not None:
-        return handle.dispose
-    return handle.scoped_release
-
-
-def disposal(bound: BoundApi, handle: HandlePlan, name: str, receiver: str) -> str:
+def disposal(bound: BoundApi, name: str, receiver: str) -> str:
     """A native call that disposes `receiver` with `name`, passing a null
-    completion to a dispose that is also the release, and a null diagnostic."""
+    diagnostic."""
     function = bound.source.functions_by_name[name]
-    arguments = [
-        "std::ptr::null()" if p.name == handle.dispose_completion else receiver
-        for p in function.parameters
-    ]
-    return native_call(function, arguments, diagnostic="std::ptr::null_mut()")
+    if len(function.parameters) != 1:
+        raise Unsupported(f"{name} disposes with more than its handle")
+    return native_call(function, [receiver], diagnostic="std::ptr::null_mut()")
 
 
 def compact(body: list[str]) -> list[str]:
@@ -996,9 +971,9 @@ def lower(api: Api | BoundApi) -> Lowered:
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
     exits = {
-        scoped_release(handle, bound)
+        handle.scoped_dispose
         for handle in bound.handles.values()
-        if handle.native in OWNERS
+        if handle.native in OWNERS and handle.scoped_dispose
     }
     # Native rules answer in place of a callback that must answer on its
     # native thread, so the operations that only such a callback calls have
@@ -1058,7 +1033,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         if support and isinstance(support.support, DisposeSupport):
             errors.pop(handle.cleanup, None)
         disposer = bound.source.functions_by_name[handle.cleanup]
-        call = f"unsafe {{ {disposal(bound, handle, handle.cleanup, 'handle')} }}"
+        call = f"unsafe {{ {disposal(bound, handle.cleanup, 'handle')} }}"
         if ctype(disposer.return_type) == "void":
             call += "; sys::MLN_STATUS_OK"
         rust_values += f'\nunsafe extern "C" fn generated_dispose_{handle.native}(handle: sys::{handle.native}) -> sys::mln_status {{ {call} }}\n'
@@ -1171,24 +1146,24 @@ def lower(api: Api | BoundApi) -> Lowered:
     owner_classes = []
     for native, owner in OWNERS.items():
         handle = bound.handles[native]
-        # A handle without scoped cleanup, such as a frame, has no `with` block.
+        # A handle without scoped cleanup, such as a frame, has no `with` block,
+        # and leaving any other handle's block disposes it.
         mixin = (
             "NativeHandleMixin"
-            if handle.scoped_release is None
+            if handle.scoped_dispose is None
             else "ScopedHandleMixin"
         )
         id_doc = (
             "The native handle value, which runtime events report as their source.\n\n"
-            "        It stays readable after close, so events drained later still match\n"
+            "        It stays readable after release, so events drained later still match\n"
             "        the handle that produced them.\n        "
             if native in bound.event_sources
-            else "The native handle value. It stays readable after close."
+            else "The native handle value. It stays readable after release."
         )
-        # The dispose is the scoped release, which `__exit__` also calls.
         dispose = (
             f"""
     def dispose(self) -> None:
-{docs.docstring(docs.discarding(bound.doc(handle.dispose)), symbols(bound), "        ")}        self._native._exit()
+{docs.docstring(bound.doc(handle.dispose), symbols(bound), "        ")}        self._native._dispose()
 """
             if public_dispose(handle)
             else ""

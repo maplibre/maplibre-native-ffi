@@ -20,11 +20,11 @@ internal constructor(
   internal val binding =
     HandleState("AcquiredFrameHandle", handle, GeneratedOwnerDisposal::acquiredFrame)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
-  /** The native handle value. It stays readable after close. */
+  /** The native handle value. It stays readable after release. */
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release, dispose, close, or discard has ended the handle. */
+  /** Whether a release, dispose, or discard has ended the handle. */
   public val isClosed: Boolean
     get() = binding.isReleased
 

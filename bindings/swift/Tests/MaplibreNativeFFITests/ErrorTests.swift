@@ -17,7 +17,7 @@ import Testing
       == native?.description)
 
     let binding = await expectMaplibreError(.invalidState) {
-      try await fixture.map.close()
+      try await fixture.map.release()
       return try fixture.map.getSnapshot()
     }
     #expect(binding?.diagnostic.isEmpty == false)

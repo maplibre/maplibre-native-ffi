@@ -24,7 +24,7 @@ static void a_released_map_handle_never_names_a_later_map(void) {
     last_error_mentions("stale"),
     "A released handle should report that it is stale."
   );
-  MLN_TEST_INVALID_STATE(mln_test_map_close(first));
+  MLN_TEST_INVALID_STATE(mln_test_map_release(first));
 
   MLN_TEST_OK(mln_test_map_request_repaint(second));
 

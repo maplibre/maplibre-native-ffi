@@ -1010,7 +1010,6 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_dispose(
         MlnRenderSession session,
-        mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1091,6 +1090,13 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_reduce_memory_use(
+        MlnRenderSession session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_release(
         MlnRenderSession session,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic

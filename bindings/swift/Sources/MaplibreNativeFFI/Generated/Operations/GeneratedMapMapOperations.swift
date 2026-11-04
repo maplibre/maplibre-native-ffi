@@ -25,7 +25,7 @@ public extension MapHandle {
   /// Releases the map in any state, and finishes in the background.
   ///
   /// Use it from destructors and finalizers. Otherwise, use
-  /// `MapHandle.close()`.
+  /// `MapHandle.release()`.
   ///
   /// See `mln_map_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -122,12 +122,12 @@ public extension MapHandle {
   ///
   /// See `mln_map_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func close() async throws {
-    guard let future = try startClose() else { return }
+  func release() async throws {
+    guard let future = try startRelease() else { return }
     try await future.value()
   }
 
-  internal func startClose() throws -> NativeFuture<Void>? {
+  internal func startRelease() throws -> NativeFuture<Void>? {
     try nativeStartClose { raw, completion, diagnostic in mln_map_release(
       raw,
       completion,

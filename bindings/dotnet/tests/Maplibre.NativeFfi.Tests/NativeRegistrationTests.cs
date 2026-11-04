@@ -14,7 +14,7 @@ public sealed unsafe class NativeRegistrationTests
     public static TheoryData<TestGraphicsBackend> Backends => RenderFixture.Backends;
 
     // The attach consumes both wakes. Native code calls them as C functions, and releases each
-    // context once after the session closes. A rejected attach releases its context in the
+    // context once after the session retires. A rejected attach releases its context in the
     // binding, and a copy of a consumed wake fails before it reaches native code.
     [Theory]
     [MemberData(nameof(Backends))]
@@ -80,7 +80,7 @@ public sealed unsafe class NativeRegistrationTests
 
     // Only a Vulkan target takes a queue lock, and another target fails the attach with native
     // code's unsupported status. Either way, the context is released once: by native code after the
-    // session closes, or by the binding for the rejected attach.
+    // session retires, or by the binding for the rejected attach.
     [Theory]
     [MemberData(nameof(Backends))]
     public void ANativeQueueLockReachesNativeCodeAndItsContextIsReleasedOnce(

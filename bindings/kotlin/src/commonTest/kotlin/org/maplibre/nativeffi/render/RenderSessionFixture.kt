@@ -166,7 +166,7 @@ internal class RenderSessionFixture(
 
 /**
  * Runs [block] against a map with an attached session that renders into a borrowed ring of
- * [ringDepth] textures of [width] x [height] on the build's backend, and abandons and closes the
+ * [ringDepth] textures of [width] x [height] on the build's backend, and abandons and disposes the
  * session afterwards, then destroys the textures. The caller drives the session on
  * [TestGraphics.thread]. The map's runtime is created from [runtimeOptions], and [onFrameWake] runs
  * on each frame wake.
@@ -213,8 +213,8 @@ internal suspend fun <T> withTestTextures(
 
 /**
  * Runs [block] against a map with an attached offscreen session of [width] x [height] that a core
- * worker renders, and abandons and closes the session afterwards. The map's runtime is created from
- * [runtimeOptions], and [onFrameWake] runs on each frame wake.
+ * worker renders, and abandons and disposes the session afterwards. The map's runtime is created
+ * from [runtimeOptions], and [onFrameWake] runs on each frame wake.
  */
 internal suspend fun <T> withOffscreenSession(
   width: Int = 32,
@@ -248,7 +248,8 @@ internal fun attachOffscreenSession(
 
 /**
  * Runs [block] against a session of this map that [attach] submits on [TestGraphics.thread] with
- * options for [driver], once the attach completes, and abandons and closes the session afterwards.
+ * options for [driver], once the attach completes, and abandons and disposes the session
+ * afterwards.
  */
 internal suspend fun <T> MapFixture.withRenderSession(
   driver: RenderDriverKind,
@@ -273,17 +274,17 @@ internal suspend fun <T> MapFixture.withRenderSession(
     fixture.complete(session.ready, "the attach")
     return fixture.block()
   } finally {
-    withContext(NonCancellable + TestGraphics.thread) { session.abandonAndClose() }
+    withContext(NonCancellable + TestGraphics.thread) { session.abandonAndDispose() }
   }
 }
 
 /**
- * Leaves a session closed. An attached session is abandoned first, so its graphics objects are gone
- * before the fixture's device is, where a close alone would only schedule their destruction.
+ * Leaves a session disposed. An attached session is abandoned first, so its graphics objects are
+ * gone before the fixture's device is, where a dispose alone would only schedule their destruction.
  */
-internal fun RenderSessionHandle.abandonAndClose() {
+internal fun RenderSessionHandle.abandonAndDispose() {
   if (isClosed) return
   val state = getSnapshot().state
   if (state != RenderSessionState.DETACHED && state != RenderSessionState.ABANDONED) abandon()
-  close()
+  dispose()
 }

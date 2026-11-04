@@ -645,8 +645,8 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
     if any(callback_scoped(p.value) for p in callback.arguments):
         invocation = f"withCallbackScope {{ scope -> {invocation} }}"
     if owned:
-        closes = "; ".join(f"{local}.close()" for local in owned)
-        invocation = f"try {{ {invocation} }} catch (failure: Throwable) {{ {closes}; throw failure }}"
+        releases = "; ".join(f"{local}.release()" for local in owned)
+        invocation = f"try {{ {invocation} }} catch (failure: Throwable) {{ {releases}; throw failure }}"
     if callback.result.native == "void":
         lines.append(invocation)
     elif status_callback(callback):
@@ -699,7 +699,7 @@ def queued_site(
             arguments.append(borrowed)
         else:
             arguments.append(callback_argument(parameter, values))
-    released = "; ".join(f"{local}.close()" for local in owners)
+    released = "; ".join(f"{local}.release()" for local in owners)
     invoke = f"value.{member}"
     lines = []
     if callback_value.nullable:

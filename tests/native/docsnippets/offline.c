@@ -205,7 +205,7 @@ void mln_doc_offline(void) {
   wait_for_done();
 
   // #region manage
-  // Resume a download that stopped when the runtime closed.
+  // Resume a download that stopped when the runtime was released.
   mln_runtime_set_offline_region_download_state(
     runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &done,
     NULL

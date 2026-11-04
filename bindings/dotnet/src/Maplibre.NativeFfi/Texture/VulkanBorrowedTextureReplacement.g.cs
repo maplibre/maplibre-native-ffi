@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 /// ring keeps its depth, context, <c>format</c>, <c>final_layout</c>, and
 /// <c>owner</c>, so give it as many images as it attached with, in that format,
 /// on the same device. The session uses the images until a replacement or
-/// release of the target completes, a detach or disposal of the session
+/// release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.</para>
 /// <para>See <c>mln_vulkan_borrowed_texture_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>

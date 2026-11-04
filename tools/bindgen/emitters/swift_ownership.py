@@ -41,14 +41,14 @@ def consumed(plan, owner, values):
             args.append(encode(values, parameter.value, local))
         # A release with inputs is idempotent. An answer keeps its name, ends
         # its receiver whatever it returns, and a repeated one reaches native.
-        name = "release" if plan.release else identifier(method_name(plan))
-        close = "answer" if plan.answers else "closeOnce"
+        name = identifier(method_name(plan))
+        consume = "answer" if plan.answers else "closeOnce"
         return (
             f"""public extension {owner} {{
 {doc(values.bound, function.name, "  ")}  func {name}({", ".join(declarations)}) throws {{
     let arena = NativeInputArena()
     defer {{ withExtendedLifetime(arena) {{}} }}
-    try handle.{close} {{ live in
+    try handle.{consume} {{ live in
       {"var" if "&raw" in args else "let"} raw = live.raw
       {checked(native_call(function, *args))}
     }}
@@ -58,10 +58,22 @@ def consumed(plan, owner, values):
             None,
         )
     method = disposal(plan, handle)
-    # The closure's parameters select the overload: a status-returning close
-    # takes the diagnostic, so its status is always checked. A void release
-    # can't fail, so its close doesn't throw.
-    call = native_call(function, *disposer_arguments(handle, function, "raw"))
+    if plan.completion:
+        return (
+            f"""{documented}func {method}() async throws {{
+  guard let future = try startRelease() else {{ return }}
+  try await future.value()
+}}
+internal func startRelease() throws -> NativeFuture<Void>? {{
+  try nativeStartClose {{ raw, completion, diagnostic in {native_call(function, "raw", "completion")} }}
+}}
+""",
+            owner,
+        )
+    # The closure's parameters select the overload: a status-returning release
+    # or dispose takes the diagnostic, so its status is always checked. A void
+    # release can't fail, so it doesn't throw.
+    call = native_call(function, *disposer_arguments(function, "raw"))
     if function.return_type.kind == "void":
         synchronous = f"""{documented}func {method}() {{
   nativeClose {{ raw in {call} }}
@@ -72,20 +84,6 @@ def consumed(plan, owner, values):
   try nativeClose {{ raw, diagnostic in {call} }}
 }}
 """
-    if plan.completion:
-        asynchronous = f"""{documented}func close() async throws {{
-  guard let future = try startClose() else {{ return }}
-  try await future.value()
-}}
-internal func startClose() throws -> NativeFuture<Void>? {{
-  try nativeStartClose {{ raw, completion, diagnostic in {native_call(function, "raw", "completion")} }}
-}}
-"""
-        # A release that is also the dispose passes a completion, and the
-        # dispose passes none.
-        if plan.completion.optional:
-            return asynchronous + synchronous, owner
-        return asynchronous, owner
     return synchronous, owner
 
 
@@ -100,43 +98,23 @@ def receiver_handle(plan):
 
 
 def disposal(plan, handle):
-    """The synchronous method of a release, dispose, or discard of `handle`.
-
-    A release that is also the dispose closes asynchronously, so its
-    synchronous form is the dispose.
-    """
-    function = plan.function
-    return (
-        "close"
-        if function.name == handle.release and not handle.dispose_completion
-        else "discard"
-        if function.name == handle.discard
-        else "dispose"
-    )
+    """The method of a release, dispose, or discard of `handle`, which the
+    shared plan names."""
+    return camel(plan.member)
 
 
 def method_name(plan):
-    """The name of the method that consumes an operation's receiver.
-
-    A release with inputs is `release`, and an answer that consumes its
-    receiver keeps its own name. A release with a completion is the
-    asynchronous `close`, even when it also has a synchronous form.
-    """
-    if len(plan.inputs) != 1 or not plan.release:
-        return "release" if plan.release else camel(plan.member)
-    if plan.completion:
-        return "close"
-    return disposal(plan, receiver_handle(plan))
+    """The name of the method that consumes an operation's receiver: a
+    release, dispose, or discard by its shared name, and an answer by its
+    own."""
+    return camel(plan.member)
 
 
-def disposer_arguments(handle, function, raw):
-    """The arguments before the diagnostic of `function` when it disposes `handle`.
-
-    A disposer reports nothing, so it passes nil for a dispose's optional
-    completion.
-    """
-    if handle.dispose_completion and function.name == handle.dispose:
-        return [raw, "nil"]
+def disposer_arguments(function, raw):
+    """The arguments before the diagnostic of `function` when it disposes a
+    handle: the handle alone."""
+    if len(function.parameters) != 1:
+        raise Unsupported(f"Swift: {function.name} disposes with more than its handle")
     return [raw]
 
 
@@ -173,7 +151,7 @@ def owner_declarations(bound):
         cleanup = handle.cleanup or handle.release
         function = bound.source.functions_by_name[cleanup]
         # Abandoned disposal has no caller to report a diagnostic to.
-        arguments = disposer_arguments(handle, function, "raw")
+        arguments = disposer_arguments(function, "raw")
         if function.diagnostic:
             arguments.append("nil")
         expression = f"{cleanup}({', '.join(arguments)})"
@@ -196,10 +174,10 @@ def owner_declarations(bound):
         id_doc = (
             "  /// The native handle, which no later handle in the process reuses\n"
             "  /// and runtime events report as their source. It stays valid after\n"
-            "  /// the handle closes.\n"
+            "  /// the handle is released.\n"
             if handle.native in bound.event_sources
             else "  /// The native handle, which no later handle in the process reuses.\n"
-            "  /// It stays valid after the handle closes.\n"
+            "  /// It stays valid after the handle is released.\n"
         )
         # A callback's borrowed owner never releases or disposes its handle.
         borrow = (
@@ -242,8 +220,8 @@ def owner_declarations(bound):
     handle = try NativeHandleState(typeName: "{owner}", handle: {raw}(raw: raw){passed})
 {ready_assignment}  }}
 {borrow}{ready_member}{id_doc}  public var id: UInt64 {{ handle.value.raw }}
-  /// Whether the binding has accepted a close, dispose, discard, or release
-  /// of this handle.
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
   public var isClosed: Bool {{ handle.isClosed }}
   public var description: String {{ handle.description }}
   public static func == (lhs: {owner}, rhs: {owner}) -> Bool {{ lhs.id == rhs.id }}

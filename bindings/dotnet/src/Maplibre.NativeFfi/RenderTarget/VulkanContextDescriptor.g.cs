@@ -6,7 +6,7 @@ namespace Maplibre.NativeFfi;
 /// The Vulkan device and queue that a render session uses.
 /// </summary>
 /// <remarks>
-/// <para>Keep these objects alive until a detach or disposal of the session
+/// <para>Keep these objects alive until a detach or release of the session
 /// completes, or an abandon of it returns.</para>
 /// <para>See <c>mln_vulkan_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>

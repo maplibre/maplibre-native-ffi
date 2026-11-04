@@ -145,10 +145,6 @@ def operation(
     body = begin(plan, receiver)
     convert(plan, value_types, body, receiver)
     method = plan.member
-    if discard and plan.completion and plan.completion.optional:
-        # The release passes the completion, and the dispose, which keeps the
-        # C name, passes none.
-        method = function.name.removeprefix(f"{receiver}_")
     if method in {"native", "submit_command", "submit_query", "drop", "adopt"} or (
         method == "close" and not plan.consumes
     ):

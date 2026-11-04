@@ -53,18 +53,11 @@ class Method:
 
 
 def lower_function(
-    plan: OperationPlan, values: Values, *, discard=False, dispose=False
+    plan: OperationPlan, values: Values, *, discard=False
 ) -> tuple[str, str]:
     """An operation's owner and method. With `discard`, the method passes no
-    completion, and with `dispose`, it is the release's synchronous dispose."""
+    completion."""
     function = plan.function
-    # A dispose that is also the release passes no completion, so it consumes
-    # synchronously, as a separate dispose does.
-    disposed = None
-    if dispose:
-        assert plan.completion is not None
-        disposed = plan.completion.parameter
-        plan = replace(plan, completion=None, shape="release")
     # An answer ends its receiver on every outcome, through its own
     # adapter; any other call that always consumes is a void release.
     if (
@@ -82,10 +75,10 @@ def lower_function(
     receiver, receiver_reference = receiver_handle(plan, values.bound)
     method = Method(
         receiver or "Globals",
-        method_name(plan, values.bound, dispose=dispose),
+        method_name(plan, values.bound),
         receiver,
     )
-    convert(plan, values, method, receiver_reference, disposed)
+    convert(plan, values, method, receiver_reference)
     register(plan, method)
     match plan.shape:
         case "discard" | "release" | "answer":
@@ -121,7 +114,6 @@ def convert(
     values: Values,
     method: Method,
     receiver_reference: bool,
-    disposed: str | None,
 ):
     """Converts each parameter after the receiver into the native call's
     arguments, and makes the call."""
@@ -164,9 +156,6 @@ def convert(
     for parameter in function.parameters[1 if receiver else 0 :]:
         if plan.completion and parameter.name == plan.completion.parameter:
             args.append("completion")
-            continue
-        if parameter.name == disposed:
-            args.append("nullptr")
             continue
         local = camel(parameter.name)
         if (
@@ -525,15 +514,11 @@ def completed(plan: OperationPlan, values: Values, method: Method) -> str:
     return f"  Future<{public}> {method.name}({method.parameters}) => {operation};\n"
 
 
-def disposer_arguments(handle, function, live):
-    """The arguments of a handle's disposer: the handle, and a null completion
-    when the dispose is also the release."""
-    arguments = [live]
-    for parameter in function.parameters[1:]:
-        if parameter.name != handle.dispose_completion:
-            raise Unsupported(f"{function.name} disposes with more than its handle")
-        arguments.append("nullptr")
-    return arguments
+def disposer_arguments(function, live):
+    """The arguments of a handle's disposer: the handle alone."""
+    if len(function.parameters) != 1:
+        raise Unsupported(f"{function.name} disposes with more than its handle")
+    return [live]
 
 
 def adopt_owner(owned, expression, function, values):
@@ -554,7 +539,7 @@ def adopt_owner(owned, expression, function, values):
     if not owned.handle.cleanup:
         raise Unsupported("owned adoption requires a native disposer")
     dispose = values.bound.source.functions_by_name[owned.handle.cleanup]
-    cleanup = native_call(dispose, disposer_arguments(owned.handle, dispose, "handle"))
+    cleanup = native_call(dispose, disposer_arguments(dispose, "handle"))
     if dispose.return_type.kind != "void":
         cleanup = f"_check({cleanup})"
     result = f"_adoptOwned({expression}, () => {result}, (handle) {{ {cleanup}; }})"

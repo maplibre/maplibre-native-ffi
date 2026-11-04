@@ -38,12 +38,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     internal MlnAcquiredFrame Handle => state.Handle;
 
     /// <summary>
-    /// The native handle value. It stays readable after close.
+    /// The native handle value. It stays readable after release.
     /// </summary>
     public ulong Id => state.Handle.Value;
 
     /// <summary>
-    /// Whether a release, dispose, close, or discard has ended the handle.
+    /// Whether a release, dispose, or discard has ended the handle.
     /// </summary>
     public bool IsClosed => state.IsClosed;
 

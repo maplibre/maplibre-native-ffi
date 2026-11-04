@@ -86,27 +86,13 @@ def copier(plan, values):
     return copy, public
 
 
-def function_name(plan, values, *, discard=False):
-    """The public function's name: its member name.
-
-    A dispose that is also its handle's release keeps the C name for the call
-    that passes no completion, and takes the release's name, as `mapRelease`
-    has, for the call that passes one.
-    """
-    optional = plan.completion and plan.completion.optional
-    if optional and not discard:
-        receiver = next(p.value.native for p in plan.inputs if p.name == plan.receiver)
-        return camel(f"{values.bound.handles[receiver].stem}_{plan.member}")
-    if optional:
-        return camel(plan.name.removeprefix("mln_"))
+def function_name(plan, values):
+    """The public function's name: its member name."""
     return camel(plan.member)
 
 
-def method_name(plan, *, discard=False):
-    """A method's name: its member name, or `dispose` for the call that passes
-    no completion to a dispose that is also its handle's release."""
-    if discard and plan.completion and plan.completion.optional:
-        return "dispose"
+def method_name(plan):
+    """A method's name: its member name."""
     return camel(plan.member)
 
 
@@ -372,12 +358,8 @@ def operation(plan, values, *, discard=False, method=False, taken=frozenset()):
             i for i, p in enumerate(signature) if p.startswith("self:")
         )
         signature.insert(0, signature.pop(receiver_parameter))
-    name = (
-        method_name(plan, discard=discard)
-        if method
-        else function_name(plan, values, discard=discard)
-    )
-    if discard and not completion.optional:
+    name = method_name(plan) if method else function_name(plan, values)
+    if discard:
         receiver_parameter = next(
             i
             for i, p in enumerate(signature)

@@ -104,7 +104,7 @@ void main() {
 
       // Native code releases the wake that it accepted once the session can
       // no longer call it.
-      await within(session.close(), 'session close');
+      await within(session.release(), 'session release');
       await releases.wait('the release of the accepted wake');
       expect(releases.contexts, [1, 2]);
       wakes.close();
@@ -125,7 +125,7 @@ void main() {
     );
     addTearDown(() => releaseSession(session));
     await within(session.ready, 'attachment');
-    await within(session.close(), 'session close');
+    await within(session.release(), 'session release');
     await releases.wait('the release of the accepted queue lock');
     expect(releases.contexts, [3]);
     locks.close();

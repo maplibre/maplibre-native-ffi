@@ -19,7 +19,7 @@ void main() {
     // again.
     final text = 'a' * 1000;
     final long = StyleExpressionHandle.create(text);
-    addTearDown(long.close);
+    addTearDown(long.release);
     expect(long.evaluate(), text);
   });
 
@@ -53,7 +53,7 @@ void main() {
 
     // A record member that is null is absent, an empty view.
     final expression = StyleExpressionHandle.create(['get', 'name']);
-    addTearDown(expression.close);
+    addTearDown(expression.release);
     final inputs = StyleExpressionInputs(
       feature: {
         'type': 'Feature',
@@ -94,7 +94,7 @@ void main() {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
       final projection = MapProjectionHandle.create(map.getSnapshot().view);
-      addTearDown(projection.close);
+      addTearDown(projection.release);
       const coordinates = [
         LatLng(),
         LatLng(latitude: 10, longitude: 20),

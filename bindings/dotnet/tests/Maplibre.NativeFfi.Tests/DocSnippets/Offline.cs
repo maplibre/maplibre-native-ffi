@@ -117,7 +117,7 @@ internal static class Offline
             RecordRegion(stored.Id, stored.Metadata);
         }
 
-        // Resume a download that stopped when the runtime closed.
+        // Resume a download that stopped when the runtime was released.
         await runtime.SetOfflineRegionDownloadStateAsync(
             region.Id,
             OfflineRegionDownloadState.Active
@@ -128,6 +128,6 @@ internal static class Offline
         await runtime.DeleteOfflineRegionAsync(region.Id);
         // #endregion manage
 
-        await runtime.CloseAsync();
+        await runtime.ReleaseAsync();
     }
 }

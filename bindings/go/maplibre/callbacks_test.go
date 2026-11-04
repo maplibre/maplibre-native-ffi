@@ -269,9 +269,9 @@ func TestProviderAnswersADeferredRequest(t *testing.T) {
 	f.awaitEvent(t, "the deferred style load", isStyleLoaded)
 }
 
-// A refused answer still closes the request's handle, and the request fails
-// as a close fails it.
-func TestARefusedAnswerClosesItsRequest(t *testing.T) {
+// A refused answer still retires the request's handle, and the request fails
+// as a release fails it.
+func TestARefusedAnswerRetiresItsRequest(t *testing.T) {
 	f := newFixture(t)
 	requests := make(chan *ResourceRequestHandle, 1)
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(_ ResourceRequestInfo, request *ResourceRequestHandle) {
@@ -364,7 +364,7 @@ func TestTransformRequestAnsweredAfterItsCallback(t *testing.T) {
 			requests <- request
 			return
 		}
-		_ = request.Close()
+		_ = request.Release()
 	}})))
 	if _, err := f.m.SetStyleURL(base + "/original.json"); err != nil {
 		t.Fatal(err)
@@ -403,10 +403,10 @@ func TestCancelCallbackSurvivesACollectionUntilItRuns(t *testing.T) {
 		t.Fatalf("SetCancelCallback on a live request = (%v, %v), want (false, nil)", cancelled, err)
 	}
 	stdruntime.GC()
-	// Closing the map discards the request, which runs the callback.
-	await(t, submitted(f.m.Close()))
+	// Releasing the map discards the request, which runs the callback.
+	await(t, submitted(f.m.Release()))
 	receive(t, ran, "the cancel callback")
-	if err := held.Close(); err != nil {
+	if err := held.Release(); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -116,7 +116,7 @@ static void attach_and_dispose_here(void* context) {
   };
   run->abandon_status = mln_render_session_abandon(session, &abandoned, NULL);
   run->dispose_status =
-    mln_render_session_dispose(session, &run->dispose_completion, NULL);
+    mln_render_session_release(session, &run->dispose_completion, NULL);
 }
 
 static void dispose_on_main_thread_leaves_unstarted_worker(void) {

@@ -94,7 +94,7 @@ export async function offline(): Promise<void> {
     recordRegion(stored.id, stored.metadata);
   }
 
-  // Resume a download that stopped when the runtime closed.
+  // Resume a download that stopped when the runtime was released.
   await runtime.setOfflineRegionDownloadState(
     region.id,
     OfflineRegionDownloadState.active,
@@ -105,5 +105,5 @@ export async function offline(): Promise<void> {
   await runtime.deleteOfflineRegion(region.id);
   // #endregion manage
 
-  await runtime.close();
+  await runtime.release();
 }

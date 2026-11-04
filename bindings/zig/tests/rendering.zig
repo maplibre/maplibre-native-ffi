@@ -20,7 +20,7 @@ test "an offscreen session renders a frame that reads back as pixels" {
     const fixture = try createFixture();
     defer fixture.destroy();
     const offscreen = try support.TextureSession.attachOffscreen(fixture.map, extent);
-    defer offscreen.close();
+    defer offscreen.destroy();
     const capabilities = try offscreen.session.getCapabilities(null);
     try testing.expect(capabilities.flags.readback);
     _ = try offscreen.renderUntilRendered();
@@ -71,7 +71,7 @@ test "a copy of a custom source's borrowed map can't release it" {
     try support.expectCommitted(try fixture.map.addCustomGeometrySource("custom", .init(&probe, Probe.fetchTile, null, null), null));
     try support.expectCommitted(try fixture.map.addStyleLayerJson("{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"custom\"}", null, null));
     const offscreen = try support.TextureSession.attachOffscreen(fixture.map, extent);
-    defer offscreen.close();
+    defer offscreen.destroy();
     // The map asks for its tiles as it renders.
     var frame: usize = 0;
     while (frame < 32 and !probe.fetched.isSet()) : (frame += 1) _ = try offscreen.renderFrame();
@@ -89,7 +89,7 @@ test "a drain before any demand returns no batch" {
     const fixture = try createFixture();
     defer fixture.destroy();
     const borrowed = try support.TextureSession.attachBorrowed(fixture.map, extent, support.TextureSession.borrowed_driver);
-    defer borrowed.close();
+    defer borrowed.destroy();
     var results = try borrowed.session.drainFrameResults(testing.allocator, null);
     defer results.deinit();
     try testing.expectEqual(@as(usize, 0), results.value.len);
@@ -104,7 +104,7 @@ test "a scoped frame view holds its frame until the scope returns" {
     const fixture = try createFixture();
     defer fixture.destroy();
     const borrowed = try support.TextureSession.attachBorrowed(fixture.map, extent, support.TextureSession.borrowed_driver);
-    defer borrowed.close();
+    defer borrowed.destroy();
     _ = try borrowed.renderUntilRendered();
     var frame = (try borrowed.session.acquireFrame(null)).?;
     try support.expectCommitted(try fixture.map.requestRepaint(null));
@@ -150,7 +150,7 @@ test "disposing a parent graph retires its acquired frame and session" {
     const fixture = try createFixture();
     defer fixture.destroy();
     const borrowed = try support.TextureSession.attachBorrowed(fixture.map, extent, support.TextureSession.borrowed_driver);
-    defer borrowed.close();
+    defer borrowed.destroy();
     _ = try borrowed.renderUntilRendered();
     var frame = (try borrowed.session.acquireFrame(null)).?;
 

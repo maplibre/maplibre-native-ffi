@@ -109,7 +109,7 @@ private suspend fun offline() {
     recordRegion(stored.id, stored.metadata)
   }
 
-  // Resume a download that stopped when the runtime closed.
+  // Resume a download that stopped when the runtime was released.
   runtime
     .setOfflineRegionDownloadState(
       region.id,

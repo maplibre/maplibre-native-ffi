@@ -56,7 +56,7 @@ auto teardown(mln_render_session session, const char* failure) -> const char* {
   }
   auto disposed = mln_test_completion_default(0);
   if (
-    mln_render_session_dispose(session, &disposed.descriptor, nullptr) !=
+    mln_render_session_release(session, &disposed.descriptor, nullptr) !=
     MLN_STATUS_OK
   ) {
     discard(disposed);

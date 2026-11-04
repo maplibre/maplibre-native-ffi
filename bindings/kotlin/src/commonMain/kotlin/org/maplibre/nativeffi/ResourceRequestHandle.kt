@@ -20,13 +20,18 @@ internal constructor(
   internal val binding =
     HandleState("ResourceRequestHandle", handle, GeneratedOwnerDisposal::resourceRequest)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
-  /** The native handle value. It stays readable after close. */
+  /** The native handle value. It stays readable after release. */
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release, dispose, close, or discard has ended the handle. */
+  /** Whether a release, dispose, or discard has ended the handle. */
   public val isClosed: Boolean
     get() = binding.isReleased
+
+  /** Calls [release], for the standard library's `use`. */
+  public override fun close() {
+    release()
+  }
 
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
@@ -34,7 +39,7 @@ internal constructor(
    * Answers a resource request.
    *
    * A failed answer fails the request with `ResourceErrorReason.OTHER`, as
-   * `ResourceRequestHandle.close()` does.
+   * `ResourceRequestHandle.release()` does.
    *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -65,7 +70,7 @@ internal constructor(
    * Hands a resource request back to the library to load as usual.
    *
    * A failed call fails the request with `ResourceErrorReason.OTHER`, as
-   * `ResourceRequestHandle.close()` does.
+   * `ResourceRequestHandle.release()` does.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -83,8 +88,7 @@ internal constructor(
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public override fun close(): Unit =
-    nativeClose(this, binding) { C.mln_resource_request_release(handle) }
+  public fun release(): Unit = nativeClose(this, binding) { C.mln_resource_request_release(handle) }
 
   /**
    * Calls a callback when the library cancels a resource request.

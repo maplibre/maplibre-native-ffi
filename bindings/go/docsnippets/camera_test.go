@@ -147,7 +147,7 @@ func camera(ctx context.Context, m *maplibre.MapHandle) error {
 	if err != nil {
 		return err
 	}
-	defer projection.Close()
+	defer projection.Release()
 
 	coordinate, err := projection.LatLngForPixel(
 		maplibre.ScreenPoint{X: 100, Y: 200},

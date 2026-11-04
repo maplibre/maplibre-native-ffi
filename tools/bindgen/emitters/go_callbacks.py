@@ -127,7 +127,7 @@ def sources(values, plan):
         setup = [failure]
         copied = []
         # A handle the callback owns is adopted first; a callback that never
-        # runs or panics closes it, so native never waits on it.
+        # runs or panics releases it, so native never waits on it.
         owned = [
             p
             for p in parameters
@@ -137,11 +137,11 @@ def sources(values, plan):
             setup.append(
                 f"owned_{p.name} := adopt{values.owner(p.value.native)}(uint64(native_{p.name}), nil)"
             )
-        closes = "".join(f"owned_{p.name}.Close(); " for p in owned)
+        releases = "".join(f"owned_{p.name}.Release(); " for p in owned)
         setup.append(
             "defer func() { if failure := recover(); failure != nil { "
             + f'bindingReportCallbackPanic("{callback.native}", failure); '
-            + closes
+            + releases
             + failure
             + " } }()"
         )
@@ -164,7 +164,7 @@ def sources(values, plan):
                     values.copy(p.value, "native_" + native_identifier(p.name))
                 )
         setup.append(
-            f"callbacks, ok := bindingCallbackValue[{public(plan.native)}](native_{callback.context}); if !ok || callbacks.{name(member)} == nil {{ {closes}return }}"
+            f"callbacks, ok := bindingCallbackValue[{public(plan.native)}](native_{callback.context}); if !ok || callbacks.{name(member)} == nil {{ {releases}return }}"
         )
         invoke = f"callbacks.{name(member)}({', '.join(copied)})"
         setup.append(

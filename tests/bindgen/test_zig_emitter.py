@@ -126,37 +126,30 @@ class ZigEmitterTests(unittest.TestCase):
             source,
         )
 
-    def test_a_dispose_with_a_completion_releases_and_disposes(self):
+    def test_a_release_waits_and_a_dispose_does_not(self):
         api = parse(
             """
-typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_dispose;dispose=mln_session_dispose");
+typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_release;dispose=mln_session_dispose");
 BIND("execution=lifecycle")
-mln_status mln_session_dispose(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+mln_status mln_session_release(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+mln_status mln_session_dispose(mln_session session, mln_diagnostic *out_diagnostic);
 """,
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
         )
         validate(api)
         self.assertEqual(zig.lower(api).unsupported, {})
         source = emitted(zig, api)["maplibre_native_ffi.zig"]
-        # deinit and the sync dispose pass no completion; the release passes one.
-        self.assertIn(
-            "try status.call(c.mln_session_dispose, .{ raw, null }, null);", source
-        )
-        # Both take the caller's value and close it once native accepts. The
-        # sync dispose of a closed value does nothing, and the async release
-        # reaches native.
+        # deinit, as `defer` runs it, disposes.
+        self.assertIn("try status.call(c.mln_session_dispose, .{ raw }, null);", source)
         self.assertIn(
             "pub fn release(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n"
-            '    const released = try call.submit("mln_session_dispose", .handle, self.*,',
+            '    const released = try call.submit("mln_session_release", .handle, self.*,',
             source,
         )
         self.assertIn(
-            "pub fn dispose(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {\n"
-            "    if (self.closed) return;\n"
-            '    try call.discard("mln_session_dispose", .handle, self.*,',
+            "pub fn dispose(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {",
             source,
         )
-        self.assertEqual(source.count("self.closed = true;"), 2)
 
     def test_only_runtime_event_sources_document_their_id_as_a_source(self):
         api = parse(

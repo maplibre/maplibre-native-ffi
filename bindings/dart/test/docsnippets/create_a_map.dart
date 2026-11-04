@@ -60,6 +60,6 @@ Future<void> createAMap() async {
   // #region close
   session.dispose();
   map.dispose();
-  await runtime.close();
+  await runtime.release();
   // #endregion close
 }

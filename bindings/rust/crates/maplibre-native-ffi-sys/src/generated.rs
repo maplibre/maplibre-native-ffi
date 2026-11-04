@@ -2784,7 +2784,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_dispose(
         session: mln_render_session,
-        completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_drain_frame_results(
@@ -2845,6 +2844,11 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_reduce_memory_use(
+        session: mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_release(
         session: mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,

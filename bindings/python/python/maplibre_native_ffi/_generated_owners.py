@@ -40,7 +40,7 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
 
@@ -66,7 +66,7 @@ class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMi
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
 
@@ -102,7 +102,7 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
     def id(self) -> int:
         """The native handle value, which runtime events report as their source.
 
-        It stays readable after close, so events drained later still match
+        It stays readable after release, so events drained later still match
         the handle that produced them.
         """
         return int(self._native.id)
@@ -111,12 +111,12 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
         """Releases the map in any state, and finishes in the background.
 
         Use it from destructors and finalizers. Otherwise, use
-        `MapHandle.close()`.
+        `MapHandle.release()`.
 
         See `mln_map_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        self._native._exit()
+        self._native._dispose()
 
 
 class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
@@ -141,7 +141,7 @@ class MapProjectionHandle(_MapProjectionHandleOperations, ScopedHandleMixin):
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
 
@@ -167,7 +167,7 @@ class OffscreenDeviceHandle(_OffscreenDeviceHandleOperations, ScopedHandleMixin)
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
 
@@ -201,26 +201,23 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
     def dispose(self) -> None:
-        """Releases the session in any state.
+        """Releases the session in any state, and finishes in the background.
 
-        An attached session detaches first, and frees its graphics objects,
-        unless you hold one of its frames. A session driven by
-        `RenderDriverKind.CALLER_GRAPHICS_THREAD` detaches at your next
-        `RenderSessionHandle.service_driver_work()`, so keep servicing it
-        until the disposal completes. If you release or dispose its map
-        before that service, the session is abandoned instead. Any other
-        session is abandoned as `RenderSessionHandle.abandon()` does. Once
-        the disposal completes, the library no longer uses your graphics
-        objects.
+        Use it from destructors and finalizers. Otherwise, use
+        `RenderSessionHandle.release()`. The session retires as a release
+        does, except that a session whose frames you hold is abandoned, which
+        ends the frames. Keep servicing a session driven by
+        `RenderDriverKind.CALLER_GRAPHICS_THREAD` until
+        `RenderSessionHandle.service_driver_work()` no longer accepts it.
 
         See `mln_render_session_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
-        self._native._exit()
+        self._native._dispose()
 
 
 class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin):
@@ -245,7 +242,7 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, ScopedHandleMixin)
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
 
@@ -273,7 +270,7 @@ class ResourceTransformRequestHandle(
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)
 
 
@@ -301,7 +298,7 @@ class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
     def id(self) -> int:
         """The native handle value, which runtime events report as their source.
 
-        It stays readable after close, so events drained later still match
+        It stays readable after release, so events drained later still match
         the handle that produced them.
         """
         return int(self._native.id)
@@ -314,7 +311,7 @@ class RuntimeHandle(_RuntimeHandleOperations, ScopedHandleMixin):
         See `mln_runtime_dispose` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        self._native._exit()
+        self._native._dispose()
 
 
 class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin):
@@ -339,5 +336,5 @@ class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin)
 
     @property
     def id(self) -> int:
-        """The native handle value. It stays readable after close."""
+        """The native handle value. It stays readable after release."""
         return int(self._native.id)

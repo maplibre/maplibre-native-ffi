@@ -219,7 +219,7 @@ static void open_map(enum target_kind kind, retarget_map* out) {
   TEST_ASSERT_TRUE_MESSAGE(attached, mln_test_graphics_last_error());
 }
 
-static void close_map(retarget_map* map) {
+static void tear_down_map(retarget_map* map) {
   mln_test_render_fixture_destroy(&map->fixture);
   mln_test_destroy_map(map->map);
   mln_test_destroy_runtime(map->runtime);
@@ -249,7 +249,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   expect_texture_color(fixture, replacement, blue, "the replacement");
   expect_texture_color(fixture, NULL, red, "the replaced texture");
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static void open_borrowed_ring(retarget_map* out, uint32_t driver) {
@@ -315,7 +315,7 @@ static void a_borrowed_retarget_is_refused_while_a_frame_is_acquired(void) {
     mln_test_last_error()
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 // A frame disposed without consumer synchronization quarantines its slot, since
@@ -366,7 +366,7 @@ static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
     mln_test_texture_handle(replacements[slot]), texture
   );
   release(&frame);
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 // Driver service runs the demand and the replacement in queue order, so the
@@ -423,7 +423,7 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   );
   expect_texture_color(fixture, replacements[slot], blue, "the new texture");
   release(&frame);
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 // A replacement holds no frame of the map's latest update, so a demand that
@@ -467,7 +467,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   TEST_ASSERT_EQUAL_UINT64(3000, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   expect_texture_color(fixture, replacement, red, "the replacement");
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 // A host may hand the session its current target again, such as on every
@@ -537,7 +537,7 @@ static void a_retarget_to_the_current_target_renders_nothing(void) {
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the released texture again");
   TEST_ASSERT_TRUE(has_target(fixture));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
@@ -583,7 +583,7 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   TEST_ASSERT_EQUAL_UINT32(width, snapshot.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(height, snapshot.view.extent.height);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static void a_borrowed_retarget_sizes_the_map(void) {
@@ -782,7 +782,7 @@ static void refused_retargets_leave_the_old_target_rendering(void) {
     mln_test_completion_destroy(&completion);
 
     expect_old_target_rendering(row, &map);
-    close_map(&map);
+    tear_down_map(&map);
     release_replacement(&made);
   }
 }
@@ -884,7 +884,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
   if (next_texture != NULL) {
     expect_texture_color(fixture, next_texture, blue, "the next texture");
   }
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 static void a_released_texture_can_be_destroyed_before_the_next(void) {
@@ -971,7 +971,7 @@ static void a_release_finishes_a_waiting_demand(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
   );
-  close_map(&map);
+  tear_down_map(&map);
 }
 
 // An offscreen session renders into a texture of its own, so it takes no
@@ -1021,7 +1021,7 @@ static void an_offscreen_session_refuses_targets(void) {
 
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
   expect_offscreen_color(fixture, red, "the offscreen session's own texture");
-  close_map(&offscreen);
+  tear_down_map(&offscreen);
 }
 
 static void releases_that_a_ring_refuses(void) {
@@ -1047,7 +1047,7 @@ static void releases_that_a_ring_refuses(void) {
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   MLN_TEST_OK(acquire(fixture, &frame));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
-  close_map(&map);
+  tear_down_map(&map);
 }
 #endif
 

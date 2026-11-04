@@ -39,7 +39,7 @@ type renderFixture struct {
 	// frames and driverWork receive the session's frame and driver-work wakes.
 	frames, driverWork chan struct{}
 	token              uint64
-	closed             bool
+	released           bool
 }
 
 // newRenderFixture starts attaching a ring of two 32x16 textures to a map,
@@ -146,18 +146,18 @@ func (r *renderFixture) attach(t *testing.T) {
 	await(t, r.attached)
 }
 
-// teardown detaches the session on this thread when it can, then closes it
+// teardown detaches the session on this thread when it can, then releases it
 // and waits for its retirement, after which the cleanups release the map and
 // destroy the graphics objects. A later teardown does nothing.
 func (r *renderFixture) teardown(t *testing.T) {
-	if r.closed {
+	if r.released {
 		return
 	}
-	r.closed = true
+	r.released = true
 	if detach, err := r.session.Detach(); err == nil {
 		r.service(t, detach.Done(), "the detach")
 	}
-	await(t, submitted(r.session.Close()))
+	await(t, submitted(r.session.Release()))
 }
 
 // service services a caller-driven session until done closes. An offscreen
@@ -250,17 +250,17 @@ func TestCallerDriverIsServicedFromAGoroutine(t *testing.T) {
 	r.renderFrame(t)
 }
 
-// Closing an attached session retires it without a detach. Once the close
+// Releasing an attached session retires it without a detach. Once the release
 // completes, the map takes another session.
-func TestCloseRetiresAnAttachedSession(t *testing.T) {
+func TestReleaseRetiresAnAttachedSession(t *testing.T) {
 	r := newOffscreenFixture(t)
 	r.attach(t)
 	r.renderFrame(t)
-	r.closed = true
-	await(t, submitted(r.session.Close()))
+	r.released = true
+	await(t, submitted(r.session.Release()))
 	// Native refuses an attach while the map still has a session.
 	r.start(t, r.options())
-	r.closed = false
+	r.released = false
 	r.attach(t)
 }
 
@@ -301,9 +301,9 @@ func TestRenderedFrameReadsBackAsPixels(t *testing.T) {
 }
 
 // A frame view lends its texture only for its callback. While it lives, it
-// refuses a read of the texture from another thread, and the frame refuses to
-// close from one; once the callback returns, the view refuses the texture but
-// still reads its plain values, and the frame closes.
+// refuses a read of the texture from another thread, and the frame refuses a
+// release from one; once the callback returns, the view refuses the texture but
+// still reads its plain values, and the frame releases.
 func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
@@ -324,14 +324,14 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 		// This goroutine holds its OS thread, so another one runs elsewhere.
 		foreign := make(chan [2]error, 1)
 		go func() {
-			foreign <- [2]error{readTexture(view), frame.Close(GPUSync{Kind: GPUSyncKindCPUComplete})}
+			foreign <- [2]error{readTexture(view), frame.Release(GPUSync{Kind: GPUSyncKindCPUComplete})}
 		}()
 		result := <-foreign
 		if !errors.Is(result[0], StatusInvalidState) {
 			t.Errorf("view read from another thread = %v, want StatusInvalidState", result[0])
 		}
 		if !errors.Is(result[1], StatusBusy) {
-			t.Errorf("frame close during the view = %v, want StatusBusy for a frame in use", result[1])
+			t.Errorf("frame release during the view = %v, want StatusBusy for a frame in use", result[1])
 		}
 		return nil
 	})
@@ -344,15 +344,15 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	if width := expired.Width(); width != 32 {
 		t.Fatalf("expired view width = %d, want 32", width)
 	}
-	if err := frame.Close(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
-		t.Fatalf("frame close after the view: %v", err)
+	if err := frame.Release(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
+		t.Fatalf("frame release after the view: %v", err)
 	}
 	if err := withFrameView(frame, func(frameView) error { return nil }); !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("view of a closed frame = %v, want StatusInvalidState", err)
 	}
 }
 
-// A frame closes once: a second discard or a close after one does nothing.
+// A frame retires once: a second discard or a release after one does nothing.
 func TestFrameDiscardsOnce(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
@@ -367,8 +367,8 @@ func TestFrameDiscardsOnce(t *testing.T) {
 			t.Fatalf("AcquiredFrameHandle.Discard: %v", err)
 		}
 	}
-	if err := frame.Close(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
-		t.Fatalf("AcquiredFrameHandle.Close after Discard: %v, want a no-op", err)
+	if err := frame.Release(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
+		t.Fatalf("AcquiredFrameHandle.Release after Discard: %v, want a no-op", err)
 	}
 	checkHandleMembers(t, frame, "AcquiredFrameHandle", true)
 }
@@ -385,8 +385,8 @@ func TestFrameViewSurvivesYielding(t *testing.T) {
 		t.Fatalf("AcquireFrame = %v, %v; want a rendered frame", frame, err)
 	}
 	defer func() {
-		if err := frame.Close(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
-			t.Errorf("frame close: %v", err)
+		if err := frame.Release(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
+			t.Errorf("frame release: %v", err)
 		}
 	}()
 

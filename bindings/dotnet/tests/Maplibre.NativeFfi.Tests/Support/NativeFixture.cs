@@ -79,14 +79,14 @@ internal sealed class NativeFixture : IAsyncDisposable
             }
             catch
             {
-                await map.DisposeAsync();
+                await ((IAsyncDisposable)map).DisposeAsync();
                 throw;
             }
             return new NativeFixture(runtime, map, events, pendingEvents);
         }
         catch
         {
-            await runtime.CloseAsync();
+            await runtime.ReleaseAsync();
             events.Dispose();
             throw;
         }
@@ -130,12 +130,12 @@ internal sealed class NativeFixture : IAsyncDisposable
         try
         {
             if (Map is not null && IsLive(() => Map.GetSnapshot()))
-                await Map.CloseAsync();
+                await Map.ReleaseAsync();
         }
         finally
         {
             if (Runtime is not null && IsLive(() => Runtime.Discarding.ClearResourceTransform()))
-                await Runtime.CloseAsync();
+                await Runtime.ReleaseAsync();
             // Runtime teardown retires the event handler before the semaphore is disposed.
             events.Dispose();
         }

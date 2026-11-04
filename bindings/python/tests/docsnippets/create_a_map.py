@@ -61,7 +61,8 @@ def create_a_map() -> None:
     session = attach_target(map_handle)
 
     # #region close
-    session.dispose()
-    map_handle.dispose()
-    runtime.close().result()
+    # Leaving the block disposes the session, the map, and the runtime, in
+    # that order, without waiting for them to retire.
+    with runtime, map_handle, session:
+        pass  # Render frames and change the map.
     # #endregion close

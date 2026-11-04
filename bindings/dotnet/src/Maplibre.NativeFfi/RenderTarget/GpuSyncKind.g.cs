@@ -9,7 +9,7 @@ namespace Maplibre.NativeFfi;
 /// <c>AcquiredFrameHandle.Release()</c> succeeds, the session takes the one you
 /// pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
 /// up with each frame, so the one you pass stays yours. Keep it valid until a
-/// detach or disposal of the session completes.</para>
+/// detach or release of the session completes.</para>
 /// <para>See <c>mln_gpu_sync_kind</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>

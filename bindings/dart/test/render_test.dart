@@ -1,5 +1,5 @@
 // Render sessions on a core worker: rendering and readback offscreen,
-// disposal and close of an attached session, and the scope of a frame view of
+// disposal and release of an attached session, and the scope of a frame view of
 // a borrowed texture.
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
@@ -76,8 +76,8 @@ void main() {
       // A second dispose is a no-op.
       session.dispose();
       // A dispose reports no retirement, so the map's release waits for it.
-      await within(map.close(), 'map close');
-      device.close();
+      await within(map.release(), 'map release');
+      device.release();
     },
   );
 
@@ -97,7 +97,7 @@ void main() {
       session.dispose();
       // The disposal fails the attach before the map's release finishes, and
       // the zone would report a failure that nothing handled.
-      await within(map.close(), 'map close');
+      await within(map.release(), 'map release');
       await expectLater(
         session.ready,
         throwsA(

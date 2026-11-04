@@ -78,25 +78,26 @@ void a_deferred_runtime_release_does_not_hold_other_retirements() {
     waiting, &map_options, &map, &create_map.descriptor, nullptr
   ));
   MLN_TEST_OK(mln_test_completion_settle(&create_map));
-  auto map_close = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_release(map, &map_close.descriptor, nullptr));
+  auto map_release = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_release(map, &map_release.descriptor, nullptr));
   const auto cleanup_parked =
     sync_points.wait_for_hits(SyncPoint::MapPoolShutdown, 1);
-  MLN_TEST_OK(mln_test_completion_settle(&map_close));
+  MLN_TEST_OK(mln_test_completion_settle(&map_release));
 
-  auto waiting_close = mln_test_completion_default(0);
+  auto waiting_release = mln_test_completion_default(0);
   const auto waiting_accepted =
-    mln_runtime_release(waiting, &waiting_close.descriptor, nullptr);
+    mln_runtime_release(waiting, &waiting_release.descriptor, nullptr);
   const auto waiting_deferred =
     sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
-  auto other_close = mln_test_completion_default(0);
+  auto other_release = mln_test_completion_default(0);
   const auto other_accepted =
-    mln_runtime_release(other, &other_close.descriptor, nullptr);
-  const auto other_closed = mln_test_completion_wait(&other_close, -1);
-  const auto waiting_closed_early = mln_test_completion_poll(&waiting_close);
+    mln_runtime_release(other, &other_release.descriptor, nullptr);
+  const auto other_released = mln_test_completion_wait(&other_release, -1);
+  const auto waiting_released_early =
+    mln_test_completion_poll(&waiting_release);
   sync_points.release(SyncPoint::MapPoolShutdown);
-  const auto other_status = mln_test_completion_settle(&other_close);
-  const auto waiting_status = mln_test_completion_settle(&waiting_close);
+  const auto other_status = mln_test_completion_settle(&other_release);
+  const auto waiting_status = mln_test_completion_settle(&waiting_release);
 
   TEST_ASSERT_TRUE(cleanup_parked);
   MLN_TEST_OK(waiting_accepted);
@@ -106,20 +107,21 @@ void a_deferred_runtime_release_does_not_hold_other_retirements() {
   );
   MLN_TEST_OK(other_accepted);
   TEST_ASSERT_TRUE_MESSAGE(
-    other_closed,
+    other_released,
     "a runtime release waited behind another runtime's deferred retirement"
   );
   TEST_ASSERT_FALSE_MESSAGE(
-    waiting_closed_early,
+    waiting_released_early,
     "the runtime release completed while a map's cleanup was parked"
   );
   MLN_TEST_OK(other_status);
   MLN_TEST_OK(waiting_status);
 }
 
-// Models a command that acquired its map lease before close and queued after
-// cancellation. The transition's CLOSED callback fences the first close stage.
-void map_release_waits_for_a_lease_queued_after_close_begins() {
+// Models a command that acquired its map lease before release and queued
+// after cancellation. The transition's CLOSED callback fences the release's
+// first stage.
+void map_release_waits_for_a_lease_queued_after_release_begins() {
   const auto runtime = create_runtime();
   auto creation = mln_test_completion_default(0);
   auto map = mln_map{MLN_HANDLE_NULL};
@@ -145,10 +147,10 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
   auto live = mln::core::handle_table<mln::core::MapObject>().lease(map);
   TEST_ASSERT_TRUE(live->control.acquire());
   auto lease = mln::core::ControlLease{&live->control};
-  auto closed = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_release(map, &closed.descriptor, nullptr));
+  auto released = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_release(map, &released.descriptor, nullptr));
   TEST_ASSERT_TRUE(mln_test_wait_transition_end(&transition));
-  TEST_ASSERT_FALSE(mln_test_completion_poll(&closed));
+  TEST_ASSERT_FALSE(mln_test_completion_poll(&released));
   MLN_TEST_INVALID_STATE(mln_map_dispose(map, nullptr));
   // Runtime disposal must preserve the worker for the already-leased command.
   MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
@@ -164,7 +166,7 @@ void map_release_waits_for_a_lease_queued_after_close_begins() {
     mln::core::complete_command(completion, status);
   });
   MLN_TEST_OK(mln_test_completion_settle(&command));
-  MLN_TEST_OK(mln_test_completion_settle(&closed));
+  MLN_TEST_OK(mln_test_completion_settle(&released));
   TEST_ASSERT_TRUE(mln_test_await(
     [](void* context) {
       return static_cast<std::weak_ptr<mln::core::RuntimeObject>*>(context)
@@ -231,21 +233,21 @@ void accepted_completions_hold_runtime_release() {
     }
     const auto release_entered = mln_test_gate_wait_entered(&release);
     live.reset();
-    auto closed = mln_test_completion_default(0);
-    const auto close_status =
-      mln_runtime_release(runtime, &closed.descriptor, nullptr);
+    auto released = mln_test_completion_default(0);
+    const auto release_status =
+      mln_runtime_release(runtime, &released.descriptor, nullptr);
     const auto deferred =
       sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
-    const auto closed_early = mln_test_completion_poll(&closed);
+    const auto released_early = mln_test_completion_poll(&released);
     mln_test_gate_release(&release);
     if (resolver.joinable()) resolver.join();
-    MLN_TEST_OK(mln_test_completion_settle(&closed));
+    MLN_TEST_OK(mln_test_completion_settle(&released));
     TEST_ASSERT_TRUE(release_entered);
-    MLN_TEST_OK(close_status);
+    MLN_TEST_OK(release_status);
     TEST_ASSERT_TRUE_MESSAGE(
       deferred, "runtime release did not wait for a completion's release"
     );
-    TEST_ASSERT_FALSE(closed_early);
+    TEST_ASSERT_FALSE(released_early);
   }
 }
 
@@ -292,16 +294,16 @@ void an_abandoned_completion_holds_runtime_release_until_it_cancels() {
     live->executor.invoke([&work_ran] { mln_test_flag_set(&work_ran); });
     const auto ran = mln_test_wait_for_flag(&work_ran);
     live.reset();
-    auto closed = mln_test_completion_default(0);
-    const auto close_status =
-      mln_runtime_release(runtime, &closed.descriptor, nullptr);
+    auto released = mln_test_completion_default(0);
+    const auto release_status =
+      mln_runtime_release(runtime, &released.descriptor, nullptr);
     const auto deferred =
       sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
     completion.reset();
     const auto status = mln_test_completion_settle(&result);
-    MLN_TEST_OK(mln_test_completion_settle(&closed));
+    MLN_TEST_OK(mln_test_completion_settle(&released));
     TEST_ASSERT_TRUE(ran);
-    MLN_TEST_OK(close_status);
+    MLN_TEST_OK(release_status);
     TEST_ASSERT_TRUE(deferred);
     MLN_TEST_STATUS(MLN_STATUS_CANCELLED, status);
   }
@@ -372,7 +374,7 @@ MLN_TEST_GROUP {
 
   RUN_TEST(submission_failure_callbacks_can_submit_again);
   RUN_TEST(a_deferred_runtime_release_does_not_hold_other_retirements);
-  RUN_TEST(map_release_waits_for_a_lease_queued_after_close_begins);
+  RUN_TEST(map_release_waits_for_a_lease_queued_after_release_begins);
 #if defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__) && \
   !defined(__OHOS__)
   RUN_TEST(a_runtime_raises_musls_default_thread_stack);

@@ -87,6 +87,9 @@ enum class SyncPoint : std::uint8_t {
   // A host's abandon has leased its session and is about to take the
   // session's control lock. No lock is held.
   RenderAbandonLeased,
+  // A frame acquire has leased its session and is about to take the session's
+  // control lock. No lock is held.
+  RenderAcquireLeased,
   // Replacing a render session scheduler's work-available hook found another
   // thread running the hook and is about to wait for it to return. It fires
   // only when the replacement has to wait. No lock is held.

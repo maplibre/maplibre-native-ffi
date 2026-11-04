@@ -43,14 +43,14 @@ private func style(map: MapHandle, pixels: Data) async throws {
   )
   try map.discarding.addGeoJsonSourceData("points", data: data)
   // The source keeps its own reference to the data.
-  data.close()
+  data.release()
 
   // Later, prepare new data with the same options, and set it.
   let next = try GeoJsonSourceDataHandle.create(
     data: #"{"type": "Point", "coordinates": [2.35, 48.86]}"#
   )
   try map.discarding.setGeoJsonSourceData("points", data: next)
-  next.close()
+  next.release()
   // #endregion geojson
 
   // #region set-property

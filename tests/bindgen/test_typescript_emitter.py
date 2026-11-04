@@ -173,26 +173,24 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("queue_lock", members)
         self.assertTrue(self.values.member_optional(options, members["queue_lock"]))
 
-    def test_a_dispose_that_is_also_the_release_closes_both_ways(self):
-        # The session's release is its dispose with a completion, so close()
-        # awaits retirement, while dispose(), `using`, and an adopted handle's
-        # cleanup pass no completion.
+    def test_await_using_releases_and_using_disposes(self):
         text = next(
             text
             for name, text in emitted(typescript, self.api).items()
             if name.endswith("generated_operations.ts")
         )
-        self.assertIn('defineDisposers(RenderSessionHandle, "close", "dispose");', text)
         self.assertIn(
-            "native.mln_render_session_dispose(handle, token, completion)", text
+            'defineDisposers(RenderSessionHandle, "release", "dispose");', text
+        )
+        # A handle that its release frees at once releases in either scope, and
+        # one whose release needs what only the host knows has neither.
+        self.assertIn(
+            'defineDisposers(StyleExpressionHandle, "release", "release");', text
         )
         self.assertIn(
-            "native.mln_render_session_dispose(handle, token, undefined)", text
+            "defineDisposers(AcquiredFrameHandle, undefined, undefined);", text
         )
-        self.assertIn(
-            "native.mln_render_session_dispose(disposed, undefined, undefined)",
-            text,
-        )
+        self.assertIn("native.mln_render_session_dispose(disposed, undefined)", text)
 
     def test_a_record_of_only_a_union_is_that_union(self):
         # The union takes the record's name. Only a union that native returns

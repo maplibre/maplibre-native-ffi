@@ -94,7 +94,7 @@ internal actual object TestGraphicsLibrary {
 
 /**
  * A canvas element that a session takes over, named by [selector]. [close] removes it once that
- * session has closed.
+ * session has retired.
  */
 internal class TestCanvas(val selector: String, private val remove: () -> Unit) : AutoCloseable {
   override fun close() = remove()
@@ -203,7 +203,7 @@ internal fun requestPageWebGpuDevice(): Promise<JsAny?> =
 
 /**
  * A WebGPU surface over a canvas element, imported as [surface], and the [format] that the page
- * prefers. [close] releases it once its session has closed.
+ * prefers. [close] releases it once its session has retired.
  */
 internal class WebGpuCanvasSurface(private val surface: ImportedWebGpuObject, val format: UInt) :
   AutoCloseable {

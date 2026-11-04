@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 /// The ring keeps its depth, context, and texture target, so give it as many
 /// textures as it attached with, in the same share group. The session uses the
 /// textures until a replacement or release of the target completes, a detach or
-/// disposal of the session completes, or an abandon of it returns.</para>
+/// release of the session completes, or an abandon of it returns.</para>
 /// <para>See <c>mln_open_gl_borrowed_texture_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>

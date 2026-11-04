@@ -62,7 +62,7 @@ test(
     session[Symbol.dispose]();
     session[Symbol.dispose]();
     assert.throws(() => demandFrame(session, 2n), MaplibreError);
-    await bounded(map.close(), "the map release");
+    await bounded(map.release(), "the map release");
   },
   { needs: ["disposers"] },
 );
@@ -135,7 +135,7 @@ test("a session disposed while it attaches rejects its ready without an unhandle
   session.dispose();
   // The disposal fails the attach before the map's release finishes, and a
   // later turn reports a rejection that nothing handled.
-  await bounded(map.close(), "the map release");
+  await bounded(map.release(), "the map release");
   await turn();
   await assert.rejects(
     session.ready,

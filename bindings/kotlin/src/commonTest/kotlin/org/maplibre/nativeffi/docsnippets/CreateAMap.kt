@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.MapOptions
 import org.maplibre.nativeffi.MaplibreException
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.RuntimeHandle
+import org.maplibre.nativeffi.useReleasing
 
 private fun reportFailure(error: MaplibreException) {}
 
@@ -72,8 +73,13 @@ private suspend fun createAMap() {
   val session = attachTarget(map)
 
   // #region close
-  session.close()
-  map.close()
-  runtime.release().await()
+  // Each block releases its handle when it ends, and waits for it.
+  runtime.useReleasing {
+    map.useReleasing {
+      session.useReleasing {
+        // Render frames and change the map.
+      }
+    }
+  }
   // #endregion close
 }

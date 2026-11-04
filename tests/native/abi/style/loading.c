@@ -338,7 +338,7 @@ static void releasing_the_map_cancels_its_pending_style_load(void) {
   mln_test_completion load = mln_test_completion_default(0);
   MLN_TEST_OK(set_style_url(map, url, &load));
   TEST_ASSERT_TRUE(mln_test_provider_wait_for_requests(provider, url, 1));
-  MLN_TEST_OK(mln_test_map_close(map));
+  MLN_TEST_OK(mln_test_map_release(map));
   expect_cancelled(&load);
 
   const mln_resource_response late =

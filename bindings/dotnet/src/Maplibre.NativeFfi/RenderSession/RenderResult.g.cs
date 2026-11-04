@@ -31,7 +31,7 @@ public enum RenderResult : uint
 
     /// <summary>
     /// The session failed, and <c>RenderSessionHandle.GetFailure()</c> reports
-    /// why. Once <c>RenderSessionHandle.CloseAsync()</c> completes, you can
+    /// why. Once <c>RenderSessionHandle.ReleaseAsync()</c> completes, you can
     /// attach a new session.
     /// </summary>
     Failed = 4,

@@ -37,13 +37,13 @@ def _adopt_value(raw, owner, parent=None, ready=None):
 def _answer(owner, call):
     """Runs an answer, which ends the handle whatever it returns. Native ends
     a live handle on every outcome, and an answer that fails before it reaches
-    native, such as on an argument that fails to convert, closes the handle."""
+    native, such as on an argument that fails to convert, releases the handle."""
     try:
         return call()
     except BaseException:
         native = owner._native
         if not native._is_closed and not native._is_borrowed:
-            native.close()
+            native.release()
         raise
 
 

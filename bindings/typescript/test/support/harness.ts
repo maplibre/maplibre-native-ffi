@@ -48,7 +48,7 @@ let teardowns: (() => unknown)[] | undefined;
 
 /**
  * Registers cleanup for the running case. Cleanups run after the case in
- * reverse order, so a map closes before the runtime that owns it.
+ * reverse order, so a map is released before the runtime that owns it.
  */
 export function teardown(cleanup: () => unknown): void {
   if (teardowns === undefined) {
@@ -58,12 +58,14 @@ export function teardown(cleanup: () => unknown): void {
 }
 
 /**
- * Closes an owner unless the case already released it. A release after an
+ * Releases an owner unless the case already released it. A release after an
  * accepted one reaches native code, which reports the handle stale.
  */
-export async function closeIfLive(close: () => Promise<void>): Promise<void> {
+export async function releaseIfLive(
+  release: () => Promise<void>,
+): Promise<void> {
   try {
-    await close();
+    await release();
   } catch (error) {
     if (
       !(error instanceof MaplibreError && error.status === Status.invalidState)

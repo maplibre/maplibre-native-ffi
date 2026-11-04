@@ -4556,26 +4556,18 @@ static napi_value mln_ts_export_mln_render_session_dispose(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status =
-    mln_render_session_dispose(arg_session, present_completion, &diagnostic);
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  status = mln_render_session_dispose(arg_session, &diagnostic);
   if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -4955,6 +4947,38 @@ static napi_value mln_ts_export_mln_render_session_reduce_memory_use(
     arg_session, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_render_session_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_render_session arg_session = 0;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
+    arg_session = (mln_render_session)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[2], false, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_render_session_release(arg_session, present_completion, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (status == MLN_STATUS_OK) mln_ts_consume(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6917,6 +6941,7 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_render_session_read_texture},
   {"mln_render_session_reduce_memory_use",
    mln_ts_export_mln_render_session_reduce_memory_use},
+  {"mln_render_session_release", mln_ts_export_mln_render_session_release},
   {"mln_render_session_release_target",
    mln_ts_export_mln_render_session_release_target},
   {"mln_render_session_resize", mln_ts_export_mln_render_session_resize},

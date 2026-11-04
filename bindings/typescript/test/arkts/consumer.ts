@@ -9,5 +9,5 @@ import { postToParent, realmData } from "./realm-child.ts";
 
 await realmData();
 const runtime = await RuntimeHandle.create();
-await runtime.close();
+await runtime.release();
 postToParent({ version: cVersion() });

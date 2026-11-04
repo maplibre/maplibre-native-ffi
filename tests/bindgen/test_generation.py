@@ -274,7 +274,7 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             ),
             zig: (
                 "const borrowed_map = Map.borrow(callback_arg_1);",
-                "pub fn close(self: *Map) status.Error!void {\n    try self.requireOwned(null);",
+                "pub fn release(self: *Map) status.Error!void {\n    try self.requireOwned(null);",
                 '@"callback": *const fn (context: ?*anyopaque, map: *const Map, name: []const u8)',
             ),
         }

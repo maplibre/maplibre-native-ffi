@@ -115,7 +115,7 @@ void mln_doc_images(mln_runtime runtime) {
   // #endregion read
   wait_for_done();
 
-  mln_render_session_dispose(session, NULL, NULL);
+  mln_render_session_dispose(session, NULL);
   mln_map_release(map, &done, NULL);
   wait_for_done();
 }

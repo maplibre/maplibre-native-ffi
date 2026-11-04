@@ -114,7 +114,7 @@ void mln_doc_create_a_map(void) {
   mln_render_session session = attach_target(map);
 
   // #region close
-  mln_render_session_dispose(session, NULL, NULL);
+  mln_render_session_dispose(session, NULL);
   mln_map_dispose(map, NULL);
   mln_runtime_release(runtime, &done, NULL);
   // #endregion close

@@ -21,11 +21,11 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.setLogAsyncSeverityMask
 import org.maplibre.nativeffi.setLogCallback
 import org.maplibre.nativeffi.smallMapOptions
-import org.maplibre.nativeffi.use
+import org.maplibre.nativeffi.useReleasing
 
 /**
- * A JVM that has received native log records exits with the callback installed, both after closing
- * its runtime and map and with them and their callbacks still live.
+ * A JVM that has received native log records exits with the callback installed, both after
+ * releasing its runtime and map and with them and their callbacks still live.
  */
 class LogProcessExitTest {
   @Test fun jvmExitsWithNativeLogCallbackInstalled() = assertProcessExits("installed")
@@ -70,9 +70,9 @@ object LogProcessExitProbe {
       }
     } else {
       runSuspendTest {
-        RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        RuntimeHandle.create(RuntimeOptions()).useReleasing { runtime ->
           val map = runtime.createMap(smallMapOptions())
-          map.use {
+          map.useReleasing {
             map.ready.await()
             warnFromStyle(it, received)
           }

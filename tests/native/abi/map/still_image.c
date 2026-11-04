@@ -334,7 +334,7 @@ static void a_continuous_map_refuses_a_still_image(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void map_close_cancels_the_pending_still_image(void) {
+static void map_release_cancels_the_pending_still_image(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_STATIC);
 
@@ -361,5 +361,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_barrier_ends_a_still_image_demand_until_the_next);
   RUN_TEST(host_demands_and_a_still_image_demand_never_replace_each_other);
   RUN_TEST(a_continuous_map_refuses_a_still_image);
-  RUN_TEST(map_close_cancels_the_pending_still_image);
+  RUN_TEST(map_release_cancels_the_pending_still_image);
 }

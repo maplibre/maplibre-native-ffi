@@ -8,7 +8,7 @@ from .go import GO_KEYWORDS, camel, documented_operation, name, native_call
 from .go_values import Values, is_text, public
 
 # Members every handle owner declares, which no operation may take.
-OWNER_MEMBERS = {"Close", "Dispose", "ID", "IsClosed", "String"}
+OWNER_MEMBERS = {"ID", "IsClosed", "String"}
 
 
 def element(value):
@@ -17,8 +17,6 @@ def element(value):
 
 def method_name(plan, receiver, handle):
     method = name(plan.member)
-    if handle and handle.handle and plan.name == handle.handle.release:
-        return "Close"
     if receiver and method in OWNER_MEMBERS:
         raise Unsupported(f"{plan.name}: {method} is reserved for owner state")
     return method
@@ -43,9 +41,9 @@ def receiver_type_name(plan, values):
     return values.owner(handle.native)
 
 
-def declared_name(plan, bound, *, dispose=False):
+def declared_name(plan, bound):
     receiver, handle = receiver_of(plan)
-    method = "Dispose" if dispose else method_name(plan, receiver, handle)
+    method = method_name(plan, receiver, handle)
     if plan.factory:
         # Go names a constructor New and the type that it returns.
         return "New" + name(bound.handles[plan.factory].stem)
@@ -142,7 +140,7 @@ def copies_borrowed(value):
 
 def borrows_receiver(plan):
     """Whether an immediate receiver call copies output that borrows the
-    receiver's storage, which a concurrent close would free."""
+    receiver's storage, which a concurrent release or dispose would free."""
     return bool(
         plan.receiver
         and not plan.completion
@@ -158,19 +156,15 @@ def borrows_receiver(plan):
 
 
 def operation(plan, values, *, discard=False, dispose=False):
-    """`dispose` lowers a handle's C dispose as its synchronous `Dispose`,
-    which passes a null completion to a dispose that is also the release."""
-    dropped_completion = None
-    if dispose and plan.completion:
-        dropped_completion = plan.completion.parameter
-        plan = replace(plan, completion=None)
+    """`dispose` lowers a handle's C dispose, a support operation, as its
+    synchronous `Dispose`."""
     if plan.role == "support" and not dispose:
         raise Unsupported(
             f"{plan.name}: support relationship is emitted with its owner or value"
         )
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver, handle = receiver_of(plan)
-    method = declared_name(plan, values.api, dispose=dispose)
+    method = declared_name(plan, values.api)
     internal = {
         "arena",
         "raw",
@@ -206,8 +200,6 @@ def operation(plan, values, *, discard=False, dispose=False):
     # that the runtime calls again when the text did not fit.
     text = plan.caller_sized_text
     signature, setup, body_setup, arguments = [], [], [], {}
-    if dropped_completion:
-        arguments[dropped_completion] = "nil"
     for p in plan.inputs:
         if p.name == receiver_name:
             continue

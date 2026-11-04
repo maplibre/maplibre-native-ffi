@@ -47,7 +47,7 @@ impl MapWindow {
             .iter()
             .any(|result| result.disposition == RenderResult::Failed)
         {
-            // Close the session and attach a new one.
+            // Release the session and attach a new one.
             self.replace_session();
         } else if !self.paused {
             run_at_next_refresh(MapWindow::demand_frame);

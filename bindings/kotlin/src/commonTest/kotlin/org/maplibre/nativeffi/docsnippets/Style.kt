@@ -51,7 +51,7 @@ private suspend fun style(map: MapHandle, pixels: ByteArray) {
     )
   map.discarding.addGeoJsonSourceData("points", data)
   // The source keeps its own reference to the data.
-  data.close()
+  data.release()
 
   // Later, prepare new data with the same options, and set it.
   val next =
@@ -59,7 +59,7 @@ private suspend fun style(map: MapHandle, pixels: ByteArray) {
       """{"type": "Point", "coordinates": [2.35, 48.86]}""",
     )
   map.discarding.setGeoJsonSourceData("points", next)
-  next.close()
+  next.release()
   // #endregion geojson
 
   // #region set-property

@@ -143,7 +143,7 @@ public sealed class ResourceTransformTests
                     if (url == styleUrl)
                         received.TrySetResult(request);
                     else
-                        request.Dispose();
+                        request.Release();
                 },
             }
         );

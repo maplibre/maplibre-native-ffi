@@ -15,7 +15,7 @@ import { renderExtent, demandFrame, TestSession } from "./graphics.ts";
 import { bounded, callbackArrival } from "./harness.ts";
 import { backgroundStyle, emptyStyle } from "./styles.ts";
 
-/** Loads a style, waits for its event, and closes everything it opened. */
+/** Loads a style, waits for its event, and releases everything it opened. */
 export async function loadStyle(): Promise<void> {
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();
@@ -117,7 +117,7 @@ export async function liveNativeWork(): Promise<RenderSessionHandle> {
     callback: (_request, handle) => hold(handle),
   });
   await runtime.setResourceTransform({
-    callback: (_kind, _url, request) => request.close(),
+    callback: (_kind, _url, request) => request.release(),
   });
   const pending = runtime.createMap({
     initialExtent: renderExtent,

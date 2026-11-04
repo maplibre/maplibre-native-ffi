@@ -53,7 +53,7 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
   // #endregion read
 
   session.dispose();
-  await map.close();
+  await map.release();
 }
 
 export async function imagesTile(
@@ -75,5 +75,5 @@ export async function imagesTile(
   });
   // #endregion tile
 
-  await map.close();
+  await map.release();
 }

@@ -154,7 +154,7 @@ def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
         assert projection.lat_lngs_for_pixels(()) == ()
         assert projection.lat_lngs_for_pixels_unwrapped(()) == ()
     finally:
-        projection.close()
+        projection.release()
 
 
 def test_json_crosses_as_json_dumps_and_json_loads_values(
@@ -195,7 +195,7 @@ def test_json_crosses_as_json_dumps_and_json_loads_values(
         inputs = mln.StyleExpressionInputs(feature=feature, feature_state=None)
         assert expression.evaluate(inputs) == "a"
     finally:
-        expression.close()
+        expression.release()
 
     # A value that json.dumps rejects raises its error before native runs.
     with pytest.raises(TypeError, match="not JSON serializable"):
@@ -209,7 +209,7 @@ def test_caller_sized_text_returns_results_longer_than_its_first_storage() -> No
     try:
         assert long.evaluate() == text
     finally:
-        long.close()
+        long.release()
 
 
 def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(

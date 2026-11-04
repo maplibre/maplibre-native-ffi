@@ -1369,7 +1369,7 @@ native_enum! {
 /// `AcquiredFrameHandle::release()` succeeds, the session takes the one you
 /// pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
 /// up with each frame, so the one you pass stays yours. Keep it valid until a
-/// detach or disposal of the session completes.
+/// detach or release of the session completes.
 ///
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2324,8 +2324,8 @@ impl ToNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
 /// pixel format, one sample, and MTLTextureUsageRenderTarget.
 ///
 /// The session uses the textures until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2380,8 +2380,8 @@ impl ToNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTextu
 /// textures follow its rules. The ring keeps its depth, device, and command
 /// queue, so give it as many textures as it attached with, on the same device.
 /// The session uses the textures until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_metal_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2480,7 +2480,7 @@ impl ToNative<sys::mln_metal_surface_descriptor> for MetalSurfaceDescriptor {
 ///
 /// The session renders to it with the device that it attached with. It uses the
 /// layer until a replacement or release of the target completes, a detach or
-/// disposal of the session completes, or an abandon of it returns.
+/// release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_metal_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -2896,8 +2896,8 @@ impl ToNative<sys::mln_open_gl_borrowed_texture> for OpenGlBorrowedTexture {
 /// size.
 ///
 /// The session uses the textures until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_open_gl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2957,7 +2957,7 @@ impl<'a> ToNative<sys::mln_open_gl_borrowed_texture_descriptor>
 /// the textures follow its rules. The ring keeps its depth, context, and
 /// texture target, so give it as many textures as it attached with, in the same
 /// share group. The session uses the textures until a replacement or release of
-/// the target completes, a detach or disposal of the session completes, or an
+/// the target completes, a detach or release of the session completes, or an
 /// abandon of it returns.
 ///
 /// See `mln_open_gl_borrowed_texture_replacement` in the
@@ -3103,8 +3103,8 @@ pub struct OpenGlContextProviderFlag: u32 {
 /// An OpenGL surface to present to, for `MapHandle::attach_open_gl_surface()`.
 ///
 /// The session uses the surface until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_open_gl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -5866,8 +5866,8 @@ impl ToNative<sys::mln_vulkan_borrowed_texture> for VulkanBorrowedTexture {
 /// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
 ///
 /// The session uses the images until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -5933,7 +5933,7 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
 /// the images follow its rules. The ring keeps its depth, context, `format`,
 /// `final_layout`, and `owner`, so give it as many images as it attached with,
 /// in that format, on the same device. The session uses the images until a
-/// replacement or release of the target completes, a detach or disposal of the
+/// replacement or release of the target completes, a detach or release of the
 /// session completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_borrowed_texture_replacement` in the
@@ -5978,8 +5978,8 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_replacement> for VulkanBorrowedTe
 
 /// The Vulkan device and queue that a render session uses.
 ///
-/// Keep these objects alive until a detach or disposal of the session
-/// completes, or an abandon of it returns.
+/// Keep these objects alive until a detach or release of the session completes,
+/// or an abandon of it returns.
 ///
 /// See `mln_vulkan_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -6061,7 +6061,7 @@ impl Default for VulkanImageOwner {
 /// The device must have VK_KHR_swapchain enabled, and the queue family of
 /// `graphics_queue_family_index` must support presenting to the surface. The
 /// session creates the swapchain. It uses the surface until a replacement or
-/// release of the target completes, a detach or disposal of the session
+/// release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_surface_descriptor` in the
@@ -6098,7 +6098,7 @@ impl ToNative<sys::mln_vulkan_surface_descriptor> for VulkanSurfaceDescriptor {
 /// The session presents to it with the context that it attached with, so the
 /// queue family of that context's `graphics_queue_family_index` must support
 /// presenting to the surface. It uses the surface until a replacement or
-/// release of the target completes, a detach or disposal of the session
+/// release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.
 ///
 /// See `mln_vulkan_surface_replacement` in the
@@ -6301,8 +6301,8 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture> for WebGpuBorrowedTexture {
 /// layer, one mip level, one sample, and WGPUTextureUsage_RenderAttachment.
 ///
 /// The session uses the textures until a replacement or release of the target
-/// completes, a detach or disposal of the session completes, or an abandon of
-/// it returns.
+/// completes, a detach or release of the session completes, or an abandon of it
+/// returns.
 ///
 /// See `mln_web_gpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6360,7 +6360,7 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture_descriptor> for WebGpuBorrowedTe
 /// the textures follow its rules. The ring keeps its depth, context, and
 /// `format`, so give it as many textures as it attached with, in that format,
 /// on the same device. The session uses the textures until a replacement or
-/// release of the target completes, a detach or disposal of the session
+/// release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.
 ///
 /// See `mln_web_gpu_borrowed_texture_replacement` in the
@@ -6438,7 +6438,7 @@ impl ToNative<sys::mln_web_gpu_context_descriptor> for WebGpuContextDescriptor {
 /// A WebGPU surface to present to, for `MapHandle::attach_web_gpu_surface()`.
 ///
 /// The session configures the surface. It uses the surface until a replacement
-/// or release of the target completes, a detach or disposal of the session
+/// or release of the target completes, a detach or release of the session
 /// completes, or an abandon of it returns.
 ///
 /// See `mln_web_gpu_surface_descriptor` in the
@@ -6484,7 +6484,7 @@ impl ToNative<sys::mln_web_gpu_surface_descriptor> for WebGpuSurfaceDescriptor {
 ///
 /// The session configures it with the context and format that it attached with.
 /// It uses the surface until a replacement or release of the target completes,
-/// a detach or disposal of the session completes, or an abandon of it returns.
+/// a detach or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_web_gpu_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

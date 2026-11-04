@@ -37,7 +37,7 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
         core::render_frame_batch_release(handle);
         return MLN_STATUS_OK;
       case core::HandleKind::RenderSession:
-        return core::render_session_dispose(handle, nullptr);
+        return core::render_session_dispose(handle);
       case core::HandleKind::ResourceRequest:
         core::release_resource_request(handle);
         return MLN_STATUS_OK;

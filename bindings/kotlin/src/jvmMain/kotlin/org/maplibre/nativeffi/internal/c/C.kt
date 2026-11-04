@@ -870,7 +870,7 @@ internal actual object C {
   private val mln_render_session_detach =
     Ffm.downcall("mln_render_session_detach", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_dispose =
-    Ffm.downcall("mln_render_session_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_render_session_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_drain_frame_results =
     Ffm.downcall(
       "mln_render_session_drain_frame_results",
@@ -933,6 +933,8 @@ internal actual object C {
     Ffm.downcall("mln_render_session_read_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_reduce_memory_use =
     Ffm.downcall("mln_render_session_reduce_memory_use", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_release =
+    Ffm.downcall("mln_render_session_release", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_release_target =
     Ffm.downcall("mln_render_session_release_target", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_resize =
@@ -2577,8 +2579,8 @@ internal actual object C {
   actual fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int =
     mln_render_session_detach.invokeExact(session, completion, outDiagnostic) as Int
 
-  actual fun mln_render_session_dispose(session: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_render_session_dispose.invokeExact(session, completion, outDiagnostic) as Int
+  actual fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int =
+    mln_render_session_dispose.invokeExact(session, outDiagnostic) as Int
 
   actual fun mln_render_session_drain_frame_results(
     session: Long,
@@ -2686,6 +2688,9 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_reduce_memory_use.invokeExact(session, completion, outDiagnostic) as Int
+
+  actual fun mln_render_session_release(session: Long, completion: Long, outDiagnostic: Long): Int =
+    mln_render_session_release.invokeExact(session, completion, outDiagnostic) as Int
 
   actual fun mln_render_session_release_target(
     session: Long,

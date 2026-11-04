@@ -304,7 +304,7 @@ func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64))
 	runtime.AddCleanup(owner, func(state *bindingState) {
 		if !state.released.Load() {
 			state.dispose(state.raw)
-			slog.Warn("maplibre: leaked handle; close it explicitly", "type", state.typeName, "handle", state.raw)
+			slog.Warn("maplibre: leaked handle; release it explicitly", "type", state.typeName, "handle", state.raw)
 		}
 	}, state)
 	return owner

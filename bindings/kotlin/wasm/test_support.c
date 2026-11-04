@@ -359,7 +359,7 @@ EMSCRIPTEN_KEEPALIVE mln_kw_test_canvas* mln_kw_test_canvas_create(
 
 /**
  * Removes [canvas] from the document and frees it. Call it once the session
- * that took the canvas over has closed.
+ * that took the canvas over has retired.
  */
 EMSCRIPTEN_KEEPALIVE void mln_kw_test_canvas_destroy(
   mln_kw_test_canvas* canvas

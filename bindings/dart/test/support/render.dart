@@ -22,7 +22,7 @@ const _frameAttempts = 8;
 final _size = LogicalSize(width: renderSize, height: renderSize);
 
 /// Opens a runtime and a map sized for the render targets, with [style]
-/// committed. Teardowns close both.
+/// committed. Teardowns release both.
 Future<MapHandle> openRenderMap(Object? style) async {
   final runtime = await openRuntime();
   final map = await runtime.openMap(
@@ -42,7 +42,7 @@ Future<MapHandle> openRenderMap(Object? style) async {
 /// Creates an offscreen device, which a teardown releases.
 OffscreenDeviceHandle openOffscreenDevice() {
   final device = OffscreenDeviceHandle.create();
-  addTearDown(device.close);
+  addTearDown(device.release);
   return device;
 }
 
@@ -52,7 +52,7 @@ RenderSessionHandle attachOffscreenSession(
   RenderSessionAttachOptions options,
 ) => map.attachOffscreen(OffscreenDescriptor(logicalSize: _size), options);
 
-/// A session driven by its core worker, which a teardown closes before the
+/// A session driven by its core worker, which a teardown releases before the
 /// map and any graphics context it uses.
 final class WorkerSession {
   WorkerSession._(this.session);
@@ -105,10 +105,10 @@ final class WorkerSession {
   }
 }
 
-/// Closes [session] in any state unless a test already did, and waits until
+/// Releases [session] in any state unless a test already did, and waits until
 /// it retires, so a teardown that runs later may destroy its graphics.
 Future<void> releaseSession(RenderSessionHandle session) =>
-    closeIfLive(session.close);
+    releaseIfLive(session.release);
 
 /// Demands a forced frame, which renders whether or not the map changed.
 void _demandFrame(RenderSessionHandle session, int token) {

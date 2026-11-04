@@ -1,8 +1,8 @@
 ---
 title: Create a map
-description: Create a runtime and a map, and close them.
+description: Create a runtime and a map, and release them.
 # Scope: what a runtime and a map are, creating them, how calls complete and
-# fail, and closing in order. Render targets belong in their own guides.
+# fail, and releasing in order. Render targets belong in their own guides.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -18,7 +18,7 @@ You primarily work with three stateful objects:
 - A [](api:mln_render_session) belongs to a map, and holds the renderer that
   draws it into a target, such as a texture or a window.
 
-To avoid a leak, close each of these when you're done with it.
+To avoid a leak, release each of these when you're done with it.
 
 ```mermaid
 sequenceDiagram
@@ -32,13 +32,13 @@ sequenceDiagram
   App->>Lib: Attach a render target
   Lib-->>App: Render session attached
   Note over App,Lib: Render frames and change the map
-  App->>Lib: Close the render session
-  App->>Lib: Close the map
-  App->>Lib: Close the runtime
-  Lib-->>App: Runtime closed
+  App->>Lib: Release the render session
+  App->>Lib: Release the map
+  App->>Lib: Release the runtime
+  Lib-->>App: Runtime released
 ```
 
-This guide creates a runtime and a map, closes them, and covers how calls
+This guide creates a runtime and a map, releases them, and covers how calls
 complete and fail.
 [Choose a render target](/maplibre-native-ffi/guides/choose-a-target/) covers
 the target.
@@ -90,13 +90,15 @@ fail. Every failure carries a [](api:mln_status) and a message.
 
 <Snippet page="create-a-map" region="errors" />
 
-## Close
+## Release
 
-Close the render session, the map, and the runtime, in that order.
+Release the render session, the map, and the runtime, in that order. Where your
+language has scoped cleanup, such as `await using` or `with`, leaving the scope
+cleans them up in that order.
 
 <Aside type="note">
-  Even in a language with a garbage collector, close them yourself. The binding
-  reports a leak if the collector finds one still open.
+  Even in a language with a garbage collector, release them yourself. The
+  binding reports a leak if the collector finds one still open.
 </Aside>
 
 <Snippet page="create-a-map" region="close" />

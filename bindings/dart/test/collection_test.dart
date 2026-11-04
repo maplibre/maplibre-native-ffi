@@ -55,15 +55,15 @@ void main() {
     final styleLoaded = Completer<RuntimeHandle>();
     final map = await _mapWithoutItsRuntime(styleLoaded);
     // A closure in the helper would share its context with the runtime.
-    addTearDown(() => closeIfLive(map.close));
+    addTearDown(() => releaseIfLive(map.release));
     await collectGarbage();
 
     // Only the runtime roots its event handler, so the handler runs only if
     // the map kept the runtime through the collection.
     await expectCommitted(map.setStyleJson(emptyStyle));
     final runtime = await within(styleLoaded.future, 'the style load event');
-    await within(map.close(), 'map close');
-    await within(runtime.close(), 'runtime close');
+    await within(map.release(), 'map release');
+    await within(runtime.release(), 'runtime release');
   });
 
   for (final identicalCallback in [false, true]) {

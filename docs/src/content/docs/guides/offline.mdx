@@ -15,7 +15,7 @@ hold whole areas that you download on purpose.
 
 To keep the cache between runs, set a cache file path in
 [](api:mln_runtime_options) when you create the runtime. Without one, the cache
-lives in memory, and offline regions are lost when the runtime closes.
+lives in memory, and offline regions are lost when the runtime is released.
 
 <Snippet page="offline" region="cache-file" />
 
@@ -59,8 +59,8 @@ events in your [event handler](/maplibre-native-ffi/guides/events-and-logs/).
 ## Manage regions
 
 List the regions in the cache file with
-[](api:mln_runtime_list_offline_regions). A download stops when the runtime
-closes, so to resume one, set its download active again.
+[](api:mln_runtime_list_offline_regions). A download stops when the runtime is
+released, so to resume one, set its download active again.
 
 When the server's data changes, invalidate the region with
 [](api:mln_runtime_invalidate_offline_region), and maps check each of its

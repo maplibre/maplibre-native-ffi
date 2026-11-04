@@ -35,7 +35,7 @@ typedef enum mln_render_result : uint32_t {
   MLN_RENDER_RESULT_SUPERSEDED = 3,
   /**
    * The session failed, and mln_render_session_get_failure() reports why. Once
-   * mln_render_session_dispose() completes, you can attach a new session.
+   * mln_render_session_release() completes, you can attach a new session.
    */
   MLN_RENDER_RESULT_FAILED = 4,
 } mln_render_result;
@@ -207,8 +207,8 @@ MLN_API mln_status mln_render_session_get_failure(
  * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
  *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
  *   carries the failure's message.
- * - MLN_STATUS_INVALID_STATE when you detached, abandoned, or disposed the
- *   session, or discarded a frame from every texture of its ring.
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
+ *   disposed the session, or discarded a frame from every texture of its ring.
  */
 MLN_API mln_status mln_render_session_demand_frame(
   mln_render_session session, const mln_frame_demand* demand,
@@ -253,8 +253,8 @@ MLN_API void mln_render_frame_batch_release(
  * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
  *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
  *   carries the failure's message.
- * - MLN_STATUS_INVALID_STATE when you detached, abandoned, or disposed the
- *   session.
+ * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
+ *   disposed the session.
  */
 MLN_API mln_status mln_render_session_acquire_frame(
   mln_render_session session,
@@ -447,11 +447,12 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * Use it with MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and call it from the
  * same thread every time. Call it each time
  * mln_render_session_attach_options.driver_work_wake is called, even while you
- * demand no frames, and until a detach or disposal completes. It returns once
- * no work is ready.
+ * demand no frames, and until a detach or the session's retirement completes.
+ * It returns once no work is ready.
  *
- * It accepts a disposed session until the session retires. The service after
- * the disposal detaches the session and frees its graphics objects.
+ * It accepts a released or disposed session until the session retires. The
+ * service after the release or disposal detaches the session and frees its
+ * graphics objects.
  */
 MLN_BINDING("after_release=true")
 MLN_API mln_status mln_render_session_service_driver_work(
@@ -464,7 +465,7 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * Release every acquired frame first. Pending frame demands finish with
  * MLN_RENDER_RESULT_TARGET_NOT_READY. Once the detach completes, the library no
  * longer uses your graphics objects, and you can attach another session to the
- * map. Dispose the session afterward.
+ * map. Release the session afterward.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the
@@ -483,7 +484,7 @@ MLN_API mln_status mln_render_session_detach(
  * finish first. Pending work completes with MLN_STATUS_TARGET_LOST, and
  * pending frame demands finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once
  * the call returns, the library no longer uses your graphics objects, and you
- * can attach another session to the map. Dispose the session afterward.
+ * can attach another session to the map. Release the session afterward.
  *
  * Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
  * keeps them until the process exits, reports how many it kept, and logs a
@@ -503,21 +504,40 @@ MLN_API mln_status mln_render_session_abandon(
 ) MLN_NOEXCEPT;
 
 /**
- * Releases the session in any state.
+ * Releases the session, detaching it first when it is attached.
  *
- * An attached session detaches first, and frees its graphics objects, unless
- * you hold one of its frames. A session driven by
- * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD detaches at your next
- * mln_render_session_service_driver_work(), so keep servicing it until the
- * disposal completes. If you release or dispose its map before that service,
- * the session is abandoned instead. Any other session is abandoned as
- * mln_render_session_abandon() does. Once the disposal completes, the library
- * no longer uses your graphics objects.
+ * The completion runs once the session retires. From then on, the library no
+ * longer uses your graphics objects, and you can attach another session to the
+ * map. Pending frame demands finish with MLN_RENDER_RESULT_TARGET_NOT_READY.
+ *
+ * A session driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD detaches at
+ * your next mln_render_session_service_driver_work(), so keep servicing it
+ * until the release completes. If you release or dispose its map before that
+ * service, the session is abandoned instead. A session that isn't attached,
+ * such as one that is still attaching or that failed, is abandoned as
+ * mln_render_session_abandon() does.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE while you hold one of the session's acquired
+ *   frames. Release or discard them first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_render_session_dispose(
+MLN_API mln_status mln_render_session_release(
   mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Releases the session in any state, and finishes in the background.
+ *
+ * Use it from destructors and finalizers. Otherwise, use
+ * mln_render_session_release(). The session retires as a release does, except
+ * that a session whose frames you hold is abandoned, which ends the frames.
+ * Keep servicing a session driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+ * until mln_render_session_service_driver_work() no longer accepts it.
+ */
+MLN_API mln_status mln_render_session_dispose(
+  mln_render_session session, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

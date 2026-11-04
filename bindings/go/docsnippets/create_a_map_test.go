@@ -90,11 +90,11 @@ func createAMap(ctx context.Context) error {
 	if err := m.Dispose(); err != nil {
 		return err
 	}
-	runtimeClosed, err := runtime.Close()
+	runtimeReleased, err := runtime.Release()
 	if err != nil {
 		return err
 	}
-	if _, err := runtimeClosed.Await(ctx); err != nil {
+	if _, err := runtimeReleased.Await(ctx); err != nil {
 		return err
 	}
 	// #endregion close

@@ -111,7 +111,7 @@ private func camera(_ map: MapHandle) async throws {
   )
   let point = try projection.pixelForLatLng(coordinate: coordinate)
 
-  projection.close()
+  projection.release()
   // #endregion convert
   _ = point
 }

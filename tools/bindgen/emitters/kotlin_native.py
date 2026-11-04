@@ -641,7 +641,7 @@ class NativeShims:
         from .kotlin_operations import disposer_arguments
 
         function = self.bound.source.functions_by_name[handle.release]
-        arguments = disposer_arguments(handle, function, local, "NULL")
+        arguments = disposer_arguments(function, local)
         if function.diagnostic:
             arguments.append("NULL")
         return f"{handle.release}({', '.join(arguments)});"

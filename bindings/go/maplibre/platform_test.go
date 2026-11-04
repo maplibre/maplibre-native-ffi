@@ -39,7 +39,7 @@ func exitWithLiveHandles(t *testing.T) {
 	if err := SetLogCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) {}}); err != nil {
 		t.Fatal(err)
 	}
-	// The process exits before the fixture's cleanups can close anything.
+	// The process exits before the fixture's cleanups can release anything.
 	f := newFixture(t)
 	f.serveStyle(t, "custom://style.json")
 	if _, err := f.m.SetStyleURL("custom://style.json"); err != nil {

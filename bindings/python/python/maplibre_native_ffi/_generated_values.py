@@ -391,10 +391,10 @@ class GpuSyncKind(UnknownIntEnum):
     """How one side waits for the other's GPU work on a shared texture.
 
     A sync file descriptor or an OpenGL fence signals once, so when
-    `AcquiredFrameHandle.close()` succeeds, the session takes the one you
+    `AcquiredFrameHandle.release()` succeeds, the session takes the one you
     pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence
     counts up with each frame, so the one you pass stays yours. Keep it valid
-    until a detach or disposal of the session completes.
+    until a detach or release of the session completes.
 
     See `mln_gpu_sync_kind` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -2337,7 +2337,7 @@ class MetalBorrowedTextureDescriptor:
     MTLTextureUsageRenderTarget.
 
     The session uses the textures until a replacement or release of the
-    target completes, a detach or disposal of the session completes, or an
+    target completes, a detach or release of the session completes, or an
     abandon of it returns.
 
     See `mln_metal_borrowed_texture_descriptor` in the
@@ -2382,8 +2382,8 @@ class MetalBorrowedTextureReplacement:
     the textures follow its rules. The ring keeps its depth, device, and
     command queue, so give it as many textures as it attached with, on the
     same device. The session uses the textures until a replacement or release
-    of the target completes, a detach or disposal of the session completes,
-    or an abandon of it returns.
+    of the target completes, a detach or release of the session completes, or
+    an abandon of it returns.
 
     See `mln_metal_borrowed_texture_replacement` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2465,7 +2465,7 @@ class MetalSurfaceReplacement:
 
     The session renders to it with the device that it attached with. It uses
     the layer until a replacement or release of the target completes, a
-    detach or disposal of the session completes, or an abandon of it returns.
+    detach or release of the session completes, or an abandon of it returns.
 
     See `mln_metal_surface_replacement` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -2765,7 +2765,7 @@ class OpenGlBorrowedTextureDescriptor:
     share group, with storage of that size.
 
     The session uses the textures until a replacement or release of the
-    target completes, a detach or disposal of the session completes, or an
+    target completes, a detach or release of the session completes, or an
     abandon of it returns.
 
     See `mln_open_gl_borrowed_texture_descriptor` in the
@@ -2811,7 +2811,7 @@ class OpenGlBorrowedTextureReplacement:
     the textures follow its rules. The ring keeps its depth, context, and
     texture target, so give it as many textures as it attached with, in the
     same share group. The session uses the textures until a replacement or
-    release of the target completes, a detach or disposal of the session
+    release of the target completes, a detach or release of the session
     completes, or an abandon of it returns.
 
     See `mln_open_gl_borrowed_texture_replacement` in the
@@ -2882,8 +2882,8 @@ class OpenGlSurfaceDescriptor:
     `MapHandle.attach_open_gl_surface()`.
 
     The session uses the surface until a replacement or release of the target
-    completes, a detach or disposal of the session completes, or an abandon
-    of it returns.
+    completes, a detach or release of the session completes, or an abandon of
+    it returns.
 
     See `mln_open_gl_surface_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -3276,7 +3276,7 @@ class RenderSessionCapabilities:
     """The kind of `GpuSync` that `AcquiredFrameHandle.producer_sync()` reports."""
 
     consumer_sync_kinds: GpuSyncKindFlag
-    """The kinds of `GpuSync` that `AcquiredFrameHandle.close()` accepts.
+    """The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts.
 
     They depend on the target and on what the device supports, so read this
     field instead of assuming a kind.
@@ -3468,7 +3468,7 @@ class ResourceProvider:
         try:
             return callback(ResourceRequestInfo._from_native(request), handle)
         except BaseException:
-            handle.close()
+            handle.release()
             raise
 
 
@@ -3666,7 +3666,7 @@ class ResourceTransform:
         try:
             return callback(ResourceKind(kind), url, request)
         except BaseException:
-            request.close()
+            request.release()
             raise
 
 
@@ -4713,8 +4713,8 @@ class VulkanBorrowedTextureDescriptor:
     the context's device.
 
     The session uses the images until a replacement or release of the target
-    completes, a detach or disposal of the session completes, or an abandon
-    of it returns.
+    completes, a detach or release of the session completes, or an abandon of
+    it returns.
 
     See `mln_vulkan_borrowed_texture_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4767,7 +4767,7 @@ class VulkanBorrowedTextureReplacement:
     `final_layout`, and `owner`, so give it as many images as it attached
     with, in that format, on the same device. The session uses the images
     until a replacement or release of the target completes, a detach or
-    disposal of the session completes, or an abandon of it returns.
+    release of the session completes, or an abandon of it returns.
 
     See `mln_vulkan_borrowed_texture_replacement` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4800,7 +4800,7 @@ class VulkanBorrowedTextureReplacement:
 class VulkanContextDescriptor:
     """The Vulkan device and queue that a render session uses.
 
-    Keep these objects alive until a detach or disposal of the session
+    Keep these objects alive until a detach or release of the session
     completes, or an abandon of it returns.
 
     See `mln_vulkan_context_descriptor` in the
@@ -4849,7 +4849,7 @@ class VulkanSurfaceDescriptor:
     The device must have VK_KHR_swapchain enabled, and the queue family of
     `graphics_queue_family_index` must support presenting to the surface. The
     session creates the swapchain. It uses the surface until a replacement or
-    release of the target completes, a detach or disposal of the session
+    release of the target completes, a detach or release of the session
     completes, or an abandon of it returns.
 
     See `mln_vulkan_surface_descriptor` in the
@@ -4880,7 +4880,7 @@ class VulkanSurfaceReplacement:
     The session presents to it with the context that it attached with, so the
     queue family of that context's `graphics_queue_family_index` must support
     presenting to the surface. It uses the surface until a replacement or
-    release of the target completes, a detach or disposal of the session
+    release of the target completes, a detach or release of the session
     completes, or an abandon of it returns.
 
     See `mln_vulkan_surface_replacement` in the

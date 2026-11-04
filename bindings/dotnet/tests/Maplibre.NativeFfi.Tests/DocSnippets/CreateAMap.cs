@@ -15,11 +15,11 @@ internal static class CreateAMap
     internal static async Task Run()
     {
         // #region runtime
-        var runtime = RuntimeHandle.Create();
+        await using var runtime = RuntimeHandle.Create();
         // #endregion runtime
 
         // #region map
-        var map = runtime.CreateMap(
+        await using var map = runtime.CreateMap(
             new MapOptions
             {
                 InitialExtent = new LogicalExtent(800, 600, 2),
@@ -60,12 +60,10 @@ internal static class CreateAMap
         }
         // #endregion errors
 
-        var session = await AttachTarget(map);
-
         // #region close
-        session.Dispose();
-        map.Dispose();
-        await runtime.CloseAsync();
+        await using var session = await AttachTarget(map);
+        // Leaving the scope releases the session, the map, and the runtime, in
+        // that order, and waits for each.
         // #endregion close
     }
 }

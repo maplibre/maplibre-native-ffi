@@ -44,7 +44,7 @@
     }
 
     if results.contains(where: { $0.disposition == .failed }) {
-      replaceSession() // Close the session and attach a new one.
+      replaceSession() // Release the session and attach a new one.
     } else if !paused {
       atNextRefresh(demandFrame)
     }
@@ -151,7 +151,7 @@
     _ = graphicsThreadOptions
 
     paused = true
-    try await session.close()
+    try await session.release()
     destroySurface() // For example, with vkDestroySurfaceKHR.
   }
 #endif

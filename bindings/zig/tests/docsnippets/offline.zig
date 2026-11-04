@@ -104,7 +104,7 @@ fn offline(allocator: std.mem.Allocator) !void {
         recordRegion(stored.id, stored.metadata);
     }
 
-    // Resume a download that stopped when the runtime closed.
+    // Resume a download that stopped when the runtime was released.
     const resumed = try runtime.setOfflineRegionDownloadState(
         region.value.id,
         .active,

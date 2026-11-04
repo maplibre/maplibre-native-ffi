@@ -119,9 +119,9 @@ macro_rules! native_owner {
             /// accepts it and hands it back in the error otherwise.
             pub(crate) fn consume<R>(
                 self,
-                close: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
+                call: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
             ) -> std::result::Result<R, $crate::ReleaseError<Self>> {
-                match close(self.inner.native()) {
+                match call(self.inner.native()) {
                     Ok(value) => {
                         // Native took the handle, so nothing is left to dispose.
                         std::mem::forget(self);
@@ -138,10 +138,10 @@ macro_rules! native_owner {
             #[allow(dead_code)]
             pub(crate) fn consume_always<R>(
                 self,
-                close: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
+                call: impl FnOnce(maplibre_native_ffi_sys::$native) -> $crate::Result<R>,
             ) -> $crate::Result<R> {
                 // Converting the refusal drops the handle it gave back.
-                self.consume(close).map_err($crate::Error::from)
+                self.consume(call).map_err($crate::Error::from)
             }
 
             $(#[$id_meta])*

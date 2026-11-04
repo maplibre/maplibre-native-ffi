@@ -98,7 +98,7 @@ void main() {
     );
 
     // The binding still delivers the completion to the future the waiter
-    // gave up on, once closing the map cancels the request.
+    // gave up on, once releasing the map cancels the request.
     final cancelled = expectLater(
       image,
       throwsA(
@@ -109,7 +109,7 @@ void main() {
         ),
       ),
     );
-    await within(map.close(), 'map close');
+    await within(map.release(), 'map release');
     await within(cancelled, 'the cancelled still image');
   });
 }

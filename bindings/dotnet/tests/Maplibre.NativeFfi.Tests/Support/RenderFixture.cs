@@ -189,13 +189,13 @@ internal sealed class RenderFixture : IDisposable
     }
 
     /// <summary>
-    /// Closes the session and waits until it retires, servicing it meanwhile, since an attached
+    /// Releases the session and waits until it retires, servicing it meanwhile, since an attached
     /// caller-driven session detaches at its next service. Returns how many services ran.
     /// </summary>
-    internal int CloseSession()
+    internal int ReleaseSession()
     {
-        var closed = Session.CloseAsync();
-        closed.ContinueWith(
+        var released = Session.ReleaseAsync();
+        released.ContinueWith(
             _ => Signal(),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
@@ -203,7 +203,7 @@ internal sealed class RenderFixture : IDisposable
         );
         var elapsed = Stopwatch.StartNew();
         var serviced = 0;
-        while (!closed.IsCompleted)
+        while (!released.IsCompleted)
         {
             try
             {
@@ -214,10 +214,10 @@ internal sealed class RenderFixture : IDisposable
             {
                 // The session retired, and native reports its handle stale.
             }
-            if (!closed.IsCompleted)
+            if (!released.IsCompleted)
                 TestWaits.Wait(wake, elapsed, "the session to retire");
         }
-        closed.GetAwaiter().GetResult();
+        released.GetAwaiter().GetResult();
         return serviced;
     }
 
@@ -255,14 +255,14 @@ internal sealed class RenderFixture : IDisposable
             {
                 // The map's release completes once its session has retired.
                 if (Map is not null)
-                    Complete(Map.DisposeAsync().AsTask());
+                    Complete(((IAsyncDisposable)Map).DisposeAsync().AsTask());
             }
             finally
             {
                 try
                 {
                     if (Runtime is not null)
-                        Complete(Runtime.CloseAsync());
+                        Complete(Runtime.ReleaseAsync());
                 }
                 finally
                 {

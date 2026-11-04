@@ -75,7 +75,7 @@ private suspend fun images(runtime: RuntimeHandle) {
   copyPixels(image.data, image.info.stride)
   // #endregion read
 
-  session.close()
+  session.dispose()
   map.release().await()
 }
 

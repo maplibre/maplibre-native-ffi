@@ -19,13 +19,18 @@ internal constructor(
   internal val binding =
     HandleState("MapProjectionHandle", handle, GeneratedOwnerDisposal::mapProjection)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
-  /** The native handle value. It stays readable after close. */
+  /** The native handle value. It stays readable after release. */
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release, dispose, close, or discard has ended the handle. */
+  /** Whether a release, dispose, or discard has ended the handle. */
   public val isClosed: Boolean
     get() = binding.isReleased
+
+  /** Calls [release], for the standard library's `use`. */
+  public override fun close() {
+    release()
+  }
 
   /**
    * Reads the projection's camera.
@@ -181,8 +186,7 @@ internal constructor(
    * See `mln_map_projection_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public override fun close(): Unit =
-    nativeClose(this, binding) { C.mln_map_projection_release(handle) }
+  public fun release(): Unit = nativeClose(this, binding) { C.mln_map_projection_release(handle) }
 
   /**
    * Moves the projection's camera, without changing the map.

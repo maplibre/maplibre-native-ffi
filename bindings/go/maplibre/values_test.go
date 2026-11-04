@@ -102,7 +102,7 @@ func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer projection.Close()
+	defer projection.Release()
 	coordinates := []LatLng{{Latitude: 0, Longitude: 0}, {Latitude: 10, Longitude: 20}, {Latitude: -12, Longitude: -30}}
 	points, err := projection.PixelsForLatLngs(coordinates)
 	if err != nil {
@@ -148,7 +148,7 @@ func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer zoom.Close()
+	defer zoom.Release()
 	level := 5.0
 	got, err := zoom.Evaluate(&StyleExpressionInputs{Zoom: &level})
 	if err != nil {
@@ -164,7 +164,7 @@ func TestCallerSizedTextReturnsResultsLongerThanItsFirstStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer long.Close()
+	defer long.Release()
 	got, err = long.Evaluate(nil)
 	if err != nil {
 		t.Fatal(err)

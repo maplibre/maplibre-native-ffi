@@ -19,13 +19,18 @@ internal constructor(
   internal val binding =
     HandleState("StyleExpressionHandle", handle, GeneratedOwnerDisposal::styleExpression)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
-  /** The native handle value. It stays readable after close. */
+  /** The native handle value. It stays readable after release. */
   public val id: ULong
     get() = binding.handle.toULong()
 
-  /** Whether a release, dispose, close, or discard has ended the handle. */
+  /** Whether a release, dispose, or discard has ended the handle. */
   public val isClosed: Boolean
     get() = binding.isReleased
+
+  /** Calls [release], for the standard library's `use`. */
+  public override fun close() {
+    release()
+  }
 
   /**
    * Evaluates a style expression and writes its result as JSON.
@@ -84,8 +89,7 @@ internal constructor(
    * See `mln_style_expression_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
    */
-  public override fun close(): Unit =
-    nativeClose(this, binding) { C.mln_style_expression_release(handle) }
+  public fun release(): Unit = nativeClose(this, binding) { C.mln_style_expression_release(handle) }
 
   override fun toString(): String =
     "StyleExpressionHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"

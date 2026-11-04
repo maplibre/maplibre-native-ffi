@@ -143,7 +143,7 @@ private suspend fun camera(map: MapHandle) {
     projection.latLngForPixel(ScreenPoint(x = 100.0, y = 200.0))
   val point = projection.pixelForLatLng(coordinate)
 
-  projection.close()
+  projection.release()
   // #endregion convert
   usePoint(point)
 }

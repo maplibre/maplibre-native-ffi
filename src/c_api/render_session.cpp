@@ -183,12 +183,20 @@ auto mln_render_session_abandon(
   });
 }
 
-auto mln_render_session_dispose(
+auto mln_render_session_release(
   mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
-    return mln::core::render_session_dispose(session, completion);
+    return mln::core::render_session_release(session, completion);
+  });
+}
+
+auto mln_render_session_dispose(
+  mln_render_session session, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::render_session_dispose(session);
   });
 }
 

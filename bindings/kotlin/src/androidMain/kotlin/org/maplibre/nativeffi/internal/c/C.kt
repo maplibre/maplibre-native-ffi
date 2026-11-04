@@ -991,12 +991,7 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic
-  actual external fun mln_render_session_dispose(
-    session: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  @JvmStatic actual external fun mln_render_session_dispose(session: Long, outDiagnostic: Long): Int
 
   @CriticalNative
   @JvmStatic
@@ -1077,6 +1072,13 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_render_session_reduce_memory_use(
+    session: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_render_session_release(
     session: Long,
     completion: Long,
     outDiagnostic: Long,

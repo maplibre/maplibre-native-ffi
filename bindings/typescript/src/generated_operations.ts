@@ -534,29 +534,15 @@ export class GeoJsonSourceDataHandle extends Owner {
     super(key, handle, "GeoJsonSourceDataHandle", { registrations });
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
   /**
-   * Calls `close()`, for `using`.
+   * Calls `release()`, for `using`.
    * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.dispose]: () => void;
-
-  /**
-   * Releases prepared GeoJSON data.
-   *
-   * Sources that use the data keep it.
-   *
-   * See `mln_geo_json_source_data_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_geo_json_source_data_release(handle, token),
-    );
-  }
 
   /**
    * Prepares GeoJSON data for GeoJSON sources.
@@ -586,8 +572,22 @@ export class GeoJsonSourceDataHandle extends Owner {
         native.mln_geo_json_source_data_release(disposed, undefined),
     );
   }
+
+  /**
+   * Releases prepared GeoJSON data.
+   *
+   * Sources that use the data keep it.
+   *
+   * See `mln_geo_json_source_data_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_geo_json_source_data_release(handle, token),
+    );
+  }
 }
-defineDisposers(GeoJsonSourceDataHandle, undefined, "close");
+defineDisposers(GeoJsonSourceDataHandle, "release", "release");
 
 /**
  * A map, with its style and camera.
@@ -621,7 +621,7 @@ export class MapHandle extends Owner {
 
   /**
    * The native handle value, which runtime events report as their
-   * source. It stays readable after close, so events drained later
+   * source. It stays readable after release, so events drained later
    * still match this handle.
    */
   declare readonly id: bigint;
@@ -631,7 +631,7 @@ export class MapHandle extends Owner {
     return new MapHandleDiscarding(ADOPT, this);
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
@@ -885,7 +885,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -927,7 +927,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -977,7 +977,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1020,7 +1020,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1062,7 +1062,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1105,7 +1105,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1147,7 +1147,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1190,7 +1190,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1232,7 +1232,7 @@ export class MapHandle extends Owner {
                 registrations,
               ),
             (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined, undefined),
+              native.mln_render_session_dispose(disposed, undefined),
           ),
       ),
     );
@@ -1380,25 +1380,10 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Releases the map.
-   *
-   * Detach the map's render session first.
-   *
-   * See `mln_map_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  close(): Promise<void> {
-    return closeAsync(this, (handle, token) =>
-      submitRun((completion) =>
-        native.mln_map_release(handle, token, completion),
-      ),
-    );
-  }
-
-  /**
    * Releases the map in any state, and finishes in the background.
    *
-   * Use it from destructors and finalizers. Otherwise, use `MapHandle.close()`.
+   * Use it from destructors and finalizers. Otherwise, use
+   * `MapHandle.release()`.
    *
    * See `mln_map_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1897,6 +1882,22 @@ export class MapHandle extends Owner {
         layerId,
         beforeLayerId,
         completion,
+      ),
+    );
+  }
+
+  /**
+   * Releases the map.
+   *
+   * Detach the map's render session first.
+   *
+   * See `mln_map_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  release(): Promise<void> {
+    return closeAsync(this, (handle, token) =>
+      submitRun((completion) =>
+        native.mln_map_release(handle, token, completion),
       ),
     );
   }
@@ -2701,7 +2702,7 @@ export class MapHandle extends Owner {
     );
   }
 }
-defineDisposers(MapHandle, "close", "dispose");
+defineDisposers(MapHandle, "release", "dispose");
 
 /**
  * The commands of a {@link MapHandle} that discard their outcomes:
@@ -3640,27 +3641,15 @@ export class MapProjectionHandle extends Owner {
     super(key, handle, "MapProjectionHandle", { registrations });
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
   /**
-   * Calls `close()`, for `using`.
+   * Calls `release()`, for `using`.
    * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.dispose]: () => void;
-
-  /**
-   * Releases a projection.
-   *
-   * See `mln_map_projection_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_map_projection_release(handle, token),
-    );
-  }
 
   /**
    * Creates a projection that converts coordinates for one view of a map.
@@ -3784,6 +3773,18 @@ export class MapProjectionHandle extends Owner {
   }
 
   /**
+   * Releases a projection.
+   *
+   * See `mln_map_projection_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_map_projection_release(handle, token),
+    );
+  }
+
+  /**
    * Moves the projection's camera, without changing the map.
    *
    * Camera fields that `camera` doesn't set keep their values.
@@ -3795,7 +3796,7 @@ export class MapProjectionHandle extends Owner {
     native.mln_map_projection_set_camera(this.id, camera);
   }
 }
-defineDisposers(MapProjectionHandle, undefined, "close");
+defineDisposers(MapProjectionHandle, "release", "release");
 
 /**
  * A GPU device that the library creates to render maps offscreen.
@@ -3813,29 +3814,15 @@ export class OffscreenDeviceHandle extends Owner {
     super(key, handle, "OffscreenDeviceHandle", { registrations });
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
   /**
-   * Calls `close()`, for `using`.
+   * Calls `release()`, for `using`.
    * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.dispose]: () => void;
-
-  /**
-   * Releases an offscreen device.
-   *
-   * Render sessions on the device keep working until they detach.
-   *
-   * See `mln_offscreen_device_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_offscreen_device_release(handle, token),
-    );
-  }
 
   /**
    * Creates a GPU device for rendering maps offscreen.
@@ -3865,8 +3852,22 @@ export class OffscreenDeviceHandle extends Owner {
       (disposed) => native.mln_offscreen_device_release(disposed, undefined),
     );
   }
+
+  /**
+   * Releases an offscreen device.
+   *
+   * Render sessions on the device keep working until they detach.
+   *
+   * See `mln_offscreen_device_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_offscreen_device_release(handle, token),
+    );
+  }
 }
-defineDisposers(OffscreenDeviceHandle, undefined, "close");
+defineDisposers(OffscreenDeviceHandle, "release", "release");
 
 /**
  * A render session draws a map into a surface or a texture.
@@ -3907,7 +3908,7 @@ export class RenderSessionHandle extends Owner {
     return new RenderSessionHandleDiscarding(ADOPT, this);
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
@@ -3924,7 +3925,7 @@ export class RenderSessionHandle extends Owner {
    * finish first. Pending work completes with `Status.targetLost`, and pending
    * frame demands finish with `RenderResult.targetNotReady`. Once the call
    * returns, the library no longer uses your graphics objects, and you can
-   * attach another session to the map. Dispose the session afterward.
+   * attach another session to the map. Release the session afterward.
    *
    * Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
    * keeps them until the process exits, reports how many it kept, and logs a
@@ -3958,8 +3959,8 @@ export class RenderSessionHandle extends Owner {
    * - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
    *   `Status.nativeError`, when the session has failed. The diagnostic carries
    *   the failure's message.
-   * - `Status.invalidState` when you detached, abandoned, or disposed the
-   *   session.
+   * - `Status.invalidState` when you detached, abandoned, released, or disposed
+   *   the session.
    */
   acquireFrame(): AcquiredFrameHandle | undefined {
     const handle = native.mln_render_session_acquire_frame(this.id);
@@ -4011,29 +4012,6 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Releases the session in any state.
-   *
-   * An attached session detaches first, and frees its graphics objects, unless
-   * you hold one of its frames. A session driven by
-   * `RenderDriverKind.callerGraphicsThread` detaches at your next
-   * `RenderSessionHandle.serviceDriverWork()`, so keep servicing it until the
-   * disposal completes. If you release or dispose its map before that service,
-   * the session is abandoned instead. Any other session is abandoned as
-   * `RenderSessionHandle.abandon()` does. Once the disposal completes, the
-   * library no longer uses your graphics objects.
-   *
-   * See `mln_render_session_dispose` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  close(): Promise<void> {
-    return closeAsync(this, (handle, token) =>
-      submitRun((completion) =>
-        native.mln_render_session_dispose(handle, token, completion),
-      ),
-    );
-  }
-
-  /**
    * Asks the session to render a frame.
    *
    * You can call it once the attach call returns. While the attach runs, the
@@ -4050,8 +4028,8 @@ export class RenderSessionHandle extends Owner {
    * - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
    *   `Status.nativeError`, when the session has failed. The diagnostic carries
    *   the failure's message.
-   * - `Status.invalidState` when you detached, abandoned, or disposed the
-   *   session, or discarded a frame from every texture of its ring.
+   * - `Status.invalidState` when you detached, abandoned, released, or disposed
+   *   the session, or discarded a frame from every texture of its ring.
    */
   demandFrame(demand: FrameDemand): void {
     native.mln_render_session_demand_frame(this.id, demand);
@@ -4063,7 +4041,7 @@ export class RenderSessionHandle extends Owner {
    * Release every acquired frame first. Pending frame demands finish with
    * `RenderResult.targetNotReady`. Once the detach completes, the library no
    * longer uses your graphics objects, and you can attach another session to
-   * the map. Dispose the session afterward.
+   * the map. Release the session afterward.
    *
    * See `mln_render_session_detach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4080,23 +4058,21 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Releases the session in any state.
+   * Releases the session in any state, and finishes in the background.
    *
-   * An attached session detaches first, and frees its graphics objects, unless
-   * you hold one of its frames. A session driven by
-   * `RenderDriverKind.callerGraphicsThread` detaches at your next
-   * `RenderSessionHandle.serviceDriverWork()`, so keep servicing it until the
-   * disposal completes. If you release or dispose its map before that service,
-   * the session is abandoned instead. Any other session is abandoned as
-   * `RenderSessionHandle.abandon()` does. Once the disposal completes, the
-   * library no longer uses your graphics objects.
+   * Use it from destructors and finalizers. Otherwise, use
+   * `RenderSessionHandle.release()`. The session retires as a release does,
+   * except that a session whose frames you hold is abandoned, which ends the
+   * frames. Keep servicing a session driven by
+   * `RenderDriverKind.callerGraphicsThread` until
+   * `RenderSessionHandle.serviceDriverWork()` no longer accepts it.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
   dispose(): void {
     closeSync(this, (handle, token) =>
-      native.mln_render_session_dispose(handle, token, undefined),
+      native.mln_render_session_dispose(handle, token),
     );
   }
 
@@ -4281,6 +4257,36 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
+   * Releases the session, detaching it first when it is attached.
+   *
+   * The completion runs once the session retires. From then on, the library no
+   * longer uses your graphics objects, and you can attach another session to
+   * the map. Pending frame demands finish with `RenderResult.targetNotReady`.
+   *
+   * A session driven by `RenderDriverKind.callerGraphicsThread` detaches at
+   * your next `RenderSessionHandle.serviceDriverWork()`, so keep servicing it
+   * until the release completes. If you release or dispose its map before that
+   * service, the session is abandoned instead. A session that isn't attached,
+   * such as one that is still attaching or that failed, is abandoned as
+   * `RenderSessionHandle.abandon()` does.
+   *
+   * See `mln_render_session_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` while you hold one of the session's acquired
+   *   frames. Release or discard them first.
+   */
+  release(): Promise<void> {
+    return closeAsync(this, (handle, token) =>
+      submitRun((completion) =>
+        native.mln_render_session_release(handle, token, completion),
+      ),
+    );
+  }
+
+  /**
    * Lets go of the session's surface or textures, and keeps the rest of the
    * session.
    *
@@ -4335,11 +4341,12 @@ export class RenderSessionHandle extends Owner {
    * Use it with `RenderDriverKind.callerGraphicsThread`, and call it from the
    * same thread every time. Call it each time
    * `RenderSessionAttachOptions.driverWorkWake` is called, even while you
-   * demand no frames, and until a detach or disposal completes. It returns once
-   * no work is ready.
+   * demand no frames, and until a detach or the session's retirement completes.
+   * It returns once no work is ready.
    *
-   * It accepts a disposed session until the session retires. The service after
-   * the disposal detaches the session and frees its graphics objects.
+   * It accepts a released or disposed session until the session retires. The
+   * service after the release or disposal detaches the session and frees its
+   * graphics objects.
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4542,7 +4549,7 @@ export class RenderSessionHandle extends Owner {
     );
   }
 }
-defineDisposers(RenderSessionHandle, "close", "dispose");
+defineDisposers(RenderSessionHandle, "release", "dispose");
 
 /**
  * The commands of a {@link RenderSessionHandle} that discard their outcomes:
@@ -4597,33 +4604,21 @@ export class ResourceRequestHandle extends Owner {
     super(key, handle, "ResourceRequestHandle", { registrations });
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
   /**
-   * Calls `close()`, for `using`.
+   * Calls `release()`, for `using`.
    * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases a resource request.
-   *
-   * See `mln_resource_request_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_resource_request_release(handle, token),
-    );
-  }
-
-  /**
    * Answers a resource request.
    *
    * A failed answer fails the request with `ResourceErrorReason.other`, as
-   * `ResourceRequestHandle.close()` does.
+   * `ResourceRequestHandle.release()` does.
    *
    * See `mln_resource_request_complete` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4652,7 +4647,7 @@ export class ResourceRequestHandle extends Owner {
    * Hands a resource request back to the library to load as usual.
    *
    * A failed call fails the request with `ResourceErrorReason.other`, as
-   * `ResourceRequestHandle.close()` does.
+   * `ResourceRequestHandle.release()` does.
    *
    * See `mln_resource_request_pass_through` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4664,6 +4659,18 @@ export class ResourceRequestHandle extends Owner {
   passThrough(): void {
     answerSync(this, (handle, token) =>
       native.mln_resource_request_pass_through(handle, token),
+    );
+  }
+
+  /**
+   * Releases a resource request.
+   *
+   * See `mln_resource_request_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_resource_request_release(handle, token),
     );
   }
 
@@ -4688,7 +4695,7 @@ export class ResourceRequestHandle extends Owner {
     });
   }
 }
-defineDisposers(ResourceRequestHandle, undefined, "close");
+defineDisposers(ResourceRequestHandle, "release", "release");
 
 /**
  * A URL rewrite that a resource transform answers with the URL to load.
@@ -4706,36 +4713,21 @@ export class ResourceTransformRequestHandle extends Owner {
     super(key, handle, "ResourceTransformRequestHandle", { registrations });
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
   /**
-   * Calls `close()`, for `using`.
+   * Calls `release()`, for `using`.
    * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Releases a resource transform request.
-   *
-   * Releasing a request without an answer fails it with
-   * `ResourceErrorReason.other`.
-   *
-   * See `mln_resource_transform_request_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_resource_transform_request_release(handle, token),
-    );
-  }
-
-  /**
    * Answers a resource transform request with the URL to load instead.
    *
    * `url` must not be empty. A failed answer fails the request with
-   * `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.close()`
+   * `ResourceErrorReason.other`, as `ResourceTransformRequestHandle.release()`
    * does.
    *
    * See `mln_resource_transform_request_complete` in the
@@ -4753,7 +4745,7 @@ export class ResourceTransformRequestHandle extends Owner {
    * The library retries a request that failed for a reason it retries, such as
    * `ResourceErrorReason.connection`, and the retry calls the transform again.
    * When this call fails, the request fails with `ResourceErrorReason.other`,
-   * as `ResourceTransformRequestHandle.close()` does.
+   * as `ResourceTransformRequestHandle.release()` does.
    *
    * See `mln_resource_transform_request_fail` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4763,8 +4755,23 @@ export class ResourceTransformRequestHandle extends Owner {
       native.mln_resource_transform_request_fail(handle, token, error),
     );
   }
+
+  /**
+   * Releases a resource transform request.
+   *
+   * Releasing a request without an answer fails it with
+   * `ResourceErrorReason.other`.
+   *
+   * See `mln_resource_transform_request_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_resource_transform_request_release(handle, token),
+    );
+  }
 }
-defineDisposers(ResourceTransformRequestHandle, undefined, "close");
+defineDisposers(ResourceTransformRequestHandle, "release", "release");
 
 /**
  * A runtime owns maps and the network and cache settings that they share.
@@ -4784,7 +4791,7 @@ export class RuntimeHandle extends Owner {
 
   /**
    * The native handle value, which runtime events report as their
-   * source. It stays readable after close, so events drained later
+   * source. It stays readable after release, so events drained later
    * still match this handle.
    */
   declare readonly id: bigint;
@@ -4794,7 +4801,7 @@ export class RuntimeHandle extends Owner {
     return new RuntimeHandleDiscarding(ADOPT, this);
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
@@ -4850,22 +4857,6 @@ export class RuntimeHandle extends Owner {
   clearResourceTransform(): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_runtime_clear_resource_transform(this.id, completion),
-    );
-  }
-
-  /**
-   * Releases a runtime.
-   *
-   * Release the runtime's maps first.
-   *
-   * See `mln_runtime_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  close(): Promise<void> {
-    return closeAsync(this, (handle, token) =>
-      submitRun((completion) =>
-        native.mln_runtime_release(handle, token, completion),
-      ),
     );
   }
 
@@ -5063,6 +5054,22 @@ export class RuntimeHandle extends Owner {
         this.id,
         sideDatabasePath,
         completion,
+      ),
+    );
+  }
+
+  /**
+   * Releases a runtime.
+   *
+   * Release the runtime's maps first.
+   *
+   * See `mln_runtime_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  release(): Promise<void> {
+    return closeAsync(this, (handle, token) =>
+      submitRun((completion) =>
+        native.mln_runtime_release(handle, token, completion),
       ),
     );
   }
@@ -5268,7 +5275,7 @@ export class RuntimeHandle extends Owner {
     );
   }
 }
-defineDisposers(RuntimeHandle, "close", "dispose");
+defineDisposers(RuntimeHandle, "release", "dispose");
 
 /**
  * The commands of a {@link RuntimeHandle} that discard their outcomes:
@@ -5426,27 +5433,15 @@ export class StyleExpressionHandle extends Owner {
     super(key, handle, "StyleExpressionHandle", { registrations });
   }
   /**
-   * Calls `close()`, for `await using`.
+   * Calls `release()`, for `await using`.
    * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.asyncDispose]: () => Promise<void>;
   /**
-   * Calls `close()`, for `using`.
+   * Calls `release()`, for `using`.
    * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
    */
   declare [Symbol.dispose]: () => void;
-
-  /**
-   * Releases a parsed style expression.
-   *
-   * See `mln_style_expression_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
-   */
-  close(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_style_expression_release(handle, token),
-    );
-  }
 
   /**
    * Parses a style
@@ -5499,8 +5494,20 @@ export class StyleExpressionHandle extends Owner {
   getInfo(): StyleExpressionInfo {
     return native.mln_style_expression_get_info(this.id);
   }
+
+  /**
+   * Releases a parsed style expression.
+   *
+   * See `mln_style_expression_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_style_expression_release(handle, token),
+    );
+  }
 }
-defineDisposers(StyleExpressionHandle, undefined, "close");
+defineDisposers(StyleExpressionHandle, "release", "release");
 
 /**
  * A `GpuSync` whose native objects stay valid only while the
@@ -5792,7 +5799,7 @@ defineCallbacks([
       const callback = (target as ResourceProvider).callback;
       callback(request, owner);
     } catch (error) {
-      owner.close();
+      owner.release();
       throw error;
     }
   },
@@ -5819,7 +5826,7 @@ defineCallbacks([
       >;
       callback(kind, url, owner);
     } catch (error) {
-      owner.close();
+      owner.release();
       throw error;
     }
   },

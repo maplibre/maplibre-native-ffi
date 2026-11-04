@@ -50,14 +50,14 @@ internal static class Style
         );
         map.Discarding.AddGeoJsonSourceData("points", data);
         // The source keeps its own reference to the data.
-        data.Dispose();
+        data.Release();
 
         // Later, prepare new data with the same options, and set it.
         var next = GeoJsonSourceDataHandle.Create(
             """{"type":"Point","coordinates":[2.35,48.86]}"""
         );
         map.Discarding.SetGeoJsonSourceData("points", next);
-        next.Dispose();
+        next.Release();
         // #endregion geojson
 
         // #region set-property

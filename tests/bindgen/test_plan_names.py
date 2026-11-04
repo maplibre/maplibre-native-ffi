@@ -28,7 +28,8 @@ class PlanNameTests(unittest.TestCase):
             {
                 "mln_pass_redeem": "redeem",
                 "mln_pass_stamp": "stamp",
-                "mln_pass_close": "close",
+                # The release takes C's verb, whatever its function is named.
+                "mln_pass_close": "release",
             },
         )
         self.assertEqual(

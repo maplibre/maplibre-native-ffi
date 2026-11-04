@@ -187,7 +187,7 @@ static inline mln_render_session mln_test_create_disposed_session(mln_map map) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
   const mln_render_session session = fixture.session;
-  MLN_TEST_OK(mln_test_render_session_dispose(session));
+  MLN_TEST_OK(mln_test_render_session_release(session));
   mln_test_render_fixture_destroy(&fixture);
   return session;
 }
