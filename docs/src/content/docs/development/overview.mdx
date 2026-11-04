@@ -47,11 +47,11 @@ These SDKs are large, so they're opt-in. Install one with
 to every later command, or set `MISE_ENV`. After an NDK update, run
 `mise run clean <preset>` for each Android preset.
 
-The site's live demo in `docs/demo` loads the TypeScript binding's browser
-modules. Build them with
+The browser example in `examples/browser`, which the site serves as its live
+demo, loads the TypeScript binding's browser modules. Build them with
 `mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl`,
-and again for `emscripten-wasm32-webgpu`, then serve the demo with
-`mise run //docs:demo-dev`. The release puts it in the site.
+and again for `emscripten-wasm32-webgpu`, then serve the example with
+`mise run //examples/browser:dev`. The release puts it in the site.
 
 ### Emulators and simulators
 

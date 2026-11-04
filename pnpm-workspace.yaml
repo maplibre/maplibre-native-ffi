@@ -2,7 +2,7 @@ packages:
   - bindings/typescript
   - bindings/typescript/react-native
   - docs
-  - docs/demo
+  - examples/browser
   - examples/react-native
 
 pnpmfile: .config/pnpmfile.cjs
