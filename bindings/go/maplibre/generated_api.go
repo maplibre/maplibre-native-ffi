@@ -81,11 +81,9 @@ func (value CameraChangeMode) String() string {
 // CameraTransitionOutcome corresponds to mln_camera_transition_outcome. How a
 // camera change ended.
 //
-// A camera delta that pans and also scales, rotates, or pitches animates as two
-// parts, and any other change as one. When the parts of a change end in
-// different ways, the change reports CameraTransitionOutcomeCancelled if any
-// part was cancelled, then CameraTransitionOutcomeReplaced if any part was
-// replaced.
+// A change that ends in more than one way reports
+// CameraTransitionOutcomeCancelled if any of it was cancelled, and otherwise
+// CameraTransitionOutcomeReplaced if any of it was replaced.
 //
 // See mln_camera_transition_outcome in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -96,19 +94,19 @@ const (
 	CameraTransitionOutcomeCompleted CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED)
 	// MapHandle.CancelCameraTransitions(),
 	// MapHandle.CancelCameraTransitionsWithID(), a gesture's GesturePhaseBegin or
-	// GesturePhaseCancel, MapHandle.SetFreeCameraOptions(), or a resize that moves
-	// the camera back inside its bounds stopped the change, or the command failed
-	// before it moved the camera.
+	// GesturePhaseCancel, MapHandle.SetFreeCameraOptions(), or a resize that moved
+	// the camera back inside its bounds stopped the change. A command that fails
+	// before it moves the camera also reports this.
 	CameraTransitionOutcomeCancelled CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED)
 	// The map closed before the change ended.
 	CameraTransitionOutcomeClosed CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CLOSED)
-	// A later camera change set every camera field that a part of the change still
-	// animated, so that part stopped.
+	// A later camera change set every field that a part of the change was still
+	// animating, so that part stopped. Its other parts keep animating, and the
+	// change reports this outcome when they end, unless one was cancelled.
 	//
-	// A fly animates its center and zoom together, and an anchor animates the
-	// center together with the fields it keeps in place, so a later change of any
-	// of them replaces them all. A part that a later change took only some fields
-	// from keeps animating the others, and ends as they end.
+	// A later change that sets only some of those fields leaves the change
+	// animating the rest. A fly's center and zoom count as one field, and so do an
+	// anchored change's center and the fields that the anchor holds in place.
 	CameraTransitionOutcomeReplaced CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_REPLACED)
 )
 
@@ -475,8 +473,7 @@ const (
 	MapLoadErrorUnknown MapLoadError = MapLoadError(C.MLN_MAP_LOAD_ERROR_UNKNOWN)
 	// The style document isn't a valid style.
 	MapLoadErrorStyleParse MapLoadError = MapLoadError(C.MLN_MAP_LOAD_ERROR_STYLE_PARSE)
-	// The style's request failed, for any reason, including a 404 or a missing
-	// file.
+	// The style's request failed, such as with a 404 or a missing file.
 	MapLoadErrorStyleLoad MapLoadError = MapLoadError(C.MLN_MAP_LOAD_ERROR_STYLE_LOAD)
 )
 
@@ -1135,10 +1132,6 @@ func (value RuntimeEventSourceType) String() string {
 
 // RuntimeEventType corresponds to mln_runtime_event_type. The kind of an event.
 //
-// An event's payload_type names the member of its payload that holds the
-// event's details. An event that reports a failure carries the error's text in
-// message.
-//
 // Only maps in MapModeContinuous raise RuntimeEventTypeMapLoadingFinished,
 // RuntimeEventTypeMapIdle, and the render frame and render map events. Offline
 // region events come only for the regions and types that
@@ -1149,63 +1142,43 @@ func (value RuntimeEventSourceType) String() string {
 type RuntimeEventType uint32
 
 const (
-	// The camera is about to change. Its details are in camera_change.
 	RuntimeEventTypeMapCameraWillChange RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)
 	RuntimeEventTypeMapCameraIsChanging RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING)
-	// The camera changed. Its details are in camera_change.
-	RuntimeEventTypeMapCameraDidChange RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
-	RuntimeEventTypeMapStyleLoaded     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
+	RuntimeEventTypeMapCameraDidChange  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventTypeMapStyleLoaded      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
 	// The map started to load a style.
 	RuntimeEventTypeMapLoadingStarted RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED)
 	// The map loaded its style and everything that the current view needs, and
 	// rendered the result.
 	RuntimeEventTypeMapLoadingFinished RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED)
-	// The map failed to load a style. Its details are in loading_failed, and the
-	// error's text is in message.
+	// The map failed to load a style.
 	RuntimeEventTypeMapLoadingFailed RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
 	// The map rendered a complete frame and has nothing left to load, animate, or
 	// redraw.
-	RuntimeEventTypeMapIdle RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
-	// The map failed to render. The error's text is in message.
-	RuntimeEventTypeMapRenderError        RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
-	RuntimeEventTypeMapRenderFrameStarted RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
-	// The map rendered a frame. Its details are in render_frame.
+	RuntimeEventTypeMapIdle                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
+	RuntimeEventTypeMapRenderError         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
+	RuntimeEventTypeMapRenderFrameStarted  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
 	RuntimeEventTypeMapRenderFrameFinished RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)
 	RuntimeEventTypeMapRenderMapStarted    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED)
 	RuntimeEventTypeMapRenderMapFinished   RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)
-	// The style uses an image that it doesn't have. Its details are in style_image.
+	// The style uses an image that it doesn't have.
 	RuntimeEventTypeMapStyleImageMissing RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)
-	// A tile moved to another step of loading. Its details are in tile_action.
-	RuntimeEventTypeMapTileAction RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
-	// A source changed. Its details are in source_changed.
-	RuntimeEventTypeMapSourceChanged RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
-	// The region's status changed. Its details are in offline_region_status.
+	// A tile moved to another step of loading.
+	RuntimeEventTypeMapTileAction              RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
+	RuntimeEventTypeMapSourceChanged           RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED)
 	RuntimeEventTypeOfflineRegionStatusChanged RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
-	// A resource that the region needs failed to download. Its details are in
-	// offline_region_response_error, and the error's text is in message.
+	// A resource that the region needs failed to download.
 	RuntimeEventTypeOfflineRegionResponseError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	// The region's download became inactive because the cache file's offline
-	// regions reached their limit of 6000 tiles from MapLibre's demo tile server.
-	// Its details are in offline_region_tile_count_limit.
-	//
-	// Only tiles of sources on the demo server count toward the limit: sources with
-	// a maplibre:// URL, which resolves to https://demotiles.maplibre.org. Tiles
-	// from other servers never count.
+	// regions hold as many tiles from MapLibre's demo tile server as the limit
+	// allows. Only tiles of sources with a maplibre:// URL count toward the limit.
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	// The map requested a range of glyphs. Its details are in glyphs.
-	RuntimeEventTypeMapGlyphsRequested RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
-	// A range of glyphs loaded. Its details are in glyphs.
-	RuntimeEventTypeMapGlyphsLoaded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
-	// A range of glyphs failed to load. Its details are in glyphs, and the error's
-	// text is in message.
-	RuntimeEventTypeMapGlyphsError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
-	// The map requested a sprite. Its details are in sprite.
-	RuntimeEventTypeMapSpriteRequested RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
-	// A sprite loaded. Its details are in sprite.
-	RuntimeEventTypeMapSpriteLoaded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
-	// A sprite failed to load. Its details are in sprite, and the error's text is
-	// in message.
-	RuntimeEventTypeMapSpriteError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
+	RuntimeEventTypeMapGlyphsRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
+	RuntimeEventTypeMapGlyphsLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
+	RuntimeEventTypeMapGlyphsError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
+	RuntimeEventTypeMapSpriteRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
+	RuntimeEventTypeMapSpriteLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
+	RuntimeEventTypeMapSpriteError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
 )
 
 func (value RuntimeEventType) String() string {
@@ -1735,10 +1708,8 @@ func (value WebGLContextKind) String() string {
 // FeatureID corresponds to mln_feature_id. The ID of a feature in a source, as
 // the source's data gives it.
 //
-// The map compares feature IDs as text, so a string and a number with the same
-// text, such as "7" and 7, name the same feature. A number's text is its
-// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
-// same feature, and so do 1e21 and "1e21".
+// The map compares feature IDs as text. A number names the same feature as the
+// string of its shortest decimal form, so 7, 7.0, and "7" name one feature.
 //
 // See mln_feature_id in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2206,7 +2177,9 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 // See mln_camera_fit_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraFitOptions struct {
-	// Space to leave between the area and each edge of the map.
+	// Space to leave between the area and each edge of the map. The left and right
+	// insets must add up to less than the map's width, and the top and bottom to
+	// less than its height.
 	Padding *EdgeInsets
 	// The rotation from north, in degrees.
 	Bearing *float64
@@ -2228,8 +2201,7 @@ func nativeCameraFitOptions(input CameraFitOptions, arena *bindingArena) C.mln_c
 // fits an area, for MapHandle.FitCameraToLatLngBounds() and the other fit
 // commands.
 //
-// A jump uses only the end handler of animation, and the handler runs as soon
-// as the camera moves.
+// A jump uses only the end handler of animation, as in CameraUpdate.
 //
 // See mln_camera_fit_update in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2984,11 +2956,8 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
 type LogHandler struct {
 	// The severities that also go to the platform's log, as they do without a
-	// callback. 0 sends none.
-	//
-	// A record that the handler's delivery queue can't accept is dropped. These
-	// severities alone decide whether a record also goes to the platform's log,
-	// whether or not the queue accepts it.
+	// callback. 0 sends none. A message of these severities goes to the platform's
+	// log even when the handler's queue can't accept it.
 	PlatformSeverities LogSeverityFlag
 	Callback           func(severity LogSeverity, event LogEvent, code int64, message string)
 }
@@ -3058,8 +3027,7 @@ func nativeLogicalSize(input LogicalSize, arena *bindingArena) C.mln_logical_siz
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapOptions struct {
 	// The map's first size, and its scale factor. The scale factor stays fixed for
-	// the map's life, and every render session of the map renders at it. To render
-	// at another density, create a new map and attach a new session.
+	// the map's life, and every render session of the map renders at it.
 	InitialExtent LogicalExtent
 	MapMode       MapMode
 	// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -4582,7 +4550,7 @@ func nativeResourceRoute(input ResourceRoute, arena *bindingArena) C.mln_resourc
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceTransform struct {
 	// The first rule that matches a request adds its parameters, and no other. A
-	// request that no rule matches keeps its URL. Rules never fail a request.
+	// request that no rule matches keeps its URL.
 	Rules    []ResourceTransformRule
 	Callback func(kind ResourceKind, url string, request *ResourceTransformRequestHandle)
 }
@@ -4634,9 +4602,8 @@ func nativeResourceTransformError(input ResourceTransformError, arena *bindingAr
 // parameters to add to the URLs of requests that match a pattern.
 //
 // The library adds the parameters, in order, at the end of the URL's query and
-// before any fragment. It writes ? before them when the URL has no ?, or & when
-// the text before them ends with neither ? nor &. It keeps the parameters that
-// the URL already has, even one with the same name.
+// before any fragment. It keeps the parameters that the URL already has, even
+// one with the same name.
 //
 // See mln_resource_transform_rule in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -6573,23 +6540,20 @@ func CVersion() uint32 {
 // map.
 //
 // Jump a map in MapModeTile to the camera to render tile, where logicalSize is
-// the map's size. The camera centers the tile and zooms until the tile fills
-// the map: to zoom z for a 512-pixel map, or z - 1 for a 256-pixel one, plus
-// 0.0001 to keep the neighboring tiles out. It looks straight down with north
-// up and no padding, so the map's earlier camera doesn't change the view. The
-// map keeps the camera within its zoom limits, so for a deep tile, raise the
-// maximum zoom past the camera's with MapHandle.SetBounds().
+// the map's size. The camera centers the tile, zooms until the tile fills the
+// map, and looks straight down with north up and no padding. The map keeps its
+// camera within its zoom limits, so for a deep tile, raise the maximum zoom
+// past the camera's with MapHandle.SetBounds().
 //
 // See mln_camera_for_tile in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 //
 // Errors:
 //   - StatusInvalidArgument when logicalSize isn't square, or is wider than 512
-//     pixels, the width of a vector tile at its zoom. For denser tiles, raise
-//     the map's scale factor instead.
+//     pixels. For denser tiles, raise the map's scale factor instead.
 //   - StatusInvalidArgument when tile.x or tile.y isn't less than 2 to the
-//     power tile.z, or when the camera's zoom would fall outside 0 to 25.5, as
-//     for tile 0/0/0 on a 256-pixel map.
+//     power tile.z, or when the tile can't fill the map at a zoom from 0 to
+//     25.5, as for tile 0/0/0 on a 256-pixel map.
 func CameraForTile(tile CanonicalTileID, logicalSize LogicalSize) (CameraOptions, error) {
 	var outCamera C.mln_camera_options
 	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
@@ -7037,8 +7001,7 @@ func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], erro
 //
 // Errors:
 //   - StatusInvalidArgument when the padding in fitOptions leaves no room for
-//     the area: its left and right add up to at least the map's width, or its
-//     top and bottom to at least the map's height.
+//     the area.
 func (receiver *MapHandle) CameraForGeometry(geometry string, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
@@ -7055,8 +7018,7 @@ func (receiver *MapHandle) CameraForGeometry(geometry string, fitOptions *Camera
 //
 // Errors:
 //   - StatusInvalidArgument when the padding in fitOptions leaves no room for
-//     the area: its left and right add up to at least the map's width, or its
-//     top and bottom to at least the map's height.
+//     the area.
 func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
@@ -7073,8 +7035,7 @@ func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions
 //
 // Errors:
 //   - StatusInvalidArgument when the padding in fitOptions leaves no room for
-//     the area: its left and right add up to at least the map's width, or its
-//     top and bottom to at least the map's height.
+//     the area.
 func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_camera_for_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
@@ -7132,18 +7093,16 @@ func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error)
 // view, at once or with an animation.
 //
 // geometry is a GeoJSON geometry object with at least one coordinate, not a
-// feature. The map computes the camera when it runs the command, from the
-// camera and size that earlier commands leave, as MapHandle.CameraForGeometry()
-// would then. The function finishes when the map applies the change, before an
-// animation ends.
+// feature. The camera is the one that MapHandle.CameraForGeometry() computes
+// after the commands sent before this one apply. The function finishes when the
+// map applies the change, before an animation ends.
 //
 // See mln_map_fit_camera_to_geometry in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 //
 // Errors:
 //   - StatusInvalidArgument when the padding in update leaves no room for the
-//     area: its left and right add up to at least the map's width, or its top
-//     and bottom to at least the map's height. The camera doesn't move.
+//     area. The camera doesn't move.
 func (receiver *MapHandle) FitCameraToGeometry(geometry string, update CameraFitUpdate) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_fit_camera_to_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
@@ -7153,18 +7112,16 @@ func (receiver *MapHandle) FitCameraToGeometry(geometry string, update CameraFit
 // FitCameraToLatLngBounds moves the camera to fit bounds in the map's view, at
 // once or with an animation.
 //
-// The map computes the camera when it runs the command, from the camera and
-// size that earlier commands leave, as MapHandle.CameraForLatLngBounds() would
-// then. The function finishes when the map applies the change, before an
-// animation ends.
+// The camera is the one that MapHandle.CameraForLatLngBounds() computes after
+// the commands sent before this one apply. The function finishes when the map
+// applies the change, before an animation ends.
 //
 // See mln_map_fit_camera_to_lat_lng_bounds in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 //
 // Errors:
 //   - StatusInvalidArgument when the padding in update leaves no room for the
-//     area: its left and right add up to at least the map's width, or its top
-//     and bottom to at least the map's height. The camera doesn't move.
+//     area. The camera doesn't move.
 func (receiver *MapHandle) FitCameraToLatLngBounds(bounds LatLngBounds, update CameraFitUpdate) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_fit_camera_to_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
@@ -7174,18 +7131,17 @@ func (receiver *MapHandle) FitCameraToLatLngBounds(bounds LatLngBounds, update C
 // FitCameraToLatLngs moves the camera to fit coordinates in the map's view, at
 // once or with an animation.
 //
-// coordinates must not be empty. The map computes the camera when it runs the
-// command, from the camera and size that earlier commands leave, as
-// MapHandle.CameraForLatLngs() would then. The function finishes when the map
-// applies the change, before an animation ends.
+// coordinates must not be empty. The camera is the one that
+// MapHandle.CameraForLatLngs() computes after the commands sent before this one
+// apply. The function finishes when the map applies the change, before an
+// animation ends.
 //
 // See mln_map_fit_camera_to_lat_lngs in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
 //
 // Errors:
 //   - StatusInvalidArgument when the padding in update leaves no room for the
-//     area: its left and right add up to at least the map's width, or its top
-//     and bottom to at least the map's height. The camera doesn't move.
+//     area. The camera doesn't move.
 func (receiver *MapHandle) FitCameraToLatLngs(coordinates []LatLng, update CameraFitUpdate) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_fit_camera_to_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativeCameraFitUpdate(update, arena), arena), completion, diagnostic))
@@ -7936,10 +7892,9 @@ func (receiver *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSo
 // SetGeoJSONSourceSynchronousTiling sets whether a GeoJSON source builds its
 // tiles while the map renders.
 //
-// When enabled is true, the source builds its tiles while the map renders
-// instead of in the background, so new data shows in the next frame. Until this
-// is called, a source follows the synchronousUpdate member of its source JSON,
-// which defaults to false. This setting replaces that value.
+// Building tiles while the map renders, instead of in the background, makes new
+// data show in the next frame. The setting replaces the synchronousUpdate
+// member of the source's JSON, which defaults to false.
 //
 // See mln_map_set_geo_json_source_synchronous_tiling in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -8184,12 +8139,10 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 // style's sources, sprites, and glyphs then load in the background.
 //
 // The map's style is loaded from the time a style document parses until the
-// next call to this function. It isn't loaded before the map's first style
-// parses, while a style URL loads, or after a style URL fails to load. While
-// the style isn't loaded, the commands that change it complete with
-// StatusInvalidState, because the next style to parse would replace their
-// changes. To change a new map's style without a style document, first load an
-// empty style, such as {"version":8,"sources":{},"layers":[]}.
+// next call to this function. While the style isn't loaded, the commands that
+// change it complete with StatusInvalidState. To change a new map's style
+// without a style document, first load an empty style, such as
+// {"version":8,"sources":{},"layers":[]}.
 //
 // See mln_map_set_style_url in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -8569,8 +8522,7 @@ func (receiver *RenderSessionHandle) GetClusterChildren(sourceID string, cluster
 // clustered GeoJSON source splits.
 //
 // clusterID is the "cluster_id" property of a cluster feature. At the result's
-// zoom level, the cluster's points no longer form this cluster, but two or more
-// clusters or points.
+// zoom level, the cluster splits into two or more clusters or points.
 //
 // A cluster ID can go out of date as RenderSessionHandle.GetClusterChildren()
 // describes.
@@ -8923,6 +8875,8 @@ func (receiver *ResourceRequestHandle) PassThrough() error {
 
 // Release releases a resource request.
 //
+// Releasing a request without an answer fails it with ResourceErrorReasonOther.
+//
 // See mln_resource_request_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *ResourceRequestHandle) Release() error {
@@ -9180,8 +9134,7 @@ func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo
 // Errors:
 //   - StatusInvalidArgument when sideDatabasePath isn't a readable database
 //     file.
-//   - StatusNativeError when the merge would exceed the limit on tiles from
-//     MapLibre's demo tile server that
+//   - StatusNativeError when the merge would exceed the tile limit that
 //     RuntimeEventTypeOfflineRegionTileCountLimitExceeded describes.
 func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {

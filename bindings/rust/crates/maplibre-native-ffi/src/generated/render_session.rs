@@ -307,8 +307,8 @@ impl RenderSessionHandle {
     /// splits.
     ///
     /// `cluster_id` is the "cluster_id" property of a cluster feature. At the
-    /// result's zoom level, the cluster's points no longer form this cluster,
-    /// but two or more clusters or points.
+    /// result's zoom level, the cluster splits into two or more clusters or
+    /// points.
     ///
     /// A cluster ID can go out of date as
     /// `RenderSessionHandle::get_cluster_children()` describes.

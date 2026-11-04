@@ -649,8 +649,7 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_ARGUMENT` when the padding in `fit_options` leaves
-          no room for the area: its left and right add up to at least the
-          map's width, or its top and bottom to at least the map's height.
+          no room for the area.
         """
         return map_future(
             self._native.camera_for_geometry(geometry, fit_options),
@@ -671,8 +670,7 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_ARGUMENT` when the padding in `fit_options` leaves
-          no room for the area: its left and right add up to at least the
-          map's width, or its top and bottom to at least the map's height.
+          no room for the area.
         """
         return map_future(
             self._native.camera_for_lat_lng_bounds(bounds, fit_options),
@@ -694,8 +692,7 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_ARGUMENT` when the padding in `fit_options` leaves
-          no room for the area: its left and right add up to at least the
-          map's width, or its top and bottom to at least the map's height.
+          no room for the area.
         """
         return map_future(
             self._native.camera_for_lat_lngs(coordinates, fit_options),
@@ -750,10 +747,10 @@ class _MapHandleOperations(GeneratedOperations):
         or with an animation.
 
         `geometry` is a GeoJSON geometry object with at least one coordinate,
-        not a feature. The map computes the camera when it runs the command,
-        from the camera and size that earlier commands leave, as
-        `MapHandle.camera_for_geometry()` would then. The function finishes
-        when the map applies the change, before an animation ends.
+        not a feature. The camera is the one that
+        `MapHandle.camera_for_geometry()` computes after the commands sent
+        before this one apply. The function finishes when the map applies the
+        change, before an animation ends.
 
         See `mln_map_fit_camera_to_geometry` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -761,9 +758,7 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no
-          room for the area: its left and right add up to at least the map's
-          width, or its top and bottom to at least the map's height. The
-          camera doesn't move.
+          room for the area. The camera doesn't move.
         """
         return self._native.fit_camera_to_geometry(geometry, update)
 
@@ -773,9 +768,8 @@ class _MapHandleOperations(GeneratedOperations):
         """Moves the camera to fit `bounds` in the map's view, at once or with
         an animation.
 
-        The map computes the camera when it runs the command, from the camera
-        and size that earlier commands leave, as
-        `MapHandle.camera_for_lat_lng_bounds()` would then. The function
+        The camera is the one that `MapHandle.camera_for_lat_lng_bounds()`
+        computes after the commands sent before this one apply. The function
         finishes when the map applies the change, before an animation ends.
 
         See `mln_map_fit_camera_to_lat_lng_bounds` in the
@@ -784,9 +778,7 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no
-          room for the area: its left and right add up to at least the map's
-          width, or its top and bottom to at least the map's height. The
-          camera doesn't move.
+          room for the area. The camera doesn't move.
         """
         return self._native.fit_camera_to_lat_lng_bounds(bounds, update)
 
@@ -796,10 +788,10 @@ class _MapHandleOperations(GeneratedOperations):
         """Moves the camera to fit `coordinates` in the map's view, at once or
         with an animation.
 
-        `coordinates` must not be empty. The map computes the camera when it
-        runs the command, from the camera and size that earlier commands
-        leave, as `MapHandle.camera_for_lat_lngs()` would then. The function
-        finishes when the map applies the change, before an animation ends.
+        `coordinates` must not be empty. The camera is the one that
+        `MapHandle.camera_for_lat_lngs()` computes after the commands sent
+        before this one apply. The function finishes when the map applies the
+        change, before an animation ends.
 
         See `mln_map_fit_camera_to_lat_lngs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -807,9 +799,7 @@ class _MapHandleOperations(GeneratedOperations):
         Errors:
 
         - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no
-          room for the area: its left and right add up to at least the map's
-          width, or its top and bottom to at least the map's height. The
-          camera doesn't move.
+          room for the area. The camera doesn't move.
         """
         return self._native.fit_camera_to_lat_lngs(coordinates, update)
 
@@ -1382,11 +1372,10 @@ class _MapHandleOperations(GeneratedOperations):
     ) -> Future[CommandCompletion]:
         """Sets whether a GeoJSON source builds its tiles while the map renders.
 
-        When `enabled` is true, the source builds its tiles while the map
-        renders instead of in the background, so new data shows in the next
-        frame. Until this is called, a source follows the `synchronousUpdate`
-        member of its source JSON, which defaults to false. This setting
-        replaces that value.
+        Building tiles while the map renders, instead of in the background,
+        makes new data show in the next frame. The setting replaces the
+        `synchronousUpdate` member of the source's JSON, which defaults to
+        false.
 
         See `mln_map_set_geo_json_source_synchronous_tiling` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1645,13 +1634,10 @@ class _MapHandleOperations(GeneratedOperations):
         The style's sources, sprites, and glyphs then load in the background.
 
         The map's style is loaded from the time a style document parses until
-        the next call to this function. It isn't loaded before the map's
-        first style parses, while a style URL loads, or after a style URL
-        fails to load. While the style isn't loaded, the commands that change
-        it complete with `Status.INVALID_STATE`, because the next style to
-        parse would replace their changes. To change a new map's style
-        without a style document, first load an empty style, such as
-        `{"version":8,"sources":{},"layers":[]}`.
+        the next call to this function. While the style isn't loaded, the
+        commands that change it complete with `Status.INVALID_STATE`. To
+        change a new map's style without a style document, first load an
+        empty style, such as `{"version":8,"sources":{},"layers":[]}`.
 
         See `mln_map_set_style_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2072,8 +2058,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         splits.
 
         `cluster_id` is the "cluster_id" property of a cluster feature. At
-        the result's zoom level, the cluster's points no longer form this
-        cluster, but two or more clusters or points.
+        the result's zoom level, the cluster splits into two or more clusters
+        or points.
 
         A cluster ID can go out of date as
         `RenderSessionHandle.get_cluster_children()` describes.
@@ -2482,6 +2468,9 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     def release(self) -> None:
         """Releases a resource request.
 
+        Releasing a request without an answer fails it with
+        `ResourceErrorReason.OTHER`.
+
         See `mln_resource_request_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
@@ -2712,9 +2701,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         - `Status.INVALID_ARGUMENT` when `side_database_path` isn't a
           readable database file.
-        - `Status.NATIVE_ERROR` when the merge would exceed the limit on
-          tiles from MapLibre's demo tile server that
-          `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`
+        - `Status.NATIVE_ERROR` when the merge would exceed the tile limit
+          that `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`
           describes.
         """
         return map_future(
@@ -3036,13 +3024,11 @@ def camera_for_tile(tile: CanonicalTileId, logical_size: LogicalSize) -> CameraO
     """Computes the camera that shows exactly one tile on a square map.
 
     Jump a map in `MapMode.TILE` to the camera to render `tile`, where
-    `logical_size` is the map's size. The camera centers the tile and
-    zooms until the tile fills the map: to zoom z for a 512-pixel map, or
-    z - 1 for a 256-pixel one, plus 0.0001 to keep the neighboring tiles
-    out. It looks straight down with north up and no padding, so the
-    map's earlier camera doesn't change the view. The map keeps the
-    camera within its zoom limits, so for a deep tile, raise the maximum
-    zoom past the camera's with `MapHandle.set_bounds()`.
+    `logical_size` is the map's size. The camera centers the tile, zooms
+    until the tile fills the map, and looks straight down with north up
+    and no padding. The map keeps its camera within its zoom limits, so
+    for a deep tile, raise the maximum zoom past the camera's with
+    `MapHandle.set_bounds()`.
 
     See `mln_camera_for_tile` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -3050,11 +3036,11 @@ def camera_for_tile(tile: CanonicalTileId, logical_size: LogicalSize) -> CameraO
     Errors:
 
     - `Status.INVALID_ARGUMENT` when `logical_size` isn't square, or is
-      wider than 512 pixels, the width of a vector tile at its zoom. For
-      denser tiles, raise the map's scale factor instead.
+      wider than 512 pixels. For denser tiles, raise the map's scale
+      factor instead.
     - `Status.INVALID_ARGUMENT` when `tile.x` or `tile.y` isn't less than
-      2 to the power `tile.z`, or when the camera's zoom would fall
-      outside 0 to 25.5, as for tile 0/0/0 on a 256-pixel map.
+      2 to the power `tile.z`, or when the tile can't fill the map at a
+      zoom from 0 to 25.5, as for tile 0/0/0 on a 256-pixel map.
     """
     return CameraOptions._from_native(_native.camera_for_tile(tile, logical_size))
 
@@ -3339,10 +3325,10 @@ class MapHandleDiscarding:
         or with an animation.
 
         `geometry` is a GeoJSON geometry object with at least one coordinate,
-        not a feature. The map computes the camera when it runs the command,
-        from the camera and size that earlier commands leave, as
-        `MapHandle.camera_for_geometry()` would then. The function finishes
-        when the map applies the change, before an animation ends.
+        not a feature. The camera is the one that
+        `MapHandle.camera_for_geometry()` computes after the commands sent
+        before this one apply. The function finishes when the map applies the
+        change, before an animation ends.
 
         See `mln_map_fit_camera_to_geometry` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -3355,9 +3341,8 @@ class MapHandleDiscarding:
         """Moves the camera to fit `bounds` in the map's view, at once or with
         an animation.
 
-        The map computes the camera when it runs the command, from the camera
-        and size that earlier commands leave, as
-        `MapHandle.camera_for_lat_lng_bounds()` would then. The function
+        The camera is the one that `MapHandle.camera_for_lat_lng_bounds()`
+        computes after the commands sent before this one apply. The function
         finishes when the map applies the change, before an animation ends.
 
         See `mln_map_fit_camera_to_lat_lng_bounds` in the
@@ -3371,10 +3356,10 @@ class MapHandleDiscarding:
         """Moves the camera to fit `coordinates` in the map's view, at once or
         with an animation.
 
-        `coordinates` must not be empty. The map computes the camera when it
-        runs the command, from the camera and size that earlier commands
-        leave, as `MapHandle.camera_for_lat_lngs()` would then. The function
-        finishes when the map applies the change, before an animation ends.
+        `coordinates` must not be empty. The camera is the one that
+        `MapHandle.camera_for_lat_lngs()` computes after the commands sent
+        before this one apply. The function finishes when the map applies the
+        change, before an animation ends.
 
         See `mln_map_fit_camera_to_lat_lngs` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -3631,11 +3616,10 @@ class MapHandleDiscarding:
     ) -> None:
         """Sets whether a GeoJSON source builds its tiles while the map renders.
 
-        When `enabled` is true, the source builds its tiles while the map
-        renders instead of in the background, so new data shows in the next
-        frame. Until this is called, a source follows the `synchronousUpdate`
-        member of its source JSON, which defaults to false. This setting
-        replaces that value.
+        Building tiles while the map renders, instead of in the background,
+        makes new data show in the next frame. The setting replaces the
+        `synchronousUpdate` member of the source's JSON, which defaults to
+        false.
 
         See `mln_map_set_geo_json_source_synchronous_tiling` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3802,13 +3786,10 @@ class MapHandleDiscarding:
         The style's sources, sprites, and glyphs then load in the background.
 
         The map's style is loaded from the time a style document parses until
-        the next call to this function. It isn't loaded before the map's
-        first style parses, while a style URL loads, or after a style URL
-        fails to load. While the style isn't loaded, the commands that change
-        it complete with `Status.INVALID_STATE`, because the next style to
-        parse would replace their changes. To change a new map's style
-        without a style document, first load an empty style, such as
-        `{"version":8,"sources":{},"layers":[]}`.
+        the next call to this function. While the style isn't loaded, the
+        commands that change it complete with `Status.INVALID_STATE`. To
+        change a new map's style without a style document, first load an
+        empty style, such as `{"version":8,"sources":{},"layers":[]}`.
 
         See `mln_map_set_style_url` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

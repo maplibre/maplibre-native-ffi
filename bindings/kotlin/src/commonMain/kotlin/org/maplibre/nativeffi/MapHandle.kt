@@ -379,9 +379,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area: its
-   *   left and right add up to at least the map's width, or its top and bottom to at least the
-   *   map's height.
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area.
    */
   public fun cameraForGeometry(
     geometry: String,
@@ -410,9 +408,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area: its
-   *   left and right add up to at least the map's width, or its top and bottom to at least the
-   *   map's height.
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area.
    */
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
@@ -441,9 +437,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area: its
-   *   left and right add up to at least the map's width, or its top and bottom to at least the
-   *   map's height.
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area.
    */
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
@@ -532,19 +526,17 @@ internal constructor(
   /**
    * Moves the camera to fit a GeoJSON geometry in the map's view, at once or with an animation.
    *
-   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a feature. The map
-   * computes the camera when it runs the command, from the camera and size that earlier commands
-   * leave, as `MapHandle.cameraForGeometry()` would then. The function finishes when the map
-   * applies the change, before an animation ends.
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a feature. The camera
+   * is the one that `MapHandle.cameraForGeometry()` computes after the commands sent before this
+   * one apply. The function finishes when the map applies the change, before an animation ends.
    *
    * See `mln_map_fit_camera_to_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area: its left
-   *   and right add up to at least the map's width, or its top and bottom to at least the map's
-   *   height. The camera doesn't move.
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area. The
+   *   camera doesn't move.
    */
   public fun fitCameraToGeometry(
     geometry: String,
@@ -565,18 +557,17 @@ internal constructor(
   /**
    * Moves the camera to fit `bounds` in the map's view, at once or with an animation.
    *
-   * The map computes the camera when it runs the command, from the camera and size that earlier
-   * commands leave, as `MapHandle.cameraForLatLngBounds()` would then. The function finishes when
-   * the map applies the change, before an animation ends.
+   * The camera is the one that `MapHandle.cameraForLatLngBounds()` computes after the commands sent
+   * before this one apply. The function finishes when the map applies the change, before an
+   * animation ends.
    *
    * See `mln_map_fit_camera_to_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area: its left
-   *   and right add up to at least the map's width, or its top and bottom to at least the map's
-   *   height. The camera doesn't move.
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area. The
+   *   camera doesn't move.
    */
   public fun fitCameraToLatLngBounds(
     bounds: LatLngBounds,
@@ -597,18 +588,17 @@ internal constructor(
   /**
    * Moves the camera to fit `coordinates` in the map's view, at once or with an animation.
    *
-   * `coordinates` must not be empty. The map computes the camera when it runs the command, from the
-   * camera and size that earlier commands leave, as `MapHandle.cameraForLatLngs()` would then. The
-   * function finishes when the map applies the change, before an animation ends.
+   * `coordinates` must not be empty. The camera is the one that `MapHandle.cameraForLatLngs()`
+   * computes after the commands sent before this one apply. The function finishes when the map
+   * applies the change, before an animation ends.
    *
    * See `mln_map_fit_camera_to_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area: its left
-   *   and right add up to at least the map's width, or its top and bottom to at least the map's
-   *   height. The camera doesn't move.
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area. The
+   *   camera doesn't move.
    */
   public fun fitCameraToLatLngs(
     coordinates: List<LatLng>,
@@ -1468,10 +1458,9 @@ internal constructor(
   /**
    * Sets whether a GeoJSON source builds its tiles while the map renders.
    *
-   * When `enabled` is true, the source builds its tiles while the map renders instead of in the
-   * background, so new data shows in the next frame. Until this is called, a source follows the
-   * `synchronousUpdate` member of its source JSON, which defaults to false. This setting replaces
-   * that value.
+   * Building tiles while the map renders, instead of in the background, makes new data show in the
+   * next frame. The setting replaces the `synchronousUpdate` member of the source's JSON, which
+   * defaults to false.
    *
    * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1843,11 +1832,9 @@ internal constructor(
    * sprites, and glyphs then load in the background.
    *
    * The map's style is loaded from the time a style document parses until the next call to this
-   * function. It isn't loaded before the map's first style parses, while a style URL loads, or
-   * after a style URL fails to load. While the style isn't loaded, the commands that change it
-   * complete with `Status.INVALID_STATE`, because the next style to parse would replace their
-   * changes. To change a new map's style without a style document, first load an empty style, such
-   * as `{"version":8,"sources":{},"layers":[]}`.
+   * function. While the style isn't loaded, the commands that change it complete with
+   * `Status.INVALID_STATE`. To change a new map's style without a style document, first load an
+   * empty style, such as `{"version":8,"sources":{},"layers":[]}`.
    *
    * See `mln_map_set_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

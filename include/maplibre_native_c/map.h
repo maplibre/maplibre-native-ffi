@@ -213,8 +213,7 @@ typedef struct mln_map_options {
   mln_map_option_fields fields;
   /**
    * The map's first size, and its scale factor. The scale factor stays fixed
-   * for the map's life, and every render session of the map renders at it. To
-   * render at another density, create a new map and attach a new session.
+   * for the map's life, and every render session of the map renders at it.
    */
   mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;
@@ -307,9 +306,7 @@ typedef struct mln_camera {
 /**
  * Makes camera options that set every member of `camera`.
  *
- * Use it to send a camera that you read back, such as to restore a saved
- * camera or to move another map to the same camera. The options don't set
- * `anchor`.
+ * The options don't set `anchor`.
  */
 static inline mln_camera_options mln_camera_to_options(mln_camera camera) {
   mln_camera_options options;
@@ -350,11 +347,9 @@ typedef struct mln_unit_bezier {
 /**
  * How a camera change ended.
  *
- * A camera delta that pans and also scales, rotates, or pitches animates as
- * two parts, and any other change as one. When the parts of a change end in
- * different ways, the change reports MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED
- * if any part was cancelled, then MLN_CAMERA_TRANSITION_OUTCOME_REPLACED if
- * any part was replaced.
+ * A change that ends in more than one way reports
+ * MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED if any of it was cancelled, and
+ * otherwise MLN_CAMERA_TRANSITION_OUTCOME_REPLACED if any of it was replaced.
  */
 typedef enum mln_camera_transition_outcome : uint32_t {
   /** The camera finished the change. */
@@ -363,21 +358,21 @@ typedef enum mln_camera_transition_outcome : uint32_t {
    * mln_map_cancel_camera_transitions(),
    * mln_map_cancel_camera_transitions_with_id(), a gesture's
    * MLN_GESTURE_PHASE_BEGIN or MLN_GESTURE_PHASE_CANCEL,
-   * mln_map_set_free_camera_options(), or a resize that moves the camera back
-   * inside its bounds stopped the change, or the command failed before it
-   * moved the camera.
+   * mln_map_set_free_camera_options(), or a resize that moved the camera back
+   * inside its bounds stopped the change. A command that fails before it moves
+   * the camera also reports this.
    */
   MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
   /** The map closed before the change ended. */
   MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2,
   /**
-   * A later camera change set every camera field that a part of the change
-   * still animated, so that part stopped.
+   * A later camera change set every field that a part of the change was still
+   * animating, so that part stopped. Its other parts keep animating, and the
+   * change reports this outcome when they end, unless one was cancelled.
    *
-   * A fly animates its center and zoom together, and an anchor animates the
-   * center together with the fields it keeps in place, so a later change of
-   * any of them replaces them all. A part that a later change took only some
-   * fields from keeps animating the others, and ends as they end.
+   * A later change that sets only some of those fields leaves the change
+   * animating the rest. A fly's center and zoom count as one field, and so do
+   * an anchored change's center and the fields that the anchor holds in place.
    */
   MLN_CAMERA_TRANSITION_OUTCOME_REPLACED = 3,
 } mln_camera_transition_outcome;
@@ -534,7 +529,11 @@ typedef struct mln_camera_update {
 typedef struct mln_camera_fit_options {
   uint32_t size;
   mln_camera_fit_option_fields fields;
-  /** Space to leave between the area and each edge of the map. */
+  /**
+   * Space to leave between the area and each edge of the map. The left and
+   * right insets must add up to less than the map's width, and the top and
+   * bottom to less than its height.
+   */
   mln_edge_insets padding
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PADDING");
   /** The rotation from north, in degrees. */
@@ -547,8 +546,7 @@ typedef struct mln_camera_fit_options {
  * A camera change that fits an area, for mln_map_fit_camera_to_lat_lng_bounds()
  * and the other fit commands.
  *
- * A jump uses only the end handler of `animation`, and the handler runs as
- * soon as the camera moves.
+ * A jump uses only the end handler of `animation`, as in mln_camera_update.
  */
 typedef struct mln_camera_fit_update {
   uint32_t size;
@@ -622,10 +620,9 @@ typedef union mln_feature_id_data {
 /**
  * The ID of a feature in a source, as the source's data gives it.
  *
- * The map compares feature IDs as text, so a string and a number with the same
- * text, such as "7" and 7, name the same feature. A number's text is its
- * shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
- * same feature, and so do 1e21 and "1e21".
+ * The map compares feature IDs as text. A number names the same feature as
+ * the string of its shortest decimal form, so 7, 7.0, and "7" name one
+ * feature.
  */
 typedef struct mln_feature_id {
   mln_feature_id_type type;
@@ -806,8 +803,7 @@ MLN_API mln_status mln_runtime_list_offline_regions(
  *   database file.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the merge would exceed the limit on tiles from
- *   MapLibre's demo tile server that
+ * - MLN_STATUS_NATIVE_ERROR when the merge would exceed the tile limit that
  *   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED describes.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info;shape=array")
@@ -1190,12 +1186,10 @@ mln_map_dispose(mln_map map, mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
  * style's sources, sprites, and glyphs then load in the background.
  *
  * The map's style is loaded from the time a style document parses until the
- * next call to this function. It isn't loaded before the map's first style
- * parses, while a style URL loads, or after a style URL fails to load. While
- * the style isn't loaded, the commands that change it complete with
- * MLN_STATUS_INVALID_STATE, because the next style to parse would replace
- * their changes. To change a new map's style without a style document, first
- * load an empty style, such as `{"version":8,"sources":{},"layers":[]}`.
+ * next call to this function. While the style isn't loaded, the commands that
+ * change it complete with MLN_STATUS_INVALID_STATE. To change a new map's
+ * style without a style document, first load an empty style, such as
+ * `{"version":8,"sources":{},"layers":[]}`.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the style document fails to load or isn't a

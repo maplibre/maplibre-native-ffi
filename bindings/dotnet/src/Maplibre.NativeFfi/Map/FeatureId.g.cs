@@ -6,10 +6,9 @@ namespace Maplibre.NativeFfi;
 /// The ID of a feature in a source, as the source's data gives it.
 /// </summary>
 /// <remarks>
-/// <para>The map compares feature IDs as text, so a string and a number with
-/// the same text, such as "7" and 7, name the same feature. A number's text is
-/// its shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name
-/// the same feature, and so do 1e21 and "1e21".</para>
+/// <para>The map compares feature IDs as text. A number names the same feature
+/// as the string of its shortest decimal form, so 7, 7.0, and "7" name one
+/// feature.</para>
 /// <para>See <c>mln_feature_id</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>

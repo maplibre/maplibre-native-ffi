@@ -3153,12 +3153,10 @@ int cVersion() {
 /// Computes the camera that shows exactly one tile on a square map.
 ///
 /// Jump a map in `MapMode.tile` to the camera to render `tile`, where
-/// `logicalSize` is the map's size. The camera centers the tile and zooms
-/// until the tile fills the map: to zoom z for a 512-pixel map, or z - 1 for
-/// a 256-pixel one, plus 0.0001 to keep the neighboring tiles out. It looks
-/// straight down with north up and no padding, so the map's earlier camera
-/// doesn't change the view. The map keeps the camera within its zoom limits,
-/// so for a deep tile, raise the maximum zoom past the camera's with
+/// `logicalSize` is the map's size. The camera centers the tile, zooms until
+/// the tile fills the map, and looks straight down with north up and no
+/// padding. The map keeps its camera within its zoom limits, so for a deep
+/// tile, raise the maximum zoom past the camera's with
 /// `MapHandle.setBounds()`.
 ///
 /// See `mln_camera_for_tile` in the
@@ -3167,11 +3165,10 @@ int cVersion() {
 /// Errors:
 ///
 /// - `Status.invalidArgument` when `logicalSize` isn't square, or is wider
-///   than 512 pixels, the width of a vector tile at its zoom. For denser
-///   tiles, raise the map's scale factor instead.
+///   than 512 pixels. For denser tiles, raise the map's scale factor instead.
 /// - `Status.invalidArgument` when `tile.x` or `tile.y` isn't less than 2 to
-///   the power `tile.z`, or when the camera's zoom would fall outside 0 to
-///   25.5, as for tile 0/0/0 on a 256-pixel map.
+///   the power `tile.z`, or when the tile can't fill the map at a zoom from 0
+///   to 25.5, as for tile 0/0/0 on a 256-pixel map.
 CameraOptions cameraForTile(CanonicalTileId tile, LogicalSize logicalSize) =>
     withNativeArena((arena) {
       ensureAbiVersion();
@@ -4862,8 +4859,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
-  ///   for the area: its left and right add up to at least the map's width, or
-  ///   its top and bottom to at least the map's height.
+  ///   for the area.
   Future<CameraOptions> cameraForGeometry(
     Object? geometry, {
     CameraFitOptions? fitOptions,
@@ -4889,8 +4885,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
-  ///   for the area: its left and right add up to at least the map's width, or
-  ///   its top and bottom to at least the map's height.
+  ///   for the area.
   Future<CameraOptions> cameraForLatLngBounds(
     LatLngBounds bounds, {
     CameraFitOptions? fitOptions,
@@ -4917,8 +4912,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
-  ///   for the area: its left and right add up to at least the map's width, or
-  ///   its top and bottom to at least the map's height.
+  ///   for the area.
   Future<CameraOptions> cameraForLatLngs(
     List<LatLng> coordinates, {
     CameraFitOptions? fitOptions,
@@ -5008,10 +5002,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// with an animation.
   ///
   /// `geometry` is a GeoJSON geometry object with at least one coordinate, not
-  /// a feature. The map computes the camera when it runs the command, from the
-  /// camera and size that earlier commands leave, as
-  /// `MapHandle.cameraForGeometry()` would then. The function finishes when the
-  /// map applies the change, before an animation ends.
+  /// a feature. The camera is the one that `MapHandle.cameraForGeometry()`
+  /// computes after the commands sent before this one apply. The function
+  /// finishes when the map applies the change, before an animation ends.
   ///
   /// See `mln_map_fit_camera_to_geometry` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -5019,8 +5012,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.invalidArgument` when the padding in `update` leaves no room for
-  ///   the area: its left and right add up to at least the map's width, or its
-  ///   top and bottom to at least the map's height. The camera doesn't move.
+  ///   the area. The camera doesn't move.
   Future<CommandCompletion> fitCameraToGeometry(
     Object? geometry,
     CameraFitUpdate update,
@@ -5040,10 +5032,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Moves the camera to fit `bounds` in the map's view, at once or with an
   /// animation.
   ///
-  /// The map computes the camera when it runs the command, from the camera and
-  /// size that earlier commands leave, as `MapHandle.cameraForLatLngBounds()`
-  /// would then. The function finishes when the map applies the change, before
-  /// an animation ends.
+  /// The camera is the one that `MapHandle.cameraForLatLngBounds()` computes
+  /// after the commands sent before this one apply. The function finishes when
+  /// the map applies the change, before an animation ends.
   ///
   /// See `mln_map_fit_camera_to_lat_lng_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -5051,8 +5042,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.invalidArgument` when the padding in `update` leaves no room for
-  ///   the area: its left and right add up to at least the map's width, or its
-  ///   top and bottom to at least the map's height. The camera doesn't move.
+  ///   the area. The camera doesn't move.
   Future<CommandCompletion> fitCameraToLatLngBounds(
     LatLngBounds bounds,
     CameraFitUpdate update,
@@ -5072,10 +5062,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Moves the camera to fit `coordinates` in the map's view, at once or with
   /// an animation.
   ///
-  /// `coordinates` must not be empty. The map computes the camera when it runs
-  /// the command, from the camera and size that earlier commands leave, as
-  /// `MapHandle.cameraForLatLngs()` would then. The function finishes when the
-  /// map applies the change, before an animation ends.
+  /// `coordinates` must not be empty. The camera is the one that
+  /// `MapHandle.cameraForLatLngs()` computes after the commands sent before
+  /// this one apply. The function finishes when the map applies the change,
+  /// before an animation ends.
   ///
   /// See `mln_map_fit_camera_to_lat_lngs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -5083,8 +5073,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Errors:
   ///
   /// - `Status.invalidArgument` when the padding in `update` leaves no room for
-  ///   the area: its left and right add up to at least the map's width, or its
-  ///   top and bottom to at least the map's height. The camera doesn't move.
+  ///   the area. The camera doesn't move.
   Future<CommandCompletion> fitCameraToLatLngs(
     List<LatLng> coordinates,
     CameraFitUpdate update,
@@ -5848,10 +5837,9 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Sets whether a GeoJSON source builds its tiles while the map renders.
   ///
-  /// When `enabled` is true, the source builds its tiles while the map renders
-  /// instead of in the background, so new data shows in the next frame. Until
-  /// this is called, a source follows the `synchronousUpdate` member of its
-  /// source JSON, which defaults to false. This setting replaces that value.
+  /// Building tiles while the map renders, instead of in the background, makes
+  /// new data show in the next frame. The setting replaces the
+  /// `synchronousUpdate` member of the source's JSON, which defaults to false.
   ///
   /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -6206,12 +6194,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// style's sources, sprites, and glyphs then load in the background.
   ///
   /// The map's style is loaded from the time a style document parses until the
-  /// next call to this function. It isn't loaded before the map's first style
-  /// parses, while a style URL loads, or after a style URL fails to load. While
-  /// the style isn't loaded, the commands that change it complete with
-  /// `Status.invalidState`, because the next style to parse would replace their
-  /// changes. To change a new map's style without a style document, first load
-  /// an empty style, such as `{"version":8,"sources":{},"layers":[]}`.
+  /// next call to this function. While the style isn't loaded, the commands
+  /// that change it complete with `Status.invalidState`. To change a new map's
+  /// style without a style document, first load an empty style, such as
+  /// `{"version":8,"sources":{},"layers":[]}`.
   ///
   /// See `mln_map_set_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -6959,8 +6945,8 @@ final class RenderSessionHandle implements Finalizable {
   /// splits.
   ///
   /// `clusterId` is the "cluster_id" property of a cluster feature. At the
-  /// result's zoom level, the cluster's points no longer form this cluster, but
-  /// two or more clusters or points.
+  /// result's zoom level, the cluster splits into two or more clusters or
+  /// points.
   ///
   /// A cluster ID can go out of date as
   /// `RenderSessionHandle.getClusterChildren()` describes.
@@ -7498,6 +7484,9 @@ final class ResourceRequestHandle implements Finalizable, _CallbackRootOwner {
 
   /// Releases a resource request.
   ///
+  /// Releasing a request without an answer fails it with
+  /// `ResourceErrorReason.other`.
+  ///
   /// See `mln_resource_request_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void release() => _state.close((handle) {
@@ -7973,8 +7962,7 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.invalidArgument` when `sideDatabasePath` isn't a readable
   ///   database file.
-  /// - `Status.nativeError` when the merge would exceed the limit on tiles from
-  ///   MapLibre's demo tile server that
+  /// - `Status.nativeError` when the merge would exceed the tile limit that
   ///   `RuntimeEventType.offlineRegionTileCountLimitExceeded` describes.
   Future<List<OfflineRegionInfo>> mergeOfflineRegions(
     String sideDatabasePath,

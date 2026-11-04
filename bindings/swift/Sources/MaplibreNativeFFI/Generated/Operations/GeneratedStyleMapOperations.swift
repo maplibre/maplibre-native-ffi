@@ -787,10 +787,9 @@ public extension MapHandle {
 
   /// Sets whether a GeoJSON source builds its tiles while the map renders.
   ///
-  /// When `enabled` is true, the source builds its tiles while the map renders
-  /// instead of in the background, so new data shows in the next frame. Until
-  /// this is called, a source follows the `synchronousUpdate` member of its
-  /// source JSON, which defaults to false. This setting replaces that value.
+  /// Building tiles while the map renders, instead of in the background, makes
+  /// new data show in the next frame. The setting replaces the
+  /// `synchronousUpdate` member of the source's JSON, which defaults to false.
   ///
   /// See `mln_map_set_geo_json_source_synchronous_tiling` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
