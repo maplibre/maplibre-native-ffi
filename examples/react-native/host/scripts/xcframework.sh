@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Combines the iOS builds of the C library that exist into the XCFramework that
-# the podspec vendors. Build them with `mise run //:build ios-arm64-metal` for
-# devices and `mise run //:build ios-simulator-arm64-metal` for the simulator.
+# the binding's podspec vendors. The npm package carries the XCFramework, so
+# only the workspace checkout needs this. Build the library with
+# `mise run //:build ios-arm64-metal` for devices and
+# `mise run //:build ios-simulator-arm64-metal` for the simulator.
 set -euo pipefail
 
 host=$(cd "$(dirname "$0")/.." && pwd -P)
 root=$(cd "$host/../../.." && pwd -P)
-output="$host/build/MaplibreNativeC.xcframework"
+output="$root/bindings/typescript/native/MaplibreNativeC.xcframework"
 
 frameworks=()
 for preset in ios-arm64-metal ios-simulator-arm64-metal; do

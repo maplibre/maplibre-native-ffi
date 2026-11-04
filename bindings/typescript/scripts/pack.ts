@@ -280,6 +280,11 @@ for (const backend of new Set(addons.map((addon) => addon.backend))) {
 const facade = join(staging, "facade");
 cpSync(dist, join(facade, "dist"), { recursive: true });
 cpSync(join(binding, "README.md"), join(facade, "README.md"));
+// React Native autolinking installs the Hermes adapter on iOS from this pod.
+cpSync(
+  join(binding, "MaplibreNativeFfi.podspec"),
+  join(facade, "MaplibreNativeFfi.podspec"),
+);
 // Keep C sources separate from C++ for native embedding hosts.
 for (const name of [
   "generated_addon.c",
@@ -365,7 +370,7 @@ pack(
     peerDependenciesMeta: Object.fromEntries(
       Object.keys(backendPeers).map((name) => [name, { optional: true }]),
     ),
-    files: ["dist", "native"],
+    files: ["dist", "native", "MaplibreNativeFfi.podspec"],
   },
   facadeInventories,
   [
