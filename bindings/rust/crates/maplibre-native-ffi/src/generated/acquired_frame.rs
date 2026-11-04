@@ -132,6 +132,36 @@ impl AcquiredFrameHandle {
     }
 }
 impl AcquiredFrameView<'_> {
+    /// Gets the Android hardware buffer of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrameHandle::get_producer_sync()` before you read the
+    /// buffer. Once you release or discard the frame, the session may render
+    /// into the buffer again. A reference that you take with
+    /// `AHardwareBuffer_acquire` keeps the buffer's memory, but not its
+    /// contents.
+    ///
+    /// See `mln_acquired_frame_get_android_hardware_buffer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
+    #[cfg(target_os = "android")]
+    pub fn get_android_hardware_buffer(&self) -> Result<Lent<'_, AndroidHardwareBufferFrame>> {
+        let mut call = self.owner.inner.call();
+        let mut out_frame: sys::mln_android_hardware_buffer_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_android_hardware_buffer_frame>() as _;
+        call.status(|frame, out_diagnostic| unsafe {
+            sys::mln_acquired_frame_get_android_hardware_buffer(
+                frame,
+                &mut out_frame,
+                out_diagnostic,
+            )
+        })?;
+        Ok(Lent::new(unsafe { from_native(out_frame) }?))
+    }
+
     /// Gets the Metal texture of an acquired frame.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the

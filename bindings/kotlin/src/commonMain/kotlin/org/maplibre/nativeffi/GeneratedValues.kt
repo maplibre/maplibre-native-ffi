@@ -1814,6 +1814,30 @@ public value class WebGlContextKind(public val rawValue: UInt) {
 }
 
 /**
+ * The Android hardware buffer of an acquired frame.
+ *
+ * See `mln_android_hardware_buffer_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+public class AndroidHardwareBufferFrame(
+  public val width: UInt,
+  public val height: UInt,
+  public val scaleFactor: Double,
+  /** The buffer's index in the ring. */
+  public val slot: UInt,
+  /** The `AHardwareBuffer*`. */
+  buffer: NativePointer,
+) {
+  internal var bindingScope: ViewScope? = null
+  private val storedBuffer: NativePointer = buffer
+  public val buffer: NativePointer
+    get() {
+      bindingScope?.ensureActive()
+      return storedBuffer
+    }
+}
+
+/**
  * The Metal texture of an acquired frame.
  *
  * See `mln_metal_texture_frame` in the
@@ -2432,22 +2456,26 @@ public data class CameraDelta(
 )
 
 /**
- * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
+ * A ring of Android hardware buffers that the library allocates, for
+ * `MapHandle.attachAndroidHardwareBufferRing()`.
  *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns.
+ * Each buffer has the map's size in pixels, `logical_size` times the map's scale factor, and the
+ * format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage is
+ * AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+ * `usage`.
  *
- * See `mln_android_surface_descriptor` in the
+ * See `mln_android_hardware_buffer_ring_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
  */
-public data class AndroidSurfaceDescriptor(
+public data class AndroidHardwareBufferRingDescriptor(
   public val logicalSize: LogicalSize,
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  public val window: NativePointer,
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  public val jniEnv: NativePointer,
-  /** An `android.view.Surface`, with `jni_env`. */
-  public val surface: NativePointer,
+  /** How many buffers the ring has, from 1 to 8. */
+  public val bufferCount: UInt,
+  /**
+   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+   * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   */
+  public val usage: ULong = 0uL,
 )
 
 /**
@@ -2463,7 +2491,7 @@ public data class RenderSessionAttachOptions(
    * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL or WGL context, an
    *   existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android or OpenHarmony
-   *   window, or an offscreen session.
+   *   window, a ring of Android hardware buffers, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.
@@ -2492,6 +2520,25 @@ public data class RenderSessionAttachOptions(
   public val driverWorkWake: Wake = Wake(),
   /** Your lock on the Vulkan queue, when you submit to it yourself. */
   public val queueLock: QueueLock = QueueLock(),
+)
+
+/**
+ * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
+ *
+ * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
+ * to the window, so you can release yours once the call returns.
+ *
+ * See `mln_android_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ */
+public data class AndroidSurfaceDescriptor(
+  public val logicalSize: LogicalSize,
+  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
+  public val window: NativePointer,
+  /** The calling thread's `JNIEnv*`, with `surface`. */
+  public val jniEnv: NativePointer,
+  /** An `android.view.Surface`, with `jni_env`. */
+  public val surface: NativePointer,
 )
 
 /**

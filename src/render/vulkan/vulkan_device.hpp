@@ -24,4 +24,11 @@ auto create_vulkan_device(
 auto find_vulkan_device(const void* device)
   -> std::shared_ptr<const mln_vulkan_context_descriptor>;
 
+// The device with presentation that the library's Android and OpenHarmony
+// sessions share when the host passes none. It lasts while one of them holds
+// it, and the next one creates it again.
+auto shared_presentation_device(
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status;
+
 }  // namespace mln::core

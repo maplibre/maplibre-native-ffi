@@ -1,6 +1,8 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
+  AndroidHardwareBufferFrame,
+  AndroidHardwareBufferRingDescriptor,
   AndroidSurfaceDescriptor,
   AndroidSurfaceReplacement,
   BoundOptions,
@@ -438,6 +440,41 @@ export class AcquiredFrameHandle extends Owner {
   release(consumerCompletion: GpuSync): void {
     closeSync(this, (handle, token) =>
       native.mln_acquired_frame_release(handle, token, consumerCompletion),
+    );
+  }
+
+  /**
+   * Gets the Android hardware buffer of an acquired frame.
+   *
+   * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+   * buffer. Once you release or discard the frame, the session may render into
+   * the buffer again. A reference that you take with `AHardwareBuffer_acquire`
+   * keeps the buffer's memory, but not its contents.
+   *
+   * See `mln_acquired_frame_get_android_hardware_buffer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
+   */
+  withAndroidHardwareBuffer<T>(
+    use: (view: ScopedAndroidHardwareBufferFrame) => T,
+  ): T {
+    return new ViewScope(
+      ADOPT,
+      this,
+      (handle) => native.mln_acquired_frame_view_begin(handle),
+      (scope) => native.mln_acquired_frame_view_end(scope),
+    ).use((scope) =>
+      use(
+        new ScopedAndroidHardwareBufferFrame(
+          ADOPT,
+          scope,
+          native.mln_acquired_frame_get_android_hardware_buffer(this.id),
+        ),
+      ),
     );
   }
 
@@ -953,6 +990,72 @@ export class MapHandle extends Owner {
         native.mln_map_apply_camera_delta(this.id, delta, completion);
         registrations.commit(rootsOf(this));
       }),
+    );
+  }
+
+  /**
+   * Creates a session that renders the map into a ring of Android hardware
+   * buffers that the library allocates.
+   *
+   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+   * buffer with `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
+   * `RenderSessionHandle.resize()` gives the ring new buffers of the new size.
+   *
+   * A Vulkan build renders with `device`, or, when `device` is null, with a
+   * device that the library creates. An OpenGL build uses an EGL context on the
+   * default display, and `device` must be null. Attach with
+   * `RenderDriverKind.coreWorker`.
+   *
+   * To show the buffers through Android's UI, such as with
+   * `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag.syncFd` in
+   * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
+   * before you acquire it. Keep each frame acquired until the next one replaces
+   * it on screen, then release it with `GpuSyncKind.cpuComplete`. Give the ring
+   * 3 buffers, so the session can render while you hold two frames.
+   *
+   * See `mln_map_attach_android_hardware_buffer_ring` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when Android is older than 8.0, API level 26, or
+   *   when the graphics context can't render into hardware buffers: the Vulkan
+   *   device lacks VK_ANDROID_external_memory_android_hardware_buffer, or the
+   *   EGL display lacks EGL_ANDROID_get_native_client_buffer or
+   *   EGL_ANDROID_image_native_buffer.
+   * - `Status.nativeError` when the library can't create its Vulkan device or
+   *   initialize the default EGL display.
+   */
+  attachAndroidHardwareBufferRing(
+    descriptor: AndroidHardwareBufferRingDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_android_hardware_buffer_ring(
+            this.id,
+            descriptor,
+            device?.id,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
     );
   }
 
@@ -4631,7 +4734,8 @@ export class RenderSessionHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.unsupported` when the session renders offscreen.
+   * - `Status.unsupported` when the session renders offscreen or into Android
+   *   hardware buffers that it allocates.
    * - `Status.unsupported` when the target is a WebGL canvas.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
@@ -6012,6 +6116,51 @@ export class VulkanDeviceHandle extends Owner {
   }
 }
 defineDisposers(VulkanDeviceHandle, "release", "release");
+
+/**
+ * A `AndroidHardwareBufferFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withAndroidHardwareBuffer} runs. Its other members stay
+ * readable after the callback returns.
+ */
+export class ScopedAndroidHardwareBufferFrame {
+  readonly #value: AndroidHardwareBufferFrame;
+  readonly #scope: ViewScope;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(
+    key: AdoptKey,
+    scope: ViewScope,
+    value: AndroidHardwareBufferFrame,
+  ) {
+    checkKey(key);
+    this.#value = value;
+    this.#scope = scope;
+  }
+
+  get width(): AndroidHardwareBufferFrame["width"] {
+    return this.#value.width;
+  }
+
+  get height(): AndroidHardwareBufferFrame["height"] {
+    return this.#value.height;
+  }
+
+  get scaleFactor(): AndroidHardwareBufferFrame["scaleFactor"] {
+    return this.#value.scaleFactor;
+  }
+
+  get slot(): AndroidHardwareBufferFrame["slot"] {
+    return this.#value.slot;
+  }
+
+  get buffer(): AndroidHardwareBufferFrame["buffer"] {
+    return this.#scope.active(this.#value).buffer;
+  }
+}
 
 /**
  * A `GpuSync` whose native objects stay valid only while the

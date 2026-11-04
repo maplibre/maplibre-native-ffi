@@ -119,6 +119,18 @@ auto get_egl_proc_address(
   EGLenum active_api
 ) -> void*;
 
+#if defined(__ANDROID__) || defined(__OHOS__)
+struct WindowEglConfig {
+  EGLDisplay display = EGL_NO_DISPLAY;
+  EGLConfig config = nullptr;
+};
+
+// The default display and an OpenGL ES 3 config for RGBA8888 windows, with
+// pbuffers for a session without a window, which the library's dedicated
+// contexts on this platform share.
+auto window_egl_config(WindowEglConfig& out_config) -> mln_status;
+#endif
+
 }  // namespace mln::core::opengl
 
 #endif

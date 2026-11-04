@@ -112,6 +112,30 @@ typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
 
+final class mln_android_hardware_buffer_frame extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int width;
+  @Uint32()
+  external int height;
+  @Double()
+  external double scale_factor;
+  @Uint32()
+  external int slot;
+  external Pointer<Void> buffer;
+}
+
+final class mln_android_hardware_buffer_ring_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  @Uint32()
+  external int buffer_count;
+  @Uint64()
+  external int usage;
+}
+
 final class mln_android_surface_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -2446,6 +2470,19 @@ external int mln_acquired_frame_discard(
 @Native<
   Int32 Function(
     mln_acquired_frame,
+    Pointer<mln_android_hardware_buffer_frame>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_acquired_frame_get_android_hardware_buffer(
+  int frame,
+  Pointer<mln_android_hardware_buffer_frame> out_frame,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_acquired_frame,
     Pointer<mln_metal_texture_frame>,
     Pointer<mln_diagnostic>,
   )
@@ -2830,6 +2867,27 @@ external int mln_map_add_style_source_json(
 external int mln_map_apply_camera_delta(
   int map,
   Pointer<mln_camera_delta> delta,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_android_hardware_buffer_ring_descriptor>,
+    mln_vulkan_device,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_android_hardware_buffer_ring(
+  int map,
+  Pointer<mln_android_hardware_buffer_ring_descriptor> descriptor,
+  int device,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

@@ -1462,6 +1462,40 @@ final class WebGlContextKind extends _Enum {
   };
 }
 
+/// The Android hardware buffer of an acquired frame.
+///
+/// See `mln_android_hardware_buffer_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+final class AndroidHardwareBufferFrame extends _Value {
+  const AndroidHardwareBufferFrame({
+    this.width = 0,
+    this.height = 0,
+    this.scaleFactor = 0,
+    this.slot = 0,
+    this.buffer = NativePointer.nullPointer,
+  });
+  final int width;
+  final int height;
+  final double scaleFactor;
+
+  /// The buffer's index in the ring.
+  final int slot;
+
+  /// The `AHardwareBuffer*`.
+  final NativePointer buffer;
+
+  @override
+  List<Object?> get _members => [width, height, scaleFactor, slot, buffer];
+  @override
+  String toString() => _describe('AndroidHardwareBufferFrame', const [
+    'width',
+    'height',
+    'scaleFactor',
+    'slot',
+    'buffer',
+  ]);
+}
+
 /// The Metal texture of an acquired frame.
 ///
 /// See `mln_metal_texture_frame` in the
@@ -2655,53 +2689,49 @@ final class CameraDelta extends _Value {
   ]);
 }
 
-/// An Android window to present to, for `MapHandle.attachAndroidSurface()`.
+/// A ring of Android hardware buffers that the library allocates, for
+/// `MapHandle.attachAndroidHardwareBufferRing()`.
 ///
-/// Name the window by `window`, or by `jni_env` and `surface`. The session
-/// takes its own reference to the window, so you can release yours once the
-/// call returns.
+/// Each buffer has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
+/// usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+/// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
 ///
-/// See `mln_android_surface_descriptor` in the
+/// See `mln_android_hardware_buffer_ring_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-final class AndroidSurfaceDescriptor extends _Value {
-  const AndroidSurfaceDescriptor({
+final class AndroidHardwareBufferRingDescriptor extends _Value {
+  const AndroidHardwareBufferRingDescriptor({
     required this.logicalSize,
-    this.window = NativePointer.nullPointer,
-    this.jniEnv = NativePointer.nullPointer,
-    this.surface = NativePointer.nullPointer,
+    required this.bufferCount,
+    this.usage = 0,
   });
   final LogicalSize logicalSize;
 
-  /// Your `ANativeWindow*`, or null to name the window by `surface`.
-  final NativePointer window;
+  /// How many buffers the ring has, from 1 to 8.
+  final int bufferCount;
 
-  /// The calling thread's `JNIEnv*`, with `surface`.
-  final NativePointer jniEnv;
-
-  /// An `android.view.Surface`, with `jni_env`.
-  final NativePointer surface;
+  /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+  /// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+  final int usage;
 
   /// A copy of this value with the given members replaced.
-  AndroidSurfaceDescriptor copyWith({
+  AndroidHardwareBufferRingDescriptor copyWith({
     LogicalSize? logicalSize,
-    NativePointer? window,
-    NativePointer? jniEnv,
-    NativePointer? surface,
-  }) => AndroidSurfaceDescriptor(
+    int? bufferCount,
+    int? usage,
+  }) => AndroidHardwareBufferRingDescriptor(
     logicalSize: logicalSize ?? this.logicalSize,
-    window: window ?? this.window,
-    jniEnv: jniEnv ?? this.jniEnv,
-    surface: surface ?? this.surface,
+    bufferCount: bufferCount ?? this.bufferCount,
+    usage: usage ?? this.usage,
   );
 
   @override
-  List<Object?> get _members => [logicalSize, window, jniEnv, surface];
+  List<Object?> get _members => [logicalSize, bufferCount, usage];
   @override
-  String toString() => _describe('AndroidSurfaceDescriptor', const [
+  String toString() => _describe('AndroidHardwareBufferRingDescriptor', const [
     'logicalSize',
-    'window',
-    'jniEnv',
-    'surface',
+    'bufferCount',
+    'usage',
   ]);
 }
 
@@ -2804,7 +2834,8 @@ final class RenderSessionAttachOptions extends _Value {
   /// - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
   ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
-  ///   or OpenHarmony window, or an offscreen session.
+  ///   or OpenHarmony window, a ring of Android hardware buffers, or an
+  ///   offscreen session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
@@ -2872,6 +2903,56 @@ final class RenderSessionAttachOptions extends _Value {
     'redrawWake',
     'driverWorkWake',
     'queueLock',
+  ]);
+}
+
+/// An Android window to present to, for `MapHandle.attachAndroidSurface()`.
+///
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns.
+///
+/// See `mln_android_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+final class AndroidSurfaceDescriptor extends _Value {
+  const AndroidSurfaceDescriptor({
+    required this.logicalSize,
+    this.window = NativePointer.nullPointer,
+    this.jniEnv = NativePointer.nullPointer,
+    this.surface = NativePointer.nullPointer,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `ANativeWindow*`, or null to name the window by `surface`.
+  final NativePointer window;
+
+  /// The calling thread's `JNIEnv*`, with `surface`.
+  final NativePointer jniEnv;
+
+  /// An `android.view.Surface`, with `jni_env`.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  AndroidSurfaceDescriptor copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? window,
+    NativePointer? jniEnv,
+    NativePointer? surface,
+  }) => AndroidSurfaceDescriptor(
+    logicalSize: logicalSize ?? this.logicalSize,
+    window: window ?? this.window,
+    jniEnv: jniEnv ?? this.jniEnv,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, window, jniEnv, surface];
+  @override
+  String toString() => _describe('AndroidSurfaceDescriptor', const [
+    'logicalSize',
+    'window',
+    'jniEnv',
+    'surface',
   ]);
 }
 

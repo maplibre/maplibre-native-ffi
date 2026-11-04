@@ -321,6 +321,69 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that renders the map into a ring of Android hardware
+    /// buffers that the library allocates.
+    /// </summary>
+    /// <remarks>
+    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
+    /// and get its buffer with
+    /// <c>AcquiredFrameHandle.WithAndroidHardwareBuffer()</c>.
+    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new buffers of
+    /// the new size.</para>
+    /// <para>A Vulkan build renders with <c>device</c>, or, when <c>device</c>
+    /// is null, with a device that the library creates. An OpenGL build uses an
+    /// EGL context on the default display, and <c>device</c> must be null.
+    /// Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>To show the buffers through Android's UI, such as with
+    /// <c>Bitmap.wrapHardwareBuffer</c>, attach without
+    /// <c>GpuSyncKindFlag.SyncFd</c> in
+    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
+    /// finishes before you acquire it. Keep each frame acquired until the next
+    /// one replaces it on screen, then release it with
+    /// <c>GpuSyncKind.CpuComplete</c>. Give the ring 3 buffers, so the session
+    /// can render while you hold two frames.</para>
+    /// <para>See <c>mln_map_attach_android_hardware_buffer_ring</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when Android is older than
+    /// 8.0, API level 26, or when the graphics context can't render into
+    /// hardware buffers: the Vulkan device lacks
+    /// VK_ANDROID_external_memory_android_hardware_buffer, or the EGL display
+    /// lacks EGL_ANDROID_get_native_client_buffer or
+    /// EGL_ANDROID_image_native_buffer.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create its Vulkan device or initialize the default EGL
+    /// display.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    public RenderSessionHandle AttachAndroidHardwareBufferRing(
+        AndroidHardwareBufferRingDescriptor descriptor,
+        VulkanDeviceHandle? device,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeAndroidHardwareBufferRingDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_android_hardware_buffer_ring(
+            Handle,
+            &nativeDescriptor,
+            scope.UseOptional(device),
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Creates a session that presents the map to an Android window, with a
     /// graphics context that the library creates.
     /// </summary>

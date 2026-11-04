@@ -1,5 +1,18 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
+fn generated_copy_mln_android_hardware_buffer_frame(
+    py: Python<'_>,
+    value: &sys::mln_android_hardware_buffer_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("buffer", generated_value(py, value.buffer as usize)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_camera(py: Python<'_>, value: &sys::mln_camera) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("center", generated_copy_mln_lat_lng(py, &value.center)?)?;
@@ -1596,6 +1609,18 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
         },
     );
     outcome
+}
+
+fn generated_input_mln_android_hardware_buffer_ring_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_android_hardware_buffer_ring_descriptor> {
+    let mut raw: sys::mln_android_hardware_buffer_ring_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_android_hardware_buffer_ring_descriptor>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.buffer_count = value.getattr("buffer_count")?.extract::<u32>()?;
+    raw.usage = value.getattr("usage")?.extract::<u64>()?;
+    Ok(raw)
 }
 
 fn generated_input_mln_android_surface_descriptor<'py>(
@@ -3534,6 +3559,23 @@ impl AcquiredFrameHandle {
         Ok(py.None())
     }
     #[pyo3(signature = ())]
+    fn android_hardware_buffer(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_frame: sys::mln_android_hardware_buffer_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_android_hardware_buffer_frame>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_acquired_frame_get_android_hardware_buffer(
+                    handle,
+                    &mut out_frame,
+                    diagnostic,
+                )
+            })
+        }?;
+        generated_copy_mln_android_hardware_buffer_frame(py, &out_frame)
+    }
+    #[pyo3(signature = ())]
     fn metal_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -4054,6 +4096,53 @@ impl MapHandle {
         let callback_roots = call.accept_callbacks();
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
+    }
+    #[pyo3(signature = (descriptor, device, options))]
+    fn attach_android_hardware_buffer_ring(
+        &self,
+        py: Python<'_>,
+        descriptor: &Bound<'_, PyAny>,
+        device: Option<&VulkanDeviceHandle>,
+        options: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value = generated_input_mln_android_hardware_buffer_ring_descriptor(
+            &descriptor.clone(),
+            storage,
+        )?;
+        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
+        let options_value =
+            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
+        let handle = self.input();
+        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_map_attach_android_hardware_buffer_ring(
+                        handle,
+                        &descriptor_value,
+                        device_handle,
+                        &options_value,
+                        &mut out_session,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }?;
+        let callback_roots = call.accept_callbacks();
+        let mut out_session_owner =
+            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
+        let out_session_python = unsafe {
+            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
+        }?;
+        let result = PyDict::new(py);
+        result.set_item("session", out_session_python)?;
+        result.set_item("ready", future)?;
+        Ok(result.into_any().unbind())
     }
     #[pyo3(signature = (descriptor, device, options))]
     fn attach_android_surface(

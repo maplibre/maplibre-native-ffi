@@ -1,6 +1,8 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
+  AndroidHardwareBufferFrame,
+  AndroidHardwareBufferRingDescriptor,
   AndroidSurfaceDescriptor,
   AndroidSurfaceReplacement,
   BoundOptions,
@@ -96,6 +98,9 @@ import type { NativeCompletion, NativeThreadStart } from "./internal/addon.ts";
 /** The addon function of each generated operation, by C function name. */
 export interface NativeOperations {
   mln_acquired_frame_discard(frame: bigint, token: object | undefined): void;
+  mln_acquired_frame_get_android_hardware_buffer(
+    frame: bigint,
+  ): AndroidHardwareBufferFrame;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
   mln_acquired_frame_get_open_gl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
@@ -175,6 +180,13 @@ export interface NativeOperations {
     delta: CameraDelta,
     completion: NativeCompletion | undefined,
   ): void;
+  mln_map_attach_android_hardware_buffer_ring(
+    map: bigint,
+    descriptor: AndroidHardwareBufferRingDescriptor,
+    device: bigint | undefined,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
   mln_map_attach_android_surface(
     map: bigint,
     descriptor: AndroidSurfaceDescriptor,

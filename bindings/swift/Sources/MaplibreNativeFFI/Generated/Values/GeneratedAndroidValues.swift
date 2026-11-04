@@ -3,6 +3,86 @@
 internal import MaplibreNativeC
 import Foundation
 
+/// The Android hardware buffer of an acquired frame.
+///
+/// See `mln_android_hardware_buffer_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+public struct AndroidHardwareBufferFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The buffer's index in the ring.
+  public var slot: UInt32
+  /// The `AHardwareBuffer*`.
+  public var buffer: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    buffer: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.buffer = buffer
+  }
+
+  init(raw: mln_android_hardware_buffer_frame) {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    buffer = NativePointer(bitPattern: unsafeBitCast(raw.buffer, to: UInt.self))
+  }
+}
+
+/// A ring of Android hardware buffers that the library allocates, for
+/// `MapHandle.attachAndroidHardwareBufferRing()`.
+///
+/// Each buffer has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
+/// usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+/// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+///
+/// See `mln_android_hardware_buffer_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+public struct AndroidHardwareBufferRingDescriptor: Equatable, Hashable,
+  Sendable
+{
+  public var logicalSize: LogicalSize
+  /// How many buffers the ring has, from 1 to 8.
+  public var bufferCount: UInt32
+  /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+  /// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+  public var usage: UInt64
+  public init(logicalSize: LogicalSize, bufferCount: UInt32,
+              usage: UInt64 = 0)
+  {
+    self.logicalSize = logicalSize
+    self.bufferCount = bufferCount
+    self.usage = usage
+  }
+
+  init(raw: mln_android_hardware_buffer_ring_descriptor) {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    bufferCount = raw.buffer_count
+    usage = raw.usage
+  }
+
+  func nativeValue() -> mln_android_hardware_buffer_ring_descriptor {
+    var raw = mln_android_hardware_buffer_ring_descriptor()
+    raw
+      .size = UInt32(MemoryLayout<mln_android_hardware_buffer_ring_descriptor>
+        .size)
+    raw.logical_size = logicalSize.nativeValue()
+    raw.buffer_count = bufferCount
+    raw.usage = usage
+    return raw
+  }
+}
+
 /// An Android window to present to, for `MapHandle.attachAndroidSurface()`.
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session

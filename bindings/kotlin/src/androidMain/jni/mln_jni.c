@@ -1,6 +1,8 @@
 // The hand-written half of the Android JNI shim. See mln_jni.h.
 #include <android/api-level.h>
+#include <android/hardware_buffer.h>
 #include <android/log.h>
+#include <dlfcn.h>
 #include <maplibre_native_c.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -379,6 +381,31 @@ static jint mln_jni_render_session_set_android_surface_target(
   );
 }
 
+// AHardwareBuffer_toHardwareBuffer needs API level 26, above the shim's
+// minimum, so the shim looks it up at run time.
+typedef jobject (*mln_jni_to_hardware_buffer)(JNIEnv*, AHardwareBuffer*);
+static pthread_once_t mln_jni_hardware_buffer_once = PTHREAD_ONCE_INIT;
+static mln_jni_to_hardware_buffer mln_jni_to_hardware_buffer_function;
+
+static void mln_jni_load_hardware_buffer(void) {
+  void* library = dlopen("libandroid.so", RTLD_NOW | RTLD_LOCAL);
+  if (library == NULL) return;
+  mln_jni_to_hardware_buffer_function = (mln_jni_to_hardware_buffer)dlsym(
+    library, "AHardwareBuffer_toHardwareBuffer"
+  );
+}
+
+// Returns an android.hardware.HardwareBuffer that holds its own reference to
+// the AHardwareBuffer at `buffer`, or null below API level 26.
+static jobject mln_jni_hardware_buffer(JNIEnv* env, jclass type, jlong buffer) {
+  (void)type;
+  pthread_once(&mln_jni_hardware_buffer_once, mln_jni_load_hardware_buffer);
+  if (mln_jni_to_hardware_buffer_function == NULL) return NULL;
+  return mln_jni_to_hardware_buffer_function(
+    env, MLN_JNI_POINTER(AHardwareBuffer*, buffer)
+  );
+}
+
 // Releases the context of a native registration that native code did not
 // accept, through the host's own release function.
 static void mln_jni_call_user_data_release(
@@ -397,6 +424,7 @@ static const JNINativeMethod mln_jni_runtime_methods[] = {
    (void*)mln_jni_map_attach_android_surface},
   {"renderSessionSetAndroidSurfaceTarget", "(JJLjava/lang/Object;JJ)I",
    (void*)mln_jni_render_session_set_android_surface_target},
+  {"hardwareBuffer", "(J)Ljava/lang/Object;", (void*)mln_jni_hardware_buffer},
   {"callUserDataRelease", "(JJ)V", (void*)mln_jni_call_user_data_release},
 };
 

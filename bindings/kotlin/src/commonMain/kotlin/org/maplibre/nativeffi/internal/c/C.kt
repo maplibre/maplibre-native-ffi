@@ -9,6 +9,12 @@ package org.maplibre.nativeffi.internal.c
 internal expect object C {
   fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int
 
+  fun mln_acquired_frame_get_android_hardware_buffer(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_acquired_frame_get_metal_texture(frame: Long, outFrame: Long, outDiagnostic: Long): Int
 
   fun mln_acquired_frame_get_open_gl_texture(frame: Long, outFrame: Long, outDiagnostic: Long): Int
@@ -125,6 +131,16 @@ internal expect object C {
   ): Int
 
   fun mln_map_apply_camera_delta(map: Long, delta: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_attach_android_hardware_buffer_ring(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_map_attach_android_surface(
     map: Long,

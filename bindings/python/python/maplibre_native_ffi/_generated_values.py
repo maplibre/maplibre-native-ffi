@@ -1068,6 +1068,70 @@ class WebGlContextKind(UnknownIntEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AndroidHardwareBufferFrame:
+    """The Android hardware buffer of an acquired frame.
+
+    See `mln_android_hardware_buffer_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    """
+
+    width: int
+
+    height: int
+
+    scale_factor: float
+
+    slot: int
+    """The buffer's index in the ring."""
+
+    buffer: int
+    """The `AHardwareBuffer*`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            slot=raw["slot"],
+            buffer=raw["buffer"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AndroidHardwareBufferRingDescriptor:
+    """A ring of Android hardware buffers that the library allocates, for
+    `MapHandle.attach_android_hardware_buffer_ring()`.
+
+    Each buffer has the map's size in pixels, `logical_size` times the map's
+    scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
+    usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+    AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+
+    See `mln_android_hardware_buffer_ring_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    buffer_count: int
+    """How many buffers the ring has, from 1 to 8."""
+
+    usage: int = 0
+    """More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+    AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            buffer_count=raw["buffer_count"],
+            usage=raw["usage"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class AndroidSurfaceDescriptor:
     """An Android window to present to, for
     `MapHandle.attach_android_surface()`.
@@ -3291,7 +3355,8 @@ class RenderSessionAttachOptions:
       or WGL context, an existing WebGL context, or a browser's WebGPU
       device.
     - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an
-      Android or OpenHarmony window, or an offscreen session.
+      Android or OpenHarmony window, a ring of Android hardware buffers, or
+      an offscreen session.
     - Either one for a Metal or Vulkan target.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.

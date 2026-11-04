@@ -1,6 +1,77 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+/// The Android hardware buffer of an acquired frame.
+///
+/// See `mln_android_hardware_buffer_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct AndroidHardwareBufferFrame {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    /// The buffer's index in the ring.
+    pub slot: u32,
+    /// The `AHardwareBuffer*`.
+    pub buffer: *mut std::ffi::c_void,
+}
+impl FromNative<sys::mln_android_hardware_buffer_frame> for AndroidHardwareBufferFrame {
+    unsafe fn from_native(raw: sys::mln_android_hardware_buffer_frame) -> Result<Self> {
+        Ok(Self {
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            slot: raw.slot,
+            buffer: raw.buffer,
+        })
+    }
+}
+
+/// A ring of Android hardware buffers that the library allocates, for
+/// `MapHandle::attach_android_hardware_buffer_ring()`.
+///
+/// Each buffer has the map's size in pixels, `logical_size` times the map's
+/// scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
+/// usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+/// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+///
+/// See `mln_android_hardware_buffer_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AndroidHardwareBufferRingDescriptor {
+    pub logical_size: LogicalSize,
+    /// How many buffers the ring has, from 1 to 8.
+    pub buffer_count: u32,
+    /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
+    /// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+    pub usage: u64,
+}
+impl AndroidHardwareBufferRingDescriptor {
+    pub const fn new(logical_size: LogicalSize, buffer_count: u32, usage: u64) -> Self {
+        Self {
+            logical_size,
+            buffer_count,
+            usage,
+        }
+    }
+}
+impl ToNative<sys::mln_android_hardware_buffer_ring_descriptor>
+    for AndroidHardwareBufferRingDescriptor
+{
+    fn to_native(
+        &self,
+        arena: &mut InputArena,
+    ) -> Result<sys::mln_android_hardware_buffer_ring_descriptor> {
+        let mut raw: sys::mln_android_hardware_buffer_ring_descriptor =
+            unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_android_hardware_buffer_ring_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.buffer_count = self.buffer_count;
+        raw.usage = self.usage;
+        Ok(raw)
+    }
+}
+
 /// An Android window to present to, for `MapHandle::attach_android_surface()`.
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
@@ -3772,7 +3843,8 @@ pub struct RenderSessionAttachOptions {
     ///   or WGL context, an existing WebGL context, or a browser's WebGPU
     ///   device.
     /// - `RenderDriverKind::CoreWorker` for a transferred WebGL canvas, an
-    ///   Android or OpenHarmony window, or an offscreen session.
+    ///   Android or OpenHarmony window, a ring of Android hardware buffers, or
+    ///   an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.

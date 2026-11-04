@@ -3,6 +3,34 @@
 internal import MaplibreNativeC
 import Foundation
 
+public final class AndroidHardwareBufferFrameView {
+  private let snapshot: AndroidHardwareBufferFrame
+  private let scope: NativeViewScope
+  init(_ value: AndroidHardwareBufferFrame, scope: NativeViewScope) {
+    snapshot = value; self.scope = scope
+  }
+
+  public var width: UInt32 {
+    snapshot.width
+  }
+
+  public var height: UInt32 {
+    snapshot.height
+  }
+
+  public var scaleFactor: Double {
+    snapshot.scaleFactor
+  }
+
+  public var slot: UInt32 {
+    snapshot.slot
+  }
+
+  public var buffer: NativePointer {
+    get throws { try scope.check(); return snapshot.buffer }
+  }
+}
+
 public final class MetalTextureFrameView {
   private let snapshot: MetalTextureFrame
   private let scope: NativeViewScope

@@ -230,6 +230,69 @@ impl MapHandle {
         })
     }
 
+    /// Creates a session that renders the map into a ring of Android hardware
+    /// buffers that the library allocates.
+    ///
+    /// Acquire each frame with `RenderSessionHandle::acquire_frame()`, and get
+    /// its buffer with `AcquiredFrameHandle::get_android_hardware_buffer()`.
+    /// `RenderSessionHandle::resize()` gives the ring new buffers of the new
+    /// size.
+    ///
+    /// A Vulkan build renders with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on
+    /// the default display, and `device` must be null. Attach with
+    /// `RenderDriverKind::CoreWorker`.
+    ///
+    /// To show the buffers through Android's UI, such as with
+    /// `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag::SYNC_FD`
+    /// in `RenderSessionAttachOptions::producer_sync_kinds`, so that each frame
+    /// finishes before you acquire it. Keep each frame acquired until the next
+    /// one replaces it on screen, then release it with
+    /// `GpuSyncKind::CpuComplete`. Give the ring 3 buffers, so the session can
+    /// render while you hold two frames.
+    ///
+    /// See `mln_map_attach_android_hardware_buffer_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when Android is older than 8.0, API level 26, or
+    ///   when the graphics context can't render into hardware buffers: the
+    ///   Vulkan device lacks
+    ///   VK_ANDROID_external_memory_android_hardware_buffer, or the EGL display
+    ///   lacks EGL_ANDROID_get_native_client_buffer or
+    ///   EGL_ANDROID_image_native_buffer.
+    /// - `Status::NativeError` when the library can't create its Vulkan device
+    ///   or initialize the default EGL display.
+    #[cfg(target_os = "android")]
+    pub fn attach_android_hardware_buffer_ring(
+        &self,
+        descriptor: &AndroidHardwareBufferRingDescriptor,
+        device: Option<&VulkanDeviceHandle>,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_vulkan_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_android_hardware_buffer_ring(
+                    map,
+                    descriptor,
+                    device,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
     /// Creates a session that presents the map to an Android window, with a
     /// graphics context that the library creates.
     ///

@@ -54,4 +54,13 @@ auto window_presentation_device(
   std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
 ) -> mln_status;
 
+// The context of the Vulkan device that `device` names, for a session that
+// renders into textures that the library allocates. A null `device` leaves
+// `out_context` null, for the device that window sessions share. A build
+// without Vulkan takes only a null `device`.
+auto texture_ring_device(
+  mln_vulkan_device device,
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status;
+
 }  // namespace mln::core

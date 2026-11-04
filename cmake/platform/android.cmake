@@ -40,6 +40,7 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/android/file_sources.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/frame_pacer.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/hardware_buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/i18n.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/java_vm.cpp
@@ -51,6 +52,7 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/timer.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/android_hardware_buffer_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/android_surface_session.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})

@@ -8,6 +8,29 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class GeneratedValues
 {
+    internal static AndroidHardwareBufferFrame CopyAndroidHardwareBufferFrame(
+        mln_android_hardware_buffer_frame value
+    ) =>
+        new(
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.slot,
+            NativePointer.FromNativeAddress((nint)value.buffer)
+        );
+
+    internal static mln_android_hardware_buffer_ring_descriptor NativeAndroidHardwareBufferRingDescriptor(
+        AndroidHardwareBufferRingDescriptor value
+    )
+    {
+        var native = new mln_android_hardware_buffer_ring_descriptor();
+        native.size = (uint)sizeof(mln_android_hardware_buffer_ring_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.buffer_count = value.BufferCount;
+        native.usage = value.Usage;
+        return native;
+    }
+
     internal static mln_android_surface_descriptor NativeAndroidSurfaceDescriptor(
         AndroidSurfaceDescriptor value
     )

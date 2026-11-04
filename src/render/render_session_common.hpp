@@ -61,7 +61,10 @@ namespace mln::core {
 struct MapObject;
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
-enum class TextureSessionMode : uint8_t { Offscreen, Borrowed };
+// Exported is a ring that the session allocates and hands to the host, such
+// as one of Android hardware buffers. Like an offscreen session, it owns its
+// target, so it resizes instead of taking a replacement.
+enum class TextureSessionMode : uint8_t { Offscreen, Borrowed, Exported };
 
 enum class RenderSessionMaintenance : uint8_t {
   ReduceMemoryUse,
