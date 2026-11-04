@@ -2099,11 +2099,31 @@ auto submit_retarget(
   RenderDriverCallable work, std::shared_ptr<Completion> completion,
   const ValuelessCompletion& valueless, RenderDriverAdmission admit
 ) -> mln_status {
-  auto [deliver, make_work] = valueless_driver_work(std::move(work), valueless);
-  admit.commit = [logical_size,
+  // The submission sizes the map, so the map takes the new extent in order
+  // with the host's map commands. A replacement that then fails keeps the
+  // session at its old extent, so it sizes the map back, unless a later resize
+  // or retarget has already sized both again.
+  auto submission = std::make_shared<uint64_t>(0);
+  auto restoring = [work = std::move(work),
+                    submission](mln_render_session_object& target) {
+    const auto status = work(target);
+    if (status != MLN_STATUS_OK) {
+      const auto lock = std::scoped_lock{target.control_mutex};
+      if (target.extent_submissions == *submission) {
+        static_cast<void>(
+          map_post_resize(target.map, target.width, target.height)
+        );
+      }
+    }
+    return status;
+  };
+  auto [deliver, make_work] =
+    valueless_driver_work(std::move(restoring), valueless);
+  admit.commit = [logical_size, submission,
                   commit =
                     std::move(admit.commit)](mln_render_session_object& live) {
     if (commit) commit(live);
+    *submission = ++live.extent_submissions;
     static_cast<void>(
       map_post_resize(live.map, logical_size.width, logical_size.height)
     );
@@ -4199,6 +4219,7 @@ auto render_session_resize_start(
         live->driver_work.pop_back();
         return fail_on_worker(post, thread_last_error_message());
       }
+      ++live->extent_submissions;
       static_cast<void>(context.release());
       live->pending_changes = true;
       // Old-size, unacquired ring entries must not outrank the first frame

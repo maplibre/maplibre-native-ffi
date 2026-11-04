@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -818,6 +819,56 @@ void a_same_size_resize_redraws_after_an_earlier_queued_frame() {
   demand.flags = 0;
   demand.token = 9003;
   MLN_TEST_OK(demand_frame(fixture, demand));
+  const auto batch = wait_for_results(fixture);
+  const auto result = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  destroy_fixture(fixture);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+}
+
+// The submission of a retarget sizes the map. A replacement that then fails on
+// the driver keeps the session at its extent, so the session sizes the map back
+// to it and renders the next frame, which it couldn't at a size it didn't have.
+void a_failed_retarget_sizes_the_map_back_to_the_session() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  mln_test_render_until_idle(fixture.runtime, fixture.map, &fixture.render);
+  auto logical = mln_logical_size{};
+  auto physical = mln::Size{};
+  auto depth = std::size_t{0};
+  {
+    const auto live = mln::core::lease_render_session(fixture.render.session);
+    TEST_ASSERT_NOT_NULL(live.get());
+    logical = mln_logical_size{live->width + 16, live->height + 16};
+    physical = mln::Size{live->physical_width + 16, live->physical_height + 16};
+    depth = live->texture.slots.size();
+  }
+  auto retarget = mln_test_completion_default(0);
+  auto checked = std::shared_ptr<mln::core::Completion>{};
+  MLN_TEST_OK(
+    mln::core::validate_render_session_retarget_submission(
+      fixture.render.session, mln::core::RetargetTargetKind::BorrowedTexture,
+      &retarget.descriptor, checked
+    )
+  );
+  MLN_TEST_OK(
+    mln::core::enqueue_borrowed_texture_retarget(
+      fixture.render.session, depth, logical, physical, {1},
+      [](mln_render_session_object&, mln::Size) {
+        mln::core::set_thread_error("the replacement failed");
+        return MLN_STATUS_NATIVE_ERROR;
+      },
+      std::move(checked),
+      mln::core::valueless_completion<&mln_render_session_reduce_memory_use>()
+    )
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_NATIVE_ERROR,
+    mln_test_render_fixture_finish_operation(&fixture.render, &retarget)
+  );
+  mln_test_completion_destroy(&retarget);
+  MLN_TEST_OK(mln_test_map_fence(fixture.map));
+  mln_test_render_demand_forced(&fixture.render, 9101);
   const auto batch = wait_for_results(fixture);
   const auto result = batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
@@ -1988,6 +2039,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_update_during_a_failed_still_image_attempt_retries_it);
   RUN_TEST(an_idle_demand_reports_a_failed_backend_activation);
   RUN_TEST(a_same_size_resize_redraws_after_an_earlier_queued_frame);
+  RUN_TEST(a_failed_retarget_sizes_the_map_back_to_the_session);
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_hook_replacement_waits_for_the_running_hook);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);

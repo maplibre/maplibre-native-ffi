@@ -953,6 +953,10 @@ struct mln_render_session_object
   bool views_invalidated = false;
   bool abandonment_complete = false;
   std::optional<mln::core::OwnerThreadToken> abandonment_thread;
+  // Counts the resizes and retargets submitted to the map and the driver,
+  // which take the control lock to submit, so driver work can tell whether a
+  // later one has sized the map since its own.
+  uint64_t extent_submissions = 0;
   mln_render_session_state state = MLN_RENDER_SESSION_STATE_ATTACHING;
   mln_status failure_status = MLN_STATUS_OK;
   mln_diagnostic failure{.size = sizeof(mln_diagnostic), .message = {}};
