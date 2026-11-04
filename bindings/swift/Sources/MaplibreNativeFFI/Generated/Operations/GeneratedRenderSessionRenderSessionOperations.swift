@@ -12,11 +12,9 @@ public extension RenderSessionHandle {
   /// call returns, the library no longer uses your graphics objects, and you
   /// can attach another session to the map. Release the session afterward.
   ///
-  /// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
-  /// keeps them until the process exits, reports how many it kept, and logs a
-  /// warning. Detach the session instead to free them. A disposal that another
-  /// thread starts first retires the session itself, and the abandon then fails
-  /// as it does for any released session.
+  /// Abandon keeps the session's OpenGL and WebGPU objects until the process
+  /// exits, and reports how many it kept. Detach the session instead to free
+  /// them.
   ///
   /// See `mln_render_session_abandon` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -45,9 +43,9 @@ public extension RenderSessionHandle {
   ///
   /// - `Status.unsupported` when the session lacks
   ///   `RenderSessionCapabilityFlag.frameAcquisition`.
-  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
-  ///   `Status.nativeError`, when the session has failed. The diagnostic
-  ///   carries the failure's message.
+  /// - `Status.targetLost` or `Status.nativeError`, as
+  ///   `RenderSessionSnapshot.failureStatus` reports, when the session has
+  ///   failed.
   /// - `Status.invalidState` when you detached, abandoned, released, or
   ///   disposed the session.
   func acquireFrame() throws -> AcquiredFrameHandle? {
@@ -119,9 +117,9 @@ public extension RenderSessionHandle {
   ///
   /// Errors:
   ///
-  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
-  ///   `Status.nativeError`, when the session has failed. The diagnostic
-  ///   carries the failure's message.
+  /// - `Status.targetLost` or `Status.nativeError`, as
+  ///   `RenderSessionSnapshot.failureStatus` reports, when the session has
+  ///   failed.
   /// - `Status.invalidState` when you detached, abandoned, released, or
   ///   disposed the session, or discarded a frame from every texture of its
   ///   ring.
@@ -161,10 +159,10 @@ public extension RenderSessionHandle {
 
   /// Releases the session in any state, and finishes in the background.
   ///
-  /// Use it from destructors and finalizers. Otherwise, use
-  /// `RenderSessionHandle.release()`. The session retires as a release does,
-  /// except that a session whose frames you hold is abandoned, which ends the
-  /// frames. Keep servicing a session driven by
+  /// Use it from destructors and finalizers, and
+  /// `RenderSessionHandle.release()` elsewhere. It ends the session as a
+  /// release does, except that it abandons a session whose frames you hold,
+  /// which ends those frames. Keep servicing a session driven by
   /// `RenderDriverKind.callerGraphicsThread` until
   /// `RenderSessionHandle.serviceDriverWork()` no longer accepts it.
   ///
@@ -302,15 +300,15 @@ public extension RenderSessionHandle {
 
   /// Releases the session, detaching it first when it is attached.
   ///
-  /// The completion runs once the session retires. From then on, the library no
-  /// longer uses your graphics objects, and you can attach another session to
-  /// the map. Pending frame demands finish with `RenderResult.targetNotReady`.
+  /// Pending frame demands finish with `RenderResult.targetNotReady`. Once the
+  /// release completes, the library no longer uses your graphics objects, and
+  /// you can attach another session to the map.
   ///
   /// A session driven by `RenderDriverKind.callerGraphicsThread` detaches at
   /// your next `RenderSessionHandle.serviceDriverWork()`, so keep servicing it
-  /// until the release completes. If you release or dispose its map before that
-  /// service, the session is abandoned instead. A session that isn't attached,
-  /// such as one that is still attaching or that failed, is abandoned as
+  /// until the release completes. When the session isn't attached, such as
+  /// while it attaches or after it fails, or when you release or dispose its
+  /// map before that service, the release abandons it as
   /// `RenderSessionHandle.abandon()` does.
   ///
   /// See `mln_render_session_release` in the
@@ -349,8 +347,7 @@ public extension RenderSessionHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the session renders offscreen, since the
-  ///   session owns that target.
+  /// - `Status.unsupported` when the session renders offscreen.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
@@ -397,12 +394,11 @@ public extension RenderSessionHandle {
   /// Use it with `RenderDriverKind.callerGraphicsThread`, and call it from the
   /// same thread every time. Call it each time
   /// `RenderSessionAttachOptions.driverWorkWake` is called, even while you
-  /// demand no frames, and until a detach or the session's retirement
-  /// completes. It returns once no work is ready.
+  /// demand no frames, until a detach, release, or disposal of the session
+  /// finishes. It returns once no work is ready.
   ///
-  /// It accepts a released or disposed session until the session retires. The
-  /// service after the release or disposal detaches the session and frees its
-  /// graphics objects.
+  /// It accepts a released or disposed session until that release or disposal
+  /// finishes.
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

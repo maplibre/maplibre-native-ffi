@@ -78,10 +78,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// Releases the session in any state, and finishes in the background.
     /// </summary>
     /// <remarks>
-    /// <para>Use it from destructors and finalizers. Otherwise, use
-    /// <c>RenderSessionHandle.ReleaseAsync()</c>. The session retires as a
-    /// release does, except that a session whose frames you hold is abandoned,
-    /// which ends the frames. Keep servicing a session driven by
+    /// <para>Use it from destructors and finalizers, and
+    /// <c>RenderSessionHandle.ReleaseAsync()</c> elsewhere. It ends the session
+    /// as a release does, except that it abandons a session whose frames you
+    /// hold, which ends those frames. Keep servicing a session driven by
     /// <c>RenderDriverKind.CallerGraphicsThread</c> until
     /// <c>RenderSessionHandle.ServiceDriverWork()</c> no longer accepts
     /// it.</para>
@@ -103,11 +103,9 @@ public sealed unsafe partial class RenderSessionHandle
     /// <c>RenderResult.TargetNotReady</c>. Once the call returns, the library
     /// no longer uses your graphics objects, and you can attach another session
     /// to the map. Release the session afterward.</para>
-    /// <para>Only the driver thread can destroy OpenGL and WebGPU objects, so
-    /// abandon keeps them until the process exits, reports how many it kept,
-    /// and logs a warning. Detach the session instead to free them. A disposal
-    /// that another thread starts first retires the session itself, and the
-    /// abandon then fails as it does for any released session.</para>
+    /// <para>Abandon keeps the session's OpenGL and WebGPU objects until the
+    /// process exits, and reports how many it kept. Detach the session instead
+    /// to free them.</para>
     /// <para>See <c>mln_render_session_abandon</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -138,10 +136,9 @@ public sealed unsafe partial class RenderSessionHandle
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the session lacks
     /// <c>RenderSessionCapabilityFlag.FrameAcquisition</c>.</description></item>
-    /// <item><description><c>RenderSessionSnapshot.FailureStatus</c>,
-    /// <c>Status.TargetLost</c> or <c>Status.NativeError</c>, when the session
-    /// has failed. The diagnostic carries the failure's
-    /// message.</description></item>
+    /// <item><description><c>Status.TargetLost</c> or
+    /// <c>Status.NativeError</c>, as <c>RenderSessionSnapshot.FailureStatus</c>
+    /// reports, when the session has failed.</description></item>
     /// <item><description><c>Status.InvalidState</c> when you detached,
     /// abandoned, released, or disposed the session.</description></item>
     /// </list>
@@ -221,10 +218,9 @@ public sealed unsafe partial class RenderSessionHandle
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>RenderSessionSnapshot.FailureStatus</c>,
-    /// <c>Status.TargetLost</c> or <c>Status.NativeError</c>, when the session
-    /// has failed. The diagnostic carries the failure's
-    /// message.</description></item>
+    /// <item><description><c>Status.TargetLost</c> or
+    /// <c>Status.NativeError</c>, as <c>RenderSessionSnapshot.FailureStatus</c>
+    /// reports, when the session has failed.</description></item>
     /// <item><description><c>Status.InvalidState</c> when you detached,
     /// abandoned, released, or disposed the session, or discarded a frame from
     /// every texture of its ring.</description></item>
@@ -679,16 +675,16 @@ public sealed unsafe partial class RenderSessionHandle
     /// Releases the session, detaching it first when it is attached.
     /// </summary>
     /// <remarks>
-    /// <para>The completion runs once the session retires. From then on, the
+    /// <para>Pending frame demands finish with
+    /// <c>RenderResult.TargetNotReady</c>. Once the release completes, the
     /// library no longer uses your graphics objects, and you can attach another
-    /// session to the map. Pending frame demands finish with
-    /// <c>RenderResult.TargetNotReady</c>.</para>
+    /// session to the map.</para>
     /// <para>A session driven by <c>RenderDriverKind.CallerGraphicsThread</c>
     /// detaches at your next <c>RenderSessionHandle.ServiceDriverWork()</c>, so
-    /// keep servicing it until the release completes. If you release or dispose
-    /// its map before that service, the session is abandoned instead. A session
-    /// that isn't attached, such as one that is still attaching or that failed,
-    /// is abandoned as <c>RenderSessionHandle.Abandon()</c> does.</para>
+    /// keep servicing it until the release completes. When the session isn't
+    /// attached, such as while it attaches or after it fails, or when you
+    /// release or dispose its map before that service, the release abandons it
+    /// as <c>RenderSessionHandle.Abandon()</c> does.</para>
     /// <para>See <c>mln_render_session_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -733,7 +729,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the session renders
-    /// offscreen, since the session owns that target.</description></item>
+    /// offscreen.</description></item>
     /// <item><description><c>Status.Unsupported</c> when the target is a WebGL
     /// canvas.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session loses its
@@ -789,11 +785,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it with <c>RenderDriverKind.CallerGraphicsThread</c>, and call
     /// it from the same thread every time. Call it each time
     /// <c>RenderSessionAttachOptions.DriverWorkWake</c> is called, even while
-    /// you demand no frames, and until a detach or the session's retirement
-    /// completes. It returns once no work is ready.</para>
-    /// <para>It accepts a released or disposed session until the session
-    /// retires. The service after the release or disposal detaches the session
-    /// and frees its graphics objects.</para>
+    /// you demand no frames, until a detach, release, or disposal of the
+    /// session finishes. It returns once no work is ready.</para>
+    /// <para>It accepts a released or disposed session until that release or
+    /// disposal finishes.</para>
     /// <para>With a caller-graphics-thread driver, <c>Ready</c>,
     /// <c>DetachAsync</c>, <c>BarrierAsync</c>, and <c>ResizeAsync</c> progress
     /// only through <c>ServiceDriverWork</c>, so awaiting one on the graphics
@@ -887,8 +882,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it to resize the ring, or to give the session textures again
     /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
     /// acquired frame first. Once the replacement completes, the session no
-    /// longer uses the old textures. A replacement with the textures and sizes
-    /// that the ring renders into already changes nothing.</para>
+    /// longer uses the old textures.</para>
     /// <para>See <c>mln_render_session_set_metal_borrowed_texture_target</c> in
     /// the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
@@ -924,8 +918,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it to give the session a layer again after
     /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
     /// layer, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old layer. A replacement with the layer and logical size
-    /// that the session renders to already changes nothing.</para>
+    /// longer uses the old layer.</para>
     /// <para>See <c>mln_render_session_set_metal_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -954,8 +947,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it to resize the ring, or to give the session textures again
     /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
     /// acquired frame first. Once the replacement completes, the session no
-    /// longer uses the old textures. A replacement with the textures and sizes
-    /// that the ring renders into already changes nothing.</para>
+    /// longer uses the old textures.</para>
     /// <para>See <c>mln_render_session_set_open_gl_borrowed_texture_target</c>
     /// in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
@@ -981,8 +973,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it to give the session a surface again after
     /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
     /// surface, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old surface. A replacement with the surface and logical
-    /// size that the session presents to already changes nothing.</para>
+    /// longer uses the old surface.</para>
     /// <para>See <c>mln_render_session_set_open_gl_surface_target</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
@@ -1008,8 +999,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it to resize the ring, or to give the session images again
     /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
     /// acquired frame first. Once the replacement completes, the session no
-    /// longer uses the old images. A replacement with the images and sizes that
-    /// the ring renders into already changes nothing.</para>
+    /// longer uses the old images.</para>
     /// <para>See <c>mln_render_session_set_vulkan_borrowed_texture_target</c>
     /// in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
@@ -1039,8 +1029,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Use it to give the session a surface again after
     /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
     /// surface, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old surface. A replacement with the surface and logical
-    /// size that the session presents to already changes nothing.</para>
+    /// longer uses the old surface.</para>
     /// <para>See <c>mln_render_session_set_vulkan_surface_target</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>

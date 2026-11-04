@@ -7,12 +7,10 @@ namespace Maplibre.NativeFfi;
 /// <c>RenderSessionHandle.SetMetalBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// <para>The members mean what they mean in
-/// <c>MetalBorrowedTextureDescriptor</c>, and the textures follow its rules.
-/// The ring keeps its depth, device, and command queue, so give it as many
-/// textures as it attached with, on the same device. The session uses the
-/// textures until a replacement or release of the target completes, a detach or
-/// release of the session completes, or an abandon of it returns.</para>
+/// <para>The members and the textures follow the rules of
+/// <c>MetalBorrowedTextureDescriptor</c>. The ring keeps its depth, device, and
+/// command queue, so give it as many textures as it attached with, on the same
+/// device.</para>
 /// <para>See <c>mln_metal_borrowed_texture_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>

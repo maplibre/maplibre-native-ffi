@@ -7,12 +7,10 @@ namespace Maplibre.NativeFfi;
 /// <c>RenderSessionHandle.SetOpenGlBorrowedTextureTargetAsync()</c>.
 /// </summary>
 /// <remarks>
-/// <para>The members mean what they mean in
-/// <c>OpenGlBorrowedTextureDescriptor</c>, and the textures follow its rules.
-/// The ring keeps its depth, context, and texture target, so give it as many
-/// textures as it attached with, in the same share group. The session uses the
-/// textures until a replacement or release of the target completes, a detach or
-/// release of the session completes, or an abandon of it returns.</para>
+/// <para>The members and the textures follow the rules of
+/// <c>OpenGlBorrowedTextureDescriptor</c>. The ring keeps its depth, context,
+/// and texture target, so give it as many textures as it attached with, in the
+/// same share group.</para>
 /// <para>See <c>mln_open_gl_borrowed_texture_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>

@@ -125,16 +125,13 @@ typedef uint32_t mln_gpu_sync_kind_flags;
 typedef struct mln_render_session_attach_options {
   uint32_t size;
   /**
-   * The thread that runs the session's graphics work. Whoever owns the
-   * target's graphics context drives it:
+   * The thread that runs the session's graphics work, which depends on the
+   * target:
    *
-   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for an OpenGL or WebGPU target
-   *   that you pass, since its context belongs to your thread: a shared or
-   *   dedicated EGL or WGL context, an existing WebGL context, or a browser's
-   *   WebGPU device.
-   * - MLN_RENDER_DRIVER_CORE_WORKER for a target whose context the library
-   *   owns: a transferred WebGL canvas, an Android or OpenHarmony window, or
-   *   an offscreen session.
+   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a shared or dedicated EGL or
+   *   WGL context, an existing WebGL context, or a browser's WebGPU device.
+   * - MLN_RENDER_DRIVER_CORE_WORKER for a transferred WebGL canvas, an Android
+   *   or OpenHarmony window, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with MLN_STATUS_UNSUPPORTED.
@@ -183,9 +180,7 @@ typedef struct mln_render_session_capabilities {
   mln_gpu_sync_kind producer_sync_kind;
   /**
    * The kinds of mln_gpu_sync that mln_acquired_frame_release() accepts.
-   *
-   * They depend on the target and on what the device supports, so read this
-   * field instead of assuming a kind.
+   * They depend on the target and on what the device supports.
    */
   mln_gpu_sync_kind_flags consumer_sync_kinds;
 } mln_render_session_capabilities;
@@ -335,7 +330,7 @@ typedef union mln_open_gl_context_descriptor_data {
 /**
  * How a render session gets the OpenGL context that it renders with.
  *
- * Keep the objects that it names alive until a detach or disposal of the
+ * Keep the objects that it names alive until a detach or release of the
  * session completes, or an abandon of it returns.
  */
 typedef struct mln_open_gl_context_descriptor {

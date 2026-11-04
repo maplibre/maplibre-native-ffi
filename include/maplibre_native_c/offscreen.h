@@ -69,8 +69,7 @@ typedef struct mln_offscreen_descriptor {
  * mln_map_attach_offscreen() creates a device of its own when it gets none.
  * Create one to share it among the sessions on many maps, or to pick a GPU.
  *
- * A browser WebGPU build can't create a device here, because the browser
- * answers a request for one asynchronously. Attach without a device instead.
+ * In a browser WebGPU build, attach without a device instead.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED in a browser WebGPU build, or when the device can't

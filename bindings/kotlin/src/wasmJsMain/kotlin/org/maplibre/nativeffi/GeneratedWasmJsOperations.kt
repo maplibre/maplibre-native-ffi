@@ -101,8 +101,7 @@ public fun MapHandle.attachWebGpuSurface(
  *
  * Use it to resize the ring, or to give the session textures again after
  * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
- * completes, the session no longer uses the old textures. A replacement with the textures and sizes
- * that the ring renders into already changes nothing.
+ * completes, the session no longer uses the old textures.
  *
  * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -126,8 +125,7 @@ public fun RenderSessionHandle.setWebGpuBorrowedTextureTarget(
  *
  * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
  * it to another surface, or to resize it. Once the replacement completes, the session no longer
- * uses the old surface. A replacement with the surface and logical size that the session presents
- * to already changes nothing.
+ * uses the old surface.
  *
  * See `mln_render_session_set_web_gpu_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
