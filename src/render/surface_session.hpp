@@ -36,6 +36,12 @@ auto validate_opengl_surface_replacement(
 auto validate_webgpu_surface_replacement(
   const mln_web_gpu_surface_replacement* replacement
 ) -> mln_status;
+auto validate_android_surface_descriptor(
+  const mln_android_surface_descriptor* descriptor
+) -> mln_status;
+auto validate_android_surface_replacement(
+  const mln_android_surface_replacement* replacement
+) -> mln_status;
 auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,

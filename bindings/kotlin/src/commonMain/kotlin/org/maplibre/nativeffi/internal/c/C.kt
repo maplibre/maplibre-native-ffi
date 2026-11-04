@@ -126,6 +126,16 @@ internal expect object C {
 
   fun mln_map_apply_camera_delta(map: Long, delta: Long, completion: Long, outDiagnostic: Long): Int
 
+  fun mln_map_attach_android_surface(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_attach_metal_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -790,6 +800,13 @@ internal expect object C {
   ): Int
 
   fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int
+
+  fun mln_render_session_set_android_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_render_session_set_frame_pacer(session: Long, pacer: Long, outDiagnostic: Long): Int
 

@@ -289,6 +289,19 @@ int32_t mln_kw_mln_map_apply_camera_delta(
   );
 }
 
+int32_t mln_kw_mln_map_attach_android_surface(
+  int64_t map, uintptr_t descriptor, int64_t device, uintptr_t options,
+  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_attach_android_surface(
+    (mln_map)map, (const mln_android_surface_descriptor*)descriptor,
+    (mln_vulkan_device)device,
+    (const mln_render_session_attach_options*)options,
+    (mln_render_session*)out_session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_attach_metal_borrowed_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
@@ -1481,6 +1494,17 @@ int32_t mln_kw_mln_render_session_service_driver_work(
 ) {
   return (int32_t)mln_render_session_service_driver_work(
     (mln_render_session)session, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_render_session_set_android_surface_target(
+  int64_t session, uintptr_t replacement, uintptr_t completion,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_set_android_surface_target(
+    (mln_render_session)session,
+    (const mln_android_surface_replacement*)replacement,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 

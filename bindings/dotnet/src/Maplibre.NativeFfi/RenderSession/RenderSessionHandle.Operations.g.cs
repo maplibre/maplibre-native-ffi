@@ -828,6 +828,44 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
+    /// Replaces the Android window that the session presents to.
+    /// </summary>
+    /// <remarks>
+    /// <para>Use it to give the session a window again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
+    /// window, or to resize it. Once the replacement completes, the session no
+    /// longer uses the old window. A replacement with the window and logical
+    /// size that the session presents to already changes nothing.</para>
+    /// <para>See <c>mln_render_session_set_android_surface_target</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>surface</c> has
+    /// no window, such as after the platform destroyed it.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when, in a Vulkan build,
+    /// the new window needs a different color format or pre-rotation support
+    /// than the old one. Attach a new session instead.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create the window's surface.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    public Task SetAndroidSurfaceTargetAsync(AndroidSurfaceReplacement replacement)
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeReplacement = NativeAndroidSurfaceReplacement(replacement);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_render_session_set_android_surface_target(
+            Handle,
+            &nativeReplacement,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Sets the frame pacer that demands the session's frames.
     /// </summary>
     /// <remarks>

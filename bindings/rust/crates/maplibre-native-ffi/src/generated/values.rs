@@ -1,6 +1,91 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+/// An Android window to present to, for `MapHandle::attach_android_surface()`.
+///
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns. It uses the window until a replacement or release of the
+/// target completes, a detach or release of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_android_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AndroidSurfaceDescriptor {
+    pub logical_size: LogicalSize,
+    /// Your `ANativeWindow*`, or null to name the window by `surface`.
+    pub window: *mut std::ffi::c_void,
+    /// The calling thread's `JNIEnv*`, with `surface`.
+    pub jni_env: *mut std::ffi::c_void,
+    /// An `android.view.Surface`, with `jni_env`.
+    pub surface: *mut std::ffi::c_void,
+}
+impl AndroidSurfaceDescriptor {
+    pub fn new(logical_size: LogicalSize) -> Self {
+        Self {
+            logical_size,
+            window: Default::default(),
+            jni_env: Default::default(),
+            surface: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_android_surface_descriptor> for AndroidSurfaceDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_android_surface_descriptor> {
+        let mut raw: sys::mln_android_surface_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_android_surface_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.window = self.window;
+        raw.jni_env = self.jni_env;
+        raw.surface = self.surface;
+        Ok(raw)
+    }
+}
+
+/// A new Android window for
+/// `RenderSessionHandle::set_android_surface_target()`.
+///
+/// Name the window by `window`, or by `jni_env` and `surface`. The session
+/// takes its own reference to the window, so you can release yours once the
+/// call returns. It uses the window until a replacement or release of the
+/// target completes, a detach or release of the session completes, or an
+/// abandon of it returns.
+///
+/// See `mln_android_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AndroidSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your `ANativeWindow*`, or null to name the window by `surface`.
+    pub window: *mut std::ffi::c_void,
+    /// The calling thread's `JNIEnv*`, with `surface`.
+    pub jni_env: *mut std::ffi::c_void,
+    /// An `android.view.Surface`, with `jni_env`.
+    pub surface: *mut std::ffi::c_void,
+}
+impl AndroidSurfaceReplacement {
+    pub fn new(logical_size: LogicalSize) -> Self {
+        Self {
+            logical_size,
+            window: Default::default(),
+            jni_env: Default::default(),
+            surface: Default::default(),
+        }
+    }
+}
+impl ToNative<sys::mln_android_surface_replacement> for AndroidSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_android_surface_replacement> {
+        let mut raw: sys::mln_android_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_android_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.window = self.window;
+        raw.jni_env = self.jni_env;
+        raw.surface = self.surface;
+        Ok(raw)
+    }
+}
+
 /// How a camera change animates.
 ///
 /// See `mln_animation_options` in the
@@ -3628,7 +3713,8 @@ pub struct RenderSessionAttachOptions {
     ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
     ///   a browser's WebGPU device.
     /// - `RenderDriverKind::CoreWorker` for a target whose context the library
-    ///   owns: a transferred WebGL canvas, or an offscreen session.
+    ///   owns: a transferred WebGL canvas, an Android window, or an offscreen
+    ///   session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.

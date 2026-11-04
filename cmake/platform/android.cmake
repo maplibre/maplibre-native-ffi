@@ -50,7 +50,8 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/timer.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/android_surface_session.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_ANDROID_SOURCES})

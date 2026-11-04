@@ -230,6 +230,65 @@ impl MapHandle {
         })
     }
 
+    /// Creates a session that presents the map to an Android window, with a
+    /// graphics context that the library creates.
+    ///
+    /// The build's render backend decides the context. A Vulkan build presents
+    /// with `device`, or, when `device` is null, with a device that the library
+    /// creates with presentation and shares between these sessions. An OpenGL
+    /// build creates an EGL context on the default display, and `device` must
+    /// be null. Attach with `RenderDriverKind::CoreWorker`, since the context
+    /// belongs to the library.
+    ///
+    /// Before the platform destroys the window, such as in
+    /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+    /// `RenderSessionHandle::release_target()` and wait for that to complete.
+    /// The session's reference keeps the window, but not its buffers.
+    ///
+    /// See `mln_map_attach_android_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `surface` has no window, such as after
+    ///   the platform destroyed it.
+    /// - `Status::Unsupported` when `device` can't present, because you created
+    ///   it without `VulkanDeviceOptions::presentation`.
+    /// - `Status::Unsupported` when the GPU or the Vulkan loader can't present.
+    /// - `Status::NativeError` when the library can't create the graphics
+    ///   context or the window's surface.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "android")]
+    pub unsafe fn attach_android_surface(
+        &self,
+        descriptor: &AndroidSurfaceDescriptor,
+        device: Option<&VulkanDeviceHandle>,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call();
+        let device = device.map_or(sys::mln_vulkan_device(0), |device| device.inner.native());
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_android_surface(
+                    map,
+                    descriptor,
+                    device,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session)?, future))
+    }
+
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     ///

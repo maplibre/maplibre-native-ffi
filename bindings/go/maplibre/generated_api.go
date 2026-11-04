@@ -1957,6 +1957,66 @@ func (RuntimeEventPayloadSpriteVariant) bindingTag() uint32 {
 }
 func (RuntimeEventPayloadSpriteVariant) isRuntimeEventPayload() {}
 
+// AndroidSurfaceDescriptor corresponds to mln_android_surface_descriptor. An
+// Android window to present to, for MapHandle.AttachAndroidSurface().
+//
+// Name the window by window, or by jni_env and surface. The session takes its
+// own reference to the window, so you can release yours once the call returns.
+// It uses the window until a replacement or release of the target completes, a
+// detach or release of the session completes, or an abandon of it returns.
+//
+// See mln_android_surface_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+type AndroidSurfaceDescriptor struct {
+	LogicalSize LogicalSize
+	// Your ANativeWindow*, or null to name the window by surface.
+	Window uintptr
+	// The calling thread's JNIEnv*, with surface.
+	JniEnv uintptr
+	// An android.view.Surface, with jni_env.
+	Surface uintptr
+}
+
+func nativeAndroidSurfaceDescriptor(input AndroidSurfaceDescriptor, arena *bindingArena) C.mln_android_surface_descriptor {
+	raw := C.mln_android_surface_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
+	raw.jni_env = unsafe.Pointer(C.binding_address(C.uintptr_t(input.JniEnv)))
+	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
+	return raw
+}
+
+// AndroidSurfaceReplacement corresponds to mln_android_surface_replacement. A
+// new Android window for RenderSessionHandle.SetAndroidSurfaceTarget().
+//
+// Name the window by window, or by jni_env and surface. The session takes its
+// own reference to the window, so you can release yours once the call returns.
+// It uses the window until a replacement or release of the target completes, a
+// detach or release of the session completes, or an abandon of it returns.
+//
+// See mln_android_surface_replacement in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+type AndroidSurfaceReplacement struct {
+	LogicalSize LogicalSize
+	// Your ANativeWindow*, or null to name the window by surface.
+	Window uintptr
+	// The calling thread's JNIEnv*, with surface.
+	JniEnv uintptr
+	// An android.view.Surface, with jni_env.
+	Surface uintptr
+}
+
+func nativeAndroidSurfaceReplacement(input AndroidSurfaceReplacement, arena *bindingArena) C.mln_android_surface_replacement {
+	raw := C.mln_android_surface_replacement{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
+	raw.jni_env = unsafe.Pointer(C.binding_address(C.uintptr_t(input.JniEnv)))
+	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
+	return raw
+}
+
 // AnimationOptions corresponds to mln_animation_options. How a camera change
 // animates.
 //
@@ -4078,7 +4138,7 @@ type RenderSessionAttachOptions struct {
 	//     EGL or WGL context, an existing WebGL context, or a browser's WebGPU
 	//     device.
 	//   - RenderDriverKindCoreWorker for a target whose context the library owns: a
-	//     transferred WebGL canvas, or an offscreen session.
+	//     transferred WebGL canvas, an Android window, or an offscreen session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.

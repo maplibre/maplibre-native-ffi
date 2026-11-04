@@ -8,6 +8,32 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class GeneratedValues
 {
+    internal static mln_android_surface_descriptor NativeAndroidSurfaceDescriptor(
+        AndroidSurfaceDescriptor value
+    )
+    {
+        var native = new mln_android_surface_descriptor();
+        native.size = (uint)sizeof(mln_android_surface_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.window = (void*)value.Window.Address;
+        native.jni_env = (void*)value.JniEnv.Address;
+        native.surface = (void*)value.Surface.Address;
+        return native;
+    }
+
+    internal static mln_android_surface_replacement NativeAndroidSurfaceReplacement(
+        AndroidSurfaceReplacement value
+    )
+    {
+        var native = new mln_android_surface_replacement();
+        native.size = (uint)sizeof(mln_android_surface_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.window = (void*)value.Window.Address;
+        native.jni_env = (void*)value.JniEnv.Address;
+        native.surface = (void*)value.Surface.Address;
+        return native;
+    }
+
     internal static mln_animation_options NativeAnimationOptions(
         AnimationOptions value,
         NativeCallScope scope

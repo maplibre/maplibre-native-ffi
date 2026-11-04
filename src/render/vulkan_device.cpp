@@ -98,9 +98,9 @@ auto vulkan_device_create(
     return create_status;
   }
   *out_device = vulkan_device_table().insert(
-    std::make_shared<VulkanDeviceObject>(
-      VulkanDeviceObject{.context = std::move(context)}
-    )
+    std::make_shared<VulkanDeviceObject>(VulkanDeviceObject{
+      .context = std::move(context), .presentation = selection.presentation
+    })
   );
   return MLN_STATUS_OK;
 }

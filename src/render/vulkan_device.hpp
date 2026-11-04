@@ -15,6 +15,8 @@ namespace mln::core {
 // it keeps them alive. Only a Vulkan build makes one.
 struct VulkanDeviceObject {
   std::shared_ptr<const mln_vulkan_context_descriptor> context;
+  // Whether the device enabled the extensions that present to a window.
+  bool presentation = false;
 };
 
 template <>

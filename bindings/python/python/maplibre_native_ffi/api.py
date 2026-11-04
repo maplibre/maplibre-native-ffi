@@ -35,6 +35,8 @@ from ._generated_owners import (
     VulkanDeviceHandle,
 )
 from ._generated_values import (
+    AndroidSurfaceDescriptor,
+    AndroidSurfaceReplacement,
     AnimationOptions,
     BoundOptions,
     CacheDatabaseOperation,
@@ -262,6 +264,8 @@ from ._generated_values import (
 
 __all__ = [
     "AcquiredFrameHandle",
+    "AndroidSurfaceDescriptor",
+    "AndroidSurfaceReplacement",
     "AnimationOptions",
     "BoundOptions",
     "CacheDatabaseOperation",

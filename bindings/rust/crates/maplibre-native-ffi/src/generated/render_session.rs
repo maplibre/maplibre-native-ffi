@@ -659,6 +659,49 @@ impl RenderSessionHandle {
         Ok(())
     }
 
+    /// Replaces the Android window that the session presents to.
+    ///
+    /// Use it to give the session a window again after
+    /// `RenderSessionHandle::release_target()`, to move it to another window,
+    /// or to resize it. Once the replacement completes, the session no longer
+    /// uses the old window. A replacement with the window and logical size that
+    /// the session presents to already changes nothing.
+    ///
+    /// See `mln_render_session_set_android_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `surface` has no window, such as after
+    ///   the platform destroyed it.
+    /// - `Status::Unsupported` when, in a Vulkan build, the new window needs a
+    ///   different color format or pre-rotation support than the old one.
+    ///   Attach a new session instead.
+    /// - `Status::NativeError` when the library can't create the window's
+    ///   surface.
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    #[cfg(target_os = "android")]
+    pub unsafe fn set_android_surface_target(
+        &self,
+        replacement: &AndroidSurfaceReplacement,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self.inner.call();
+        let replacement = call.reference(&replacement)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_android_surface_target(
+                    session,
+                    replacement,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
     /// Sets the frame pacer that demands the session's frames.
     ///
     /// At the first display refresh after the session has something new to

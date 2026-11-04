@@ -11,6 +11,8 @@ from . import _native
 from ._completion import CommandCompletion
 from ._future import map_future
 from ._generated_values import (
+    AndroidSurfaceDescriptor,
+    AndroidSurfaceReplacement,
     BoundOptions,
     CacheDatabaseOperation,
     CameraDelta,
@@ -441,6 +443,47 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.apply_camera_delta(delta)
+
+    def attach_android_surface(
+        self,
+        descriptor: AndroidSurfaceDescriptor,
+        device: VulkanDeviceHandle | None,
+        options: RenderSessionAttachOptions,
+    ) -> RenderSessionHandle:
+        """Creates a session that presents the map to an Android window, with a
+        graphics context that the library creates.
+
+        The build's render backend decides the context. A Vulkan build
+        presents with `device`, or, when `device` is null, with a device that
+        the library creates with presentation and shares between these
+        sessions. An OpenGL build creates an EGL context on the default
+        display, and `device` must be null. Attach with
+        `RenderDriverKind.CORE_WORKER`, since the context belongs to the
+        library.
+
+        Before the platform destroys the window, such as in
+        `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+        `RenderSessionHandle.release_target()` and wait for that to complete.
+        The session's reference keeps the window, but not its buffers.
+
+        See `mln_map_attach_android_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `surface` has no window, such as
+          after the platform destroyed it.
+        - `Status.UNSUPPORTED` when `device` can't present, because you
+          created it without `VulkanDeviceOptions.presentation`.
+        - `Status.UNSUPPORTED` when the GPU or the Vulkan loader can't
+          present.
+        - `Status.NATIVE_ERROR` when the library can't create the graphics
+          context or the window's surface.
+        """
+        raw = self._native.attach_android_surface(
+            descriptor, None if device is None else device._native, options
+        )
+        return _adopt_value(raw["session"], "RenderSessionHandle", self, raw["ready"])
 
     def attach_metal_borrowed_texture(
         self,
@@ -2269,6 +2312,32 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native.service_driver_work()
+
+    def set_android_surface_target(
+        self, replacement: AndroidSurfaceReplacement
+    ) -> Future[None]:
+        """Replaces the Android window that the session presents to.
+
+        Use it to give the session a window again after
+        `RenderSessionHandle.release_target()`, to move it to another window,
+        or to resize it. Once the replacement completes, the session no
+        longer uses the old window. A replacement with the window and logical
+        size that the session presents to already changes nothing.
+
+        See `mln_render_session_set_android_surface_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `surface` has no window, such as
+          after the platform destroyed it.
+        - `Status.UNSUPPORTED` when, in a Vulkan build, the new window needs
+          a different color format or pre-rotation support than the old one.
+          Attach a new session instead.
+        - `Status.NATIVE_ERROR` when the library can't create the window's
+          surface.
+        """
+        return self._native.set_android_surface_target(replacement)
 
     def set_frame_pacer(self, pacer: FramePacerHandle | None = None) -> None:
         """Sets the frame pacer that demands the session's frames.

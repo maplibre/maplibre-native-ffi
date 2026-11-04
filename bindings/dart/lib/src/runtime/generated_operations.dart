@@ -797,49 +797,17 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   return result;
 }
 
-Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
-  MetalBorrowedTexture value,
+Pointer<raw.mln_android_surface_descriptor> _writeAndroidSurfaceDescriptor(
+  AndroidSurfaceDescriptor value,
   Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture>? into,
+  Pointer<raw.mln_android_surface_descriptor>? into,
 }) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  return result;
-}
-
-Pointer<raw.mln_metal_borrowed_texture_descriptor>
-_writeMetalBorrowedTextureDescriptor(
-  MetalBorrowedTextureDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
-  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  final result = into ?? arena<raw.mln_android_surface_descriptor>();
+  result.ref.size = sizeOf<raw.mln_android_surface_descriptor>();
   result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
-    value.textures.isEmpty ? 1 : value.textures.length,
-  );
-  result.ref.texture_count = value.textures.length;
-  for (var index = 0; index < value.textures.length; index++) {
-    _writeMetalBorrowedTexture(
-      value.textures[index],
-      arena,
-      into: result.ref.textures + index,
-    );
-  }
-  result.ref.command_queue = Pointer<Void>.fromAddress(
-    value.commandQueue.address,
-  ).cast();
+  result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
+  result.ref.jni_env = Pointer<Void>.fromAddress(value.jniEnv.address).cast();
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   return result;
 }
 
@@ -934,6 +902,52 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
         .add(_prepareQueueLock(value.queueLock!))
         .ref;
   }
+  return result;
+}
+
+Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
+  MetalBorrowedTexture value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture>();
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_metal_borrowed_texture_descriptor>
+_writeMetalBorrowedTextureDescriptor(
+  MetalBorrowedTextureDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_borrowed_texture_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeMetalBorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  result.ref.command_queue = Pointer<Void>.fromAddress(
+    value.commandQueue.address,
+  ).cast();
   return result;
 }
 
@@ -1984,6 +1998,20 @@ TextureReadbackResult _readTextureReadbackResult(
   data: _copyBufferView(source.data),
   info: _readTextureImageInfo(source.info),
 );
+
+Pointer<raw.mln_android_surface_replacement> _writeAndroidSurfaceReplacement(
+  AndroidSurfaceReplacement value,
+  Allocator arena, {
+  Pointer<raw.mln_android_surface_replacement>? into,
+}) {
+  final result = into ?? arena<raw.mln_android_surface_replacement>();
+  result.ref.size = sizeOf<raw.mln_android_surface_replacement>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.window = Pointer<Void>.fromAddress(value.window.address).cast();
+  result.ref.jni_env = Pointer<Void>.fromAddress(value.jniEnv.address).cast();
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  return result;
+}
 
 Pointer<raw.mln_metal_borrowed_texture_replacement>
 _writeMetalBorrowedTextureReplacement(
@@ -4478,6 +4506,63 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           ),
         );
       });
+
+  /// Creates a session that presents the map to an Android window, with a
+  /// graphics context that the library creates.
+  ///
+  /// The build's render backend decides the context. A Vulkan build presents
+  /// with `device`, or, when `device` is null, with a device that the library
+  /// creates with presentation and shares between these sessions. An OpenGL
+  /// build creates an EGL context on the default display, and `device` must be
+  /// null. Attach with `RenderDriverKind.coreWorker`, since the context belongs
+  /// to the library.
+  ///
+  /// Before the platform destroys the window, such as in
+  /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+  /// `RenderSessionHandle.releaseTarget()` and wait for that to complete. The
+  /// session's reference keeps the window, but not its buffers.
+  ///
+  /// See `mln_map_attach_android_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `surface` has no window, such as after the
+  ///   platform destroyed it.
+  /// - `Status.unsupported` when `device` can't present, because you created it
+  ///   without `VulkanDeviceOptions.presentation`.
+  /// - `Status.unsupported` when the GPU or the Vulkan loader can't present.
+  /// - `Status.nativeError` when the library can't create the graphics context
+  ///   or the window's surface.
+  RenderSessionHandle attachAndroidSurface(
+    AndroidSurfaceDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    VulkanDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_android_surface(
+          _handle.raw,
+          _writeAndroidSurfaceDescriptor(descriptor, arena),
+          (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
 
   /// Creates a session that renders the map into a ring of your Metal textures.
   ///
@@ -7163,6 +7248,36 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Replaces the Android window that the session presents to.
+  ///
+  /// Use it to give the session a window again after
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
+  /// resize it. Once the replacement completes, the session no longer uses the
+  /// old window. A replacement with the window and logical size that the
+  /// session presents to already changes nothing.
+  ///
+  /// See `mln_render_session_set_android_surface_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `surface` has no window, such as after the
+  ///   platform destroyed it.
+  /// - `Status.unsupported` when, in a Vulkan build, the new window needs a
+  ///   different color format or pre-rotation support than the old one. Attach
+  ///   a new session instead.
+  /// - `Status.nativeError` when the library can't create the window's surface.
+  Future<void> setAndroidSurfaceTarget(AndroidSurfaceReplacement replacement) =>
+      _run(
+        (arena, completion) =>
+            raw.mln_render_session_set_android_surface_target(
+              _handle.raw,
+              _writeAndroidSurfaceReplacement(replacement, arena),
+              completion,
+              nativeDiagnostic,
+            ),
+      );
 
   /// Sets the frame pacer that demands the session's frames.
   ///

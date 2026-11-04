@@ -48,3 +48,71 @@ func InitAndroid(jniEnv uintptr, context uintptr) error {
 		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
 }
+
+// AttachAndroidSurface creates a session that presents the map to an Android
+// window, with a graphics context that the library creates.
+//
+// The build's render backend decides the context. A Vulkan build presents with
+// device, or, when device is null, with a device that the library creates with
+// presentation and shares between these sessions. An OpenGL build creates an
+// EGL context on the default display, and device must be null. Attach with
+// RenderDriverKindCoreWorker, since the context belongs to the library.
+//
+// Before the platform destroys the window, such as in
+// SurfaceHolder.Callback.surfaceDestroyed, release the target with
+// RenderSessionHandle.ReleaseTarget() and wait for that to complete. The
+// session's reference keeps the window, but not its buffers.
+//
+// See mln_map_attach_android_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when surface has no window, such as after the
+//     platform destroyed it.
+//   - StatusUnsupported when device can't present, because you created it
+//     without VulkanDeviceOptions.Presentation.
+//   - StatusUnsupported when the GPU or the Vulkan loader can't present.
+//   - StatusNativeError when the library can't create the graphics context or
+//     the window's surface.
+func (receiver *MapHandle) AttachAndroidSurface(descriptor AndroidSurfaceDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+	var outSession C.mln_render_session
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_android_surface(C.mln_map(raw), bindingStore(nativeAndroidSurfaceDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		session *RenderSessionHandle
+		ready   *Future[struct{}]
+	} {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return struct {
+			session *RenderSessionHandle
+			ready   *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.session, result.ready, err
+}
+
+// SetAndroidSurfaceTarget replaces the Android window that the session presents
+// to.
+//
+// Use it to give the session a window again after
+// RenderSessionHandle.ReleaseTarget(), to move it to another window, or to
+// resize it. Once the replacement completes, the session no longer uses the old
+// window. A replacement with the window and logical size that the session
+// presents to already changes nothing.
+//
+// See mln_render_session_set_android_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when surface has no window, such as after the
+//     platform destroyed it.
+//   - StatusUnsupported when, in a Vulkan build, the new window needs a
+//     different color format or pre-rotation support than the old one. Attach a
+//     new session instead.
+//   - StatusNativeError when the library can't create the window's surface.
+func (receiver *RenderSessionHandle) SetAndroidSurfaceTarget(replacement AndroidSurfaceReplacement) (*Future[struct{}], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_android_surface_target(C.mln_render_session(raw), bindingStore(nativeAndroidSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}

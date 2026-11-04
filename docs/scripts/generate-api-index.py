@@ -5,12 +5,17 @@ The generator spells each C declaration as each binding's public symbol, and
 each language's reference, built into public/reference, gives the symbol's
 page. A symbol that a reference doesn't show has no entry, and the Api
 component fails the build when a page names it.
+
+Each reference documents the platform that builds it, so a function that serves
+only other platforms, such as Android's, is missing from some. Where it is, its
+readers see the C declaration, linked to the C reference.
 """
 
 import base64
 import importlib
 import json
 import pathlib
+import platform
 import re
 import sys
 import zlib
@@ -25,7 +30,8 @@ from tools.bindgen.compiler import compile_api
 from tools.bindgen.docs import Resolver, Symbol
 from tools.bindgen.emitters import dart_values, typescript
 from tools.bindgen.frontend import parse_headers
-from tools.bindgen.schema import validate
+from tools.bindgen.model import Api
+from tools.bindgen.schema import platforms, validate
 
 BINDINGS = ("dart", "dotnet", "go", "kotlin", "python", "rust", "swift", "zig")
 
@@ -33,15 +39,13 @@ BINDINGS = ("dart", "dotnet", "go", "kotlin", "python", "rust", "swift", "zig")
 Link = Callable[[str], str | None]
 
 
-def binding_names() -> dict[str, dict[str, str]]:
+def binding_names(api: Api) -> dict[str, dict[str, str]]:
     """Each binding's spelling of each C declaration that it exposes."""
 
     def spellings(symbol: Symbol) -> dict[str, str]:
         assert isinstance(symbol, Resolver)
         return symbol.names
 
-    api = parse_headers(REPO_ROOT / "include")
-    validate(api)
     bound = compile_api(api)
     names = {
         binding: spellings(
@@ -255,8 +259,18 @@ LINKS: dict[str, Callable[[], Link]] = {
 }
 
 
+def elsewhere(api: Api) -> set[str]:
+    """The functions that don't serve the platform that builds the references."""
+    host = platform.system().lower().replace("darwin", "macos")
+    return {
+        function.name for function in api.functions if host not in platforms(function)
+    }
+
+
 def main() -> None:
-    names = binding_names()
+    api = parse_headers(REPO_ROOT / "include")
+    validate(api)
+    names = binding_names(api)
     declarations = set().union(*(spelled.keys() for spelled in names.values()))
     names["c"] = {name: name for name in declarations}
     index: dict[str, dict[str, dict[str, str]]] = {}
@@ -273,6 +287,9 @@ def main() -> None:
     for language, natives in NATIVE_ONLY.items():
         for native in natives:
             index[native][language] = index[native]["c"]
+    for native in elsewhere(api):
+        for language in links:
+            index[native].setdefault(language, index[native]["c"])
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
 
