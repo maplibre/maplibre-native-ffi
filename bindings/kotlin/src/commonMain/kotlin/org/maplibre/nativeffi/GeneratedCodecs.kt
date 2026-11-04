@@ -171,6 +171,27 @@ internal fun NativeArena.putStyleExpressionOptions(target: Long, value: StyleExp
 internal fun NativeArena.writeStyleExpressionOptions(value: StyleExpressionOptions): Long =
   allocate(20, 4).also { putStyleExpressionOptions(it, value) }
 
+internal fun NativeArena.putVulkanDeviceOptions(target: Long, value: VulkanDeviceOptions) {
+  writeU32(target, w(28, 48).toUInt())
+  var fields = 0u
+  value.presentation?.let {
+    fields = fields or 1u
+    writeBool(target + 8, it)
+  }
+  value.deviceUuid?.let {
+    fields = fields or 2u
+    putView(target + w(12, 16), it)
+  }
+  value.deviceLuid?.let {
+    fields = fields or 4u
+    putView(target + w(20, 32), it)
+  }
+  writeU32(target + 4, fields)
+}
+
+internal fun NativeArena.writeVulkanDeviceOptions(value: VulkanDeviceOptions): Long =
+  allocate(w(28, 48), w(4, 8)).also { putVulkanDeviceOptions(it, value) }
+
 internal fun NativeCall.putCustomGeometrySourceOptions(
   target: Long,
   value: CustomGeometrySourceOptions,
@@ -1416,6 +1437,9 @@ internal fun readStyleExpressionInfo(source: Long): StyleExpressionInfo =
     isZoomConstant = readBool(source + 5),
   )
 
+internal fun readVulkanDeviceContextResult(source: Long): VulkanDeviceContextResult =
+  VulkanDeviceContextResult(context = readVulkanContextDescriptor(source + w(4, 8)))
+
 internal fun NativeArena.putCamera(target: Long, value: Camera) {
   putLatLng(target, value.center)
   writeF64(target + 16, value.centerAltitude)
@@ -1905,6 +1929,17 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
       else -> OfflineRegionDefinition.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72)))
     }
   }
+
+internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor =
+  VulkanContextDescriptor(
+    instance = NativePointer.ofAddress(readAddress(source)),
+    physicalDevice = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+    device = NativePointer.ofAddress(readAddress(source + w(8, 16))),
+    graphicsQueue = NativePointer.ofAddress(readAddress(source + w(12, 24))),
+    graphicsQueueFamilyIndex = readU32(source + w(16, 32)),
+    getInstanceProcAddr = NativePointer.ofAddress(readAddress(source + w(20, 40))),
+    getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(24, 48))),
+  )
 
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
   writeF64(target, value.x1)

@@ -14,6 +14,7 @@ from ._generated_operations import (
     _ResourceTransformRequestHandleOperations,
     _RuntimeHandleOperations,
     _StyleExpressionHandleOperations,
+    _VulkanDeviceHandleOperations,
 )
 from ._lifecycle import NativeHandleMixin, ScopedHandleMixin
 
@@ -323,6 +324,32 @@ class StyleExpressionHandle(_StyleExpressionHandleOperations, ScopedHandleMixin)
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "StyleExpressionHandle"
+
+    def __init__(self):
+        raise TypeError("native handles are returned by their owning operations")
+
+    @classmethod
+    def _from_native(cls, native, parent=None):
+        owner = cls.__new__(cls)
+        owner._native = native
+        owner._parent = parent
+        return owner
+
+    @property
+    def id(self) -> int:
+        """The native handle value. It stays readable after release."""
+        return int(self._native.id)
+
+
+class VulkanDeviceHandle(_VulkanDeviceHandleOperations, ScopedHandleMixin):
+    """A Vulkan instance, device, and queue that the library creates and owns.
+
+    See `mln_vulkan_device` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
+    __module__ = "maplibre_native_ffi"
+    _handle_name = "VulkanDeviceHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

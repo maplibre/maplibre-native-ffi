@@ -2811,6 +2811,66 @@ napi_value mln_ts_read_vec3(napi_env env, const mln_vec3* source, size_t size) {
   return result;
 }
 
+napi_value mln_ts_read_vulkan_context_descriptor(
+  napi_env env, const mln_vulkan_context_descriptor* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "instance",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->instance))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "physicalDevice",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->physical_device))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "device",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->device))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "graphicsQueue",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->graphics_queue))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "graphicsQueueFamilyIndex",
+        mln_ts_number(env, (double)(source->graphics_queue_family_index))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "getInstanceProcAddr",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->get_instance_proc_addr))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "getDeviceProcAddr",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->get_device_proc_addr))
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_vulkan_device_context_result(
+  napi_env env, const mln_vulkan_device_context_result* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "context",
+        mln_ts_read_vulkan_context_descriptor(
+          env, &(source->context), sizeof(source->context)
+        )
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_vulkan_texture_frame(
   napi_env env, const mln_vulkan_texture_frame* source, size_t size
 ) {
@@ -6782,31 +6842,59 @@ bool mln_ts_write_vulkan_context_descriptor(
   if (!mln_ts_member(call, value, "graphicsQueueFamilyIndex", &member))
     return false;
   mln_ts_path(child, sizeof child, path, "graphicsQueueFamilyIndex");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->graphics_queue_family_index = (uint32_t)number;
-    }
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->graphics_queue_family_index = (uint32_t)number;
   }
   if (!mln_ts_member(call, value, "getInstanceProcAddr", &member)) return false;
   mln_ts_path(child, sizeof child, path, "getInstanceProcAddr");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->get_instance_proc_addr = (void*)(uintptr_t)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->get_instance_proc_addr = (void*)(uintptr_t)number;
   }
   if (!mln_ts_member(call, value, "getDeviceProcAddr", &member)) return false;
   mln_ts_path(child, sizeof child, path, "getDeviceProcAddr");
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->get_device_proc_addr = (void*)(uintptr_t)number;
+  }
+  return true;
+}
+
+bool mln_ts_write_vulkan_device_options(
+  mln_ts_call* call, napi_value value, mln_vulkan_device_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "presentation", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "presentation");
   if (!mln_ts_is_absent(call, member)) {
     {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->get_device_proc_addr = (void*)(uintptr_t)number;
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->presentation = flag;
     }
+    out->fields |= MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
+  }
+  if (!mln_ts_member(call, value, "deviceUuid", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "deviceUuid");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_bytes_view(call, member, &out->device_uuid, child))
+      return false;
+    out->fields |= MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
+  }
+  if (!mln_ts_member(call, value, "deviceLuid", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "deviceLuid");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_bytes_view(call, member, &out->device_luid, child))
+      return false;
+    out->fields |= MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
   }
   return true;
 }

@@ -85,6 +85,8 @@ import type {
   TextureReadbackResult,
   VulkanBorrowedTextureDescriptor,
   VulkanBorrowedTextureReplacement,
+  VulkanDeviceContextResult,
+  VulkanDeviceOptions,
   VulkanSurfaceDescriptor,
   VulkanSurfaceReplacement,
   VulkanTextureFrame,
@@ -5508,6 +5510,96 @@ export class StyleExpressionHandle extends Owner {
   }
 }
 defineDisposers(StyleExpressionHandle, "release", "release");
+
+/**
+ * A Vulkan instance, device, and queue that the library creates and owns.
+ *
+ * See `mln_vulkan_device` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export class VulkanDeviceHandle extends Owner {
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
+    super(key, handle, "VulkanDeviceHandle", { registrations });
+  }
+  /**
+   * Calls `release()`, for `await using`.
+   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.asyncDispose]: () => Promise<void>;
+  /**
+   * Calls `release()`, for `using`.
+   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.dispose]: () => void;
+
+  /**
+   * Creates a Vulkan instance, device, and graphics queue for render sessions.
+   *
+   * Attach sessions with the context from `VulkanDeviceHandle.getContext()`, in
+   * place of a device of your own. Without `device_uuid` or `device_luid`, the
+   * device uses a discrete GPU over an integrated one, and an integrated GPU
+   * over any other. The device enables the features that rendering needs, and
+   * the external memory and semaphore extensions that the GPU offers.
+   *
+   * See `mln_vulkan_device_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.vulkan`, or when `presentation` is true and the Vulkan
+   *   loader or the GPU can't present.
+   * - `Status.notFound` when no GPU matches `device_uuid` and `device_luid`.
+   * - `Status.nativeError` when there is no Vulkan loader, no GPU has a
+   *   graphics queue, or Vulkan can't create the instance or the device.
+   */
+  static create(options?: VulkanDeviceOptions): VulkanDeviceHandle {
+    const handle = native.mln_vulkan_device_create(options);
+    return adopt(
+      handle,
+      () => new VulkanDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_vulkan_device_release(disposed, undefined),
+    );
+  }
+
+  /**
+   * Gets the context to attach render sessions to the device with.
+   *
+   * Pass it as the context of `MapHandle.attachVulkanSurface()` or
+   * `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device share
+   * its one graphics queue, and the library orders their submissions to it. To
+   * submit to the queue yourself, set `RenderSessionAttachOptions.queueLock` on
+   * each session.
+   *
+   * See `mln_vulkan_device_get_context` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+   */
+  getContext(): VulkanDeviceContextResult {
+    return native.mln_vulkan_device_get_context(this.id);
+  }
+
+  /**
+   * Releases a Vulkan device.
+   *
+   * Render sessions that attached with the device's context keep using it until
+   * they detach or retire, and the library destroys the device after the last
+   * of them.
+   *
+   * See `mln_vulkan_device_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_vulkan_device_release(handle, token),
+    );
+  }
+}
+defineDisposers(VulkanDeviceHandle, "release", "release");
 
 /**
  * A `GpuSync` whose native objects stay valid only while the

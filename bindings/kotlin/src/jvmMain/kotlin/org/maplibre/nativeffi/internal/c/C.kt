@@ -1248,6 +1248,11 @@ internal actual object C {
     Ffm.downcall("mln_style_expression_release", null, JAVA_LONG)
   private val mln_supported_render_backend_mask =
     Ffm.downcall("mln_supported_render_backend_mask", JAVA_INT)
+  private val mln_vulkan_device_create =
+    Ffm.downcall("mln_vulkan_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_vulkan_device_get_context =
+    Ffm.downcall("mln_vulkan_device_get_context", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_vulkan_device_release = Ffm.downcall("mln_vulkan_device_release", null, JAVA_LONG)
 
   actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
     mln_acquired_frame_discard.invokeExact(frame, outDiagnostic) as Int
@@ -3130,6 +3135,19 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int =
     mln_supported_render_backend_mask.invokeExact() as Int
+
+  actual fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_vulkan_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
+
+  actual fun mln_vulkan_device_get_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int = mln_vulkan_device_get_context.invokeExact(device, outResult, outDiagnostic) as Int
+
+  actual fun mln_vulkan_device_release(device: Long) {
+    mln_vulkan_device_release.invoke(device)
+  }
 }
 
 // The layout of each record that C passes or returns by value, nested ones first.

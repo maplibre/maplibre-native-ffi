@@ -234,6 +234,8 @@ struct mln_test_graphics {
   metal_runtime objc;
   void* metal_queue;
   vulkan_functions vk;
+  // Set when the instance and device are the caller's.
+  bool vulkan_borrowed;
   VkCommandPool vulkan_command_pool;
   bool vulkan_headless_surface;
   bool vulkan_metal_surface;
@@ -938,9 +940,44 @@ static bool vulkan_create(mln_test_graphics* graphics) {
   return true;
 }
 
+// Loads the functions of the caller's instance and device that `context`
+// names.
+static bool vulkan_borrow(
+  mln_test_graphics* graphics, const mln_test_graphics_context* context
+) {
+  if (
+    context->vulkan_instance == NULL || context->vulkan_device == NULL ||
+    context->vulkan_queue == NULL ||
+    context->vulkan_get_instance_proc_addr == NULL
+  ) {
+    set_error("the context names no Vulkan device");
+    return false;
+  }
+  graphics->context = *context;
+  graphics->context.backend = MLN_TEST_GRAPHICS_BACKEND_VULKAN;
+  graphics->vulkan_borrowed = true;
+  *(void**)&graphics->vk.get_instance_proc_addr =
+    context->vulkan_get_instance_proc_addr;
+  if (!vulkan_load_functions(graphics)) return false;
+  if (context->vulkan_get_device_proc_addr != NULL) {
+    *(void**)&graphics->vk.get_device_proc_addr =
+      context->vulkan_get_device_proc_addr;
+  }
+  graphics->context.vulkan_get_device_proc_addr =
+    (void*)(uintptr_t)graphics->vk.get_device_proc_addr;
+  return true;
+}
+
 static void vulkan_destroy(mln_test_graphics* graphics) {
   vulkan_functions* vk = &graphics->vk;
   VkDevice device = (VkDevice)graphics->context.vulkan_device;
+  if (graphics->vulkan_borrowed) {
+    // The pool's command buffers finished with the copies that used them.
+    if (graphics->vulkan_command_pool != VK_NULL_HANDLE) {
+      vk->destroy_command_pool(device, graphics->vulkan_command_pool, NULL);
+    }
+    return;
+  }
   if (device != VK_NULL_HANDLE) {
     vk->device_wait_idle(device);
     if (graphics->vulkan_command_pool != VK_NULL_HANDLE) {
@@ -2147,6 +2184,27 @@ mln_test_graphics* mln_test_graphics_create(uint32_t backend) {
     return NULL;
   }
   return graphics;
+}
+
+mln_test_graphics* mln_test_graphics_create_vulkan_borrowed(
+  const mln_test_graphics_context* context
+) {
+#if !defined(__EMSCRIPTEN__)
+  mln_test_graphics* graphics = calloc(1, sizeof(*graphics));
+  if (graphics == NULL) {
+    set_error("out of memory");
+    return NULL;
+  }
+  if (!vulkan_borrow(graphics, context)) {
+    free(graphics);
+    return NULL;
+  }
+  return graphics;
+#else
+  (void)context;
+  set_error("this platform has no Vulkan");
+  return NULL;
+#endif
 }
 
 void mln_test_graphics_destroy(mln_test_graphics* graphics) {

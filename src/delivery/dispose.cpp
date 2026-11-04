@@ -6,6 +6,7 @@
 #include "map/map.hpp"
 #include "render/offscreen_device.hpp"
 #include "render/render_session_common.hpp"
+#include "render/vulkan_device.hpp"
 #include "resources/custom_resource_provider.hpp"
 #include "resources/resource_transform.hpp"
 #include "runtime/runtime.hpp"
@@ -48,6 +49,9 @@ auto dispose_owner(core::HandleKind kind, std::uint64_t handle) noexcept
         return core::dispose_runtime(handle);
       case core::HandleKind::StyleExpression:
         core::style_expression_release(handle);
+        return MLN_STATUS_OK;
+      case core::HandleKind::VulkanDevice:
+        core::vulkan_device_release(handle);
         return MLN_STATUS_OK;
     }
     return MLN_STATUS_INVALID_ARGUMENT;

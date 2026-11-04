@@ -75,6 +75,8 @@ import type {
   StyleVectorTileEncoding,
   VulkanBorrowedTextureDescriptor,
   VulkanBorrowedTextureReplacement,
+  VulkanDeviceContextResult,
+  VulkanDeviceOptions,
   VulkanSurfaceDescriptor,
   VulkanSurfaceReplacement,
   VulkanTextureFrame,
@@ -879,6 +881,9 @@ export interface NativeOperations {
     token: object | undefined,
   ): void;
   mln_supported_render_backend_mask(): RenderBackendFlag;
+  mln_vulkan_device_create(options: VulkanDeviceOptions | undefined): bigint;
+  mln_vulkan_device_get_context(device: bigint): VulkanDeviceContextResult;
+  mln_vulkan_device_release(device: bigint, token: object | undefined): void;
   mln_acquired_frame_view_begin(handle: bigint): bigint;
   mln_acquired_frame_view_end(scope: bigint): void;
 }

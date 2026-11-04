@@ -5556,6 +5556,18 @@ type VulkanContextDescriptor struct {
 	GetDeviceProcAddr uintptr
 }
 
+func copyVulkanContextDescriptor(raw C.mln_vulkan_context_descriptor) VulkanContextDescriptor {
+	var result VulkanContextDescriptor
+	result.Instance = uintptr(unsafe.Pointer(raw.instance))
+	result.PhysicalDevice = uintptr(unsafe.Pointer(raw.physical_device))
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.GraphicsQueue = uintptr(unsafe.Pointer(raw.graphics_queue))
+	result.GraphicsQueueFamilyIndex = uint32(raw.graphics_queue_family_index)
+	result.GetInstanceProcAddr = uintptr(unsafe.Pointer(raw.get_instance_proc_addr))
+	result.GetDeviceProcAddr = uintptr(unsafe.Pointer(raw.get_device_proc_addr))
+	return result
+}
+
 func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *bindingArena) C.mln_vulkan_context_descriptor {
 	raw := C.mln_vulkan_context_descriptor{}
 	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
@@ -5565,6 +5577,53 @@ func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *binding
 	raw.graphics_queue_family_index = C.uint32_t(input.GraphicsQueueFamilyIndex)
 	raw.get_instance_proc_addr = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetInstanceProcAddr)))
 	raw.get_device_proc_addr = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetDeviceProcAddr)))
+	return raw
+}
+
+// VulkanDeviceContextResult corresponds to mln_vulkan_device_context_result. A
+// Vulkan device's context, as VulkanDeviceHandle.Context() reports it.
+//
+// See mln_vulkan_device_context_result in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
+type VulkanDeviceContextResult struct{ Context VulkanContextDescriptor }
+
+func copyVulkanDeviceContextResult(raw C.mln_vulkan_device_context_result) VulkanDeviceContextResult {
+	var result VulkanDeviceContextResult
+	result.Context = copyVulkanContextDescriptor(raw.context)
+	return result
+}
+
+// VulkanDeviceOptions corresponds to mln_vulkan_device_options. Options for
+// NewVulkanDevice().
+//
+// See mln_vulkan_device_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
+type VulkanDeviceOptions struct {
+	// Whether the device can present to a window's surface. It enables
+	// VK_KHR_surface and the platform's surface extensions on the instance, and
+	// VK_KHR_swapchain on the device. Defaults to false.
+	Presentation *bool
+	// The 16-byte deviceUUID of the GPU to use, as VkPhysicalDeviceIDProperties
+	// reports it. Name a GPU to share textures with another graphics API on it.
+	DeviceUuid *[]byte
+	// The 8-byte deviceLUID of the GPU to use, as VkPhysicalDeviceIDProperties
+	// reports it. On Windows, this is the GPU's DXGI adapter LUID.
+	DeviceLuid *[]byte
+}
+
+func nativeVulkanDeviceOptions(input VulkanDeviceOptions, arena *bindingArena) C.mln_vulkan_device_options {
+	raw := C.mln_vulkan_device_options{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_VULKAN_DEVICE_OPTION_PRESENTATION, &raw.presentation, input.Presentation, arena, bindingBool[bool, C.bool])
+	if input.DeviceUuid != nil {
+		raw.device_uuid = C.mln_buffer_view{data: arena.bytes((*input.DeviceUuid)), size: C.size_t(len((*input.DeviceUuid)))}
+		raw.fields |= C.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID
+	}
+	if input.DeviceLuid != nil {
+		raw.device_luid = C.mln_buffer_view{data: arena.bytes((*input.DeviceLuid)), size: C.size_t(len((*input.DeviceLuid)))}
+		raw.fields |= C.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID
+	}
 	return raw
 }
 
@@ -6178,6 +6237,38 @@ func (handle *StyleExpressionHandle) IsClosed() bool { return handle.owner().isC
 // String formats the handle as StyleExpressionHandle(id=0x<hex>, closed=<true|false>).
 func (handle *StyleExpressionHandle) String() string {
 	return bindingDescribe("StyleExpressionHandle", handle.owner())
+}
+
+// VulkanDeviceHandle corresponds to mln_vulkan_device. A Vulkan instance,
+// device, and queue that the library creates and owns.
+//
+// See mln_vulkan_device in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type VulkanDeviceHandle struct{ *bindingOwner }
+
+func adoptVulkanDeviceHandle(raw uint64, parent any) *VulkanDeviceHandle {
+	owner := &VulkanDeviceHandle{bindingAdopt(raw, parent, "VulkanDeviceHandle", func(raw uint64) { C.mln_vulkan_device_release(C.mln_vulkan_device(raw)) })}
+	return owner
+}
+
+func (handle *VulkanDeviceHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// ID returns the native handle value. It stays readable after the handle
+// is released.
+func (handle *VulkanDeviceHandle) ID() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *VulkanDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as VulkanDeviceHandle(id=0x<hex>, closed=<true|false>).
+func (handle *VulkanDeviceHandle) String() string {
+	return bindingDescribe("VulkanDeviceHandle", handle.owner())
 }
 
 type MapHandleDiscarding struct{ owner *MapHandle }
@@ -9043,6 +9134,71 @@ func (receiver *StyleExpressionHandle) Release() error {
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 func SupportedRenderBackendMask() RenderBackendFlag {
 	return RenderBackendFlag(C.mln_supported_render_backend_mask())
+}
+
+// NewVulkanDevice creates a Vulkan instance, device, and graphics queue for
+// render sessions.
+//
+// Attach sessions with the context from VulkanDeviceHandle.Context(), in place
+// of a device of your own. Without device_uuid or device_luid, the device uses
+// a discrete GPU over an integrated one, and an integrated GPU over any other.
+// The device enables the features that rendering needs, and the external memory
+// and semaphore extensions that the GPU offers.
+//
+// See mln_vulkan_device_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagVulkan, or when presentation is true and the Vulkan
+//     loader or the GPU can't present.
+//   - StatusNotFound when no GPU matches device_uuid and device_luid.
+//   - StatusNativeError when there is no Vulkan loader, no GPU has a graphics
+//     queue, or Vulkan can't create the instance or the device.
+func NewVulkanDevice(options *VulkanDeviceOptions) (*VulkanDeviceHandle, error) {
+	var outDevice C.mln_vulkan_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_device_create(bindingStoreOptional(options, arena, nativeVulkanDeviceOptions), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *VulkanDeviceHandle {
+		adopted := adoptVulkanDeviceHandle(uint64(outDevice), nil)
+		return adopted
+	})
+}
+
+// Context gets the context to attach render sessions to the device with.
+//
+// Pass it as the context of MapHandle.AttachVulkanSurface() or
+// MapHandle.AttachVulkanBorrowedTexture(). The sessions on the device share its
+// one graphics queue, and the library orders their submissions to it. To submit
+// to the queue yourself, set RenderSessionAttachOptions.QueueLock on each
+// session.
+//
+// See mln_vulkan_device_get_context in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
+func (receiver *VulkanDeviceHandle) Context() (VulkanDeviceContextResult, error) {
+	var outResult C.mln_vulkan_device_context_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_device_get_context(C.mln_vulkan_device(raw), &outResult, diagnostic))
+	}, func(arena *bindingArena) VulkanDeviceContextResult {
+		return copyVulkanDeviceContextResult(outResult)
+	})
+}
+
+// Release releases a Vulkan device.
+//
+// Render sessions that attached with the device's context keep using it until
+// they detach or retire, and the library destroys the device after the last of
+// them.
+//
+// See mln_vulkan_device_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
+func (receiver *VulkanDeviceHandle) Release() error {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_vulkan_device_release(C.mln_vulkan_device(raw))
+		return struct{}{}
+	})
+	return err
 }
 
 // Dispose releases the map in any state, and finishes in the background.

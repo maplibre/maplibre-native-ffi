@@ -130,6 +130,15 @@ MLN_TEST_GRAPHICS_API void mln_test_graphics_destroy(
   mln_test_graphics* MLN_TEST_GRAPHICS_NULLABLE graphics
 );
 
+// Creates a Vulkan graphics object on the instance, device, and queue that
+// `context` names, which stay the caller's: destroying the graphics object
+// leaves them. Destroy it before the device. Returns null when `context` names
+// no Vulkan device.
+MLN_TEST_GRAPHICS_API mln_test_graphics* MLN_TEST_GRAPHICS_NULLABLE
+mln_test_graphics_create_vulkan_borrowed(
+  const mln_test_graphics_context* MLN_TEST_GRAPHICS_NONNULL context
+);
+
 MLN_TEST_GRAPHICS_API bool mln_test_graphics_get_context(
   const mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics,
   mln_test_graphics_context* MLN_TEST_GRAPHICS_NONNULL out_context

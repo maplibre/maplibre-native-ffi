@@ -1418,4 +1418,20 @@ internal actual object C {
   @JvmStatic actual external fun mln_style_expression_release(expression: Long): Unit
 
   @JvmStatic actual external fun mln_supported_render_backend_mask(): Int
+
+  @JvmStatic
+  actual external fun mln_vulkan_device_create(
+    options: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_vulkan_device_get_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic actual external fun mln_vulkan_device_release(device: Long): Unit
 }

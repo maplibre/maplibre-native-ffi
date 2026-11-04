@@ -4852,6 +4852,61 @@ class VulkanContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class VulkanDeviceContextResult:
+    """A Vulkan device's context, as `VulkanDeviceHandle.get_context()` reports
+    it.
+
+    See `mln_vulkan_device_context_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    """
+
+    context: VulkanContextDescriptor
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(context=VulkanContextDescriptor._from_native(raw["context"]))
+
+
+@dataclass(frozen=True, slots=True)
+class VulkanDeviceOptions:
+    """Options for `VulkanDeviceHandle.create()`.
+
+    See `mln_vulkan_device_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    """
+
+    presentation: bool | None = None
+    """Whether the device can present to a window's surface. It enables
+    VK_KHR_surface and the platform's surface extensions on the instance, and
+    VK_KHR_swapchain on the device. Defaults to false.
+    """
+
+    device_uuid: Buffer | None = None
+    """The 16-byte `deviceUUID` of the GPU to use, as
+    `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
+    with another graphics API on it.
+    """
+
+    device_luid: Buffer | None = None
+    """The 8-byte `deviceLUID` of the GPU to use, as
+    `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
+    DXGI adapter LUID.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "device_uuid", _bytes(self.device_uuid))
+        object.__setattr__(self, "device_luid", _bytes(self.device_luid))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            presentation=raw["presentation"],
+            device_uuid=raw["device_uuid"],
+            device_luid=raw["device_luid"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class VulkanSurfaceDescriptor:
     """A Vulkan surface to present to, for `MapHandle.attach_vulkan_surface()`.
 

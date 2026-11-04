@@ -21,6 +21,7 @@ typedef mln_resource_request = Uint64;
 typedef mln_resource_transform_request = Uint64;
 typedef mln_runtime = Uint64;
 typedef mln_style_expression = Uint64;
+typedef mln_vulkan_device = Uint64;
 
 typedef mln_camera_transition_end_callback =
     Pointer<NativeFunction<mln_camera_transition_end_callbackFunction>>;
@@ -1667,6 +1668,23 @@ final class mln_vulkan_context_descriptor extends Struct {
   external Pointer<Void> get_device_proc_addr;
 }
 
+final class mln_vulkan_device_context_result extends Struct {
+  @Uint32()
+  external int size;
+  external mln_vulkan_context_descriptor context;
+}
+
+final class mln_vulkan_device_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Bool()
+  external bool presentation;
+  external mln_buffer_view device_uuid;
+  external mln_buffer_view device_luid;
+}
+
 final class mln_vulkan_surface_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -2355,6 +2373,11 @@ const MLN_URL_MATCH_GLOB = 1;
 // mln_viewport_mode
 const MLN_VIEWPORT_MODE_DEFAULT = 0;
 const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
+
+// mln_vulkan_device_option_field
+const MLN_VULKAN_DEVICE_OPTION_PRESENTATION = 1;
+const MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID = 2;
+const MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID = 4;
 
 // mln_vulkan_image_owner
 const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0;
@@ -4935,3 +4958,32 @@ external void mln_style_expression_release(int expression);
 
 @Native<Uint32 Function()>()
 external int mln_supported_render_backend_mask();
+
+@Native<
+  Int32 Function(
+    Pointer<mln_vulkan_device_options>,
+    Pointer<mln_vulkan_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_vulkan_device_create(
+  Pointer<mln_vulkan_device_options> options,
+  Pointer<mln_vulkan_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_vulkan_device,
+    Pointer<mln_vulkan_device_context_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_vulkan_device_get_context(
+  int device,
+  Pointer<mln_vulkan_device_context_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_vulkan_device)>()
+external void mln_vulkan_device_release(int device);

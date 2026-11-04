@@ -1882,6 +1882,19 @@ internal actual object C {
   }
 
   actual fun mln_supported_render_backend_mask(): Int = mln_kw_mln_supported_render_backend_mask()
+
+  actual fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_vulkan_device_create(word(options), word(outDevice), word(outDiagnostic))
+
+  actual fun mln_vulkan_device_get_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_vulkan_device_get_context(device, word(outResult), word(outDiagnostic))
+
+  actual fun mln_vulkan_device_release(device: Long) {
+    mln_kw_mln_vulkan_device_release(device)
+  }
 }
 
 private fun mln_kw_mln_acquired_frame_discard(p0: Long, p1: Int): Int =
@@ -3235,3 +3248,16 @@ private fun mln_kw_mln_supported_render_backend_mask(): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_supported_render_backend_mask()",
   )
+
+private fun mln_kw_mln_vulkan_device_create(p0: Int, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_create(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_vulkan_device_get_context(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_get_context(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_vulkan_device_release(p0: Long): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_release(p0)")

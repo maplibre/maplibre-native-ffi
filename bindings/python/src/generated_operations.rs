@@ -1525,6 +1525,48 @@ fn generated_copy_mln_vec3(py: Python<'_>, value: &sys::mln_vec3) -> PyResult<Py
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_vulkan_context_descriptor(
+    py: Python<'_>,
+    value: &sys::mln_vulkan_context_descriptor,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("instance", generated_value(py, value.instance as usize)?)?;
+    dict.set_item(
+        "physical_device",
+        generated_value(py, value.physical_device as usize)?,
+    )?;
+    dict.set_item("device", generated_value(py, value.device as usize)?)?;
+    dict.set_item(
+        "graphics_queue",
+        generated_value(py, value.graphics_queue as usize)?,
+    )?;
+    dict.set_item(
+        "graphics_queue_family_index",
+        generated_value(py, value.graphics_queue_family_index)?,
+    )?;
+    dict.set_item(
+        "get_instance_proc_addr",
+        generated_value(py, value.get_instance_proc_addr as usize)?,
+    )?;
+    dict.set_item(
+        "get_device_proc_addr",
+        generated_value(py, value.get_device_proc_addr as usize)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_vulkan_device_context_result(
+    py: Python<'_>,
+    value: &sys::mln_vulkan_device_context_result,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "context",
+        generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_vulkan_texture_frame(
     py: Python<'_>,
     value: &sys::mln_vulkan_texture_frame,
@@ -3257,6 +3299,28 @@ fn generated_input_mln_vulkan_context_descriptor<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_vulkan_device_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_vulkan_device_options> {
+    let mut raw: sys::mln_vulkan_device_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_vulkan_device_options>() as _;
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "presentation")? {
+        raw.presentation = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
+    }
+    if let Some(field) = generated_present(value, "device_uuid")? {
+        raw.device_uuid = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
+    }
+    if let Some(field) = generated_present(value, "device_luid")? {
+        raw.device_luid = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_vulkan_surface_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3398,6 +3462,13 @@ unsafe extern "C" fn generated_dispose_mln_style_expression(
     handle: sys::mln_style_expression,
 ) -> sys::mln_status {
     unsafe { sys::mln_style_expression_release(handle) };
+    sys::MLN_STATUS_OK
+}
+
+unsafe extern "C" fn generated_dispose_mln_vulkan_device(
+    handle: sys::mln_vulkan_device,
+) -> sys::mln_status {
+    unsafe { sys::mln_vulkan_device_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -8359,6 +8430,66 @@ impl StyleExpressionHandle {
         Ok(py.None())
     }
 }
+
+#[pymethods]
+impl VulkanDeviceHandle {
+    #[staticmethod]
+    #[pyo3(signature = (options=None))]
+    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_vulkan_device_options(&options, storage)
+        })?;
+        let mut out_device: sys::mln_vulkan_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_vulkan_device_create(
+                    generated_pointer(&options_value),
+                    &mut out_device,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { VulkanDeviceHandle::adopt(py, out_device, Vec::new()) }
+    }
+    #[pyo3(signature = ())]
+    fn get_context(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_result: sys::mln_vulkan_device_context_result = unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_vulkan_device_context_result>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_vulkan_device_get_context(handle, &mut out_result, diagnostic)
+            })
+        }?;
+        generated_copy_mln_vulkan_device_context_result(py, &out_result)
+    }
+    #[pyo3(signature = ())]
+    fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_vulkan_device_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_vulkan_device_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+}
 generated_owner!(
     AcquiredFrameHandle,
     "_AcquiredFrameHandle",
@@ -8424,6 +8555,12 @@ generated_owner!(
     "_StyleExpressionHandle",
     mln_style_expression,
     Some(generated_dispose_mln_style_expression)
+);
+generated_owner!(
+    VulkanDeviceHandle,
+    "_VulkanDeviceHandle",
+    mln_vulkan_device,
+    Some(generated_dispose_mln_vulkan_device)
 );
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]
@@ -8613,6 +8750,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ResourceTransformRequestHandle>()?;
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<StyleExpressionHandle>()?;
+    module.add_class::<VulkanDeviceHandle>()?;
     module.add_function(wrap_pyfunction!(init_android, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(camera_for_tile, module)?)?;

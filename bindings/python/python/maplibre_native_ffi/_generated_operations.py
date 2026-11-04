@@ -94,6 +94,8 @@ from ._generated_values import (
     TextureReadbackResult,
     VulkanBorrowedTextureDescriptor,
     VulkanBorrowedTextureReplacement,
+    VulkanDeviceContextResult,
+    VulkanDeviceOptions,
     VulkanSurfaceDescriptor,
     VulkanSurfaceReplacement,
     VulkanTextureFrame,
@@ -111,6 +113,7 @@ if TYPE_CHECKING:
         RenderSessionHandle,
         RuntimeHandle,
         StyleExpressionHandle,
+        VulkanDeviceHandle,
     )
 
 
@@ -2740,6 +2743,65 @@ class _StyleExpressionHandleOperations(GeneratedOperations):
 
         See `mln_style_expression_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+        """
+        return self._native.release()
+
+
+class _VulkanDeviceHandleOperations(GeneratedOperations):
+    _native: _native._VulkanDeviceHandle
+
+    @classmethod
+    def create(cls, options: VulkanDeviceOptions | None = None) -> VulkanDeviceHandle:
+        """Creates a Vulkan instance, device, and graphics queue for render
+        sessions.
+
+        Attach sessions with the context from
+        `VulkanDeviceHandle.get_context()`, in place of a device of your own.
+        Without `device_uuid` or `device_luid`, the device uses a discrete
+        GPU over an integrated one, and an integrated GPU over any other. The
+        device enables the features that rendering needs, and the external
+        memory and semaphore extensions that the GPU offers.
+
+        See `mln_vulkan_device_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.VULKAN`, or when `presentation` is true and the
+          Vulkan loader or the GPU can't present.
+        - `Status.NOT_FOUND` when no GPU matches `device_uuid` and
+          `device_luid`.
+        - `Status.NATIVE_ERROR` when there is no Vulkan loader, no GPU has a
+          graphics queue, or Vulkan can't create the instance or the device.
+        """
+        return _adopt_value(
+            _native._VulkanDeviceHandle.create(options), "VulkanDeviceHandle", None
+        )
+
+    def get_context(self) -> VulkanDeviceContextResult:
+        """Gets the context to attach render sessions to the device with.
+
+        Pass it as the context of `MapHandle.attach_vulkan_surface()` or
+        `MapHandle.attach_vulkan_borrowed_texture()`. The sessions on the
+        device share its one graphics queue, and the library orders their
+        submissions to it. To submit to the queue yourself, set
+        `RenderSessionAttachOptions.queue_lock` on each session.
+
+        See `mln_vulkan_device_get_context` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+        """
+        return VulkanDeviceContextResult._from_native(self._native.get_context())
+
+    def release(self) -> None:
+        """Releases a Vulkan device.
+
+        Render sessions that attached with the device's context keep using it
+        until they detach or retire, and the library destroys the device
+        after the last of them.
+
+        See `mln_vulkan_device_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
         """
         return self._native.release()
 

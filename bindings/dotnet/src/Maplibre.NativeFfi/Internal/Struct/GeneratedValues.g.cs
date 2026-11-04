@@ -2531,6 +2531,22 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static VulkanContextDescriptor CopyVulkanContextDescriptor(
+        mln_vulkan_context_descriptor value
+    ) =>
+        default(VulkanContextDescriptor) with
+        {
+            Instance = NativePointer.FromNativeAddress((nint)value.instance),
+            PhysicalDevice = NativePointer.FromNativeAddress((nint)value.physical_device),
+            Device = NativePointer.FromNativeAddress((nint)value.device),
+            GraphicsQueue = NativePointer.FromNativeAddress((nint)value.graphics_queue),
+            GraphicsQueueFamilyIndex = value.graphics_queue_family_index,
+            GetInstanceProcAddr = NativePointer.FromNativeAddress(
+                (nint)value.get_instance_proc_addr
+            ),
+            GetDeviceProcAddr = NativePointer.FromNativeAddress((nint)value.get_device_proc_addr),
+        };
+
     internal static mln_vulkan_context_descriptor NativeVulkanContextDescriptor(
         VulkanContextDescriptor value
     )
@@ -2543,6 +2559,45 @@ internal static unsafe class GeneratedValues
         native.graphics_queue_family_index = value.GraphicsQueueFamilyIndex;
         native.get_instance_proc_addr = (void*)value.GetInstanceProcAddr.Address;
         native.get_device_proc_addr = (void*)value.GetDeviceProcAddr.Address;
+        return native;
+    }
+
+    internal static VulkanDeviceContextResult CopyVulkanDeviceContextResult(
+        mln_vulkan_device_context_result value
+    ) =>
+        default(VulkanDeviceContextResult) with
+        {
+            Context = CopyVulkanContextDescriptor(value.context),
+        };
+
+    internal static mln_vulkan_device_options NativeVulkanDeviceOptions(
+        VulkanDeviceOptions value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_vulkan_device_options();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_vulkan_device_options);
+        native.fields |= Put(
+            value.Presentation,
+            ref native.presentation,
+            MLN_VULKAN_DEVICE_OPTION_PRESENTATION,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.DeviceUuidStorage?.Items,
+            ref native.device_uuid,
+            MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID,
+            scope,
+            static (present, scope) => scope.Buffer(present)
+        );
+        native.fields |= Put(
+            value.DeviceLuidStorage?.Items,
+            ref native.device_luid,
+            MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID,
+            scope,
+            static (present, scope) => scope.Buffer(present)
+        );
         return native;
     }
 

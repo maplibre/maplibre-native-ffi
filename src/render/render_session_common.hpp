@@ -202,6 +202,18 @@ class RenderSessionBackend {
   // destroyed, so one that registered the host's graphics handles process-wide
   // releases them here: the host may reuse those handles.
   virtual void quarantine() noexcept {}
+
+  // Keeps something that this backend's objects belong to, such as the
+  // graphics device they were made on. The base is destroyed after every
+  // member of the derived backend, so what it keeps outlives the objects made
+  // on it, and a backend that detach or abandon keeps forever keeps it too.
+  // What it keeps is destroyed in no particular order.
+  void retain(std::shared_ptr<const void> object) {
+    retained_.push_back(std::move(object));
+  }
+
+ private:
+  std::vector<std::shared_ptr<const void>> retained_;
 };
 
 class SurfaceSessionBackend : public RenderSessionBackend {
@@ -409,18 +421,6 @@ class TextureSessionBackend : public RenderSessionBackend {
   virtual auto select_render_slot(std::size_t) -> mln_status {
     return MLN_STATUS_OK;
   }
-
-  // Keeps something that this backend's objects belong to, such as the
-  // graphics device they were made on. The base is destroyed after every
-  // member of the derived backend, so what it keeps outlives the objects made
-  // on it, and a backend that detach or abandon keeps forever keeps it too.
-  // What it keeps is destroyed in no particular order.
-  void retain(std::shared_ptr<const void> object) {
-    retained_.push_back(std::move(object));
-  }
-
- private:
-  std::vector<std::shared_ptr<const void>> retained_;
 };
 
 // The scheduler mbgl sees as current while a render session renders. Work

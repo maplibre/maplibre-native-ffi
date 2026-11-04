@@ -34,6 +34,7 @@ enum class HandleKind : std::uint8_t {
   DeliveryQueue = 23,
   StyleExpression = 25,
   OffscreenDevice = 26,
+  VulkanDevice = 27,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

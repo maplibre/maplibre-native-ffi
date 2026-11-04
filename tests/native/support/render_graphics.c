@@ -44,8 +44,7 @@ static void report(const char* what) {
   fprintf(stderr, "%s: %s\n", what, mln_test_graphics_last_error());
 }
 
-// Set only while mln_test_render_fixture_create_vulkan_borrowed_texture()
-// attaches a fixture on the graphics object of another.
+// Set only while a fixture attaches on a graphics object that it doesn't own.
 static mln_test_graphics* shared_graphics = NULL;
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 // Set only while mln_test_render_fixture_create_vulkan_handoff_ring()
@@ -430,7 +429,32 @@ bool mln_test_render_fixture_create_vulkan_surface(
   wrap_device_proc_addr = NULL;
   return attached;
 }
+
+bool mln_test_render_fixture_create_vulkan_on(
+  mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics
+) {
+  shared_graphics = graphics;
+  const bool attached = mln_test_render_fixture_create_borrowed_ring(
+    map, fixture, 1, MLN_TEST_PRESET_DRIVER
+  );
+  shared_graphics = NULL;
+  return attached;
+}
 #endif
+
+void mln_test_render_fixture_destroy_textures(
+  const mln_test_render_fixture* fixture
+) {
+  host_state* state = fixture->backend_state;
+  if (state == NULL) {
+    return;
+  }
+  for (size_t index = 0; index < state->texture_count; index += 1) {
+    mln_test_graphics_texture_destroy(state->textures[index]);
+    state->textures[index] = NULL;
+  }
+  state->texture_count = 0;
+}
 
 bool mln_test_render_fixture_create_surface(
   mln_map map, mln_test_render_fixture* fixture

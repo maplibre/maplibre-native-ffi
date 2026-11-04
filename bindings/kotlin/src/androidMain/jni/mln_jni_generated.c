@@ -2132,6 +2132,33 @@ static jint mln_supported_render_backend_mask_jni(JNIEnv* env, jclass type) {
   return (jint)mln_supported_render_backend_mask();
 }
 
+static jint mln_vulkan_device_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_vulkan_device_create(
+    MLN_JNI_POINTER(const mln_vulkan_device_options*, options),
+    MLN_JNI_POINTER(mln_vulkan_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_vulkan_device_get_context_jni(
+  JNIEnv* env, jclass type, jlong device, jlong out_result, jlong out_diagnostic
+) {
+  return (jint)mln_vulkan_device_get_context(
+    (mln_vulkan_device)device,
+    MLN_JNI_POINTER(mln_vulkan_device_context_result*, out_result),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_vulkan_device_release_jni(
+  JNIEnv* env, jclass type, jlong device
+) {
+  mln_vulkan_device_release((mln_vulkan_device)device);
+}
+
 const JNINativeMethod mln_jni_methods[] = {
   {"mln_acquired_frame_discard", "(JJ)I",
    (void*)mln_acquired_frame_discard_jni},
@@ -2484,6 +2511,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_style_expression_release_jni},
   {"mln_supported_render_backend_mask", "()I",
    (void*)mln_supported_render_backend_mask_jni},
+  {"mln_vulkan_device_create", "(JJJ)I", (void*)mln_vulkan_device_create_jni},
+  {"mln_vulkan_device_get_context", "(JJJ)I",
+   (void*)mln_vulkan_device_get_context_jni},
+  {"mln_vulkan_device_release", "(J)V", (void*)mln_vulkan_device_release_jni},
 };
 const size_t mln_jni_method_count =
   sizeof mln_jni_methods / sizeof mln_jni_methods[0];
@@ -2840,6 +2871,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_style_expression_release_jni},
   {"mln_supported_render_backend_mask", "()I",
    (void*)mln_supported_render_backend_mask_jni},
+  {"mln_vulkan_device_create", "(JJJ)I", (void*)mln_vulkan_device_create_jni},
+  {"mln_vulkan_device_get_context", "(JJJ)I",
+   (void*)mln_vulkan_device_get_context_jni},
+  {"mln_vulkan_device_release", "(J)V", (void*)mln_vulkan_device_release_jni},
 };
 
 static mln_jni_upcall mln_jni_completion_upcall = {

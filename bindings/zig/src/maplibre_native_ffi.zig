@@ -2544,6 +2544,80 @@ pub const StyleExpression = struct {
     }
 };
 
+/// A Vulkan instance, device, and queue that the library creates and owns.
+///
+/// See `mln_vulkan_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const VulkanDevice = struct {
+    raw: u64,
+    closed: bool = false,
+    pub const native_name = "mln_vulkan_device";
+    const methods = owner.Handle(@This(), "VulkanDevice", struct {
+        fn dispose(raw: u64) status.Error!void {
+            c.mln_vulkan_device_release(raw);
+        }
+    }.dispose);
+    pub const adopt = methods.adopt;
+    pub const id = methods.id;
+    pub const isClosed = methods.isClosed;
+    pub const format = methods.format;
+    pub const deinit = methods.deinit;
+    /// Creates a Vulkan instance, device, and graphics queue for render sessions.
+    ///
+    /// Attach sessions with the context from `VulkanDevice.getContext()`, in place
+    /// of a device of your own. Without `device_uuid` or `device_luid`, the device
+    /// uses a discrete GPU over an integrated one, and an integrated GPU over any
+    /// other. The device enables the features that rendering needs, and the
+    /// external memory and semaphore extensions that the GPU offers.
+    ///
+    /// See `mln_vulkan_device_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.vulkan`, or when `presentation` is true and the Vulkan
+    ///   loader or the GPU can't present.
+    /// - `error.NotFound` when no GPU matches `device_uuid` and `device_luid`.
+    /// - `error.NativeError` when there is no Vulkan loader, no GPU has a graphics
+    ///   queue, or Vulkan can't create the instance or the device.
+    pub const create = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+        fn function(options: ?VulkanDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!VulkanDevice {
+            return call.invoke("mln_vulkan_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(VulkanDevice) });
+        }
+    }.function else {};
+
+    /// Gets the context to attach render sessions to the device with.
+    ///
+    /// Pass it as the context of `Map.attachVulkanSurface()` or
+    /// `Map.attachVulkanBorrowedTexture()`. The sessions on the device share its
+    /// one graphics queue, and the library orders their submissions to it. To
+    /// submit to the queue yourself, set `RenderSessionAttachOptions.queue_lock` on
+    /// each session.
+    ///
+    /// See `mln_vulkan_device_get_context` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    pub const getContext = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+        fn function(self: VulkanDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!VulkanDeviceContextResult {
+            return call.invoke("mln_vulkan_device_get_context", .handle, self, null, diagnostic, .{call.sizedOut(VulkanDeviceContextResult)});
+        }
+    }.function else {};
+
+    /// Releases a Vulkan device.
+    ///
+    /// Render sessions that attached with the device's context keep using it until
+    /// they detach or retire, and the library destroys the device after the last of
+    /// them.
+    ///
+    /// See `mln_vulkan_device_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    pub fn release(self: *VulkanDevice) void {
+        if (self.closed) return;
+        c.mln_vulkan_device_release(self.raw);
+        self.closed = true;
+    }
+};
+
 /// How a camera change animates.
 ///
 /// See `mln_animation_options` in the
@@ -7851,6 +7925,61 @@ pub const VulkanContextDescriptor = struct {
             .graphics_queue_family_index = raw.graphics_queue_family_index,
             .get_instance_proc_addr = raw.get_instance_proc_addr,
             .get_device_proc_addr = raw.get_device_proc_addr,
+        };
+    }
+};
+
+/// A Vulkan device's context, as `VulkanDevice.getContext()` reports it.
+///
+/// See `mln_vulkan_device_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+pub const VulkanDeviceContextResult = struct {
+    context: VulkanContextDescriptor,
+    pub fn fromNative(raw: c.mln_vulkan_device_context_result) VulkanDeviceContextResult {
+        return .{
+            .context = VulkanContextDescriptor.fromNative(raw.context),
+        };
+    }
+};
+
+/// Options for `VulkanDevice.create()`.
+///
+/// See `mln_vulkan_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+pub const VulkanDeviceOptions = struct {
+    /// Whether the device can present to a window's surface. It enables
+    /// VK_KHR_surface and the platform's surface extensions on the instance,
+    /// and VK_KHR_swapchain on the device. Defaults to false.
+    presentation: ?bool = null,
+    /// The 16-byte `deviceUUID` of the GPU to use, as
+    /// `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
+    /// with another graphics API on it.
+    device_uuid: ?[]const u8 = null,
+    /// The 8-byte `deviceLUID` of the GPU to use, as
+    /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
+    /// DXGI adapter LUID.
+    device_luid: ?[]const u8 = null,
+    pub fn toNative(self: VulkanDeviceOptions) status.Error!c.mln_vulkan_device_options {
+        var raw = std.mem.zeroes(c.mln_vulkan_device_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_vulkan_device_options);
+        marshal.present(&raw.fields, c.MLN_VULKAN_DEVICE_OPTION_PRESENTATION, &raw.presentation, self.presentation);
+        if (self.device_uuid) |item| {
+            raw.fields |= c.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
+            raw.device_uuid = marshal.view(item);
+        }
+        if (self.device_luid) |item| {
+            raw.fields |= c.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
+            raw.device_luid = marshal.view(item);
+        }
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_device_options) status.Error!VulkanDeviceOptions {
+        return .{
+            .presentation = if (raw.fields & c.MLN_VULKAN_DEVICE_OPTION_PRESENTATION != 0) raw.presentation else null,
+            .device_uuid = if (raw.fields & c.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID != 0) try marshal.copyView(allocator, raw.device_uuid) else null,
+            .device_luid = if (raw.fields & c.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID != 0) try marshal.copyView(allocator, raw.device_luid) else null,
         };
     }
 };

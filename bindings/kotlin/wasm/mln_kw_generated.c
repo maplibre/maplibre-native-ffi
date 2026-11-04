@@ -1891,6 +1891,28 @@ int32_t mln_kw_mln_supported_render_backend_mask(void) {
   return (int32_t)mln_supported_render_backend_mask();
 }
 
+int32_t mln_kw_mln_vulkan_device_create(
+  uintptr_t options, uintptr_t out_device, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_vulkan_device_create(
+    (const mln_vulkan_device_options*)options, (mln_vulkan_device*)out_device,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_vulkan_device_get_context(
+  int64_t device, uintptr_t out_result, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_vulkan_device_get_context(
+    (mln_vulkan_device)device, (mln_vulkan_device_context_result*)out_result,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+void mln_kw_mln_vulkan_device_release(int64_t device) {
+  mln_vulkan_device_release((mln_vulkan_device)device);
+}
+
 static void mln_kw_upcall_completion(
   void* userData, const mln_completion_result* result
 ) {

@@ -79,7 +79,20 @@ bool mln_test_render_fixture_create_vulkan_surface(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_vulkan_device_proc_addr_wrap wrap
 );
+
+// Attaches a session on the preset's driver to a borrowed ring of one texture
+// that the fixture creates on `graphics`, which must outlive the fixture.
+bool mln_test_render_fixture_create_vulkan_on(
+  mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics
+);
 #endif
+
+// Destroys the textures of a borrowed fixture's ring now, for a case whose
+// session no longer renders to them, such as after
+// mln_render_session_release_target().
+void mln_test_render_fixture_destroy_textures(
+  const mln_test_render_fixture* fixture
+);
 
 // Attaches a session to a presentation surface that the fixture creates, with
 // the preset's driver.
