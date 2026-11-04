@@ -102,8 +102,10 @@ for package in "$staging"/*/package; do
       sbom_inputs+=(--input "$inventory")
     done
   fi
+  # macOS's bash 3.2 treats an empty array as unset under `set -u`, and the
+  # facade has no inputs.
   python3 "$binding/../../tools/release/binding_sbom.py" package \
     --name "$name" --version "$version" --ecosystem generic \
-    --output "$package/sbom/maplibre-native-ffi.cdx.json" "${sbom_inputs[@]}"
+    --output "$package/sbom/maplibre-native-ffi.cdx.json" ${sbom_inputs[@]+"${sbom_inputs[@]}"}
   tar -czf "$out/${name#@maplibre/}-$version.har" -C "$(dirname "$package")" package
 done
