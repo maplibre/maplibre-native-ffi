@@ -12,16 +12,15 @@ namespace Maplibre.NativeFfi;
 public sealed record VulkanDeviceOptions
 {
     /// <summary>
-    /// Whether the device can present to a window's surface. It enables
-    /// VK_KHR_surface and the platform's surface extensions on the instance,
-    /// and VK_KHR_swapchain on the device. Defaults to false.
+    /// Whether the device can present to a window. The instance then enables
+    /// VK_KHR_surface and the platform's surface extensions, and the device
+    /// enables VK_KHR_swapchain. Defaults to false.
     /// </summary>
     public bool? Presentation { get; init; }
 
     /// <summary>
     /// The 16-byte <c>deviceUUID</c> of the GPU to use, as
-    /// <c>VkPhysicalDeviceIDProperties</c> reports it. Name a GPU to share
-    /// textures with another graphics API on it.
+    /// <c>VkPhysicalDeviceIDProperties</c> reports it.
     /// </summary>
     public ImmutableArray<byte>? DeviceUuid
     {

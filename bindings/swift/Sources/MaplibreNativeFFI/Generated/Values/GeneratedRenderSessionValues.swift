@@ -59,10 +59,9 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
 /// See `mln_frame_pacer_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FramePacerOptions: Equatable, Hashable, Sendable {
-  /// The most times per second that the pacer demands frames, greater than
-  /// zero. The pacer skips a display refresh that comes too soon after its last
-  /// demands, and a limit at the display's refresh rate or above skips none. By
-  /// default, it can demand frames at every refresh.
+  /// The most frames per second that the pacer demands, greater than zero. The
+  /// pacer skips display refreshes to stay within it. By default, it can demand
+  /// frames at every refresh.
   public var maximumFramesPerSecond: UInt32?
   public init(maximumFramesPerSecond: UInt32? = nil) {
     self.maximumFramesPerSecond = maximumFramesPerSecond

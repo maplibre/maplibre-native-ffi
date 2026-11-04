@@ -230,10 +230,9 @@ typedef struct mln_frame_pacer_options {
   uint32_t size;
   mln_frame_pacer_option_fields fields;
   /**
-   * The most times per second that the pacer demands frames, greater than
-   * zero. The pacer skips a display refresh that comes too soon after its last
-   * demands, and a limit at the display's refresh rate or above skips none. By
-   * default, it can demand frames at every refresh.
+   * The most frames per second that the pacer demands, greater than zero. The
+   * pacer skips display refreshes to stay within it. By default, it can demand
+   * frames at every refresh.
    */
   uint32_t maximum_frames_per_second MLN_BINDING(
     "mask=fields;bit=MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND"
@@ -244,15 +243,14 @@ typedef struct mln_frame_pacer_options {
  * Sets the frame pacer that demands the session's frames.
  *
  * At the first display refresh after the session has something new to draw,
- * `pacer` demands a frame without flags and with token 0. Take the results
- * through the frame wake as usual. One pacer can serve many sessions. When
- * `pacer` is null, the session stops being paced. You can call it once the
- * attach call returns.
+ * `pacer` demands a frame without flags and with token 0. One pacer can serve
+ * many sessions. A null `pacer` stops pacing the session. You can call it once
+ * the attach call returns.
  *
  * Returns:
- * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
- *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
- *   carries the failure's message.
+ * - MLN_STATUS_TARGET_LOST or MLN_STATUS_NATIVE_ERROR, as
+ *   mln_render_session_snapshot.failure_status reports, when the session has
+ *   failed.
  * - MLN_STATUS_INVALID_STATE when you attached the session with a redraw
  *   wake, or detached, abandoned, released, or disposed it.
  */

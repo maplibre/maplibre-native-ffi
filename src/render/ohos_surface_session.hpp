@@ -21,9 +21,8 @@ struct OhosSurfaceAttach {
   std::shared_ptr<const mln_vulkan_context_descriptor> device;
 };
 
-// Creates the session's backend for its window, on the session's driver. The
-// build's render backend defines it: the Vulkan one presents through a
-// VkSurfaceKHR, and the EGL one through an EGL window surface.
+// Creates the session's backend for its window, on the session's driver. Each
+// build's render backend defines this.
 auto create_ohos_surface_backend(
   OhosSurfaceAttach attach, mln_render_session_object& target
 ) -> mln_status;

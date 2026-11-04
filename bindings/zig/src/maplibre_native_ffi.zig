@@ -147,7 +147,7 @@ pub const AcquiredFrame = struct {
     }
 };
 
-/// Demands render sessions' frames in step with a display's refreshes.
+/// Demands render sessions' frames at a display's refreshes.
 ///
 /// See `mln_frame_pacer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -378,17 +378,14 @@ pub const Map = struct {
     /// Creates a session that presents the map to an Android window, with a
     /// graphics context that the library creates.
     ///
-    /// The build's render backend decides the context. A Vulkan build presents with
-    /// `device`, or, when `device` is null, with a device that the library creates
-    /// with presentation and shares between these sessions. An OpenGL build creates
-    /// an EGL context on the default display, and `device` must be null. Attach
-    /// with `RenderDriverKind.core_worker`, since the context belongs to the
-    /// library.
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on the
+    /// default display, and `device` must be null. Attach with
+    /// `RenderDriverKind.core_worker`.
     ///
     /// Before the platform destroys the window, such as in
     /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-    /// `RenderSession.releaseTarget()` and wait for that to complete. The session's
-    /// reference keeps the window, but not its buffers.
+    /// `RenderSession.releaseTarget()` and wait for that to complete.
     ///
     /// See `mln_map_attach_android_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -397,8 +394,8 @@ pub const Map = struct {
     ///
     /// - `error.InvalidArgument` when `surface` has no window, such as after the
     ///   platform destroyed it.
-    /// - `error.Unsupported` when `device` can't present, because you created it
-    ///   without `VulkanDeviceOptions.presentation`.
+    /// - `error.Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions.presentation`.
     /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
     /// - `error.NativeError` when the library can't create the graphics context or
     ///   the window's surface.
@@ -465,17 +462,14 @@ pub const Map = struct {
     /// Creates a session that presents the map to an OpenHarmony window, with a
     /// graphics context that the library creates.
     ///
-    /// The build's render backend decides the context. A Vulkan build presents with
-    /// `device`, or, when `device` is null, with a device that the library creates
-    /// with presentation and shares between these sessions. An OpenGL build creates
-    /// an EGL context on the default display, and `device` must be null. Attach
-    /// with `RenderDriverKind.core_worker`, since the context belongs to the
-    /// library.
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on the
+    /// default display, and `device` must be null. Attach with
+    /// `RenderDriverKind.core_worker`.
     ///
     /// Before the platform destroys the window, such as in an `XComponent`'s
     /// `onSurfaceDestroyed` callback, release the target with
-    /// `RenderSession.releaseTarget()` and wait for that to complete. The session's
-    /// reference keeps the window, but not its buffers.
+    /// `RenderSession.releaseTarget()` and wait for that to complete.
     ///
     /// See `mln_map_attach_ohos_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -485,8 +479,8 @@ pub const Map = struct {
     /// - `error.InvalidArgument` when no surface in this process has
     ///   `OhosSurfaceDescriptor.surface_id`, such as after the platform destroyed
     ///   it.
-    /// - `error.Unsupported` when `device` can't present, because you created it
-    ///   without `VulkanDeviceOptions.presentation`.
+    /// - `error.Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions.presentation`.
     /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
     /// - `error.NativeError` when the library can't create the graphics context or
     ///   the window's surface.
@@ -2088,8 +2082,7 @@ pub const RenderSession = struct {
     /// Use it to give the session a window again after
     /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
     /// it. Once the replacement completes, the session no longer uses the old
-    /// window. A replacement with the window and logical size that the session
-    /// presents to already changes nothing.
+    /// window.
     ///
     /// See `mln_render_session_set_android_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -2111,19 +2104,18 @@ pub const RenderSession = struct {
     /// Sets the frame pacer that demands the session's frames.
     ///
     /// At the first display refresh after the session has something new to draw,
-    /// `pacer` demands a frame without flags and with token 0. Take the results
-    /// through the frame wake as usual. One pacer can serve many sessions. When
-    /// `pacer` is null, the session stops being paced. You can call it once the
-    /// attach call returns.
+    /// `pacer` demands a frame without flags and with token 0. One pacer can serve
+    /// many sessions. A null `pacer` stops pacing the session. You can call it once
+    /// the attach call returns.
     ///
     /// See `mln_render_session_set_frame_pacer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     ///
     /// Errors:
     ///
-    /// - `RenderSessionSnapshot.failure_status`, `error.TargetLost` or
-    ///   `error.NativeError`, when the session has failed. The diagnostic carries
-    ///   the failure's message.
+    /// - `error.TargetLost` or `error.NativeError`, as
+    ///   `RenderSessionSnapshot.failure_status` reports, when the session has
+    ///   failed.
     /// - `error.InvalidState` when you attached the session with a redraw wake, or
     ///   detached, abandoned, released, or disposed it.
     pub fn setFramePacer(self: RenderSession, pacer: ?FramePacer, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -2169,8 +2161,7 @@ pub const RenderSession = struct {
     /// Use it to give the session a window again after
     /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
     /// it. Once the replacement completes, the session no longer uses the old
-    /// window. A replacement with the window and logical size that the session
-    /// presents to already changes nothing.
+    /// window.
     ///
     /// See `mln_render_session_set_ohos_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -2796,10 +2787,9 @@ pub const VulkanDevice = struct {
     /// Creates a Vulkan instance, device, and graphics queue for render sessions.
     ///
     /// Attach sessions with the context from `VulkanDevice.getContext()`, in place
-    /// of a device of your own. Without `device_uuid` or `device_luid`, the device
-    /// uses a discrete GPU over an integrated one, and an integrated GPU over any
-    /// other. The device enables the features that rendering needs, and the
-    /// external memory and semaphore extensions that the GPU offers.
+    /// of a device of your own. Without `device_uuid` or `device_luid`, it prefers
+    /// a discrete GPU. The device enables the external memory and semaphore
+    /// extensions that the GPU offers.
     ///
     /// See `mln_vulkan_device_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -2822,9 +2812,8 @@ pub const VulkanDevice = struct {
     ///
     /// Pass it as the context of `Map.attachVulkanSurface()` or
     /// `Map.attachVulkanBorrowedTexture()`. The sessions on the device share its
-    /// one graphics queue, and the library orders their submissions to it. To
-    /// submit to the queue yourself, set `RenderSessionAttachOptions.queue_lock` on
-    /// each session.
+    /// graphics queue. To submit to the queue yourself, set
+    /// `RenderSessionAttachOptions.queue_lock` on each session.
     ///
     /// See `mln_vulkan_device_get_context` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -2837,8 +2826,7 @@ pub const VulkanDevice = struct {
     /// Releases a Vulkan device.
     ///
     /// Render sessions that attached with the device's context keep using it until
-    /// they detach or retire, and the library destroys the device after the last of
-    /// them.
+    /// they detach or their release finishes.
     ///
     /// See `mln_vulkan_device_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -2853,9 +2841,7 @@ pub const VulkanDevice = struct {
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
 /// takes its own reference to the window, so you can release yours once the
-/// call returns. It uses the window until a replacement or release of the
-/// target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// call returns.
 ///
 /// See `mln_android_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -2890,9 +2876,7 @@ pub const AndroidSurfaceDescriptor = struct {
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
 /// takes its own reference to the window, so you can release yours once the
-/// call returns. It uses the window until a replacement or release of the
-/// target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// call returns.
 ///
 /// See `mln_android_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -3884,10 +3868,9 @@ pub const FrameDemandFlag = struct {
 /// See `mln_frame_pacer_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const FramePacerOptions = struct {
-    /// The most times per second that the pacer demands frames, greater than
-    /// zero. The pacer skips a display refresh that comes too soon after its
-    /// last demands, and a limit at the display's refresh rate or above skips
-    /// none. By default, it can demand frames at every refresh.
+    /// The most frames per second that the pacer demands, greater than zero.
+    /// The pacer skips display refreshes to stay within it. By default, it can
+    /// demand frames at every refresh.
     maximum_frames_per_second: ?u32 = null,
     pub fn toNative(self: FramePacerOptions) c.mln_frame_pacer_options {
         var raw = std.mem.zeroes(c.mln_frame_pacer_options);
@@ -5303,9 +5286,7 @@ pub const OffscreenDeviceOptions = struct {
 /// An OpenHarmony window to present to, for `Map.attachOhosSurface()`.
 ///
 /// Name the window by `window` or by `surface_id`. The session takes its own
-/// reference to the window, so you can release yours once the call returns. It
-/// uses the window until a replacement or release of the target completes, a
-/// detach or release of the session completes, or an abandon of it returns.
+/// reference to the window, so you can release yours once the call returns.
 ///
 /// See `mln_ohos_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -5337,9 +5318,7 @@ pub const OhosSurfaceDescriptor = struct {
 /// A new OpenHarmony window for `RenderSession.setOhosSurfaceTarget()`.
 ///
 /// Name the window by `window` or by `surface_id`. The session takes its own
-/// reference to the window, so you can release yours once the call returns. It
-/// uses the window until a replacement or release of the target completes, a
-/// detach or release of the session completes, or an abandon of it returns.
+/// reference to the window, so you can release yours once the call returns.
 ///
 /// See `mln_ohos_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -6030,11 +6009,9 @@ pub const RenderSessionAttachOptions = struct {
     /// `RenderSession.drainFrameResults()`. It isn't called again until a drain
     /// takes them.
     frame_wake: Wake = .{},
-    /// Called when the session has something new to draw, because the map or
-    /// the target changed since its last frame, or the target couldn't take
-    /// that frame. Demand a frame at your next display refresh. It isn't called
-    /// again until you demand a frame, and isn't called while the session has
-    /// no target.
+    /// Called when the session has something new to draw. Demand a frame at
+    /// your next display refresh. It isn't called again until you demand a
+    /// frame, or while the session has no target.
     redraw_wake: Wake = .{},
     /// Called when a session driven by
     /// `RenderDriverKind.caller_graphics_thread` has work for
@@ -8304,13 +8281,12 @@ pub const VulkanDeviceContextResult = struct {
 /// See `mln_vulkan_device_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
 pub const VulkanDeviceOptions = struct {
-    /// Whether the device can present to a window's surface. It enables
-    /// VK_KHR_surface and the platform's surface extensions on the instance,
-    /// and VK_KHR_swapchain on the device. Defaults to false.
+    /// Whether the device can present to a window. The instance then enables
+    /// VK_KHR_surface and the platform's surface extensions, and the device
+    /// enables VK_KHR_swapchain. Defaults to false.
     presentation: ?bool = null,
     /// The 16-byte `deviceUUID` of the GPU to use, as
-    /// `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
-    /// with another graphics API on it.
+    /// `VkPhysicalDeviceIDProperties` reports it.
     device_uuid: ?[]const u8 = null,
     /// The 8-byte `deviceLUID` of the GPU to use, as
     /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
@@ -8604,12 +8580,10 @@ pub const NewRenderSession = struct {
 };
 
 /// Creates a frame pacer that follows the display through the calling thread's
-/// looper.
+/// `AChoreographer`.
 ///
-/// Call it on a thread with an `ALooper`, such as the app's main thread. The
-/// pacer demands frames from that thread at the display refreshes that the
-/// looper's `AChoreographer` reports, so keep the thread running its looper
-/// while sessions use the pacer.
+/// Call it on a thread with an `ALooper`, such as the app's main thread, and
+/// keep that thread running its looper while sessions use the pacer.
 ///
 /// See `mln_android_frame_pacer_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -8740,12 +8714,10 @@ pub fn setNetworkStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.D
     return call.invoke("mln_network_set_status", .none, {}, null, diagnostic, .{status_input});
 }
 
-/// Creates a frame pacer that follows the display through OpenHarmony's native
-/// VSync.
+/// Creates a frame pacer that follows the display through OpenHarmony's
+/// `OH_NativeVSync`.
 ///
-/// You can call it on any thread. The pacer demands frames from a system thread
-/// at the display refreshes that `OH_NativeVSync` reports, so it needs no event
-/// loop of yours.
+/// You can call it on any thread. The pacer needs no event loop of yours.
 ///
 /// See `mln_ohos_frame_pacer_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).

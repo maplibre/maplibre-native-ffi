@@ -208,11 +208,9 @@ class RenderSessionBackend {
   // releases them here: the host may reuse those handles.
   virtual void quarantine() noexcept {}
 
-  // Keeps something that this backend's objects belong to, such as the
-  // graphics device they were made on. The base is destroyed after every
-  // member of the derived backend, so what it keeps outlives the objects made
-  // on it, and a backend that detach or abandon keeps forever keeps it too.
-  // What it keeps is destroyed in no particular order.
+  // Keeps an object that the backend's objects were made on, such as a
+  // graphics device, until after the derived backend's members are destroyed.
+  // Retained objects are destroyed in no particular order.
   void retain(std::shared_ptr<const void> object) {
     retained_.push_back(std::move(object));
   }
@@ -1005,12 +1003,10 @@ struct mln_render_session_object
   std::shared_ptr<mln::core::Wake> frame_wake;
   std::shared_ptr<mln::core::Wake> driver_wake;
   std::shared_ptr<mln::core::Wake> redraw_wake;
-  // Whether the host attached the session with a redraw wake, which rules out
-  // a pacer.
+  // Whether the host attached the session with a redraw wake. Such a session
+  // takes no pacer.
   bool has_redraw_wake = false;
-  // The pacer that the session asks in place of the redraw wake, which counts
-  // the session from mln_render_session_set_frame_pacer() until the session
-  // lets go of it. Null for none.
+  // The pacer that the session asks in place of the redraw wake, or null.
   std::shared_ptr<mln::core::FramePacer> pacer;
   // The host's lock on the queue the backend submits to. initialize_backend
   // shares it with a backend that takes it around its queue calls. Null when

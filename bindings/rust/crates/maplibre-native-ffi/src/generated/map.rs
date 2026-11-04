@@ -233,17 +233,14 @@ impl MapHandle {
     /// Creates a session that presents the map to an Android window, with a
     /// graphics context that the library creates.
     ///
-    /// The build's render backend decides the context. A Vulkan build presents
-    /// with `device`, or, when `device` is null, with a device that the library
-    /// creates with presentation and shares between these sessions. An OpenGL
-    /// build creates an EGL context on the default display, and `device` must
-    /// be null. Attach with `RenderDriverKind::CoreWorker`, since the context
-    /// belongs to the library.
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on
+    /// the default display, and `device` must be null. Attach with
+    /// `RenderDriverKind::CoreWorker`.
     ///
     /// Before the platform destroys the window, such as in
     /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
     /// `RenderSessionHandle::release_target()` and wait for that to complete.
-    /// The session's reference keeps the window, but not its buffers.
     ///
     /// See `mln_map_attach_android_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -252,8 +249,8 @@ impl MapHandle {
     ///
     /// - `Status::InvalidArgument` when `surface` has no window, such as after
     ///   the platform destroyed it.
-    /// - `Status::Unsupported` when `device` can't present, because you created
-    ///   it without `VulkanDeviceOptions::presentation`.
+    /// - `Status::Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions::presentation`.
     /// - `Status::Unsupported` when the GPU or the Vulkan loader can't present.
     /// - `Status::NativeError` when the library can't create the graphics
     ///   context or the window's surface.
@@ -424,17 +421,14 @@ impl MapHandle {
     /// Creates a session that presents the map to an OpenHarmony window, with a
     /// graphics context that the library creates.
     ///
-    /// The build's render backend decides the context. A Vulkan build presents
-    /// with `device`, or, when `device` is null, with a device that the library
-    /// creates with presentation and shares between these sessions. An OpenGL
-    /// build creates an EGL context on the default display, and `device` must
-    /// be null. Attach with `RenderDriverKind::CoreWorker`, since the context
-    /// belongs to the library.
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on
+    /// the default display, and `device` must be null. Attach with
+    /// `RenderDriverKind::CoreWorker`.
     ///
     /// Before the platform destroys the window, such as in an `XComponent`'s
     /// `onSurfaceDestroyed` callback, release the target with
     /// `RenderSessionHandle::release_target()` and wait for that to complete.
-    /// The session's reference keeps the window, but not its buffers.
     ///
     /// See `mln_map_attach_ohos_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -444,8 +438,8 @@ impl MapHandle {
     /// - `Status::InvalidArgument` when no surface in this process has
     ///   `OhosSurfaceDescriptor::surface_id`, such as after the platform
     ///   destroyed it.
-    /// - `Status::Unsupported` when `device` can't present, because you created
-    ///   it without `VulkanDeviceOptions::presentation`.
+    /// - `Status::Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions::presentation`.
     /// - `Status::Unsupported` when the GPU or the Vulkan loader can't present.
     /// - `Status::NativeError` when the library can't create the graphics
     ///   context or the window's surface.

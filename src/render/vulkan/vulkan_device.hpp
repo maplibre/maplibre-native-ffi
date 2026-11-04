@@ -9,10 +9,9 @@
 
 namespace mln::core {
 
-// Creates a Vulkan instance and a device with one graphics queue, which the
-// returned context names. The pointer aliases the device, which lasts while
-// any copy of it does. An offscreen device names the GPU by `adapter_index`,
-// its index in the instance's list, instead of by ID.
+// Creates a Vulkan instance, device, and graphics queue. The device lasts while
+// any copy of `out_context` does. An offscreen device names its GPU by
+// `adapter_index`, an index into the instance's GPUs, instead of by ID.
 auto create_vulkan_device(
   const VulkanDeviceSelection& selection,
   std::optional<std::uint32_t> adapter_index,

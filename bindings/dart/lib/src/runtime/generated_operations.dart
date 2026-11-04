@@ -3087,12 +3087,10 @@ final _resultint = _CompletionValue(
 );
 
 /// Creates a frame pacer that follows the display through the calling
-/// thread's looper.
+/// thread's `AChoreographer`.
 ///
-/// Call it on a thread with an `ALooper`, such as the app's main thread. The
-/// pacer demands frames from that thread at the display refreshes that the
-/// looper's `AChoreographer` reports, so keep the thread running its looper
-/// while sessions use the pacer.
+/// Call it on a thread with an `ALooper`, such as the app's main thread, and
+/// keep that thread running its looper while sessions use the pacer.
 ///
 /// See `mln_android_frame_pacer_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -3556,7 +3554,7 @@ extension type const _NativeFramePacer(int raw) implements NativeHandle {}
 
 /// Owner of one native handle.
 ///
-/// Demands render sessions' frames in step with a display's refreshes.
+/// Demands render sessions' frames at a display's refreshes.
 ///
 /// See `mln_frame_pacer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -4506,17 +4504,14 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// Creates a session that presents the map to an Android window, with a
   /// graphics context that the library creates.
   ///
-  /// The build's render backend decides the context. A Vulkan build presents
-  /// with `device`, or, when `device` is null, with a device that the library
-  /// creates with presentation and shares between these sessions. An OpenGL
-  /// build creates an EGL context on the default display, and `device` must be
-  /// null. Attach with `RenderDriverKind.coreWorker`, since the context belongs
-  /// to the library.
+  /// A Vulkan build presents with `device`, or, when `device` is null, with a
+  /// device that the library creates. An OpenGL build uses an EGL context on
+  /// the default display, and `device` must be null. Attach with
+  /// `RenderDriverKind.coreWorker`.
   ///
   /// Before the platform destroys the window, such as in
   /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-  /// `RenderSessionHandle.releaseTarget()` and wait for that to complete. The
-  /// session's reference keeps the window, but not its buffers.
+  /// `RenderSessionHandle.releaseTarget()` and wait for that to complete.
   ///
   /// See `mln_map_attach_android_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -4525,8 +4520,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.invalidArgument` when `surface` has no window, such as after the
   ///   platform destroyed it.
-  /// - `Status.unsupported` when `device` can't present, because you created it
-  ///   without `VulkanDeviceOptions.presentation`.
+  /// - `Status.unsupported` when you created `device` without
+  ///   `VulkanDeviceOptions.presentation`.
   /// - `Status.unsupported` when the GPU or the Vulkan loader can't present.
   /// - `Status.nativeError` when the library can't create the graphics context
   ///   or the window's surface.
@@ -7218,8 +7213,7 @@ final class RenderSessionHandle implements Finalizable {
   /// Use it to give the session a window again after
   /// `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
   /// resize it. Once the replacement completes, the session no longer uses the
-  /// old window. A replacement with the window and logical size that the
-  /// session presents to already changes nothing.
+  /// old window.
   ///
   /// See `mln_render_session_set_android_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -7246,19 +7240,18 @@ final class RenderSessionHandle implements Finalizable {
   /// Sets the frame pacer that demands the session's frames.
   ///
   /// At the first display refresh after the session has something new to draw,
-  /// `pacer` demands a frame without flags and with token 0. Take the results
-  /// through the frame wake as usual. One pacer can serve many sessions. When
-  /// `pacer` is null, the session stops being paced. You can call it once the
-  /// attach call returns.
+  /// `pacer` demands a frame without flags and with token 0. One pacer can
+  /// serve many sessions. A null `pacer` stops pacing the session. You can call
+  /// it once the attach call returns.
   ///
   /// See `mln_render_session_set_frame_pacer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   ///
   /// Errors:
   ///
-  /// - `RenderSessionSnapshot.failureStatus`, `Status.targetLost` or
-  ///   `Status.nativeError`, when the session has failed. The diagnostic
-  ///   carries the failure's message.
+  /// - `Status.targetLost` or `Status.nativeError`, as
+  ///   `RenderSessionSnapshot.failureStatus` reports, when the session has
+  ///   failed.
   /// - `Status.invalidState` when you attached the session with a redraw wake,
   ///   or detached, abandoned, released, or disposed it.
   void setFramePacer({FramePacerHandle? pacer}) => _check(
@@ -8332,9 +8325,8 @@ final class VulkanDeviceHandle implements Finalizable {
   ///
   /// Attach sessions with the context from `VulkanDeviceHandle.getContext()`,
   /// in place of a device of your own. Without `device_uuid` or `device_luid`,
-  /// the device uses a discrete GPU over an integrated one, and an integrated
-  /// GPU over any other. The device enables the features that rendering needs,
-  /// and the external memory and semaphore extensions that the GPU offers.
+  /// it prefers a discrete GPU. The device enables the external memory and
+  /// semaphore extensions that the GPU offers.
   ///
   /// See `mln_vulkan_device_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -8373,8 +8365,7 @@ final class VulkanDeviceHandle implements Finalizable {
   ///
   /// Pass it as the context of `MapHandle.attachVulkanSurface()` or
   /// `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device
-  /// share its one graphics queue, and the library orders their submissions to
-  /// it. To submit to the queue yourself, set
+  /// share its graphics queue. To submit to the queue yourself, set
   /// `RenderSessionAttachOptions.queueLock` on each session.
   ///
   /// See `mln_vulkan_device_get_context` in the
@@ -8395,8 +8386,7 @@ final class VulkanDeviceHandle implements Finalizable {
   /// Releases a Vulkan device.
   ///
   /// Render sessions that attached with the device's context keep using it
-  /// until they detach or retire, and the library destroys the device after the
-  /// last of them.
+  /// until they detach or their release finishes.
   ///
   /// See `mln_vulkan_device_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).

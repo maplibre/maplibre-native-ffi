@@ -64,10 +64,9 @@ public sealed unsafe partial class VulkanDeviceHandle : IDisposable, INativeOwne
     /// <remarks>
     /// <para>Attach sessions with the context from
     /// <c>VulkanDeviceHandle.GetContext()</c>, in place of a device of your
-    /// own. Without <c>device_uuid</c> or <c>device_luid</c>, the device uses a
-    /// discrete GPU over an integrated one, and an integrated GPU over any
-    /// other. The device enables the features that rendering needs, and the
-    /// external memory and semaphore extensions that the GPU offers.</para>
+    /// own. Without <c>device_uuid</c> or <c>device_luid</c>, it prefers a
+    /// discrete GPU. The device enables the external memory and semaphore
+    /// extensions that the GPU offers.</para>
     /// <para>See <c>mln_vulkan_device_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -111,8 +110,7 @@ public sealed unsafe partial class VulkanDeviceHandle : IDisposable, INativeOwne
     /// <remarks>
     /// <para>Pass it as the context of <c>MapHandle.AttachVulkanSurface()</c>
     /// or <c>MapHandle.AttachVulkanBorrowedTexture()</c>. The sessions on the
-    /// device share its one graphics queue, and the library orders their
-    /// submissions to it. To submit to the queue yourself, set
+    /// device share its graphics queue. To submit to the queue yourself, set
     /// <c>RenderSessionAttachOptions.QueueLock</c> on each session.</para>
     /// <para>See <c>mln_vulkan_device_get_context</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html">C API reference</see>.</para>
@@ -137,8 +135,7 @@ public sealed unsafe partial class VulkanDeviceHandle : IDisposable, INativeOwne
     /// </summary>
     /// <remarks>
     /// <para>Render sessions that attached with the device's context keep using
-    /// it until they detach or retire, and the library destroys the device
-    /// after the last of them.</para>
+    /// it until they detach or their release finishes.</para>
     /// <para>See <c>mln_vulkan_device_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html">C API reference</see>.</para>
     /// </remarks>

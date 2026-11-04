@@ -1062,10 +1062,9 @@ auto arm_still_image_demand_locked(
 }
 
 // Calls the redraw wake, or asks the pacer for a demand, when the session has
-// something that its last frame doesn't show, as a demand without flags would
-// find, and a target to draw it to. Called wherever that can start to hold: a
-// map update, a new or resized target, attachment, a new pacer, and a frame
-// that the target couldn't take.
+// something new to draw and a target to draw it to. Called wherever that can
+// start to hold: a map update, a new or resized target, attachment, a new
+// pacer, and a frame that the target couldn't take.
 auto request_redraw_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) noexcept -> void {
@@ -3456,8 +3455,8 @@ auto render_session_set_frame_pacer(
       status = MLN_STATUS_INVALID_STATE;
     } else {
       previous = std::exchange(live->pacer, next);
-      // This drops a request that waits on the previous pacer, which can be
-      // `next` too, so the session asks again.
+      // Removing the session drops its waiting request, even when `previous`
+      // is `next`, so the session asks again.
       if (previous != nullptr) previous->remove_session(session);
       live->redraw_wake_pending = false;
       request_redraw_locked(*live, wakes);

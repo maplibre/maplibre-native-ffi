@@ -2,12 +2,10 @@
 use super::*;
 
 /// Creates a frame pacer that follows the display through the calling
-/// thread's looper.
+/// thread's `AChoreographer`.
 ///
-/// Call it on a thread with an `ALooper`, such as the app's main thread.
-/// The pacer demands frames from that thread at the display refreshes that
-/// the looper's `AChoreographer` reports, so keep the thread running its
-/// looper while sessions use the pacer.
+/// Call it on a thread with an `ALooper`, such as the app's main thread,
+/// and keep that thread running its looper while sessions use the pacer.
 ///
 /// See `mln_android_frame_pacer_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -212,11 +210,9 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
 }
 
 /// Creates a frame pacer that follows the display through OpenHarmony's
-/// native VSync.
+/// `OH_NativeVSync`.
 ///
-/// You can call it on any thread. The pacer demands frames from a system
-/// thread at the display refreshes that `OH_NativeVSync` reports, so it
-/// needs no event loop of yours.
+/// You can call it on any thread. The pacer needs no event loop of yours.
 ///
 /// See `mln_ohos_frame_pacer_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).

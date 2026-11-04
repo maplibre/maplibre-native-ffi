@@ -53,11 +53,10 @@ surface on the instance of the context from
 
 On Android, attach the window itself with
 [](api:mln_map_attach_android_surface), by its `ANativeWindow` or its Java
-`Surface`. The library creates the graphics context for the backend you
-installed, and drives it on its own thread. Replace the window with
-[](api:mln_render_session_set_android_surface_target), and release it as the
-[lost surface](#handle-a-lost-surface) section shows, before `surfaceDestroyed`
-returns.
+`Surface`, and the library creates the graphics context. Replace the window with
+[](api:mln_render_session_set_android_surface_target). Release it before
+`surfaceDestroyed` returns, as [Handle a lost surface](#handle-a-lost-surface)
+shows.
 
 On OpenHarmony, attach an `XComponent`'s window the same way with
 [](api:mln_map_attach_ohos_surface), by its `OHNativeWindow` or its surface ID,

@@ -23,13 +23,12 @@ public struct VulkanDeviceContextResult: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_device_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
 public struct VulkanDeviceOptions: Equatable, Hashable, Sendable {
-  /// Whether the device can present to a window's surface. It enables
-  /// VK_KHR_surface and the platform's surface extensions on the instance, and
-  /// VK_KHR_swapchain on the device. Defaults to false.
+  /// Whether the device can present to a window. The instance then enables
+  /// VK_KHR_surface and the platform's surface extensions, and the device
+  /// enables VK_KHR_swapchain. Defaults to false.
   public var presentation: Bool?
   /// The 16-byte `deviceUUID` of the GPU to use, as
-  /// `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
-  /// with another graphics API on it.
+  /// `VkPhysicalDeviceIDProperties` reports it.
   public var deviceUuid: Data?
   /// The 8-byte `deviceLUID` of the GPU to use, as
   /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's

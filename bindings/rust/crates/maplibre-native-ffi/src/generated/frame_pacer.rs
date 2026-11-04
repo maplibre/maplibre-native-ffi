@@ -4,7 +4,7 @@ use super::*;
 native_owner! {
     /// Owns one native handle.
     ///
-    /// Demands render sessions' frames in step with a display's refreshes.
+    /// Demands render sessions' frames at a display's refreshes.
     ///
     /// See `mln_frame_pacer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Demands render sessions' frames in step with a display's refreshes.
+/// Demands render sessions' frames at a display's refreshes.
 /// </summary>
 /// <remarks>
 /// See <c>mln_frame_pacer</c> in the <see

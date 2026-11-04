@@ -32,16 +32,15 @@ typedef struct mln_vulkan_device_options {
   uint32_t size;
   mln_vulkan_device_option_fields fields;
   /**
-   * Whether the device can present to a window's surface. It enables
-   * VK_KHR_surface and the platform's surface extensions on the instance, and
-   * VK_KHR_swapchain on the device. Defaults to false.
+   * Whether the device can present to a window. The instance then enables
+   * VK_KHR_surface and the platform's surface extensions, and the device
+   * enables VK_KHR_swapchain. Defaults to false.
    */
   bool presentation
     MLN_BINDING("mask=fields;bit=MLN_VULKAN_DEVICE_OPTION_PRESENTATION");
   /**
    * The 16-byte `deviceUUID` of the GPU to use, as
-   * `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
-   * with another graphics API on it.
+   * `VkPhysicalDeviceIDProperties` reports it.
    */
   mln_buffer_view device_uuid MLN_BINDING(
     "encoding=bytes;mask=fields;bit=MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID"
@@ -66,10 +65,9 @@ typedef struct mln_vulkan_device_context_result {
  * Creates a Vulkan instance, device, and graphics queue for render sessions.
  *
  * Attach sessions with the context from mln_vulkan_device_get_context(), in
- * place of a device of your own. Without `device_uuid` or `device_luid`, the
- * device uses a discrete GPU over an integrated one, and an integrated GPU over
- * any other. The device enables the features that rendering needs, and the
- * external memory and semaphore extensions that the GPU offers.
+ * place of a device of your own. Without `device_uuid` or `device_luid`, it
+ * prefers a discrete GPU. The device enables the external memory and semaphore
+ * extensions that the GPU offers.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
@@ -91,8 +89,7 @@ MLN_API mln_status mln_vulkan_device_create(
  *
  * Pass it as the context of mln_map_attach_vulkan_surface() or
  * mln_map_attach_vulkan_borrowed_texture(). The sessions on the device share
- * its one graphics queue, and the library orders their submissions to it. To
- * submit to the queue yourself, set
+ * its graphics queue. To submit to the queue yourself, set
  * mln_render_session_attach_options.queue_lock on each session.
  *
  * Lifetimes:
@@ -109,14 +106,12 @@ MLN_API mln_status mln_vulkan_device_get_context(
  * Releases a Vulkan device.
  *
  * Render sessions that attached with the device's context keep using it until
- * they detach or retire, and the library destroys the device after the last of
- * them.
+ * they detach or their release finishes.
  *
  * Lifetimes:
- * The library destroys the device once you have released it and the last
- * session that uses it has detached or retired. Destroy the Vulkan objects that
- * you created with the device's context, such as images and surfaces, before
- * then.
+ * The library destroys the device once you release it and no session uses it.
+ * Destroy the Vulkan objects that you created with its context, such as images
+ * and surfaces, before then.
  */
 MLN_API void mln_vulkan_device_release(mln_vulkan_device device) MLN_NOEXCEPT;
 

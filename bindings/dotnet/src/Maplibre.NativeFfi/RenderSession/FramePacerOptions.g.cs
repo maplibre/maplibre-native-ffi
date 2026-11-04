@@ -12,10 +12,9 @@ namespace Maplibre.NativeFfi;
 public sealed record FramePacerOptions
 {
     /// <summary>
-    /// The most times per second that the pacer demands frames, greater than
-    /// zero. The pacer skips a display refresh that comes too soon after its
-    /// last demands, and a limit at the display's refresh rate or above skips
-    /// none. By default, it can demand frames at every refresh.
+    /// The most frames per second that the pacer demands, greater than zero.
+    /// The pacer skips display refreshes to stay within it. By default, it can
+    /// demand frames at every refresh.
     /// </summary>
     public uint? MaximumFramesPerSecond { get; init; }
 }

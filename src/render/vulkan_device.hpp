@@ -10,9 +10,8 @@
 
 namespace mln::core {
 
-// A Vulkan device that the library owns, as its handle holds it. The pointer
-// aliases the device that owns the objects the context names, so whoever holds
-// it keeps them alive. Only a Vulkan build makes one.
+// A Vulkan device that the library owns, as its handle holds it. Holding
+// `context` keeps the device alive.
 struct VulkanDeviceObject {
   std::shared_ptr<const mln_vulkan_context_descriptor> context;
   // Whether the device enabled the extensions that present to a window.
@@ -48,9 +47,8 @@ auto vulkan_device_get_context(
 auto vulkan_device_release(mln_vulkan_device device) -> void;
 
 // The context of the presenting Vulkan device that `device` names, for a
-// session that presents to a platform window, or null for the device that
-// these sessions share. A build without Vulkan presents through a context of
-// its own, so it takes only null.
+// platform window's session. A null `device` leaves `out_context` null, for the
+// shared device. A build without Vulkan takes only a null `device`.
 auto window_presentation_device(
   mln_vulkan_device device,
   std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
