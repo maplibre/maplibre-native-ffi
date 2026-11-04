@@ -1,19 +1,19 @@
 /**
- * @file maplibre_native_c/android.h
+ * @file maplibre_native_c/platform/android.h
  * Set up the library in an Android app, present to its windows, render into
  * hardware buffers, and pace its frames to the display.
  */
 
-#ifndef MAPLIBRE_NATIVE_C_ANDROID_H
-#define MAPLIBRE_NATIVE_C_ANDROID_H
+#ifndef MAPLIBRE_NATIVE_C_PLATFORM_ANDROID_H
+#define MAPLIBRE_NATIVE_C_PLATFORM_ANDROID_H
 
 #include <stdint.h>
 
-#include "base.h"
-#include "completion.h"
-#include "map.h"
-#include "render_session.h"
-#include "render_target.h"
+#include "../base.h"
+#include "../completion.h"
+#include "../map.h"
+#include "../render_session.h"
+#include "../render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -242,4 +242,4 @@ MLN_API mln_status mln_acquired_frame_get_android_hardware_buffer(
 }
 #endif
 
-#endif  // MAPLIBRE_NATIVE_C_ANDROID_H
+#endif  // MAPLIBRE_NATIVE_C_PLATFORM_ANDROID_H

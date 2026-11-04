@@ -8,17 +8,19 @@
 #ifndef MAPLIBRE_NATIVE_C_H
 #define MAPLIBRE_NATIVE_C_H
 
-#include "maplibre_native_c/android.h"           // IWYU pragma: export
-#include "maplibre_native_c/apple.h"             // IWYU pragma: export
 #include "maplibre_native_c/base.h"              // IWYU pragma: export
 #include "maplibre_native_c/camera.h"            // IWYU pragma: export
 #include "maplibre_native_c/completion.h"        // IWYU pragma: export
 #include "maplibre_native_c/delivery.h"          // IWYU pragma: export
-#include "maplibre_native_c/linux.h"             // IWYU pragma: export
 #include "maplibre_native_c/logging.h"           // IWYU pragma: export
 #include "maplibre_native_c/map.h"               // IWYU pragma: export
 #include "maplibre_native_c/offscreen.h"         // IWYU pragma: export
-#include "maplibre_native_c/ohos.h"              // IWYU pragma: export
+#include "maplibre_native_c/platform/android.h"  // IWYU pragma: export
+#include "maplibre_native_c/platform/apple.h"    // IWYU pragma: export
+#include "maplibre_native_c/platform/linux.h"    // IWYU pragma: export
+#include "maplibre_native_c/platform/ohos.h"     // IWYU pragma: export
+#include "maplibre_native_c/platform/wayland.h"  // IWYU pragma: export
+#include "maplibre_native_c/platform/win32.h"    // IWYU pragma: export
 #include "maplibre_native_c/projection.h"        // IWYU pragma: export
 #include "maplibre_native_c/query.h"             // IWYU pragma: export
 #include "maplibre_native_c/render_session.h"    // IWYU pragma: export
@@ -30,7 +32,5 @@
 #include "maplibre_native_c/texture.h"           // IWYU pragma: export
 #include "maplibre_native_c/vulkan.h"            // IWYU pragma: export
 #include "maplibre_native_c/wake.h"              // IWYU pragma: export
-#include "maplibre_native_c/wayland.h"           // IWYU pragma: export
-#include "maplibre_native_c/win32.h"             // IWYU pragma: export
 
 #endif  // MAPLIBRE_NATIVE_C_H

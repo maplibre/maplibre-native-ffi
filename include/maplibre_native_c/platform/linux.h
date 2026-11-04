@@ -1,19 +1,19 @@
 /**
- * @file maplibre_native_c/linux.h
+ * @file maplibre_native_c/platform/linux.h
  * Render into dmabufs on Linux and FreeBSD.
  */
 
-#ifndef MAPLIBRE_NATIVE_C_LINUX_H
-#define MAPLIBRE_NATIVE_C_LINUX_H
+#ifndef MAPLIBRE_NATIVE_C_PLATFORM_LINUX_H
+#define MAPLIBRE_NATIVE_C_PLATFORM_LINUX_H
 
 #include <stddef.h>
 #include <stdint.h>
 
-#include "base.h"
-#include "completion.h"
-#include "map.h"
-#include "render_session.h"
-#include "render_target.h"
+#include "../base.h"
+#include "../completion.h"
+#include "../map.h"
+#include "../render_session.h"
+#include "../render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -135,4 +135,4 @@ MLN_API mln_status mln_acquired_frame_get_dma_buf(
 }
 #endif
 
-#endif  // MAPLIBRE_NATIVE_C_LINUX_H
+#endif  // MAPLIBRE_NATIVE_C_PLATFORM_LINUX_H

@@ -2,15 +2,17 @@
 #ifndef MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 #define MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 
-#include "maplibre_native_c/android.h"
-#include "maplibre_native_c/apple.h"
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
-#include "maplibre_native_c/linux.h"
 #include "maplibre_native_c/logging.h"
 #include "maplibre_native_c/map.h"
 #include "maplibre_native_c/offscreen.h"
-#include "maplibre_native_c/ohos.h"
+#include "maplibre_native_c/platform/android.h"
+#include "maplibre_native_c/platform/apple.h"
+#include "maplibre_native_c/platform/linux.h"
+#include "maplibre_native_c/platform/ohos.h"
+#include "maplibre_native_c/platform/wayland.h"
+#include "maplibre_native_c/platform/win32.h"
 #include "maplibre_native_c/plugin.h"
 #include "maplibre_native_c/projection.h"
 #include "maplibre_native_c/query.h"
@@ -22,8 +24,6 @@
 #include "maplibre_native_c/surface.h"
 #include "maplibre_native_c/texture.h"
 #include "maplibre_native_c/vulkan.h"
-#include "maplibre_native_c/wayland.h"
-#include "maplibre_native_c/win32.h"
 #include "runtime.h"
 
 /** The realm's callback adapters, by the callback type that each

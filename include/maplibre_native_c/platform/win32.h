@@ -1,18 +1,18 @@
 /**
- * @file maplibre_native_c/win32.h
+ * @file maplibre_native_c/platform/win32.h
  * Present the map to a Win32 window.
  */
 
-#ifndef MAPLIBRE_NATIVE_C_WIN32_H
-#define MAPLIBRE_NATIVE_C_WIN32_H
+#ifndef MAPLIBRE_NATIVE_C_PLATFORM_WIN32_H
+#define MAPLIBRE_NATIVE_C_PLATFORM_WIN32_H
 
 #include <stdint.h>
 
-#include "base.h"
-#include "completion.h"
-#include "map.h"
-#include "render_session.h"
-#include "render_target.h"
+#include "../base.h"
+#include "../completion.h"
+#include "../map.h"
+#include "../render_session.h"
+#include "../render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,4 +103,4 @@ MLN_API mln_status mln_render_session_set_win32_window_target(
 }
 #endif
 
-#endif  // MAPLIBRE_NATIVE_C_WIN32_H
+#endif  // MAPLIBRE_NATIVE_C_PLATFORM_WIN32_H

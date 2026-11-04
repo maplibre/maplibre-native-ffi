@@ -1,18 +1,18 @@
 /**
- * @file maplibre_native_c/wayland.h
+ * @file maplibre_native_c/platform/wayland.h
  * Present the map to a Wayland surface.
  */
 
-#ifndef MAPLIBRE_NATIVE_C_WAYLAND_H
-#define MAPLIBRE_NATIVE_C_WAYLAND_H
+#ifndef MAPLIBRE_NATIVE_C_PLATFORM_WAYLAND_H
+#define MAPLIBRE_NATIVE_C_PLATFORM_WAYLAND_H
 
 #include <stdint.h>
 
-#include "base.h"
-#include "completion.h"
-#include "map.h"
-#include "render_session.h"
-#include "render_target.h"
+#include "../base.h"
+#include "../completion.h"
+#include "../map.h"
+#include "../render_session.h"
+#include "../render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,4 +98,4 @@ MLN_API mln_status mln_render_session_set_wayland_surface_target(
 }
 #endif
 
-#endif  // MAPLIBRE_NATIVE_C_WAYLAND_H
+#endif  // MAPLIBRE_NATIVE_C_PLATFORM_WAYLAND_H
