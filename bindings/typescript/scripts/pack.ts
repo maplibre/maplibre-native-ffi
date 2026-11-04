@@ -123,7 +123,8 @@ function addonOf(preset: string): Addon {
     backend,
     name: `${source.name}-${backend}-${os}-${cpu}${suffix}`,
     platform: { os, cpu, ...(libc === undefined ? {} : { libc }) },
-    // The addon links the shared C library, which loads from beside it.
+    // The addon links the shared C library, which loads from beside it, as do
+    // the C++ runtime DLLs that a Windows build carries.
     files: [
       "maplibre_native_ffi.node",
       os === "win32"
@@ -131,7 +132,7 @@ function addonOf(preset: string): Addon {
         : os === "darwin"
           ? "libmaplibre-native-c.dylib"
           : "libmaplibre-native-c.so",
-      ...(mingw
+      ...(os === "win32"
         ? readdirSync(
             join(binding, "native", "build", preset, "install"),
           ).filter(

@@ -77,11 +77,6 @@ function(mln_ffi_link_rust_platform target)
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
       "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
-  if(MSVC)
-    list(
-      APPEND rust_environment
-      "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
-  endif()
   # Emscripten rejects mixing objects that carry atomics with objects that do
   # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
   # built with atomics, so std is rebuilt from source. -Zbuild-std is

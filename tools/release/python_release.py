@@ -52,6 +52,30 @@ def prepare(package: pathlib.Path, version: str) -> None:
     shutil.copy2(LICENSE, package / "LICENSE")
 
 
+def stage_runtime_dlls(
+    runtime_root: pathlib.Path, prefix: pathlib.Path, platform: str
+) -> None:
+    """Put the Visual C++ runtime DLLs beside an MSVC wheel's extension.
+
+    The extension embeds the MSVC archive, which imports the runtime, and
+    CPython ships only part of it. Windows finds the DLLs in the package
+    directory that the extension loads from.
+    """
+    (module,) = (runtime_root / "python").iterdir()
+    for stale in module.glob("*.dll"):
+        stale.unlink()
+    if not platform.startswith("windows-") or platform.startswith("windows-mingw-"):
+        return
+    runtime_dlls = [
+        *sorted(prefix.glob("bin/vcruntime140*.dll")),
+        *sorted(prefix.glob("bin/msvcp140*.dll")),
+    ]
+    if not runtime_dlls:
+        raise SystemExit(f"{prefix} carries no Visual C++ runtime DLLs")
+    for dll in runtime_dlls:
+        shutil.copy2(dll, module / dll.name)
+
+
 def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     descriptor = json.loads((prefix / DESCRIPTOR_PATH).read_text())
     backend = descriptor["backend"]
@@ -70,6 +94,7 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     shutil.rmtree(licenses, ignore_errors=True)
     shutil.copytree(notices, licenses)
     shutil.copy2(LICENSE, licenses.parent / "LICENSE")
+    stage_runtime_dlls(runtime_root, prefix, descriptor["platform"]["id"])
     target = descriptor["platform"]["rustTarget"]
     manifest = package / "Cargo.toml"
     flags = ("--features", "pyo3/extension-module")

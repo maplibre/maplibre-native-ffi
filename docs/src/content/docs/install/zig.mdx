@@ -26,16 +26,25 @@ When it builds, the package downloads the C library for your target.
 
 Your executable loads the library at run time, from its own directory on
 Windows, and from `../lib` elsewhere. Install the library from the package's
-`prefix` beside your executable:
+`prefix` beside your executable. On Windows, install every DLL in the prefix's
+`bin`, which with MSVC includes the Visual C++ runtime that the library imports:
 
 ```zig title="build.zig"
-const library = switch (target.result.os.tag) {
-    .windows => "bin/maplibre-native-c.dll",
-    .macos, .maccatalyst => "lib/libmaplibre-native-c.dylib",
-    else => "lib/libmaplibre-native-c.so",
-};
 const prefix = maplibre.namedLazyPath("prefix");
-b.getInstallStep().dependOn(&b.addInstallFile(prefix.path(b, library), library).step);
+if (target.result.os.tag == .windows) {
+    b.installDirectory(.{
+        .source_dir = prefix.path(b, "bin"),
+        .install_dir = .bin,
+        .install_subdir = "",
+        .include_extensions = &.{".dll"},
+    });
+} else {
+    const library = switch (target.result.os.tag) {
+        .macos, .maccatalyst => "lib/libmaplibre-native-c.dylib",
+        else => "lib/libmaplibre-native-c.so",
+    };
+    b.getInstallStep().dependOn(&b.addInstallFile(prefix.path(b, library), library).step);
+}
 ```
 
 ## Choose a backend

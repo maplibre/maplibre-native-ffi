@@ -91,7 +91,9 @@ Both shared and static targets use the release's Release binaries:
     find_package(maplibre-native-c CONFIG REQUIRED)
     target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
 
-Use maplibre-native-c::maplibre-native-c-static for static linkage.
+Use maplibre-native-c::maplibre-native-c-static for static linkage. On Windows,
+it links the dynamic CRT, as the default Windows triplets and the -static-md
+ones do.
 """
 
 

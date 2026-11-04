@@ -435,7 +435,6 @@
       "inherits": "_single-config",
       "toolchainFile": "${fileDir}/cmake/toolchains/clang-cl.cmake",
       "cacheVariables": {
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
         "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
         "HAVE_FSEEKO": { "type": "BOOL", "value": "OFF" },
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"

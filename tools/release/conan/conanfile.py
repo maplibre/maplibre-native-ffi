@@ -88,10 +88,10 @@ class MaplibreNativeC(ConanFile):
     def validate(self):
         if (
             self.settings.os == "Windows"
-            and self.settings.get_safe("compiler.runtime") != "static"
+            and self.settings.get_safe("compiler.runtime") == "static"
         ):
             raise ConanInvalidConfiguration(
-                "Windows archives require -s compiler.runtime=static"
+                "Windows archives link the dynamic CRT; use compiler.runtime=dynamic"
             )
         self._source()
 

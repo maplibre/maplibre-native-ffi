@@ -5,7 +5,14 @@ import pathlib
 import tempfile
 import unittest
 
-from python_release import BACKENDS, embed_wheel, pack, prepare, runtime_metadata
+from python_release import (
+    BACKENDS,
+    embed_wheel,
+    pack,
+    prepare,
+    runtime_metadata,
+    stage_runtime_dlls,
+)
 from sbom import component, document, package_inventory
 from wheel.wheelfile import WheelFile
 
@@ -72,6 +79,23 @@ class PythonReleaseTest(unittest.TestCase):
 
         with self.assertRaisesRegex(SystemExit, "no Python runtime serves"):
             runtime_metadata(self.package, self.prefix)
+
+    def test_an_msvc_runtime_carries_the_visual_cpp_dlls_beside_its_extension(
+        self,
+    ) -> None:
+        module = self.package / "runtimes/vulkan/python/maplibre_native_ffi_runtime"
+        module.mkdir(parents=True)
+        (module / "stale.dll").write_text("stale")
+        (self.prefix / "bin").mkdir()
+        dlls = ("msvcp140.dll", "vcruntime140.dll")
+        for name in (*dlls, "maplibre-native-c.dll"):
+            (self.prefix / "bin" / name).write_text(name)
+
+        stage_runtime_dlls(module.parents[1], self.prefix, "windows-x64")
+        self.assertEqual(sorted(path.name for path in module.glob("*.dll")), [*dlls])
+
+        stage_runtime_dlls(module.parents[1], self.prefix, "windows-mingw-x64")
+        self.assertEqual(list(module.glob("*.dll")), [])
 
     def test_rejects_a_version_outside_the_release_scheme(self) -> None:
         with self.assertRaisesRegex(SystemExit, "invalid release version"):

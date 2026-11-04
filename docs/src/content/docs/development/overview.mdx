@@ -71,6 +71,11 @@ Set `WINE` to a Wine executable, then run tests with
 `mise -E msvc run test windows-x64-vulkan`. Wine isn't Windows: when results
 differ, Windows CI is right.
 
+A package carries the Visual C++ runtime DLLs beside the library, and only
+Visual Studio has them, so `package-native` fails its check on Linux. Set
+`VCToolsRedistDir` to a copy of Visual Studio's `VC/Redist/MSVC/<version>`
+directory to package anyway.
+
 ### MinGW
 
 On Windows, install [MSYS2](https://www.msys2.org/) and run this in its MINGW64

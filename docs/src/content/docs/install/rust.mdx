@@ -33,6 +33,15 @@ maplibre-native-ffi = "{{version}}"
 maplibre-native-ffi = { version = "{{version}}", features = ["vulkan"] }
 ```
 
+## Windows with MSVC
+
+The crate links the C library statically against the dynamic CRT, as Rust does
+by default, so don't enable `+crt-static`. Your executable imports the Visual
+C++ runtime. Ship the `vcruntime140*.dll` and `msvcp140*.dll` files from the
+`bin` directory of the [C library](/maplibre-native-ffi/install/c/) archive
+beside it, or require the
+[redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
+
 ## Windows with MinGW
 
 For `x86_64-pc-windows-gnu`, link with MSYS2's MINGW64 Clang and LLD
