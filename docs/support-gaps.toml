@@ -339,6 +339,15 @@ link = "https://youtrack.jetbrains.com/issue/KT-52275"
 
 [[entry]]
 bindings = ["kotlin-native"]
+platforms = ["linux-gnu"]
+archs = ["arm64"]
+operations = ["test"]
+status = "blocked"
+reason = "Kotlin/Native can't run on Linux ARM64, so the Linux x64 job compiles the ARM64 KLIB. Running its x64 compiler under emulation to link the suite took 37 minutes per job."
+link = "https://kotlinlang.org/docs/native-target-support.html#hosts"
+
+[[entry]]
+bindings = ["kotlin-native"]
 platforms = ["windows"]
 archs = ["arm64"]
 status = "blocked"

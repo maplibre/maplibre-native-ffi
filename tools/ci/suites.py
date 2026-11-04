@@ -11,6 +11,10 @@ from tools.ci import gaps
 if TYPE_CHECKING:
     from tools.ci.plan import Target
 
+# Kotlin/Native can't run on Linux ARM64, so the Linux x64 Vulkan job compiles
+# the Linux ARM64 KLIB, and the Linux ARM64 jobs leave Kotlin/Native out.
+LINUX_ARM64_KLIB = "//bindings/kotlin:linux-arm64-klib"
+
 # The CI steps that run before the suites. A suite after the archive and
 # install also needs those to have succeeded.
 BUILD = "build"
@@ -94,6 +98,12 @@ def consumer_commands(target: Target) -> list[list[str]]:
     for binding in gaps.BINDING_LABELS:
         if binding == "c" or not gaps.supported(binding, target, "build"):
             continue
+        if (
+            binding == "kotlin-native"
+            and target.platform == "linux-gnu"
+            and target.architecture == "arm64"
+        ):
+            continue
         # Android also publishes the native KLIB, which the test executable
         # alone does not prove builds.
         if (
@@ -117,6 +127,8 @@ def consumer_commands(target: Target) -> list[list[str]]:
             extra = "//bindings/kotlin:test:wasm-canary"
         if extra and gaps.supported(binding, target, "test"):
             commands.append(["mise", "run", extra, target.preset])
+        if target.preset == "linux-gnu-x64-vulkan" and binding == "kotlin-native":
+            commands.append(["mise", "run", LINUX_ARM64_KLIB])
     return commands
 
 

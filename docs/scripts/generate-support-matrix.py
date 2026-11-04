@@ -24,7 +24,7 @@ from tools.ci.gaps import (
     load_gaps,
     target_from_preset,
 )
-from tools.ci.suites import command_support, target_suites
+from tools.ci.suites import LINUX_ARM64_KLIB, command_support, target_suites
 
 
 def support_matrix() -> dict[str, Any]:
@@ -49,6 +49,10 @@ def support_matrix() -> dict[str, Any]:
         for command in commands:
             for binding, status in command_support(command):
                 record(binding, target, status)
+            if LINUX_ARM64_KLIB in command.split():
+                for other in plan.targets(presets):
+                    if other.platform == "linux-gnu" and other.architecture == "arm64":
+                        record("kotlin-native", target_from_preset(other), "build-only")
 
     issue, entries = load_gaps()
     built = {target_from_preset(preset) for preset in plan.targets(presets)}

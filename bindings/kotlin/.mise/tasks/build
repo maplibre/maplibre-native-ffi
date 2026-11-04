@@ -18,12 +18,10 @@ case "$usage_preset" in
   android-x64-vulkan) kotlin_target=androidNativeX64; runtime_backend=vulkan ;;
   linux-gnu-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
   linux-gnu-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-gnu-arm64-egl) kotlin_target=linuxArm64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-gnu-arm64-vulkan) kotlin_target=linuxArm64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
   macos-arm64-*) kotlin_target=macosArm64; tasks+=(:bindings:kotlin:jvmJar) ;;
   macos-x64-metal) kotlin_target=macosX64; runtime_backend=metal ;;
   windows-x64-*) kotlin_target=mingwX64; tasks+=(:bindings:kotlin:jvmJar) ;;
-  windows-arm64-* | mingw-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-arm64-* | windows-arm64-* | mingw-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
   *)
     echo "Unsupported Kotlin build preset: $usage_preset" >&2
     exit 2
@@ -37,8 +35,5 @@ fi
 # builds for a preset whose backend has a matching runtime publication.
 if [[ -n "$runtime_backend" ]]; then
   tasks+=(":bindings:kotlin:runtimes:${runtime_backend}:${kotlin_target}Klib")
-fi
-if [[ "$kotlin_target" == linuxArm64 ]]; then
-  exec bindings/kotlin/scripts/gradle-linux-arm64.sh "${gradle_args[@]}" "${tasks[@]}"
 fi
 exec ./gradlew "${gradle_args[@]}" "${tasks[@]}"
