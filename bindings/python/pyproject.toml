@@ -29,7 +29,7 @@ Repository = "https://github.com/maplibre/maplibre-native-ffi"
 Issues = "https://github.com/maplibre/maplibre-native-ffi/issues"
 
 [dependency-groups]
-dev = ["maturin>=1.15.0,<2", "pytest>=9,<10"]
+dev = ["maturin>=1.16.0,<2", "pytest>=9,<10"]
 docs = ["pdoc>=16,<17"]
 android = ["cibuildwheel>=4.3.4,<5"]
 
