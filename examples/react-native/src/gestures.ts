@@ -6,7 +6,7 @@ import {
   GesturePhase,
   type MapHandle,
   type ScreenPoint,
-} from "@maplibre/native-ffi/hermes";
+} from "@maplibre/native-ffi-react-native";
 import {
   type GestureResponderEvent,
   PanResponder,

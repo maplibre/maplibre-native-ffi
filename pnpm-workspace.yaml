@@ -1,9 +1,9 @@
 packages:
   - bindings/typescript
+  - bindings/typescript/react-native
   - docs
   - docs/demo
   - examples/react-native
-  - examples/react-native/host
 
 pnpmfile: .config/pnpmfile.cjs
 
