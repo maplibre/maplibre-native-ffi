@@ -33,6 +33,7 @@ pub enum Kind {
     ResourceRequest = 12,
     ResourceTransformRequest = 13,
     RenderFrameBatch = 21,
+    GeoJsonSourceData = 22,
     DeliveryQueue = 23,
     StyleExpression = 25,
     OffscreenDevice = 26,
@@ -88,6 +89,7 @@ pub enum Object {
     // Held so the batch's results stay valid until its release.
     #[allow(dead_code)]
     FrameBatch(Arc<FrameBatch>),
+    GeoJsonSourceData(Arc<crate::geojson_data::PreparedGeoJson>),
     OffscreenDevice,
     StyleExpression(Arc<StyleExpression>),
     ResourceRequest(Arc<ResourceRequestObject>),
@@ -103,6 +105,7 @@ impl Object {
             Object::Session(_) => Kind::RenderSession,
             Object::Queue(_) => Kind::DeliveryQueue,
             Object::FrameBatch(_) => Kind::RenderFrameBatch,
+            Object::GeoJsonSourceData(_) => Kind::GeoJsonSourceData,
             Object::OffscreenDevice => Kind::OffscreenDevice,
             Object::StyleExpression(_) => Kind::StyleExpression,
             Object::ResourceRequest(_) => Kind::ResourceRequest,

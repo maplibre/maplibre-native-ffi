@@ -103,59 +103,6 @@ pub unsafe extern "C" fn mln_binding_render_session_abandon_at_exit(session: mln
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_binding_render_session_abandon_at_exit") }
 }
 
-/// `mln_geo_json_source_data_create` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_geo_json_source_data_create(data: mln_buffer_view, options: *const mln_geo_json_source_options, out_data: *mut mln_geo_json_source_data, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_geo_json_source_data_create") }
-}
-
-/// `mln_geo_json_source_data_release` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_geo_json_source_data_release(data: mln_geo_json_source_data) {
-}
-
-/// `mln_map_add_custom_geometry_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_custom_geometry_source(map: mln_map, source_id: mln_buffer_view, options: *const mln_custom_geometry_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_custom_geometry_source") }
-}
-
-/// `mln_map_add_custom_vector_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_custom_vector_source(map: mln_map, source_id: mln_buffer_view, options: *const mln_custom_vector_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_custom_vector_source") }
-}
-
-/// `mln_map_add_geo_json_source_data` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_geo_json_source_data(map: mln_map, source_id: mln_buffer_view, data: mln_geo_json_source_data, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_geo_json_source_data") }
-}
-
-/// `mln_map_add_geo_json_source_url` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_geo_json_source_url(map: mln_map, source_id: mln_buffer_view, url: mln_buffer_view, options: *const mln_geo_json_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_geo_json_source_url") }
-}
-
-/// `mln_map_add_image_source_image` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_image_source_image(map: mln_map, source_id: mln_buffer_view, coordinates: *const mln_lat_lng, coordinate_count: usize, image: *const mln_premultiplied_rgba8_image, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_image_source_image") }
-}
-
-/// `mln_map_add_image_source_url` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_image_source_url(map: mln_map, source_id: mln_buffer_view, coordinates: *const mln_lat_lng, coordinate_count: usize, url: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_image_source_url") }
-}
-
-/// `mln_map_add_style_source_json` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_style_source_json(map: mln_map, source_id: mln_buffer_view, source_json: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_style_source_json") }
-}
-
 /// `mln_map_attach_metal_borrowed_texture` (texture.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_attach_metal_borrowed_texture(map: mln_map, descriptor: *const mln_metal_borrowed_texture_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
@@ -204,142 +151,16 @@ pub unsafe extern "C" fn mln_map_get_feature_state(map: mln_map, selector: *cons
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_feature_state") }
 }
 
-/// `mln_map_get_image_source_coordinates` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_image_source_coordinates(map: mln_map, source_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_image_source_coordinates") }
-}
-
-/// `mln_map_get_style_image` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_image(map: mln_map, image_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_image") }
-}
-
-/// `mln_map_get_style_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_source(map: mln_map, source_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_source") }
-}
-
-/// `mln_map_invalidate_custom_geometry_source_region` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_invalidate_custom_geometry_source_region(map: mln_map, source_id: mln_buffer_view, bounds: mln_lat_lng_bounds, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_geometry_source_region") }
-}
-
-/// `mln_map_invalidate_custom_geometry_source_tile` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_invalidate_custom_geometry_source_tile(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_geometry_source_tile") }
-}
-
-/// `mln_map_invalidate_custom_vector_source_tile` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_invalidate_custom_vector_source_tile(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_vector_source_tile") }
-}
-
-/// `mln_map_list_style_sources` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_list_style_sources(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_list_style_sources") }
-}
-
 /// `mln_map_remove_feature_state` (map.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_remove_feature_state(map: mln_map, selector: *const mln_feature_state_selector, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_feature_state") }
 }
 
-/// `mln_map_remove_style_image` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_style_image(map: mln_map, image_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_image") }
-}
-
-/// `mln_map_remove_style_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_style_source(map: mln_map, source_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_source") }
-}
-
-/// `mln_map_set_custom_geometry_source_tile_data` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_geometry_source_tile_data(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, data: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_geometry_source_tile_data") }
-}
-
-/// `mln_map_set_custom_geometry_source_tile_error` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_geometry_source_tile_error(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, message: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_geometry_source_tile_error") }
-}
-
-/// `mln_map_set_custom_vector_source_tile_data` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_vector_source_tile_data(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, encoding: mln_style_vector_tile_encoding, data: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_vector_source_tile_data") }
-}
-
-/// `mln_map_set_custom_vector_source_tile_error` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_vector_source_tile_error(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, message: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_vector_source_tile_error") }
-}
-
 /// `mln_map_set_feature_state` (map.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_set_feature_state(map: mln_map, selector: *const mln_feature_state_selector, state: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_feature_state") }
-}
-
-/// `mln_map_set_geo_json_source_data` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_geo_json_source_data(map: mln_map, source_id: mln_buffer_view, data: mln_geo_json_source_data, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_data") }
-}
-
-/// `mln_map_set_geo_json_source_synchronous_tiling` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_geo_json_source_synchronous_tiling(map: mln_map, source_id: mln_buffer_view, enabled: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_synchronous_tiling") }
-}
-
-/// `mln_map_set_geo_json_source_url` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_geo_json_source_url(map: mln_map, source_id: mln_buffer_view, url: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_url") }
-}
-
-/// `mln_map_set_image_source_coordinates` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_image_source_coordinates(map: mln_map, source_id: mln_buffer_view, coordinates: *const mln_lat_lng, coordinate_count: usize, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_coordinates") }
-}
-
-/// `mln_map_set_image_source_image` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_image_source_image(map: mln_map, source_id: mln_buffer_view, image: *const mln_premultiplied_rgba8_image, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_image") }
-}
-
-/// `mln_map_set_image_source_url` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_image_source_url(map: mln_map, source_id: mln_buffer_view, url: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_url") }
-}
-
-/// `mln_map_set_style_image` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_image(map: mln_map, image_id: mln_buffer_view, image: *const mln_premultiplied_rgba8_image, options: *const mln_style_image_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_image") }
-}
-
-/// `mln_map_set_style_source_volatile` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_source_volatile(map: mln_map, source_id: mln_buffer_view, is_volatile: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_source_volatile") }
 }
 
 /// `mln_open_gl_supported_context_provider_mask` (render_target.h): not implemented.
@@ -451,13 +272,22 @@ const _: () = {
     let _ = [crate::types::mln_delivery_queue_create, crate::delivery::mln_delivery_queue_create];
     let _ = [crate::types::mln_delivery_queue_dispatch, crate::delivery::mln_delivery_queue_dispatch];
     let _ = [crate::types::mln_delivery_queue_release, crate::delivery::mln_delivery_queue_release];
+    let _ = [crate::types::mln_geo_json_source_data_create, crate::geojson_data::mln_geo_json_source_data_create];
+    let _ = [crate::types::mln_geo_json_source_data_release, crate::geojson_data::mln_geo_json_source_data_release];
     let _ = [crate::types::mln_http_header_transform_response_set_header, crate::http_headers::mln_http_header_transform_response_set_header];
     let _ = [crate::types::mln_lat_lng_for_projected_meters, crate::projection::mln_lat_lng_for_projected_meters];
     let _ = [crate::types::mln_log_clear_callback, crate::logging::mln_log_clear_callback];
     let _ = [crate::types::mln_log_set_async_severity_mask, crate::logging::mln_log_set_async_severity_mask];
     let _ = [crate::types::mln_log_set_callback, crate::logging::mln_log_set_callback];
     let _ = [crate::types::mln_logical_extent_physical_size, crate::base::mln_logical_extent_physical_size];
+    let _ = [crate::types::mln_map_add_custom_geometry_source, crate::custom_sources::mln_map_add_custom_geometry_source];
+    let _ = [crate::types::mln_map_add_custom_vector_source, crate::custom_sources::mln_map_add_custom_vector_source];
+    let _ = [crate::types::mln_map_add_geo_json_source_data, crate::style_sources::mln_map_add_geo_json_source_data];
+    let _ = [crate::types::mln_map_add_geo_json_source_url, crate::style_sources::mln_map_add_geo_json_source_url];
+    let _ = [crate::types::mln_map_add_image_source_image, crate::style_sources::mln_map_add_image_source_image];
+    let _ = [crate::types::mln_map_add_image_source_url, crate::style_sources::mln_map_add_image_source_url];
     let _ = [crate::types::mln_map_add_style_layer_json, crate::style_layers::mln_map_add_style_layer_json];
+    let _ = [crate::types::mln_map_add_style_source_json, crate::style_sources::mln_map_add_style_source_json];
     let _ = [crate::types::mln_map_apply_camera_delta, crate::camera::mln_map_apply_camera_delta];
     let _ = [crate::types::mln_map_attach_offscreen, crate::session::mln_map_attach_offscreen];
     let _ = [crate::types::mln_map_attach_web_gpu_surface, crate::surface_session::mln_map_attach_web_gpu_surface];
@@ -475,16 +305,23 @@ const _: () = {
     let _ = [crate::types::mln_map_fit_camera_to_lat_lngs, crate::camera::mln_map_fit_camera_to_lat_lngs];
     let _ = [crate::types::mln_map_get_camera, crate::camera::mln_map_get_camera];
     let _ = [crate::types::mln_map_get_global_state, crate::style_layers::mln_map_get_global_state];
+    let _ = [crate::types::mln_map_get_image_source_coordinates, crate::style_sources::mln_map_get_image_source_coordinates];
     let _ = [crate::types::mln_map_get_loaded_style_json, crate::map::mln_map_get_loaded_style_json];
     let _ = [crate::types::mln_map_get_snapshot, crate::map::mln_map_get_snapshot];
+    let _ = [crate::types::mln_map_get_style_image, crate::style_images::mln_map_get_style_image];
     let _ = [crate::types::mln_map_get_style_layer, crate::style_layers::mln_map_get_style_layer];
     let _ = [crate::types::mln_map_get_style_layer_json, crate::style_layers::mln_map_get_style_layer_json];
     let _ = [crate::types::mln_map_get_style_layer_property, crate::style_layers::mln_map_get_style_layer_property];
     let _ = [crate::types::mln_map_get_style_light_property, crate::style_layers::mln_map_get_style_light_property];
+    let _ = [crate::types::mln_map_get_style_source, crate::style_sources::mln_map_get_style_source];
     let _ = [crate::types::mln_map_get_style_transition_options, crate::style_layers::mln_map_get_style_transition_options];
     let _ = [crate::types::mln_map_get_style_url, crate::map::mln_map_get_style_url];
+    let _ = [crate::types::mln_map_invalidate_custom_geometry_source_region, crate::custom_sources::mln_map_invalidate_custom_geometry_source_region];
+    let _ = [crate::types::mln_map_invalidate_custom_geometry_source_tile, crate::custom_sources::mln_map_invalidate_custom_geometry_source_tile];
+    let _ = [crate::types::mln_map_invalidate_custom_vector_source_tile, crate::custom_sources::mln_map_invalidate_custom_vector_source_tile];
     let _ = [crate::types::mln_map_lat_lng_bounds_for_camera, crate::camera::mln_map_lat_lng_bounds_for_camera];
     let _ = [crate::types::mln_map_list_style_layers, crate::style_layers::mln_map_list_style_layers];
+    let _ = [crate::types::mln_map_list_style_sources, crate::style_sources::mln_map_list_style_sources];
     let _ = [crate::types::mln_map_move_style_layer, crate::style_layers::mln_map_move_style_layer];
     let _ = [crate::types::mln_map_projection_create, crate::projection::mln_map_projection_create];
     let _ = [crate::types::mln_map_projection_get_camera, crate::projection::mln_map_projection_get_camera];
@@ -498,21 +335,35 @@ const _: () = {
     let _ = [crate::types::mln_map_projection_release, crate::projection::mln_map_projection_release];
     let _ = [crate::types::mln_map_projection_set_camera, crate::projection::mln_map_projection_set_camera];
     let _ = [crate::types::mln_map_release, crate::map::mln_map_release];
+    let _ = [crate::types::mln_map_remove_style_image, crate::style_images::mln_map_remove_style_image];
     let _ = [crate::types::mln_map_remove_style_layer, crate::style_layers::mln_map_remove_style_layer];
+    let _ = [crate::types::mln_map_remove_style_source, crate::style_sources::mln_map_remove_style_source];
     let _ = [crate::types::mln_map_request_repaint, crate::map::mln_map_request_repaint];
     let _ = [crate::types::mln_map_request_still_image, crate::session::mln_map_request_still_image];
     let _ = [crate::types::mln_map_resize, crate::map::mln_map_resize];
     let _ = [crate::types::mln_map_set_bounds, crate::camera::mln_map_set_bounds];
+    let _ = [crate::types::mln_map_set_custom_geometry_source_tile_data, crate::custom_sources::mln_map_set_custom_geometry_source_tile_data];
+    let _ = [crate::types::mln_map_set_custom_geometry_source_tile_error, crate::custom_sources::mln_map_set_custom_geometry_source_tile_error];
+    let _ = [crate::types::mln_map_set_custom_vector_source_tile_data, crate::custom_sources::mln_map_set_custom_vector_source_tile_data];
+    let _ = [crate::types::mln_map_set_custom_vector_source_tile_error, crate::custom_sources::mln_map_set_custom_vector_source_tile_error];
     let _ = [crate::types::mln_map_set_debug_flags, crate::camera::mln_map_set_debug_flags];
     let _ = [crate::types::mln_map_set_event_mask, crate::map::mln_map_set_event_mask];
     let _ = [crate::types::mln_map_set_free_camera_options, crate::camera::mln_map_set_free_camera_options];
+    let _ = [crate::types::mln_map_set_geo_json_source_data, crate::style_sources::mln_map_set_geo_json_source_data];
+    let _ = [crate::types::mln_map_set_geo_json_source_synchronous_tiling, crate::style_sources::mln_map_set_geo_json_source_synchronous_tiling];
+    let _ = [crate::types::mln_map_set_geo_json_source_url, crate::style_sources::mln_map_set_geo_json_source_url];
     let _ = [crate::types::mln_map_set_global_state_property, crate::style_layers::mln_map_set_global_state_property];
+    let _ = [crate::types::mln_map_set_image_source_coordinates, crate::style_sources::mln_map_set_image_source_coordinates];
+    let _ = [crate::types::mln_map_set_image_source_image, crate::style_sources::mln_map_set_image_source_image];
+    let _ = [crate::types::mln_map_set_image_source_url, crate::style_sources::mln_map_set_image_source_url];
     let _ = [crate::types::mln_map_set_projection_mode, crate::camera::mln_map_set_projection_mode];
     let _ = [crate::types::mln_map_set_rendering_stats_view_enabled, crate::camera::mln_map_set_rendering_stats_view_enabled];
+    let _ = [crate::types::mln_map_set_style_image, crate::style_images::mln_map_set_style_image];
     let _ = [crate::types::mln_map_set_style_json, crate::map::mln_map_set_style_json];
     let _ = [crate::types::mln_map_set_style_layer_property, crate::style_layers::mln_map_set_style_layer_property];
     let _ = [crate::types::mln_map_set_style_light_json, crate::style_layers::mln_map_set_style_light_json];
     let _ = [crate::types::mln_map_set_style_light_property, crate::style_layers::mln_map_set_style_light_property];
+    let _ = [crate::types::mln_map_set_style_source_volatile, crate::style_sources::mln_map_set_style_source_volatile];
     let _ = [crate::types::mln_map_set_style_transition_options, crate::style_layers::mln_map_set_style_transition_options];
     let _ = [crate::types::mln_map_set_style_url, crate::map::mln_map_set_style_url];
     let _ = [crate::types::mln_map_set_tile_options, crate::camera::mln_map_set_tile_options];
