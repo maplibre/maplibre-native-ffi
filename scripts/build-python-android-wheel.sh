@@ -119,7 +119,7 @@ uv run --project . --group android --no-sync \
   --output-dir dist \
   "runtimes/$runtime" || python_test_status=$?
 if ((python_test_status == 0)); then
-  uv run --no-project --with wheel==0.47.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed dist "runtimes/$runtime/sbom.cdx.json"
+  uv run --no-project --with wheel==0.48.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed dist "runtimes/$runtime/sbom.cdx.json"
   exit 0
 fi
 

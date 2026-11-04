@@ -50,5 +50,5 @@ MAPLIBRE_NATIVE_FFI_LOCAL_BUILD="$install_dir" \
   uv run --project ../.. --no-sync maturin build --release --out "$wheel_output" \
   ${maturin_flags[@]+"${maturin_flags[@]}"}
 
-uv run --no-project --with wheel==0.47.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed "$wheel_output" sbom.cdx.json
+uv run --no-project --with wheel==0.48.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed "$wheel_output" sbom.cdx.json
 mv "$wheel_output"/*.whl ../../dist/

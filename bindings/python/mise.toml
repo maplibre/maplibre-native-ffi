@@ -3,7 +3,7 @@ description = "Build the API wheel, which holds the Python modules, into dist/."
 run = '''
 cp "$MISE_MONOREPO_ROOT/LICENSE" LICENSE
 uv build --wheel --out-dir dist .
-uv run --no-project --with wheel==0.47.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed-api dist
+uv run --no-project --with wheel==0.48.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" embed-api dist
 '''
 
 [tasks.prepare-release]
@@ -12,7 +12,7 @@ usage = '''
 arg "<version>" help="The release version, or a snapshot's <next release>.devSTAMP"
 arg "<wheels>" help="Directory containing the runtime wheels from CI"
 '''
-run = 'uv run --no-project --with wheel==0.47.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" pack . "$usage_version" "$usage_wheels"'
+run = 'uv run --no-project --with wheel==0.48.0 python "$MISE_MONOREPO_ROOT/tools/release/python_release.py" pack . "$usage_version" "$usage_wheels"'
 
 [tasks._test-android]
 hide = true
