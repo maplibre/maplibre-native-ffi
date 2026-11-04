@@ -507,6 +507,25 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_attach_wayland_surface(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_wayland_surface(
+      map.toULong(),
+      descriptor.toCPointer(),
+      device.toULong(),
+      options.toCPointer(),
+      outSession.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_attach_web_gpu_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -1980,6 +1999,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_vulkan_surface_target(
+      session.toULong(),
+      replacement.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_set_wayland_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_wayland_surface_target(
       session.toULong(),
       replacement.toCPointer(),
       completion.toCPointer(),

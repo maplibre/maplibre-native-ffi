@@ -3843,8 +3843,8 @@ pub struct RenderSessionAttachOptions {
     ///   or WGL context, an existing WebGL context, or a browser's WebGPU
     ///   device.
     /// - `RenderDriverKind::CoreWorker` for a transferred WebGL canvas, an
-    ///   Android or OpenHarmony window, a ring of Android hardware buffers, or
-    ///   an offscreen session.
+    ///   Android or OpenHarmony window, a Wayland surface, a ring of Android
+    ///   hardware buffers, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.
@@ -6505,6 +6505,71 @@ impl ToNative<sys::mln_wake> for Wake {
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
             raw.release_user_data = Some(callback::release::<Self>);
         }
+        Ok(raw)
+    }
+}
+
+/// A Wayland surface to present to, for `MapHandle::attach_wayland_surface()`.
+///
+/// See `mln_wayland_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WaylandSurfaceDescriptor {
+    pub logical_size: LogicalSize,
+    /// Your `wl_display*`.
+    pub display: *mut std::ffi::c_void,
+    /// Your `wl_surface*`, on `display`.
+    pub surface: *mut std::ffi::c_void,
+}
+impl WaylandSurfaceDescriptor {
+    pub fn new(
+        logical_size: LogicalSize,
+        display: *mut std::ffi::c_void,
+        surface: *mut std::ffi::c_void,
+    ) -> Self {
+        Self {
+            logical_size,
+            display,
+            surface,
+        }
+    }
+}
+impl ToNative<sys::mln_wayland_surface_descriptor> for WaylandSurfaceDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_wayland_surface_descriptor> {
+        let mut raw: sys::mln_wayland_surface_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_wayland_surface_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.display = self.display;
+        raw.surface = self.surface;
+        Ok(raw)
+    }
+}
+
+/// A new Wayland surface for
+/// `RenderSessionHandle::set_wayland_surface_target()`.
+///
+/// See `mln_wayland_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WaylandSurfaceReplacement {
+    pub logical_size: LogicalSize,
+    /// Your `wl_surface*`, on the display that the session attached with.
+    pub surface: *mut std::ffi::c_void,
+}
+impl WaylandSurfaceReplacement {
+    pub fn new(logical_size: LogicalSize, surface: *mut std::ffi::c_void) -> Self {
+        Self {
+            logical_size,
+            surface,
+        }
+    }
+}
+impl ToNative<sys::mln_wayland_surface_replacement> for WaylandSurfaceReplacement {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_wayland_surface_replacement> {
+        let mut raw: sys::mln_wayland_surface_replacement = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_wayland_surface_replacement>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.surface = self.surface;
         Ok(raw)
     }
 }

@@ -3355,8 +3355,8 @@ class RenderSessionAttachOptions:
       or WGL context, an existing WebGL context, or a browser's WebGPU
       device.
     - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an
-      Android or OpenHarmony window, a ring of Android hardware buffers, or
-      an offscreen session.
+      Android or OpenHarmony window, a Wayland surface, a ring of Android
+      hardware buffers, or an offscreen session.
     - Either one for a Metal or Vulkan target.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.
@@ -5196,6 +5196,54 @@ class NativeWake:
         value = cls.__new__(cls)
         value._registration = registration
         return value
+
+
+@dataclass(frozen=True, slots=True)
+class WaylandSurfaceDescriptor:
+    """A Wayland surface to present to, for
+    `MapHandle.attach_wayland_surface()`.
+
+    See `mln_wayland_surface_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    display: int
+    """Your `wl_display*`."""
+
+    surface: int
+    """Your `wl_surface*`, on `display`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            display=raw["display"],
+            surface=raw["surface"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WaylandSurfaceReplacement:
+    """A new Wayland surface for
+    `RenderSessionHandle.set_wayland_surface_target()`.
+
+    See `mln_wayland_surface_replacement` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    surface: int
+    """Your `wl_surface*`, on the display that the session attached with."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            surface=raw["surface"],
+        )
 
 
 @dataclass(frozen=True, slots=True)

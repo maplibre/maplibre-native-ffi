@@ -721,6 +721,61 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that presents the map to a Wayland surface, with a
+    /// graphics context that the library creates.
+    /// </summary>
+    /// <remarks>
+    /// <para>A Vulkan build presents with <c>device</c>, or, when <c>device</c>
+    /// is null, with a device that the library creates. An OpenGL build uses an
+    /// EGL context on the display, and <c>device</c> must be null. Attach with
+    /// <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>The session presents without waiting for the compositor, so demand
+    /// at most one frame per display refresh.</para>
+    /// <para>Keep the surface until a release or replacement of the target, or
+    /// a detach of the session, completes. Keep the display connected until the
+    /// session's detach completes. In an OpenGL build, if you also use EGL on
+    /// the display, initialize it before you attach.</para>
+    /// <para>See <c>mln_map_attach_wayland_surface</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when you created
+    /// <c>device</c> without
+    /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
+    /// loader can't present to Wayland.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the library can't
+    /// create the graphics context or present to the
+    /// surface.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public RenderSessionHandle AttachWaylandSurface(
+        WaylandSurfaceDescriptor descriptor,
+        VulkanDeviceHandle? device,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeWaylandSurfaceDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_wayland_surface(
+            Handle,
+            &nativeDescriptor,
+            scope.UseOptional(device),
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Holds back the map's changes from rendering until
     /// <c>MapHandle.EndCommandGroupAsync()</c>, so they show in the same frame.
     /// </summary>

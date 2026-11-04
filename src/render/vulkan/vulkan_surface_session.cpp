@@ -4,7 +4,8 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
+#include <cstddef>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -20,6 +21,13 @@
 
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
+#if defined(MLN_FFI_WAYLAND)
+// The Wayland surface extension names libwayland-client's types without its
+// headers, which the build doesn't have.
+struct wl_display;
+struct wl_surface;
+#include <vulkan/vulkan_wayland.h>
+#endif
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
@@ -29,6 +37,8 @@
 #include "render/android_surface_session.hpp"
 #elif defined(__OHOS__)
 #include "render/ohos_surface_session.hpp"
+#elif defined(MLN_FFI_WAYLAND)
+#include "render/wayland_surface_session.hpp"
 #endif
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
@@ -182,9 +192,11 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
       : public mln::vulkan::SurfaceRenderableResource {
    public:
     VulkanSurfaceRenderableResource(
-      VulkanSurfaceBackend& backend_, VkSurfaceKHR surface_
+      VulkanSurfaceBackend& backend_, VkSurfaceKHR surface_,
+      vk::PresentModeKHR present_mode
     )
-        : SurfaceRenderableResource(backend_), borrowed_surface(surface_) {}
+        : SurfaceRenderableResource(backend_, present_mode),
+          borrowed_surface(surface_) {}
     VulkanSurfaceRenderableResource(const VulkanSurfaceRenderableResource&) =
       delete;
     auto operator=(const VulkanSurfaceRenderableResource&)
@@ -358,12 +370,14 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
  public:
   VulkanSurfaceBackend(
     const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
-    std::shared_ptr<const mln::core::QueueLock> queue_lock
+    std::shared_ptr<const mln::core::QueueLock> queue_lock,
+    vk::PresentModeKHR present_mode
   )
       : mln::core::VulkanQueueAccess(std::move(queue_lock)),
         mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::vulkan::Renderable(size, nullptr),
-        descriptor_(descriptor) {
+        descriptor_(descriptor),
+        present_mode_(present_mode) {
     initSharedDevice();
     initAllocator();
     initSwapchain();
@@ -388,7 +402,8 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
     if (!resource) {
       resource = std::make_unique<VulkanSurfaceRenderableResource>(
         *this,
-        mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor_.surface)
+        mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor_.surface),
+        present_mode_
       );
     }
     return *this;
@@ -535,6 +550,7 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
   }
 
   mln_vulkan_surface_descriptor descriptor_;
+  vk::PresentModeKHR present_mode_;
 };
 
 class VulkanSurfaceSessionBackend final
@@ -542,9 +558,10 @@ class VulkanSurfaceSessionBackend final
  public:
   VulkanSurfaceSessionBackend(
     const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
-    std::shared_ptr<const mln::core::QueueLock> queue_lock
+    std::shared_ptr<const mln::core::QueueLock> queue_lock,
+    vk::PresentModeKHR present_mode = vk::PresentModeKHR::eFifo
   )
-      : backend_(descriptor, size, std::move(queue_lock)) {}
+      : backend_(descriptor, size, std::move(queue_lock), present_mode) {}
 
   auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
@@ -603,11 +620,20 @@ class VulkanSurfaceSessionBackend final
   VulkanSurfaceBackend backend_;
 };
 
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 #if defined(__ANDROID__)
 using PlatformWindow = mln::core::AndroidWindow;
-#else
+#elif defined(__OHOS__)
 using PlatformWindow = mln::core::OhosWindow;
+#else
+using PlatformWindow = mln::core::WaylandWindow;
+#endif
+#if defined(MLN_FFI_WAYLAND)
+// The connection that each of the session's Wayland surfaces belongs to.
+using PlatformDisplay = wl_display*;
+#else
+// An Android or OpenHarmony window stands on its own.
+using PlatformDisplay = std::nullptr_t;
 #endif
 
 // A VkSurfaceKHR that the library made for a platform window.
@@ -645,6 +671,8 @@ class OwnedVulkanSurface final {
     return mln::core::vulkan_handle_to_abi(surface_);
   }
 
+  [[nodiscard]] auto get() const noexcept -> VkSurfaceKHR { return surface_; }
+
  private:
   VkInstance instance_ = VK_NULL_HANDLE;
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
@@ -652,12 +680,14 @@ class OwnedVulkanSurface final {
 };
 
 auto create_window_vulkan_surface(
-  const mln_vulkan_context_descriptor& context,
+  const mln_vulkan_context_descriptor& context, PlatformDisplay display,
   PlatformWindow::element_type* window, OwnedVulkanSurface& out_surface
 ) -> mln_status {
   auto dispatcher = mln::core::vulkan_dispatch_loader(context);
   mln::core::vulkan_init_instance_dispatch(dispatcher, context);
+  auto* const instance = static_cast<VkInstance>(context.instance);
 #if defined(__ANDROID__)
+  static_cast<void>(display);
   const auto create = dispatcher.vkCreateAndroidSurfaceKHR;
   constexpr auto create_name = "vkCreateAndroidSurfaceKHR";
   const auto info = VkAndroidSurfaceCreateInfoKHR{
@@ -666,7 +696,8 @@ auto create_window_vulkan_surface(
     .flags = 0,
     .window = window,
   };
-#else
+#elif defined(__OHOS__)
+  static_cast<void>(display);
   const auto create = dispatcher.vkCreateSurfaceOHOS;
   constexpr auto create_name = "vkCreateSurfaceOHOS";
   const auto info = VkSurfaceCreateInfoOHOS{
@@ -675,6 +706,20 @@ auto create_window_vulkan_surface(
     .flags = 0,
     .window = window,
   };
+#else
+  // Vulkan-Hpp's dispatcher has this entry only with the Wayland headers.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+  const auto create = reinterpret_cast<PFN_vkCreateWaylandSurfaceKHR>(
+    dispatcher.vkGetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR")
+  );
+  constexpr auto create_name = "vkCreateWaylandSurfaceKHR";
+  const auto info = VkWaylandSurfaceCreateInfoKHR{
+    .sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+    .pNext = nullptr,
+    .flags = 0,
+    .display = display,
+    .surface = window,
+  };
 #endif
   if (create == nullptr || dispatcher.vkDestroySurfaceKHR == nullptr) {
     mln::core::set_thread_error(
@@ -682,7 +727,6 @@ auto create_window_vulkan_surface(
     );
     return MLN_STATUS_UNSUPPORTED;
   }
-  auto* const instance = static_cast<VkInstance>(context.instance);
   auto surface = VkSurfaceKHR{VK_NULL_HANDLE};
   const auto result = create(instance, &info, nullptr, &surface);
   if (result != VK_SUCCESS) {
@@ -696,20 +740,68 @@ auto create_window_vulkan_surface(
   return MLN_STATUS_OK;
 }
 
-// Presents to an Android or OpenHarmony window through a VkSurfaceKHR that it
-// creates for each window and destroys once the swapchain no longer uses it.
+#if defined(MLN_FFI_WAYLAND)
+// A Wayland compositor answers a hidden surface's frame callbacks only once it
+// shows again, and FIFO presentation waits for them, which would hold a detach
+// queued behind a present. The host paces frames itself, so presents never
+// wait for the compositor when the surface allows it.
+auto window_present_mode(
+  const mln_vulkan_context_descriptor& context, VkSurfaceKHR surface
+) -> vk::PresentModeKHR {
+  auto dispatcher = mln::core::vulkan_dispatch_loader(context);
+  mln::core::vulkan_init_instance_dispatch(dispatcher, context);
+  auto* const physical_device =
+    static_cast<VkPhysicalDevice>(context.physical_device);
+  auto count = uint32_t{};
+  auto modes = std::vector<VkPresentModeKHR>{};
+  if (
+    dispatcher.vkGetPhysicalDeviceSurfacePresentModesKHR(
+      physical_device, surface, &count, nullptr
+    ) == VK_SUCCESS
+  ) {
+    modes.resize(count);
+    if (
+      dispatcher.vkGetPhysicalDeviceSurfacePresentModesKHR(
+        physical_device, surface, &count, modes.data()
+      ) != VK_SUCCESS
+    ) {
+      count = 0;
+    }
+    modes.resize(count);
+  }
+  for (const auto mode :
+       {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
+    if (std::ranges::find(modes, mode) != modes.end()) {
+      return static_cast<vk::PresentModeKHR>(mode);
+    }
+  }
+  return vk::PresentModeKHR::eFifo;
+}
+#else
+// Android and OpenHarmony present in FIFO order.
+auto window_present_mode(const mln_vulkan_context_descriptor&, VkSurfaceKHR)
+  -> vk::PresentModeKHR {
+  return vk::PresentModeKHR::eFifo;
+}
+#endif
+
+// Presents to an Android, OpenHarmony, or Wayland window through a
+// VkSurfaceKHR that it creates for each window and destroys once the swapchain
+// no longer uses it.
 class WindowVulkanSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   WindowVulkanSurfaceSessionBackend(
-    PlatformWindow window, OwnedVulkanSurface surface,
+    PlatformDisplay display, PlatformWindow window, OwnedVulkanSurface surface,
     const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
-    std::shared_ptr<const mln::core::QueueLock> queue_lock
+    std::shared_ptr<const mln::core::QueueLock> queue_lock,
+    vk::PresentModeKHR present_mode
   )
       : context_(descriptor.context),
+        display_(display),
         window_(std::move(window)),
         surface_(std::move(surface)),
-        session_(descriptor, size, std::move(queue_lock)) {}
+        session_(descriptor, size, std::move(queue_lock), present_mode) {}
 
   auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return session_.renderer_backend();
@@ -739,8 +831,13 @@ class WindowVulkanSurfaceSessionBackend final
     -> mln_status override {
     return set_window(window, physical_size);
   }
-#else
+#elif defined(__OHOS__)
   auto set_ohos_target(const PlatformWindow& window, mln::Size physical_size)
+    -> mln_status override {
+    return set_window(window, physical_size);
+  }
+#else
+  auto set_wayland_target(const PlatformWindow& window, mln::Size physical_size)
     -> mln_status override {
     return set_window(window, physical_size);
   }
@@ -763,7 +860,7 @@ class WindowVulkanSurfaceSessionBackend final
     }
     auto next = OwnedVulkanSurface{};
     const auto create_status =
-      create_window_vulkan_surface(context_, window.get(), next);
+      create_window_vulkan_surface(context_, display_, window.get(), next);
     if (create_status != MLN_STATUS_OK) return create_status;
     const auto replacement = mln_vulkan_surface_replacement{
       .size = sizeof(mln_vulkan_surface_replacement),
@@ -787,6 +884,7 @@ class WindowVulkanSurfaceSessionBackend final
   }
 
   mln_vulkan_context_descriptor context_;
+  PlatformDisplay display_;
   PlatformWindow window_;
   OwnedVulkanSurface surface_;
   // Surfaces that a failed replacement left the swapchain possibly using.
@@ -800,11 +898,11 @@ class WindowVulkanSurfaceSessionBackend final
 
 namespace mln::core {
 
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 namespace {
 
 auto create_window_backend(
-  PlatformWindow window,
+  PlatformDisplay display, PlatformWindow window,
   std::shared_ptr<const mln_vulkan_context_descriptor> device,
   mln_render_session_object& target
 ) -> mln_status {
@@ -814,7 +912,7 @@ auto create_window_backend(
   }
   auto surface = OwnedVulkanSurface{};
   const auto surface_status =
-    create_window_vulkan_surface(*device, window.get(), surface);
+    create_window_vulkan_surface(*device, display, window.get(), surface);
   if (surface_status != MLN_STATUS_OK) return surface_status;
   const auto descriptor = mln_vulkan_surface_descriptor{
     .size = sizeof(mln_vulkan_surface_descriptor),
@@ -824,9 +922,11 @@ auto create_window_backend(
   };
   const auto handles_status = validate_vulkan_handles(descriptor);
   if (handles_status != MLN_STATUS_OK) return handles_status;
+  const auto present_mode = window_present_mode(*device, surface.get());
   auto backend = std::make_unique<WindowVulkanSurfaceSessionBackend>(
-    std::move(window), std::move(surface), descriptor,
-    mln::Size{target.physical_width, target.physical_height}, target.queue_lock
+    display, std::move(window), std::move(surface), descriptor,
+    mln::Size{target.physical_width, target.physical_height}, target.queue_lock,
+    present_mode
   );
   backend->retain(std::move(device));
   target.surface.backend = std::move(backend);
@@ -840,15 +940,23 @@ auto create_android_surface_backend(
   AndroidSurfaceAttach attach, mln_render_session_object& target
 ) -> mln_status {
   return create_window_backend(
-    std::move(attach.window), std::move(attach.device), target
+    nullptr, std::move(attach.window), std::move(attach.device), target
   );
 }
-#else
+#elif defined(__OHOS__)
 auto create_ohos_surface_backend(
   OhosSurfaceAttach attach, mln_render_session_object& target
 ) -> mln_status {
   return create_window_backend(
-    std::move(attach.window), std::move(attach.device), target
+    nullptr, std::move(attach.window), std::move(attach.device), target
+  );
+}
+#else
+auto create_wayland_surface_backend(
+  WaylandSurfaceAttach attach, mln_render_session_object& target
+) -> mln_status {
+  return create_window_backend(
+    attach.display, std::move(attach.window), std::move(attach.device), target
   );
 }
 #endif

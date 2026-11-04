@@ -418,6 +418,19 @@ int32_t mln_kw_mln_map_attach_vulkan_surface(
   );
 }
 
+int32_t mln_kw_mln_map_attach_wayland_surface(
+  int64_t map, uintptr_t descriptor, int64_t device, uintptr_t options,
+  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_attach_wayland_surface(
+    (mln_map)map, (const mln_wayland_surface_descriptor*)descriptor,
+    (mln_vulkan_device)device,
+    (const mln_render_session_attach_options*)options,
+    (mln_render_session*)out_session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_attach_web_gpu_borrowed_texture(
   int64_t map, uintptr_t descriptor, uintptr_t options, uintptr_t out_session,
   uintptr_t completion, uintptr_t out_diagnostic
@@ -1611,6 +1624,17 @@ int32_t mln_kw_mln_render_session_set_vulkan_surface_target(
   return (int32_t)mln_render_session_set_vulkan_surface_target(
     (mln_render_session)session,
     (const mln_vulkan_surface_replacement*)replacement,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_render_session_set_wayland_surface_target(
+  int64_t session, uintptr_t replacement, uintptr_t completion,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_set_wayland_surface_target(
+    (mln_render_session)session,
+    (const mln_wayland_surface_replacement*)replacement,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }

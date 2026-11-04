@@ -40,6 +40,10 @@ struct CompletionResult<&mln_map_attach_vulkan_surface> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_map_attach_wayland_surface> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_map_attach_web_gpu_borrowed_texture> {
   static constexpr bool has_value = false;
 };
@@ -290,6 +294,10 @@ struct CompletionResult<
 };
 template <>
 struct CompletionResult<&mln_render_session_set_vulkan_surface_target> {
+  static constexpr bool has_value = false;
+};
+template <>
+struct CompletionResult<&mln_render_session_set_wayland_surface_target> {
   static constexpr bool has_value = false;
 };
 template <>

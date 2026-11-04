@@ -48,6 +48,12 @@ auto validate_ohos_surface_descriptor(
 auto validate_ohos_surface_replacement(
   const mln_ohos_surface_replacement* replacement
 ) -> mln_status;
+auto validate_wayland_surface_descriptor(
+  const mln_wayland_surface_descriptor* descriptor
+) -> mln_status;
+auto validate_wayland_surface_replacement(
+  const mln_wayland_surface_replacement* replacement
+) -> mln_status;
 auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,

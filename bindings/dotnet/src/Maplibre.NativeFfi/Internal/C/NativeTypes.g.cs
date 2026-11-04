@@ -1470,6 +1470,21 @@ internal unsafe struct mln_wake
     public MlnDeliveryQueue queue;
 }
 
+internal unsafe struct mln_wayland_surface_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* display;
+    public void* surface;
+}
+
+internal unsafe struct mln_wayland_surface_replacement
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public void* surface;
+}
+
 internal unsafe struct mln_web_gl_context_descriptor
 {
     public mln_web_gl_context_kind kind;

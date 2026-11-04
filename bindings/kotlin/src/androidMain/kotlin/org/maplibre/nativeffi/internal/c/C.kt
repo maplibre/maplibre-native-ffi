@@ -314,6 +314,17 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_attach_wayland_surface(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_attach_web_gpu_borrowed_texture(
     map: Long,
     descriptor: Long,
@@ -1233,6 +1244,14 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_render_session_set_vulkan_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_render_session_set_wayland_surface_target(
     session: Long,
     replacement: Long,
     completion: Long,

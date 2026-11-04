@@ -2491,7 +2491,7 @@ public data class RenderSessionAttachOptions(
    * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL or WGL context, an
    *   existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android or OpenHarmony
-   *   window, a ring of Android hardware buffers, or an offscreen session.
+   *   window, a Wayland surface, a ring of Android hardware buffers, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.
@@ -2827,6 +2827,20 @@ public data class VulkanSurfaceDescriptor(
   public val context: VulkanContextDescriptor,
   /** Your VkSurfaceKHR. */
   public val surface: ULong,
+)
+
+/**
+ * A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
+ *
+ * See `mln_wayland_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ */
+public data class WaylandSurfaceDescriptor(
+  public val logicalSize: LogicalSize,
+  /** Your `wl_display*`. */
+  public val display: NativePointer,
+  /** Your `wl_surface*`, on `display`. */
+  public val surface: NativePointer,
 )
 
 /**
@@ -3705,6 +3719,18 @@ public data class VulkanSurfaceReplacement(
   public val logicalSize: LogicalSize,
   /** Your VkSurfaceKHR. */
   public val surface: ULong,
+)
+
+/**
+ * A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
+ *
+ * See `mln_wayland_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ */
+public data class WaylandSurfaceReplacement(
+  public val logicalSize: LogicalSize,
+  /** Your `wl_surface*`, on the display that the session attached with. */
+  public val surface: NativePointer,
 )
 
 /**

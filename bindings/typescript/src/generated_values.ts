@@ -2224,8 +2224,8 @@ export interface RenderSessionAttachOptions {
    * - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
    *   WGL context, an existing WebGL context, or a browser's WebGPU device.
    * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android
-   *   or OpenHarmony window, a ring of Android hardware buffers, or an
-   *   offscreen session.
+   *   or OpenHarmony window, a Wayland surface, a ring of Android hardware
+   *   buffers, or an offscreen session.
    * - Either one for a Metal or Vulkan target.
    *
    * An attach with another driver fails with `Status.unsupported`.
@@ -4077,6 +4077,38 @@ export interface NativeWakeFields {
   readonly callback: bigint;
   readonly userData?: bigint;
   readonly releaseUserData?: bigint;
+}
+
+/**
+ * A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
+ *
+ * See `mln_wayland_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ */
+export interface WaylandSurfaceDescriptor {
+  logicalSize: LogicalSize;
+  /**
+   * Your `wl_display*`.
+   */
+  display: bigint;
+  /**
+   * Your `wl_surface*`, on `display`.
+   */
+  surface: bigint;
+}
+
+/**
+ * A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
+ *
+ * See `mln_wayland_surface_replacement` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ */
+export interface WaylandSurfaceReplacement {
+  logicalSize: LogicalSize;
+  /**
+   * Your `wl_surface*`, on the display that the session attached with.
+   */
+  surface: bigint;
 }
 
 /**

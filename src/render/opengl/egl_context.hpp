@@ -119,15 +119,23 @@ auto get_egl_proc_address(
   EGLenum active_api
 ) -> void*;
 
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 struct WindowEglConfig {
   EGLDisplay display = EGL_NO_DISPLAY;
   EGLConfig config = nullptr;
 };
 
-// The default display and an OpenGL ES 3 config for RGBA8888 windows, with
-// pbuffers for a session without a window, which the library's dedicated
-// contexts on this platform share.
+// An OpenGL ES 3 config of the initialized `display` for RGBA8888 windows,
+// with pbuffers for a session without a window where the display has such a
+// config. `display_name` names the display in the error.
+auto choose_window_egl_config(
+  EGLDisplay display, const char* display_name, EGLConfig& out_config
+) -> mln_status;
+#endif
+
+#if defined(__ANDROID__) || defined(__OHOS__)
+// The default display and its config from choose_window_egl_config(), which
+// the library's dedicated contexts on this platform share.
 auto window_egl_config(WindowEglConfig& out_config) -> mln_status;
 #endif
 

@@ -21,6 +21,7 @@
 #include "maplibre_native_c/surface.h"
 #include "maplibre_native_c/texture.h"
 #include "maplibre_native_c/vulkan.h"
+#include "maplibre_native_c/wayland.h"
 #include "runtime.h"
 
 /** The realm's callback adapters, by the callback type that each
@@ -774,6 +775,14 @@ bool mln_ts_write_vulkan_surface_replacement(
 );
 bool mln_ts_write_wake(
   mln_ts_call* call, napi_value value, mln_wake* out, const char* path
+);
+bool mln_ts_write_wayland_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_wayland_surface_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_wayland_surface_replacement(
+  mln_ts_call* call, napi_value value, mln_wayland_surface_replacement* out,
+  const char* path
 );
 bool mln_ts_write_web_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gl_context_descriptor* out,

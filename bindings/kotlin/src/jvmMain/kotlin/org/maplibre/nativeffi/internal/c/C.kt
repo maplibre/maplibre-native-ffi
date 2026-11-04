@@ -277,6 +277,18 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_attach_wayland_surface =
+    Ffm.downcall(
+      "mln_map_attach_wayland_surface",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_attach_web_gpu_borrowed_texture =
     Ffm.downcall(
       "mln_map_attach_web_gpu_borrowed_texture",
@@ -1079,6 +1091,15 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_render_session_set_wayland_surface_target =
+    Ffm.downcall(
+      "mln_render_session_set_wayland_surface_target",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_render_session_set_web_gpu_borrowed_texture_target =
     Ffm.downcall(
       "mln_render_session_set_web_gpu_borrowed_texture_target",
@@ -1746,6 +1767,25 @@ internal actual object C {
     mln_map_attach_vulkan_surface.invokeExact(
       map,
       descriptor,
+      options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_attach_wayland_surface(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_wayland_surface.invokeExact(
+      map,
+      descriptor,
+      device,
       options,
       outSession,
       completion,
@@ -2989,6 +3029,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_set_vulkan_surface_target.invokeExact(
+      session,
+      replacement,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_render_session_set_wayland_surface_target(
+    session: Long,
+    replacement: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_render_session_set_wayland_surface_target.invokeExact(
       session,
       replacement,
       completion,

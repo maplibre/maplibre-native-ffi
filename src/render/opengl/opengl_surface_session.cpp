@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
-#if defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -38,10 +38,15 @@
 #include "render/android_surface_session.hpp"
 #elif defined(__OHOS__)
 #include "render/ohos_surface_session.hpp"
+#elif defined(MLN_FFI_WAYLAND)
+#include "render/wayland_surface_session.hpp"
 #endif
 #include "render/opengl/context_mode.hpp"
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
+#endif
+#if defined(MLN_FFI_WAYLAND) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+#include "render/opengl/wayland_egl.hpp"
 #endif
 #include "render/opengl/webgl_worker.hpp"
 #include "render/opengl/wgl_common.hpp"
@@ -165,8 +170,21 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     // reads its device_context.
     descriptor_.surface = surface;
     fallback_drawable_ = false;
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    swap_interval_pending_ = swap_interval_.has_value();
+#endif
     setRenderableSize(size);
   }
+
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  // Sets the swap interval of each surface that the context renders to from
+  // here on. EGL keeps the interval with the surface, so each one gets it once
+  // the context is first current on it.
+  void set_swap_interval(EGLint interval) {
+    swap_interval_ = interval;
+    swap_interval_pending_ = true;
+  }
+#endif
 
   // Stops presenting through the host surface, so the host may destroy it.
   // The context moves to the drawable it was created from, which a dedicated
@@ -311,6 +329,17 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
       egl_context_->activate_surface(
         static_cast<EGLSurface>(descriptor_.surface)
       );
+      if (swap_interval_pending_) {
+        if (
+          eglSwapInterval(
+            static_cast<EGLDisplay>(descriptor_.context.data.egl.display),
+            *swap_interval_
+          ) == EGL_FALSE
+        ) {
+          throw std::runtime_error("Setting the EGL swap interval failed");
+        }
+        swap_interval_pending_ = false;
+      }
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
     // The context carries the canvas it draws to, so there is no second
@@ -448,6 +477,9 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
   void* previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   std::optional<mln::core::opengl::EglSharedContext> egl_context_;
+  std::optional<EGLint> swap_interval_;
+  // Whether the surface still needs swap_interval_.
+  bool swap_interval_pending_ = false;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous_webgl_context_ = 0;
 #endif
@@ -476,6 +508,12 @@ class OpenGLSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  void set_swap_interval(EGLint interval) {
+    backend_.set_swap_interval(interval);
+  }
+#endif
+
   auto release_target() -> mln_status override {
     if (!backend_.release_surface()) {
       return mln::core::unsupported_retarget(
@@ -489,12 +527,14 @@ class OpenGLSurfaceSessionBackend final
   OpenGLSurfaceBackend backend_;
 };
 
-#if (defined(__ANDROID__) || defined(__OHOS__)) && \
+#if (defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)) && \
   defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #if defined(__ANDROID__)
 using PlatformWindow = mln::core::AndroidWindow;
-#else
+#elif defined(__OHOS__)
 using PlatformWindow = mln::core::OhosWindow;
+#else
+using PlatformWindow = mln::core::WaylandWindow;
 #endif
 
 auto egl_failure(const char* what) -> mln_status {
@@ -504,10 +544,43 @@ auto egl_failure(const char* what) -> mln_status {
   return MLN_STATUS_NATIVE_ERROR;
 }
 
-using mln::core::opengl::window_egl_config;
 using mln::core::opengl::WindowEglConfig;
 
-// An EGL window surface that the library made for a platform window.
+#if defined(MLN_FFI_WAYLAND)
+// The connection that each of the session's Wayland surfaces belongs to.
+using PlatformDisplay = wl_display*;
+// The EGL display of the session's connection, which stays initialized while
+// the session holds it.
+using WindowEglDisplay = mln::core::opengl::WaylandEglDisplay;
+
+auto open_window_egl_display(PlatformDisplay display, WindowEglDisplay& out)
+  -> mln_status {
+  return mln::core::opengl::acquire_wayland_egl_display(display, out);
+}
+#else
+// An Android or OpenHarmony window stands on its own.
+using PlatformDisplay = std::nullptr_t;
+
+// The default EGL display, which stays initialized for the rest of the
+// process.
+class WindowEglDisplay final {
+ public:
+  [[nodiscard]] auto config() const noexcept -> const WindowEglConfig& {
+    return config_;
+  }
+
+  friend auto open_window_egl_display(PlatformDisplay, WindowEglDisplay& out)
+    -> mln_status {
+    return mln::core::opengl::window_egl_config(out.config_);
+  }
+
+ private:
+  WindowEglConfig config_;
+};
+#endif
+
+// An EGL window surface that the library made for a platform window. On
+// Wayland, it also owns the wl_egl_window that EGL presents through.
 class EglWindowSurface final {
  public:
   EglWindowSurface() = default;
@@ -517,12 +590,21 @@ class EglWindowSurface final {
   auto operator=(const EglWindowSurface&) -> EglWindowSurface& = delete;
   EglWindowSurface(EglWindowSurface&& other) noexcept
       : display_(other.display_),
-        surface_(std::exchange(other.surface_, EGL_NO_SURFACE)) {}
+        surface_(std::exchange(other.surface_, EGL_NO_SURFACE))
+#if defined(MLN_FFI_WAYLAND)
+        ,
+        native_(std::move(other.native_))
+#endif
+  {
+  }
   auto operator=(EglWindowSurface&& other) noexcept -> EglWindowSurface& {
     if (this != &other) {
       reset();
       display_ = other.display_;
       surface_ = std::exchange(other.surface_, EGL_NO_SURFACE);
+#if defined(MLN_FFI_WAYLAND)
+      native_ = std::move(other.native_);
+#endif
     }
     return *this;
   }
@@ -531,47 +613,98 @@ class EglWindowSurface final {
   void reset() noexcept {
     if (surface_ != EGL_NO_SURFACE) eglDestroySurface(display_, surface_);
     surface_ = EGL_NO_SURFACE;
+#if defined(MLN_FFI_WAYLAND)
+    native_.reset();
+#endif
+  }
+
+  // A Wayland client sizes its own buffers, which EGL reads from the
+  // wl_egl_window.
+  void resize(uint32_t physical_width, uint32_t physical_height) noexcept {
+#if defined(MLN_FFI_WAYLAND)
+    native_.resize(physical_width, physical_height);
+#else
+    static_cast<void>(physical_width);
+    static_cast<void>(physical_height);
+#endif
   }
 
   [[nodiscard]] auto get() const noexcept -> EGLSurface { return surface_; }
 
+#if defined(MLN_FFI_WAYLAND)
+  friend auto create_window_surface(
+    const WindowEglConfig& egl, PlatformWindow::element_type* window,
+    mln::Size physical_size, EglWindowSurface& out_surface
+  ) -> mln_status;
+#endif
+
  private:
   EGLDisplay display_ = EGL_NO_DISPLAY;
   EGLSurface surface_ = EGL_NO_SURFACE;
+#if defined(MLN_FFI_WAYLAND)
+  mln::core::opengl::WaylandEglWindow native_;
+#endif
 };
 
 auto create_window_surface(
-  const WindowEglConfig& egl, EGLNativeWindowType window,
-  EglWindowSurface& out_surface
+  const WindowEglConfig& egl, PlatformWindow::element_type* window,
+  mln::Size physical_size, EglWindowSurface& out_surface
 ) -> mln_status {
+#if defined(MLN_FFI_WAYLAND)
+  auto native = mln::core::opengl::WaylandEglWindow{};
+  const auto native_status = mln::core::opengl::create_wayland_egl_window(
+    window, physical_size.width, physical_size.height, native
+  );
+  if (native_status != MLN_STATUS_OK) return native_status;
+  // EGL takes a wl_egl_window as its Wayland platform's native window.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+  const auto native_window =
+    reinterpret_cast<EGLNativeWindowType>(native.get());
+#else
+  static_cast<void>(physical_size);
+  auto* const native_window = window;
+#endif
   auto* const surface =
-    eglCreateWindowSurface(egl.display, egl.config, window, nullptr);
+    eglCreateWindowSurface(egl.display, egl.config, native_window, nullptr);
   if (surface == EGL_NO_SURFACE) {
     return egl_failure("creating the EGL window surface failed");
   }
   out_surface = EglWindowSurface{egl.display, surface};
+#if defined(MLN_FFI_WAYLAND)
+  out_surface.native_ = std::move(native);
+#endif
   return MLN_STATUS_OK;
 }
 
-// Presents to an Android or OpenHarmony window through an EGL window surface
-// that it creates for each window, with a dedicated context that it creates.
+// Presents to an Android, OpenHarmony, or Wayland window through an EGL window
+// surface that it creates for each window, with a dedicated context that it
+// creates.
 class WindowEglSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   WindowEglSurfaceSessionBackend(
-    const WindowEglConfig& egl, PlatformWindow window, EglWindowSurface surface,
+    WindowEglDisplay egl, PlatformWindow window, EglWindowSurface surface,
     const mln_open_gl_surface_descriptor& descriptor, mln::Size size
   )
-      : egl_(egl),
+      : egl_(std::move(egl)),
         window_(std::move(window)),
         surface_(std::move(surface)),
-        session_(descriptor, size) {}
+        session_(descriptor, size) {
+#if defined(MLN_FFI_WAYLAND)
+    // A Wayland compositor answers a hidden surface's frame callbacks only
+    // once it shows again, and a swap with an interval waits for them, which
+    // would hold a detach queued behind a render. The host paces frames
+    // itself.
+    session_.set_swap_interval(0);
+#endif
+  }
 
   auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return session_.renderer_backend();
   }
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
+    surface_.resize(physical_width, physical_height);
     session_.resize(physical_width, physical_height);
   }
 
@@ -584,8 +717,13 @@ class WindowEglSurfaceSessionBackend final
     -> mln_status override {
     return set_window(window, physical_size);
   }
-#else
+#elif defined(__OHOS__)
   auto set_ohos_target(const PlatformWindow& window, mln::Size physical_size)
+    -> mln_status override {
+    return set_window(window, physical_size);
+  }
+#else
+  auto set_wayland_target(const PlatformWindow& window, mln::Size physical_size)
     -> mln_status override {
     return set_window(window, physical_size);
   }
@@ -603,11 +741,12 @@ class WindowEglSurfaceSessionBackend final
   auto set_window(const PlatformWindow& window, mln::Size physical_size)
     -> mln_status {
     if (window == window_) {
-      session_.resize(physical_size.width, physical_size.height);
+      resize(physical_size.width, physical_size.height);
       return MLN_STATUS_OK;
     }
     auto next = EglWindowSurface{};
-    const auto create_status = create_window_surface(egl_, window.get(), next);
+    const auto create_status =
+      create_window_surface(egl_.config(), window.get(), physical_size, next);
     if (create_status != MLN_STATUS_OK) return create_status;
     // The context stays current on its surface between renders, so it moves
     // off the old one before that goes.
@@ -627,7 +766,8 @@ class WindowEglSurfaceSessionBackend final
     return MLN_STATUS_OK;
   }
 
-  WindowEglConfig egl_;
+  // Destroyed last, so the display outlives the context and the surfaces.
+  WindowEglDisplay egl_;
   PlatformWindow window_;
   EglWindowSurface surface_;
   // Destroyed first, so the context goes before the surface and the window.
@@ -639,18 +779,23 @@ class WindowEglSurfaceSessionBackend final
 
 namespace mln::core {
 
-#if (defined(__ANDROID__) || defined(__OHOS__)) && \
+#if (defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)) && \
   defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 namespace {
 
 auto create_window_backend(
-  PlatformWindow window, mln_render_session_object& target
+  PlatformDisplay display, PlatformWindow window,
+  mln_render_session_object& target
 ) -> mln_status {
-  auto egl = WindowEglConfig{};
-  const auto config_status = window_egl_config(egl);
-  if (config_status != MLN_STATUS_OK) return config_status;
+  auto egl_display = WindowEglDisplay{};
+  const auto display_status = open_window_egl_display(display, egl_display);
+  if (display_status != MLN_STATUS_OK) return display_status;
+  const auto& egl = egl_display.config();
+  const auto physical_size =
+    mln::Size{target.physical_width, target.physical_height};
   auto surface = EglWindowSurface{};
-  const auto surface_status = create_window_surface(egl, window.get(), surface);
+  const auto surface_status =
+    create_window_surface(egl, window.get(), physical_size, surface);
   if (surface_status != MLN_STATUS_OK) return surface_status;
   const auto descriptor = mln_open_gl_surface_descriptor{
     .size = sizeof(mln_open_gl_surface_descriptor),
@@ -674,8 +819,8 @@ auto create_window_backend(
     .surface = surface.get(),
   };
   target.surface.backend = std::make_unique<WindowEglSurfaceSessionBackend>(
-    egl, std::move(window), std::move(surface), descriptor,
-    mln::Size{target.physical_width, target.physical_height}
+    std::move(egl_display), std::move(window), std::move(surface), descriptor,
+    physical_size
   );
   return MLN_STATUS_OK;
 }
@@ -686,13 +831,21 @@ auto create_window_backend(
 auto create_android_surface_backend(
   AndroidSurfaceAttach attach, mln_render_session_object& target
 ) -> mln_status {
-  return create_window_backend(std::move(attach.window), target);
+  return create_window_backend(nullptr, std::move(attach.window), target);
 }
-#else
+#elif defined(__OHOS__)
 auto create_ohos_surface_backend(
   OhosSurfaceAttach attach, mln_render_session_object& target
 ) -> mln_status {
-  return create_window_backend(std::move(attach.window), target);
+  return create_window_backend(nullptr, std::move(attach.window), target);
+}
+#else
+auto create_wayland_surface_backend(
+  WaylandSurfaceAttach attach, mln_render_session_object& target
+) -> mln_status {
+  return create_window_backend(
+    attach.display, std::move(attach.window), target
+  );
 }
 #endif
 #endif

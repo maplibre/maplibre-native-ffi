@@ -98,6 +98,8 @@ import type {
   VulkanSurfaceReplacement,
   VulkanTextureFrame,
   Wake,
+  WaylandSurfaceDescriptor,
+  WaylandSurfaceReplacement,
   WebGpuBorrowedTextureDescriptor,
   WebGpuBorrowedTextureReplacement,
   WebGpuSurfaceDescriptor,
@@ -1490,6 +1492,68 @@ export class MapHandle extends Owner {
           native.mln_map_attach_vulkan_surface(
             this.id,
             descriptor,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
+    );
+  }
+
+  /**
+   * Creates a session that presents the map to a Wayland surface, with a
+   * graphics context that the library creates.
+   *
+   * A Vulkan build presents with `device`, or, when `device` is null, with a
+   * device that the library creates. An OpenGL build uses an EGL context on the
+   * display, and `device` must be null. Attach with
+   * `RenderDriverKind.coreWorker`.
+   *
+   * The session presents without waiting for the compositor, so demand at most
+   * one frame per display refresh.
+   *
+   * Keep the surface until a release or replacement of the target, or a detach
+   * of the session, completes. Keep the display connected until the session's
+   * detach completes. In an OpenGL build, if you also use EGL on the display,
+   * initialize it before you attach.
+   *
+   * See `mln_map_attach_wayland_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when you created `device` without
+   *   `VulkanDeviceOptions.presentation`.
+   * - `Status.unsupported` when the GPU or the Vulkan loader can't present to
+   *   Wayland.
+   * - `Status.nativeError` when the library can't create the graphics context
+   *   or present to the surface.
+   */
+  attachWaylandSurface(
+    descriptor: WaylandSurfaceDescriptor,
+    device: VulkanDeviceHandle | undefined,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_wayland_surface(
+            this.id,
+            descriptor,
+            device?.id,
             options,
             completion,
           ),
@@ -5035,6 +5099,35 @@ export class RenderSessionHandle extends Owner {
   setVulkanSurfaceTarget(replacement: VulkanSurfaceReplacement): Promise<void> {
     return run((completion) =>
       native.mln_render_session_set_vulkan_surface_target(
+        this.id,
+        replacement,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Replaces the Wayland surface that the session presents to.
+   *
+   * Use it to give the session a surface again after
+   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
+   * resize it. Once the replacement completes, the session no longer uses the
+   * old surface.
+   *
+   * See `mln_render_session_set_wayland_surface_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when, in a Vulkan build, the new surface needs a
+   *   different color format than the old one. Attach a new session instead.
+   * - `Status.nativeError` when the library can't present to the new surface.
+   */
+  setWaylandSurfaceTarget(
+    replacement: WaylandSurfaceReplacement,
+  ): Promise<void> {
+    return run((completion) =>
+      native.mln_render_session_set_wayland_surface_target(
         this.id,
         replacement,
         completion,

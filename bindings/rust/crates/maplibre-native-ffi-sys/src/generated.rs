@@ -1848,6 +1848,21 @@ pub struct mln_wake {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_wayland_surface_descriptor {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub display: *mut std::ffi::c_void,
+    pub surface: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_wayland_surface_replacement {
+    pub size: u32,
+    pub logical_size: mln_logical_size,
+    pub surface: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_web_gl_context_descriptor {
     pub kind: mln_web_gl_context_kind,
     pub context: i32,
@@ -2345,6 +2360,15 @@ unsafe extern "C" {
     pub fn mln_map_attach_vulkan_surface(
         map: mln_map,
         descriptor: *const mln_vulkan_surface_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_wayland_surface(
+        map: mln_map,
+        descriptor: *const mln_wayland_surface_descriptor,
+        device: mln_vulkan_device,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
@@ -3077,6 +3101,12 @@ unsafe extern "C" {
     pub fn mln_render_session_set_vulkan_surface_target(
         session: mln_render_session,
         replacement: *const mln_vulkan_surface_replacement,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_wayland_surface_target(
+        session: mln_render_session,
+        replacement: *const mln_wayland_surface_replacement,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

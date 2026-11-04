@@ -44,6 +44,7 @@ set(MLN_NATIVE_FILE_TAGS
     android
     ohos
     apple
+    wayland
     icu)
 
 function(mln_native_active_file_tags out_var)
@@ -62,6 +63,9 @@ function(mln_native_active_file_tags out_var)
   endif()
   if(APPLE)
     list(APPEND tags apple)
+  endif()
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
+    list(APPEND tags wayland)
   endif()
   # Linux, FreeBSD, OpenHarmony, and Windows evaluate locale expressions with
   # ICU: ICU4X on Linux and FreeBSD and the system's ICU4C on OpenHarmony and
@@ -402,6 +406,12 @@ function(mln_native_configure_suite target registry_dir)
   endif()
   if(WIN32)
     target_link_libraries(${target} PRIVATE ws2_32)
+  endif()
+  # The Wayland cases present to surfaces of a compositor that the suite runs
+  # itself, on the libwayland that the graphics drivers bring.
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
+    target_sources(${target} PRIVATE "${support_dir}/wayland_compositor.c")
+    target_link_libraries(${target} PRIVATE ${CMAKE_DL_LIBS})
   endif()
   if(TARGET mln_test_graphics_objects)
     target_link_libraries(${target} PRIVATE mln_test_graphics_objects)

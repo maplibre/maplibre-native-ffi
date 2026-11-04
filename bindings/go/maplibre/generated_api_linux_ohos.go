@@ -51,6 +51,49 @@ func (receiver *MapHandle) AttachOhosSurface(descriptor OhosSurfaceDescriptor, d
 	return result.session, result.ready, err
 }
 
+// AttachWaylandSurface creates a session that presents the map to a Wayland
+// surface, with a graphics context that the library creates.
+//
+// A Vulkan build presents with device, or, when device is null, with a device
+// that the library creates. An OpenGL build uses an EGL context on the display,
+// and device must be null. Attach with RenderDriverKindCoreWorker.
+//
+// The session presents without waiting for the compositor, so demand at most
+// one frame per display refresh.
+//
+// Keep the surface until a release or replacement of the target, or a detach of
+// the session, completes. Keep the display connected until the session's detach
+// completes. In an OpenGL build, if you also use EGL on the display, initialize
+// it before you attach.
+//
+// See mln_map_attach_wayland_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html
+//
+// Errors:
+//   - StatusUnsupported when you created device without
+//     VulkanDeviceOptions.Presentation.
+//   - StatusUnsupported when the GPU or the Vulkan loader can't present to
+//     Wayland.
+//   - StatusNativeError when the library can't create the graphics context or
+//     present to the surface.
+func (receiver *MapHandle) AttachWaylandSurface(descriptor WaylandSurfaceDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+	var outSession C.mln_render_session
+	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_wayland_surface(C.mln_map(raw), bindingStore(nativeWaylandSurfaceDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
+		session *RenderSessionHandle
+		ready   *Future[struct{}]
+	} {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return struct {
+			session *RenderSessionHandle
+			ready   *Future[struct{}]
+		}{adopted, future}
+	})
+	return result.session, result.ready, err
+}
+
 // OhosFramePacerCreate creates a frame pacer that follows the display through
 // OpenHarmony's OH_NativeVSync.
 //
@@ -94,5 +137,26 @@ func OhosFramePacerCreate(options *FramePacerOptions) (*FramePacerHandle, error)
 func (receiver *RenderSessionHandle) SetOhosSurfaceTarget(replacement OhosSurfaceReplacement) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_ohos_surface_target(C.mln_render_session(raw), bindingStore(nativeOhosSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetWaylandSurfaceTarget replaces the Wayland surface that the session
+// presents to.
+//
+// Use it to give the session a surface again after
+// RenderSessionHandle.ReleaseTarget(), to move it to another surface, or to
+// resize it. Once the replacement completes, the session no longer uses the old
+// surface.
+//
+// See mln_render_session_set_wayland_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html
+//
+// Errors:
+//   - StatusUnsupported when, in a Vulkan build, the new surface needs a
+//     different color format than the old one. Attach a new session instead.
+//   - StatusNativeError when the library can't present to the new surface.
+func (receiver *RenderSessionHandle) SetWaylandSurfaceTarget(replacement WaylandSurfaceReplacement) (*Future[struct{}], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_wayland_surface_target(C.mln_render_session(raw), bindingStore(nativeWaylandSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }

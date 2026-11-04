@@ -4203,8 +4203,8 @@ type RenderSessionAttachOptions struct {
 	//   - RenderDriverKindCallerGraphicsThread for a shared or dedicated EGL or WGL
 	//     context, an existing WebGL context, or a browser's WebGPU device.
 	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android or
-	//     OpenHarmony window, a ring of Android hardware buffers, or an offscreen
-	//     session.
+	//     OpenHarmony window, a Wayland surface, a ring of Android hardware
+	//     buffers, or an offscreen session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.
@@ -5899,6 +5899,47 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 			raw.callback = C.mln_wake_callback(C.binding_mln_wake_callback)
 		}
 	}
+	return raw
+}
+
+// WaylandSurfaceDescriptor corresponds to mln_wayland_surface_descriptor. A
+// Wayland surface to present to, for MapHandle.AttachWaylandSurface().
+//
+// See mln_wayland_surface_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html
+type WaylandSurfaceDescriptor struct {
+	LogicalSize LogicalSize
+	// Your wl_display*.
+	Display uintptr
+	// Your wl_surface*, on display.
+	Surface uintptr
+}
+
+func nativeWaylandSurfaceDescriptor(input WaylandSurfaceDescriptor, arena *bindingArena) C.mln_wayland_surface_descriptor {
+	raw := C.mln_wayland_surface_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
+	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
+	return raw
+}
+
+// WaylandSurfaceReplacement corresponds to mln_wayland_surface_replacement. A
+// new Wayland surface for RenderSessionHandle.SetWaylandSurfaceTarget().
+//
+// See mln_wayland_surface_replacement in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html
+type WaylandSurfaceReplacement struct {
+	LogicalSize LogicalSize
+	// Your wl_surface*, on the display that the session attached with.
+	Surface uintptr
+}
+
+func nativeWaylandSurfaceReplacement(input WaylandSurfaceReplacement, arena *bindingArena) C.mln_wayland_surface_replacement {
+	raw := C.mln_wayland_surface_replacement{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
 }
 

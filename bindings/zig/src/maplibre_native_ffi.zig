@@ -611,6 +611,40 @@ pub const Map = struct {
         }
     }.function else {};
 
+    /// Creates a session that presents the map to a Wayland surface, with a
+    /// graphics context that the library creates.
+    ///
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on the
+    /// display, and `device` must be null. Attach with
+    /// `RenderDriverKind.core_worker`.
+    ///
+    /// The session presents without waiting for the compositor, so demand at most
+    /// one frame per display refresh.
+    ///
+    /// Keep the surface until a release or replacement of the target, or a detach
+    /// of the session, completes. Keep the display connected until the session's
+    /// detach completes. In an OpenGL build, if you also use EGL on the display,
+    /// initialize it before you attach.
+    ///
+    /// See `mln_map_attach_wayland_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions.presentation`.
+    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present to
+    ///   Wayland.
+    /// - `error.NativeError` when the library can't create the graphics context or
+    ///   present to the surface.
+    pub const attachWaylandSurface = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
+        fn function(self: Map, descriptor: WaylandSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+            const started = try call.submit("mln_map_attach_wayland_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
+            return .{ .session = started.outputs, .ready = started.ready };
+        }
+    }.function else {};
+
     /// Holds back the map's changes from rendering until `Map.endCommandGroup()`,
     /// so they show in the same frame.
     ///
@@ -2296,6 +2330,27 @@ pub const RenderSession = struct {
     pub const setVulkanSurfaceTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
         fn function(self: RenderSession, replacement: VulkanSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
             return call.submit("mln_render_session_set_vulkan_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
+        }
+    }.function else {};
+
+    /// Replaces the Wayland surface that the session presents to.
+    ///
+    /// Use it to give the session a surface again after
+    /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
+    /// it. Once the replacement completes, the session no longer uses the old
+    /// surface.
+    ///
+    /// See `mln_render_session_set_wayland_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when, in a Vulkan build, the new surface needs a
+    ///   different color format than the old one. Attach a new session instead.
+    /// - `error.NativeError` when the library can't present to the new surface.
+    pub const setWaylandSurfaceTarget = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
+        fn function(self: RenderSession, replacement: WaylandSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+            return call.submit("mln_render_session_set_wayland_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
         }
     }.function else {};
 };
@@ -6112,8 +6167,8 @@ pub const RenderSessionAttachOptions = struct {
     ///   EGL or WGL context, an existing WebGL context, or a browser's WebGPU
     ///   device.
     /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
-    ///   Android or OpenHarmony window, a ring of Android hardware buffers, or
-    ///   an offscreen session.
+    ///   Android or OpenHarmony window, a Wayland surface, a ring of Android
+    ///   hardware buffers, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.
@@ -8604,6 +8659,56 @@ pub const Wake = struct {
                     return callback(@as(Context, @ptrCast(@alignCast(erased.?))));
                 }
             }.call,
+        };
+    }
+};
+
+/// A Wayland surface to present to, for `Map.attachWaylandSurface()`.
+///
+/// See `mln_wayland_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+pub const WaylandSurfaceDescriptor = struct {
+    logical_size: LogicalSize,
+    /// Your `wl_display*`.
+    display: ?*anyopaque,
+    /// Your `wl_surface*`, on `display`.
+    surface: ?*anyopaque,
+    pub fn toNative(self: WaylandSurfaceDescriptor) c.mln_wayland_surface_descriptor {
+        var raw = std.mem.zeroes(c.mln_wayland_surface_descriptor);
+        raw.size = @sizeOf(c.mln_wayland_surface_descriptor);
+        raw.logical_size = self.logical_size.toNative();
+        raw.display = self.display;
+        raw.surface = self.surface;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_wayland_surface_descriptor) WaylandSurfaceDescriptor {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .display = raw.display,
+            .surface = raw.surface,
+        };
+    }
+};
+
+/// A new Wayland surface for `RenderSession.setWaylandSurfaceTarget()`.
+///
+/// See `mln_wayland_surface_replacement` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+pub const WaylandSurfaceReplacement = struct {
+    logical_size: LogicalSize,
+    /// Your `wl_surface*`, on the display that the session attached with.
+    surface: ?*anyopaque,
+    pub fn toNative(self: WaylandSurfaceReplacement) c.mln_wayland_surface_replacement {
+        var raw = std.mem.zeroes(c.mln_wayland_surface_replacement);
+        raw.size = @sizeOf(c.mln_wayland_surface_replacement);
+        raw.logical_size = self.logical_size.toNative();
+        raw.surface = self.surface;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_wayland_surface_replacement) WaylandSurfaceReplacement {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .surface = raw.surface,
         };
     }
 };

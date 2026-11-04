@@ -51,6 +51,8 @@ struct mln_render_session_object;
 struct ANativeWindow;
 // OpenHarmony's OHNativeWindow, which only OpenHarmony builds define.
 struct NativeWindow;
+// A Wayland surface, which libwayland-client defines.
+struct wl_surface;
 
 namespace mln {
 class UpdateParameters;
@@ -293,6 +295,16 @@ class SurfaceSessionBackend : public RenderSessionBackend {
     (void)physical_size;
     return unsupported_retarget(
       "session does not render through an OpenHarmony window"
+    );
+  }
+  // Presents to a new Wayland surface of the session's connection.
+  virtual auto set_wayland_target(
+    const std::shared_ptr<wl_surface>& window, mln::Size physical_size
+  ) -> mln_status {
+    (void)window;
+    (void)physical_size;
+    return unsupported_retarget(
+      "session does not render through a Wayland surface"
     );
   }
 

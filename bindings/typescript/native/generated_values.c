@@ -7229,6 +7229,59 @@ bool mln_ts_write_wake(
   return true;
 }
 
+bool mln_ts_write_wayland_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_wayland_surface_descriptor* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "display", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "display");
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->display = (void*)(uintptr_t)number;
+  }
+  if (!mln_ts_member(call, value, "surface", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "surface");
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->surface = (void*)(uintptr_t)number;
+  }
+  return true;
+}
+
+bool mln_ts_write_wayland_surface_replacement(
+  mln_ts_call* call, napi_value value, mln_wayland_surface_replacement* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "surface", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "surface");
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->surface = (void*)(uintptr_t)number;
+  }
+  return true;
+}
+
 bool mln_ts_write_web_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gl_context_descriptor* out,
   const char* path

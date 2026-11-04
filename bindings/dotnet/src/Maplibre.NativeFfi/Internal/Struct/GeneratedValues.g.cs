@@ -2737,6 +2737,29 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_wayland_surface_descriptor NativeWaylandSurfaceDescriptor(
+        WaylandSurfaceDescriptor value
+    )
+    {
+        var native = new mln_wayland_surface_descriptor();
+        native.size = (uint)sizeof(mln_wayland_surface_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.display = (void*)value.Display.Address;
+        native.surface = (void*)value.Surface.Address;
+        return native;
+    }
+
+    internal static mln_wayland_surface_replacement NativeWaylandSurfaceReplacement(
+        WaylandSurfaceReplacement value
+    )
+    {
+        var native = new mln_wayland_surface_replacement();
+        native.size = (uint)sizeof(mln_wayland_surface_replacement);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.surface = (void*)value.Surface.Address;
+        return native;
+    }
+
     internal static mln_web_gl_context_descriptor NativeWebGlContextDescriptor(
         WebGlContextDescriptor value,
         NativeCallScope scope

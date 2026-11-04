@@ -1802,6 +1802,21 @@ final class mln_wake extends Struct {
   external int queue;
 }
 
+final class mln_wayland_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> display;
+  external Pointer<Void> surface;
+}
+
+final class mln_wayland_surface_replacement extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  external Pointer<Void> surface;
+}
+
 final class mln_web_gl_context_descriptor extends Struct {
   @Uint32()
   external int kind;
@@ -3055,6 +3070,27 @@ external int mln_map_attach_vulkan_borrowed_texture(
 external int mln_map_attach_vulkan_surface(
   int map,
   Pointer<mln_vulkan_surface_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_wayland_surface_descriptor>,
+    mln_vulkan_device,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_wayland_surface(
+  int map,
+  Pointer<mln_wayland_surface_descriptor> descriptor,
+  int device,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
   Pointer<mln_completion> completion,
@@ -4730,6 +4766,21 @@ external int mln_render_session_set_vulkan_borrowed_texture_target(
 external int mln_render_session_set_vulkan_surface_target(
   int session,
   Pointer<mln_vulkan_surface_replacement> replacement,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_wayland_surface_replacement>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_wayland_surface_target(
+  int session,
+  Pointer<mln_wayland_surface_replacement> replacement,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
