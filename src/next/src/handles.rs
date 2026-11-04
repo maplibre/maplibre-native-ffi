@@ -12,6 +12,7 @@
 use crate::delivery::DeliveryQueue;
 use crate::diagnostics::Failure;
 use crate::map::MapShared;
+use crate::projection::ProjectionObject;
 use crate::runtime::RuntimeShared;
 use crate::session::{FrameBatch, SessionShared};
 use crate::style_expression::StyleExpression;
@@ -25,6 +26,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 pub enum Kind {
     Runtime = 1,
     Map = 2,
+    MapProjection = 3,
     RenderSession = 4,
     RenderFrameBatch = 21,
     DeliveryQueue = 23,
@@ -76,6 +78,7 @@ fn generation_of(handle: u64) -> u64 {
 pub enum Object {
     Runtime(Arc<RuntimeShared>),
     Map(Arc<MapShared>),
+    Projection(Arc<ProjectionObject>),
     Session(Arc<SessionShared>),
     Queue(Arc<DeliveryQueue>),
     // Held so the batch's results stay valid until its release.
@@ -90,6 +93,7 @@ impl Object {
         match self {
             Object::Runtime(_) => Kind::Runtime,
             Object::Map(_) => Kind::Map,
+            Object::Projection(_) => Kind::MapProjection,
             Object::Session(_) => Kind::RenderSession,
             Object::Queue(_) => Kind::DeliveryQueue,
             Object::FrameBatch(_) => Kind::RenderFrameBatch,
@@ -228,6 +232,13 @@ pub fn runtime(handle: impl Into<u64>) -> Result<Arc<RuntimeShared>, Failure> {
 pub fn map(handle: impl Into<u64>) -> Result<Arc<MapShared>, Failure> {
     match resolve(Kind::Map, handle)? {
         Object::Map(map) => Ok(map),
+        _ => unreachable!(),
+    }
+}
+
+pub fn projection(handle: impl Into<u64>) -> Result<Arc<ProjectionObject>, Failure> {
+    match resolve(Kind::MapProjection, handle)? {
+        Object::Projection(projection) => Ok(projection),
         _ => unreachable!(),
     }
 }

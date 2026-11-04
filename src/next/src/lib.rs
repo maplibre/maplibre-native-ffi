@@ -11,12 +11,16 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod base;
+mod camera;
+mod camera_transition;
+mod command_group;
 mod delivery;
 mod diagnostics;
 mod handles;
 mod logging;
 mod map;
 mod plugin;
+mod projection;
 mod runtime;
 mod session;
 mod stubs;

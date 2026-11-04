@@ -129,6 +129,9 @@ pub enum Value {
     Camera(mln_camera_query_result),
     /// A C value, or array of them, that points into storage it owns.
     Lent(Box<dyn LentValue>),
+    /// Any other plain C struct, such as an `mln_camera_options`: its bytes
+    /// (in 8-byte words, so the value is aligned for its doubles) and size.
+    Struct { words: Vec<u64>, size: usize },
 }
 
 /// A completion value whose C form points into storage that the value owns,
@@ -137,6 +140,19 @@ pub trait LentValue: Send {
     /// The C value (or the first of an array of them), the size of one, and
     /// how many there are. Valid while `self` lives.
     fn view(&self) -> (*const c_void, usize, usize);
+}
+
+impl Value {
+    /// A `Value::Struct` of `value`, a plain C struct.
+    pub fn of_struct<T: Copy>(value: T) -> Value {
+        let size = size_of::<T>();
+        let mut words = vec![0u64; size.div_ceil(8)];
+        // SAFETY: `words` has room for `size` bytes, and `T` is plain data.
+        unsafe {
+            std::ptr::copy_nonoverlapping((&raw const value).cast::<u8>(), words.as_mut_ptr().cast::<u8>(), size)
+        };
+        Value::Struct { words, size }
+    }
 }
 
 impl Completion {
@@ -194,6 +210,19 @@ impl Completion {
     }
 
     pub fn finish(self, status: i32, generation: u64, message: String, value: Value) {
+        self.finish_with(status, generation, 0, message, value);
+    }
+
+    /// `finish`, for a map command, with the render update generation that
+    /// includes its change.
+    pub fn finish_with(
+        self,
+        status: i32,
+        generation: u64,
+        render_update_generation: u64,
+        message: String,
+        value: Value,
+    ) {
         let Completion { callback, user_data, release_user_data, queue } = self;
         deliver(queue, Box::new(move || {
             // The value's C struct and what it points at, which live until
@@ -214,6 +243,7 @@ impl Completion {
                 }
                 Value::Camera(ref camera) => ((&raw const *camera).cast(), size_of::<mln_camera_query_result>(), 1),
                 Value::Lent(ref lent) => lent.view(),
+                Value::Struct { ref words, size } => (words.as_ptr().cast(), size, 1),
             };
             let disposition = if status == MLN_STATUS_OK {
                 MLN_COMMAND_DISPOSITION_COMMITTED
@@ -229,7 +259,7 @@ impl Completion {
                 disposition,
                 value_size: value_size as u32,
                 generation,
-                render_update_generation: 0,
+                render_update_generation,
                 diagnostic: mln_buffer_view::of_text(&diagnostic),
                 value: value_ptr,
                 value_count,

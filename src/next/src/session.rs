@@ -42,6 +42,11 @@ struct ProxyInner {
     session: Cell<u64>,
     /// A surface session, which renders on the host's thread.
     remote: RefCell<Option<(u64, Arc<SessionShared>)>>,
+    /// The newest update that a running command or an open command group
+    /// holds back (C++ HeadlessFrontend's `held_update_`).
+    held: RefCell<Option<Arc<UpdateParameters>>>,
+    in_command: Cell<bool>,
+    group_depth: Cell<u32>,
 }
 
 /// The map's `RendererFrontend` (see the file comment).
@@ -62,8 +67,59 @@ impl ProxyFrontend {
                 update_generation: Cell::new(0),
                 session: Cell::new(0),
                 remote: RefCell::new(None),
+                held: RefCell::new(None),
+                in_command: Cell::new(false),
+                group_depth: Cell::new(0),
             }),
         }
+    }
+
+    // A map command runs as one transaction, so the updates that MapLibre
+    // makes while it runs (a gesture flag and a camera move, or each step of
+    // a layer move) publish once, as the last of them, when it ends. A
+    // command group holds them until its outermost end (C++ HeadlessFrontend
+    // `store_held_update`, `begin_command_group`, `end_command_group`).
+
+    pub fn begin_command(&self) {
+        self.inner.in_command.set(true);
+    }
+
+    /// Publishes the update that the command held, unless a group is open.
+    pub fn end_command(&self) {
+        self.inner.in_command.set(false);
+        if self.inner.group_depth.get() == 0 {
+            let held = self.inner.held.borrow_mut().take();
+            if let Some(update) = held {
+                RendererFrontend::update(self, update);
+            }
+        }
+    }
+
+    pub fn begin_command_group(&self) {
+        self.inner.group_depth.set(self.inner.group_depth.get() + 1);
+    }
+
+    /// `false` when no group is open.
+    pub fn end_command_group(&self) -> bool {
+        let depth = self.inner.group_depth.get();
+        if depth == 0 {
+            return false;
+        }
+        self.inner.group_depth.set(depth - 1);
+        true
+    }
+
+    /// Whether a group holds the map's updates, so a still image would bind
+    /// to a stale one (C++ map_request_still_image_start fails then).
+    #[allow(dead_code)] // TODO(ffi): mln_map_request_still_image.
+    pub fn command_group_open(&self) -> bool {
+        self.inner.group_depth.get() > 0
+    }
+
+    /// The generation of the first update that includes the map's current
+    /// state: the held update publishes as the next one.
+    pub fn pending_update_generation(&self) -> u64 {
+        self.inner.update_generation.get() + u64::from(self.inner.held.borrow().is_some())
     }
 
     pub fn update_generation(&self) -> u64 {
@@ -146,6 +202,12 @@ impl RendererFrontend for ProxyFrontend {
     }
 
     fn update(&self, parameters: Arc<UpdateParameters>) {
+        if self.inner.in_command.get() || self.inner.group_depth.get() > 0 {
+            // Each update is a complete snapshot of the map, so only the
+            // newest held one is kept.
+            *self.inner.held.borrow_mut() = Some(parameters);
+            return;
+        }
         *self.inner.last_update.borrow_mut() = Some(parameters.clone());
         self.inner.update_generation.set(self.inner.update_generation.get() + 1);
         let frontend = self.inner.attached.borrow().clone();
