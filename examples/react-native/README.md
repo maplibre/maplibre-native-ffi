@@ -27,8 +27,7 @@ emulators on ARM64 hosts.
 The app has no native code of its own. It imports the binding from
 [`@maplibre/native-ffi-react-native`](../../bindings/typescript/react-native),
 which installs the binding in the runtime and draws on a native view,
-`MaplibreSurfaceView`. The app also depends on `@maplibre/native-ffi`, so that
-iOS autolinking finds the binding's pod.
+`MaplibreSurfaceView`.
 
 `src/MapController.ts` attaches a render session to the view's surface, gives
 the session each new surface, and runs the frame loop, as the browser demo in

@@ -1,6 +1,6 @@
 // Bundles the facade and packs the npm packages for one or more presets:
 //
-//   node scripts/pack.ts [--version <version>] [--xcframework <directory>] <out dir> <preset>...
+//   node scripts/pack.ts [--version <version>] [--xcframework <directory>] [--android <directory>] <out dir> <preset>...
 //
 // A desktop user installs the facade, @maplibre/native-ffi, and one backend package,
 // such as @maplibre/native-ffi-vulkan. A backend package holds no code. It
@@ -11,6 +11,11 @@
 // installs wherever its backend package does. Each addon package carries what
 // the build task installed for its preset, with the licenses of the native
 // library that it embeds.
+//
+// A React Native app installs @maplibre/native-ffi-react-native, which depends
+// on the facade. It carries the binding's native sources, which the app's build
+// compiles, with the XCFramework that --xcframework names and the Android EGL
+// libraries in the native archives under the directory that --android names.
 //
 // Every package takes the same version, 0.0.0 unless --version names one, and
 // every pin is exact, so the facade and the addon always come from one build.
@@ -31,13 +36,14 @@ const { values, positionals } = parseArgs({
   options: {
     version: { type: "string", default: "0.0.0" },
     xcframework: { type: "string" },
+    android: { type: "string" },
   },
   allowPositionals: true,
 });
 const [outArgument, ...presets] = positionals;
 if (outArgument === undefined || presets.length === 0) {
   throw new Error(
-    "usage: pack.ts [--version <version>] [--xcframework <directory>] <out dir> <preset>...",
+    "usage: pack.ts [--version <version>] [--xcframework <directory>] [--android <directory>] <out dir> <preset>...",
   );
 }
 const version = values.version;
@@ -72,6 +78,13 @@ const titles: Record<string, string> = {
   "vulkan-mingw": "Vulkan (MinGW)",
 };
 // WebGL is the OpenGL backend with the browser's context provider.
+// The Android ABI of each architecture that the presets name.
+const androidAbis: Record<string, string> = {
+  arm: "armeabi-v7a",
+  arm64: "arm64-v8a",
+  x86: "x86",
+  x64: "x86_64",
+};
 const backends: Record<string, string> = {
   egl: "opengl",
   wgl: "opengl",
@@ -143,7 +156,7 @@ function addonOf(preset: string): Addon {
   };
 }
 
-// Mobile hosts compile the addon from the facade's sources.
+// Mobile apps compile the addon from the React Native package's sources.
 const addons = presets
   .filter((preset) => !/^(android|ios|tvos|visionos)-/.test(preset))
   .map(addonOf);
@@ -157,6 +170,7 @@ function pack(
   const data = manifest as {
     name: string;
     files: string[];
+    dependencies?: Record<string, string>;
     optionalDependencies?: Record<string, string>;
     peerDependencies?: Record<string, string>;
   };
@@ -175,6 +189,10 @@ function pack(
       join(directory, "sbom/maplibre-native-ffi.cdx.json"),
       ...inventories.flatMap((file) => ["--input", file]),
       ...npm.flatMap((file) => ["--npm", file]),
+      ...Object.entries(data.dependencies ?? {}).flatMap(([name, version]) => [
+        "--dependency",
+        `${name}@${version}`,
+      ]),
       ...Object.entries({
         ...data.optionalDependencies,
         ...data.peerDependencies,
@@ -278,72 +296,47 @@ for (const backend of new Set(addons.map((addon) => addon.backend))) {
   });
 }
 
+// The binding's native sources, which native embedding hosts compile. C sources
+// stay separate from C++.
+function copyNativeSources(directory: string): void {
+  for (const name of [
+    "generated_addon.c",
+    "generated_values.c",
+    "generated_addon.h",
+    "runtime.c",
+    "runtime.h",
+    "realm.c",
+    "mutex.h",
+    "hermes",
+  ]) {
+    cpSync(join(binding, "native", name), join(directory, "native", name), {
+      recursive: true,
+    });
+  }
+  cpSync(join(root, "include"), join(directory, "native/include"), {
+    recursive: true,
+  });
+  cpSync(
+    join(binding, "node_modules/node-api-headers/include"),
+    join(directory, "native/node-api-headers"),
+    { recursive: true },
+  );
+  cpSync(
+    join(binding, "node_modules/node-api-headers/LICENSE"),
+    join(directory, "native/node-api-headers/LICENSE"),
+  );
+}
+
 const facade = join(staging, "facade");
 cpSync(dist, join(facade, "dist"), { recursive: true });
 cpSync(join(binding, "README.md"), join(facade, "README.md"));
-// React Native autolinking installs the Hermes adapter on iOS from this pod.
-cpSync(
-  join(binding, "MaplibreNativeFfi.podspec"),
-  join(facade, "MaplibreNativeFfi.podspec"),
-);
-// Keep C sources separate from C++ for native embedding hosts.
-for (const name of [
-  "generated_addon.c",
-  "generated_values.c",
-  "generated_addon.h",
-  "runtime.c",
-  "runtime.h",
-  "realm.c",
-  "mutex.h",
-  "hermes",
-]) {
-  cpSync(join(binding, "native", name), join(facade, "native", name), {
-    recursive: true,
-  });
-}
-cpSync(join(root, "include"), join(facade, "native/include"), {
-  recursive: true,
-});
-cpSync(
-  join(binding, "node_modules/node-api-headers/include"),
-  join(facade, "native/node-api-headers"),
-  { recursive: true },
-);
-cpSync(
-  join(binding, "node_modules/node-api-headers/LICENSE"),
-  join(facade, "native/node-api-headers/LICENSE"),
-);
-if (values.xcframework) {
-  cpSync(
-    resolve(values.xcframework),
-    join(facade, "native/MaplibreNativeC.xcframework"),
-    { recursive: true, dereference: true },
-  );
-  execFileSync(
-    "python3",
-    [
-      join(root, "tools/release/binding_sbom.py"),
-      "framework",
-      join(facade, "native/MaplibreNativeC.xcframework"),
-      version,
-    ],
-    { stdio: "inherit" },
-  );
-}
+copyNativeSources(facade);
 // The facade loads whichever backend package the application installed. The
 // peer pins keep that package at the facade's version, and let a strict
 // layout such as pnpm's link it where the facade can resolve it.
 const backendPeers = Object.fromEntries(
   Object.keys(titles).map((backend) => [`${source.name}-${backend}`, version]),
 );
-const facadeInventories = values.xcframework
-  ? readdirSync(resolve(values.xcframework), {
-      recursive: true,
-      withFileTypes: true,
-    })
-      .filter((entry) => entry.isFile() && entry.name === "sbom.cdx.json")
-      .map((entry) => join(entry.parentPath, entry.name))
-  : [];
 pack(
   facade,
   {
@@ -371,11 +364,136 @@ pack(
     peerDependenciesMeta: Object.fromEntries(
       Object.keys(backendPeers).map((name) => [name, { optional: true }]),
     ),
-    files: ["dist", "native", "MaplibreNativeFfi.podspec"],
+    files: ["dist", "native"],
   },
-  facadeInventories,
+  [],
   [
     join(binding, "node_modules/@emnapi/runtime"),
     join(binding, "node_modules/node-api-headers"),
   ],
+);
+
+// The React Native package, whose podspec and Gradle module compile the
+// binding's native sources beside the package's own against the C library.
+const reactNative = join(binding, "react-native");
+const reactNativeSource = JSON.parse(
+  readFileSync(join(reactNative, "package.json"), "utf8"),
+);
+const reactNativeStaging = join(staging, "react-native");
+for (const name of [
+  "README.md",
+  "MaplibreNativeFfiReactNative.podspec",
+  "react-native.config.js",
+  "src",
+  "cpp",
+  "android/build.gradle",
+  "android/CMakeLists.txt",
+  "android/src",
+]) {
+  cpSync(join(reactNative, name), join(reactNativeStaging, name), {
+    recursive: true,
+  });
+}
+for (const name of readdirSync(join(reactNative, "ios"))) {
+  if (/\.(h|mm)$/.test(name)) {
+    cpSync(
+      join(reactNative, "ios", name),
+      join(reactNativeStaging, "ios", name),
+    );
+  }
+}
+copyNativeSources(reactNativeStaging);
+const reactNativeInventories: string[] = [];
+if (values.xcframework) {
+  const xcframework = join(
+    reactNativeStaging,
+    "ios/MaplibreNativeC.xcframework",
+  );
+  cpSync(resolve(values.xcframework), xcframework, {
+    recursive: true,
+    dereference: true,
+  });
+  execFileSync(
+    "python3",
+    [
+      join(root, "tools/release/binding_sbom.py"),
+      "framework",
+      xcframework,
+      version,
+    ],
+    { stdio: "inherit" },
+  );
+  reactNativeInventories.push(
+    ...readdirSync(xcframework, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name === "sbom.cdx.json")
+      .map((entry) => join(entry.parentPath, entry.name)),
+  );
+}
+if (values.android) {
+  // The native archives of the Android EGL presets, as the release publishes
+  // them.
+  const archives = readdirSync(resolve(values.android), {
+    recursive: true,
+    withFileTypes: true,
+  }).flatMap((entry) => {
+    const match =
+      /^maplibre-native-c-android-(arm|arm64|x86|x64)-egl\.tar\.gz$/.exec(
+        entry.name,
+      );
+    return entry.isFile() && match !== null
+      ? [{ arch: match[1]!, path: join(entry.parentPath, entry.name) }]
+      : [];
+  });
+  if (archives.length === 0) {
+    throw new Error(`${values.android} holds no Android EGL native archive`);
+  }
+  for (const { arch, path } of archives) {
+    const extracted = join(staging, "android-archives", arch);
+    mkdirSync(extracted, { recursive: true });
+    execFileSync("tar", ["-xzf", path, "-C", extracted]);
+    const prefix = join(extracted, `maplibre-native-c-android-${arch}-egl`);
+    cpSync(
+      join(prefix, "lib/libmaplibre-native-c.so"),
+      join(
+        reactNativeStaging,
+        "android/libs",
+        androidAbis[arch]!,
+        "libmaplibre-native-c.so",
+      ),
+    );
+    cpSync(
+      join(prefix, "share/maplibre-native-c/licenses"),
+      join(reactNativeStaging, "licenses"),
+      { recursive: true },
+    );
+    reactNativeInventories.push(
+      join(prefix, "share/maplibre-native-c/sbom.cdx.json"),
+    );
+  }
+}
+pack(
+  reactNativeStaging,
+  {
+    name: reactNativeSource.name,
+    ...shared,
+    repository: {
+      ...source.repository,
+      directory: "bindings/typescript/react-native",
+    },
+    description: reactNativeSource.description,
+    main: "src/index.ts",
+    dependencies: { [source.name]: version },
+    peerDependencies: reactNativeSource.peerDependencies,
+    codegenConfig: reactNativeSource.codegenConfig,
+    files: [
+      "src",
+      "cpp",
+      "ios",
+      "android",
+      "native",
+      "MaplibreNativeFfiReactNative.podspec",
+      "react-native.config.js",
+    ],
+  },
+  reactNativeInventories,
 );

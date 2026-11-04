@@ -20,7 +20,7 @@ tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.16.2" }
 usage = 'arg "[args]..." var=#true help="Options for react-native run-ios, such as --udid <udid>"'
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
-../../bindings/typescript/react-native/scripts/xcframework.sh
+../../bindings/typescript/react-native/scripts/stage.sh
 (cd ios && pod install)
 pnpm exec react-native run-ios --no-packager ${usage_args:-}
 '''

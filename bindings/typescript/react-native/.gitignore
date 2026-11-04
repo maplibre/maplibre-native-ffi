@@ -1,2 +1,5 @@
 android/.cxx/
 android/build/
+# scripts/stage.sh copies these in, as the npm package carries them.
+ios/MaplibreNativeC.xcframework/
+native/

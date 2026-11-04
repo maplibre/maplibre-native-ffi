@@ -1,8 +1,8 @@
 # @maplibre/native-ffi-react-native
 
 Runs MapLibre Native FFI's Hermes binding in a React Native app, on Android and
-iOS, with the new architecture. Add it and `@maplibre/native-ffi` to the app,
-and import the binding from this package:
+iOS, with the new architecture. Add it to the app, and import the binding from
+this package:
 
 ```tsx
 import {
@@ -13,8 +13,8 @@ import {
 ```
 
 Importing the package installs the binding in the runtime first, so the app
-needs no native code of its own. `@maplibre/native-ffi` carries the binding's
-pod, which iOS autolinking finds only in the app's own dependencies.
+needs no native code of its own. The package carries the C library, built with
+OpenGL ES on Android and Metal on iOS.
 
 ## Surfaces
 

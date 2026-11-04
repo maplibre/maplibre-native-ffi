@@ -7,7 +7,6 @@
     "start": "react-native start"
   },
   "dependencies": {
-    "@maplibre/native-ffi": "workspace:*",
     "@maplibre/native-ffi-react-native": "workspace:*",
     "react": "19.3.0",
     "react-native": "0.88.1"
