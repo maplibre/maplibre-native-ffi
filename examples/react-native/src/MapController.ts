@@ -169,6 +169,9 @@ export class MapController {
   // if there is none.
   #retarget(): void {
     this.#enqueue(async () => {
+      // The view can report its surface before the map is ready to take a
+      // session.
+      await this.#map?.ready;
       const map = this.#map;
       const size = this.#size;
       const surface = this.#surface;
