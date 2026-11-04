@@ -32,10 +32,13 @@ import (
 A preset's module links only when you build for its `GOOS` and `GOARCH`, so a
 program can import one preset for each of those that it builds for. Presets that
 share them, such as an iOS device and the iOS simulator, or glibc and musl on
-Linux, need their imports in separate files with build tags of your own. Keep
-both modules at the same version: a link error that names `mln_go_preset_` means
-that the preset's module is missing, comes from another release, or is imported
-twice.
+Linux, need their imports in separate files with build tags of your own. A link
+error that names `mln_go_preset_version` means that the preset's module is
+missing or imported twice.
+
+Keep both modules at the same version. With a preset's module from another
+release, the program panics at startup with an error that names both versions,
+or fails to link if the releases' C functions differ.
 
 Every preset has a module except the Windows and web presets. On Windows,
 [use your own build](#use-your-own-build).

@@ -15,7 +15,6 @@ import datetime
 import io
 import json
 import pathlib
-import re
 import subprocess
 import sys
 import tarfile
@@ -29,7 +28,6 @@ from tools.ci import gaps
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRESETS = pathlib.Path("bindings/go/presets.json")
-BINDING = pathlib.Path("bindings/go/maplibre")
 MODULE_PREFIX = "maplibre.org/maplibre-native-ffi/go-native"
 BINDING_MODULE = "maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 GO_VERSION = "1.26"
@@ -63,7 +61,6 @@ GOARCH = {
     "x64": "amd64",
     "x86": "386",
 }
-DIGEST = re.compile(r"mln_go_preset_([0-9a-f]{16})")
 
 
 def module_path(preset: str) -> str:
@@ -119,9 +116,9 @@ def binding_headers(root: pathlib.Path) -> dict[str, bytes]:
     }
 
 
-def binding_digest(root: pathlib.Path, prefix: pathlib.Path) -> str:
-    """The digest that the binding names for its headers, after checking that
-    the install at `prefix` has the same headers."""
+def check_headers(root: pathlib.Path, prefix: pathlib.Path) -> None:
+    """Checks that the install at `prefix` has the headers that the Go binding
+    compiles against."""
     installed = prefix / "include"
     archive = {
         path.relative_to(installed).as_posix(): path.read_bytes()
@@ -129,19 +126,16 @@ def binding_digest(root: pathlib.Path, prefix: pathlib.Path) -> str:
     }
     if archive != binding_headers(root):
         raise SystemExit(f"{installed} differs from the Go binding's headers")
-    generated = (root / BINDING / "generated_native.go").read_text(encoding="utf-8")
-    match = DIGEST.search(generated)
-    if match is None:
-        raise SystemExit(f"{BINDING}/generated_native.go names no header digest")
-    return match.group(1)
 
 
 def go_mod(preset: str) -> str:
     return f"module {module_path(preset)}\n\ngo {GO_VERSION}\n"
 
 
-def module_files(prefix: pathlib.Path, preset: str, digest: str) -> dict[str, bytes]:
-    """The files of the preset's module, by path in the module."""
+def module_files(prefix: pathlib.Path, preset: str, version: str) -> dict[str, bytes]:
+    """The files of the preset's module, by path in the module. The binding
+    reads mln_go_preset_version, the release that the module belongs to, and
+    checks it against its own module's version."""
     flags = " ".join(link_flags(prefix))
     doc = f"""// Package native links the MapLibre Native C library for the {preset}
 // preset into a program that imports {BINDING_MODULE}.
@@ -158,7 +152,7 @@ package native
 
 /*
 #cgo LDFLAGS: {flags}
-const char mln_go_preset_{digest} = 0;
+const char mln_go_preset_version[] = "{version}";
 */
 import "C"
 """
@@ -199,7 +193,8 @@ def build(
         with tarfile.open(archive) as source:
             source.extractall(temporary, filter="data")
         prefix = pathlib.Path(temporary, f"{ARCHIVE_PREFIX}{preset}")
-        files = module_files(prefix, preset, binding_digest(root, prefix))
+        check_headers(root, prefix)
+        files = module_files(prefix, preset, version)
     info = json.dumps({"Version": version, "Time": time}) + "\n"
     return preset, {
         f"{version}.info": info.encode(),
