@@ -14,7 +14,7 @@ path = "src/lib.rs"
 crate-type = ["staticlib"]
 
 [dependencies]
-maplibre-native-next = "0.0.3"
+maplibre-native-next = "0.0.6"
 
 # A workspace of its own: the repository's workspace builds without the port.
 [workspace]
