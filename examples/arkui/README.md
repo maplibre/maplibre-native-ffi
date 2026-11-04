@@ -1,0 +1,44 @@
+# ArkUI example
+
+An OpenHarmony app with one ArkUI page that shows a continuous map with the
+TypeScript binding's OHPM packages, `@maplibre/native-ffi` and
+`@maplibre/native-ffi-opengl`. It renders with OpenGL ES into an `XComponent`
+surface.
+
+## Run it
+
+From the repository root, build the native library, the binding's HARs, and the
+app, then install and start it on this worktree's emulator:
+
+```bash
+mise -E ohos run //examples/arkui:run
+```
+
+The emulator is x64, so this task builds for `ohos-x64-egl`. To install on
+another device, pass its hdc connect key with `--device <key>`. To build for
+another preset, run `mise -E ohos run //examples/arkui:build <preset>`.
+
+## How it fits together
+
+The app has no native code of its own. It installs the HARs that
+`//bindings/typescript:pack-ohpm` packs, as `ohpm install` would.
+
+`entry/src/main/ets/pages/Index.ets` shows the `XComponent` and reports its
+surface. `map/MapController.ets` attaches a render session to that surface,
+gives the session each new surface, and paces its frames to the display, as the
+browser example in `examples/browser` and the React Native example in
+`examples/react-native` do. The session renders on a library thread, in a
+graphics context that the library makes for the window. `map/gestures.ets` turns
+touches into camera changes.
+
+DevEco Studio builds apps with hvigor, which isn't published, so
+`scripts/build-hap.sh` calls the tools that hvigor calls from the OpenHarmony
+SDK. ets-loader compiles the pages with its webpack configuration, which doesn't
+rewrite `@kit.*` imports. The example imports the `@ohos.*` modules instead.
+
+## Limits
+
+ArkTS can't make `onSurfaceDestroyed` wait for `releaseTarget()` to complete,
+which the C API asks for. The controller starts the release there, and it
+completes later. Going to the background doesn't destroy the surface, so this
+matters only when the component goes away.

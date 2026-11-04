@@ -801,6 +801,34 @@ jobs:
           mise run --no-deps install-native-package android-x64-egl
           build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
       - run: mise run //examples/compose:build-android x64
+  # The ArkUI example builds against the OHPM packages packed from the addon
+  # that a target job built and tested. It doesn't run the app.
+  arkui-hap:
+    name: example / arkui
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'arkui-hap')
+    env:
+      MISE_TASK_SKIP: //:build,//bindings/typescript:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          mise-env: ohos
+          zig: skip
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arkts-addon-ohos-x64-egl-${{ github.sha }}
+          path: bindings/typescript/native/build/ohos-x64-egl/install
+      - run: mise run //examples/arkui:build ohos-x64-egl
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
@@ -831,6 +859,7 @@ jobs:
       - swiftui-ios
       - swiftui-macos
       - compose-android
+      - arkui-hap
       - support-matrix
     steps:
       - name: Require every planned job
