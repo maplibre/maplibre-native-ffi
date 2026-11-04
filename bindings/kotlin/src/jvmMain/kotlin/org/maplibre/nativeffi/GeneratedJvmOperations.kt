@@ -8,6 +8,36 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
+ * Gets the dmabuf of an acquired frame.
+ *
+ * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the buffer. Once you release or
+ * discard the frame, the session may render into the buffer again. You can map a buffer with
+ * DRM_FORMAT_MOD_LINEAR with `mmap`, and bracket your reads with DMA_BUF_IOCTL_SYNC.
+ *
+ * The session owns the file descriptor, so don't close it. To keep the buffer after you release the
+ * frame, duplicate the file descriptor with `dup`. A duplicate keeps the buffer's memory, but not
+ * its contents.
+ *
+ * See `mln_acquired_frame_get_dma_buf` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
+ */
+public fun <T> AcquiredFrameHandle.withDmaBuf(block: (DmaBufFrame) -> T): T =
+  nativeCall(this, binding) {
+    borrowView(
+      { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+      { C.mln_acquired_frame_view_end(it) },
+    ) { scope ->
+      val out = sized(w(56, 56, 48), w(8, 8, 4))
+      check(C.mln_acquired_frame_get_dma_buf(handle, out, diagnostic))
+      block(readDmaBufFrame(out, scope))
+    }
+  }
+
+/**
  * Gets the Metal texture of an acquired frame.
  *
  * See `mln_acquired_frame_get_metal_texture` in the
@@ -57,6 +87,57 @@ public fun appleFramePacerCreate(options: FramePacerOptions? = null): FramePacer
       ),
     )
     adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle(it) }
+  }
+
+/**
+ * Creates a session that renders the map into a ring of dmabufs that the library allocates.
+ *
+ * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its buffer with
+ * `AcquiredFrameHandle.withDmaBuf()`. `RenderSessionHandle.resize()` gives the ring new buffers of
+ * the new size.
+ *
+ * A Vulkan build renders with `device`, or, when `device` is null, with a device that the library
+ * creates. An OpenGL build uses an EGL context of its own, and `device` must be null. Attach with
+ * `RenderDriverKind.CORE_WORKER`.
+ *
+ * For a reader that waits on no sync file, such as a Wayland compositor without explicit
+ * synchronization, attach without `GpuSyncKindFlag.SYNC_FD` in
+ * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes before you acquire
+ * it. Keep each frame acquired until its reader is done with the buffer. Give the ring 3 buffers,
+ * so the session can render while you hold two frames.
+ *
+ * See `mln_map_attach_dma_buf_ring` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when the graphics context can't render into a dmabuf of any of `formats`.
+ * - `Status.NATIVE_ERROR` when the library can't create its Vulkan device or initialize an EGL
+ *   display.
+ */
+public fun MapHandle.attachDmaBufRing(
+  descriptor: DmaBufRingDescriptor,
+  device: VulkanDeviceHandle? = null,
+  options: RenderSessionAttachOptions,
+): RenderSessionHandle =
+  nativeCall(this, binding) {
+    attach(
+      { out, completion ->
+        C.mln_map_attach_dma_buf_ring(
+          handle,
+          writeDmaBufRingDescriptor(descriptor),
+          device?.let { argument(it, it.binding) } ?: 0L,
+          writeRenderSessionAttachOptions(options),
+          out,
+          completion,
+          diagnostic,
+        )
+      },
+      GeneratedOwnerDisposal::renderSession,
+      { created, ready -> RenderSessionHandle(created, this@attachDmaBufRing, ready) },
+      { it.bindingCallbacks },
+      { it.dispose() },
+    )
   }
 
 /**

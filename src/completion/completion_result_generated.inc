@@ -8,6 +8,10 @@ struct CompletionResult<&mln_map_attach_android_surface> {
   static constexpr bool has_value = false;
 };
 template <>
+struct CompletionResult<&mln_map_attach_dma_buf_ring> {
+  static constexpr bool has_value = false;
+};
+template <>
 struct CompletionResult<&mln_map_attach_metal_borrowed_texture> {
   static constexpr bool has_value = false;
 };

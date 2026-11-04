@@ -348,7 +348,7 @@ public extension RenderSessionHandle {
   /// Errors:
   ///
   /// - `Status.unsupported` when the session renders offscreen or into Android
-  ///   hardware buffers that it allocates.
+  ///   hardware buffers or dmabufs that it allocates.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.

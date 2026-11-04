@@ -502,6 +502,44 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_dma_buf_format NativeDmaBufFormat(DmaBufFormat value)
+    {
+        var native = new mln_dma_buf_format();
+        native.fourcc = value.Fourcc;
+        native.modifier = value.Modifier;
+        return native;
+    }
+
+    internal static DmaBufFrame CopyDmaBufFrame(mln_dma_buf_frame value) =>
+        new(
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.slot,
+            value.fourcc,
+            value.modifier,
+            value.fd,
+            value.offset,
+            value.stride
+        );
+
+    internal static mln_dma_buf_ring_descriptor NativeDmaBufRingDescriptor(
+        DmaBufRingDescriptor value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_dma_buf_ring_descriptor();
+        native.size = (uint)sizeof(mln_dma_buf_ring_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.buffer_count = value.BufferCount;
+        native.formats = scope.Array<mln_dma_buf_format, DmaBufFormat>(
+            value.FormatsStorage.Items,
+            static (item, scope) => NativeDmaBufFormat(item)
+        );
+        native.format_count = checked((nuint)value.FormatsStorage.Items.Length);
+        return native;
+    }
+
     internal static EdgeInsets CopyEdgeInsets(mln_edge_insets value) =>
         new(value.top, value.left, value.bottom, value.right);
 

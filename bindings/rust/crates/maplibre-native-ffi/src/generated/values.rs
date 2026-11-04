@@ -1105,6 +1105,105 @@ impl ToNative<sys::mln_custom_vector_source_options> for CustomVectorSourceOptio
     }
 }
 
+/// A DRM format and modifier that you can import.
+///
+/// See `mln_dma_buf_format` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct DmaBufFormat {
+    /// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+    pub fourcc: u32,
+    /// A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+    pub modifier: u64,
+}
+impl DmaBufFormat {
+    pub const fn new(fourcc: u32, modifier: u64) -> Self {
+        Self { fourcc, modifier }
+    }
+}
+impl ToNative<sys::mln_dma_buf_format> for DmaBufFormat {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_dma_buf_format> {
+        let mut raw: sys::mln_dma_buf_format = unsafe { std::mem::zeroed() };
+        raw.fourcc = self.fourcc;
+        raw.modifier = self.modifier;
+        Ok(raw)
+    }
+}
+
+/// The dmabuf of an acquired frame.
+///
+/// See `mln_dma_buf_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct DmaBufFrame {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    /// The buffer's index in the ring.
+    pub slot: u32,
+    pub fourcc: u32,
+    pub modifier: u64,
+    pub fd: i32,
+    /// The bytes from the start of the buffer to its first pixel.
+    pub offset: u32,
+    /// The bytes from the start of one row to the start of the next.
+    pub stride: u32,
+}
+impl FromNative<sys::mln_dma_buf_frame> for DmaBufFrame {
+    unsafe fn from_native(raw: sys::mln_dma_buf_frame) -> Result<Self> {
+        Ok(Self {
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            slot: raw.slot,
+            fourcc: raw.fourcc,
+            modifier: raw.modifier,
+            fd: raw.fd,
+            offset: raw.offset,
+            stride: raw.stride,
+        })
+    }
+}
+
+/// A ring of dmabufs that the library allocates, for
+/// `MapHandle::attach_dma_buf_ring()`.
+///
+/// Each buffer has the map's size in pixels and a format and modifier from
+/// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
+/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+///
+/// See `mln_dma_buf_ring_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DmaBufRingDescriptor {
+    pub logical_size: LogicalSize,
+    /// How many buffers the ring has, from 1 to 8.
+    pub buffer_count: u32,
+    /// The formats and modifiers that your reader imports, most preferred
+    /// first, such as those that eglQueryDmaBufModifiersEXT() reports.
+    pub formats: Vec<DmaBufFormat>,
+}
+impl DmaBufRingDescriptor {
+    pub fn new(logical_size: LogicalSize, buffer_count: u32, formats: Vec<DmaBufFormat>) -> Self {
+        Self {
+            logical_size,
+            buffer_count,
+            formats,
+        }
+    }
+}
+impl ToNative<sys::mln_dma_buf_ring_descriptor> for DmaBufRingDescriptor {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_dma_buf_ring_descriptor> {
+        let mut raw: sys::mln_dma_buf_ring_descriptor = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_dma_buf_ring_descriptor>() as _;
+        raw.logical_size = to_native(&self.logical_size, arena)?;
+        raw.buffer_count = self.buffer_count;
+        raw.formats = convert::array(&self.formats, arena)?;
+        raw.format_count = convert::count(self.formats.len())?;
+        Ok(raw)
+    }
+}
+
 /// Distances in logical pixels from each edge of the map.
 ///
 /// See `mln_edge_insets` in the
@@ -3844,7 +3943,7 @@ pub struct RenderSessionAttachOptions {
     ///   device.
     /// - `RenderDriverKind::CoreWorker` for a transferred WebGL canvas, an
     ///   Android or OpenHarmony window, a Wayland surface, a ring of Android
-    ///   hardware buffers, or an offscreen session.
+    ///   hardware buffers or dmabufs, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.
@@ -3904,7 +4003,7 @@ pub struct RenderSessionCapabilities {
     /// How many textures the session's texture ring has.
     pub texture_ring_depth: u32,
     pub flags: RenderSessionCapabilityFlag,
-    /// The kind of `GpuSync` that `AcquiredFrameHandle::get_producer_sync()`
+    /// The kind of `GpuSync` that `AcquiredFrameView::get_producer_sync()`
     /// reports.
     pub producer_sync_kind: GpuSyncKind,
     /// The kinds of `GpuSync` that `AcquiredFrameHandle::release()` accepts.

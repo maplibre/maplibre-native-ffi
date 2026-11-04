@@ -134,7 +134,7 @@ impl AcquiredFrameHandle {
 impl AcquiredFrameView<'_> {
     /// Gets the Android hardware buffer of an acquired frame.
     ///
-    /// Wait for `AcquiredFrameHandle::get_producer_sync()` before you read the
+    /// Wait for `AcquiredFrameView::get_producer_sync()` before you read the
     /// buffer. Once you release or discard the frame, the session may render
     /// into the buffer again. A reference that you take with
     /// `AHardwareBuffer_acquire` keeps the buffer's memory, but not its
@@ -158,6 +158,38 @@ impl AcquiredFrameView<'_> {
                 &mut out_frame,
                 out_diagnostic,
             )
+        })?;
+        Ok(Lent::new(unsafe { from_native(out_frame) }?))
+    }
+
+    /// Gets the dmabuf of an acquired frame.
+    ///
+    /// Wait for `AcquiredFrameView::get_producer_sync()` before you read the
+    /// buffer. Once you release or discard the frame, the session may render
+    /// into the buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR
+    /// with `mmap`, and bracket your reads with DMA_BUF_IOCTL_SYNC.
+    ///
+    /// The session owns the file descriptor, so don't close it. To keep the
+    /// buffer after you release the frame, duplicate the file descriptor with
+    /// `dup`. A duplicate keeps the buffer's memory, but not its contents.
+    ///
+    /// See `mln_acquired_frame_get_dma_buf` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::TargetLost` when the session failed, or you detached,
+    ///   abandoned, or disposed it.
+    #[cfg(any(
+        target_os = "freebsd",
+        all(target_os = "linux", not(target_env = "ohos"))
+    ))]
+    pub fn get_dma_buf(&self) -> Result<Lent<'_, DmaBufFrame>> {
+        let mut call = self.owner.inner.call();
+        let mut out_frame: sys::mln_dma_buf_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_dma_buf_frame>() as _;
+        call.status(|frame, out_diagnostic| unsafe {
+            sys::mln_acquired_frame_get_dma_buf(frame, &mut out_frame, out_diagnostic)
         })?;
         Ok(Lent::new(unsafe { from_native(out_frame) }?))
     }

@@ -810,6 +810,50 @@ napi_value mln_ts_read_canonical_tile_id(
   return result;
 }
 
+napi_value mln_ts_read_dma_buf_frame(
+  napi_env env, const mln_dma_buf_frame* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "width", mln_ts_number(env, (double)(source->width))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "height", mln_ts_number(env, (double)(source->height))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "scaleFactor",
+        mln_ts_number(env, (double)(source->scale_factor))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "slot", mln_ts_number(env, (double)(source->slot))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "fourcc", mln_ts_number(env, (double)(source->fourcc))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "modifier", mln_ts_u64(env, (uint64_t)(source->modifier))
+      ))
+    return NULL;
+  if (!mln_ts_set(env, result, "fd", mln_ts_number(env, (double)(source->fd))))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "offset", mln_ts_number(env, (double)(source->offset))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "stride", mln_ts_number(env, (double)(source->stride))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_edge_insets(
   napi_env env, const mln_edge_insets* source, size_t size
 ) {
@@ -3814,6 +3858,70 @@ bool mln_ts_write_custom_vector_source_options(
   return true;
 }
 
+bool mln_ts_write_dma_buf_format(
+  mln_ts_call* call, napi_value value, mln_dma_buf_format* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "fourcc", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "fourcc");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->fourcc = (uint32_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "modifier", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "modifier");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->modifier = (uint64_t)number;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_dma_buf_ring_descriptor(
+  mln_ts_call* call, napi_value value, mln_dma_buf_ring_descriptor* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "bufferCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bufferCount");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->buffer_count = (uint32_t)number;
+  }
+  if (!mln_ts_member(call, value, "formats", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "formats");
+  {
+    mln_dma_buf_format* items = NULL;
+    size_t count = 0;
+    if (!mln_ts_write_list_dma_buf_format(
+          call, member, UINT32_MAX, &items, &count, child
+        ))
+      return false;
+    out->formats = items;
+    out->format_count = (size_t)count;
+  }
+  return true;
+}
+
 bool mln_ts_write_edge_insets(
   mln_ts_call* call, napi_value value, mln_edge_insets* out, const char* path
 ) {
@@ -4419,6 +4527,29 @@ bool mln_ts_write_list_buffer_view(
     mln_ts_index_path(item_path, sizeof item_path, path, index);
     memset(&items[index], 0, sizeof items[index]);
     if (!mln_ts_read_text_view(call, element, &items[index], item_path))
+      return false;
+  }
+  *out = items;
+  return true;
+}
+
+bool mln_ts_write_list_dma_buf_format(
+  mln_ts_call* call, napi_value value, size_t maximum, mln_dma_buf_format** out,
+  size_t* out_count, const char* path
+) {
+  mln_dma_buf_format* items = NULL;
+  if (!mln_ts_read_list(
+        call, value, sizeof *items, maximum, (void**)&items, out_count, path
+      ))
+    return false;
+  for (size_t index = 0; index < *out_count; index++) {
+    napi_value element;
+    char item_path[256];
+    if (!mln_ts_element(call, value, index, &element)) return false;
+    mln_ts_index_path(item_path, sizeof item_path, path, index);
+    memset(&items[index], 0, sizeof items[index]);
+    if (!mln_ts_read_record(call, element, item_path)) return false;
+    if (!mln_ts_write_dma_buf_format(call, element, &items[index], item_path))
       return false;
   }
   *out = items;

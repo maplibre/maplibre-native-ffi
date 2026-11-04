@@ -119,6 +119,20 @@ auto get_egl_proc_address(
   EGLenum active_api
 ) -> void*;
 
+#if (defined(__linux__) || defined(__FreeBSD__)) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+struct DefaultEglDisplay {
+  EGLDisplay display = EGL_NO_DISPLAY;
+  EGLConfig config = nullptr;
+};
+
+// The display and pbuffer config that an offscreen device picks when the host
+// names no adapter.
+auto default_egl_display(
+  mln_open_gl_client_api client_api, DefaultEglDisplay& out_display
+) -> mln_status;
+#endif
+
 #if defined(__ANDROID__) || defined(__OHOS__) || defined(MLN_FFI_WAYLAND)
 struct WindowEglConfig {
   EGLDisplay display = EGL_NO_DISPLAY;

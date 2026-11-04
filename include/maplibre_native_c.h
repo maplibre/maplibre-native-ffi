@@ -14,6 +14,7 @@
 #include "maplibre_native_c/camera.h"            // IWYU pragma: export
 #include "maplibre_native_c/completion.h"        // IWYU pragma: export
 #include "maplibre_native_c/delivery.h"          // IWYU pragma: export
+#include "maplibre_native_c/linux.h"             // IWYU pragma: export
 #include "maplibre_native_c/logging.h"           // IWYU pragma: export
 #include "maplibre_native_c/map.h"               // IWYU pragma: export
 #include "maplibre_native_c/offscreen.h"         // IWYU pragma: export

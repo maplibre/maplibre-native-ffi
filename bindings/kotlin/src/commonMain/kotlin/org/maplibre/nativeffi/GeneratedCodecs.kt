@@ -368,6 +368,20 @@ internal fun NativeArena.putAndroidSurfaceDescriptor(
 internal fun NativeArena.writeAndroidSurfaceDescriptor(value: AndroidSurfaceDescriptor): Long =
   allocate(w(24, 40), w(4, 8)).also { putAndroidSurfaceDescriptor(it, value) }
 
+internal fun NativeArena.putDmaBufRingDescriptor(target: Long, value: DmaBufRingDescriptor) {
+  writeU32(target, w(24, 32).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.bufferCount)
+  writeAddress(
+    target + 16,
+    array(value.formats, w(16, 16, 12), w(8, 8, 4)) { at, item -> putDmaBufFormat(at, item) },
+  )
+  writeSize(target + w(20, 24), value.formats.size.toULong())
+}
+
+internal fun NativeArena.writeDmaBufRingDescriptor(value: DmaBufRingDescriptor): Long =
+  allocate(w(24, 32), w(4, 8)).also { putDmaBufRingDescriptor(it, value) }
+
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
   value: MetalBorrowedTextureDescriptor,
@@ -1252,6 +1266,20 @@ internal fun readAndroidHardwareBufferFrame(
     )
     .also { it.bindingScope = scope }
 
+internal fun readDmaBufFrame(source: Long, scope: ViewScope? = null): DmaBufFrame =
+  DmaBufFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      fourcc = readU32(source + w(28, 28, 24)),
+      modifier = readU64(source + w(32, 32, 28)),
+      fd = readI32(source + w(40, 40, 36)),
+      offset = readU32(source + w(44, 44, 40)),
+      stride = readU32(source + w(48, 48, 44)),
+    )
+    .also { it.bindingScope = scope }
+
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
       width = readU32(source + 4),
@@ -1645,6 +1673,14 @@ internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
 
 internal fun NativeCall.writeQueueLock(value: QueueLock): Long =
   allocate(w(16, 32), w(4, 8)).also { putQueueLock(it, value) }
+
+internal fun NativeArena.putDmaBufFormat(target: Long, value: DmaBufFormat) {
+  writeU32(target, value.fourcc)
+  writeU64(target + w(8, 8, 4), value.modifier)
+}
+
+internal fun NativeArena.writeDmaBufFormat(value: DmaBufFormat): Long =
+  allocate(w(16, 16, 12), w(8, 8, 4)).also { putDmaBufFormat(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
   writeAddress(target, value.texture.address)

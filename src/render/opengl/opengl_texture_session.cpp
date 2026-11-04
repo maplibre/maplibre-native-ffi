@@ -46,6 +46,17 @@
 #define MLN_FFI_EGL_HARDWARE_BUFFERS 1
 #include <android/hardware_buffer.h>
 #endif
+// Linux and FreeBSD sessions can render into dmabufs that they allocate.
+// Android and OpenHarmony define __linux__ too.
+#if (defined(__linux__) || defined(__FreeBSD__)) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+#define MLN_FFI_EGL_DMA_BUFS 1
+#endif
+#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS) || defined(MLN_FFI_EGL_DMA_BUFS)
+#define MLN_FFI_EGL_EXPORTED_RINGS 1
+#include <any>
+#include <functional>
+#endif
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 #include <emscripten/html5.h>
 #include <emscripten/threading.h>
@@ -67,6 +78,11 @@
 #if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
 #include "platform/android/hardware_buffer.hpp"
 #include "render/android_hardware_buffer_session.hpp"
+#include "render/vulkan_device.hpp"
+#endif
+#if defined(MLN_FFI_EGL_DMA_BUFS)
+#include "platform/dma_buf/allocator.hpp"
+#include "render/dma_buf_session.hpp"
 #include "render/vulkan_device.hpp"
 #endif
 
@@ -553,18 +569,69 @@ auto check_opengl_framebuffer() -> void {
   }
 }
 
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
+using EglTargetTexture = void (*)(mln::platform::GLenum, void*);
+
+// A slot's texture over a buffer that an exported ring allocated. The
+// session's context is current while it is made and destroyed.
+class ExportedTexture {
+ public:
+  ExportedTexture() = default;
+  ExportedTexture(const ExportedTexture&) = delete;
+  auto operator=(const ExportedTexture&) -> ExportedTexture& = delete;
+  ExportedTexture(ExportedTexture&&) = delete;
+  auto operator=(ExportedTexture&&) -> ExportedTexture& = delete;
+  virtual ~ExportedTexture() = default;
+
+  [[nodiscard]] virtual auto size() const -> mln::Size = 0;
+  [[nodiscard]] virtual auto texture() const -> uint32_t = 0;
+  // What an acquired frame of the texture reports to the host.
+  [[nodiscard]] virtual auto frame_metadata(
+    const mln::core::RenderFrameMetadata& frame
+  ) const -> std::any = 0;
+};
+
+// The ring of a session that allocates a buffer for each slot, and makes a
+// slot's texture of a size over a new buffer. It throws on failure.
+struct EglExportedRing {
+  std::size_t depth = 1;
+  std::function<std::unique_ptr<ExportedTexture>(mln::gl::Context&, mln::Size)>
+    allocate;
+};
+
+// Makes a texture over `image`, or returns 0 when OpenGL can't. The texture
+// is bound through the context's state, which tracks the binding.
+auto texture_over_image(
+  EglTargetTexture target_texture, mln::gl::Context& gl, EGLImageKHR image
+) -> mln::platform::GLuint {
+  // An earlier error would read as this texture's.
+  for (auto drained = 0;
+       drained < 8 && mln::platform::glGetError() != GL_NO_ERROR; ++drained) {
+  }
+  auto texture = mln::platform::GLuint{0};
+  mln::platform::glGenTextures(1, &texture);
+  gl.activeTextureUnit = 0;
+  gl.texture[0] = texture;
+  target_texture(GL_TEXTURE_2D, image);
+  gl.texture[0] = 0;
+  if (mln::platform::glGetError() != GL_NO_ERROR) {
+    mln::platform::glDeleteTextures(1, &texture);
+    return 0;
+  }
+  return texture;
+}
+#endif
+
 #if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
 // The EGL and GLES functions through which a session renders into Android
 // hardware buffers: EGL_ANDROID_get_native_client_buffer,
 // EGL_ANDROID_image_native_buffer, and GL_OES_EGL_image.
 struct EglHardwareBuffers {
-  using TargetTexture = void (*)(mln::platform::GLenum, void*);
-
   EGLDisplay display = EGL_NO_DISPLAY;
   PFNEGLGETNATIVECLIENTBUFFERANDROIDPROC client_buffer = nullptr;
   PFNEGLCREATEIMAGEKHRPROC create_image = nullptr;
   PFNEGLDESTROYIMAGEKHRPROC destroy_image = nullptr;
-  TargetTexture target_texture = nullptr;
+  EglTargetTexture target_texture = nullptr;
 
   static auto load(const mln_egl_context_descriptor& egl)
     -> std::optional<EglHardwareBuffers> {
@@ -589,7 +656,7 @@ struct EglHardwareBuffers {
     buffers.destroy_image =
       reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(proc("eglDestroyImageKHR"));
     buffers.target_texture =
-      reinterpret_cast<TargetTexture>(proc("glEGLImageTargetTexture2DOES"));
+      reinterpret_cast<EglTargetTexture>(proc("glEGLImageTargetTexture2DOES"));
     // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
     if (
       buffers.client_buffer == nullptr || buffers.create_image == nullptr ||
@@ -600,17 +667,8 @@ struct EglHardwareBuffers {
   }
 };
 
-// The ring of an Android hardware buffer session, which allocates a buffer for
-// each slot.
-struct EglExportedRing {
-  std::size_t depth = 1;
-  uint64_t usage = 0;
-  EglHardwareBuffers egl;
-};
-
 // A slot's texture over an Android hardware buffer that the ring allocated.
-// The session's context is current while it is made and destroyed.
-class HardwareBufferTexture final {
+class HardwareBufferTexture final : public ExportedTexture {
  public:
   HardwareBufferTexture(
     const EglHardwareBuffers& egl, mln::gl::Context& gl, mln::Size size,
@@ -637,18 +695,8 @@ class HardwareBufferTexture final {
           "EGL can't make an image of the Android hardware buffer"
         );
       }
-      // An earlier error would read as this texture's.
-      for (auto drained = 0;
-           drained < 8 && mln::platform::glGetError() != GL_NO_ERROR;
-           ++drained) {
-      }
-      mln::platform::glGenTextures(1, &texture_);
-      // Bound through the context's state, which tracks the binding.
-      gl.activeTextureUnit = 0;
-      gl.texture[0] = texture_;
-      egl_.target_texture(GL_TEXTURE_2D, image_);
-      gl.texture[0] = 0;
-      if (mln::platform::glGetError() != GL_NO_ERROR) {
+      texture_ = texture_over_image(egl_.target_texture, gl, image_);
+      if (texture_ == 0) {
         throw std::runtime_error(
           "OpenGL can't make a texture of the Android hardware buffer"
         );
@@ -663,12 +711,21 @@ class HardwareBufferTexture final {
     -> HardwareBufferTexture& = delete;
   HardwareBufferTexture(HardwareBufferTexture&&) = delete;
   auto operator=(HardwareBufferTexture&&) -> HardwareBufferTexture& = delete;
-  ~HardwareBufferTexture() { destroy(); }
+  ~HardwareBufferTexture() override { destroy(); }
 
-  [[nodiscard]] auto size() const -> mln::Size { return size_; }
-  [[nodiscard]] auto texture() const -> uint32_t { return texture_; }
-  [[nodiscard]] auto buffer() const -> AHardwareBuffer* {
-    return buffer_.get();
+  [[nodiscard]] auto size() const -> mln::Size override { return size_; }
+  [[nodiscard]] auto texture() const -> uint32_t override { return texture_; }
+  [[nodiscard]] auto frame_metadata(
+    const mln::core::RenderFrameMetadata& frame
+  ) const -> std::any override {
+    return mln_android_hardware_buffer_frame{
+      .size = sizeof(mln_android_hardware_buffer_frame),
+      .width = frame.physical_width,
+      .height = frame.physical_height,
+      .scale_factor = frame.scale_factor,
+      .slot = frame.slot,
+      .buffer = buffer_.get(),
+    };
   }
 
  private:
@@ -684,6 +741,203 @@ class HardwareBufferTexture final {
   EglHardwareBuffers egl_;
   mln::Size size_;
   mln::platform::android::HardwareBuffer buffer_;
+  EGLImageKHR image_ = EGL_NO_IMAGE_KHR;
+  mln::platform::GLuint texture_ = 0;
+};
+#endif
+
+#if defined(MLN_FFI_EGL_DMA_BUFS)
+// The EGL and GLES functions through which a session renders into dmabufs:
+// EGL_EXT_image_dma_buf_import_modifiers and GL_OES_EGL_image.
+struct EglDmaBufs {
+  using QueryModifiers = EGLBoolean (*)(
+    EGLDisplay, EGLint, EGLint, EGLuint64KHR*, EGLBoolean*, EGLint*
+  );
+
+  EGLDisplay display = EGL_NO_DISPLAY;
+  PFNEGLCREATEIMAGEKHRPROC create_image = nullptr;
+  PFNEGLDESTROYIMAGEKHRPROC destroy_image = nullptr;
+  QueryModifiers query_modifiers = nullptr;
+  EglTargetTexture target_texture = nullptr;
+
+  static auto load(const mln_egl_context_descriptor& egl)
+    -> std::optional<EglDmaBufs> {
+    auto buffers = EglDmaBufs{.display = static_cast<EGLDisplay>(egl.display)};
+    for (const auto* name :
+         {"EGL_KHR_image_base", "EGL_EXT_image_dma_buf_import",
+          "EGL_EXT_image_dma_buf_import_modifiers"}) {
+      if (!egl_has_extension(buffers.display, name)) return std::nullopt;
+    }
+    const auto proc = [&egl](const char* name) {
+      return mln::core::opengl::get_egl_proc_address(egl, name, EGL_NONE);
+    };
+    // EGL hands out extension functions as untyped procedure pointers.
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    buffers.create_image =
+      reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(proc("eglCreateImageKHR"));
+    buffers.destroy_image =
+      reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(proc("eglDestroyImageKHR"));
+    buffers.query_modifiers =
+      reinterpret_cast<QueryModifiers>(proc("eglQueryDmaBufModifiersEXT"));
+    buffers.target_texture =
+      reinterpret_cast<EglTargetTexture>(proc("glEGLImageTargetTexture2DOES"));
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+    if (
+      buffers.create_image == nullptr || buffers.destroy_image == nullptr ||
+      buffers.query_modifiers == nullptr || buffers.target_texture == nullptr
+    )
+      return std::nullopt;
+    return buffers;
+  }
+
+  // Whether the display imports a buffer of `fourcc` with `modifier` as a
+  // texture that a context renders into.
+  [[nodiscard]] auto imports(uint32_t fourcc, uint64_t modifier) const -> bool {
+    auto count = EGLint{};
+    const auto format = static_cast<EGLint>(fourcc);
+    if (
+      query_modifiers(display, format, 0, nullptr, nullptr, &count) ==
+        EGL_FALSE ||
+      count <= 0
+    )
+      return false;
+    auto modifiers = std::vector<EGLuint64KHR>(static_cast<std::size_t>(count));
+    auto external = std::vector<EGLBoolean>(static_cast<std::size_t>(count));
+    if (
+      query_modifiers(
+        display, format, count, modifiers.data(), external.data(), &count
+      ) == EGL_FALSE
+    )
+      return false;
+    for (auto index = std::size_t{0}; index < static_cast<std::size_t>(count);
+         ++index) {
+      if (modifiers[index] == modifier && external[index] == EGL_FALSE)
+        return true;
+    }
+    return false;
+  }
+};
+
+// The DRM render node of the display's GPU, or empty for a display without
+// one, such as a renderer on the CPU's.
+auto egl_render_node(const mln_egl_context_descriptor& egl) -> std::string {
+  using QueryDisplay = EGLBoolean (*)(EGLDisplay, EGLint, EGLAttrib*);
+  using QueryDevice = const char* (*)(void*, EGLint);
+  // Spelled out, since the EGL headers that a system ships differ in which
+  // extensions they declare.
+  constexpr auto egl_device = EGLint{0x322C};
+  constexpr auto egl_drm_render_node_file = EGLint{0x3377};
+  // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+  const auto query_display =
+    reinterpret_cast<QueryDisplay>(mln::core::opengl::get_egl_proc_address(
+      egl, "eglQueryDisplayAttribEXT", EGL_NONE
+    ));
+  const auto query_device =
+    reinterpret_cast<QueryDevice>(mln::core::opengl::get_egl_proc_address(
+      egl, "eglQueryDeviceStringEXT", EGL_NONE
+    ));
+  // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+  auto device = EGLAttrib{};
+  if (
+    query_display == nullptr || query_device == nullptr ||
+    query_display(static_cast<EGLDisplay>(egl.display), egl_device, &device) ==
+      EGL_FALSE
+  )
+    return {};
+  // NOLINTNEXTLINE(performance-no-int-to-ptr)
+  const auto* const node =
+    query_device(reinterpret_cast<void*>(device), egl_drm_render_node_file);
+  return node == nullptr ? std::string{} : std::string{node};
+}
+
+// A ring's buffers: what imports them, what allocates them, and their fourcc
+// and modifiers.
+struct EglDmaBufRing {
+  EglDmaBufs egl;
+  std::shared_ptr<const mln::platform::dma_buf::Allocator> allocator;
+  mln::core::DmaBufChoice choice;
+};
+
+// A slot's texture over a dmabuf that the ring allocated.
+class DmaBufTexture final : public ExportedTexture {
+ public:
+  DmaBufTexture(const EglDmaBufRing& ring, mln::gl::Context& gl, mln::Size size)
+      : egl_(ring.egl),
+        size_(size),
+        buffer_(ring.allocator->allocate(
+          size.width, size.height, ring.choice.fourcc, ring.choice.modifiers
+        )) {
+    try {
+      const auto modifier = buffer_.modifier;
+      const EGLint attributes[] = {
+        EGL_WIDTH,
+        static_cast<EGLint>(size.width),
+        EGL_HEIGHT,
+        static_cast<EGLint>(size.height),
+        EGL_LINUX_DRM_FOURCC_EXT,
+        static_cast<EGLint>(ring.choice.fourcc),
+        EGL_DMA_BUF_PLANE0_FD_EXT,
+        buffer_.fd.get(),
+        EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+        static_cast<EGLint>(buffer_.offset),
+        EGL_DMA_BUF_PLANE0_PITCH_EXT,
+        static_cast<EGLint>(buffer_.stride),
+        EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+        static_cast<EGLint>(modifier & 0xFFFFFFFFU),
+        EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
+        static_cast<EGLint>(modifier >> 32U),
+        EGL_NONE,
+      };
+      image_ = egl_.create_image(
+        egl_.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, nullptr, attributes
+      );
+      if (image_ == EGL_NO_IMAGE_KHR) {
+        throw std::runtime_error("EGL can't make an image of the dmabuf");
+      }
+      texture_ = texture_over_image(egl_.target_texture, gl, image_);
+      if (texture_ == 0) {
+        throw std::runtime_error("OpenGL can't make a texture of the dmabuf");
+      }
+    } catch (...) {
+      destroy();
+      throw;
+    }
+    layout_ = mln::core::DmaBufLayout{
+      .fourcc = ring.choice.fourcc,
+      .modifier = buffer_.modifier,
+      .fd = buffer_.fd.get(),
+      .offset = buffer_.offset,
+      .stride = buffer_.stride,
+    };
+  }
+  DmaBufTexture(const DmaBufTexture&) = delete;
+  auto operator=(const DmaBufTexture&) -> DmaBufTexture& = delete;
+  DmaBufTexture(DmaBufTexture&&) = delete;
+  auto operator=(DmaBufTexture&&) -> DmaBufTexture& = delete;
+  ~DmaBufTexture() override { destroy(); }
+
+  [[nodiscard]] auto size() const -> mln::Size override { return size_; }
+  [[nodiscard]] auto texture() const -> uint32_t override { return texture_; }
+  [[nodiscard]] auto frame_metadata(
+    const mln::core::RenderFrameMetadata& frame
+  ) const -> std::any override {
+    return mln::core::dma_buf_frame(layout_, frame);
+  }
+
+ private:
+  void destroy() noexcept {
+    // A framebuffer that still attaches the texture keeps its storage until
+    // the context deletes that framebuffer.
+    if (texture_ != 0) mln::platform::glDeleteTextures(1, &texture_);
+    texture_ = 0;
+    if (image_ != EGL_NO_IMAGE_KHR) egl_.destroy_image(egl_.display, image_);
+    image_ = EGL_NO_IMAGE_KHR;
+  }
+
+  EglDmaBufs egl_;
+  mln::Size size_;
+  mln::platform::dma_buf::Buffer buffer_;
+  mln::core::DmaBufLayout layout_;
   EGLImageKHR image_ = EGL_NO_IMAGE_KHR;
   mln::platform::GLuint texture_ = 0;
 };
@@ -821,9 +1075,9 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
         borrowed_textures_(borrowed_texture_names(target.textures)),
         ring_(target.textures.size()) {}
 
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
-  // An exported ring's backend, which renders into a hardware buffer that it
-  // allocates for each slot, in a dedicated context.
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
+  // An exported ring's backend, which renders into a buffer that it allocates
+  // for each slot, in a dedicated context.
   OpenGLTextureBackend(
     const mln_open_gl_context_descriptor& context, mln::Size size,
     EglExportedRing ring
@@ -833,7 +1087,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
         context_(context),
         ring_(ring.depth),
         exported_(std::move(ring)),
-        hardware_textures_(exported_->depth) {}
+        exported_textures_(exported_->depth) {}
 #endif
 
   OpenGLTextureBackend(const OpenGLTextureBackend&) = delete;
@@ -855,10 +1109,10 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     auto cleanup = [this] {
       resource.reset();
       ring_.clear();
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
       // Made only while the context was current, so they exist only when it
       // does.
-      hardware_textures_.clear();
+      exported_textures_.clear();
 #endif
       context.reset();
     };
@@ -925,13 +1179,12 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     return renderable.texture();
   }
 
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
-  // The hardware buffer of an exported ring's selected slot, once texture()
-  // made it, or null for any other ring.
-  [[nodiscard]] auto hardware_buffer() const -> AHardwareBuffer* {
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
+  // The texture of an exported ring's selected slot, once texture() made it,
+  // or null for any other ring.
+  [[nodiscard]] auto exported_texture() const -> const ExportedTexture* {
     if (!exported_) return nullptr;
-    const auto& slot = hardware_textures_.at(ring_.selected());
-    return slot ? slot->buffer() : nullptr;
+    return exported_textures_.at(ring_.selected()).get();
   }
 #endif
 
@@ -1168,22 +1421,20 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 #endif
 
   // The texture that the selected slot renders into at `size`: the caller's
-  // for a borrowed ring, one over the slot's hardware buffer for an exported
-  // ring, or 0 for one that the renderable makes. A slot whose buffer has
+  // for a borrowed ring, one over the slot's buffer for an exported ring, or 0
+  // for one that the renderable makes. A slot whose buffer has
   // another size gets a new buffer. It runs while the renderer builds the
   // slot's renderable, so the context is current.
   auto slot_texture(mln::Size size) -> uint32_t {
     if (!borrowed_textures_.empty()) {
       return borrowed_textures_[ring_.selected()];
     }
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
     if (exported_) {
-      auto& slot = hardware_textures_.at(ring_.selected());
+      auto& slot = exported_textures_.at(ring_.selected());
       if (!slot || slot->size() != size) {
         slot.reset();
-        slot = std::make_unique<HardwareBufferTexture>(
-          exported_->egl, getContext<mln::gl::Context>(), size, exported_->usage
-        );
+        slot = exported_->allocate(getContext<mln::gl::Context>(), size);
       }
       return slot->texture();
     }
@@ -1210,11 +1461,11 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   std::vector<uint32_t> borrowed_textures_;
   mln::Size resource_size_{};
   mln::core::RenderableSlotRing ring_;
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
-  // The exported ring, and each slot's texture over its hardware buffer, which
-  // the slot makes when it first renders.
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
+  // The exported ring, and each slot's texture over its buffer, which the slot
+  // makes when it first renders.
   std::optional<EglExportedRing> exported_;
-  std::vector<std::unique_ptr<HardwareBufferTexture>> hardware_textures_;
+  std::vector<std::unique_ptr<ExportedTexture>> exported_textures_;
 #endif
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -1244,7 +1495,7 @@ class OpenGLTextureSessionBackend final
   )
       : backend_(target, size), producer_sync_kind_(producer_sync_kind) {}
 
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
   OpenGLTextureSessionBackend(
     const mln_open_gl_context_descriptor& context, mln::Size size,
     EglExportedRing ring, mln_gpu_sync_kind producer_sync_kind
@@ -1459,16 +1710,9 @@ class OpenGLTextureSessionBackend final
     } else {
       backend_.finish_rendering();
     }
-#if defined(MLN_FFI_EGL_HARDWARE_BUFFERS)
-    if (auto* const buffer = backend_.hardware_buffer(); buffer != nullptr) {
-      out_metadata = mln_android_hardware_buffer_frame{
-        .size = sizeof(mln_android_hardware_buffer_frame),
-        .width = frame.physical_width,
-        .height = frame.physical_height,
-        .scale_factor = frame.scale_factor,
-        .slot = frame.slot,
-        .buffer = buffer,
-      };
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
+    if (const auto* const exported = backend_.exported_texture()) {
+      out_metadata = exported->frame_metadata(frame);
       return MLN_STATUS_OK;
     }
 #endif
@@ -1774,19 +2018,114 @@ auto configure_android_hardware_buffer_session(
     return MLN_STATUS_UNSUPPORTED;
   }
   session.probe_sync_kinds = [context] { return opengl_sync_support(context); };
-  session.initialize_backend = [context, exported = EglExportedRing{
-                                           .depth = ring.buffer_count,
-                                           .usage = ring.usage,
-                                           .egl = *buffers,
-                                         }](mln_render_session_object& live) {
-    auto backend = std::make_unique<OpenGLTextureSessionBackend>(
-      context, mln::Size{live.physical_width, live.physical_height}, exported,
-      live.producer_sync_kind
-    );
-    const auto status = backend->initialize_sync();
-    live.texture.backend = std::move(backend);
-    return status;
+  auto exported = EglExportedRing{
+    .depth = ring.buffer_count,
+    .allocate = [egl = *buffers, usage = ring.usage](
+                  mln::gl::Context& gl, mln::Size size
+                ) -> std::unique_ptr<ExportedTexture> {
+      return std::make_unique<HardwareBufferTexture>(egl, gl, size, usage);
+    },
   };
+  session.initialize_backend =
+    [context, exported = std::move(exported)](mln_render_session_object& live) {
+      auto backend = std::make_unique<OpenGLTextureSessionBackend>(
+        context, mln::Size{live.physical_width, live.physical_height}, exported,
+        live.producer_sync_kind
+      );
+      const auto status = backend->initialize_sync();
+      live.texture.backend = std::move(backend);
+      return status;
+    };
+  return MLN_STATUS_OK;
+}
+#endif
+
+#if defined(MLN_FFI_EGL_DMA_BUFS)
+auto configure_dma_buf_session(
+  const DmaBufRing& ring, mln_vulkan_device device,
+  mln_render_session_object& session
+) -> mln_status {
+  auto vulkan = std::shared_ptr<const mln_vulkan_context_descriptor>{};
+  const auto device_status = texture_ring_device(device, vulkan);
+  if (device_status != MLN_STATUS_OK) return device_status;
+  auto display = opengl::DefaultEglDisplay{};
+  const auto display_status =
+    opengl::default_egl_display(MLN_OPEN_GL_CLIENT_API_GLES, display);
+  if (display_status != MLN_STATUS_OK) return display_status;
+  const auto context = mln_open_gl_context_descriptor{
+    .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
+    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED,
+    .data = {
+      .egl = {
+        .display = display.display,
+        .config = display.config,
+        .share_context = nullptr,
+        .client_api = MLN_OPEN_GL_CLIENT_API_GLES,
+        .get_proc_address = nullptr,
+      },
+    },
+  };
+  const auto buffers = EglDmaBufs::load(context.data.egl);
+  if (!buffers) {
+    set_thread_error(
+      "the EGL display can't render into dmabufs, because it lacks "
+      "EGL_EXT_image_dma_buf_import_modifiers"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  // A renderer on the CPU has no GPU to allocate on, so it renders into
+  // shared memory instead.
+  const auto node = egl_render_node(context.data.egl);
+  auto allocator = std::shared_ptr<const platform::dma_buf::Allocator>{
+    node.empty() ? platform::dma_buf::udmabuf_allocator()
+                 : platform::dma_buf::gbm_allocator(node)
+  };
+  if (allocator == nullptr) {
+    set_thread_error(
+      node.empty() ? "the EGL display renders on the CPU, and can't share its "
+                     "memory as dmabufs without /dev/udmabuf"
+                   : "GBM can't allocate dmabufs on the EGL display's GPU"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  auto choice = DmaBufChoice{};
+  if (!choose_dma_buf_format(
+        ring.formats,
+        [&](const mln_dma_buf_format& format) {
+          return buffers->imports(format.fourcc, format.modifier) &&
+                 allocator->allocates(format.fourcc, format.modifier);
+        },
+        choice
+      )) {
+    set_thread_error(
+      "the EGL display can render into a dmabuf of none of the formats"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  session.probe_sync_kinds = [context] { return opengl_sync_support(context); };
+  auto exported = EglExportedRing{
+    .depth = ring.buffer_count,
+    .allocate = [dma_bufs =
+                   EglDmaBufRing{
+                     .egl = *buffers,
+                     .allocator = std::move(allocator),
+                     .choice = std::move(choice),
+                   }](
+                  mln::gl::Context& gl, mln::Size size
+                ) -> std::unique_ptr<ExportedTexture> {
+      return std::make_unique<DmaBufTexture>(dma_bufs, gl, size);
+    },
+  };
+  session.initialize_backend =
+    [context, exported = std::move(exported)](mln_render_session_object& live) {
+      auto backend = std::make_unique<OpenGLTextureSessionBackend>(
+        context, mln::Size{live.physical_width, live.physical_height}, exported,
+        live.producer_sync_kind
+      );
+      const auto status = backend->initialize_sync();
+      live.texture.backend = std::move(backend);
+      return status;
+    };
   return MLN_STATUS_OK;
 }
 #endif

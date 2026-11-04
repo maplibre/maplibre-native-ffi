@@ -729,7 +729,7 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the session renders
-    /// offscreen or into Android hardware buffers that it
+    /// offscreen or into Android hardware buffers or dmabufs that it
     /// allocates.</description></item>
     /// <item><description><c>Status.Unsupported</c> when the target is a WebGL
     /// canvas.</description></item>

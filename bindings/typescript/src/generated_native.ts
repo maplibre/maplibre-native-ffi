@@ -15,6 +15,8 @@ import type {
   CanonicalTileId,
   CustomGeometrySourceOptions,
   CustomVectorSourceOptions,
+  DmaBufFrame,
+  DmaBufRingDescriptor,
   FeatureStateSelector,
   FrameDemand,
   FramePacerOptions,
@@ -103,6 +105,7 @@ export interface NativeOperations {
   mln_acquired_frame_get_android_hardware_buffer(
     frame: bigint,
   ): AndroidHardwareBufferFrame;
+  mln_acquired_frame_get_dma_buf(frame: bigint): DmaBufFrame;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
   mln_acquired_frame_get_open_gl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
@@ -193,6 +196,13 @@ export interface NativeOperations {
   mln_map_attach_android_surface(
     map: bigint,
     descriptor: AndroidSurfaceDescriptor,
+    device: bigint | undefined,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_dma_buf_ring(
+    map: bigint,
+    descriptor: DmaBufRingDescriptor,
     device: bigint | undefined,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,

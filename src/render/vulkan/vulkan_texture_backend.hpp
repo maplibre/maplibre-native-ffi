@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -22,13 +23,15 @@
 
 namespace mln::core {
 
+class VulkanSlotImage;
+
 struct VulkanTextureFrameResources {
   VkImage image = VK_NULL_HANDLE;
   VkImageView image_view = VK_NULL_HANDLE;
   VkDevice device = nullptr;
   VkFormat format = VK_FORMAT_UNDEFINED;
-  // The platform buffer that an exported ring's image imports, or null.
-  void* buffer = nullptr;
+  // The image that an exported ring made for the slot, or null.
+  const VulkanSlotImage* exported = nullptr;
 };
 
 // The image that an exported ring made for one of its slots, with what backs
@@ -44,12 +47,14 @@ class VulkanSlotImage {
 
   [[nodiscard]] virtual auto image() const -> vk::Image = 0;
   [[nodiscard]] virtual auto view() const -> vk::ImageView = 0;
-  // The platform buffer that the image imports, which the host reads.
-  [[nodiscard]] virtual auto buffer() const -> void* = 0;
+  // What an acquired frame of the image reports to the host.
+  [[nodiscard]] virtual auto frame_metadata(
+    const RenderFrameMetadata& frame
+  ) const -> std::any = 0;
 };
 
 // A ring of images that the backend allocates and hands to the host, such as
-// images over Android hardware buffers.
+// images over Android hardware buffers or dmabufs.
 struct VulkanExportedRing {
   std::size_t depth = 1;
   VkFormat format = VK_FORMAT_UNDEFINED;

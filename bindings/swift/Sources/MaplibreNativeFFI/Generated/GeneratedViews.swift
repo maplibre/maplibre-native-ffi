@@ -31,6 +31,50 @@ public final class AndroidHardwareBufferFrameView {
   }
 }
 
+public final class DmaBufFrameView {
+  private let snapshot: DmaBufFrame
+  private let scope: NativeViewScope
+  init(_ value: DmaBufFrame, scope: NativeViewScope) {
+    snapshot = value; self.scope = scope
+  }
+
+  public var width: UInt32 {
+    snapshot.width
+  }
+
+  public var height: UInt32 {
+    snapshot.height
+  }
+
+  public var scaleFactor: Double {
+    snapshot.scaleFactor
+  }
+
+  public var slot: UInt32 {
+    snapshot.slot
+  }
+
+  public var fourcc: UInt32 {
+    snapshot.fourcc
+  }
+
+  public var modifier: UInt64 {
+    snapshot.modifier
+  }
+
+  public var fd: Int32 {
+    get throws { try scope.check(); return snapshot.fd }
+  }
+
+  public var offset: UInt32 {
+    snapshot.offset
+  }
+
+  public var stride: UInt32 {
+    snapshot.stride
+  }
+}
+
 public final class MetalTextureFrameView {
   private let snapshot: MetalTextureFrame
   private let scope: NativeViewScope

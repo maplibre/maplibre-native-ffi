@@ -76,6 +76,9 @@ constexpr auto sharing_extensions = std::to_array<SharingExtension>({
   {.name = "VK_KHR_external_semaphore_fd", .requires_extension = nullptr},
   {.name = "VK_EXT_external_memory_dma_buf",
    .requires_extension = "VK_KHR_external_memory_fd"},
+  {.name = "VK_KHR_image_format_list", .requires_extension = nullptr},
+  {.name = "VK_EXT_image_drm_format_modifier",
+   .requires_extension = "VK_KHR_image_format_list"},
 #endif
 #if defined(__ANDROID__)
   {.name = "VK_ANDROID_external_memory_android_hardware_buffer",
@@ -608,28 +611,48 @@ auto find_vulkan_device(const void* device)
   return {owner, &owner->context()};
 }
 
-auto shared_presentation_device(
+namespace {
+
+struct SharedDevice {
+  std::mutex mutex;
+  std::weak_ptr<const mln_vulkan_context_descriptor> device;
+};
+
+auto shared_device(
+  SharedDevice& shared, bool presentation,
   std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
 ) -> mln_status {
-  struct Shared {
-    std::mutex mutex;
-    std::weak_ptr<const mln_vulkan_context_descriptor> device;
-  };
-  // Leaked, so a session that lets go of the device while the process exits
-  // never finds this destroyed.
-  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-  static auto* const shared = new Shared();
-  const auto lock = std::scoped_lock{shared->mutex};
-  if (auto device = shared->device.lock()) {
+  const auto lock = std::scoped_lock{shared.mutex};
+  if (auto device = shared.device.lock()) {
     out_context = std::move(device);
     return MLN_STATUS_OK;
   }
   auto selection = VulkanDeviceSelection{};
-  selection.presentation = true;
+  selection.presentation = presentation;
   const auto status =
     create_vulkan_device(selection, std::nullopt, out_context);
-  if (status == MLN_STATUS_OK) shared->device = out_context;
+  if (status == MLN_STATUS_OK) shared.device = out_context;
   return status;
+}
+
+}  // namespace
+
+// Each shared device is leaked, so a session that lets go of it while the
+// process exits never finds it destroyed.
+auto shared_presentation_device(
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status {
+  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+  static auto* const shared = new SharedDevice();
+  return shared_device(*shared, true, out_context);
+}
+
+auto shared_rendering_device(
+  std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
+) -> mln_status {
+  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+  static auto* const shared = new SharedDevice();
+  return shared_device(*shared, false, out_context);
 }
 
 auto create_backend_vulkan_device(

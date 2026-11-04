@@ -25,6 +25,13 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_dma_buf(
+      frame.toULong(),
+      outFrame.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -377,6 +384,25 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_attach_android_surface(
+      map.toULong(),
+      descriptor.toCPointer(),
+      device.toULong(),
+      options.toCPointer(),
+      outSession.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_attach_dma_buf_ring(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_dma_buf_ring(
       map.toULong(),
       descriptor.toCPointer(),
       device.toULong(),

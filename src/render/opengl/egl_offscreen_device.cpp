@@ -275,6 +275,29 @@ class EglOffscreenDevice final : public OffscreenDevice {
 
 }  // namespace
 
+#if defined(MLN_FFI_EGL_DEVICE_PLATFORMS)
+namespace opengl {
+
+auto default_egl_display(
+  mln_open_gl_client_api client_api, DefaultEglDisplay& out_display
+) -> mln_status {
+  const auto api = egl_api(client_api);
+  const auto choice = default_display(api);
+  if (choice.display == EGL_NO_DISPLAY) {
+    const auto message = std::string{"no EGL display has a "} + api_name(api) +
+                         " pbuffer config (EGL error " +
+                         std::to_string(eglGetError()) + ")";
+    set_thread_error(message.c_str());
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  out_display =
+    DefaultEglDisplay{.display = choice.display, .config = choice.config};
+  return MLN_STATUS_OK;
+}
+
+}  // namespace opengl
+#endif
+
 auto create_backend_offscreen_device(
   const mln_offscreen_device_options& options,
   std::shared_ptr<OffscreenDevice>& out_device

@@ -1707,6 +1707,104 @@ class CustomVectorSourceOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class DmaBufFormat:
+    """A DRM format and modifier that you can import.
+
+    See `mln_dma_buf_format` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    """
+
+    fourcc: int = 0
+    """A DRM fourcc code, such as DRM_FORMAT_ABGR8888."""
+
+    modifier: int = 0
+    """A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(fourcc=raw["fourcc"], modifier=raw["modifier"])
+
+
+@dataclass(frozen=True, slots=True)
+class DmaBufFrame:
+    """The dmabuf of an acquired frame.
+
+    See `mln_dma_buf_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    """
+
+    width: int
+
+    height: int
+
+    scale_factor: float
+
+    slot: int
+    """The buffer's index in the ring."""
+
+    fourcc: int
+
+    modifier: int
+
+    fd: int
+
+    offset: int
+    """The bytes from the start of the buffer to its first pixel."""
+
+    stride: int
+    """The bytes from the start of one row to the start of the next."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            slot=raw["slot"],
+            fourcc=raw["fourcc"],
+            modifier=raw["modifier"],
+            fd=raw["fd"],
+            offset=raw["offset"],
+            stride=raw["stride"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DmaBufRingDescriptor:
+    """A ring of dmabufs that the library allocates, for
+    `MapHandle.attach_dma_buf_ring()`.
+
+    Each buffer has the map's size in pixels and a format and modifier from
+    `formats`. The library renders only DRM_FORMAT_ABGR8888 and
+    DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+
+    See `mln_dma_buf_ring_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    buffer_count: int
+    """How many buffers the ring has, from 1 to 8."""
+
+    formats: Sequence[DmaBufFormat]
+    """The formats and modifiers that your reader imports, most preferred first,
+    such as those that eglQueryDmaBufModifiersEXT() reports.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "formats", _sequence(self.formats))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            buffer_count=raw["buffer_count"],
+            formats=tuple(DmaBufFormat._from_native(item) for item in raw["formats"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class EdgeInsets:
     """Distances in logical pixels from each edge of the map.
 
@@ -3356,7 +3454,7 @@ class RenderSessionAttachOptions:
       device.
     - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an
       Android or OpenHarmony window, a Wayland surface, a ring of Android
-      hardware buffers, or an offscreen session.
+      hardware buffers or dmabufs, or an offscreen session.
     - Either one for a Metal or Vulkan target.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.

@@ -21,6 +21,9 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_acquired_frame_get_dma_buf(frame, word(outFrame), word(outDiagnostic))
+
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -293,6 +296,25 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_map_attach_android_surface(
+      map,
+      word(descriptor),
+      device,
+      word(options),
+      word(outSession),
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_attach_dma_buf_ring(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_attach_dma_buf_ring(
       map,
       word(descriptor),
       device,
@@ -2063,6 +2085,11 @@ private fun mln_kw_mln_acquired_frame_get_android_hardware_buffer(p0: Long, p1: 
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_android_hardware_buffer(p0, p1, p2)",
   )
 
+private fun mln_kw_mln_acquired_frame_get_dma_buf(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_dma_buf(p0, p1, p2)",
+  )
+
 private fun mln_kw_mln_acquired_frame_get_metal_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_metal_texture(p0, p1, p2)",
@@ -2275,6 +2302,19 @@ private fun mln_kw_mln_map_attach_android_surface(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_android_surface(p0, p1, p2, p3, p4, p5, p6)",
+  )
+
+private fun mln_kw_mln_map_attach_dma_buf_ring(
+  p0: Long,
+  p1: Int,
+  p2: Long,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+  p6: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_dma_buf_ring(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_attach_metal_borrowed_texture(

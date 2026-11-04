@@ -204,7 +204,8 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/i18n.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/wayland_surface_session.cpp)
+      ${PROJECT_SOURCE_DIR}/src/render/wayland_surface_session.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/dma_buf_session.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_LINUX_SOURCES})
