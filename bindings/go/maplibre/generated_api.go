@@ -3350,12 +3350,9 @@ func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, 
 // mln_metal_borrowed_texture_replacement. New Metal textures for a borrowed
 // ring, for RenderSessionHandle.SetMetalBorrowedTextureTarget().
 //
-// The members mean what they mean in MetalBorrowedTextureDescriptor, and the
-// textures follow its rules. The ring keeps its depth, device, and command
+// The members and the textures follow the rules of
+// MetalBorrowedTextureDescriptor. The ring keeps its depth, device, and command
 // queue, so give it as many textures as it attached with, on the same device.
-// The session uses the textures until a replacement or release of the target
-// completes, a detach or release of the session completes, or an abandon of it
-// returns.
 //
 // See mln_metal_borrowed_texture_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -3404,7 +3401,7 @@ func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingAr
 //
 // The session sets the layer's device, pixel format, and drawable size. It uses
 // the layer until a replacement or release of the target completes, a detach or
-// disposal of the session completes, or an abandon of it returns.
+// release of the session completes, or an abandon of it returns.
 //
 // See mln_metal_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
@@ -3810,12 +3807,10 @@ func nativeOpenGLBorrowedTextureDescriptor(input OpenGLBorrowedTextureDescriptor
 // mln_open_gl_borrowed_texture_replacement. New OpenGL textures for a borrowed
 // ring, for RenderSessionHandle.SetOpenGLBorrowedTextureTarget().
 //
-// The members mean what they mean in OpenGLBorrowedTextureDescriptor, and the
-// textures follow its rules. The ring keeps its depth, context, and texture
-// target, so give it as many textures as it attached with, in the same share
-// group. The session uses the textures until a replacement or release of the
-// target completes, a detach or release of the session completes, or an abandon
-// of it returns.
+// The members and the textures follow the rules of
+// OpenGLBorrowedTextureDescriptor. The ring keeps its depth, context, and
+// texture target, so give it as many textures as it attached with, in the same
+// share group.
 //
 // See mln_open_gl_borrowed_texture_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -3846,8 +3841,8 @@ func nativeOpenGLBorrowedTextureReplacement(input OpenGLBorrowedTextureReplaceme
 // OpenGLContextDescriptor corresponds to mln_open_gl_context_descriptor. How a
 // render session gets the OpenGL context that it renders with.
 //
-// Keep the objects that it names alive until a detach or disposal of the
-// session completes, or an abandon of it returns.
+// Keep the objects that it names alive until a detach or release of the session
+// completes, or an abandon of it returns.
 //
 // See mln_open_gl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
@@ -3906,7 +3901,7 @@ func nativeOpenGLSurfaceDescriptor(input OpenGLSurfaceDescriptor, arena *binding
 //
 // The session presents to it with the context that it attached with. It uses
 // the surface until a replacement or release of the target completes, a detach
-// or disposal of the session completes, or an abandon of it returns.
+// or release of the session completes, or an abandon of it returns.
 //
 // See mln_open_gl_surface_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
@@ -4188,16 +4183,13 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 // See mln_render_session_attach_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type RenderSessionAttachOptions struct {
-	// The thread that runs the session's graphics work. Whoever owns the target's
-	// graphics context drives it:
+	// The thread that runs the session's graphics work, which depends on the
+	// target:
 	//
-	//   - RenderDriverKindCallerGraphicsThread for an OpenGL or WebGPU target that
-	//     you pass, since its context belongs to your thread: a shared or dedicated
-	//     EGL or WGL context, an existing WebGL context, or a browser's WebGPU
-	//     device.
-	//   - RenderDriverKindCoreWorker for a target whose context the library owns: a
-	//     transferred WebGL canvas, an Android or OpenHarmony window, or an
-	//     offscreen session.
+	//   - RenderDriverKindCallerGraphicsThread for a shared or dedicated EGL or WGL
+	//     context, an existing WebGL context, or a browser's WebGPU device.
+	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android or
+	//     OpenHarmony window, or an offscreen session.
 	//   - Either one for a Metal or Vulkan target.
 	//
 	// An attach with another driver fails with StatusUnsupported.
@@ -4247,10 +4239,8 @@ type RenderSessionCapabilities struct {
 	Flags            RenderSessionCapabilityFlag
 	// The kind of GPUSync that AcquiredFrameHandle.WithProducerSync() reports.
 	ProducerSyncKind GPUSyncKind
-	// The kinds of GPUSync that AcquiredFrameHandle.Release() accepts.
-	//
-	// They depend on the target and on what the device supports, so read this field
-	// instead of assuming a kind.
+	// The kinds of GPUSync that AcquiredFrameHandle.Release() accepts. They depend
+	// on the target and on what the device supports.
 	ConsumerSyncKinds GPUSyncKindFlag
 }
 
@@ -5639,12 +5629,10 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 // mln_vulkan_borrowed_texture_replacement. New Vulkan images for a borrowed
 // ring, for RenderSessionHandle.SetVulkanBorrowedTextureTarget().
 //
-// The members mean what they mean in VulkanBorrowedTextureDescriptor, and the
-// images follow its rules. The ring keeps its depth, context, format,
+// The members and the images follow the rules of
+// VulkanBorrowedTextureDescriptor. The ring keeps its depth, context, format,
 // final_layout, and owner, so give it as many images as it attached with, in
-// that format, on the same device. The session uses the images until a
-// replacement or release of the target completes, a detach or release of the
-// session completes, or an abandon of it returns.
+// that format, on the same device.
 //
 // See mln_vulkan_borrowed_texture_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -6557,7 +6545,7 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 // Pass GPUSyncKindCPUComplete when that work has already finished. The session
 // waits for that point before it renders into the texture again. If that wait
 // fails, such as for an OpenGL fence outside the session's share group, the
-// session fails and never renders into the texture again.
+// session fails.
 //
 // See mln_acquired_frame_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -8291,8 +8279,7 @@ func SetNetworkStatus(status NetworkStatus) error {
 // MapHandle.AttachOffscreen() creates a device of its own when it gets none.
 // Create one to share it among the sessions on many maps, or to pick a GPU.
 //
-// A browser WebGPU build can't create a device here, because the browser
-// answers a request for one asynchronously. Attach without a device instead.
+// In a browser WebGPU build, attach without a device instead.
 //
 // See mln_offscreen_device_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
@@ -8372,11 +8359,8 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 // library no longer uses your graphics objects, and you can attach another
 // session to the map. Release the session afterward.
 //
-// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
-// keeps them until the process exits, reports how many it kept, and logs a
-// warning. Detach the session instead to free them. A disposal that another
-// thread starts first retires the session itself, and the abandon then fails as
-// it does for any released session.
+// Abandon keeps the session's OpenGL and WebGPU objects until the process
+// exits, and reports how many it kept. Detach the session instead to free them.
 //
 // See mln_render_session_abandon in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -8404,9 +8388,8 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 // Errors:
 //   - StatusUnsupported when the session lacks
 //     RenderSessionCapabilityFlagFrameAcquisition.
-//   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
-//     StatusNativeError, when the session has failed. The diagnostic carries
-//     the failure's message.
+//   - StatusTargetLost or StatusNativeError, as
+//     RenderSessionSnapshot.FailureStatus reports, when the session has failed.
 //   - StatusInvalidState when you detached, abandoned, released, or disposed
 //     the session.
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
@@ -8466,9 +8449,8 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
-//     StatusNativeError, when the session has failed. The diagnostic carries
-//     the failure's message.
+//   - StatusTargetLost or StatusNativeError, as
+//     RenderSessionSnapshot.FailureStatus reports, when the session has failed.
 //   - StatusInvalidState when you detached, abandoned, released, or disposed
 //     the session, or discarded a frame from every texture of its ring.
 func (receiver *RenderSessionHandle) DemandFrame(demand FrameDemand) error {
@@ -8722,16 +8704,15 @@ func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error
 
 // Release releases the session, detaching it first when it is attached.
 //
-// The completion runs once the session retires. From then on, the library no
-// longer uses your graphics objects, and you can attach another session to the
-// map. Pending frame demands finish with RenderResultTargetNotReady.
+// Pending frame demands finish with RenderResultTargetNotReady. Once the
+// release completes, the library no longer uses your graphics objects, and you
+// can attach another session to the map.
 //
 // A session driven by RenderDriverKindCallerGraphicsThread detaches at your
 // next RenderSessionHandle.ServiceDriverWork(), so keep servicing it until the
-// release completes. If you release or dispose its map before that service, the
-// session is abandoned instead. A session that isn't attached, such as one that
-// is still attaching or that failed, is abandoned as
-// RenderSessionHandle.Abandon() does.
+// release completes. When the session isn't attached, such as while it attaches
+// or after it fails, or when you release or dispose its map before that
+// service, the release abandons it as RenderSessionHandle.Abandon() does.
 //
 // See mln_render_session_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -8757,8 +8738,7 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the session renders offscreen, since the session
-//     owns that target.
+//   - StatusUnsupported when the session renders offscreen.
 //   - StatusUnsupported when the target is a WebGL canvas.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.
@@ -8793,12 +8773,11 @@ func (receiver *RenderSessionHandle) Resize(logicalSize LogicalSize) (*Future[Co
 // Use it with RenderDriverKindCallerGraphicsThread, and call it from the same
 // thread every time. Call it each time
 // RenderSessionAttachOptions.DriverWorkWake is called, even while you demand no
-// frames, and until a detach or the session's retirement completes. It returns
-// once no work is ready.
+// frames, until a detach, release, or disposal of the session finishes. It
+// returns once no work is ready.
 //
-// It accepts a released or disposed session until the session retires. The
-// service after the release or disposal detaches the session and frees its
-// graphics objects.
+// It accepts a released or disposed session until that release or disposal
+// finishes.
 //
 // See mln_render_session_service_driver_work in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -8836,9 +8815,7 @@ func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) erro
 //
 // Use it to resize the ring, or to give the session textures again after
 // RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
-// the replacement completes, the session no longer uses the old textures. A
-// replacement with the textures and sizes that the ring renders into already
-// changes nothing.
+// the replacement completes, the session no longer uses the old textures.
 //
 // See mln_render_session_set_open_gl_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -8854,8 +8831,7 @@ func (receiver *RenderSessionHandle) SetOpenGLBorrowedTextureTarget(replacement 
 // Use it to give the session a surface again after
 // RenderSessionHandle.ReleaseTarget(), to move it to another surface, or to
 // resize it. Once the replacement completes, the session no longer uses the old
-// surface. A replacement with the surface and logical size that the session
-// presents to already changes nothing.
+// surface.
 //
 // See mln_render_session_set_open_gl_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
@@ -8870,9 +8846,7 @@ func (receiver *RenderSessionHandle) SetOpenGLSurfaceTarget(replacement OpenGLSu
 //
 // Use it to resize the ring, or to give the session images again after
 // RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
-// the replacement completes, the session no longer uses the old images. A
-// replacement with the images and sizes that the ring renders into already
-// changes nothing.
+// the replacement completes, the session no longer uses the old images.
 //
 // See mln_render_session_set_vulkan_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -8888,8 +8862,7 @@ func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(replacement 
 // Use it to give the session a surface again after
 // RenderSessionHandle.ReleaseTarget(), to move it to another surface, or to
 // resize it. Once the replacement completes, the session no longer uses the old
-// surface. A replacement with the surface and logical size that the session
-// presents to already changes nothing.
+// surface.
 //
 // See mln_render_session_set_vulkan_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
@@ -9511,10 +9484,10 @@ func (receiver *MapHandle) Dispose() error {
 
 // Dispose releases the session in any state, and finishes in the background.
 //
-// Use it from destructors and finalizers. Otherwise, use
-// RenderSessionHandle.Release(). The session retires as a release does, except
-// that a session whose frames you hold is abandoned, which ends the frames.
-// Keep servicing a session driven by RenderDriverKindCallerGraphicsThread until
+// Use it from destructors and finalizers, and RenderSessionHandle.Release()
+// elsewhere. It ends the session as a release does, except that it abandons a
+// session whose frames you hold, which ends those frames. Keep servicing a
+// session driven by RenderDriverKindCallerGraphicsThread until
 // RenderSessionHandle.ServiceDriverWork() no longer accepts it.
 //
 // See mln_render_session_dispose in the C API reference:

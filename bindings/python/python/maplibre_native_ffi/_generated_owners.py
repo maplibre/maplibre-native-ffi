@@ -235,10 +235,10 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
     def dispose(self) -> None:
         """Releases the session in any state, and finishes in the background.
 
-        Use it from destructors and finalizers. Otherwise, use
-        `RenderSessionHandle.release()`. The session retires as a release
-        does, except that a session whose frames you hold is abandoned, which
-        ends the frames. Keep servicing a session driven by
+        Use it from destructors and finalizers, and
+        `RenderSessionHandle.release()` elsewhere. It ends the session as a
+        release does, except that it abandons a session whose frames you
+        hold, which ends those frames. Keep servicing a session driven by
         `RenderDriverKind.CALLER_GRAPHICS_THREAD` until
         `RenderSessionHandle.service_driver_work()` no longer accepts it.
 

@@ -6,7 +6,7 @@ namespace Maplibre.NativeFfi;
 /// How a render session gets the OpenGL context that it renders with.
 /// </summary>
 /// <remarks>
-/// <para>Keep the objects that it names alive until a detach or disposal of the
+/// <para>Keep the objects that it names alive until a detach or release of the
 /// session completes, or an abandon of it returns.</para>
 /// <para>See <c>mln_open_gl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>

@@ -55,12 +55,10 @@ typedef struct mln_metal_borrowed_texture_descriptor {
  * New Metal textures for a borrowed ring, for
  * mln_render_session_set_metal_borrowed_texture_target().
  *
- * The members mean what they mean in mln_metal_borrowed_texture_descriptor,
- * and the textures follow its rules. The ring keeps its depth, device, and
+ * The members and the textures follow the rules of
+ * mln_metal_borrowed_texture_descriptor. The ring keeps its depth, device, and
  * command queue, so give it as many textures as it attached with, on the same
- * device. The session uses the textures until a replacement or release of the
- * target completes, a detach or release of the session completes, or an
- * abandon of it returns.
+ * device.
  */
 typedef struct mln_metal_borrowed_texture_replacement {
   uint32_t size;
@@ -145,12 +143,10 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
  * New Vulkan images for a borrowed ring, for
  * mln_render_session_set_vulkan_borrowed_texture_target().
  *
- * The members mean what they mean in mln_vulkan_borrowed_texture_descriptor,
- * and the images follow its rules. The ring keeps its depth, context,
+ * The members and the images follow the rules of
+ * mln_vulkan_borrowed_texture_descriptor. The ring keeps its depth, context,
  * `format`, `final_layout`, and `owner`, so give it as many images as it
- * attached with, in that format, on the same device. The session uses the
- * images until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
+ * attached with, in that format, on the same device.
  */
 typedef struct mln_vulkan_borrowed_texture_replacement {
   uint32_t size;
@@ -220,12 +216,10 @@ typedef struct mln_open_gl_borrowed_texture_descriptor {
  * New OpenGL textures for a borrowed ring, for
  * mln_render_session_set_open_gl_borrowed_texture_target().
  *
- * The members mean what they mean in mln_open_gl_borrowed_texture_descriptor,
- * and the textures follow its rules. The ring keeps its depth, context, and
- * texture target, so give it as many textures as it attached with, in the same
- * share group. The session uses the textures until a replacement or release of
- * the target completes, a detach or release of the session completes, or an
- * abandon of it returns.
+ * The members and the textures follow the rules of
+ * mln_open_gl_borrowed_texture_descriptor. The ring keeps its depth, context,
+ * and texture target, so give it as many textures as it attached with, in the
+ * same share group.
  */
 typedef struct mln_open_gl_borrowed_texture_replacement {
   uint32_t size;
@@ -276,12 +270,10 @@ typedef struct mln_web_gpu_borrowed_texture_descriptor {
  * New WebGPU textures for a borrowed ring, for
  * mln_render_session_set_web_gpu_borrowed_texture_target().
  *
- * The members mean what they mean in mln_web_gpu_borrowed_texture_descriptor,
- * and the textures follow its rules. The ring keeps its depth, context, and
- * `format`, so give it as many textures as it attached with, in that format,
- * on the same device. The session uses the textures until a replacement or
- * release of the target completes, a detach or release of the session
- * completes, or an abandon of it returns.
+ * The members and the textures follow the rules of
+ * mln_web_gpu_borrowed_texture_descriptor. The ring keeps its depth, context,
+ * and `format`, so give it as many textures as it attached with, in that
+ * format, on the same device.
  */
 typedef struct mln_web_gpu_borrowed_texture_replacement {
   uint32_t size;
@@ -414,8 +406,6 @@ MLN_API mln_status mln_map_attach_web_gpu_borrowed_texture(
  * Use it to resize the ring, or to give the session textures again after
  * mln_render_session_release_target(). Release every acquired frame first.
  * Once the replacement completes, the session no longer uses the old textures.
- * A replacement with the textures and sizes that the ring renders into already
- * changes nothing.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the new textures have a different pixel format
@@ -434,8 +424,6 @@ MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
  * Use it to resize the ring, or to give the session images again after
  * mln_render_session_release_target(). Release every acquired frame first.
  * Once the replacement completes, the session no longer uses the old images.
- * A replacement with the images and sizes that the ring renders into already
- * changes nothing.
  */
 MLN_BINDING(
   "execution=operation;platforms=android,freebsd,linux,macos,ohos,windows"
@@ -452,8 +440,6 @@ MLN_API mln_status mln_render_session_set_vulkan_borrowed_texture_target(
  * Use it to resize the ring, or to give the session textures again after
  * mln_render_session_release_target(). Release every acquired frame first.
  * Once the replacement completes, the session no longer uses the old textures.
- * A replacement with the textures and sizes that the ring renders into already
- * changes nothing.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_set_open_gl_borrowed_texture_target(
@@ -468,8 +454,6 @@ MLN_API mln_status mln_render_session_set_open_gl_borrowed_texture_target(
  * Use it to resize the ring, or to give the session textures again after
  * mln_render_session_release_target(). Release every acquired frame first.
  * Once the replacement completes, the session no longer uses the old textures.
- * A replacement with the textures and sizes that the ring renders into already
- * changes nothing.
  */
 MLN_BINDING("execution=operation;platforms=web")
 MLN_API mln_status mln_render_session_set_web_gpu_borrowed_texture_target(

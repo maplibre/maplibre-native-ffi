@@ -91,9 +91,7 @@ func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor,
 //
 // Use it to resize the ring, or to give the session textures again after
 // RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
-// the replacement completes, the session no longer uses the old textures. A
-// replacement with the textures and sizes that the ring renders into already
-// changes nothing.
+// the replacement completes, the session no longer uses the old textures.
 //
 // See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -112,8 +110,7 @@ func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(replacement M
 // Use it to give the session a layer again after
 // RenderSessionHandle.ReleaseTarget(), to move it to another layer, or to
 // resize it. Once the replacement completes, the session no longer uses the old
-// layer. A replacement with the layer and logical size that the session renders
-// to already changes nothing.
+// layer.
 //
 // See mln_render_session_set_metal_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html

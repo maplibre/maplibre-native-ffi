@@ -204,9 +204,9 @@ MLN_API mln_status mln_render_session_get_failure(
  * the same flags.
  *
  * Returns:
- * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
- *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
- *   carries the failure's message.
+ * - MLN_STATUS_TARGET_LOST or MLN_STATUS_NATIVE_ERROR, as
+ *   mln_render_session_snapshot.failure_status reports, when the session has
+ *   failed.
  * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
  *   disposed the session, or discarded a frame from every texture of its ring.
  */
@@ -305,9 +305,9 @@ MLN_API void mln_render_frame_batch_release(
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session lacks
  *   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.
- * - mln_render_session_snapshot.failure_status, MLN_STATUS_TARGET_LOST or
- *   MLN_STATUS_NATIVE_ERROR, when the session has failed. The diagnostic
- *   carries the failure's message.
+ * - MLN_STATUS_TARGET_LOST or MLN_STATUS_NATIVE_ERROR, as
+ *   mln_render_session_snapshot.failure_status reports, when the session has
+ *   failed.
  * - MLN_STATUS_INVALID_STATE when you detached, abandoned, released, or
  *   disposed the session.
  */
@@ -353,7 +353,7 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * finishes. Pass MLN_GPU_SYNC_CPU_COMPLETE when that work has already finished.
  * The session waits for that point before it renders into the texture again.
  * If that wait fails, such as for an OpenGL fence outside the session's share
- * group, the session fails and never renders into the texture again.
+ * group, the session fails.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when
@@ -426,8 +426,7 @@ MLN_API mln_status mln_render_session_resize(
  * destroy the old target.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the session renders offscreen, since the
- *   session owns that target.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas.
@@ -502,12 +501,11 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * Use it with MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and call it from the
  * same thread every time. Call it each time
  * mln_render_session_attach_options.driver_work_wake is called, even while you
- * demand no frames, and until a detach or the session's retirement completes.
- * It returns once no work is ready.
+ * demand no frames, until a detach, release, or disposal of the session
+ * finishes. It returns once no work is ready.
  *
- * It accepts a released or disposed session until the session retires. The
- * service after the release or disposal detaches the session and frees its
- * graphics objects.
+ * It accepts a released or disposed session until that release or disposal
+ * finishes.
  */
 MLN_BINDING("after_release=true")
 MLN_API mln_status mln_render_session_service_driver_work(
@@ -541,11 +539,9 @@ MLN_API mln_status mln_render_session_detach(
  * the call returns, the library no longer uses your graphics objects, and you
  * can attach another session to the map. Release the session afterward.
  *
- * Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
- * keeps them until the process exits, reports how many it kept, and logs a
- * warning. Detach the session instead to free them. A disposal that another
- * thread starts first retires the session itself, and the abandon then fails
- * as it does for any released session.
+ * Abandon keeps the session's OpenGL and WebGPU objects until the process
+ * exits, and reports how many it kept. Detach the session instead to free
+ * them.
  *
  * Returns:
  * - MLN_STATUS_BUSY while mln_render_session_service_driver_work() runs for the
@@ -561,16 +557,15 @@ MLN_API mln_status mln_render_session_abandon(
 /**
  * Releases the session, detaching it first when it is attached.
  *
- * The completion runs once the session retires. From then on, the library no
- * longer uses your graphics objects, and you can attach another session to the
- * map. Pending frame demands finish with MLN_RENDER_RESULT_TARGET_NOT_READY.
+ * Pending frame demands finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once
+ * the release completes, the library no longer uses your graphics objects, and
+ * you can attach another session to the map.
  *
  * A session driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD detaches at
  * your next mln_render_session_service_driver_work(), so keep servicing it
- * until the release completes. If you release or dispose its map before that
- * service, the session is abandoned instead. A session that isn't attached,
- * such as one that is still attaching or that failed, is abandoned as
- * mln_render_session_abandon() does.
+ * until the release completes. When the session isn't attached, such as while
+ * it attaches or after it fails, or when you release or dispose its map before
+ * that service, the release abandons it as mln_render_session_abandon() does.
  *
  * Returns:
  * - MLN_STATUS_INVALID_STATE while you hold one of the session's acquired
@@ -585,11 +580,11 @@ MLN_API mln_status mln_render_session_release(
 /**
  * Releases the session in any state, and finishes in the background.
  *
- * Use it from destructors and finalizers. Otherwise, use
- * mln_render_session_release(). The session retires as a release does, except
- * that a session whose frames you hold is abandoned, which ends the frames.
- * Keep servicing a session driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
- * until mln_render_session_service_driver_work() no longer accepts it.
+ * Use it from destructors and finalizers, and mln_render_session_release()
+ * elsewhere. It ends the session as a release does, except that it abandons a
+ * session whose frames you hold, which ends those frames. Keep servicing a
+ * session driven by MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD until
+ * mln_render_session_service_driver_work() no longer accepts it.
  */
 MLN_API mln_status mln_render_session_dispose(
   mln_render_session session, mln_diagnostic* out_diagnostic

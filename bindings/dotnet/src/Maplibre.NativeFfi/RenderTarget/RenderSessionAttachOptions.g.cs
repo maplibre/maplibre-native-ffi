@@ -30,18 +30,17 @@ public readonly partial record struct RenderSessionAttachOptions
     }
 
     /// <summary>
-    /// The thread that runs the session's graphics work. Whoever owns the
-    /// target's graphics context drives it:
+    /// The thread that runs the session's graphics work, which depends on the
+    /// target:
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
-    /// <item><description><c>RenderDriverKind.CallerGraphicsThread</c> for an
-    /// OpenGL or WebGPU target that you pass, since its context belongs to your
-    /// thread: a shared or dedicated EGL or WGL context, an existing WebGL
-    /// context, or a browser's WebGPU device.</description></item>
-    /// <item><description><c>RenderDriverKind.CoreWorker</c> for a target whose
-    /// context the library owns: a transferred WebGL canvas, an Android or
-    /// OpenHarmony window, or an offscreen session.</description></item>
+    /// <item><description><c>RenderDriverKind.CallerGraphicsThread</c> for a
+    /// shared or dedicated EGL or WGL context, an existing WebGL context, or a
+    /// browser's WebGPU device.</description></item>
+    /// <item><description><c>RenderDriverKind.CoreWorker</c> for a transferred
+    /// WebGL canvas, an Android or OpenHarmony window, or an offscreen
+    /// session.</description></item>
     /// <item><description>Either one for a Metal or Vulkan
     /// target.</description></item>
     /// </list>

@@ -55,10 +55,8 @@ internal constructor(
    * `RenderResult.TARGET_NOT_READY`. Once the call returns, the library no longer uses your
    * graphics objects, and you can attach another session to the map. Release the session afterward.
    *
-   * Only the driver thread can destroy OpenGL and WebGPU objects, so abandon keeps them until the
-   * process exits, reports how many it kept, and logs a warning. Detach the session instead to free
-   * them. A disposal that another thread starts first retires the session itself, and the abandon
-   * then fails as it does for any released session.
+   * Abandon keeps the session's OpenGL and WebGPU objects until the process exits, and reports how
+   * many it kept. Detach the session instead to free them.
    *
    * See `mln_render_session_abandon` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -83,8 +81,8 @@ internal constructor(
    * Errors:
    *
    * - `Status.UNSUPPORTED` when the session lacks `RenderSessionCapabilityFlag.FRAME_ACQUISITION`.
-   * - `RenderSessionSnapshot.failureStatus`, `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, when
-   *   the session has failed. The diagnostic carries the failure's message.
+   * - `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, as `RenderSessionSnapshot.failureStatus`
+   *   reports, when the session has failed.
    * - `Status.INVALID_STATE` when you detached, abandoned, released, or disposed the session.
    */
   public fun acquireFrame(): AcquiredFrameHandle? =
@@ -144,8 +142,8 @@ internal constructor(
    *
    * Errors:
    *
-   * - `RenderSessionSnapshot.failureStatus`, `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, when
-   *   the session has failed. The diagnostic carries the failure's message.
+   * - `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, as `RenderSessionSnapshot.failureStatus`
+   *   reports, when the session has failed.
    * - `Status.INVALID_STATE` when you detached, abandoned, released, or disposed the session, or
    *   discarded a frame from every texture of its ring.
    */
@@ -174,11 +172,10 @@ internal constructor(
   /**
    * Releases the session in any state, and finishes in the background.
    *
-   * Use it from destructors and finalizers. Otherwise, use `RenderSessionHandle.release()`. The
-   * session retires as a release does, except that a session whose frames you hold is abandoned,
-   * which ends the frames. Keep servicing a session driven by
-   * `RenderDriverKind.CALLER_GRAPHICS_THREAD` until `RenderSessionHandle.serviceDriverWork()` no
-   * longer accepts it.
+   * Use it from destructors and finalizers, and `RenderSessionHandle.release()` elsewhere. It ends
+   * the session as a release does, except that it abandons a session whose frames you hold, which
+   * ends those frames. Keep servicing a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`
+   * until `RenderSessionHandle.serviceDriverWork()` no longer accepts it.
    *
    * See `mln_render_session_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -498,14 +495,14 @@ internal constructor(
   /**
    * Releases the session, detaching it first when it is attached.
    *
-   * The completion runs once the session retires. From then on, the library no longer uses your
-   * graphics objects, and you can attach another session to the map. Pending frame demands finish
-   * with `RenderResult.TARGET_NOT_READY`.
+   * Pending frame demands finish with `RenderResult.TARGET_NOT_READY`. Once the release completes,
+   * the library no longer uses your graphics objects, and you can attach another session to the
+   * map.
    *
    * A session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` detaches at your next
-   * `RenderSessionHandle.serviceDriverWork()`, so keep servicing it until the release completes. If
-   * you release or dispose its map before that service, the session is abandoned instead. A session
-   * that isn't attached, such as one that is still attaching or that failed, is abandoned as
+   * `RenderSessionHandle.serviceDriverWork()`, so keep servicing it until the release completes.
+   * When the session isn't attached, such as while it attaches or after it fails, or when you
+   * release or dispose its map before that service, the release abandons it as
    * `RenderSessionHandle.abandon()` does.
    *
    * See `mln_render_session_release` in the
@@ -534,7 +531,7 @@ internal constructor(
    *
    * Errors:
    *
-   * - `Status.UNSUPPORTED` when the session renders offscreen, since the session owns that target.
+   * - `Status.UNSUPPORTED` when the session renders offscreen.
    * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */
@@ -569,11 +566,10 @@ internal constructor(
    *
    * Use it with `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and call it from the same thread every
    * time. Call it each time `RenderSessionAttachOptions.driverWorkWake` is called, even while you
-   * demand no frames, and until a detach or the session's retirement completes. It returns once no
-   * work is ready.
+   * demand no frames, until a detach, release, or disposal of the session finishes. It returns once
+   * no work is ready.
    *
-   * It accepts a released or disposed session until the session retires. The service after the
-   * release or disposal detaches the session and frees its graphics objects.
+   * It accepts a released or disposed session until that release or disposal finishes.
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -617,8 +613,7 @@ internal constructor(
    *
    * Use it to resize the ring, or to give the session textures again after
    * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
-   * completes, the session no longer uses the old textures. A replacement with the textures and
-   * sizes that the ring renders into already changes nothing.
+   * completes, the session no longer uses the old textures.
    *
    * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -642,8 +637,7 @@ internal constructor(
    *
    * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
    * it to another surface, or to resize it. Once the replacement completes, the session no longer
-   * uses the old surface. A replacement with the surface and logical size that the session presents
-   * to already changes nothing.
+   * uses the old surface.
    *
    * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

@@ -10,8 +10,7 @@ public extension OffscreenDeviceHandle {
   /// none. Create one to share it among the sessions on many maps, or to pick a
   /// GPU.
   ///
-  /// A browser WebGPU build can't create a device here, because the browser
-  /// answers a request for one asynchronously. Attach without a device instead.
+  /// In a browser WebGPU build, attach without a device instead.
   ///
   /// See `mln_offscreen_device_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).

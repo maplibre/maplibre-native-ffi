@@ -31,9 +31,7 @@ public extension RenderSessionHandle {
     /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame
     /// first.
     /// Once the replacement completes, the session no longer uses the old
-    /// textures. A replacement with the textures and sizes that the ring
-    /// renders
-    /// into already changes nothing.
+    /// textures.
     ///
     /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -62,8 +60,7 @@ public extension RenderSessionHandle {
   /// Use it to resize the ring, or to give the session textures again after
   /// `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
   /// Once the replacement completes, the session no longer uses the old
-  /// textures. A replacement with the textures and sizes that the ring renders
-  /// into already changes nothing.
+  /// textures.
   ///
   /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -88,9 +85,6 @@ public extension RenderSessionHandle {
     /// first.
     /// Once the replacement completes, the session no longer uses the old
     /// images.
-    /// A replacement with the images and sizes that the ring renders into
-    /// already
-    /// changes nothing.
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

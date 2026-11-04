@@ -7,7 +7,7 @@ import Foundation
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
-/// detach or disposal of the session completes, or an abandon of it returns.
+/// detach or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -113,7 +113,7 @@ public struct OpenGlSurfaceDescriptor: Equatable, Hashable, Sendable {
 ///
 /// The session presents to it with the context that it attached with. It uses
 /// the surface until a replacement or release of the target completes, a detach
-/// or disposal of the session completes, or an abandon of it returns.
+/// or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_open_gl_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

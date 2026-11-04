@@ -135,8 +135,7 @@ public fun MapHandle.attachVulkanSurface(
  *
  * Use it to resize the ring, or to give the session images again after
  * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
- * completes, the session no longer uses the old images. A replacement with the images and sizes
- * that the ring renders into already changes nothing.
+ * completes, the session no longer uses the old images.
  *
  * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -160,8 +159,7 @@ public fun RenderSessionHandle.setVulkanBorrowedTextureTarget(
  *
  * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
  * it to another surface, or to resize it. Once the replacement completes, the session no longer
- * uses the old surface. A replacement with the surface and logical size that the session presents
- * to already changes nothing.
+ * uses the old surface.
  *
  * See `mln_render_session_set_vulkan_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).

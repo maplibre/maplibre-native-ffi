@@ -2488,12 +2488,10 @@ impl ToNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTextu
 /// New Metal textures for a borrowed ring, for
 /// `RenderSessionHandle::set_metal_borrowed_texture_target()`.
 ///
-/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
-/// textures follow its rules. The ring keeps its depth, device, and command
-/// queue, so give it as many textures as it attached with, on the same device.
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// The members and the textures follow the rules of
+/// `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
+/// command queue, so give it as many textures as it attached with, on the same
+/// device.
 ///
 /// See `mln_metal_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2556,7 +2554,7 @@ impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
-/// detach or disposal of the session completes, or an abandon of it returns.
+/// detach or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -3144,12 +3142,10 @@ impl<'a> ToNative<sys::mln_open_gl_borrowed_texture_descriptor>
 /// New OpenGL textures for a borrowed ring, for
 /// `RenderSessionHandle::set_open_gl_borrowed_texture_target()`.
 ///
-/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
-/// the textures follow its rules. The ring keeps its depth, context, and
+/// The members and the textures follow the rules of
+/// `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
 /// texture target, so give it as many textures as it attached with, in the same
-/// share group. The session uses the textures until a replacement or release of
-/// the target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// share group.
 ///
 /// See `mln_open_gl_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3210,7 +3206,7 @@ impl Default for OpenGlClientApi {
 
 /// How a render session gets the OpenGL context that it renders with.
 ///
-/// Keep the objects that it names alive until a detach or disposal of the
+/// Keep the objects that it names alive until a detach or release of the
 /// session completes, or an abandon of it returns.
 ///
 /// See `mln_open_gl_context_descriptor` in the
@@ -3331,7 +3327,7 @@ impl<'a> ToNative<sys::mln_open_gl_surface_descriptor> for OpenGlSurfaceDescript
 ///
 /// The session presents to it with the context that it attached with. It uses
 /// the surface until a replacement or release of the target completes, a detach
-/// or disposal of the session completes, or an abandon of it returns.
+/// or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_open_gl_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -3784,16 +3780,14 @@ impl Default for RenderResult {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone)]
 pub struct RenderSessionAttachOptions {
-    /// The thread that runs the session's graphics work. Whoever owns the
-    /// target's graphics context drives it:
+    /// The thread that runs the session's graphics work, which depends on the
+    /// target:
     ///
-    /// - `RenderDriverKind::CallerGraphicsThread` for an OpenGL or WebGPU
-    ///   target that you pass, since its context belongs to your thread: a
-    ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
-    ///   a browser's WebGPU device.
-    /// - `RenderDriverKind::CoreWorker` for a target whose context the library
-    ///   owns: a transferred WebGL canvas, an Android or OpenHarmony window, or
-    ///   an offscreen session.
+    /// - `RenderDriverKind::CallerGraphicsThread` for a shared or dedicated EGL
+    ///   or WGL context, an existing WebGL context, or a browser's WebGPU
+    ///   device.
+    /// - `RenderDriverKind::CoreWorker` for a transferred WebGL canvas, an
+    ///   Android or OpenHarmony window, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `Status::Unsupported`.
@@ -3859,9 +3853,7 @@ pub struct RenderSessionCapabilities {
     /// reports.
     pub producer_sync_kind: GpuSyncKind,
     /// The kinds of `GpuSync` that `AcquiredFrameHandle::release()` accepts.
-    ///
-    /// They depend on the target and on what the device supports, so read this
-    /// field instead of assuming a kind.
+    /// They depend on the target and on what the device supports.
     pub consumer_sync_kinds: GpuSyncKindFlag,
 }
 impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilities {
@@ -6129,12 +6121,10 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
 /// New Vulkan images for a borrowed ring, for
 /// `RenderSessionHandle::set_vulkan_borrowed_texture_target()`.
 ///
-/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
-/// the images follow its rules. The ring keeps its depth, context, `format`,
-/// `final_layout`, and `owner`, so give it as many images as it attached with,
-/// in that format, on the same device. The session uses the images until a
-/// replacement or release of the target completes, a detach or release of the
-/// session completes, or an abandon of it returns.
+/// The members and the images follow the rules of
+/// `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
+/// `format`, `final_layout`, and `owner`, so give it as many images as it
+/// attached with, in that format, on the same device.
 ///
 /// See `mln_vulkan_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6626,12 +6616,10 @@ impl ToNative<sys::mln_web_gpu_borrowed_texture_descriptor> for WebGpuBorrowedTe
 /// New WebGPU textures for a borrowed ring, for
 /// `RenderSessionHandle::set_web_gpu_borrowed_texture_target()`.
 ///
-/// The members mean what they mean in `WebGpuBorrowedTextureDescriptor`, and
-/// the textures follow its rules. The ring keeps its depth, context, and
+/// The members and the textures follow the rules of
+/// `WebGpuBorrowedTextureDescriptor`. The ring keeps its depth, context, and
 /// `format`, so give it as many textures as it attached with, in that format,
-/// on the same device. The session uses the textures until a replacement or
-/// release of the target completes, a detach or release of the session
-/// completes, or an abandon of it returns.
+/// on the same device.
 ///
 /// See `mln_web_gpu_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

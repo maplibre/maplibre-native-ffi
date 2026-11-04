@@ -21,7 +21,7 @@ extern "C" {
  *
  * The session sets the layer's device, pixel format, and drawable size. It uses
  * the layer until a replacement or release of the target completes, a detach
- * or disposal of the session completes, or an abandon of it returns.
+ * or release of the session completes, or an abandon of it returns.
  */
 typedef struct mln_metal_surface_descriptor {
   uint32_t size;
@@ -130,7 +130,7 @@ typedef struct mln_open_gl_surface_descriptor {
  *
  * The session presents to it with the context that it attached with. It uses
  * the surface until a replacement or release of the target completes, a detach
- * or disposal of the session completes, or an abandon of it returns.
+ * or release of the session completes, or an abandon of it returns.
  */
 typedef struct mln_open_gl_surface_replacement {
   uint32_t size;
@@ -210,8 +210,7 @@ MLN_API mln_status mln_map_attach_web_gpu_surface(
  * Use it to give the session a layer again after
  * mln_render_session_release_target(), to move it to another layer, or to
  * resize it. Once the replacement completes, the session no longer uses the
- * old layer. A replacement with the layer and logical size that the session
- * renders to already changes nothing.
+ * old layer.
  */
 MLN_BINDING("execution=operation;platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_render_session_set_metal_surface_target(
@@ -225,8 +224,7 @@ MLN_API mln_status mln_render_session_set_metal_surface_target(
  * Use it to give the session a surface again after
  * mln_render_session_release_target(), to move it to another surface, or to
  * resize it. Once the replacement completes, the session no longer uses the
- * old surface. A replacement with the surface and logical size that the
- * session presents to already changes nothing.
+ * old surface.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the new surface needs a different color format
@@ -246,8 +244,7 @@ MLN_API mln_status mln_render_session_set_vulkan_surface_target(
  * Use it to give the session a surface again after
  * mln_render_session_release_target(), to move it to another surface, or to
  * resize it. Once the replacement completes, the session no longer uses the
- * old surface. A replacement with the surface and logical size that the
- * session presents to already changes nothing.
+ * old surface.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_set_open_gl_surface_target(
@@ -262,8 +259,7 @@ MLN_API mln_status mln_render_session_set_open_gl_surface_target(
  * Use it to give the session a surface again after
  * mln_render_session_release_target(), to move it to another surface, or to
  * resize it. Once the replacement completes, the session no longer uses the
- * old surface. A replacement with the surface and logical size that the
- * session presents to already changes nothing.
+ * old surface.
  */
 MLN_BINDING("execution=operation;platforms=web")
 MLN_API mln_status mln_render_session_set_web_gpu_surface_target(

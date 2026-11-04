@@ -131,8 +131,7 @@ pub const AcquiredFrame = struct {
     /// finishes. Pass `GpuSyncKind.cpu_complete` when that work has already
     /// finished. The session waits for that point before it renders into the
     /// texture again. If that wait fails, such as for an OpenGL fence outside the
-    /// session's share group, the session fails and never renders into the texture
-    /// again.
+    /// session's share group, the session fails.
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1663,8 +1662,7 @@ pub const OffscreenDevice = struct {
     /// `Map.attachOffscreen()` creates a device of its own when it gets none.
     /// Create one to share it among the sessions on many maps, or to pick a GPU.
     ///
-    /// A browser WebGPU build can't create a device here, because the browser
-    /// answers a request for one asynchronously. Attach without a device instead.
+    /// In a browser WebGPU build, attach without a device instead.
     ///
     /// See `mln_offscreen_device_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
@@ -1722,11 +1720,9 @@ pub const RenderSession = struct {
     /// returns, the library no longer uses your graphics objects, and you can
     /// attach another session to the map. Release the session afterward.
     ///
-    /// Only the driver thread can destroy OpenGL and WebGPU objects, so abandon
-    /// keeps them until the process exits, reports how many it kept, and logs a
-    /// warning. Detach the session instead to free them. A disposal that another
-    /// thread starts first retires the session itself, and the abandon then fails
-    /// as it does for any released session.
+    /// Abandon keeps the session's OpenGL and WebGPU objects until the process
+    /// exits, and reports how many it kept. Detach the session instead to free
+    /// them.
     ///
     /// See `mln_render_session_abandon` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1749,9 +1745,9 @@ pub const RenderSession = struct {
     ///
     /// - `error.Unsupported` when the session lacks
     ///   `RenderSessionCapabilityFlag.frame_acquisition`.
-    /// - `RenderSessionSnapshot.failure_status`, `error.TargetLost` or
-    ///   `error.NativeError`, when the session has failed. The diagnostic carries
-    ///   the failure's message.
+    /// - `error.TargetLost` or `error.NativeError`, as
+    ///   `RenderSessionSnapshot.failure_status` reports, when the session has
+    ///   failed.
     /// - `error.InvalidState` when you detached, abandoned, released, or disposed
     ///   the session.
     pub fn acquireFrame(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!?AcquiredFrame {
@@ -1800,9 +1796,9 @@ pub const RenderSession = struct {
     ///
     /// Errors:
     ///
-    /// - `RenderSessionSnapshot.failure_status`, `error.TargetLost` or
-    ///   `error.NativeError`, when the session has failed. The diagnostic carries
-    ///   the failure's message.
+    /// - `error.TargetLost` or `error.NativeError`, as
+    ///   `RenderSessionSnapshot.failure_status` reports, when the session has
+    ///   failed.
     /// - `error.InvalidState` when you detached, abandoned, released, or disposed
     ///   the session, or discarded a frame from every texture of its ring.
     pub fn demandFrame(self: RenderSession, demand: FrameDemand, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -1829,11 +1825,11 @@ pub const RenderSession = struct {
 
     /// Releases the session in any state, and finishes in the background.
     ///
-    /// Use it from destructors and finalizers. Otherwise, use
-    /// `RenderSession.release()`. The session retires as a release does, except
-    /// that a session whose frames you hold is abandoned, which ends the frames.
-    /// Keep servicing a session driven by `RenderDriverKind.caller_graphics_thread`
-    /// until `RenderSession.serviceDriverWork()` no longer accepts it.
+    /// Use it from destructors and finalizers, and `RenderSession.release()`
+    /// elsewhere. It ends the session as a release does, except that it abandons a
+    /// session whose frames you hold, which ends those frames. Keep servicing a
+    /// session driven by `RenderDriverKind.caller_graphics_thread` until
+    /// `RenderSession.serviceDriverWork()` no longer accepts it.
     ///
     /// See `mln_render_session_dispose` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2019,16 +2015,15 @@ pub const RenderSession = struct {
 
     /// Releases the session, detaching it first when it is attached.
     ///
-    /// The completion runs once the session retires. From then on, the library no
-    /// longer uses your graphics objects, and you can attach another session to the
-    /// map. Pending frame demands finish with `RenderResult.target_not_ready`.
+    /// Pending frame demands finish with `RenderResult.target_not_ready`. Once the
+    /// release completes, the library no longer uses your graphics objects, and you
+    /// can attach another session to the map.
     ///
     /// A session driven by `RenderDriverKind.caller_graphics_thread` detaches at
     /// your next `RenderSession.serviceDriverWork()`, so keep servicing it until
-    /// the release completes. If you release or dispose its map before that
-    /// service, the session is abandoned instead. A session that isn't attached,
-    /// such as one that is still attaching or that failed, is abandoned as
-    /// `RenderSession.abandon()` does.
+    /// the release completes. When the session isn't attached, such as while it
+    /// attaches or after it fails, or when you release or dispose its map before
+    /// that service, the release abandons it as `RenderSession.abandon()` does.
     ///
     /// See `mln_render_session_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2057,8 +2052,7 @@ pub const RenderSession = struct {
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` when the session renders offscreen, since the session
-    ///   owns that target.
+    /// - `error.Unsupported` when the session renders offscreen.
     /// - `error.Unsupported` when the target is a WebGL canvas.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
@@ -2089,12 +2083,11 @@ pub const RenderSession = struct {
     /// Use it with `RenderDriverKind.caller_graphics_thread`, and call it from the
     /// same thread every time. Call it each time
     /// `RenderSessionAttachOptions.driver_work_wake` is called, even while you
-    /// demand no frames, and until a detach or the session's retirement completes.
-    /// It returns once no work is ready.
+    /// demand no frames, until a detach, release, or disposal of the session
+    /// finishes. It returns once no work is ready.
     ///
-    /// It accepts a released or disposed session until the session retires. The
-    /// service after the release or disposal detaches the session and frees its
-    /// graphics objects.
+    /// It accepts a released or disposed session until that release or disposal
+    /// finishes.
     ///
     /// See `mln_render_session_service_driver_work` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2153,9 +2146,7 @@ pub const RenderSession = struct {
     ///
     /// Use it to resize the ring, or to give the session textures again after
     /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
-    /// the replacement completes, the session no longer uses the old textures. A
-    /// replacement with the textures and sizes that the ring renders into already
-    /// changes nothing.
+    /// the replacement completes, the session no longer uses the old textures.
     ///
     /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2175,8 +2166,7 @@ pub const RenderSession = struct {
     /// Use it to give the session a layer again after
     /// `RenderSession.releaseTarget()`, to move it to another layer, or to resize
     /// it. Once the replacement completes, the session no longer uses the old
-    /// layer. A replacement with the layer and logical size that the session
-    /// renders to already changes nothing.
+    /// layer.
     ///
     /// See `mln_render_session_set_metal_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -2216,9 +2206,7 @@ pub const RenderSession = struct {
     ///
     /// Use it to resize the ring, or to give the session textures again after
     /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
-    /// the replacement completes, the session no longer uses the old textures. A
-    /// replacement with the textures and sizes that the ring renders into already
-    /// changes nothing.
+    /// the replacement completes, the session no longer uses the old textures.
     ///
     /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2231,8 +2219,7 @@ pub const RenderSession = struct {
     /// Use it to give the session a surface again after
     /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
     /// it. Once the replacement completes, the session no longer uses the old
-    /// surface. A replacement with the surface and logical size that the session
-    /// presents to already changes nothing.
+    /// surface.
     ///
     /// See `mln_render_session_set_open_gl_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -2244,9 +2231,7 @@ pub const RenderSession = struct {
     ///
     /// Use it to resize the ring, or to give the session images again after
     /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
-    /// the replacement completes, the session no longer uses the old images. A
-    /// replacement with the images and sizes that the ring renders into already
-    /// changes nothing.
+    /// the replacement completes, the session no longer uses the old images.
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2261,8 +2246,7 @@ pub const RenderSession = struct {
     /// Use it to give the session a surface again after
     /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
     /// it. Once the replacement completes, the session no longer uses the old
-    /// surface. A replacement with the surface and logical size that the session
-    /// presents to already changes nothing.
+    /// surface.
     ///
     /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -4928,12 +4912,10 @@ pub const MetalBorrowedTextureDescriptor = struct {
 /// New Metal textures for a borrowed ring, for
 /// `RenderSession.setMetalBorrowedTextureTarget()`.
 ///
-/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
-/// textures follow its rules. The ring keeps its depth, device, and command
-/// queue, so give it as many textures as it attached with, on the same device.
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// The members and the textures follow the rules of
+/// `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
+/// command queue, so give it as many textures as it attached with, on the same
+/// device.
 ///
 /// See `mln_metal_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4994,7 +4976,7 @@ pub const MetalContextDescriptor = struct {
 ///
 /// The session sets the layer's device, pixel format, and drawable size. It
 /// uses the layer until a replacement or release of the target completes, a
-/// detach or disposal of the session completes, or an abandon of it returns.
+/// detach or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -5479,12 +5461,10 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
 /// New OpenGL textures for a borrowed ring, for
 /// `RenderSession.setOpenGlBorrowedTextureTarget()`.
 ///
-/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
-/// the textures follow its rules. The ring keeps its depth, context, and
+/// The members and the textures follow the rules of
+/// `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
 /// texture target, so give it as many textures as it attached with, in the same
-/// share group. The session uses the textures until a replacement or release of
-/// the target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// share group.
 ///
 /// See `mln_open_gl_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -5537,7 +5517,7 @@ pub const OpenGlClientApi = enum(u32) {
 
 /// How a render session gets the OpenGL context that it renders with.
 ///
-/// Keep the objects that it names alive until a detach or disposal of the
+/// Keep the objects that it names alive until a detach or release of the
 /// session completes, or an abandon of it returns.
 ///
 /// See `mln_open_gl_context_descriptor` in the
@@ -5652,7 +5632,7 @@ pub const OpenGlSurfaceDescriptor = struct {
 ///
 /// The session presents to it with the context that it attached with. It uses
 /// the surface until a replacement or release of the target completes, a detach
-/// or disposal of the session completes, or an abandon of it returns.
+/// or release of the session completes, or an abandon of it returns.
 ///
 /// See `mln_open_gl_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
@@ -6046,16 +6026,14 @@ pub const RenderResult = enum(u32) {
 /// See `mln_render_session_attach_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const RenderSessionAttachOptions = struct {
-    /// The thread that runs the session's graphics work. Whoever owns the
-    /// target's graphics context drives it:
+    /// The thread that runs the session's graphics work, which depends on the
+    /// target:
     ///
-    /// - `RenderDriverKind.caller_graphics_thread` for an OpenGL or WebGPU
-    ///   target that you pass, since its context belongs to your thread: a
-    ///   shared or dedicated EGL or WGL context, an existing WebGL context, or
-    ///   a browser's WebGPU device.
-    /// - `RenderDriverKind.core_worker` for a target whose context the library
-    ///   owns: a transferred WebGL canvas, an Android or OpenHarmony window, or
-    ///   an offscreen session.
+    /// - `RenderDriverKind.caller_graphics_thread` for a shared or dedicated
+    ///   EGL or WGL context, an existing WebGL context, or a browser's WebGPU
+    ///   device.
+    /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
+    ///   Android or OpenHarmony window, or an offscreen session.
     /// - Either one for a Metal or Vulkan target.
     ///
     /// An attach with another driver fails with `error.Unsupported`.
@@ -6117,10 +6095,8 @@ pub const RenderSessionCapabilities = struct {
     flags: RenderSessionCapabilityFlag = .{},
     /// The kind of `GpuSync` that `AcquiredFrame.getProducerSync()` reports.
     producer_sync_kind: GpuSyncKind = .cpu_complete,
-    /// The kinds of `GpuSync` that `AcquiredFrame.release()` accepts.
-    ///
-    /// They depend on the target and on what the device supports, so read this
-    /// field instead of assuming a kind.
+    /// The kinds of `GpuSync` that `AcquiredFrame.release()` accepts. They
+    /// depend on the target and on what the device supports.
     consumer_sync_kinds: GpuSyncKindFlag = .{},
     pub fn fromNative(raw: c.mln_render_session_capabilities) RenderSessionCapabilities {
         return .{
@@ -8266,12 +8242,10 @@ pub const VulkanBorrowedTextureDescriptor = struct {
 /// New Vulkan images for a borrowed ring, for
 /// `RenderSession.setVulkanBorrowedTextureTarget()`.
 ///
-/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
-/// the images follow its rules. The ring keeps its depth, context, `format`,
-/// `final_layout`, and `owner`, so give it as many images as it attached with,
-/// in that format, on the same device. The session uses the images until a
-/// replacement or release of the target completes, a detach or release of the
-/// session completes, or an abandon of it returns.
+/// The members and the images follow the rules of
+/// `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
+/// `format`, `final_layout`, and `owner`, so give it as many images as it
+/// attached with, in that format, on the same device.
 ///
 /// See `mln_vulkan_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

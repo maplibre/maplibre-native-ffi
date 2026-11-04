@@ -81,12 +81,10 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// New Metal textures for a borrowed ring, for
 /// `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
 ///
-/// The members mean what they mean in `MetalBorrowedTextureDescriptor`, and the
-/// textures follow its rules. The ring keeps its depth, device, and command
-/// queue, so give it as many textures as it attached with, on the same device.
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// The members and the textures follow the rules of
+/// `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
+/// command queue, so give it as many textures as it attached with, on the same
+/// device.
 ///
 /// See `mln_metal_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -250,12 +248,10 @@ public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// New OpenGL textures for a borrowed ring, for
 /// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
 ///
-/// The members mean what they mean in `OpenGlBorrowedTextureDescriptor`, and
-/// the textures follow its rules. The ring keeps its depth, context, and
+/// The members and the textures follow the rules of
+/// `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
 /// texture target, so give it as many textures as it attached with, in the same
-/// share group. The session uses the textures until a replacement or release of
-/// the target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// share group.
 ///
 /// See `mln_open_gl_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -475,12 +471,10 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// New Vulkan images for a borrowed ring, for
 /// `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
 ///
-/// The members mean what they mean in `VulkanBorrowedTextureDescriptor`, and
-/// the images follow its rules. The ring keeps its depth, context, `format`,
-/// `final_layout`, and `owner`, so give it as many images as it attached with,
-/// in that format, on the same device. The session uses the images until a
-/// replacement or release of the target completes, a detach or release of the
-/// session completes, or an abandon of it returns.
+/// The members and the images follow the rules of
+/// `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
+/// `format`, `final_layout`, and `owner`, so give it as many images as it
+/// attached with, in that format, on the same device.
 ///
 /// See `mln_vulkan_borrowed_texture_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
