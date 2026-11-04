@@ -203,10 +203,11 @@ importers:
         version: 7.0.2
 
   bindings/typescript/react-native:
-    devDependencies:
+    dependencies:
       '@maplibre/native-ffi':
         specifier: workspace:*
         version: link:..
+    devDependencies:
       '@react-native/typescript-config':
         specifier: 0.88.1
         version: 0.88.1
@@ -258,9 +259,6 @@ importers:
 
   examples/react-native:
     dependencies:
-      '@maplibre/native-ffi':
-        specifier: workspace:*
-        version: link:../../bindings/typescript
       '@maplibre/native-ffi-react-native':
         specifier: workspace:*
         version: link:../../bindings/typescript/react-native

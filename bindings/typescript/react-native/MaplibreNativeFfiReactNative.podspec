@@ -1,9 +1,10 @@
-# The React Native module and surface view. The binding's own pod,
-# MaplibreNativeFfi from @maplibre/native-ffi, carries the Hermes adapter and
-# the C library.
+# The React Native module and surface view, with the binding's Hermes adapter
+# and the C library. The npm package carries the binding's native sources and
+# the XCFramework. In a workspace checkout, scripts/stage.sh copies them in.
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+symbols = "-include \"${PODS_TARGET_SRCROOT}/native/hermes/symbols.h\""
 
 Pod::Spec.new do |s|
   s.name = "MaplibreNativeFfiReactNative"
@@ -18,9 +19,25 @@ Pod::Spec.new do |s|
     :tag => "v#{s.version}",
   }
 
-  s.source_files = ["ios/*.{h,mm}", "cpp/*.{h,cpp}"]
-  s.pod_target_xcconfig = { "HEADER_SEARCH_PATHS" => "\"#{__dir__}/cpp\"" }
+  s.source_files = [
+    "ios/*.{h,mm}",
+    "cpp/*.{h,cpp}",
+    "native/{generated_addon,generated_values,realm,runtime}.c",
+    "native/{generated_addon,runtime,mutex}.h",
+    "native/hermes/*.{h,cpp}",
+  ]
+  s.public_header_files = "ios/*.h"
+  s.vendored_frameworks = "ios/MaplibreNativeC.xcframework"
 
-  s.dependency "MaplibreNativeFfi"
+  s.pod_target_xcconfig = {
+    "HEADER_SEARCH_PATHS" => %w[cpp native native/include native/node-api-headers]
+      .map { |path| "\"${PODS_TARGET_SRCROOT}/#{path}\"" }.join(" "),
+    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) NAPI_VERSION=8",
+    # The adapter's Node-API functions stay private to this library.
+    "OTHER_CFLAGS" => "$(inherited) #{symbols}",
+    "OTHER_CPLUSPLUSFLAGS" => "$(inherited) #{symbols}",
+  }
+
+  # React Native's helper adds the JSI and the rest of React Native's pods.
   install_modules_dependencies(s)
 end

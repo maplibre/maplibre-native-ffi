@@ -5,13 +5,14 @@
   "license": "BSD-2-Clause",
   "private": true,
   "main": "src/index.ts",
+  "dependencies": {
+    "@maplibre/native-ffi": "workspace:*"
+  },
   "peerDependencies": {
-    "@maplibre/native-ffi": "*",
     "react": "*",
     "react-native": "*"
   },
   "devDependencies": {
-    "@maplibre/native-ffi": "workspace:*",
     "@react-native/typescript-config": "0.88.1",
     "@types/react": "^19.2.0",
     "react": "19.3.0",

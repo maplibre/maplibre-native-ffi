@@ -8,11 +8,11 @@ sidebar:
 
 ## Install
 
-The TypeScript binding runs on Node.js, Bun, Deno, in browsers, in Hermes, and
-on OpenHarmony. Each runtime takes one backend package, which holds the native
-library for your [backend](/maplibre-native-ffi/install/#choose-a-backend).
-Install from npm, or from OHPM on OpenHarmony, as the section for your runtime
-shows.
+The TypeScript binding runs on Node.js, Bun, Deno, in browsers, in React Native
+and other Hermes hosts, and on OpenHarmony. Each runtime takes one backend
+package, which holds the native library for your
+[backend](/maplibre-native-ffi/install/#choose-a-backend). Install from npm, or
+from OHPM on OpenHarmony, as the section for your runtime shows.
 
 ## Node.js, Bun, and Deno
 
@@ -49,7 +49,32 @@ const runtime = await RuntimeHandle.create();
 
 The page must meet the [web requirements](/maplibre-native-ffi/install/#web).
 
-## Hermes
+## React Native
+
+Add `@maplibre/native-ffi-react-native` from npm. It needs React Native's new
+architecture, and carries the native library: OpenGL ES on Android and Metal on
+iOS.
+
+```bash frame="terminal"
+npm install @maplibre/native-ffi-react-native
+```
+
+Import the binding from this package, which installs it in the app's runtime
+first:
+
+```tsx title="Map.tsx"
+import {
+  MaplibreSurfaceView,
+  RuntimeHandle,
+  surfaces,
+} from "@maplibre/native-ffi-react-native";
+```
+
+`MaplibreSurfaceView` reports its native surface, which `surfaces.acquire()`
+turns into the handles to attach a render session with. The package's README
+covers the surface lifecycle.
+
+## Other Hermes hosts
 
 To embed the binding in a Hermes runtime, install the package and import its
 Hermes entry:
