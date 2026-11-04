@@ -1,6 +1,6 @@
+import { MaplibreSurfaceView } from "@maplibre/native-ffi-react-native";
 import { useEffect, useState } from "react";
 import { StatusBar, StyleSheet, Text, View } from "react-native";
-import { MapSurfaceView } from "react-native-example-host";
 
 import { mapGestures } from "./gestures";
 import { MapController, type Status } from "./MapController";
@@ -20,7 +20,7 @@ export default function App() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" />
-      <MapSurfaceView
+      <MaplibreSurfaceView
         style={StyleSheet.absoluteFill}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;

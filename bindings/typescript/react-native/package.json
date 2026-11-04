@@ -1,0 +1,36 @@
+{
+  "name": "@maplibre/native-ffi-react-native",
+  "version": "0.0.0",
+  "description": "Installs MapLibre Native FFI's Hermes binding in React Native apps, and lends native surfaces to it.",
+  "license": "BSD-2-Clause",
+  "private": true,
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "@maplibre/native-ffi": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@maplibre/native-ffi": "workspace:*",
+    "@react-native/typescript-config": "0.88.1",
+    "@types/react": "^19.2.0",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  },
+  "codegenConfig": {
+    "name": "MaplibreNativeFfiReactNativeSpec",
+    "type": "all",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "org.maplibre.nativeffi.reactnative"
+    },
+    "ios": {
+      "componentProvider": {
+        "MaplibreSurfaceView": "MLNReactNativeSurfaceView"
+      },
+      "modulesProvider": {
+        "MaplibreNativeFfi": "MLNReactNativeModule"
+      }
+    }
+  }
+}

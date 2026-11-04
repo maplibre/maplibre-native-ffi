@@ -8,9 +8,9 @@
   },
   "dependencies": {
     "@maplibre/native-ffi": "workspace:*",
+    "@maplibre/native-ffi-react-native": "workspace:*",
     "react": "19.3.0",
-    "react-native": "0.88.1",
-    "react-native-example-host": "workspace:*"
+    "react-native": "0.88.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

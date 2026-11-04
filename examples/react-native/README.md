@@ -24,21 +24,13 @@ emulators on ARM64 hosts.
 
 ## How it fits together
 
-React Native doesn't know about the binding, so the app carries a small native
-host in `host/`, which React Native autolinks:
+The app has no native code of its own. It imports the binding from
+[`@maplibre/native-ffi-react-native`](../../bindings/typescript/react-native),
+which installs the binding in the runtime and draws on a native view,
+`MaplibreSurfaceView`. The app also depends on `@maplibre/native-ffi`, so that
+iOS autolinking finds the binding's pod.
 
-- `host/cpp/Host.cpp` installs `mln::hermes::Module` in the runtime when
-  JavaScript first loads the host's module, with a scheduler that posts work to
-  the JavaScript thread through React Native's `CallInvoker`. It cleans the
-  module up before React Native destroys the runtime, as on a reload, when React
-  Native invalidates the host's module: on the JavaScript thread on iOS, and
-  after that thread stops on Android.
-- `MapSurfaceView` is a native view that lends its surface to JavaScript: a
-  `CAMetalLayer` on iOS, and the window of a `SurfaceView` on Android. It
-  reports when the platform provides the surface and when it takes the surface
-  away, such as when the app goes to the background. `host/cpp/Surfaces.cpp`
-  keeps each surface until the session stops using it.
-- `src/MapController.ts` attaches a render session to the surface, gives the
-  session each new surface, and runs the frame loop, as the browser demo in
-  `docs/demo` does. Both sessions render on a library thread, and on Android the
-  library makes the OpenGL ES context for the window.
+`src/MapController.ts` attaches a render session to the view's surface, gives
+the session each new surface, and runs the frame loop, as the browser demo in
+`docs/demo` does. Both sessions render on a library thread, and on Android the
+library makes the OpenGL ES context for the window.

@@ -14,9 +14,8 @@ PODS:
   - hermes-engine (260318099.0.5):
     - hermes-engine/Pre-built (= 260318099.0.5)
   - hermes-engine/Pre-built (260318099.0.5)
-  - MaplibreExampleHost (0.0.0):
+  - MaplibreNativeFfi (0.0.0):
     - hermes-engine
-    - MaplibreNativeFfi
     - RCTRequired
     - RCTTypeSafety
     - React-bridging
@@ -38,8 +37,9 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - MaplibreNativeFfi (0.0.0):
+  - MaplibreNativeFfiReactNative (0.0.0):
     - hermes-engine
+    - MaplibreNativeFfi
     - RCTRequired
     - RCTTypeSafety
     - React-bridging
@@ -1801,8 +1801,8 @@ DEPENDENCIES:
   - fmt (from `build/rndeps-facades/fmt`)
   - glog (from `build/rndeps-facades/glog`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
-  - MaplibreExampleHost (from `../node_modules/react-native-example-host`)
   - "MaplibreNativeFfi (from `../node_modules/@maplibre/native-ffi`)"
+  - "MaplibreNativeFfiReactNative (from `../node_modules/@maplibre/native-ffi-react-native`)"
   - RCT-Folly (from `build/rndeps-facades/RCT-Folly`)
   - RCTDeprecation (from `build/rncore-facades/RCTDeprecation`)
   - RCTRequired (from `build/rncore-facades/RCTRequired`)
@@ -1900,10 +1900,10 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v260318099.0.5
-  MaplibreExampleHost:
-    :path: "../node_modules/react-native-example-host"
   MaplibreNativeFfi:
     :path: "../node_modules/@maplibre/native-ffi"
+  MaplibreNativeFfiReactNative:
+    :path: "../node_modules/@maplibre/native-ffi-react-native"
   RCT-Folly:
     :path: build/rndeps-facades/RCT-Folly
   RCTDeprecation:
@@ -2071,8 +2071,8 @@ SPEC CHECKSUMS:
   fmt: ba0886e864ebb21d14c98b2e12e164b8002f5b93
   glog: 3cf7cb46f743c4bc758ae3e6d9c15bd1b4cfd6d4
   hermes-engine: fad86e6621008f83fd32648fe95f7cf1a00421a4
-  MaplibreExampleHost: 1b76db7e0cc43727696d6ad5c7f120f586c925f3
-  MaplibreNativeFfi: 737b094beaf84b4d0ef0dec20cdd7be594cea029
+  MaplibreNativeFfi: 365d04aa196c0e58838ee353e3b127681798c885
+  MaplibreNativeFfiReactNative: 71ab2774ff8f43b91b919363f9fd2add1e825b3e
   RCT-Folly: 82921e585c0400eda46fac1068297aa9dfb035e4
   RCTDeprecation: c62b9b3fbf0d26b76755f3ebd1c913a4fb469dde
   RCTRequired: d0563e2484633b657976195f0543e180133afd3a

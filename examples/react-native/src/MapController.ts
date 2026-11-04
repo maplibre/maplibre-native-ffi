@@ -1,4 +1,4 @@
-// A continuous map on a MapSurfaceView. The view lends its surface when the
+// A continuous map on a MaplibreSurfaceView. The view lends its surface when the
 // platform provides one, and the controller attaches a session to it, or gives
 // an attached session the new surface. Everything else matches the browser
 // demo in docs/demo.
@@ -16,9 +16,10 @@ import {
   RuntimeEventFlag,
   RuntimeEventType,
   RuntimeHandle,
-} from "@maplibre/native-ffi/hermes";
+  type SurfaceHandles,
+  surfaces,
+} from "@maplibre/native-ffi-react-native";
 import { PixelRatio } from "react-native";
-import { type SurfaceHandles, surfaces } from "react-native-example-host";
 
 const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
 
