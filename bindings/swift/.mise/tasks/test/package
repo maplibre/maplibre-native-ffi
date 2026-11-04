@@ -1,29 +1,57 @@
 #!/usr/bin/env bash
-#MISE description="Write the Swift package as a release does, with a local XCFramework, then run a macOS consumer and build it for iOS."
+#MISE description="Write the Swift package as a release does, with local native assets, then run a consumer against it. On macOS, the assets are the XCFramework, and the consumer also builds for iOS. On Linux, they are the native archives, whose artifact bundles the package takes, and the consumer runs with each backend trait."
 #MISE dir="../.."
 #MISE shell="bash"
-#USAGE arg "[assets]" default="build/packages/native/dist" help="Directory that holds MaplibreNativeC.xcframework.zip"
+#USAGE arg "[assets]" default="build/packages/native/dist" help="Directory that holds MaplibreNativeC.xcframework.zip on macOS, or the native archives on Linux"
 set -euo pipefail
 
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
-# The package takes a copy of the XCFramework where a release's would take its
-# URL, so it builds as a consumer's dependency on the release would.
-package="$scratch/maplibre-native-ffi-distribution"
-python3 tools/release/distribution.py "$package" "$usage_assets" --local
+assets="$usage_assets"
+if [[ "$(uname -s)" == Linux ]]; then
+  source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
+  # The package takes the bundles that a release would build from the same
+  # archives.
+  assets="$scratch/assets"
+  mkdir -p "$assets"
+  while IFS= read -r preset; do
+    archive="$(find "$usage_assets" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+    if [[ -z "$archive" ]]; then
+      echo "Missing native package for ${preset} under ${usage_assets}" >&2
+      exit 1
+    fi
+    ln -s "$(realpath "$archive")" "$assets/"
+  done < <(python3 -m tools.ci.plan --package-inputs swift-artifact-bundles)
+  PYTHONPATH=tools/release python3 - "$assets" <<'PY'
+import pathlib
+import sys
 
-consumer="$scratch/consumer"
-mkdir -p "$consumer"
-cp -R tests/release/swift-package/. "$consumer/"
-cat >"$consumer/Package.swift" <<EOF
-// swift-tools-version: 6.0
+from swift_artifact_bundle import write_bundles
+
+assets = pathlib.Path(sys.argv[1])
+write_bundles(assets, sorted(assets.glob("*.tar.gz")), "0.0.0")
+PY
+fi
+
+# The package takes copies of the assets where a release's would take their
+# URLs, so it builds as a consumer's dependency on the release would.
+package="$scratch/maplibre-native-ffi-distribution"
+python3 tools/release/distribution.py "$package" "$assets" --local
+
+# Writes a consumer of the package, with the package's traits given as Swift.
+consumer() {
+  local directory="$scratch/consumer$1"
+  mkdir -p "$directory"
+  cp -R tests/release/swift-package/. "$directory/"
+  cat >"$directory/Package.swift" <<EOF
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
   name: "PackageConsumer",
   platforms: [.macOS("14.3"), .iOS("15.0")],
-  dependencies: [.package(path: "$package")],
+  dependencies: [.package(path: "$package"$2)],
   targets: [
     .executableTarget(
       name: "PackageConsumer",
@@ -35,8 +63,28 @@ let package = Package(
   ]
 )
 EOF
+  echo "$directory"
+}
 
-cd "$consumer"
+if [[ "$(uname -s)" == Linux ]]; then
+  # The consumer prints the backend mask that the package linked.
+  for case in default:2 OpenGL:4 Vulkan:2; do
+    trait="${case%:*}"
+    traits=""
+    [[ "$trait" == default ]] || traits=", traits: [\"$trait\"]"
+    directory="$(consumer "-$trait" "$traits")"
+    swift build --package-path "$directory" --scratch-path "$scratch/build/$trait"
+    backends="$("$(swift build --package-path "$directory" --scratch-path "$scratch/build/$trait" --show-bin-path)/PackageConsumer")"
+    if [[ "$backends" != "${case#*:}" ]]; then
+      echo "The $trait trait linked backends $backends, not ${case#*:}" >&2
+      exit 1
+    fi
+    echo "The $trait trait linked backends $backends"
+  done
+  exit 0
+fi
+
+cd "$(consumer "" "")"
 swift run --scratch-path "$scratch/build/macos" PackageConsumer
 swift build \
   --product PackageConsumer \

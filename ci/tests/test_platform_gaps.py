@@ -153,6 +153,7 @@ class PlatformGapsTest(unittest.TestCase):
             ("typescript", "arkts-ohpm", "ohos-x64-egl"),
             ("kotlin-jvm", "kotlin-maven", "freebsd-x64-egl"),
             ("swift", "swift-package", "macos-arm64-metal"),
+            ("swift", "swift-artifact-bundles", "linux-gnu-x64-vulkan"),
         )
         issue, entries = gaps.load_gaps()
         for binding, job, preset in cases:

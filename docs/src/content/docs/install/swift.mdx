@@ -25,31 +25,24 @@ Then depend on its `MaplibreNativeFFI` product:
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi-distribution")
 ```
 
-## Apple platforms
+The package takes the C library from the release: on Apple platforms, its
+[XCFramework](/maplibre-native-ffi/install/c/#swift-package-manager), and
+elsewhere an artifact bundle that links it statically. SwiftPM downloads the
+XCFramework and both bundles, about 350 MB, whichever platform you build for.
 
-On Apple platforms, the package uses the release's
-[XCFramework](/maplibre-native-ffi/install/c/#swift-package-manager), so it
-needs nothing else.
+## Choose a backend
 
-## Other platforms
+On Apple platforms, the package renders with Metal. Elsewhere it uses your
+platform's [default backend](/maplibre-native-ffi/install/#choose-a-backend). To
+choose another, enable one trait, `OpenGL` or `Vulkan`, in place of the default:
 
-On Linux, Windows, and Android, download and unpack the
-[C library](/maplibre-native-ffi/install/c/) for your preset, and point
-pkg-config at it before you build:
-
-```bash frame="terminal"
-export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+```swift title="Package.swift"
+.package(
+  url: "https://github.com/maplibre/maplibre-native-ffi-distribution",
+  exact: "{{version}}",
+  traits: ["Vulkan"]
+)
 ```
-
-On Linux, SwiftPM ignores the rpath that pkg-config adds, so pass the prefix's
-`lib` directory to the linker:
-
-```bash frame="terminal"
-swift build -Xlinker -rpath -Xlinker <prefix>/lib
-```
-
-On Windows, put the prefix's `bin` directory on `PATH`, or copy the DLLs in it
-next to the executable.
 
 ## Android
 
@@ -64,10 +57,8 @@ try initAndroid(
 
 ## Snapshots
 
-Depend on this repository at `main`, and install the C library from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
-as for other platforms. This applies to Apple platforms too. SwiftPM names the
-package after the repository:
+Depend on this repository at `main`. SwiftPM names the package after the
+repository:
 
 ```swift title="Package.swift"
 .package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
@@ -76,3 +67,22 @@ package after the repository:
 ```swift title="Package.swift"
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
 ```
+
+This package finds the C library with pkg-config, on Apple platforms too.
+Download and unpack the C library for your preset from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
+and point pkg-config at it before you build:
+
+```bash frame="terminal"
+export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+```
+
+SwiftPM ignores the rpath that pkg-config adds, so on Linux, pass the prefix's
+`lib` directory to the linker:
+
+```bash frame="terminal"
+swift build -Xlinker -rpath -Xlinker <prefix>/lib
+```
+
+On Windows, put the prefix's `bin` directory on `PATH`, or copy the DLLs in it
+next to the executable.

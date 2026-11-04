@@ -24,7 +24,7 @@ from native_package_release import (
 )
 from release_version import next_release, require_current_month, validate_tag
 from sbom import SBOM_NAME, component, document
-from swift_artifact_bundle import bundle_name
+from swift_artifact_bundle import TRIPLES, bundle_name
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import zig_hash
 
@@ -481,6 +481,20 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.assertTrue(any("macos-arm64" in ref for ref in refs))
         for entry in combined["dependencies"]:
             self.assertTrue(set(entry["dependsOn"]) <= set(refs))
+
+    def test_swift_bundles_have_a_triple_for_each_platform_ci_bundles(self) -> None:
+        from tools.ci import plan
+
+        targets = plan.targets(
+            json.loads((REPOSITORY / "CMakePresets.json").read_text())
+        )
+        self.assertEqual(
+            {
+                f"{target.platform}-{target.architecture}"
+                for target in plan.consumed("swift-artifact-bundles", targets)
+            },
+            set(TRIPLES),
+        )
 
     def test_a_swift_bundle_merges_each_platforms_archives(self) -> None:
         self.archive()

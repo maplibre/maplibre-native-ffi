@@ -63,6 +63,14 @@ link = "https://github.com/swiftlang/swift/issues/78349"
 
 [[entry]]
 bindings = ["swift"]
+platforms = ["windows-mingw"]
+operations = ["package"]
+status = "blocked"
+reason = "The binding builds and tests against the MinGW DLL, but its package links the C library statically, and Swift's Windows toolchain targets only MSVC, whose runtime a MinGW archive cannot link with."
+link = "https://www.swift.org/install/windows/"
+
+[[entry]]
+bindings = ["swift"]
 platforms = ["freebsd"]
 status = "blocked"
 reason = "Swift.org provides only a mutable development preview for FreeBSD 14 on x64, with no versioned toolchain release to pin."
