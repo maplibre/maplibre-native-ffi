@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <new>
 #include <optional>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -11,8 +13,10 @@
 #include <mln/mtl/renderable_resource.hpp>
 #include <mln/mtl/texture2d.hpp>
 
+#include <CoreFoundation/CoreFoundation.h>
 #include <Foundation/NSError.hpp>
 #include <Foundation/NSString.hpp>
+#include <IOSurface/IOSurfaceRef.h>
 #include <Metal/MTLBlitPass.hpp>
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
@@ -24,19 +28,65 @@
 #include "render/metal/metal_texture_backend.inc"
 
 namespace mln::core {
+namespace {
+
+struct CFReleaser {
+  void operator()(CFTypeRef object) const { CFRelease(object); }
+};
+using IOSurfacePtr =
+  std::unique_ptr<std::remove_pointer_t<IOSurfaceRef>, CFReleaser>;
+
+void set_number(
+  CFMutableDictionaryRef properties, CFStringRef key, int64_t value
+) {
+  auto number = std::unique_ptr<const void, CFReleaser>(
+    CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt64Type, &value)
+  );
+  CFDictionarySetValue(properties, key, number.get());
+}
+
+// A surface that Metal renders into as MTLPixelFormatBGRA8Unorm, and that
+// Core Video wraps as kCVPixelFormatType_32BGRA.
+auto create_bgra_io_surface(std::size_t width, std::size_t height)
+  -> IOSurfacePtr {
+  constexpr int64_t bytes_per_element = 4;
+  // kCVPixelFormatType_32BGRA, the four characters 'BGRA'.
+  constexpr int64_t pixel_format = 0x42475241;
+  auto properties =
+    std::unique_ptr<__CFDictionary, CFReleaser>(CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+      &kCFTypeDictionaryValueCallBacks
+    ));
+  if (!properties) return {};
+  set_number(properties.get(), kIOSurfaceWidth, static_cast<int64_t>(width));
+  set_number(properties.get(), kIOSurfaceHeight, static_cast<int64_t>(height));
+  set_number(properties.get(), kIOSurfaceBytesPerElement, bytes_per_element);
+  set_number(
+    properties.get(), kIOSurfaceBytesPerRow,
+    static_cast<int64_t>(IOSurfaceAlignProperty(
+      kIOSurfaceBytesPerRow, width * static_cast<std::size_t>(bytes_per_element)
+    ))
+  );
+  set_number(properties.get(), kIOSurfacePixelFormat, pixel_format);
+  return IOSurfacePtr{IOSurfaceCreate(properties.get())};
+}
+
+}  // namespace
 
 class MetalTextureBackend::MetalTextureRenderableResource final
     : public mln::mtl::RenderableResource {
  public:
   MetalTextureRenderableResource(
     MetalTextureBackend& backend_, mln::mtl::Context& context_, mln::Size size_,
-    MTL::Texture* borrowed_texture_, MTL::PixelFormat owned_pixel_format_
+    MTL::Texture* borrowed_texture_, MTL::PixelFormat owned_pixel_format_,
+    bool io_surface_
   )
       : backend(backend_),
         context(context_),
         size(size_),
         borrowedTexture(borrowed_texture_),
-        ownedPixelFormat(owned_pixel_format_) {
+        ownedPixelFormat(owned_pixel_format_),
+        ioSurfaceBacked(io_surface_) {
     depthTexture = context.createTexture2D();
     depthTexture->setSize(size);
     depthTexture->setFormat(
@@ -103,7 +153,16 @@ class MetalTextureBackend::MetalTextureRenderableResource final
       descriptor->setUsage(
         MTL::TextureUsageShaderRead | MTL::TextureUsageRenderTarget
       );
-      ownedTexture = context.createMetalTexture(std::move(descriptor));
+      if (ioSurfaceBacked) {
+        ioSurface = create_bgra_io_surface(size.width, size.height);
+        if (!ioSurface) throw std::bad_alloc();
+        ownedTexture =
+          NS::TransferPtr(context.getBackend().getDevice()->newTexture(
+            descriptor.get(), ioSurface.get(), 0
+          ));
+      } else {
+        ownedTexture = context.createMetalTexture(std::move(descriptor));
+      }
       if (!ownedTexture) {
         throw std::bad_alloc();
       }
@@ -208,6 +267,8 @@ class MetalTextureBackend::MetalTextureRenderableResource final
   mln::Size size;
   MTL::Texture* borrowedTexture = nullptr;
   MTL::PixelFormat ownedPixelFormat;
+  bool ioSurfaceBacked;
+  IOSurfacePtr ioSurface;
   mln::mtl::MTLTexturePtr ownedTexture;
   mln::gfx::Texture2DPtr depthTexture;
   mln::gfx::Texture2DPtr stencilTexture;
@@ -217,11 +278,12 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
 MetalTextureBackend::MetalTextureBackend(
   MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
-  std::size_t ring_depth, MTL::PixelFormat pixel_format
+  std::size_t ring_depth, MTL::PixelFormat pixel_format, bool io_surfaces
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       owned_pixel_format_(pixel_format),
+      io_surfaces_(io_surfaces),
       ring_(ring_depth) {
   device = NS::RetainPtr(host_device);
   commandQueue = host_queue != nullptr
@@ -260,7 +322,7 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
       *this, static_cast<mln::mtl::Context&>(getContext()), getSize(),
       borrowed_textures_.empty() ? nullptr
                                  : borrowed_textures_[ring_.selected()],
-      owned_pixel_format_
+      owned_pixel_format_, io_surfaces_
     );
     // Recorded with the resource it describes, so a slot that keeps an older
     // resource keeps the size that resource was built for.

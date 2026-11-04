@@ -395,6 +395,16 @@ internal fun NativeArena.writeDxgiSharedTextureRingDescriptor(
   value: DxgiSharedTextureRingDescriptor,
 ): Long = allocate(16, 4).also { putDxgiSharedTextureRingDescriptor(it, value) }
 
+internal fun NativeArena.putIoSurfaceRingDescriptor(target: Long, value: IoSurfaceRingDescriptor) {
+  writeU32(target, w(20, 24).toUInt())
+  putLogicalSize(target + 4, value.logicalSize)
+  writeU32(target + 12, value.bufferCount)
+  putMetalContextDescriptor(target + 16, value.context)
+}
+
+internal fun NativeArena.writeIoSurfaceRingDescriptor(value: IoSurfaceRingDescriptor): Long =
+  allocate(w(20, 24), w(4, 8)).also { putIoSurfaceRingDescriptor(it, value) }
+
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
   value: MetalBorrowedTextureDescriptor,
@@ -1328,6 +1338,19 @@ internal fun readDxgiSharedTextureFrame(
     )
     .also { it.bindingScope = scope }
 
+internal fun readIoSurfaceFrame(source: Long, scope: ViewScope? = null): IoSurfaceFrame =
+  IoSurfaceFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      surface =
+        readAddress(source + w(28, 32, 24)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+    )
+    .also { it.bindingScope = scope }
+
 internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
   MetalTextureFrame(
       width = readU32(source + 4),
@@ -1730,19 +1753,19 @@ internal fun NativeArena.putDmaBufFormat(target: Long, value: DmaBufFormat) {
 internal fun NativeArena.writeDmaBufFormat(value: DmaBufFormat): Long =
   allocate(w(16, 16, 12), w(8, 8, 4)).also { putDmaBufFormat(it, value) }
 
-internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
-  writeAddress(target, value.texture.address)
-}
-
-internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
-  allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
-
 internal fun NativeArena.putMetalContextDescriptor(target: Long, value: MetalContextDescriptor) {
   writeAddress(target, value.device.address)
 }
 
 internal fun NativeArena.writeMetalContextDescriptor(value: MetalContextDescriptor): Long =
   allocate(w(4, 8), w(4, 8)).also { putMetalContextDescriptor(it, value) }
+
+internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
+  writeAddress(target, value.texture.address)
+}
+
+internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
+  allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
 
 internal fun NativeArena.putOpenGlContextDescriptor(target: Long, value: OpenGlContextDescriptor) {
   writeU32(target + 4, value.ownership.rawValue)

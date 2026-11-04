@@ -41,6 +41,9 @@ auto validate_dma_buf_ring_descriptor(
 auto validate_dxgi_shared_texture_ring_descriptor(
   const mln_dxgi_shared_texture_ring_descriptor* descriptor
 ) -> mln_status;
+auto validate_io_surface_ring_descriptor(
+  const mln_io_surface_ring_descriptor* descriptor
+) -> mln_status;
 auto validate_metal_borrowed_texture_replacement(
   const mln_metal_borrowed_texture_replacement* replacement
 ) -> mln_status;
@@ -116,6 +119,9 @@ auto acquired_frame_get_dma_buf(
 ) -> mln_status;
 auto acquired_frame_get_dxgi_shared_texture(
   mln_acquired_frame frame, mln_dxgi_shared_texture_frame* out_frame
+) -> mln_status;
+auto acquired_frame_get_io_surface(
+  mln_acquired_frame frame, mln_io_surface_frame* out_frame
 ) -> mln_status;
 
 }  // namespace mln::core

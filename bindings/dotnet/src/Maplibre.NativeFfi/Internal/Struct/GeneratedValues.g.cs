@@ -918,6 +918,27 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static IoSurfaceFrame CopyIoSurfaceFrame(mln_io_surface_frame value) =>
+        new(
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.slot,
+            NativePointer.FromNativeAddress((nint)value.surface)
+        );
+
+    internal static mln_io_surface_ring_descriptor NativeIoSurfaceRingDescriptor(
+        IoSurfaceRingDescriptor value
+    )
+    {
+        var native = new mln_io_surface_ring_descriptor();
+        native.size = (uint)sizeof(mln_io_surface_ring_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.buffer_count = value.BufferCount;
+        native.context = NativeMetalContextDescriptor(value.Context);
+        return native;
+    }
+
     internal static LatLng CopyLatLng(mln_lat_lng value) => new(value.latitude, value.longitude);
 
     internal static mln_lat_lng NativeLatLng(LatLng value)

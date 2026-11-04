@@ -26,6 +26,8 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_acquired_frame_get_io_surface =
+    Ffm.downcall("mln_acquired_frame_get_io_surface", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_metal_texture =
     Ffm.downcall("mln_acquired_frame_get_metal_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_open_gl_texture =
@@ -226,6 +228,17 @@ internal actual object C {
       "mln_map_attach_dxgi_shared_texture_ring",
       JAVA_INT,
       JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_attach_io_surface_ring =
+    Ffm.downcall(
+      "mln_map_attach_io_surface_ring",
+      JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
@@ -1428,6 +1441,12 @@ internal actual object C {
   ): Int =
     mln_acquired_frame_get_dxgi_shared_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
 
+  actual fun mln_acquired_frame_get_io_surface(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int = mln_acquired_frame_get_io_surface.invokeExact(frame, outFrame, outDiagnostic) as Int
+
   actual fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -1749,6 +1768,23 @@ internal actual object C {
       map,
       descriptor,
       device,
+      options,
+      outSession,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_attach_io_surface_ring(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_attach_io_surface_ring.invokeExact(
+      map,
+      descriptor,
       options,
       outSession,
       completion,

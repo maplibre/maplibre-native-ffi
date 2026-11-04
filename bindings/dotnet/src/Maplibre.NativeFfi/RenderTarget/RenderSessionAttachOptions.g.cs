@@ -40,9 +40,9 @@ public readonly partial record struct RenderSessionAttachOptions
     /// browser's WebGPU device.</description></item>
     /// <item><description><c>RenderDriverKind.CoreWorker</c> for a transferred
     /// WebGL canvas, an Android, OpenHarmony, or Win32 window, a Wayland
-    /// surface, a ring of Android hardware buffers, dmabufs, or DXGI shared
-    /// textures, or an offscreen session.</description></item>
-    /// <item><description>Either one for a Metal or Vulkan
+    /// surface, a ring of Android hardware buffers, dmabufs, DXGI shared
+    /// textures, or IOSurfaces, or an offscreen session.</description></item>
+    /// <item><description>Either one for another Metal or Vulkan
     /// target.</description></item>
     /// </list>
     /// <para>An attach with another driver fails with

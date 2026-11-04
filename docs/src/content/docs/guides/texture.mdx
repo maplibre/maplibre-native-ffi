@@ -1,8 +1,9 @@
 ---
 title: Render to a texture
 description: Share rendered frames with your renderer.
-# Scope: rings of your textures, of Android hardware buffers, of dmabufs, or
-# of DXGI shared textures, acquiring frames, and replacing the ring.
+# Scope: rings of your textures, of Android hardware buffers, of dmabufs, of
+# DXGI shared textures, or of IOSurfaces, acquiring frames, and replacing the
+# ring.
 # Reading pixels back belongs in Render images. Running driver work on your
 # graphics thread belongs in Render to a window.
 ---
@@ -82,6 +83,17 @@ created with its adapter's LUID. Get each frame's texture with
 [](api:mln_acquired_frame_get_dxgi_shared_texture). To resize the ring, use
 [](api:mln_render_session_resize) instead of replacing it. Attach with three
 textures, and keep each frame acquired until your renderer is done with it.
+
+### Apple IOSurfaces
+
+On Apple platforms with Metal, the library can allocate the ring itself, as
+IOSurfaces that your UI draws, such as through a `CVPixelBuffer` from
+`CVPixelBufferCreateWithIOSurface`. Attach with
+[](api:mln_map_attach_io_surface_ring) and the library's thread as the driver,
+and get each frame's surface with [](api:mln_acquired_frame_get_io_surface). To
+resize the ring, use [](api:mln_render_session_resize) instead of replacing it.
+Attach with three surfaces, and keep each frame acquired until your UI is done
+with it.
 
 ## Draw each frame
 

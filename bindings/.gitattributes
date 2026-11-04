@@ -9,6 +9,9 @@
 /dotnet/src/Maplibre.NativeFfi/Android/AndroidSurfaceDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Android/AndroidSurfaceReplacement.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Android/MaplibreNative.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Apple/IoSurfaceFrame.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Apple/IoSurfaceFrameView.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Apple/IoSurfaceRingDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Apple/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
@@ -334,7 +337,9 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAndroidRenderSessionOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAppleAcquiredFrameOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAppleGlobalsOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedAppleMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedBaseGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedCameraMapOperations.swift linguist-generated=true
@@ -372,6 +377,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedWin32MapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedWin32RenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedAndroidValues.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedAppleValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedBaseValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedLinuxValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedLoggingValues.swift linguist-generated=true

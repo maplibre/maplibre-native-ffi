@@ -132,9 +132,13 @@ class MetalTextureSessionBackend final
  public:
   MetalTextureSessionBackend(
     MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
-    std::size_t ring_depth, MTL::PixelFormat pixel_format
+    std::size_t ring_depth, MTL::PixelFormat pixel_format,
+    bool io_surfaces = false
   )
-      : backend_(host_device, host_queue, size, ring_depth, pixel_format) {}
+      : backend_(
+          host_device, host_queue, size, ring_depth, pixel_format, io_surfaces
+        ),
+        io_surfaces_(io_surfaces) {}
 
   MetalTextureSessionBackend(
     std::vector<MTL::Texture*> borrowed_textures, MTL::CommandQueue* host_queue,
@@ -223,6 +227,17 @@ class MetalTextureSessionBackend final
         "rendered Metal texture is not available"
       );
     }
+    if (io_surfaces_) {
+      out_metadata = mln_io_surface_frame{
+        .size = sizeof(mln_io_surface_frame),
+        .width = static_cast<uint32_t>(metal_texture->width()),
+        .height = static_cast<uint32_t>(metal_texture->height()),
+        .scale_factor = frame.scale_factor,
+        .slot = frame.slot,
+        .surface = metal_texture->iosurface(),
+      };
+      return MLN_STATUS_OK;
+    }
     out_metadata = mln_metal_texture_frame{
       .size = sizeof(mln_metal_texture_frame),
       .width = static_cast<uint32_t>(metal_texture->width()),
@@ -238,6 +253,7 @@ class MetalTextureSessionBackend final
 
  private:
   mln::core::MetalTextureBackend backend_;
+  bool io_surfaces_ = false;
 };
 
 auto retain_host_queue(
@@ -329,6 +345,69 @@ auto metal_borrowed_texture_attach_start(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
     valueless_completion<&mln_map_attach_metal_borrowed_texture>()
+  );
+}
+
+auto io_surface_ring_attach_start(
+  mln_map map, const mln_io_surface_ring_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
+) -> mln_status {
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
+  if (map_status != MLN_STATUS_OK) return map_status;
+  const auto descriptor_status =
+    validate_io_surface_ring_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) return descriptor_status;
+  const auto request_status =
+    validate_render_session_attach_request(options, out_session, completion);
+  if (request_status != MLN_STATUS_OK) return request_status;
+  const auto driver_status = require_render_driver(
+    options, MLN_RENDER_DRIVER_CORE_WORKER,
+    "an IOSurface ring renders on a library thread, since the library owns "
+    "its command queue; attach it with MLN_RENDER_DRIVER_CORE_WORKER"
+  );
+  if (driver_status != MLN_STATUS_OK) return driver_status;
+
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  const auto size_status = size_new_session(*session, descriptor->logical_size);
+  if (size_status != MLN_STATUS_OK) return size_status;
+  auto device =
+    descriptor->context.device != nullptr
+      ? NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device))
+      : NS::TransferPtr(MTL::CreateSystemDefaultDevice());
+  if (!device) {
+    set_thread_error("Metal has no device");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  session->texture.mode = TextureSessionMode::Exported;
+  session->producer_sync_kinds |= MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT;
+  session->initialize_backend =
+    [device = std::move(device),
+     depth = descriptor->buffer_count](mln_render_session_object& target) {
+      auto backend = std::make_unique<MetalTextureSessionBackend>(
+        device.get(), nullptr,
+        mln::Size{target.physical_width, target.physical_height}, depth,
+        MTL::PixelFormatBGRA8Unorm, true
+      );
+      backend->set_producer_sync_kind(target.producer_sync_kind);
+      target.texture.backend = std::move(backend);
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = {},
+    .texture_ring_depth = descriptor->buffer_count,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
+    .producer_sync_kind = {},
+    .consumer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE |
+                           MLN_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT,
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, completion,
+    valueless_completion<&mln_map_attach_io_surface_ring>()
   );
 }
 

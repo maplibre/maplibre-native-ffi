@@ -28,6 +28,8 @@ import type {
   GeoJsonSourceOptions,
   GpuSync,
   HttpHeaderTransform,
+  IoSurfaceFrame,
+  IoSurfaceRingDescriptor,
   LatLng,
   LatLngBounds,
   LogHandler,
@@ -583,6 +585,41 @@ export class AcquiredFrameHandle extends Owner {
           ADOPT,
           scope,
           native.mln_acquired_frame_get_dxgi_shared_texture(this.id),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Gets the IOSurface of an acquired frame.
+   *
+   * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+   * surface. Once you release or discard the frame, the session may render into
+   * the surface again. For an API that takes a `CVPixelBuffer`, wrap the
+   * surface with `CVPixelBufferCreateWithIOSurface`. A reference that you take
+   * with `CFRetain`, or a pixel buffer that wraps the surface, keeps the
+   * surface's memory, but not its contents.
+   *
+   * See `mln_acquired_frame_get_io_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
+   */
+  withIoSurface<T>(use: (view: ScopedIoSurfaceFrame) => T): T {
+    return new ViewScope(
+      ADOPT,
+      this,
+      (handle) => native.mln_acquired_frame_view_begin(handle),
+      (scope) => native.mln_acquired_frame_view_end(scope),
+    ).use((scope) =>
+      use(
+        new ScopedIoSurfaceFrame(
+          ADOPT,
+          scope,
+          native.mln_acquired_frame_get_io_surface(this.id),
         ),
       ),
     );
@@ -1334,6 +1371,62 @@ export class MapHandle extends Owner {
             this.id,
             descriptor,
             device?.id,
+            options,
+            completion,
+          ),
+        (handle, ready) =>
+          adopt(
+            handle,
+            () =>
+              new RenderSessionHandle(
+                ADOPT,
+                handle,
+                this,
+                ready,
+                registrations,
+              ),
+            (disposed) =>
+              native.mln_render_session_dispose(disposed, undefined),
+          ),
+      ),
+    );
+  }
+
+  /**
+   * Creates a session that renders the map into a ring of IOSurfaces that the
+   * library allocates.
+   *
+   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+   * surface with `AcquiredFrameHandle.withIoSurface()`.
+   * `RenderSessionHandle.resize()` gives the ring new surfaces of the new size.
+   * Attach with `RenderDriverKind.coreWorker`.
+   *
+   * To hand frames to a reader that can't wait on an event, such as Flutter's
+   * `copyPixelBuffer`, attach without `GpuSyncKindFlag.metalSharedEvent` in
+   * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
+   * before you acquire it. Release a frame with `GpuSyncKind.cpuComplete` only
+   * once the reader has finished with its surface.
+   *
+   * See `mln_map_attach_io_surface_ring` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.metal`.
+   * - `Status.nativeError` when `context` names no device and the system has no
+   *   Metal device.
+   */
+  attachIoSurfaceRing(
+    descriptor: IoSurfaceRingDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionHandle {
+    return withRegistrations((registrations) =>
+      attach(
+        (completion) =>
+          native.mln_map_attach_io_surface_ring(
+            this.id,
+            descriptor,
             options,
             completion,
           ),
@@ -5099,7 +5192,8 @@ export class RenderSessionHandle extends Owner {
    * Errors:
    *
    * - `Status.unsupported` when the session renders offscreen or into Android
-   *   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
+   *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
+   *   allocates.
    * - `Status.unsupported` when the target is a WebGL canvas.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
@@ -6719,6 +6813,47 @@ export class ScopedGpuSync {
 
   get value(): GpuSync["value"] {
     return this.#value.value;
+  }
+}
+
+/**
+ * A `IoSurfaceFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withIoSurface} runs. Its other members stay
+ * readable after the callback returns.
+ */
+export class ScopedIoSurfaceFrame {
+  readonly #value: IoSurfaceFrame;
+  readonly #scope: ViewScope;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, scope: ViewScope, value: IoSurfaceFrame) {
+    checkKey(key);
+    this.#value = value;
+    this.#scope = scope;
+  }
+
+  get width(): IoSurfaceFrame["width"] {
+    return this.#value.width;
+  }
+
+  get height(): IoSurfaceFrame["height"] {
+    return this.#value.height;
+  }
+
+  get scaleFactor(): IoSurfaceFrame["scaleFactor"] {
+    return this.#value.scaleFactor;
+  }
+
+  get slot(): IoSurfaceFrame["slot"] {
+    return this.#value.slot;
+  }
+
+  get surface(): IoSurfaceFrame["surface"] {
+    return this.#scope.active(this.#value).surface;
   }
 }
 

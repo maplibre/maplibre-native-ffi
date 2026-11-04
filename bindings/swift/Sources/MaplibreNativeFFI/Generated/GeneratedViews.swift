@@ -107,6 +107,34 @@ public final class DxgiSharedTextureFrameView {
   }
 }
 
+public final class IoSurfaceFrameView {
+  private let snapshot: IoSurfaceFrame
+  private let scope: NativeViewScope
+  init(_ value: IoSurfaceFrame, scope: NativeViewScope) {
+    snapshot = value; self.scope = scope
+  }
+
+  public var width: UInt32 {
+    snapshot.width
+  }
+
+  public var height: UInt32 {
+    snapshot.height
+  }
+
+  public var scaleFactor: Double {
+    snapshot.scaleFactor
+  }
+
+  public var slot: UInt32 {
+    snapshot.slot
+  }
+
+  public var surface: NativePointer {
+    get throws { try scope.check(); return snapshot.surface }
+  }
+}
+
 public final class MetalTextureFrameView {
   private let snapshot: MetalTextureFrame
   private let scope: NativeViewScope

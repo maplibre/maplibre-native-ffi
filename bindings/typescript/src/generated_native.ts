@@ -26,6 +26,8 @@ import type {
   GeoJsonSourceOptions,
   GpuSync,
   HttpHeaderTransform,
+  IoSurfaceFrame,
+  IoSurfaceRingDescriptor,
   LatLng,
   LatLngBounds,
   LogHandler,
@@ -113,6 +115,7 @@ export interface NativeOperations {
   mln_acquired_frame_get_dxgi_shared_texture(
     frame: bigint,
   ): DxgiSharedTextureFrame;
+  mln_acquired_frame_get_io_surface(frame: bigint): IoSurfaceFrame;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
   mln_acquired_frame_get_open_gl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
@@ -218,6 +221,12 @@ export interface NativeOperations {
     map: bigint,
     descriptor: DxgiSharedTextureRingDescriptor,
     device: bigint | undefined,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_io_surface_ring(
+    map: bigint,
+    descriptor: IoSurfaceRingDescriptor,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
   ): bigint;

@@ -33,6 +33,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_acquired_frame_get_io_surface(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -272,6 +279,16 @@ internal actual object C {
     map: Long,
     descriptor: Long,
     device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_attach_io_surface_ring(
+    map: Long,
+    descriptor: Long,
     options: Long,
     outSession: Long,
     completion: Long,

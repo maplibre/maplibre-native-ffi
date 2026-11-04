@@ -34,6 +34,15 @@ DxgiSharedTextureFrame _readDxgiSharedTextureFrame(
   handle: NativePointer(source.handle.address),
 );
 
+IoSurfaceFrame _readIoSurfaceFrame(raw.mln_io_surface_frame source) =>
+    IoSurfaceFrame(
+      width: source.width,
+      height: source.height,
+      scaleFactor: source.scale_factor,
+      slot: source.slot,
+      surface: NativePointer(source.surface.address),
+    );
+
 MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
     MetalTextureFrame(
       width: source.width,
@@ -1000,6 +1009,29 @@ _writeDxgiSharedTextureRingDescriptor(
   return result;
 }
 
+Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
+  MetalContextDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_metal_context_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_metal_context_descriptor>();
+  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
+  return result;
+}
+
+Pointer<raw.mln_io_surface_ring_descriptor> _writeIoSurfaceRingDescriptor(
+  IoSurfaceRingDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_io_surface_ring_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_io_surface_ring_descriptor>();
+  result.ref.size = sizeOf<raw.mln_io_surface_ring_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.buffer_count = _nativeInteger(value.bufferCount, 0, 4294967295);
+  result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
+  return result;
+}
+
 Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
   MetalBorrowedTexture value,
   Allocator arena, {
@@ -1043,16 +1075,6 @@ _writeMetalBorrowedTextureDescriptor(
   result.ref.command_queue = Pointer<Void>.fromAddress(
     value.commandQueue.address,
   ).cast();
-  return result;
-}
-
-Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
-  MetalContextDescriptor value,
-  Allocator arena, {
-  Pointer<raw.mln_metal_context_descriptor>? into,
-}) {
-  final result = into ?? arena<raw.mln_metal_context_descriptor>();
-  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
   return result;
 }
 
@@ -3685,6 +3707,42 @@ final class AcquiredFrameHandle implements Finalizable {
     return _readDxgiSharedTextureFrame(outFrame.ref);
   });
 
+  /// Gets the IOSurface of an acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// surface. Once you release or discard the frame, the session may render
+  /// into the surface again. For an API that takes a `CVPixelBuffer`, wrap the
+  /// surface with `CVPixelBufferCreateWithIOSurface`. A reference that you take
+  /// with `CFRetain`, or a pixel buffer that wraps the surface, keeps the
+  /// surface's memory, but not its contents.
+  ///
+  /// See `mln_acquired_frame_get_io_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+  T withIoSurface<T>(T Function(ScopedIoSurfaceFrame view) use) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use((scope) => use(ScopedIoSurfaceFrame._(scope, _getIoSurface())));
+
+  IoSurfaceFrame _getIoSurface() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_io_surface_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_io_surface_frame>();
+    _check(
+      raw.mln_acquired_frame_get_io_surface(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
+    return _readIoSurfaceFrame(outFrame.ref);
+  });
+
   /// Gets the Metal texture of an acquired frame.
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
@@ -5022,6 +5080,58 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
           _handle.raw,
           _writeDxgiSharedTextureRingDescriptor(descriptor, arena),
           (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
+
+  /// Creates a session that renders the map into a ring of IOSurfaces that the
+  /// library allocates.
+  ///
+  /// Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+  /// surface with `AcquiredFrameHandle.withIoSurface()`.
+  /// `RenderSessionHandle.resize()` gives the ring new surfaces of the new
+  /// size. Attach with `RenderDriverKind.coreWorker`.
+  ///
+  /// To hand frames to a reader that can't wait on an event, such as Flutter's
+  /// `copyPixelBuffer`, attach without `GpuSyncKindFlag.metalSharedEvent` in
+  /// `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+  /// finishes before you acquire it. Release a frame with
+  /// `GpuSyncKind.cpuComplete` only once the reader has finished with its
+  /// surface.
+  ///
+  /// See `mln_map_attach_io_surface_ring` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+  ///   `RenderBackendFlag.metal`.
+  /// - `Status.nativeError` when `context` names no device and the system has
+  ///   no Metal device.
+  RenderSessionHandle attachIoSurfaceRing(
+    IoSurfaceRingDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_io_surface_ring(
+          _handle.raw,
+          _writeIoSurfaceRingDescriptor(descriptor, arena),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
           completion,
@@ -7776,7 +7886,8 @@ final class RenderSessionHandle implements Finalizable {
   /// Errors:
   ///
   /// - `Status.unsupported` when the session renders offscreen or into Android
-  ///   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
+  ///   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
+  ///   allocates.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
@@ -9106,6 +9217,24 @@ final class ScopedDxgiSharedTextureFrame {
     _value.handle.address,
     checkValid: _scope.checkActive,
     debugName: 'DxgiSharedTextureFrame.handle',
+  );
+}
+
+/// A `IoSurfaceFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withIoSurface` runs. Its
+/// other members stay readable after the callback returns.
+final class ScopedIoSurfaceFrame {
+  ScopedIoSurfaceFrame._(this._scope, this._value);
+  final IoSurfaceFrame _value;
+  final _NativeViewScope _scope;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get slot => _value.slot;
+  ScopedNativePointer get surface => ScopedNativePointer(
+    _value.surface.address,
+    checkValid: _scope.checkActive,
+    debugName: 'IoSurfaceFrame.surface',
   );
 }
 

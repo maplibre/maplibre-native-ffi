@@ -559,6 +559,60 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a session that renders the map into a ring of IOSurfaces that
+    /// the library allocates.
+    /// </summary>
+    /// <remarks>
+    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
+    /// and get its surface with <c>AcquiredFrameHandle.WithIoSurface()</c>.
+    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new surfaces of
+    /// the new size. Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
+    /// <para>To hand frames to a reader that can't wait on an event, such as
+    /// Flutter's <c>copyPixelBuffer</c>, attach without
+    /// <c>GpuSyncKindFlag.MetalSharedEvent</c> in
+    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// <c>GpuSyncKind.CpuComplete</c> only once the reader has finished with
+    /// its surface.</para>
+    /// <para>See <c>mln_map_attach_io_surface_ring</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when
+    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
+    /// <c>RenderBackendFlag.Metal</c>.</description></item>
+    /// <item><description><c>Status.NativeError</c> when <c>context</c> names
+    /// no device and the system has no Metal device.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
+    public RenderSessionHandle AttachIoSurfaceRing(
+        IoSurfaceRingDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeDescriptor = NativeIoSurfaceRingDescriptor(descriptor);
+        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+        MlnRenderSession outSession = default;
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_attach_io_surface_ring(
+            Handle,
+            &nativeDescriptor,
+            &nativeOptions,
+            &outSession,
+            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        var nativeReady = nativePending.Submitted(nativeStatus);
+        scope.Accept();
+        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
+    }
+
+    /// <summary>
     /// Creates a session that renders the map into a ring of your Metal
     /// textures.
     /// </summary>

@@ -30,9 +30,12 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   };
 
   // A null host_queue makes the backend create its own queue on the device.
+  // With io_surfaces, each slot renders into a texture over an IOSurface of
+  // its own, which the texture's iosurface() names.
   MetalTextureBackend(
     MTL::Device* host_device, MTL::CommandQueue* host_queue, mln::Size size,
-    std::size_t ring_depth, MTL::PixelFormat pixel_format
+    std::size_t ring_depth, MTL::PixelFormat pixel_format,
+    bool io_surfaces = false
   );
   MetalTextureBackend(
     std::vector<MTL::Texture*> borrowed_textures, MTL::CommandQueue* host_queue,
@@ -89,6 +92,7 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
   MTL::PixelFormat owned_pixel_format_ = MTL::PixelFormatInvalid;
+  bool io_surfaces_ = false;
   RenderableSlotRing ring_;
   std::optional<CommandBufferFailure> command_buffer_failure_;
   mln_gpu_sync_kind producer_sync_kind_ = MLN_GPU_SYNC_CPU_COMPLETE;

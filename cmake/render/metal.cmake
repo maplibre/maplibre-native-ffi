@@ -1,7 +1,7 @@
 function(mln_ffi_configure_render_dependencies target)
   target_link_libraries(
     ${target}
-    INTERFACE "-framework Metal" "-framework QuartzCore")
+    INTERFACE "-framework IOSurface" "-framework Metal" "-framework QuartzCore")
 endfunction()
 
 function(mln_ffi_configure_renderer target)
