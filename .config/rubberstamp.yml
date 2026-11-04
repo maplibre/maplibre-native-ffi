@@ -633,6 +633,18 @@ ci:
               - bindings/typescript/react-native/**
               - bindings/typescript/native/hermes/**
           then: apply
+    swiftui:
+      covers: >-
+        Builds the SwiftUI example for the iOS simulator and macOS as release
+        builds, against the archives that those targets built, so it runs those
+        targets. It runs no app. Catches what breaks the example's Xcode project
+        or its Swift: changes to the example, and to the Swift binding's Apple
+        and Metal API that it calls, such as surfaces and frame pacing.
+      rules:
+        - if:
+            files:
+              - examples/swiftui/**
+          then: apply
     ohpm:
       covers: >-
         Packs the ArkTS OHPM packages from the addons that the OpenHarmony

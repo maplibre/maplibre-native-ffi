@@ -1,0 +1,70 @@
+# The SwiftUI example. Run it with `:ios` or `:macos`.
+
+# Xcode resolves the repository's Swift package as the app's dependency, and
+# rewrites its Package.resolved. The manifest pins the DocC plugin only under
+# this variable, so with it the file keeps the plugin's pins.
+[env]
+MLN_FFI_SWIFT_DOCC = "1"
+
+# Writes the Xcode project, and the XCFramework that it links, from every
+# Apple Metal build of the C library that exists. Each task below builds the
+# one it needs first.
+[tasks.project]
+description = "Write the SwiftUI example's Xcode project, and an XCFramework of the C library's local Apple builds for it to link."
+tools = { "aqua:yonaskolb/XcodeGen" = "2.46.0" }
+run = '''
+frameworks=()
+for preset in ios-arm64-metal ios-simulator-arm64-metal macos-arm64-metal; do
+  framework="$MISE_MONOREPO_ROOT/build/$preset/install/Frameworks/MaplibreNativeC.framework"
+  [[ -d "$framework" ]] && frameworks+=(-framework "$framework")
+done
+rm -rf build/MaplibreNativeC.xcframework
+xcodebuild -create-xcframework "${frameworks[@]}" -output build/MaplibreNativeC.xcframework
+xcodegen generate --quiet
+'''
+
+[tasks.ios]
+description = "Build the C library for the iOS simulator, then build the SwiftUI example and run it in a simulator."
+usage = '''flag "--udid <udid>" help="The simulator to run in. By default, this worktree's simulator from devices-cli."'''
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+mise run //examples/swiftui:project
+udid="${usage_udid:-$(devices-cli get ios)}"
+xcodebuild -project MaplibreExample.xcodeproj -scheme MaplibreExample \
+  -destination "id=$udid" -derivedDataPath build/ios-simulator -quiet build
+open -a Simulator --args -CurrentDeviceUDID "$udid"
+xcrun simctl install "$udid" build/ios-simulator/Build/Products/Debug-iphonesimulator/MaplibreExample.app
+xcrun simctl launch --terminate-running-process "$udid" org.maplibre.nativeffi.example
+'''
+
+[tasks.macos]
+description = "Build the C library for macOS, then build the SwiftUI example and run it."
+depends = [{ task = "//:build", args = ["macos-arm64-metal"] }]
+run = '''
+mise run //examples/swiftui:project
+xcodebuild -project MaplibreExample.xcodeproj -scheme MaplibreExample \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath build/macos -quiet build
+open build/macos/Build/Products/Debug/MaplibreExample.app
+'''
+
+# CI builds the app with these, without running it.
+[tasks.build-ios]
+description = "Build the C library for the iOS simulator, then build the SwiftUI example's release app for it, unsigned."
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+mise run //examples/swiftui:project
+# The C library has an arm64 simulator slice only.
+xcodebuild -project MaplibreExample.xcodeproj -scheme MaplibreExample \
+  -configuration Release -destination 'generic/platform=iOS Simulator' \
+  ARCHS=arm64 -derivedDataPath build/ios-simulator CODE_SIGNING_ALLOWED=NO build
+'''
+
+[tasks.build-macos]
+description = "Build the C library for macOS, then build the SwiftUI example's release app for it, unsigned."
+depends = [{ task = "//:build", args = ["macos-arm64-metal"] }]
+run = '''
+mise run //examples/swiftui:project
+xcodebuild -project MaplibreExample.xcodeproj -scheme MaplibreExample \
+  -configuration Release -destination 'generic/platform=macOS' \
+  ARCHS=arm64 -derivedDataPath build/macos CODE_SIGNING_ALLOWED=NO build
+'''

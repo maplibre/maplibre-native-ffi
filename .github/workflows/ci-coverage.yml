@@ -712,6 +712,64 @@ jobs:
           mise run --no-deps install-native-package ios-simulator-arm64-metal
           build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
       - run: mise run //examples/react-native:build-ios
+  # The SwiftUI example builds against the archive that a target job built
+  # and tested. It doesn't run the app.
+  swiftui-ios:
+    name: example / swiftui ios
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'swiftui-ios')
+    env:
+      MISE_TASK_SKIP: //:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          zig: skip
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-package-ios-simulator-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist
+      - run: >-
+          mise run --no-deps install-native-package ios-simulator-arm64-metal
+          build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
+      - run: mise run //examples/swiftui:build-ios
+  swiftui-macos:
+    name: example / swiftui macos
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'swiftui-macos')
+    env:
+      MISE_TASK_SKIP: //:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          zig: skip
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-package-macos-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist
+      - run: >-
+          mise run --no-deps install-native-package macos-arm64-metal
+          build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
+      - run: mise run //examples/swiftui:build-macos
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
@@ -739,6 +797,8 @@ jobs:
       - arkts-ohpm
       - react-native-android
       - react-native-ios
+      - swiftui-ios
+      - swiftui-macos
       - support-matrix
     steps:
       - name: Require every planned job
