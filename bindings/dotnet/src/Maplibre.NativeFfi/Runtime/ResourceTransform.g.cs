@@ -26,8 +26,7 @@ public readonly partial record struct ResourceTransform
 
     /// <summary>
     /// The first rule that matches a request adds its parameters, and no other.
-    /// A request that no rule matches keeps its URL. Rules never fail a
-    /// request.
+    /// A request that no rule matches keeps its URL.
     /// </summary>
     public ImmutableArray<ResourceTransformRule> Rules
     {

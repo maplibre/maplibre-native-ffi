@@ -237,8 +237,7 @@ public struct MapLoadError: RawRepresentable, CustomStringConvertible,
   public static let unknown: MapLoadError = .init(rawValue: 0)
   /// The style document isn't a valid style.
   public static let styleParse: MapLoadError = .init(rawValue: 1)
-  /// The style's request failed, for any reason, including a 404 or a missing
-  /// file.
+  /// The style's request failed, such as with a 404 or a missing file.
   public static let styleLoad: MapLoadError = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
@@ -924,7 +923,7 @@ public struct ResourceStoragePolicy: RawRepresentable, CustomStringConvertible,
 public struct ResourceTransform: Sendable {
   public var callback: ResourceTransformCallback?
   /// The first rule that matches a request adds its parameters, and no other. A
-  /// request that no rule matches keeps its URL. Rules never fail a request.
+  /// request that no rule matches keeps its URL.
   public var rules: [ResourceTransformRule]
   public init(
     callback: ResourceTransformCallback? = nil,
@@ -1026,9 +1025,8 @@ public struct ResourceTransformError: Equatable, Hashable, Sendable {
 /// Query parameters to add to the URLs of requests that match a pattern.
 ///
 /// The library adds the parameters, in order, at the end of the URL's query and
-/// before any fragment. It writes `?` before them when the URL has no `?`, or
-/// `&` when the text before them ends with neither `?` nor `&`. It keeps the
-/// parameters that the URL already has, even one with the same name.
+/// before any fragment. It keeps the parameters that the URL already has, even
+/// one with the same name.
 ///
 /// See `mln_resource_transform_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -1610,10 +1608,6 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
 
 /// The kind of an event.
 ///
-/// An event's `payload_type` names the member of its payload that holds the
-/// event's details. An event that reports a failure carries the error's text in
-/// `message`.
-///
 /// Only maps in `MapMode.continuous` raise
 /// `RuntimeEventType.mapLoadingFinished`, `RuntimeEventType.mapIdle`, and the
 /// render frame and render map events. Offline region events come only for the
@@ -1629,10 +1623,8 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The camera is about to change. Its details are in `camera_change`.
   public static let mapCameraWillChange: RuntimeEventType = .init(rawValue: 1)
   public static let mapCameraIsChanging: RuntimeEventType = .init(rawValue: 2)
-  /// The camera changed. Its details are in `camera_change`.
   public static let mapCameraDidChange: RuntimeEventType = .init(rawValue: 3)
   public static let mapStyleLoaded: RuntimeEventType = .init(rawValue: 4)
   /// The map started to load a style.
@@ -1640,57 +1632,39 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   /// The map loaded its style and everything that the current view needs, and
   /// rendered the result.
   public static let mapLoadingFinished: RuntimeEventType = .init(rawValue: 6)
-  /// The map failed to load a style. Its details are in `loading_failed`, and
-  /// the error's text is in `message`.
+  /// The map failed to load a style.
   public static let mapLoadingFailed: RuntimeEventType = .init(rawValue: 7)
   /// The map rendered a complete frame and has nothing left to load, animate,
   /// or redraw.
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
-  /// The map failed to render. The error's text is in `message`.
   public static let mapRenderError: RuntimeEventType = .init(rawValue: 9)
   public static let mapRenderFrameStarted: RuntimeEventType =
     .init(rawValue: 10)
-  /// The map rendered a frame. Its details are in `render_frame`.
   public static let mapRenderFrameFinished: RuntimeEventType =
     .init(rawValue: 11)
   public static let mapRenderMapStarted: RuntimeEventType = .init(rawValue: 12)
   public static let mapRenderMapFinished: RuntimeEventType = .init(rawValue: 13)
-  /// The style uses an image that it doesn't have. Its details are in
-  /// `style_image`.
+  /// The style uses an image that it doesn't have.
   public static let mapStyleImageMissing: RuntimeEventType = .init(rawValue: 14)
-  /// A tile moved to another step of loading. Its details are in `tile_action`.
+  /// A tile moved to another step of loading.
   public static let mapTileAction: RuntimeEventType = .init(rawValue: 15)
-  /// A source changed. Its details are in `source_changed`.
   public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 16)
-  /// The region's status changed. Its details are in `offline_region_status`.
   public static let offlineRegionStatusChanged: RuntimeEventType =
     .init(rawValue: 17)
-  /// A resource that the region needs failed to download. Its details are in
-  /// `offline_region_response_error`, and the error's text is in `message`.
+  /// A resource that the region needs failed to download.
   public static let offlineRegionResponseError: RuntimeEventType =
     .init(rawValue: 18)
   /// The region's download became inactive because the cache file's offline
-  /// regions reached their limit of 6000 tiles from MapLibre's demo tile
-  /// server. Its details are in `offline_region_tile_count_limit`.
-  ///
-  /// Only tiles of sources on the demo server count toward the limit: sources
-  /// with a `maplibre://` URL, which resolves to
-  /// https://demotiles.maplibre.org. Tiles from other servers never count.
+  /// regions hold as many tiles from MapLibre's demo tile server as the limit
+  /// allows. Only tiles of sources with a `maplibre://` URL count toward the
+  /// limit.
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 19)
-  /// The map requested a range of glyphs. Its details are in `glyphs`.
   public static let mapGlyphsRequested: RuntimeEventType = .init(rawValue: 20)
-  /// A range of glyphs loaded. Its details are in `glyphs`.
   public static let mapGlyphsLoaded: RuntimeEventType = .init(rawValue: 21)
-  /// A range of glyphs failed to load. Its details are in `glyphs`, and the
-  /// error's text is in `message`.
   public static let mapGlyphsError: RuntimeEventType = .init(rawValue: 22)
-  /// The map requested a sprite. Its details are in `sprite`.
   public static let mapSpriteRequested: RuntimeEventType = .init(rawValue: 23)
-  /// A sprite loaded. Its details are in `sprite`.
   public static let mapSpriteLoaded: RuntimeEventType = .init(rawValue: 24)
-  /// A sprite failed to load. Its details are in `sprite`, and the error's text
-  /// is in `message`.
   public static let mapSpriteError: RuntimeEventType = .init(rawValue: 25)
   public var description: String {
     switch rawValue {

@@ -696,9 +696,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when the padding in
-    /// <c>fitOptions</c> leaves no room for the area: its left and right add up
-    /// to at least the map's width, or its top and bottom to at least the map's
-    /// height.</description></item>
+    /// <c>fitOptions</c> leaves no room for the area.</description></item>
     /// </list>
     /// </remarks>
     public Task<CameraOptions> CameraForGeometryAsync(
@@ -741,9 +739,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when the padding in
-    /// <c>fitOptions</c> leaves no room for the area: its left and right add up
-    /// to at least the map's width, or its top and bottom to at least the map's
-    /// height.</description></item>
+    /// <c>fitOptions</c> leaves no room for the area.</description></item>
     /// </list>
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngBoundsAsync(
@@ -786,9 +782,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when the padding in
-    /// <c>fitOptions</c> leaves no room for the area: its left and right add up
-    /// to at least the map's width, or its top and bottom to at least the map's
-    /// height.</description></item>
+    /// <c>fitOptions</c> leaves no room for the area.</description></item>
     /// </list>
     /// </remarks>
     public Task<CameraOptions> CameraForLatLngsAsync(
@@ -911,19 +905,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </summary>
     /// <remarks>
     /// <para><c>geometry</c> is a GeoJSON geometry object with at least one
-    /// coordinate, not a feature. The map computes the camera when it runs the
-    /// command, from the camera and size that earlier commands leave, as
-    /// <c>MapHandle.CameraForGeometryAsync()</c> would then. The function
-    /// finishes when the map applies the change, before an animation
-    /// ends.</para>
+    /// coordinate, not a feature. The camera is the one that
+    /// <c>MapHandle.CameraForGeometryAsync()</c> computes after the commands
+    /// sent before this one apply. The function finishes when the map applies
+    /// the change, before an animation ends.</para>
     /// <para>See <c>mln_map_fit_camera_to_geometry</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when the padding in
-    /// <c>update</c> leaves no room for the area: its left and right add up to
-    /// at least the map's width, or its top and bottom to at least the map's
-    /// height. The camera doesn't move.</description></item>
+    /// <c>update</c> leaves no room for the area. The camera doesn't
+    /// move.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> FitCameraToGeometryAsync(string geometry, CameraFitUpdate update)
@@ -946,19 +938,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// an animation.
     /// </summary>
     /// <remarks>
-    /// <para>The map computes the camera when it runs the command, from the
-    /// camera and size that earlier commands leave, as
-    /// <c>MapHandle.CameraForLatLngBoundsAsync()</c> would then. The function
-    /// finishes when the map applies the change, before an animation
-    /// ends.</para>
+    /// <para>The camera is the one that
+    /// <c>MapHandle.CameraForLatLngBoundsAsync()</c> computes after the
+    /// commands sent before this one apply. The function finishes when the map
+    /// applies the change, before an animation ends.</para>
     /// <para>See <c>mln_map_fit_camera_to_lat_lng_bounds</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when the padding in
-    /// <c>update</c> leaves no room for the area: its left and right add up to
-    /// at least the map's width, or its top and bottom to at least the map's
-    /// height. The camera doesn't move.</description></item>
+    /// <c>update</c> leaves no room for the area. The camera doesn't
+    /// move.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> FitCameraToLatLngBoundsAsync(
@@ -984,19 +974,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// with an animation.
     /// </summary>
     /// <remarks>
-    /// <para><c>coordinates</c> must not be empty. The map computes the camera
-    /// when it runs the command, from the camera and size that earlier commands
-    /// leave, as <c>MapHandle.CameraForLatLngsAsync()</c> would then. The
-    /// function finishes when the map applies the change, before an animation
-    /// ends.</para>
+    /// <para><c>coordinates</c> must not be empty. The camera is the one that
+    /// <c>MapHandle.CameraForLatLngsAsync()</c> computes after the commands
+    /// sent before this one apply. The function finishes when the map applies
+    /// the change, before an animation ends.</para>
     /// <para>See <c>mln_map_fit_camera_to_lat_lngs</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when the padding in
-    /// <c>update</c> leaves no room for the area: its left and right add up to
-    /// at least the map's width, or its top and bottom to at least the map's
-    /// height. The camera doesn't move.</description></item>
+    /// <c>update</c> leaves no room for the area. The camera doesn't
+    /// move.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> FitCameraToLatLngsAsync(
@@ -2187,11 +2175,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Sets whether a GeoJSON source builds its tiles while the map renders.
     /// </summary>
     /// <remarks>
-    /// <para>When <c>enabled</c> is true, the source builds its tiles while the
-    /// map renders instead of in the background, so new data shows in the next
-    /// frame. Until this is called, a source follows the
-    /// <c>synchronousUpdate</c> member of its source JSON, which defaults to
-    /// false. This setting replaces that value.</para>
+    /// <para>Building tiles while the map renders, instead of in the
+    /// background, makes new data show in the next frame. The setting replaces
+    /// the <c>synchronousUpdate</c> member of the source's JSON, which defaults
+    /// to false.</para>
     /// <para>See <c>mln_map_set_geo_json_source_synchronous_tiling</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
@@ -2657,13 +2644,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// parsed. The style's sources, sprites, and glyphs then load in the
     /// background.</para>
     /// <para>The map's style is loaded from the time a style document parses
-    /// until the next call to this function. It isn't loaded before the map's
-    /// first style parses, while a style URL loads, or after a style URL fails
-    /// to load. While the style isn't loaded, the commands that change it
-    /// complete with <c>Status.InvalidState</c>, because the next style to
-    /// parse would replace their changes. To change a new map's style without a
-    /// style document, first load an empty style, such as
-    /// <c>{"version":8,"sources":{},"layers":[]}</c>.</para>
+    /// until the next call to this function. While the style isn't loaded, the
+    /// commands that change it complete with <c>Status.InvalidState</c>. To
+    /// change a new map's style without a style document, first load an empty
+    /// style, such as <c>{"version":8,"sources":{},"layers":[]}</c>.</para>
     /// <para>See <c>mln_map_set_style_url</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

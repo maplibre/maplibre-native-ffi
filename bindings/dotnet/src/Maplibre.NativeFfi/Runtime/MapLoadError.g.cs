@@ -18,8 +18,7 @@ public enum MapLoadError : uint
     StyleParse = 1,
 
     /// <summary>
-    /// The style's request failed, for any reason, including a 404 or a missing
-    /// file.
+    /// The style's request failed, such as with a 404 or a missing file.
     /// </summary>
     StyleLoad = 2,
 }

@@ -85,6 +85,8 @@ internal constructor(
   /**
    * Releases a resource request.
    *
+   * Releasing a request without an answer fails it with `ResourceErrorReason.OTHER`.
+   *
    * See `mln_resource_request_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */

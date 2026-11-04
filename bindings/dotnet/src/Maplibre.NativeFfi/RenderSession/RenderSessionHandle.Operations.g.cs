@@ -396,8 +396,8 @@ public sealed unsafe partial class RenderSessionHandle
     /// </summary>
     /// <remarks>
     /// <para><c>clusterId</c> is the "cluster_id" property of a cluster
-    /// feature. At the result's zoom level, the cluster's points no longer form
-    /// this cluster, but two or more clusters or points.</para>
+    /// feature. At the result's zoom level, the cluster splits into two or more
+    /// clusters or points.</para>
     /// <para>A cluster ID can go out of date as
     /// <c>RenderSessionHandle.GetClusterChildrenAsync()</c> describes.</para>
     /// <para>See <c>mln_render_session_get_cluster_expansion_zoom</c> in the

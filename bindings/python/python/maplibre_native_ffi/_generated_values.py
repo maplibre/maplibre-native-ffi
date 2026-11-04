@@ -314,11 +314,9 @@ class CameraChangeMode(UnknownIntEnum):
 class CameraTransitionOutcome(UnknownIntEnum):
     """How a camera change ended.
 
-    A camera delta that pans and also scales, rotates, or pitches animates as
-    two parts, and any other change as one. When the parts of a change end in
-    different ways, the change reports `CameraTransitionOutcome.CANCELLED` if
-    any part was cancelled, then `CameraTransitionOutcome.REPLACED` if any
-    part was replaced.
+    A change that ends in more than one way reports
+    `CameraTransitionOutcome.CANCELLED` if any of it was cancelled, and
+    otherwise `CameraTransitionOutcome.REPLACED` if any of it was replaced.
 
     See `mln_camera_transition_outcome` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -834,10 +832,6 @@ class RuntimeEventSourceType(UnknownIntEnum):
 
 class RuntimeEventType(UnknownIntEnum):
     """The kind of an event.
-
-    An event's `payload_type` names the member of its payload that holds the
-    event's details. An event that reports a failure carries the error's text
-    in `message`.
 
     Only maps in `MapMode.CONTINUOUS` raise
     `RuntimeEventType.MAP_LOADING_FINISHED`, `RuntimeEventType.MAP_IDLE`, and
@@ -1372,7 +1366,10 @@ class CameraFitOptions:
     """
 
     padding: EdgeInsets | None = None
-    """Space to leave between the area and each edge of the map."""
+    """Space to leave between the area and each edge of the map. The left and
+    right insets must add up to less than the map's width, and the top and
+    bottom to less than its height.
+    """
 
     bearing: float | None = None
     """The rotation from north, in degrees."""
@@ -1394,8 +1391,7 @@ class CameraFitUpdate:
     """A camera change that fits an area, for
     `MapHandle.fit_camera_to_lat_lng_bounds()` and the other fit commands.
 
-    A jump uses only the end handler of `animation`, and the handler runs as
-    soon as the camera moves.
+    A jump uses only the end handler of `animation`, as in `CameraUpdate`.
 
     See `mln_camera_fit_update` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1715,10 +1711,8 @@ type FeatureId = (
 )
 """The ID of a feature in a source, as the source's data gives it.
 
-The map compares feature IDs as text, so a string and a number with the same
-text, such as "7" and 7, name the same feature. A number's text is its
-shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
-same feature, and so do 1e21 and "1e21".
+The map compares feature IDs as text. A number names the same feature as the
+string of its shortest decimal form, so 7, 7.0, and "7" name one feature.
 
 See `mln_feature_id` in the
 [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2087,11 +2081,8 @@ class LogHandler:
         default_factory=lambda: LogSeverityFlag(0)
     )
     """The severities that also go to the platform's log, as they do without a
-    callback. 0 sends none.
-
-    A record that the handler's delivery queue can't accept is dropped. These
-    severities alone decide whether a record also goes to the platform's log,
-    whether or not the queue accepts it.
+    callback. 0 sends none. A message of these severities goes to the
+    platform's log even when the handler's queue can't accept it.
     """
 
     def _invoke_callback(self, severity, event, code, message):
@@ -2147,8 +2138,7 @@ class MapOptions:
 
     initial_extent: LogicalExtent
     """The map's first size, and its scale factor. The scale factor stays fixed
-    for the map's life, and every render session of the map renders at it. To
-    render at another density, create a new map and attach a new session.
+    for the map's life, and every render session of the map renders at it.
     """
 
     map_mode: MapMode = MapMode.CONTINUOUS
@@ -3749,7 +3739,7 @@ class ResourceTransform:
     callback: ResourceTransformCallback | None = None
     rules: Sequence[ResourceTransformRule] = ()
     """The first rule that matches a request adds its parameters, and no other.
-    A request that no rule matches keeps its URL. Rules never fail a request.
+    A request that no rule matches keeps its URL.
     """
 
     def __post_init__(self):
@@ -3795,10 +3785,8 @@ class ResourceTransformRule:
     """Query parameters to add to the URLs of requests that match a pattern.
 
     The library adds the parameters, in order, at the end of the URL's query
-    and before any fragment. It writes `?` before them when the URL has no
-    `?`, or `&` when the text before them ends with neither `?` nor `&`. It
-    keeps the parameters that the URL already has, even one with the same
-    name.
+    and before any fragment. It keeps the parameters that the URL already
+    has, even one with the same name.
 
     See `mln_resource_transform_rule` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

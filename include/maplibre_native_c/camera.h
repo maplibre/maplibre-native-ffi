@@ -134,8 +134,7 @@ MLN_API mln_status mln_map_get_camera(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the padding in `fit_options` leaves no
- *   room for the area: its left and right add up to at least the map's width,
- *   or its top and bottom to at least the map's height.
+ *   room for the area.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
@@ -153,8 +152,7 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the padding in `fit_options` leaves no
- *   room for the area: its left and right add up to at least the map's width,
- *   or its top and bottom to at least the map's height.
+ *   room for the area.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lngs(
@@ -174,8 +172,7 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the padding in `fit_options` leaves no
- *   room for the area: its left and right add up to at least the map's width,
- *   or its top and bottom to at least the map's height.
+ *   room for the area.
  */
 MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_geometry(
@@ -188,21 +185,17 @@ MLN_API mln_status mln_map_camera_for_geometry(
  * Computes the camera that shows exactly one tile on a square map.
  *
  * Jump a map in MLN_MAP_MODE_TILE to the camera to render `tile`, where
- * `logical_size` is the map's size. The camera centers the tile and zooms until
- * the tile fills the map: to zoom z for a 512-pixel map, or z - 1 for a
- * 256-pixel one, plus 0.0001 to keep the neighboring tiles out. It looks
- * straight down with north up and no padding, so the map's earlier camera
- * doesn't change the view. The map keeps the camera within its zoom limits, so
- * for a deep tile, raise the maximum zoom past the camera's with
- * mln_map_set_bounds().
+ * `logical_size` is the map's size. The camera centers the tile, zooms until
+ * the tile fills the map, and looks straight down with north up and no
+ * padding. The map keeps its camera within its zoom limits, so for a deep
+ * tile, raise the maximum zoom past the camera's with mln_map_set_bounds().
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when `logical_size` isn't square, or is wider
- *   than 512 pixels, the width of a vector tile at its zoom. For denser tiles,
- *   raise the map's scale factor instead.
+ *   than 512 pixels. For denser tiles, raise the map's scale factor instead.
  * - MLN_STATUS_INVALID_ARGUMENT when `tile.x` or `tile.y` isn't less than 2 to
- *   the power `tile.z`, or when the camera's zoom would fall outside 0 to 25.5,
- *   as for tile 0/0/0 on a 256-pixel map.
+ *   the power `tile.z`, or when the tile can't fill the map at a zoom from 0
+ *   to 25.5, as for tile 0/0/0 on a 256-pixel map.
  */
 MLN_API mln_status mln_camera_for_tile(
   mln_canonical_tile_id tile, mln_logical_size logical_size,
@@ -214,15 +207,13 @@ MLN_API mln_status mln_camera_for_tile(
  * Moves the camera to fit `bounds` in the map's view, at once or with an
  * animation.
  *
- * The map computes the camera when it runs the command, from the camera and
- * size that earlier commands leave, as mln_map_camera_for_lat_lng_bounds()
- * would then. The function finishes when the map applies the change, before an
- * animation ends.
+ * The camera is the one that mln_map_camera_for_lat_lng_bounds() computes
+ * after the commands sent before this one apply. The function finishes when the
+ * map applies the change, before an animation ends.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the padding in `update` leaves no room for
- *   the area: its left and right add up to at least the map's width, or its
- *   top and bottom to at least the map's height. The camera doesn't move.
+ *   the area. The camera doesn't move.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_fit_camera_to_lat_lng_bounds(
@@ -234,15 +225,14 @@ MLN_API mln_status mln_map_fit_camera_to_lat_lng_bounds(
  * Moves the camera to fit `coordinates` in the map's view, at once or with an
  * animation.
  *
- * `coordinates` must not be empty. The map computes the camera when it runs the
- * command, from the camera and size that earlier commands leave, as
- * mln_map_camera_for_lat_lngs() would then. The function finishes when the map
- * applies the change, before an animation ends.
+ * `coordinates` must not be empty. The camera is the one that
+ * mln_map_camera_for_lat_lngs() computes after the commands sent before this
+ * one apply. The function finishes when the map applies the change, before an
+ * animation ends.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the padding in `update` leaves no room for
- *   the area: its left and right add up to at least the map's width, or its
- *   top and bottom to at least the map's height. The camera doesn't move.
+ *   the area. The camera doesn't move.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_fit_camera_to_lat_lngs(
@@ -257,15 +247,13 @@ MLN_API mln_status mln_map_fit_camera_to_lat_lngs(
  * an animation.
  *
  * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
- * feature. The map computes the camera when it runs the command, from the
- * camera and size that earlier commands leave, as mln_map_camera_for_geometry()
- * would then. The function finishes when the map applies the change, before an
- * animation ends.
+ * feature. The camera is the one that mln_map_camera_for_geometry() computes
+ * after the commands sent before this one apply. The function finishes when the
+ * map applies the change, before an animation ends.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the padding in `update` leaves no room for
- *   the area: its left and right add up to at least the map's width, or its
- *   top and bottom to at least the map's height. The camera doesn't move.
+ *   the area. The camera doesn't move.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_fit_camera_to_geometry(

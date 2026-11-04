@@ -7,8 +7,8 @@ namespace Maplibre.NativeFfi;
 /// <c>MapHandle.FitCameraToLatLngBoundsAsync()</c> and the other fit commands.
 /// </summary>
 /// <remarks>
-/// <para>A jump uses only the end handler of <c>animation</c>, and the handler
-/// runs as soon as the camera moves.</para>
+/// <para>A jump uses only the end handler of <c>animation</c>, as in
+/// <c>CameraUpdate</c>.</para>
 /// <para>See <c>mln_camera_fit_update</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>

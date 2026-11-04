@@ -72,10 +72,8 @@ public value class CameraChangeMode(public val rawValue: UInt) {
 /**
  * How a camera change ended.
  *
- * A camera delta that pans and also scales, rotates, or pitches animates as two parts, and any
- * other change as one. When the parts of a change end in different ways, the change reports
- * `CameraTransitionOutcome.CANCELLED` if any part was cancelled, then
- * `CameraTransitionOutcome.REPLACED` if any part was replaced.
+ * A change that ends in more than one way reports `CameraTransitionOutcome.CANCELLED` if any of it
+ * was cancelled, and otherwise `CameraTransitionOutcome.REPLACED` if any of it was replaced.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -99,19 +97,20 @@ public value class CameraTransitionOutcome(public val rawValue: UInt) {
     /**
      * `MapHandle.cancelCameraTransitions()`, `MapHandle.cancelCameraTransitionsWithId()`, a
      * gesture's `GesturePhase.BEGIN` or `GesturePhase.CANCEL`, `MapHandle.setFreeCameraOptions()`,
-     * or a resize that moves the camera back inside its bounds stopped the change, or the command
-     * failed before it moved the camera.
+     * or a resize that moved the camera back inside its bounds stopped the change. A command that
+     * fails before it moves the camera also reports this.
      */
     public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(1u)
     /** The map closed before the change ended. */
     public val CLOSED: CameraTransitionOutcome = CameraTransitionOutcome(2u)
     /**
-     * A later camera change set every camera field that a part of the change still animated, so
-     * that part stopped.
+     * A later camera change set every field that a part of the change was still animating, so that
+     * part stopped. Its other parts keep animating, and the change reports this outcome when they
+     * end, unless one was cancelled.
      *
-     * A fly animates its center and zoom together, and an anchor animates the center together with
-     * the fields it keeps in place, so a later change of any of them replaces them all. A part that
-     * a later change took only some fields from keeps animating the others, and ends as they end.
+     * A later change that sets only some of those fields leaves the change animating the rest. A
+     * fly's center and zoom count as one field, and so do an anchored change's center and the
+     * fields that the anchor holds in place.
      */
     public val REPLACED: CameraTransitionOutcome = CameraTransitionOutcome(3u)
   }
@@ -538,7 +537,7 @@ public value class MapLoadError(public val rawValue: UInt) {
     public val UNKNOWN: MapLoadError = MapLoadError(0u)
     /** The style document isn't a valid style. */
     public val STYLE_PARSE: MapLoadError = MapLoadError(1u)
-    /** The style's request failed, for any reason, including a 404 or a missing file. */
+    /** The style's request failed, such as with a 404 or a missing file. */
     public val STYLE_LOAD: MapLoadError = MapLoadError(2u)
   }
 }
@@ -1297,9 +1296,6 @@ public value class RuntimeEventSourceType(public val rawValue: UInt) {
 /**
  * The kind of an event.
  *
- * An event's `payload_type` names the member of its payload that holds the event's details. An
- * event that reports a failure carries the error's text in `message`.
- *
  * Only maps in `MapMode.CONTINUOUS` raise `RuntimeEventType.MAP_LOADING_FINISHED`,
  * `RuntimeEventType.MAP_IDLE`, and the render frame and render map events. Offline region events
  * come only for the regions and types that `RuntimeHandle.setOfflineRegionObserved()` selects.
@@ -1342,10 +1338,8 @@ public value class RuntimeEventType(public val rawValue: UInt) {
     }
 
   public companion object {
-    /** The camera is about to change. Its details are in `camera_change`. */
     public val MAP_CAMERA_WILL_CHANGE: RuntimeEventType = RuntimeEventType(1u)
     public val MAP_CAMERA_IS_CHANGING: RuntimeEventType = RuntimeEventType(2u)
-    /** The camera changed. Its details are in `camera_change`. */
     public val MAP_CAMERA_DID_CHANGE: RuntimeEventType = RuntimeEventType(3u)
     public val MAP_STYLE_LOADED: RuntimeEventType = RuntimeEventType(4u)
     /** The map started to load a style. */
@@ -1354,58 +1348,34 @@ public value class RuntimeEventType(public val rawValue: UInt) {
      * The map loaded its style and everything that the current view needs, and rendered the result.
      */
     public val MAP_LOADING_FINISHED: RuntimeEventType = RuntimeEventType(6u)
-    /**
-     * The map failed to load a style. Its details are in `loading_failed`, and the error's text is
-     * in `message`.
-     */
+    /** The map failed to load a style. */
     public val MAP_LOADING_FAILED: RuntimeEventType = RuntimeEventType(7u)
     /** The map rendered a complete frame and has nothing left to load, animate, or redraw. */
     public val MAP_IDLE: RuntimeEventType = RuntimeEventType(8u)
-    /** The map failed to render. The error's text is in `message`. */
     public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(9u)
     public val MAP_RENDER_FRAME_STARTED: RuntimeEventType = RuntimeEventType(10u)
-    /** The map rendered a frame. Its details are in `render_frame`. */
     public val MAP_RENDER_FRAME_FINISHED: RuntimeEventType = RuntimeEventType(11u)
     public val MAP_RENDER_MAP_STARTED: RuntimeEventType = RuntimeEventType(12u)
     public val MAP_RENDER_MAP_FINISHED: RuntimeEventType = RuntimeEventType(13u)
-    /** The style uses an image that it doesn't have. Its details are in `style_image`. */
+    /** The style uses an image that it doesn't have. */
     public val MAP_STYLE_IMAGE_MISSING: RuntimeEventType = RuntimeEventType(14u)
-    /** A tile moved to another step of loading. Its details are in `tile_action`. */
+    /** A tile moved to another step of loading. */
     public val MAP_TILE_ACTION: RuntimeEventType = RuntimeEventType(15u)
-    /** A source changed. Its details are in `source_changed`. */
     public val MAP_SOURCE_CHANGED: RuntimeEventType = RuntimeEventType(16u)
-    /** The region's status changed. Its details are in `offline_region_status`. */
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(17u)
-    /**
-     * A resource that the region needs failed to download. Its details are in
-     * `offline_region_response_error`, and the error's text is in `message`.
-     */
+    /** A resource that the region needs failed to download. */
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(18u)
     /**
-     * The region's download became inactive because the cache file's offline regions reached their
-     * limit of 6000 tiles from MapLibre's demo tile server. Its details are in
-     * `offline_region_tile_count_limit`.
-     *
-     * Only tiles of sources on the demo server count toward the limit: sources with a `maplibre://`
-     * URL, which resolves to https://demotiles.maplibre.org. Tiles from other servers never count.
+     * The region's download became inactive because the cache file's offline regions hold as many
+     * tiles from MapLibre's demo tile server as the limit allows. Only tiles of sources with a
+     * `maplibre://` URL count toward the limit.
      */
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(19u)
-    /** The map requested a range of glyphs. Its details are in `glyphs`. */
     public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(20u)
-    /** A range of glyphs loaded. Its details are in `glyphs`. */
     public val MAP_GLYPHS_LOADED: RuntimeEventType = RuntimeEventType(21u)
-    /**
-     * A range of glyphs failed to load. Its details are in `glyphs`, and the error's text is in
-     * `message`.
-     */
     public val MAP_GLYPHS_ERROR: RuntimeEventType = RuntimeEventType(22u)
-    /** The map requested a sprite. Its details are in `sprite`. */
     public val MAP_SPRITE_REQUESTED: RuntimeEventType = RuntimeEventType(23u)
-    /** A sprite loaded. Its details are in `sprite`. */
     public val MAP_SPRITE_LOADED: RuntimeEventType = RuntimeEventType(24u)
-    /**
-     * A sprite failed to load. Its details are in `sprite`, and the error's text is in `message`.
-     */
     public val MAP_SPRITE_ERROR: RuntimeEventType = RuntimeEventType(25u)
   }
 }
@@ -2898,7 +2868,10 @@ public data class WebGpuSurfaceDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraFitOptions(
-  /** Space to leave between the area and each edge of the map. */
+  /**
+   * Space to leave between the area and each edge of the map. The left and right insets must add up
+   * to less than the map's width, and the top and bottom to less than its height.
+   */
   public val padding: EdgeInsets? = null,
   /** The rotation from north, in degrees. */
   public val bearing: Double? = null,
@@ -2921,8 +2894,7 @@ public data class LatLngBounds(
  * A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()` and the other fit
  * commands.
  *
- * A jump uses only the end handler of `animation`, and the handler runs as soon as the camera
- * moves.
+ * A jump uses only the end handler of `animation`, as in `CameraUpdate`.
  *
  * See `mln_camera_fit_update` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2947,9 +2919,8 @@ public data class CameraQueryResult(
 /**
  * The ID of a feature in a source, as the source's data gives it.
  *
- * The map compares feature IDs as text, so a string and a number with the same text, such as "7"
- * and 7, name the same feature. A number's text is its shortest decimal form without a trailing
- * ".0", so 7, 7.0, and "7" name the same feature, and so do 1e21 and "1e21".
+ * The map compares feature IDs as text. A number names the same feature as the string of its
+ * shortest decimal form, so 7, 7.0, and "7" name one feature.
  *
  * See `mln_feature_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3799,8 +3770,7 @@ public data class ResourceTransformError(
 public data class MapOptions(
   /**
    * The map's first size, and its scale factor. The scale factor stays fixed for the map's life,
-   * and every render session of the map renders at it. To render at another density, create a new
-   * map and attach a new session.
+   * and every render session of the map renders at it.
    */
   public val initialExtent: LogicalExtent,
   public val mapMode: MapMode = MapMode.CONTINUOUS,
@@ -4284,9 +4254,7 @@ public data class UrlQueryParameter(
  * Query parameters to add to the URLs of requests that match a pattern.
  *
  * The library adds the parameters, in order, at the end of the URL's query and before any fragment.
- * It writes `?` before them when the URL has no `?`, or `&` when the text before them ends with
- * neither `?` nor `&`. It keeps the parameters that the URL already has, even one with the same
- * name.
+ * It keeps the parameters that the URL already has, even one with the same name.
  *
  * See `mln_resource_transform_rule` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4364,9 +4332,8 @@ public data class LogicalExtentPhysicalSizeResult(
 public data class LogHandler(
   /**
    * The severities that also go to the platform's log, as they do without a callback. 0 sends none.
-   *
-   * A record that the handler's delivery queue can't accept is dropped. These severities alone
-   * decide whether a record also goes to the platform's log, whether or not the queue accepts it.
+   * A message of these severities goes to the platform's log even when the handler's queue can't
+   * accept it.
    */
   public val platformSeverities: LogSeverityFlag = LogSeverityFlag.NONE,
   public val callback: LogCallback,
@@ -4677,7 +4644,7 @@ public fun interface ResourceProviderCallback {
 public data class ResourceTransform(
   /**
    * The first rule that matches a request adds its parameters, and no other. A request that no rule
-   * matches keeps its URL. Rules never fail a request.
+   * matches keeps its URL.
    */
   public val rules: List<ResourceTransformRule> = emptyList(),
   public val callback: ResourceTransformCallback? = null,

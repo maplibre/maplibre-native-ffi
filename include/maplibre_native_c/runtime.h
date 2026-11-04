@@ -97,21 +97,14 @@ typedef struct mln_offline_region_status {
 /**
  * The kind of an event.
  *
- * An event's `payload_type` names the member of its payload that holds the
- * event's details. Each type below that has details names its member, and the
- * others carry MLN_RUNTIME_EVENT_PAYLOAD_NONE. An event that reports a failure
- * carries the error's text in `message`.
- *
  * Only maps in MLN_MAP_MODE_CONTINUOUS raise
  * MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED, MLN_RUNTIME_EVENT_MAP_IDLE, and the
  * render frame and render map events. Offline region events come only for the
  * regions and types that mln_runtime_set_offline_region_observed() selects.
  */
 typedef enum mln_runtime_event_type : uint32_t {
-  /** The camera is about to change. Its details are in `camera_change`. */
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
   MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2,
-  /** The camera changed. Its details are in `camera_change`. */
   MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE = 3,
   MLN_RUNTIME_EVENT_MAP_STYLE_LOADED = 4,
   /** The map started to load a style. */
@@ -121,71 +114,38 @@ typedef enum mln_runtime_event_type : uint32_t {
    * rendered the result.
    */
   MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6,
-  /**
-   * The map failed to load a style. Its details are in `loading_failed`, and
-   * the error's text is in `message`.
-   */
+  /** The map failed to load a style. */
   MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7,
   /**
    * The map rendered a complete frame and has nothing left to load, animate,
    * or redraw.
    */
   MLN_RUNTIME_EVENT_MAP_IDLE = 8,
-  /** The map failed to render. The error's text is in `message`. */
   MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 9,
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 10,
-  /** The map rendered a frame. Its details are in `render_frame`. */
   MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 11,
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 12,
   MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 13,
-  /**
-   * The style uses an image that it doesn't have. Its details are in
-   * `style_image`.
-   */
+  /** The style uses an image that it doesn't have. */
   MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 14,
-  /**
-   * A tile moved to another step of loading. Its details are in
-   * `tile_action`.
-   */
+  /** A tile moved to another step of loading. */
   MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15,
-  /** A source changed. Its details are in `source_changed`. */
   MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
-  /**
-   * The region's status changed. Its details are in `offline_region_status`.
-   */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
-  /**
-   * A resource that the region needs failed to download. Its details are in
-   * `offline_region_response_error`, and the error's text is in `message`.
-   */
+  /** A resource that the region needs failed to download. */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
   /**
    * The region's download became inactive because the cache file's offline
-   * regions reached their limit of 6000 tiles from MapLibre's demo tile server.
-   * Its details are in `offline_region_tile_count_limit`.
-   *
-   * Only tiles of sources on the demo server count toward the limit: sources
-   * with a `maplibre://` URL, which resolves to https://demotiles.maplibre.org.
-   * Tiles from other servers never count.
+   * regions hold as many tiles from MapLibre's demo tile server as the limit
+   * allows. Only tiles of sources with a `maplibre://` URL count toward the
+   * limit.
    */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
-  /** The map requested a range of glyphs. Its details are in `glyphs`. */
   MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
-  /** A range of glyphs loaded. Its details are in `glyphs`. */
   MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
-  /**
-   * A range of glyphs failed to load. Its details are in `glyphs`, and the
-   * error's text is in `message`.
-   */
   MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
-  /** The map requested a sprite. Its details are in `sprite`. */
   MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
-  /** A sprite loaded. Its details are in `sprite`. */
   MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
-  /**
-   * A sprite failed to load. Its details are in `sprite`, and the error's text
-   * is in `message`.
-   */
   MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
 } mln_runtime_event_type;
 
@@ -307,10 +267,7 @@ typedef enum mln_map_load_error : uint32_t {
   MLN_MAP_LOAD_ERROR_UNKNOWN = 0,
   /** The style document isn't a valid style. */
   MLN_MAP_LOAD_ERROR_STYLE_PARSE = 1,
-  /**
-   * The style's request failed, for any reason, including a 404 or a missing
-   * file.
-   */
+  /** The style's request failed, such as with a 404 or a missing file. */
   MLN_MAP_LOAD_ERROR_STYLE_LOAD = 2,
 } mln_map_load_error;
 
@@ -759,9 +716,8 @@ typedef struct mln_url_query_parameter {
  * Query parameters to add to the URLs of requests that match a pattern.
  *
  * The library adds the parameters, in order, at the end of the URL's query and
- * before any fragment. It writes `?` before them when the URL has no `?`, or
- * `&` when the text before them ends with neither `?` nor `&`. It keeps the
- * parameters that the URL already has, even one with the same name.
+ * before any fragment. It keeps the parameters that the URL already has, even
+ * one with the same name.
  */
 typedef struct mln_resource_transform_rule {
   uint32_t size;
@@ -787,7 +743,7 @@ typedef struct mln_resource_transform {
   mln_delivery_queue queue MLN_BINDING("kind=delivery_queue");
   /**
    * The first rule that matches a request adds its parameters, and no other.
-   * A request that no rule matches keeps its URL. Rules never fail a request.
+   * A request that no rule matches keeps its URL.
    */
   const mln_resource_transform_rule* rules MLN_BINDING("length=rule_count");
   size_t rule_count;
@@ -1096,7 +1052,12 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Releases a resource request. */
+/**
+ * Releases a resource request.
+ *
+ * Releasing a request without an answer fails it with
+ * MLN_RESOURCE_ERROR_REASON_OTHER.
+ */
 MLN_API void mln_resource_request_release(
   mln_resource_request handle
 ) MLN_NOEXCEPT;

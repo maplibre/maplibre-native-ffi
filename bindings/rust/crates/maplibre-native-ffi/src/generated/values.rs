@@ -404,7 +404,9 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CameraFitOptions {
-    /// Space to leave between the area and each edge of the map.
+    /// Space to leave between the area and each edge of the map. The left and
+    /// right insets must add up to less than the map's width, and the top and
+    /// bottom to less than its height.
     pub padding: Option<EdgeInsets>,
     /// The rotation from north, in degrees.
     pub bearing: Option<f64>,
@@ -435,8 +437,7 @@ impl ToNative<sys::mln_camera_fit_options> for CameraFitOptions {
 /// A camera change that fits an area, for
 /// `MapHandle::fit_camera_to_lat_lng_bounds()` and the other fit commands.
 ///
-/// A jump uses only the end handler of `animation`, and the handler runs as
-/// soon as the camera moves.
+/// A jump uses only the end handler of `animation`, as in `CameraUpdate`.
 ///
 /// See `mln_camera_fit_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -651,11 +652,9 @@ impl ToNative<sys::mln_camera_transition_handler> for CameraTransitionHandler {
 native_enum! {
 /// How a camera change ended.
 ///
-/// A camera delta that pans and also scales, rotates, or pitches animates as
-/// two parts, and any other change as one. When the parts of a change end in
-/// different ways, the change reports `CameraTransitionOutcome::Cancelled` if
-/// any part was cancelled, then `CameraTransitionOutcome::Replaced` if any part
-/// was replaced.
+/// A change that ends in more than one way reports
+/// `CameraTransitionOutcome::Cancelled` if any of it was cancelled, and
+/// otherwise `CameraTransitionOutcome::Replaced` if any of it was replaced.
 ///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -665,19 +664,21 @@ pub enum CameraTransitionOutcome: u32 {
     /// `MapHandle::cancel_camera_transitions()`,
     /// `MapHandle::cancel_camera_transitions_with_id()`, a gesture's
     /// `GesturePhase::Begin` or `GesturePhase::Cancel`,
-    /// `MapHandle::set_free_camera_options()`, or a resize that moves the
-    /// camera back inside its bounds stopped the change, or the command failed
-    /// before it moved the camera.
+    /// `MapHandle::set_free_camera_options()`, or a resize that moved the
+    /// camera back inside its bounds stopped the change. A command that fails
+    /// before it moves the camera also reports this.
     Cancelled = 1,
     /// The map closed before the change ended.
     Closed = 2,
-    /// A later camera change set every camera field that a part of the change
-    /// still animated, so that part stopped.
+    /// A later camera change set every field that a part of the change was
+    /// still animating, so that part stopped. Its other parts keep animating,
+    /// and the change reports this outcome when they end, unless one was
+    /// cancelled.
     ///
-    /// A fly animates its center and zoom together, and an anchor animates the
-    /// center together with the fields it keeps in place, so a later change of
-    /// any of them replaces them all. A part that a later change took only some
-    /// fields from keeps animating the others, and ends as they end.
+    /// A later change that sets only some of those fields leaves the change
+    /// animating the rest. A fly's center and zoom count as one field, and so
+    /// do an anchored change's center and the fields that the anchor holds in
+    /// place.
     Replaced = 3,
 } Unknown
 }
@@ -1121,10 +1122,8 @@ impl ToNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
 
 /// The ID of a feature in a source, as the source's data gives it.
 ///
-/// The map compares feature IDs as text, so a string and a number with the same
-/// text, such as "7" and 7, name the same feature. A number's text is its
-/// shortest decimal form without a trailing ".0", so 7, 7.0, and "7" name the
-/// same feature, and so do 1e21 and "1e21".
+/// The map compares feature IDs as text. A number names the same feature as the
+/// string of its shortest decimal form, so 7, 7.0, and "7" name one feature.
 ///
 /// See `mln_feature_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1905,11 +1904,8 @@ pub struct LogHandler {
     /// The callback receives (`severity`, `event`, `code`, `message`).
     pub callback: std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, &str) + Send + Sync + 'static>,
     /// The severities that also go to the platform's log, as they do without a
-    /// callback. 0 sends none.
-    ///
-    /// A record that the handler's delivery queue can't accept is dropped.
-    /// These severities alone decide whether a record also goes to the
-    /// platform's log, whether or not the queue accepts it.
+    /// callback. 0 sends none. A message of these severities goes to the
+    /// platform's log even when the handler's queue can't accept it.
     pub platform_severities: LogSeverityFlag,
 }
 impl std::fmt::Debug for LogHandler {
@@ -2077,8 +2073,7 @@ pub enum MapLoadError: u32 {
     Unknown = 0,
     /// The style document isn't a valid style.
     StyleParse = 1,
-    /// The style's request failed, for any reason, including a 404 or a missing
-    /// file.
+    /// The style's request failed, such as with a 404 or a missing file.
     StyleLoad = 2,
 } Unrecognized
 }
@@ -2116,7 +2111,6 @@ impl Default for MapMode {
 pub struct MapOptions {
     /// The map's first size, and its scale factor. The scale factor stays fixed
     /// for the map's life, and every render session of the map renders at it.
-    /// To render at another density, create a new map and attach a new session.
     pub initial_extent: LogicalExtent,
     pub map_mode: MapMode,
     /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -4451,8 +4445,7 @@ pub struct ResourceTransform {
         >,
     >,
     /// The first rule that matches a request adds its parameters, and no other.
-    /// A request that no rule matches keeps its URL. Rules never fail a
-    /// request.
+    /// A request that no rule matches keeps its URL.
     pub rules: Vec<ResourceTransformRule>,
 }
 impl std::fmt::Debug for ResourceTransform {
@@ -4542,9 +4535,8 @@ impl<'a> ToNative<sys::mln_resource_transform_error> for ResourceTransformError<
 /// Query parameters to add to the URLs of requests that match a pattern.
 ///
 /// The library adds the parameters, in order, at the end of the URL's query and
-/// before any fragment. It writes `?` before them when the URL has no `?`, or
-/// `&` when the text before them ends with neither `?` nor `&`. It keeps the
-/// parameters that the URL already has, even one with the same name.
+/// before any fragment. It keeps the parameters that the URL already has, even
+/// one with the same name.
 ///
 /// See `mln_resource_transform_rule` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5023,10 +5015,6 @@ impl FromNative<sys::mln_runtime_event_tile_action> for RuntimeEventTileAction {
 native_enum! {
 /// The kind of an event.
 ///
-/// An event's `payload_type` names the member of its payload that holds the
-/// event's details. An event that reports a failure carries the error's text in
-/// `message`.
-///
 /// Only maps in `MapMode::Continuous` raise
 /// `RuntimeEventType::MapLoadingFinished`, `RuntimeEventType::MapIdle`, and the
 /// render frame and render map events. Offline region events come only for the
@@ -5036,10 +5024,8 @@ native_enum! {
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum RuntimeEventType: u32 {
-    /// The camera is about to change. Its details are in `camera_change`.
     MapCameraWillChange = 1,
     MapCameraIsChanging = 2,
-    /// The camera changed. Its details are in `camera_change`.
     MapCameraDidChange = 3,
     MapStyleLoaded = 4,
     /// The map started to load a style.
@@ -5047,53 +5033,34 @@ pub enum RuntimeEventType: u32 {
     /// The map loaded its style and everything that the current view needs, and
     /// rendered the result.
     MapLoadingFinished = 6,
-    /// The map failed to load a style. Its details are in `loading_failed`, and
-    /// the error's text is in `message`.
+    /// The map failed to load a style.
     MapLoadingFailed = 7,
     /// The map rendered a complete frame and has nothing left to load, animate,
     /// or redraw.
     MapIdle = 8,
-    /// The map failed to render. The error's text is in `message`.
     MapRenderError = 9,
     MapRenderFrameStarted = 10,
-    /// The map rendered a frame. Its details are in `render_frame`.
     MapRenderFrameFinished = 11,
     MapRenderMapStarted = 12,
     MapRenderMapFinished = 13,
-    /// The style uses an image that it doesn't have. Its details are in
-    /// `style_image`.
+    /// The style uses an image that it doesn't have.
     MapStyleImageMissing = 14,
-    /// A tile moved to another step of loading. Its details are in
-    /// `tile_action`.
+    /// A tile moved to another step of loading.
     MapTileAction = 15,
-    /// A source changed. Its details are in `source_changed`.
     MapSourceChanged = 16,
-    /// The region's status changed. Its details are in `offline_region_status`.
     OfflineRegionStatusChanged = 17,
-    /// A resource that the region needs failed to download. Its details are in
-    /// `offline_region_response_error`, and the error's text is in `message`.
+    /// A resource that the region needs failed to download.
     OfflineRegionResponseError = 18,
     /// The region's download became inactive because the cache file's offline
-    /// regions reached their limit of 6000 tiles from MapLibre's demo tile
-    /// server. Its details are in `offline_region_tile_count_limit`.
-    ///
-    /// Only tiles of sources on the demo server count toward the limit: sources
-    /// with a `maplibre://` URL, which resolves to
-    /// https://demotiles.maplibre.org. Tiles from other servers never count.
+    /// regions hold as many tiles from MapLibre's demo tile server as the limit
+    /// allows. Only tiles of sources with a `maplibre://` URL count toward the
+    /// limit.
     OfflineRegionTileCountLimitExceeded = 19,
-    /// The map requested a range of glyphs. Its details are in `glyphs`.
     MapGlyphsRequested = 20,
-    /// A range of glyphs loaded. Its details are in `glyphs`.
     MapGlyphsLoaded = 21,
-    /// A range of glyphs failed to load. Its details are in `glyphs`, and the
-    /// error's text is in `message`.
     MapGlyphsError = 22,
-    /// The map requested a sprite. Its details are in `sprite`.
     MapSpriteRequested = 23,
-    /// A sprite loaded. Its details are in `sprite`.
     MapSpriteLoaded = 24,
-    /// A sprite failed to load. Its details are in `sprite`, and the error's
-    /// text is in `message`.
     MapSpriteError = 25,
 } Unknown
 }

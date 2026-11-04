@@ -143,8 +143,10 @@ public sealed unsafe partial class ResourceRequestHandle
     /// Releases a resource request.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_resource_request_release</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// <para>Releasing a request without an answer fails it with
+    /// <c>ResourceErrorReason.Other</c>.</para>
+    /// <para>See <c>mln_resource_request_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>
     public void Release()
     {

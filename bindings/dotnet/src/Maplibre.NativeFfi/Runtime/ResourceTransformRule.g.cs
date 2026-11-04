@@ -7,10 +7,8 @@ namespace Maplibre.NativeFfi;
 /// </summary>
 /// <remarks>
 /// <para>The library adds the parameters, in order, at the end of the URL's
-/// query and before any fragment. It writes <c>?</c> before them when the URL
-/// has no <c>?</c>, or <c>&amp;</c> when the text before them ends with neither
-/// <c>?</c> nor <c>&amp;</c>. It keeps the parameters that the URL already has,
-/// even one with the same name.</para>
+/// query and before any fragment. It keeps the parameters that the URL already
+/// has, even one with the same name.</para>
 /// <para>See <c>mln_resource_transform_rule</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
 /// </remarks>

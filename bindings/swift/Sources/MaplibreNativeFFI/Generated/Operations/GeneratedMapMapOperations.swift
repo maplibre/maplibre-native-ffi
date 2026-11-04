@@ -290,12 +290,10 @@ public extension MapHandle {
   /// style's sources, sprites, and glyphs then load in the background.
   ///
   /// The map's style is loaded from the time a style document parses until the
-  /// next call to this function. It isn't loaded before the map's first style
-  /// parses, while a style URL loads, or after a style URL fails to load. While
-  /// the style isn't loaded, the commands that change it complete with
-  /// `Status.invalidState`, because the next style to parse would replace their
-  /// changes. To change a new map's style without a style document, first load
-  /// an empty style, such as `{"version":8,"sources":{},"layers":[]}`.
+  /// next call to this function. While the style isn't loaded, the commands
+  /// that change it complete with `Status.invalidState`. To change a new map's
+  /// style without a style document, first load an empty style, such as
+  /// `{"version":8,"sources":{},"layers":[]}`.
   ///
   /// See `mln_map_set_style_url` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

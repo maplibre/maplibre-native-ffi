@@ -70,6 +70,9 @@ impl ResourceRequestHandle {
 
     /// Releases a resource request.
     ///
+    /// Releasing a request without an answer fails it with
+    /// `ResourceErrorReason::Other`.
+    ///
     /// See `mln_resource_request_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn release(self) -> std::result::Result<(), ReleaseError<Self>> {

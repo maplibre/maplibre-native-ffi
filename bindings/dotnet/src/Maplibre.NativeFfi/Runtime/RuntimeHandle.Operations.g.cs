@@ -404,7 +404,7 @@ public sealed unsafe partial class RuntimeHandle
     /// <c>sideDatabasePath</c> isn't a readable database
     /// file.</description></item>
     /// <item><description><c>Status.NativeError</c> when the merge would exceed
-    /// the limit on tiles from MapLibre's demo tile server that
+    /// the tile limit that
     /// <c>RuntimeEventType.OfflineRegionTileCountLimitExceeded</c>
     /// describes.</description></item>
     /// </list>

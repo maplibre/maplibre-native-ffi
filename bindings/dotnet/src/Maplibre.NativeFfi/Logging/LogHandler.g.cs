@@ -25,12 +25,8 @@ public readonly partial record struct LogHandler
 
     /// <summary>
     /// The severities that also go to the platform's log, as they do without a
-    /// callback. 0 sends none.
+    /// callback. 0 sends none. A message of these severities goes to the
+    /// platform's log even when the handler's queue can't accept it.
     /// </summary>
-    /// <remarks>
-    /// A record that the handler's delivery queue can't accept is dropped.
-    /// These severities alone decide whether a record also goes to the
-    /// platform's log, whether or not the queue accepts it.
-    /// </remarks>
     public LogSeverityFlag PlatformSeverities { get; init; }
 }

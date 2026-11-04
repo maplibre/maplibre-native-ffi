@@ -12,7 +12,9 @@ namespace Maplibre.NativeFfi;
 public sealed record CameraFitOptions
 {
     /// <summary>
-    /// Space to leave between the area and each edge of the map.
+    /// Space to leave between the area and each edge of the map. The left and
+    /// right insets must add up to less than the map's width, and the top and
+    /// bottom to less than its height.
     /// </summary>
     public EdgeInsets? Padding { get; init; }
 

@@ -5,11 +5,10 @@ namespace Maplibre.NativeFfi;
 /// How a camera change ended.
 /// </summary>
 /// <remarks>
-/// <para>A camera delta that pans and also scales, rotates, or pitches animates
-/// as two parts, and any other change as one. When the parts of a change end in
-/// different ways, the change reports <c>CameraTransitionOutcome.Cancelled</c>
-/// if any part was cancelled, then <c>CameraTransitionOutcome.Replaced</c> if
-/// any part was replaced.</para>
+/// <para>A change that ends in more than one way reports
+/// <c>CameraTransitionOutcome.Cancelled</c> if any of it was cancelled, and
+/// otherwise <c>CameraTransitionOutcome.Replaced</c> if any of it was
+/// replaced.</para>
 /// <para>See <c>mln_camera_transition_outcome</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
@@ -24,9 +23,9 @@ public enum CameraTransitionOutcome : uint
     /// <c>MapHandle.CancelCameraTransitionsAsync()</c>,
     /// <c>MapHandle.CancelCameraTransitionsWithIdAsync()</c>, a gesture's
     /// <c>GesturePhase.Begin</c> or <c>GesturePhase.Cancel</c>,
-    /// <c>MapHandle.SetFreeCameraOptionsAsync()</c>, or a resize that moves the
-    /// camera back inside its bounds stopped the change, or the command failed
-    /// before it moved the camera.
+    /// <c>MapHandle.SetFreeCameraOptionsAsync()</c>, or a resize that moved the
+    /// camera back inside its bounds stopped the change. A command that fails
+    /// before it moves the camera also reports this.
     /// </summary>
     Cancelled = 1,
 
@@ -36,14 +35,16 @@ public enum CameraTransitionOutcome : uint
     Closed = 2,
 
     /// <summary>
-    /// A later camera change set every camera field that a part of the change
-    /// still animated, so that part stopped.
+    /// A later camera change set every field that a part of the change was
+    /// still animating, so that part stopped. Its other parts keep animating,
+    /// and the change reports this outcome when they end, unless one was
+    /// cancelled.
     /// </summary>
     /// <remarks>
-    /// A fly animates its center and zoom together, and an anchor animates the
-    /// center together with the fields it keeps in place, so a later change of
-    /// any of them replaces them all. A part that a later change took only some
-    /// fields from keeps animating the others, and ends as they end.
+    /// A later change that sets only some of those fields leaves the change
+    /// animating the rest. A fly's center and zoom count as one field, and so
+    /// do an anchored change's center and the fields that the anchor holds in
+    /// place.
     /// </remarks>
     Replaced = 3,
 }
