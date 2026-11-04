@@ -311,7 +311,11 @@ static void render_still(mln_map map) {
 
 static void test_base(void) {
   CHECK(mln_c_version() == MLN_C_VERSION);
+#if defined(__APPLE__)
+  CHECK(mln_supported_render_backend_mask() == MLN_RENDER_BACKEND_FLAG_METAL);
+#else
   CHECK(mln_supported_render_backend_mask() == MLN_RENDER_BACKEND_FLAG_WEB_GPU);
+#endif
 
   // A stubbed function reports UNSUPPORTED with a message.
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};

@@ -867,6 +867,7 @@ dependencies = [
  "maplibre-native-next",
  "serde_json",
  "ureq",
+ "wgpu",
 ]
 
 [[package]]

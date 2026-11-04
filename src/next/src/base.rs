@@ -9,10 +9,15 @@ pub extern "C" fn mln_c_version() -> u32 {
     MLN_C_VERSION
 }
 
-/// The port renders through wgpu, i.e. the WebGPU API.
+/// The port renders through wgpu: on Apple platforms to Metal surfaces
+/// (metal_surface.rs), elsewhere through the WebGPU API.
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_supported_render_backend_mask() -> u32 {
-    MLN_RENDER_BACKEND_FLAG_WEB_GPU
+    if cfg!(target_vendor = "apple") {
+        MLN_RENDER_BACKEND_FLAG_METAL
+    } else {
+        MLN_RENDER_BACKEND_FLAG_WEB_GPU
+    }
 }
 
 /// # Safety
@@ -30,13 +35,22 @@ pub unsafe extern "C" fn mln_logical_extent_physical_size(
             if out_width.is_null() || out_height.is_null() {
                 return Err(Failure::invalid_argument("out_width and out_height must not be null"));
             }
-            if !(extent.scale_factor.is_finite() && extent.scale_factor > 0.0) {
-                return Err(Failure::invalid_argument("scale_factor must be finite and positive"));
+            if extent.width == 0
+                || extent.height == 0
+                || !(extent.scale_factor.is_finite() && extent.scale_factor > 0.0)
+            {
+                return Err(Failure::invalid_argument("extent dimensions and scale_factor must be positive"));
             }
-            // HeadlessFrontend's physical size: truncation of size * ratio.
-            let ratio = extent.scale_factor as f32;
-            *out_width = (extent.width as f32 * ratio) as u32;
-            *out_height = (extent.height as f32 * ratio) as u32;
+            // C++ `physical_dimension`: the product, rounded up, as a Metal
+            // surface session sizes its layer. (An offscreen session's
+            // HeadlessFrontend truncates it.)
+            let width = (f64::from(extent.width) * extent.scale_factor).ceil();
+            let height = (f64::from(extent.height) * extent.scale_factor).ceil();
+            if width > f64::from(u32::MAX) || height > f64::from(u32::MAX) {
+                return Err(Failure::invalid_argument("scaled extent dimensions are too large"));
+            }
+            *out_width = width as u32;
+            *out_height = height as u32;
             Ok(())
         })
     }

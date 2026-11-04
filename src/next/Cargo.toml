@@ -23,5 +23,10 @@ serde_json = { version = "1.0.154", features = ["float_roundtrip", "preserve_ord
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 ureq = "3.5.1"
 
+# The CAMetalLayer surfaces of metal_surface.rs. maplibre-native-next doesn't
+# re-export wgpu; this is its version, so Cargo builds one wgpu for both.
+[target.'cfg(target_vendor = "apple")'.dependencies]
+wgpu = { version = "=30.0.1", default-features = false, features = ["metal"] }
+
 # A workspace of its own: the repository's workspace builds without the port.
 [workspace]

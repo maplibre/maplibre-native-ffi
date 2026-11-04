@@ -109,12 +109,6 @@ pub unsafe extern "C" fn mln_map_attach_metal_borrowed_texture(map: mln_map, des
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_metal_borrowed_texture") }
 }
 
-/// `mln_map_attach_metal_surface` (surface.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_metal_surface(map: mln_map, descriptor: *const mln_metal_surface_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_metal_surface") }
-}
-
 /// `mln_map_attach_open_gl_borrowed_texture` (texture.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_attach_open_gl_borrowed_texture(map: mln_map, descriptor: *const mln_open_gl_borrowed_texture_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
@@ -145,24 +139,6 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_borrowed_texture(map: mln_map, d
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_web_gpu_borrowed_texture") }
 }
 
-/// `mln_map_get_feature_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_feature_state(map: mln_map, selector: *const mln_feature_state_selector, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_feature_state") }
-}
-
-/// `mln_map_remove_feature_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_feature_state(map: mln_map, selector: *const mln_feature_state_selector, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_feature_state") }
-}
-
-/// `mln_map_set_feature_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_feature_state(map: mln_map, selector: *const mln_feature_state_selector, state: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_feature_state") }
-}
-
 /// `mln_open_gl_supported_context_provider_mask` (render_target.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags {
@@ -175,58 +151,10 @@ pub unsafe extern "C" fn mln_render_session_acquire_frame(session: mln_render_se
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_acquire_frame") }
 }
 
-/// `mln_render_session_clear_data` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_clear_data(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_clear_data") }
-}
-
-/// `mln_render_session_dump_debug_logs` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_dump_debug_logs(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_dump_debug_logs") }
-}
-
-/// `mln_render_session_query_feature_extensions` (query.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_query_feature_extensions(session: mln_render_session, source_id: mln_buffer_view, feature: mln_buffer_view, extension: mln_buffer_view, extension_field: mln_buffer_view, arguments: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_feature_extensions") }
-}
-
-/// `mln_render_session_query_rendered_features` (query.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_query_rendered_features(session: mln_render_session, geometry: *const mln_rendered_query_geometry, options: *const mln_rendered_feature_query_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_rendered_features") }
-}
-
-/// `mln_render_session_query_source_features` (query.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_query_source_features(session: mln_render_session, source_id: mln_buffer_view, options: *const mln_source_feature_query_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_source_features") }
-}
-
-/// `mln_render_session_reduce_memory_use` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_reduce_memory_use(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_reduce_memory_use") }
-}
-
-/// `mln_render_session_release_target` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_release_target(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_release_target") }
-}
-
 /// `mln_render_session_set_metal_borrowed_texture_target` (texture.h): not implemented.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_set_metal_borrowed_texture_target(session: mln_render_session, replacement: *const mln_metal_borrowed_texture_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_metal_borrowed_texture_target") }
-}
-
-/// `mln_render_session_set_metal_surface_target` (surface.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_metal_surface_target(session: mln_render_session, replacement: *const mln_metal_surface_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_metal_surface_target") }
 }
 
 /// `mln_render_session_set_open_gl_borrowed_texture_target` (texture.h): not implemented.
@@ -289,6 +217,7 @@ const _: () = {
     let _ = [crate::types::mln_map_add_style_layer_json, crate::style_layers::mln_map_add_style_layer_json];
     let _ = [crate::types::mln_map_add_style_source_json, crate::style_sources::mln_map_add_style_source_json];
     let _ = [crate::types::mln_map_apply_camera_delta, crate::camera::mln_map_apply_camera_delta];
+    let _ = [crate::types::mln_map_attach_metal_surface, crate::metal_surface::mln_map_attach_metal_surface];
     let _ = [crate::types::mln_map_attach_offscreen, crate::session::mln_map_attach_offscreen];
     let _ = [crate::types::mln_map_attach_web_gpu_surface, crate::surface_session::mln_map_attach_web_gpu_surface];
     let _ = [crate::types::mln_map_begin_command_group, crate::command_group::mln_map_begin_command_group];
@@ -304,6 +233,7 @@ const _: () = {
     let _ = [crate::types::mln_map_fit_camera_to_lat_lng_bounds, crate::camera::mln_map_fit_camera_to_lat_lng_bounds];
     let _ = [crate::types::mln_map_fit_camera_to_lat_lngs, crate::camera::mln_map_fit_camera_to_lat_lngs];
     let _ = [crate::types::mln_map_get_camera, crate::camera::mln_map_get_camera];
+    let _ = [crate::types::mln_map_get_feature_state, crate::feature_state::mln_map_get_feature_state];
     let _ = [crate::types::mln_map_get_global_state, crate::style_layers::mln_map_get_global_state];
     let _ = [crate::types::mln_map_get_image_source_coordinates, crate::style_sources::mln_map_get_image_source_coordinates];
     let _ = [crate::types::mln_map_get_loaded_style_json, crate::map::mln_map_get_loaded_style_json];
@@ -335,6 +265,7 @@ const _: () = {
     let _ = [crate::types::mln_map_projection_release, crate::projection::mln_map_projection_release];
     let _ = [crate::types::mln_map_projection_set_camera, crate::projection::mln_map_projection_set_camera];
     let _ = [crate::types::mln_map_release, crate::map::mln_map_release];
+    let _ = [crate::types::mln_map_remove_feature_state, crate::feature_state::mln_map_remove_feature_state];
     let _ = [crate::types::mln_map_remove_style_image, crate::style_images::mln_map_remove_style_image];
     let _ = [crate::types::mln_map_remove_style_layer, crate::style_layers::mln_map_remove_style_layer];
     let _ = [crate::types::mln_map_remove_style_source, crate::style_sources::mln_map_remove_style_source];
@@ -348,6 +279,7 @@ const _: () = {
     let _ = [crate::types::mln_map_set_custom_vector_source_tile_error, crate::custom_sources::mln_map_set_custom_vector_source_tile_error];
     let _ = [crate::types::mln_map_set_debug_flags, crate::camera::mln_map_set_debug_flags];
     let _ = [crate::types::mln_map_set_event_mask, crate::map::mln_map_set_event_mask];
+    let _ = [crate::types::mln_map_set_feature_state, crate::feature_state::mln_map_set_feature_state];
     let _ = [crate::types::mln_map_set_free_camera_options, crate::camera::mln_map_set_free_camera_options];
     let _ = [crate::types::mln_map_set_geo_json_source_data, crate::style_sources::mln_map_set_geo_json_source_data];
     let _ = [crate::types::mln_map_set_geo_json_source_synchronous_tiling, crate::style_sources::mln_map_set_geo_json_source_synchronous_tiling];
@@ -378,16 +310,24 @@ const _: () = {
     let _ = [crate::types::mln_render_frame_batch_release, crate::session::mln_render_frame_batch_release];
     let _ = [crate::types::mln_render_session_abandon, crate::session::mln_render_session_abandon];
     let _ = [crate::types::mln_render_session_barrier, crate::session::mln_render_session_barrier];
+    let _ = [crate::types::mln_render_session_clear_data, crate::maintenance::mln_render_session_clear_data];
     let _ = [crate::types::mln_render_session_demand_frame, crate::session::mln_render_session_demand_frame];
     let _ = [crate::types::mln_render_session_detach, crate::session::mln_render_session_detach];
     let _ = [crate::types::mln_render_session_dispose, crate::session::mln_render_session_dispose];
     let _ = [crate::types::mln_render_session_drain_frame_results, crate::session::mln_render_session_drain_frame_results];
+    let _ = [crate::types::mln_render_session_dump_debug_logs, crate::maintenance::mln_render_session_dump_debug_logs];
     let _ = [crate::types::mln_render_session_get_capabilities, crate::session::mln_render_session_get_capabilities];
     let _ = [crate::types::mln_render_session_get_failure, crate::session::mln_render_session_get_failure];
     let _ = [crate::types::mln_render_session_get_snapshot, crate::session::mln_render_session_get_snapshot];
+    let _ = [crate::types::mln_render_session_query_feature_extensions, crate::query::mln_render_session_query_feature_extensions];
+    let _ = [crate::types::mln_render_session_query_rendered_features, crate::query::mln_render_session_query_rendered_features];
+    let _ = [crate::types::mln_render_session_query_source_features, crate::query::mln_render_session_query_source_features];
     let _ = [crate::types::mln_render_session_read_texture, crate::session::mln_render_session_read_texture];
+    let _ = [crate::types::mln_render_session_reduce_memory_use, crate::maintenance::mln_render_session_reduce_memory_use];
+    let _ = [crate::types::mln_render_session_release_target, crate::maintenance::mln_render_session_release_target];
     let _ = [crate::types::mln_render_session_resize, crate::session::mln_render_session_resize];
     let _ = [crate::types::mln_render_session_service_driver_work, crate::surface_session::mln_render_session_service_driver_work];
+    let _ = [crate::types::mln_render_session_set_metal_surface_target, crate::metal_surface::mln_render_session_set_metal_surface_target];
     let _ = [crate::types::mln_resource_request_complete, crate::resource_provider::mln_resource_request_complete];
     let _ = [crate::types::mln_resource_request_is_cancelled, crate::resource_provider::mln_resource_request_is_cancelled];
     let _ = [crate::types::mln_resource_request_pass_through, crate::resource_provider::mln_resource_request_pass_through];
