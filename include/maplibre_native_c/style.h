@@ -361,7 +361,7 @@ typedef struct mln_custom_geometry_source_options {
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE");
   /**
    * The width in pixels of the margin around a tile that holds geometry from
-   * beyond its edges.
+   * beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
    */
   uint32_t buffer
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER");
@@ -690,8 +690,8 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
 /**
  * Sets the data of a tile in a custom geometry source.
  *
- * `data` is a GeoJSON feature collection. The source ignores data for a tile
- * that it hasn't asked for, or has since cancelled.
+ * `data` is a GeoJSON feature collection, feature, or geometry. The source
+ * ignores data for a tile that it hasn't asked for, or has since cancelled.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.

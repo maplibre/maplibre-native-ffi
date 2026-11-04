@@ -2388,7 +2388,7 @@ final class CustomGeometrySourceOptions {
   final int? tileSize;
 
   /// The width in pixels of the margin around a tile that holds geometry from
-  /// beyond its edges.
+  /// beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
   final int? buffer;
 
   /// Whether to cut geometry at the outer edge of a tile's margin.

@@ -855,6 +855,12 @@ static void negative_tolerance(mln_custom_geometry_source_options* options) {
 static void empty_tiles(mln_custom_geometry_source_options* options) {
   options->tile_size = 0;
 }
+static void uneven_tiles(mln_custom_geometry_source_options* options) {
+  options->tile_size = 300;
+}
+static void oversized_tiles(mln_custom_geometry_source_options* options) {
+  options->tile_size = 16384;
+}
 static void oversized_buffer(mln_custom_geometry_source_options* options) {
   options->buffer = 70000;
 }
@@ -869,9 +875,22 @@ static const struct {
   {"inverted zoom range", inverted_zoom,
    "min_zoom must be less than or equal to max_zoom"},
   {"negative tolerance", negative_tolerance, "tolerance"},
-  {"empty tiles", empty_tiles, "tile_size"},
-  {"oversized buffer", oversized_buffer, "buffer"},
+  {"empty tiles", empty_tiles,
+   "tile_size must be a power of two within [1, 8192]"},
+  {"uneven tiles", uneven_tiles,
+   "tile_size must be a power of two within [1, 8192]"},
+  {"oversized tiles", oversized_tiles,
+   "tile_size must be a power of two within [1, 8192]"},
+  {"oversized buffer", oversized_buffer,
+   "buffer must be at most 2047 for a tile_size of 256"},
 };
+
+// Tile sizes with the widest buffer each takes: the widest and narrowest
+// tiles, and a small tile whose limit is below the default buffer of 128.
+static const struct {
+  uint32_t tile_size;
+  uint32_t buffer;
+} geometry_buffer_limits[] = {{8192, 65535}, {16, 127}, {1, 7}};
 
 static void custom_sources_take_and_validate_every_option(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -888,6 +907,36 @@ static void custom_sources_take_and_validate_every_option(void) {
     map, MLN_BUFFER_LITERAL("every-geometry-option"), &geometry,
     &completion.descriptor, NULL
   ));
+  const size_t limit_count =
+    sizeof(geometry_buffer_limits) / sizeof(geometry_buffer_limits[0]);
+  for (size_t index = 0; index < limit_count; index += 1) {
+    geometry = every_geometry_option(&geometry_probe);
+    geometry.tile_size = geometry_buffer_limits[index].tile_size;
+    geometry.buffer = geometry_buffer_limits[index].buffer;
+    char id[24];
+    snprintf(id, sizeof(id), "accepted-%zu", index);
+    MLN_TEST_AWAIT_OK(mln_map_add_custom_geometry_source(
+      map, mln_buffer_view_from_cstr(id), &geometry, &completion.descriptor,
+      NULL
+    ));
+
+    // One pixel more is too wide.
+    geometry.buffer += 1;
+    snprintf(id, sizeof(id), "too-wide-%zu", index);
+    char fragment[64];
+    snprintf(
+      fragment, sizeof(fragment),
+      "buffer must be at most %u for a tile_size of %u",
+      (unsigned)geometry_buffer_limits[index].buffer,
+      (unsigned)geometry_buffer_limits[index].tile_size
+    );
+    MLN_TEST_EXPECT_COMMAND_REJECTED(
+      fragment, mln_map_add_custom_geometry_source(
+                  map, mln_buffer_view_from_cstr(id), &geometry,
+                  &completion.descriptor, MLN_TEST_DIAGNOSTIC
+                )
+    );
+  }
   for (size_t index = 0;
        index < sizeof(geometry_option_cases) / sizeof(geometry_option_cases[0]);
        index += 1) {
@@ -946,9 +995,60 @@ static void custom_sources_take_and_validate_every_option(void) {
   );
 
   MLN_TEST_OK(mln_test_map_release(map));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
+  TEST_ASSERT_EQUAL_size_t(
+    1 + limit_count, atomic_load(&geometry_probe.release_count)
+  );
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&vector_probe.release_count));
   mln_test_destroy_runtime(runtime);
+}
+
+static mln_status deliver_geometry_feature(
+  mln_map map, const mln_completion* completion
+) {
+  return mln_map_set_custom_geometry_source_tile_data(
+    map, MLN_BUFFER_LITERAL("custom-geometry"), root_tile,
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+      "\"coordinates\":[0,0]},\"properties\":{}}"
+    ),
+    completion, NULL
+  );
+}
+
+static mln_status deliver_bare_geometry(
+  mln_map map, const mln_completion* completion
+) {
+  return mln_map_set_custom_geometry_source_tile_data(
+    map, MLN_BUFFER_LITERAL("custom-geometry"), root_tile,
+    MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"),
+    completion, NULL
+  );
+}
+
+static void a_geometry_tile_takes_one_feature_or_a_bare_geometry(void) {
+  const custom_kind* kind = &kinds[0];
+  mln_status (*const deliveries[])(mln_map, const mln_completion*) = {
+    deliver_geometry_feature,
+    deliver_bare_geometry,
+  };
+  for (size_t index = 0; index < sizeof(deliveries) / sizeof(deliveries[0]);
+       index += 1) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    custom_probe probe;
+    mln_test_render_fixture fixture = {0};
+    start_rendering(kind, runtime, map, &probe, &fixture);
+
+    MLN_TEST_OK(submit_and_settle(kind, map, deliveries[index]));
+    feature_target features = {.fixture = &fixture, .kind = kind};
+    TEST_ASSERT_TRUE(mln_test_style_render_until(
+      &fixture, delivered_feature_found, &features, "the delivered feature"
+    ));
+
+    mln_test_render_fixture_destroy(&fixture);
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
 }
 
 MLN_TEST_GROUP {
@@ -960,4 +1060,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_failed_tile_is_reported_and_invalidation_refetches_it);
   RUN_TEST(tile_operations_check_their_tile_and_source_kind);
   RUN_TEST(custom_sources_take_and_validate_every_option);
+  RUN_TEST(a_geometry_tile_takes_one_feature_or_a_bare_geometry);
 }

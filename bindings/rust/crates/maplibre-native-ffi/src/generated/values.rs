@@ -724,7 +724,8 @@ pub struct CustomGeometrySourceOptions {
     /// The width of a tile in pixels, a power of two no larger than 8192.
     pub tile_size: Option<u32>,
     /// The width in pixels of the margin around a tile that holds geometry from
-    /// beyond its edges.
+    /// beyond its edges. `buffer` times 8192 / `tile_size` must be at most
+    /// 65535.
     pub buffer: Option<u32>,
     /// Whether to cut geometry at the outer edge of a tile's margin.
     pub clip: Option<bool>,

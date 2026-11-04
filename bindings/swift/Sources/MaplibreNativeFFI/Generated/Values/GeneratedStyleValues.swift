@@ -48,7 +48,7 @@ public struct CustomGeometrySourceOptions: Sendable {
   /// The width of a tile in pixels, a power of two no larger than 8192.
   public var tileSize: UInt32?
   /// The width in pixels of the margin around a tile that holds geometry from
-  /// beyond its edges.
+  /// beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
   public var buffer: UInt32?
   /// Whether to cut geometry at the outer edge of a tile's margin.
   public var clip: Bool?
