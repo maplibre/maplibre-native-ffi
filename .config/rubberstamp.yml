@@ -666,6 +666,19 @@ ci:
         packages contain or how they are packed need it: the OHPM manifest and
         package files, and the packing script. Ordinary TypeScript or ArkTS
         changes and one ABI's addon don't.
+    arkui:
+      covers: >-
+        Packs the OHPM packages from the addon that the OpenHarmony x64 OpenGL
+        ES target built, so it runs that target, then builds and signs the ArkUI
+        example's HAP against them. It runs no app. Catches what breaks the
+        example's ArkUI pages, its HAP build with the OpenHarmony SDK's tools,
+        or its use of the packages: changes to the example, and to the package
+        files and packing script that it consumes.
+      rules:
+        - if:
+            files:
+              - examples/arkui/**
+          then: apply
     swiftpm:
       covers: >-
         Assembles the XCFramework from every Apple Metal target's slice, and the

@@ -1,0 +1,43 @@
+# The ArkUI example for OpenHarmony. Every task needs `-E ohos`. Run it on this
+# worktree's emulator with `mise -E ohos run //examples/arkui:run`.
+
+# CI builds the HAP with this, without running it.
+[tasks.build]
+description = "Build the C library and the TypeScript binding's OHPM HARs for an OpenHarmony preset, then build and sign the ArkUI example's HAP against them."
+usage = '''
+arg "[preset]" default="ohos-x64-egl" {
+  choices "ohos-arm64-egl" "ohos-arm64-vulkan" "ohos-x64-egl" "ohos-x64-vulkan"
+}
+'''
+# The OpenHarmony SDK packs and signs a HAP with Java tools.
+tools = { "core:java" = "{{vars.java_version}}" }
+depends = [
+  { task = "//bindings/typescript:pack-ohpm", args = [
+    "{{usage.preset}}",
+  ] },
+]
+run = '''
+case "$usage_preset" in
+  ohos-arm64-*) abi=arm64-v8a ;;
+  ohos-x64-*) abi=x86_64 ;;
+esac
+case "$usage_preset" in
+  *-egl) backend=opengl ;;
+  *-vulkan) backend=vulkan ;;
+esac
+hars="$MISE_MONOREPO_ROOT/bindings/typescript/build/ohpm"
+scripts/build-hap.sh "$abi" "$hars/native-ffi-0.0.0.har" "$hars/native-ffi-$backend-0.0.0.har"
+'''
+
+[tasks.run]
+description = "Build the ArkUI example for the x64 emulator, then install and start it on this worktree's emulator or the device that --device names."
+usage = '''
+flag "--device <key>" help="The hdc connect key of the device, which defaults to this worktree's emulator"
+'''
+tools = { "core:java" = "{{vars.java_version}}" }
+depends = [{ task = "build", args = ["ohos-x64-egl"] }]
+run = '''
+device=${usage_device:-$("$MISE_MONOREPO_ROOT/tools/devices/ohos-key")}
+hdc -t "$device" install -r build/x86_64/entry-default-signed.hap
+hdc -t "$device" shell aa start -a EntryAbility -b org.maplibre.nativeffi.example
+'''

@@ -144,6 +144,8 @@ JOBS = {
         "compose",
         lambda target: target.preset == "android-x64-egl",
     ),
+    # The ArkUI example packs its HARs from one addon.
+    "arkui-hap": ("arkui", lambda target: target.preset == "ohos-x64-egl"),
     "swift-package": (
         "swiftpm",
         lambda target: (

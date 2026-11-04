@@ -1,0 +1,43 @@
+{
+  "app": {
+    "bundleName": "org.maplibre.nativeffi.example",
+    "vendor": "maplibre",
+    "versionCode": 1,
+    "versionName": "1.0.0",
+    "apiReleaseType": "Release",
+    "debug": true,
+    "bundleType": "app",
+    "icon": "$media:icon",
+    "label": "$string:label"
+  },
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "description": "$string:label",
+    "mainElement": "EntryAbility",
+    "deviceTypes": ["default"],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "virtualMachine": "ark",
+    "compileMode": "esmodule",
+    "pages": "$profile:main_pages",
+    "requestPermissions": [{ "name": "ohos.permission.INTERNET" }],
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "exported": true,
+        "icon": "$media:icon",
+        "label": "$string:label",
+        "startWindowIcon": "$media:icon",
+        "startWindowBackground": "$color:background",
+        "skills": [
+          {
+            "entities": ["entity.system.home"],
+            "actions": ["action.system.home"]
+          }
+        ]
+      }
+    ]
+  }
+}
