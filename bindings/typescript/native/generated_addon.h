@@ -157,6 +157,12 @@ napi_value mln_ts_read_canonical_tile_id(
 napi_value mln_ts_read_dma_buf_frame(
   napi_env env, const mln_dma_buf_frame* source, size_t size
 );
+napi_value mln_ts_read_dma_buf_frame_planes(
+  napi_env env, const mln_dma_buf_frame* source
+);
+napi_value mln_ts_read_dma_buf_plane(
+  napi_env env, const mln_dma_buf_plane* source, size_t size
+);
 napi_value mln_ts_read_dxgi_shared_texture_frame(
   napi_env env, const mln_dxgi_shared_texture_frame* source, size_t size
 );

@@ -25,6 +25,7 @@
 /dotnet/src/Maplibre.NativeFfi/Linux/DmaBufFormat.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Linux/DmaBufFrame.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Linux/DmaBufFrameView.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Linux/DmaBufPlane.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Linux/DmaBufRingDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogCallback.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogEvent.g.cs linguist-generated=true

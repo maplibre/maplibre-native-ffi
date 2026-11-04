@@ -9,7 +9,9 @@ namespace Maplibre.NativeFfi;
 /// <remarks>
 /// <para>Each buffer has the map's size in pixels and a format and modifier
 /// from <c>formats</c>. The library renders only DRM_FORMAT_ABGR8888 and
-/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.</para>
+/// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+/// format has, such as a plane of compression metadata, and the library takes
+/// any such modifier that its GPU can render into and share.</para>
 /// <para>See <c>mln_dma_buf_ring_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html">C API reference</see>.</para>
 /// </remarks>

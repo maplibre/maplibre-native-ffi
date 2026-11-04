@@ -227,6 +227,14 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 self.assertIn(plain, source)
                 self.assertNotIn("storedWidth", source)
 
+    def test_every_binding_copies_an_array_that_a_view_lends(self):
+        api = parse(groups=("borrowed_view",))
+        for emitter in (dart, dotnet, go, kotlin, python, rust, swift, typescript, zig):
+            with self.subTest(emitter=emitter.__name__):
+                lowered = emitter.lower(api)
+                self.assertNotIn("mln_frame_get_texture", lowered.unsupported)
+                self.assertIn("mln_frame_get_texture", lowered.generated)
+
     def test_a_borrowed_callback_handle_reaches_the_host_unable_to_release_it(self):
         api = parse(groups=("borrowed_argument",))
         validate(api)

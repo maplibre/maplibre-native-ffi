@@ -69,7 +69,9 @@ your compositor or renderer imports, such as through
 `EGL_EXT_image_dma_buf_import` or `zwp_linux_dmabuf_v1`. Attach with
 [](api:mln_map_attach_dma_buf_ring) and the library's thread as the driver, and
 list the formats and modifiers that your importer takes. Get each frame's buffer
-with [](api:mln_acquired_frame_get_dma_buf). To resize the ring, use
+with [](api:mln_acquired_frame_get_dma_buf), and import all of its planes. A
+modifier with compression, such as AMD's DCC, adds a plane to the buffer, and
+the planes often share one file descriptor. To resize the ring, use
 [](api:mln_render_session_resize) instead of replacing it. Attach with three
 buffers, and keep each frame acquired until your importer is done with it.
 

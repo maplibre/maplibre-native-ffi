@@ -186,13 +186,13 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         Wait for `AcquiredFrameHandle.producer_sync()` before you read the
         buffer. Once you release or discard the frame, the session may render
         into the buffer again. You can map a buffer with
-        DRM_FORMAT_MOD_LINEAR with `mmap`, and bracket your reads with
-        DMA_BUF_IOCTL_SYNC.
+        DRM_FORMAT_MOD_LINEAR, which has one plane, with `mmap`, and bracket
+        your reads with DMA_BUF_IOCTL_SYNC.
 
-        The session owns the file descriptor, so don't close it. To keep the
-        buffer after you release the frame, duplicate the file descriptor
-        with `dup`. A duplicate keeps the buffer's memory, but not its
-        contents.
+        The session owns the planes' file descriptors, so don't close them.
+        To keep the buffer after you release the frame, duplicate each file
+        descriptor with `dup`. A duplicate keeps the buffer's memory, but not
+        its contents.
 
         Native resources remain valid only inside the `with` block.
 

@@ -9,15 +9,22 @@
 
 namespace mln::platform::dma_buf {
 
-// A dmabuf that an allocator made, with where its one plane lies.
-struct Buffer {
-  core::OwnedFd fd;
-  uint64_t modifier = 0;
+// One plane of a dmabuf. Planes in one dmabuf share a file descriptor, which
+// the first of them owns.
+struct Plane {
+  core::OwnedFd owned;
+  int fd = -1;
   uint32_t offset = 0;
   uint32_t stride = 0;
 };
 
-// Allocates single-plane dmabufs for a session to render into.
+// A dmabuf that an allocator made, with where each of its planes lies.
+struct Buffer {
+  uint64_t modifier = 0;
+  std::vector<Plane> planes;
+};
+
+// Allocates dmabufs for a session to render into.
 class Allocator {
  public:
   Allocator() = default;
@@ -27,7 +34,8 @@ class Allocator {
   auto operator=(Allocator&&) -> Allocator& = delete;
   virtual ~Allocator() = default;
 
-  // Whether a buffer of `fourcc` with `modifier` has one plane.
+  // Whether the allocator can make and share a buffer of `fourcc` with
+  // `modifier`, in every plane that the modifier gives it.
   [[nodiscard]] virtual auto allocates(uint32_t fourcc, uint64_t modifier) const
     -> bool = 0;
   // Allocates a buffer of `fourcc` with one of `modifiers`. Throws on failure.

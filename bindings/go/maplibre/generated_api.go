@@ -2551,11 +2551,10 @@ type DmaBufFrame struct {
 	Slot     uint32
 	Fourcc   uint32
 	Modifier uint64
-	Fd       int32
-	// The bytes from the start of the buffer to its first pixel.
-	Offset uint32
-	// The bytes from the start of one row to the start of the next.
-	Stride uint32
+	// The buffer's planes, in the order that its fourcc and modifier define. Import
+	// all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and up, or
+	// with one zwp_linux_buffer_params_v1.add call each.
+	Planes []DmaBufPlane
 }
 
 func copyDmaBufFrame(raw C.mln_dma_buf_frame) DmaBufFrame {
@@ -2566,6 +2565,35 @@ func copyDmaBufFrame(raw C.mln_dma_buf_frame) DmaBufFrame {
 	result.Slot = uint32(raw.slot)
 	result.Fourcc = uint32(raw.fourcc)
 	result.Modifier = uint64(raw.modifier)
+	result.Planes = func() []DmaBufPlane {
+		length := bindingLength(uint64(raw.plane_count))
+		result := make([]DmaBufPlane, length)
+		for i := range result {
+			item := *(*C.mln_dma_buf_plane)(bindingElement(unsafe.Pointer(raw.planes), i, uint64(unsafe.Sizeof(C.mln_dma_buf_plane{})), unsafe.Sizeof(*raw.planes), unsafe.Alignof(*raw.planes)))
+			result[i] = copyDmaBufPlane(item)
+		}
+		return result
+	}()
+	return result
+}
+
+// DmaBufPlane corresponds to mln_dma_buf_plane. Where one plane of a dmabuf
+// keeps its data.
+//
+// See mln_dma_buf_plane in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+type DmaBufPlane struct {
+	// The file descriptor of the dmabuf that holds the plane. The planes of a
+	// buffer often share one.
+	Fd int32
+	// The bytes from the start of the dmabuf to the plane's first byte.
+	Offset uint32
+	// The bytes from the start of one row to the start of the next.
+	Stride uint32
+}
+
+func copyDmaBufPlane(raw C.mln_dma_buf_plane) DmaBufPlane {
+	var result DmaBufPlane
 	result.Fd = int32(raw.fd)
 	result.Offset = uint32(raw.offset)
 	result.Stride = uint32(raw.stride)
@@ -2577,7 +2605,9 @@ func copyDmaBufFrame(raw C.mln_dma_buf_frame) DmaBufFrame {
 //
 // Each buffer has the map's size in pixels and a format and modifier from
 // formats. The library renders only DRM_FORMAT_ABGR8888 and
-// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its format
+// has, such as a plane of compression metadata, and the library takes any such
+// modifier that its GPU can render into and share.
 //
 // See mln_dma_buf_ring_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
@@ -6258,18 +6288,14 @@ func (view DmaBufFrameView) Fourcc() uint32 { return view.value.Fourcc }
 
 func (view DmaBufFrameView) Modifier() uint64 { return view.value.Modifier }
 
-func (view DmaBufFrameView) Fd() (int32, error) {
-	return bindingCall(func() int32 {
+func (view DmaBufFrameView) Planes() ([]DmaBufPlane, error) {
+	return bindingCall(func() []DmaBufPlane {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
-		return view.value.Fd
+		return view.value.Planes
 	})
 }
-
-func (view DmaBufFrameView) Offset() uint32 { return view.value.Offset }
-
-func (view DmaBufFrameView) Stride() uint32 { return view.value.Stride }
 
 type DxgiSharedTextureFrameView struct {
 	value DxgiSharedTextureFrame

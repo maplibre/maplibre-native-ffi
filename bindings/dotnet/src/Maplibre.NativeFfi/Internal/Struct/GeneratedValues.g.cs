@@ -511,17 +511,25 @@ internal static unsafe class GeneratedValues
     }
 
     internal static DmaBufFrame CopyDmaBufFrame(mln_dma_buf_frame value) =>
-        new(
-            value.width,
-            value.height,
-            value.scale_factor,
-            value.slot,
-            value.fourcc,
-            value.modifier,
-            value.fd,
-            value.offset,
-            value.stride
-        );
+        default(DmaBufFrame) with
+        {
+            Width = value.width,
+            Height = value.height,
+            ScaleFactor = value.scale_factor,
+            Slot = value.slot,
+            Fourcc = value.fourcc,
+            Modifier = value.modifier,
+            PlanesStorage = new(
+                NativeCallScope.CopyArray<mln_dma_buf_plane, DmaBufPlane>(
+                    value.planes,
+                    (nuint)(value.plane_count),
+                    static item => CopyDmaBufPlane(item)
+                )
+            ),
+        };
+
+    internal static DmaBufPlane CopyDmaBufPlane(mln_dma_buf_plane value) =>
+        new(value.fd, value.offset, value.stride);
 
     internal static mln_dma_buf_ring_descriptor NativeDmaBufRingDescriptor(
         DmaBufRingDescriptor value,

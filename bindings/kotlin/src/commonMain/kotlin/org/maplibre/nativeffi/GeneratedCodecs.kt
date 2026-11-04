@@ -1315,9 +1315,14 @@ internal fun readDmaBufFrame(source: Long, scope: ViewScope? = null): DmaBufFram
       slot = readU32(source + w(24, 24, 20)),
       fourcc = readU32(source + w(28, 28, 24)),
       modifier = readU64(source + w(32, 32, 28)),
-      fd = readI32(source + w(40, 40, 36)),
-      offset = readU32(source + w(44, 44, 40)),
-      stride = readU32(source + w(48, 48, 44)),
+      planes =
+        readArray(
+          readAddress(source + w(40, 40, 36)),
+          readSize(source + w(44, 48, 40)),
+          12.toLong(),
+        ) { item ->
+          readDmaBufPlane(item)
+        },
     )
     .also { it.bindingScope = scope }
 
@@ -2015,6 +2020,9 @@ internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
     priorData = readBytes(readAddress(source + w(88, 112, 84)), readSize(source + w(92, 120, 88))),
   )
 }
+
+internal fun readDmaBufPlane(source: Long): DmaBufPlane =
+  DmaBufPlane(fd = readI32(source), offset = readU32(source + 4), stride = readU32(source + 8))
 
 internal fun readMapView(source: Long): MapView =
   MapView(

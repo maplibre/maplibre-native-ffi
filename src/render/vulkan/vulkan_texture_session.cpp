@@ -1,4 +1,7 @@
+#include <algorithm>
 #include <any>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <memory>
@@ -713,11 +716,13 @@ auto dma_buf_vk_format(uint32_t fourcc) -> vk::Format {
 }
 
 // What a ring's images take: a format, the modifiers that the device may pick
-// from for each image, and the device's memory types.
+// from for each image with each one's count of memory planes, and the
+// device's memory types.
 struct VulkanDmaBufFormat {
   uint32_t fourcc = 0;
   vk::Format format = vk::Format::eUndefined;
   std::vector<uint64_t> modifiers;
+  std::vector<uint32_t> plane_counts;
   std::vector<vk::MemoryPropertyFlags> memory_types;
 };
 
@@ -742,8 +747,8 @@ auto dma_buf_memory_type(
   return static_cast<uint32_t>(std::countr_zero(bits));
 }
 
-// The modifiers that lay `format` out in one plane, which the device renders
-// and samples.
+// The modifiers of `format` that the device renders and samples, in at most
+// as many memory planes as a dmabuf has.
 auto device_modifiers(
   vk::PhysicalDevice physical_device,
   const mln::vulkan::DispatchLoaderDynamic& dispatcher, vk::Format format
@@ -762,7 +767,8 @@ auto device_modifiers(
     vk::FormatFeatureFlags{vk::FormatFeatureFlagBits::eColorAttachment} |
     vk::FormatFeatureFlagBits::eSampledImage;
   std::erase_if(modifiers, [features](const auto& modifier) {
-    return modifier.drmFormatModifierPlaneCount != 1 ||
+    return modifier.drmFormatModifierPlaneCount < 1 ||
+           modifier.drmFormatModifierPlaneCount > dma_buf_max_planes ||
            (modifier.drmFormatModifierTilingFeatures & features) != features;
   });
   return modifiers;
@@ -839,10 +845,18 @@ class DmaBufImage final : public VulkanSlotImage {
     }
     layout_.fourcc = format.fourcc;
     layout_.modifier = chosen.drmFormatModifier;
+    const auto modifier = std::ranges::find(format.modifiers, layout_.modifier);
+    if (modifier == format.modifiers.end()) {
+      throw std::runtime_error("Vulkan chose a modifier that the ring lacks");
+    }
+    const auto plane_count = format.plane_counts.at(
+      static_cast<std::size_t>(modifier - format.modifiers.begin())
+    );
 
     const auto requirements =
       device->getImageMemoryRequirements(*image_, dispatcher);
-    // An exported image takes memory of its own, which the dmabuf names.
+    // An exported image takes memory of its own, which the dmabuf names. The
+    // image isn't disjoint, so its planes all lie in that memory.
     const auto dedicated = vk::MemoryDedicatedAllocateInfo().setImage(*image_);
     const auto exported =
       vk::ExportMemoryAllocateInfo()
@@ -865,16 +879,25 @@ class DmaBufImage final : public VulkanSlotImage {
       ),
       dispatcher
     )};
-    const auto plane = device->getImageSubresourceLayout(
-      *image_,
-      vk::ImageSubresource().setAspectMask(
-        vk::ImageAspectFlagBits::eMemoryPlane0EXT
-      ),
-      dispatcher
-    );
-    layout_.fd = fd_.get();
-    layout_.offset = static_cast<uint32_t>(plane.offset);
-    layout_.stride = static_cast<uint32_t>(plane.rowPitch);
+    static constexpr auto aspects = std::array{
+      vk::ImageAspectFlagBits::eMemoryPlane0EXT,
+      vk::ImageAspectFlagBits::eMemoryPlane1EXT,
+      vk::ImageAspectFlagBits::eMemoryPlane2EXT,
+      vk::ImageAspectFlagBits::eMemoryPlane3EXT,
+    };
+    for (auto index = uint32_t{0}; index < plane_count; ++index) {
+      const auto plane = device->getImageSubresourceLayout(
+        *image_, vk::ImageSubresource().setAspectMask(aspects.at(index)),
+        dispatcher
+      );
+      layout_.planes.push_back(
+        mln_dma_buf_plane{
+          .fd = fd_.get(),
+          .offset = static_cast<uint32_t>(plane.offset),
+          .stride = static_cast<uint32_t>(plane.rowPitch),
+        }
+      );
+    }
     view_ = device->createImageViewUnique(
       vk::ImageViewCreateInfo()
         .setImage(*image_)
@@ -967,6 +990,15 @@ auto configure_dma_buf_session(
   format.fourcc = choice.fourcc;
   format.format = dma_buf_vk_format(choice.fourcc);
   format.modifiers = std::move(choice.modifiers);
+  const auto supported =
+    device_modifiers(physical_device, dispatcher, format.format);
+  for (const auto modifier : format.modifiers) {
+    format.plane_counts.push_back(
+      std::ranges::find_if(supported, [modifier](const auto& properties) {
+        return properties.drmFormatModifier == modifier;
+      })->drmFormatModifierPlaneCount
+    );
+  }
   const auto memory = physical_device.getMemoryProperties(dispatcher);
   for (auto index = uint32_t{0}; index < memory.memoryTypeCount; ++index) {
     format.memory_types.push_back(memory.memoryTypes.at(index).propertyFlags);

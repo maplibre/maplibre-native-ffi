@@ -26,6 +26,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Linux/DmaBufFormat.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Linux/DmaBufFrame.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Linux/DmaBufFrameView.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Linux/DmaBufPlane.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Linux/DmaBufRingDescriptor.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Logging/LogCallback.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Logging/LogEvent.g.cs",

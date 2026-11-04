@@ -748,6 +748,12 @@ pub struct mln_dma_buf_frame {
     pub slot: u32,
     pub fourcc: u32,
     pub modifier: u64,
+    pub planes: *const mln_dma_buf_plane,
+    pub plane_count: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_dma_buf_plane {
     pub fd: i32,
     pub offset: u32,
     pub stride: u32,

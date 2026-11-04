@@ -42,11 +42,10 @@ public struct DmaBufFrame: Equatable, Hashable, Sendable {
   public var slot: UInt32
   public var fourcc: UInt32
   public var modifier: UInt64
-  public var fd: Int32
-  /// The bytes from the start of the buffer to its first pixel.
-  public var offset: UInt32
-  /// The bytes from the start of one row to the start of the next.
-  public var stride: UInt32
+  /// The buffer's planes, in the order that its fourcc and modifier define.
+  /// Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and
+  /// up, or with one `zwp_linux_buffer_params_v1.add` call each.
+  public var planes: [DmaBufPlane]
   public init(
     width: UInt32 = 0,
     height: UInt32 = 0,
@@ -54,9 +53,7 @@ public struct DmaBufFrame: Equatable, Hashable, Sendable {
     slot: UInt32 = 0,
     fourcc: UInt32 = 0,
     modifier: UInt64 = 0,
-    fd: Int32 = 0,
-    offset: UInt32 = 0,
-    stride: UInt32 = 0
+    planes: [DmaBufPlane] = []
   ) {
     self.width = width
     self.height = height
@@ -64,18 +61,45 @@ public struct DmaBufFrame: Equatable, Hashable, Sendable {
     self.slot = slot
     self.fourcc = fourcc
     self.modifier = modifier
-    self.fd = fd
-    self.offset = offset
-    self.stride = stride
+    self.planes = planes
   }
 
-  init(raw: mln_dma_buf_frame) {
+  init(
+    raw: mln_dma_buf_frame,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
     slot = raw.slot
     fourcc = raw.fourcc
     modifier = raw.modifier
+    planes = try NativeInputArena.copyArray(
+      raw.planes,
+      count: Int(raw.plane_count)
+    ).map { DmaBufPlane(raw: $0) }
+  }
+}
+
+/// Where one plane of a dmabuf keeps its data.
+///
+/// See `mln_dma_buf_plane` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+public struct DmaBufPlane: Equatable, Hashable, Sendable {
+  /// The file descriptor of the dmabuf that holds the plane. The planes of a
+  /// buffer often share one.
+  public var fd: Int32
+  /// The bytes from the start of the dmabuf to the plane's first byte.
+  public var offset: UInt32
+  /// The bytes from the start of one row to the start of the next.
+  public var stride: UInt32
+  public init(fd: Int32 = 0, offset: UInt32 = 0, stride: UInt32 = 0) {
+    self.fd = fd
+    self.offset = offset
+    self.stride = stride
+  }
+
+  init(raw: mln_dma_buf_plane) {
     fd = raw.fd
     offset = raw.offset
     self.stride = raw.stride
@@ -87,7 +111,9 @@ public struct DmaBufFrame: Equatable, Hashable, Sendable {
 ///
 /// Each buffer has the map's size in pixels and a format and modifier from
 /// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
-/// DRM_FORMAT_ARGB8888, and only with modifiers that keep one plane.
+/// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+/// format has, such as a plane of compression metadata, and the library takes
+/// any such modifier that its GPU can render into and share.
 ///
 /// See `mln_dma_buf_ring_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).

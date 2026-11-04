@@ -11,6 +11,9 @@ AndroidHardwareBufferFrame _readAndroidHardwareBufferFrame(
   buffer: NativePointer(source.buffer.address),
 );
 
+DmaBufPlane _readDmaBufPlane(raw.mln_dma_buf_plane source) =>
+    DmaBufPlane(fd: source.fd, offset: source.offset, stride: source.stride);
+
 DmaBufFrame _readDmaBufFrame(raw.mln_dma_buf_frame source) => DmaBufFrame(
   width: source.width,
   height: source.height,
@@ -18,9 +21,12 @@ DmaBufFrame _readDmaBufFrame(raw.mln_dma_buf_frame source) => DmaBufFrame(
   slot: source.slot,
   fourcc: source.fourcc,
   modifier: source.modifier,
-  fd: source.fd,
-  offset: source.offset,
-  stride: source.stride,
+  planes: List<DmaBufPlane>.unmodifiable(
+    List.generate(
+      source.plane_count,
+      (index) => _readDmaBufPlane(source.planes[index]),
+    ),
+  ),
 );
 
 DxgiSharedTextureFrame _readDxgiSharedTextureFrame(
@@ -3631,12 +3637,14 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
   /// buffer. Once you release or discard the frame, the session may render into
-  /// the buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR with
-  /// `mmap`, and bracket your reads with DMA_BUF_IOCTL_SYNC.
+  /// the buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR, which
+  /// has one plane, with `mmap`, and bracket your reads with
+  /// DMA_BUF_IOCTL_SYNC.
   ///
-  /// The session owns the file descriptor, so don't close it. To keep the
-  /// buffer after you release the frame, duplicate the file descriptor with
-  /// `dup`. A duplicate keeps the buffer's memory, but not its contents.
+  /// The session owns the planes' file descriptors, so don't close them. To
+  /// keep the buffer after you release the frame, duplicate each file
+  /// descriptor with `dup`. A duplicate keeps the buffer's memory, but not its
+  /// contents.
   ///
   /// See `mln_acquired_frame_get_dma_buf` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
@@ -9196,9 +9204,7 @@ final class ScopedDmaBufFrame {
   int get slot => _value.slot;
   int get fourcc => _value.fourcc;
   int get modifier => _value.modifier;
-  int get fd => _scope.active(_value).fd;
-  int get offset => _value.offset;
-  int get stride => _value.stride;
+  List<DmaBufPlane> get planes => _scope.active(_value).planes;
 }
 
 /// A `DxgiSharedTextureFrame` whose native objects are readable only while the
