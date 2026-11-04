@@ -28,7 +28,7 @@
 [![C](https://img.shields.io/badge/C-vcpkg%20%C2%B7%20Conan%20%C2%B7%20xmake-00599C?logo=c&logoColor=white)](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
 [![Dart](https://img.shields.io/badge/Dart-pub.dev-0175C2?logo=dart&logoColor=white)](https://pub.dev/packages/maplibre_native_ffi)
 [![.NET](https://img.shields.io/badge/.NET-NuGet-512BD4?logo=dotnet&logoColor=white)](https://www.nuget.org/packages/Maplibre.NativeFfi)
-[![Go](https://img.shields.io/badge/Go-pkg.go.dev-00ADD8?logo=go&logoColor=white)](https://pkg.go.dev/github.com/maplibre/maplibre-native-ffi/bindings/go)
+[![Go](https://img.shields.io/badge/Go-pkg.go.dev-00ADD8?logo=go&logoColor=white)](https://pkg.go.dev/maplibre.org/maplibre-native-ffi/bindings/go/maplibre)
 [![Kotlin](https://img.shields.io/badge/Kotlin-Maven%20Central-7F52FF?logo=kotlin&logoColor=white)](https://central.sonatype.com/artifact/org.maplibre.nativeffi/maplibre-native-ffi)
 [![Python](https://img.shields.io/badge/Python-PyPI-3776AB?logo=python&logoColor=white)](https://pypi.org/project/maplibre-native-ffi/)
 [![Rust](https://img.shields.io/badge/Rust-crates.io-000000?logo=rust&logoColor=white)](https://crates.io/crates/maplibre-native-ffi)

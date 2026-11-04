@@ -7,7 +7,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 // session and onFrameWake come from the Render to a window page's file.

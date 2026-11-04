@@ -1,0 +1,30 @@
+---
+// A page at a Go package's import path. The go command and the Go module
+// mirror read its go-import tag to find the module's source, and a browser
+// moves on to the install guide.
+interface Props {
+  /** The module path that the tag resolves. */
+  module: string;
+  /** How the module's source is served: `git`, or `mod` for a module proxy. */
+  vcs: "git" | "mod";
+  /** The repository URL, or the module proxy's base URL. */
+  url: string;
+}
+
+const { module, vcs, url } = Astro.props;
+const content = `${module} ${vcs} ${url}`;
+const guide = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/install/go/`;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="go-import" content={content} />
+    <meta http-equiv="refresh" content={`0; url=${guide}`} />
+    <title>{module}</title>
+  </head>
+  <body>
+    <a href={guide}>Install {module}</a>
+  </body>
+</html>

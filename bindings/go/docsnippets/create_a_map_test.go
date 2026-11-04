@@ -5,7 +5,7 @@ package docsnippets
 import (
 	"context"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 func reportFailure(err error) {}

@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/maplibre"
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
 )
 
 func withAPIKey(url string) string {
