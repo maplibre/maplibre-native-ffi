@@ -128,6 +128,16 @@ class MaplibreNativeC(ConanFile):
                 src=os.path.join(self.build_folder, "lib"),
                 dst=os.path.join(self.package_folder, "lib"),
             )
+        # An executable that links the archive imports the Visual C++ runtime,
+        # which a consumer deploys from here.
+        if self.settings.os == "Windows":
+            for pattern in ("vcruntime140*.dll", "msvcp140*.dll"):
+                copy(
+                    self,
+                    pattern,
+                    src=os.path.join(self.build_folder, "bin"),
+                    dst=os.path.join(self.package_folder, "bin"),
+                )
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "maplibre-native-c")
