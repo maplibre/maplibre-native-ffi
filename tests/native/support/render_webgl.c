@@ -248,24 +248,14 @@ void mln_test_release_thread_gpu_resources(void) {
   thread_webgl_state = (webgl_state){0};
 }
 
-bool mln_test_transferred_webgl_surface_create(
-  mln_map map, mln_test_render_fixture* fixture
+// Attaches a core-worker session to the canvas with `state->id`, which the
+// fixture then owns along with `state`.
+static bool attach_transferred_surface(
+  mln_map map, webgl_fixture_state* state, mln_test_render_fixture* fixture
 ) {
-  if (map == MLN_HANDLE_NULL || fixture == NULL) {
-    return false;
-  }
   mln_test_render_reserve_session();
   *fixture = (mln_test_render_fixture){0};
   fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
-  webgl_fixture_state* state = calloc(1, sizeof(*state));
-  if (state == NULL) {
-    return false;
-  }
-  state->transferred = true;
-  const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
-  (void)snprintf(state->id, sizeof(state->id), "mln-transfer-%u", serial);
-  state->canvas_shared_ptr =
-    mln_test_register_transferred_offscreen_canvas(state->id, 64, 64);
   fixture->backend_state = state;
 
   char target[sizeof(state->id) + 1];
@@ -329,4 +319,39 @@ bool mln_test_transferred_webgl_surface_create(
   mln_test_completion_destroy(&completion);
   mln_test_render_track_session(fixture);
   return true;
+}
+
+bool mln_test_transferred_webgl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  if (map == MLN_HANDLE_NULL || fixture == NULL) {
+    return false;
+  }
+  webgl_fixture_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+  state->transferred = true;
+  const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
+  (void)snprintf(state->id, sizeof(state->id), "mln-transfer-%u", serial);
+  state->canvas_shared_ptr =
+    mln_test_register_transferred_offscreen_canvas(state->id, 64, 64);
+  return attach_transferred_surface(map, state, fixture);
+}
+
+bool mln_test_page_webgl_surface_create(
+  mln_map map, const char* canvas_id, mln_test_render_fixture* fixture
+) {
+  if (map == MLN_HANDLE_NULL || canvas_id == NULL || fixture == NULL) {
+    return false;
+  }
+  webgl_fixture_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+  // The test thread doesn't own the page's canvas, so the library's worker
+  // creation runs on the main thread, which transfers the canvas itself.
+  state->transferred = true;
+  (void)snprintf(state->id, sizeof(state->id), "%s", canvas_id);
+  return attach_transferred_surface(map, state, fixture);
 }

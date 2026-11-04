@@ -147,6 +147,11 @@ bool mln_test_render_reclaim_thread_sessions(void);
 bool mln_test_transferred_webgl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 );
+// Transfers the page's <canvas> with the ID `canvas_id`, sized 64 by 64, into
+// a core-worker WebGL surface session, which presents to the page.
+bool mln_test_page_webgl_surface_create(
+  mln_map map, const char* canvas_id, mln_test_render_fixture* fixture
+);
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)

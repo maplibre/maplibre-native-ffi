@@ -64,6 +64,7 @@ inline auto configure_transferred_webgl_worker(
 ) -> void {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   auto thread = std::make_shared<pthread_t>();
+  session.core_worker_yields_to_event_loop = true;
   session.start_worker =
     [thread, selector = std::move(selector)](std::function<void()> function) {
       auto attributes = pthread_attr_t{};
