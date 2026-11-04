@@ -645,6 +645,20 @@ ci:
             files:
               - examples/swiftui/**
           then: apply
+    compose:
+      covers: >-
+        Builds the Jetpack Compose example for Android x64 as a release build,
+        shrunk with the binding's keep rules, against the archive that the
+        Android x64 OpenGL ES target built, so it runs that target. It runs no
+        app. Catches what breaks the example's composite build of the Kotlin
+        binding and its OpenGL runtime, or the example's code: changes to the
+        example, and to the Kotlin binding's Android sources, Android build, or
+        OpenGL runtime that the example compiles.
+      rules:
+        - if:
+            files:
+              - examples/compose/**
+          then: apply
     ohpm:
       covers: >-
         Packs the ArkTS OHPM packages from the addons that the OpenHarmony

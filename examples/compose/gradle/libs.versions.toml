@@ -1,0 +1,23 @@
+[versions]
+# The repository's build uses these versions of the Android and Kotlin Gradle plugins too, and a
+# composite build loads only one of each. Keep them in step with ../../gradle/libs.versions.toml.
+agp = "9.1.1"
+kotlin = "2.4.21"
+maplibre-native-ffi = "0.1.0-SNAPSHOT"
+activity = "1.13.0"
+compose-bom = "2026.09.00"
+lifecycle = "2.11.0"
+
+[libraries]
+maplibre-native-ffi = { module = "org.maplibre.nativeffi:maplibre-native-ffi", version.ref = "maplibre-native-ffi" }
+maplibre-native-ffi-runtime-opengl = { module = "org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl", version.ref = "maplibre-native-ffi" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+androidx-compose-foundation = { module = "androidx.compose.foundation:foundation" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# AGP compiles Kotlin itself, with the Kotlin Gradle plugin of the version that the build loads.
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

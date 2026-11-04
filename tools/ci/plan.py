@@ -139,6 +139,11 @@ JOBS = {
         "swiftui",
         lambda target: target.preset == "macos-arm64-metal",
     ),
+    # The Compose example builds against the Android x64 OpenGL ES archive.
+    "compose-android": (
+        "compose",
+        lambda target: target.preset == "android-x64-egl",
+    ),
     "swift-package": (
         "swiftpm",
         lambda target: (
