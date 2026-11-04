@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Compile the Kotlin/Native Linux ARM64 KLIB on another host, since Kotlin/Native can't run on Linux ARM64."
+#MISE dir="../.."
+#MISE shell="bash"
+set -euo pipefail
+
+# cinterop reads the checked-in headers, so the KLIB needs no native build.
+exec ./gradlew :bindings:kotlin:linuxArm64Klib

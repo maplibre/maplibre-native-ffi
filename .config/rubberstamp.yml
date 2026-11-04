@@ -212,7 +212,8 @@ ci:
       covers: >-
         Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
         binding's suite, and the Dart build: the general check for shared native
-        code, bindings, and build logic.
+        code, bindings, and build logic. Also compiles the Kotlin/Native Linux
+        ARM64 KLIB.
       rules:
         - if:
             files:
@@ -221,11 +222,12 @@ ci:
     linux-arm64:
       covers: >-
         Linux ARM64 glibc with OpenGL (EGL) and Vulkan, running Linux x64's
-        suites on ARM runners about twice as slow as x64. Catches only what
-        differs by CPU architecture on Linux: architecture conditionals in code
-        or build logic, a tool or dependency fetched per architecture, and the
-        ARM runner setup. Linux platform, renderer, and binding changes that
-        Linux x64 already builds and tests don't need it.
+        suites, except Kotlin/Native's, on ARM runners about twice as slow as
+        x64. Catches only what differs by CPU architecture on Linux:
+        architecture conditionals in code or build logic, a tool or dependency
+        fetched per architecture, and the ARM runner setup. Linux platform,
+        renderer, and binding changes that Linux x64 already builds and tests
+        don't need it.
       rules:
         - if:
             files:
