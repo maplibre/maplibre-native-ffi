@@ -29,7 +29,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from .model import Api
+from .model import Api, Constant
+from .protocol import RUNTIME_CONSTANTS
 
 if TYPE_CHECKING:
     from .semantic import BoundApi, FieldPlan, MaskFlag, OperationPlan, ValuePlan
@@ -220,7 +221,9 @@ def index(api: Api) -> dict[str, Doc]:
     record or enum that it names. A function's diagnostic is hidden, and its
     other parameters are exposed until `with_parameters` says otherwise.
     """
-    internal = set(api.runtime_exports) | set(api.runtime_types)
+    internal = (
+        set(api.runtime_exports) | set(api.runtime_types) | set(RUNTIME_CONSTANTS)
+    )
     docs: dict[str, Doc] = {}
 
     def add(
@@ -265,6 +268,8 @@ def index(api: Api) -> dict[str, Doc]:
         for value in enum.values:
             if enum.name not in internal:
                 add(value.name, value.documentation, None)
+    for constant in api.constants:
+        add(constant.name, constant.documentation, constant.location.path)
     for typedef in api.typedefs:
         if typedef.name not in docs:
             add(
@@ -444,6 +449,7 @@ def resolver(
     constant: Callable[[ValuePlan, str], str | None],
     field: Callable[[ValuePlan, FieldPlan], str | None],
     flag: Callable[[ValuePlan, MaskFlag], str | None] | None = None,
+    define: Callable[[Constant], str | None] | None = None,
     extra: dict[str, str] | None = None,
     threads: dict[str, str] | None = None,
     fields: dict[str, frozenset[str]] | None = None,
@@ -453,10 +459,11 @@ def resolver(
 
     Those are the public values, handles, and callbacks, each public
     operation, the constants of each public enum, the public fields of each
-    public record, and the flags of a record's mask. Each function spells a
-    declaration as the binding generates it, or returns None for one that it
-    does not generate. `extra` names declarations that a binding's handwritten
-    runtime presents. `threads` and `fields` are as `Resolver` describes.
+    public record, the flags of a record's mask, and each public constant
+    macro, which `define` spells. Each function spells a declaration as the
+    binding generates it, or returns None for one that it does not generate.
+    `extra` names declarations that a binding's handwritten runtime presents.
+    `threads` and `fields` are as `Resolver` describes.
     `parameter` spells a C parameter name as the binding's parameters do;
     without it, a parameter keeps its C name.
     """
@@ -475,6 +482,8 @@ def resolver(
     for plan in bound.operations:
         if plan.role == "public":
             names[plan.name] = operation(plan)
+    for item in bound.public_constants:
+        names[item.name] = define(item) if define else None
     found = {name: spelled for name, spelled in names.items() if spelled}
     found.update(extra or {})
     return Resolver(found, threads or {}, fields or {}, parameter)

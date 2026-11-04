@@ -206,7 +206,7 @@ func failWithFullDiagnosticForTest(status int32) (int, error) {
 		}
 		return status
 	})
-	return int(C.MLN_DIAGNOSTIC_MESSAGE_CAPACITY), err
+	return int(DiagnosticMessageCapacity), err
 }
 
 // passImageToCForTest hands a native image to C. The default cgo check fails

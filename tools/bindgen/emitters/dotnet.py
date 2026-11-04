@@ -186,12 +186,39 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         constant=constant,
         field=field,
         flag=flag,
+        define=lambda constant: f"MaplibreNative.{constant_name(constant)}",
         extra={
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{pascal(name)}"
             for name in ("generation", "render_update_generation")
         },
         parameter=camel,
     )
+
+
+def constant_name(constant) -> str:
+    """A constant macro's name without `MLN_`: `TextureRingMaxDepth`."""
+    return pascal(constant.name.removeprefix("MLN_").lower())
+
+
+def constants_files(bound: BoundApi) -> dict[str, str]:
+    """The public constant macros, as constants of `MaplibreNative` in the
+    directory of each one's header."""
+    from .dotnet_values import SCALARS
+
+    by_directory = defaultdict(list)
+    for constant in bound.public_constants:
+        by_directory[directory_for(constant.location.path)].append(
+            doc(bound, constant.name, "    ")
+            + f"    public const {SCALARS[constant.type]} {constant_name(constant)} = {constant.value};\n"
+        )
+    return {
+        f"{directory}/MaplibreNative.Constants.g.cs": HEADER
+        + f"namespace {NAMESPACE};\n\n"
+        + "public static partial class MaplibreNative\n{\n"
+        + "\n".join(body)
+        + "}\n"
+        for directory, body in sorted(by_directory.items())
+    }
 
 
 def declared_enums(bound: BoundApi, values: Values) -> set[str]:
@@ -612,6 +639,7 @@ def lower(api: Api | BoundApi) -> Lowered:
             + "\n".join(body)
             + "}\n"
         )
+    files.update(constants_files(bound))
     for directory, body in sorted(globals_by_directory.items()):
         files[f"{directory}/MaplibreNative.Operations.g.cs"] = (
             HEADER

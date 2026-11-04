@@ -3519,7 +3519,8 @@ func nativeMetalBorrowedTexture(input MetalBorrowedTexture, arena *bindingArena)
 // logical_size sets the map's size. physical_width and physical_height give the
 // textures' size in pixels, which is usually logical_size times the map's scale
 // factor. The textures must all have that size, one device, one pixel format,
-// one sample, and MTLTextureUsageRenderTarget.
+// one sample, and MTLTextureUsageRenderTarget. The ring holds up to
+// TextureRingMaxDepth distinct textures.
 //
 // The session uses the textures until a replacement or release of the target
 // completes, a detach or release of the session completes, or an abandon of it
@@ -3971,7 +3972,8 @@ func nativeOpenGLBorrowedTexture(input OpenGLBorrowedTexture, arena *bindingAren
 // logical_size sets the map's size. physical_width and physical_height give the
 // textures' size in pixels, which is usually logical_size times the map's scale
 // factor. The context must use OpenGLContextOwnershipShared. Each texture must
-// be in your context's share group, with storage of that size.
+// be in your context's share group, with storage of that size. The ring holds
+// up to TextureRingMaxDepth distinct textures.
 //
 // The session uses the textures until a replacement or release of the target
 // completes, a detach or release of the session completes, or an abandon of it
@@ -5788,7 +5790,8 @@ func nativeVulkanBorrowedTexture(input VulkanBorrowedTexture, arena *bindingAren
 // logical_size sets the map's size. physical_width and physical_height give the
 // images' size in pixels, which is usually logical_size times the map's scale
 // factor. Each image must have that size, format, and
-// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
+// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
+// ring holds up to TextureRingMaxDepth distinct images.
 //
 // The session uses the images until a replacement or release of the target
 // completes, a detach or release of the session completes, or an abandon of it
@@ -6432,6 +6435,35 @@ func (view VulkanTextureFrameView) UnsafeDevice() (uintptr, error) {
 func (view VulkanTextureFrameView) Format() uint32 { return view.value.Format }
 
 func (view VulkanTextureFrameView) Layout() uint32 { return view.value.Layout }
+
+const (
+	// DiagnosticMessageCapacity corresponds to MLN_DIAGNOSTIC_MESSAGE_CAPACITY. The
+	// size of a diagnostic message in bytes, with its terminator.
+	//
+	// See MLN_DIAGNOSTIC_MESSAGE_CAPACITY in the C API reference:
+	// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+	DiagnosticMessageCapacity uint32 = 4096
+	// FrameDemandTokenStillImage corresponds to MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE.
+	// The token of the frame results that a session adds when it renders an image
+	// for MapHandle.RequestStillImage(). Your own demands can't use it.
+	//
+	// See MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE in the C API reference:
+	// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+	FrameDemandTokenStillImage uint64 = 18446744073709551615
+	// TextureRingMaxDepth corresponds to MLN_TEXTURE_RING_MAX_DEPTH. The most
+	// textures that a render session's texture ring can have.
+	//
+	// See MLN_TEXTURE_RING_MAX_DEPTH in the C API reference:
+	// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+	TextureRingMaxDepth uint32 = 8
+	// VulkanNonDispatchableHandleNull corresponds to
+	// MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL. The null Vulkan non-dispatchable
+	// handle.
+	//
+	// See MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL in the C API reference:
+	// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+	VulkanNonDispatchableHandleNull uint64 = 0
+)
 
 // AcquiredFrameHandle corresponds to mln_acquired_frame. A rendered frame that
 // the caller holds to read or show.

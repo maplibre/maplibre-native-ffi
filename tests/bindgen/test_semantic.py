@@ -1,11 +1,13 @@
 """Semantic mutation tests shared by every static language backend."""
 
+import importlib
 import re
 import unittest
 from typing import get_args
 
 from support import parse, parse_sources, protocol_header
 
+from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import (
@@ -50,6 +52,39 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
                         "mask": "uint64_t",
                     },
                 )
+
+    def test_every_binding_names_the_public_constants_but_not_the_runtime_s(self):
+        bound = compile_api(
+            parse(
+                """
+/** The null handle. */
+#define MLN_HANDLE_NULL ((uint64_t)0)
+/** The most items. */
+#define MLN_DEPTH 8
+""",
+                groups=("abi_version",),
+            )
+        )
+        self.assertEqual(
+            [constant.name for constant in bound.public_constants],
+            ["MLN_DEPTH", "MLN_DIAGNOSTIC_MESSAGE_CAPACITY"],
+        )
+        for binding in (
+            "dart",
+            "dotnet",
+            "go",
+            "kotlin",
+            "python",
+            "rust",
+            "swift",
+            "zig",
+        ):
+            with self.subTest(binding=binding):
+                emitter = importlib.import_module(f"tools.bindgen.emitters.{binding}")
+                symbol = emitter.symbols(bound)
+                self.assertIsNotNone(symbol("MLN_DEPTH"))
+                self.assertIsNone(symbol("MLN_C_VERSION"))
+                self.assertIsNone(symbol("MLN_HANDLE_NULL"))
 
     def test_enum_members_drop_the_prefix_their_type_name_shares(self):
         for native, constants, prefix in (

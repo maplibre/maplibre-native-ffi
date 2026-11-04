@@ -12,6 +12,7 @@ from __future__ import annotations
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import DART_RESERVED
 from tools.bindgen.model import CType, Function, Record
+from tools.bindgen.protocol import c_version
 from tools.bindgen.semantic import BoundApi
 
 PATH = "bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart"
@@ -212,7 +213,7 @@ def generate(bound: BoundApi) -> str:
         for function in api.functions
         if function.name not in bound.unsupported
     )
-    version = bound.source.c_version
+    version = c_version(bound.source)
     constants = "" if version is None else f"const int MLN_C_VERSION = {version};\n\n"
     return (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n"

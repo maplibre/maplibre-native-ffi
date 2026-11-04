@@ -198,11 +198,26 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         constant=constant,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{member}"
             for member in ("generation", "render_update_generation")
         },
         parameter=parameter_name,
+    )
+
+
+def constant_name(constant) -> str:
+    """A constant macro's name without `MLN_`: `texture_ring_max_depth`."""
+    return constant.name.removeprefix("MLN_").lower()
+
+
+def constants_source(bound: BoundApi) -> str:
+    """The public constant macros, each typed as its C type's Zig integer."""
+    return "".join(
+        doc(bound, constant.name)
+        + f"pub const {constant_name(constant)}: {SCALARS[constant.type]} = {constant.value};\n"
+        for constant in bound.public_constants
     )
 
 
@@ -562,7 +577,14 @@ pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
 
 """
-    source = docs + prefix + runtime + "\n".join([*owners, *chunks, *variants])
+    source = (
+        docs
+        + prefix
+        + runtime
+        + constants_source(bound)
+        + "\n"
+        + "\n".join([*owners, *chunks, *variants])
+    )
     status_value = bound.public_values.get(STATUS)
     files = {
         "maplibre_native_ffi.zig": source,

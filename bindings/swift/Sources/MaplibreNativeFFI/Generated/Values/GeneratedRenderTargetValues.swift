@@ -687,3 +687,15 @@ public struct WglContextDescriptor: Equatable, Hashable, Sendable {
     return raw
   }
 }
+
+/// The most textures that a render session's texture ring can have.
+///
+/// See `MLN_TEXTURE_RING_MAX_DEPTH` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public let textureRingMaxDepth: UInt32 = 8
+
+/// The null Vulkan non-dispatchable handle.
+///
+/// See `MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public let vulkanNonDispatchableHandleNull: UInt64 = 0

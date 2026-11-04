@@ -2,6 +2,11 @@
 use super::*;
 
 pub const MLN_C_VERSION: u32 = 0;
+pub const MLN_DIAGNOSTIC_MESSAGE_CAPACITY: u32 = 4096;
+pub const MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE: u64 = 18446744073709551615;
+pub const MLN_HANDLE_NULL: u64 = 0;
+pub const MLN_TEXTURE_RING_MAX_DEPTH: u32 = 8;
+pub const MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL: u64 = 0;
 pub type mln_animation_option_field = u32;
 pub const MLN_ANIMATION_OPTION_DURATION: mln_animation_option_field = 1;
 pub const MLN_ANIMATION_OPTION_VELOCITY: mln_animation_option_field = 2;

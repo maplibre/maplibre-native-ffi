@@ -12,7 +12,7 @@ from tools.bindgen.semantic import (
     OperationPlan,
 )
 
-from ..model import Api, CType, Lowered, Unsupported
+from ..model import Api, Constant, CType, Lowered, Unsupported
 
 DIRECTORY = "bindings/rust"
 
@@ -161,10 +161,27 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         constant=constant,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion::{name}"
             for name in ("generation", "render_update_generation")
         },
+    )
+
+
+def constant_name(constant: Constant) -> str:
+    """A constant macro's name without `MLN_`: `TEXTURE_RING_MAX_DEPTH`."""
+    return constant.name.removeprefix("MLN_")
+
+
+def constants_source(bound: BoundApi) -> str:
+    """The public constant macros, each with its C type's Rust integer."""
+    from .rust_sys import SCALARS as SYS_SCALARS
+
+    return "".join(
+        f"\n{doc(bound, constant.name)}pub const {constant_name(constant)}: "
+        f"{SYS_SCALARS[constant.type]} = sys::{constant.name};\n"
+        for constant in bound.public_constants
     )
 
 
@@ -393,7 +410,9 @@ def lower(api: Api | BoundApi) -> Lowered:
         modules.append("global")
     assert not chunks, f"operations without an owner module: {sorted(chunks)}"
     declarations = [value_types.render()]
-    files[f"{root}/values.rs"] = marker + "use super::*;\n\n" + "\n".join(declarations)
+    files[f"{root}/values.rs"] = (
+        marker + "use super::*;\n\n" + "\n".join(declarations) + constants_source(bound)
+    )
     files[f"{root}/mod.rs"] = marker + rust_owners.module_index(
         owners, ["values", *modules]
     )

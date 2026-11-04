@@ -22,7 +22,7 @@ class FrontendTests(unittest.TestCase):
                 'public = ["public.h"]\nruntime = ["runtime.h"]\n'
             )
             (root / "public.h").write_text(
-                "#pragma once\n#define MLN_C_VERSION 0u\n"
+                "#pragma once\n/** The epoch. */\n#define MLN_C_VERSION 0u\n"
                 + protocol_header(
                     "mln_status public_operation(mln_diagnostic *out_diagnostic);\n"
                 )
@@ -55,12 +55,55 @@ class FrontendTests(unittest.TestCase):
             self.assertEqual(api.runtime_exports, ("runtime_operation",))
             self.assertEqual(api.runtime_types, ("runtime_kind",))
 
-    def test_reads_the_abi_version_macro_and_requires_it_of_the_real_headers(self):
-        version = parse_sources({"api.h": "#define MLN_C_VERSION 7u\n"}).c_version
-        self.assertEqual(version, 7)
-        self.assertIsNone(parse_sources({"api.h": "#define OTHER 1\n"}).c_version)
-        with self.assertRaisesRegex(ModelError, "MLN_C_VERSION must be an integer"):
-            parse_sources({"api.h": "#define MLN_C_VERSION (1 + 1)\n"})
+    def test_evaluates_documented_integer_macros_as_typed_constants(self):
+        api = parse_sources(
+            {
+                "api.h": """#include <stdint.h>
+/** A plain literal. */
+#define MLN_DEPTH 8
+/** The widest token. */
+#define MLN_TOKEN UINT64_MAX
+/** A null handle. */
+#define MLN_NONE UINT64_C(0)
+/** An expression. */
+#define MLN_SUM (1u + 1u)
+/** A negative value. */
+#define MLN_NEGATIVE (-1)
+/** Takes arguments, so declares no constant. */
+#define MLN_AT(items, index) ((items)[index])
+#define MLN_EMPTY
+#define MLN_ATTRIBUTE __attribute__((visibility("default")))
+"""
+            }
+        )
+        self.assertEqual(
+            {
+                constant.name: (constant.value, constant.type)
+                for constant in api.constants
+            },
+            {
+                "MLN_DEPTH": (8, "int32_t"),
+                "MLN_NEGATIVE": (-1, "int32_t"),
+                "MLN_NONE": (0, "uint64_t"),
+                "MLN_SUM": (2, "uint32_t"),
+                "MLN_TOKEN": ((1 << 64) - 1, "uint64_t"),
+            },
+        )
+        self.assertEqual(
+            api.constants_by_name["MLN_DEPTH"].documentation, "/** A plain literal. */"
+        )
+
+    def test_rejects_an_undocumented_constant_and_a_documented_non_integer(self):
+        with self.assertRaisesRegex(
+            ModelError, "MLN_DEPTH: constant has no documentation"
+        ):
+            parse_sources({"api.h": "#define MLN_DEPTH 8\n"})
+        with self.assertRaisesRegex(
+            ModelError, "MLN_SCALE: a documented macro must be an integer constant"
+        ):
+            parse_sources({"api.h": "/** A scale. */\n#define MLN_SCALE 1.5\n"})
+
+    def test_requires_the_abi_version_of_the_real_headers(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "binding-interfaces.toml").write_text(

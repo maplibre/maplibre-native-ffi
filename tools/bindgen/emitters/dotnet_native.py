@@ -14,6 +14,7 @@ from __future__ import annotations
 from tools.bindgen.managed_contracts import KEYWORDS
 from tools.bindgen.model import CType, Function, Record
 from tools.bindgen.names import pascal
+from tools.bindgen.protocol import c_version
 from tools.bindgen.semantic import BoundApi
 
 from .dotnet_values import SCALARS, raw_handle, typed_mask
@@ -193,7 +194,7 @@ def generate(bound: BoundApi) -> dict[str, str]:
         f"internal readonly record struct {raw_handle(handle)}(ulong Value) : IMlnHandle;\n"
         for _, handle in sorted(bound.handles.items())
     )
-    version = bound.source.c_version
+    version = c_version(bound.source)
     constants = (
         ""
         if version is None

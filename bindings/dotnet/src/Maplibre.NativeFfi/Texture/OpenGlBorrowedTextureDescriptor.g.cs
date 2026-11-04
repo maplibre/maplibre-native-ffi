@@ -11,7 +11,8 @@ namespace Maplibre.NativeFfi;
 /// <c>physical_height</c> give the textures' size in pixels, which is usually
 /// <c>logical_size</c> times the map's scale factor. The context must use
 /// <c>OpenGlContextOwnership.Shared</c>. Each texture must be in your context's
-/// share group, with storage of that size.</para>
+/// share group, with storage of that size. The ring holds up to
+/// <c>MaplibreNative.TextureRingMaxDepth</c> distinct textures.</para>
 /// <para>The session uses the textures until a replacement or release of the
 /// target completes, a detach or release of the session completes, or an
 /// abandon of it returns.</para>

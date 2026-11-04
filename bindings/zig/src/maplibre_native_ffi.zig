@@ -32,6 +32,28 @@ pub const Error = status.Error;
 pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
 
+/// The size of a diagnostic message in bytes, with its terminator.
+///
+/// See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const diagnostic_message_capacity: u32 = 4096;
+/// The token of the frame results that a session adds when it renders an image
+/// for `Map.requestStillImage()`. Your own demands can't use it.
+///
+/// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub const frame_demand_token_still_image: u64 = 18446744073709551615;
+/// The most textures that a render session's texture ring can have.
+///
+/// See `MLN_TEXTURE_RING_MAX_DEPTH` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const texture_ring_max_depth: u32 = 8;
+/// The null Vulkan non-dispatchable handle.
+///
+/// See `MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const vulkan_non_dispatchable_handle_null: u64 = 0;
+
 /// A rendered frame that the caller holds to read or show.
 ///
 /// See `mln_acquired_frame` in the
@@ -5441,7 +5463,8 @@ pub const MetalBorrowedTexture = struct {
 /// `logical_size` sets the map's size. `physical_width` and `physical_height`
 /// give the textures' size in pixels, which is usually `logical_size` times the
 /// map's scale factor. The textures must all have that size, one device, one
-/// pixel format, one sample, and MTLTextureUsageRenderTarget.
+/// pixel format, one sample, and MTLTextureUsageRenderTarget. The ring holds up
+/// to `texture_ring_max_depth` distinct textures.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or release of the session completes, or an abandon of it
@@ -5985,7 +6008,7 @@ pub const OpenGlBorrowedTexture = struct {
 /// give the textures' size in pixels, which is usually `logical_size` times the
 /// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
 /// Each texture must be in your context's share group, with storage of that
-/// size.
+/// size. The ring holds up to `texture_ring_max_depth` distinct textures.
 ///
 /// The session uses the textures until a replacement or release of the target
 /// completes, a detach or release of the session completes, or an abandon of it
@@ -8732,7 +8755,8 @@ pub const VulkanBorrowedTexture = struct {
 /// `logical_size` sets the map's size. `physical_width` and `physical_height`
 /// give the images' size in pixels, which is usually `logical_size` times the
 /// map's scale factor. Each image must have that size, `format`, and
-/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
+/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
+/// ring holds up to `texture_ring_max_depth` distinct images.
 ///
 /// The session uses the images until a replacement or release of the target
 /// completes, a detach or release of the session completes, or an abandon of it

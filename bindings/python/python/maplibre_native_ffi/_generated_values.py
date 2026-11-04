@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Buffer, Sequence
 from dataclasses import dataclass, field
 from enum import IntFlag
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Final, Protocol
 
 from ._enum import UnknownIntEnum
 from ._operation import _adopt_value
@@ -2699,7 +2699,8 @@ class MetalBorrowedTextureDescriptor:
     `physical_height` give the textures' size in pixels, which is usually
     `logical_size` times the map's scale factor. The textures must all have
     that size, one device, one pixel format, one sample, and
-    MTLTextureUsageRenderTarget.
+    MTLTextureUsageRenderTarget. The ring holds up to
+    `TEXTURE_RING_MAX_DEPTH` distinct textures.
 
     The session uses the textures until a replacement or release of the
     target completes, a detach or release of the session completes, or an
@@ -3125,7 +3126,8 @@ class OpenGlBorrowedTextureDescriptor:
     `physical_height` give the textures' size in pixels, which is usually
     `logical_size` times the map's scale factor. The context must use
     `OpenGlContextOwnership.SHARED`. Each texture must be in your context's
-    share group, with storage of that size.
+    share group, with storage of that size. The ring holds up to
+    `TEXTURE_RING_MAX_DEPTH` distinct textures.
 
     The session uses the textures until a replacement or release of the
     target completes, a detach or release of the session completes, or an
@@ -5075,7 +5077,8 @@ class VulkanBorrowedTextureDescriptor:
     `physical_height` give the images' size in pixels, which is usually
     `logical_size` times the map's scale factor. Each image must have that
     size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to
-    the context's device.
+    the context's device. The ring holds up to `TEXTURE_RING_MAX_DEPTH`
+    distinct images.
 
     The session uses the images until a replacement or release of the target
     completes, a detach or release of the session completes, or an abandon of
@@ -5692,3 +5695,33 @@ class WakeCallback(Protocol):
     """
 
     def __call__(self, /) -> None: ...
+
+
+DIAGNOSTIC_MESSAGE_CAPACITY: Final[int] = 4096
+"""The size of a diagnostic message in bytes, with its terminator.
+
+See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+"""
+
+FRAME_DEMAND_TOKEN_STILL_IMAGE: Final[int] = 18446744073709551615
+"""The token of the frame results that a session adds when it renders an image
+for `MapHandle.request_still_image()`. Your own demands can't use it.
+
+See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+"""
+
+TEXTURE_RING_MAX_DEPTH: Final[int] = 8
+"""The most textures that a render session's texture ring can have.
+
+See `MLN_TEXTURE_RING_MAX_DEPTH` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+"""
+
+VULKAN_NON_DISPATCHABLE_HANDLE_NULL: Final[int] = 0
+"""The null Vulkan non-dispatchable handle.
+
+See `MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+"""

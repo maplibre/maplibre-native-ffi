@@ -1,6 +1,7 @@
 """Raw `repr(C)` declarations for the Rust -sys crate.
 
-The crate mirrors the C boundary: one type alias and its constants per enum,
+The crate mirrors the C boundary: one constant per constant macro, one type
+alias and its constants per enum,
 one `repr(C)` item per record, one transparent newtype per handle, and one
 `extern "C"` declaration per function. Rust code above the crate and the
 Python extension call the C API only through these declarations.
@@ -189,9 +190,10 @@ class Declarations:
         return True
 
     def render(self) -> str:
-        items = []
-        if self.api.c_version is not None:
-            items.append(f"pub const MLN_C_VERSION: u32 = {self.api.c_version};")
+        items = [
+            f"pub const {constant.name}: {SCALARS[constant.type]} = {constant.value};"
+            for constant in self.api.constants
+        ]
         for enum in self.api.enums:
             if enum.name not in self.used:
                 continue

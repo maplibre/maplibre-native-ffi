@@ -75,3 +75,9 @@ public struct Status: RawRepresentable, CustomStringConvertible,
     }
   }
 }
+
+/// The size of a diagnostic message in bytes, with its terminator.
+///
+/// See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public let diagnosticMessageCapacity: UInt32 = 4096

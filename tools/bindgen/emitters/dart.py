@@ -163,6 +163,7 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         constant=constant,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{name}": f"CommandCompletion.{camel(name)}"
             for name in ("generation", "render_update_generation")
@@ -176,6 +177,27 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             "registered it, after native queues the call.",
         ),
         fields=async_hosts.omitted_fields(bound),
+    )
+
+
+def constant_name(constant) -> str:
+    """A constant macro's name without `MLN_`: `textureRingMaxDepth`."""
+    return camel(constant.name.removeprefix("MLN_").lower())
+
+
+def constants_source(bound: BoundApi) -> str:
+    """The public constant macros. A Dart int holds 64 bits in two's
+    complement, so an unsigned value above its range is a hex literal of the
+    same bits, as dart:ffi reads a Uint64."""
+    from .dart_values import doc
+
+    def literal(value: int) -> str:
+        return f"0x{value:X}" if value >= 1 << 63 else str(value)
+
+    return "".join(
+        f"\n{doc(bound, constant.name)}const int {constant_name(constant)} = "
+        f"{literal(constant.value)};\n"
+        for constant in bound.public_constants
     )
 
 
@@ -378,7 +400,7 @@ def lower(api: Api | BoundApi) -> Lowered:
         {
             OPERATIONS: operations(bound, methods, generated, values, conversions),
             VALUES: "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            "part of 'values.dart';\n\n" + declarations,
+            "part of 'values.dart';\n\n" + declarations + constants_source(bound),
             dart_native.PATH: dart_native.generate(bound),
         },
         unsupported,

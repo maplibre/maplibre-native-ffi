@@ -25,6 +25,7 @@ from typing import assert_never
 
 from ..model import Parameter
 from ..names import type_name
+from ..protocol import c_version
 from ..semantic import (
     BoundApi,
     OperationPlan,
@@ -1420,7 +1421,7 @@ def render_operations(
         + interface_text
         + "}\n"
     )
-    if (version := bound.source.c_version) is not None:
+    if (version := c_version(bound.source)) is not None:
         native += (
             "\n/** The C ABI contract version of the headers this binding was generated from. */\n"
             f"export const MLN_C_VERSION = {version};\n"

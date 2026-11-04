@@ -11,7 +11,8 @@ namespace Maplibre.NativeFfi;
 /// <c>physical_height</c> give the images' size in pixels, which is usually
 /// <c>logical_size</c> times the map's scale factor. Each image must have that
 /// size, <c>format</c>, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to
-/// the context's device.</para>
+/// the context's device. The ring holds up to
+/// <c>MaplibreNative.TextureRingMaxDepth</c> distinct images.</para>
 /// <para>The session uses the images until a replacement or release of the
 /// target completes, a detach or release of the session completes, or an
 /// abandon of it returns.</para>

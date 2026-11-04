@@ -25,7 +25,7 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle
 #define MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL UINT64_C(0)
 
 /** The most textures that a render session's texture ring can have. */
-#define MLN_TEXTURE_RING_MAX_DEPTH 8
+#define MLN_TEXTURE_RING_MAX_DEPTH 8u
 
 /** The thread that runs a render session's graphics work. */
 typedef enum mln_render_driver_kind : uint32_t {

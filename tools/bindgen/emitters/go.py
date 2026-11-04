@@ -182,11 +182,34 @@ def _symbols(bound) -> docs.Symbol:
         constant=enum_member,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{name(member)}"
             for member in ("generation", "render_update_generation")
         },
         parameter=parameter_name,
+    )
+
+
+def constant_name(constant) -> str:
+    """A constant macro's exported name: `TextureRingMaxDepth`."""
+    return name(constant.name.removeprefix("MLN_").lower())
+
+
+def constants_source(bound) -> str:
+    """The public constant macros, each typed as its C type's Go integer, in
+    one group whose members carry their own comments."""
+    constants = bound.public_constants
+    if not constants:
+        return ""
+    return (
+        "const (\n"
+        + "".join(
+            doc(bound, constant.name, constant_name(constant))
+            + f"{constant_name(constant)} {constant.type.removesuffix('_t')} = {constant.value}\n"
+            for constant in constants
+        )
+        + ")\n"
     )
 
 
@@ -326,7 +349,11 @@ def _lower(api):
             f"func (receiver *{owner}) Discarding() {owner}Discarding {{ return {owner}Discarding{{receiver}} }}\n"
         )
     return (
-        values.sources() + "\n" + "\n".join(owners + operations + go),
+        values.sources()
+        + "\n"
+        + constants_source(bound)
+        + "\n"
+        + "\n".join(owners + operations + go),
         {
             build: [source for _, source in items]
             for build, items in constrained.items()

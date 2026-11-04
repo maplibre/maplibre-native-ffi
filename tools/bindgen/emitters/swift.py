@@ -195,12 +195,18 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         constant=constant,
         field=field,
         flag=flag,
+        define=constant_name,
         extra={
             f"{COMPLETION_RESULT}.{member}": f"CommandCompletion.{camel(member)}"
             for member in ("generation", "render_update_generation")
         },
         parameter=camel,
     )
+
+
+def constant_name(constant) -> str:
+    """A constant macro's name without `MLN_`: `textureRingMaxDepth`."""
+    return camel(constant.name.removeprefix("MLN_").lower())
 
 
 def member_doc(bound: BoundApi, native: str) -> str:
@@ -299,6 +305,13 @@ def _lower(
             imports[path].add(SUBMODULES[stem])
     if value_types.views:
         chunks["Generated/GeneratedViews.swift"].extend(value_types.views.values())
+    for constant in bound.public_constants:
+        stem = Path(constant.location.path).stem
+        path = f"Generated/Values/Generated{name(stem)}Values.swift"
+        chunks[path].append(
+            doc(bound, constant.name)
+            + f"public let {constant_name(constant)}: {SCALARS[constant.type]} = {constant.value}\n"
+        )
     return dict(chunks), dict(imports), generated, failures
 
 
