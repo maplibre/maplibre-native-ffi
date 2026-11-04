@@ -40,8 +40,8 @@ static hardware_buffer_functions load_functions(void) {
 }
 
 static mln_status start_attach(
-  mln_map map, mln_render_driver_kind driver, mln_test_completion* completion,
-  mln_test_render_fixture* fixture
+  mln_map map, mln_render_driver_kind driver, const mln_queue_lock* queue_lock,
+  mln_test_completion* completion, mln_test_render_fixture* fixture
 ) {
   const mln_android_hardware_buffer_ring_descriptor descriptor = {
     .size = sizeof(mln_android_hardware_buffer_ring_descriptor),
@@ -56,6 +56,7 @@ static mln_status start_attach(
       MLN_GPU_SYNC_KIND_FLAG_SYNC_FD | MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
   };
   options.frame_wake = mln_test_pulse_wake();
+  if (queue_lock != NULL) options.queue_lock = *queue_lock;
   fixture->driver = driver;
   const mln_status status = mln_map_attach_android_hardware_buffer_ring(
     map, &descriptor, MLN_HANDLE_NULL, &options, &fixture->session,
@@ -65,13 +66,20 @@ static mln_status start_attach(
   return status;
 }
 
-static void attach(mln_map map, mln_test_render_fixture* fixture) {
+static void attach_with_lock(
+  mln_map map, const mln_queue_lock* queue_lock,
+  mln_test_render_fixture* fixture
+) {
   mln_test_completion completion = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    start_attach(map, MLN_RENDER_DRIVER_CORE_WORKER, &completion, fixture)
-  );
+  MLN_TEST_OK(start_attach(
+    map, MLN_RENDER_DRIVER_CORE_WORKER, queue_lock, &completion, fixture
+  ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &completion));
   mln_test_completion_destroy(&completion);
+}
+
+static void attach(mln_map map, mln_test_render_fixture* fixture) {
+  attach_with_lock(map, NULL, fixture);
 }
 
 static mln_android_hardware_buffer_frame frame_buffer(
@@ -291,10 +299,10 @@ static void a_hardware_buffer_ring_rejects_the_callers_graphics_thread(void) {
     mln_test_render_fixture fixture = {0};
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_STATUS(
-      MLN_STATUS_UNSUPPORTED,
-      start_attach(
-        map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, &completion, &fixture
-      )
+      MLN_STATUS_UNSUPPORTED, start_attach(
+                                map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+                                NULL, &completion, &fixture
+                              )
     );
     mln_test_completion_destroy(&completion);
     TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, fixture.session);
@@ -302,9 +310,65 @@ static void a_hardware_buffer_ring_rejects_the_callers_graphics_thread(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// Counts the session's calls to the host's queue lock. It has file scope,
+// because the session can call it after a case that fails partway.
+typedef struct counted_queue_lock {
+  atomic_uint locks;
+  atomic_uint unlocks;
+} counted_queue_lock;
+
+static counted_queue_lock host_lock;
+
+static void take_host_lock(void* user_data) {
+  atomic_fetch_add(&((counted_queue_lock*)user_data)->locks, 1);
+}
+
+static void give_host_lock(void* user_data) {
+  atomic_fetch_add(&((counted_queue_lock*)user_data)->unlocks, 1);
+}
+
+// A host that submits to the device's queue itself passes its lock, which the
+// session holds around its own queue calls.
+static void a_hardware_buffer_ring_takes_the_host_queue_lock(void) {
+  atomic_store(&host_lock.locks, 0);
+  atomic_store(&host_lock.unlocks, 0);
+  const mln_queue_lock queue_lock = {
+    .lock = take_host_lock,
+    .unlock = give_host_lock,
+    .user_data = &host_lock,
+  };
+  const mln_runtime runtime = mln_test_create_runtime();
+  const mln_map map = create_red_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  if (TEST_PROTECT()) {
+    attach_with_lock(map, &queue_lock, &fixture);
+    frame = mln_test_render_and_acquire(&fixture, 1);
+    release_frame(&frame);
+    MLN_TEST_RENDER_AWAIT(
+      MLN_STATUS_OK, &fixture,
+      mln_render_session_detach(
+        fixture.session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+      )
+    );
+    TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&host_lock.locks));
+    TEST_ASSERT_EQUAL_UINT(
+      atomic_load(&host_lock.locks), atomic_load(&host_lock.unlocks)
+    );
+  }
+  release_frame(&frame);
+  release_session(&fixture);
+  destroy_map_and_runtime(map, runtime);
+}
+#endif
+
 MLN_TEST_GROUP {
   RUN_TEST(a_frame_renders_into_a_buffer_that_the_host_reads);
   RUN_TEST(a_held_frame_keeps_its_buffer);
   RUN_TEST(a_resize_gives_the_ring_buffers_of_the_new_size);
   RUN_TEST(a_hardware_buffer_ring_rejects_the_callers_graphics_thread);
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  RUN_TEST(a_hardware_buffer_ring_takes_the_host_queue_lock);
+#endif
 }
