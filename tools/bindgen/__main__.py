@@ -35,10 +35,13 @@ LANGUAGES = (
 )
 
 
-def render(api: Api) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+def render(
+    api: Api, include: Path = ROOT / "include"
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
     """The outputs by repository path, and each binding's unsupported
     declarations with their reasons."""
     from . import native_results
+    from .emitters import go
 
     bound = compile_api(api)
     if bound.diagnostics:
@@ -53,6 +56,7 @@ def render(api: Api) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
         outputs.update(lowered.files)
         if lowered.unsupported:
             unsupported[language] = lowered.unsupported
+    outputs.update(go.native_file(include))
     generated_binding_paths = {
         path.removeprefix("bindings/")
         for path in outputs
@@ -117,13 +121,13 @@ def complete(unsupported: dict[str, dict[str, str]]) -> bool:
     return not unsupported
 
 
-def generate(api: Api, root: Path = ROOT) -> int:
+def generate(api: Api, root: Path = ROOT, include: Path = ROOT / "include") -> int:
     """Write and format the outputs under `root` and return the exit status.
 
     A file that the previous run recorded and this run no longer writes is
     stale, and generation deletes it.
     """
-    outputs, unsupported = render(api)
+    outputs, unsupported = render(api, include)
     if not complete(unsupported):
         return 1
     previous = previous_outputs(root)
@@ -162,8 +166,8 @@ def main() -> int:
         )
         validate(api)
         if args.command == "generate":
-            return generate(api)
-        outputs, unsupported = render(api)
+            return generate(api, ROOT, args.include)
+        outputs, unsupported = render(api, args.include)
         if not complete(unsupported):
             return 1
         write(outputs, args.out)

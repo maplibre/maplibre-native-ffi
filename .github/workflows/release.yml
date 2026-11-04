@@ -344,6 +344,52 @@ jobs:
             echo "### $(basename "$har" .har) awaits OHPM's review" >> "$GITHUB_STEP_SUMMARY"
           done
 
+  # The release tag versions the Go binding's module. Each preset's native
+  # library is a Go module of its own, which this job publishes from the
+  # release's archives.
+  go:
+    name: Go
+    needs:
+      - source
+      - native
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      MISE_NO_HOOKS: "1"
+      GH_REPO: ${{ github.repository }}
+      PUBLISH_SHA: ${{ needs.source.outputs.sha }}
+      PUBLISH_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          ref: ${{ env.PUBLISH_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        with:
+          cache: false
+          install_args: python
+      - name: Download the preset archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          patterns=(--pattern SHA256SUMS)
+          while IFS= read -r preset; do
+            patterns+=(--pattern "maplibre-native-c-$preset.tar.gz")
+          done < <(jq -r '.[]' bindings/go/presets.json)
+          gh release download "$PUBLISH_TAG" "${patterns[@]}" --dir "$RUNNER_TEMP/assets"
+          cd "$RUNNER_TEMP/assets"
+          sha256sum --check --ignore-missing --strict SHA256SUMS
+      # A rerun replaces each file with the same contents.
+      - name: Publish the preset modules
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          PYTHONPATH=tools/release python3 tools/release/go_native_modules.py
+          publish "$PUBLISH_TAG" "$PUBLISH_SHA" "$RUNNER_TEMP/assets"
+
   # SwiftPM, vcpkg, Conan, and xmake consume the distribution repository. Each
   # release commits its packages and registry versions together, then tags the
   # commit.
@@ -552,6 +598,7 @@ jobs:
       - dart
       - distribution
       - dotnet
+      - go
       - kotlin
       - python
       - rust

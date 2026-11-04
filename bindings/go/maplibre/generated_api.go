@@ -2,7 +2,6 @@
 package maplibre
 
 /*
-#cgo pkg-config: maplibre-native-c
 #include <stdlib.h>
 #include <stdbool.h>
 #include "maplibre_native_c/plugin.h"

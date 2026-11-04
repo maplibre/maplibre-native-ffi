@@ -335,8 +335,9 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
   # binding_support.h is binding-internal support that bindings in this
   # repository read from the source tree. Keep this exclusion in sync with the
-  # Apple framework's in cmake/mln_ffi_apple_framework.cmake and with EXCLUDE in
-  # docs/doxygen/Doxyfile.
+  # Apple framework's in cmake/mln_ffi_apple_framework.cmake, with EXCLUDE in
+  # docs/doxygen/Doxyfile, and with the Go binding's header digest in
+  # tools/bindgen/emitters/go.py.
   install(
     DIRECTORY "${PROJECT_SOURCE_DIR}/include/maplibre_native_c"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"

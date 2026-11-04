@@ -233,6 +233,7 @@
     "bindings/go/maplibre/generated_api_macos.go",
     "bindings/go/maplibre/generated_callbacks.c",
     "bindings/go/maplibre/generated_callbacks.h",
+    "bindings/go/maplibre/generated_native.go",
     "bindings/kotlin/src/androidMain/jni/mln_jni_generated.c",
     "bindings/kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt",
     "bindings/kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/UpcallStubs.kt",

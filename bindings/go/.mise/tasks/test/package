@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#MISE description="Package this build's native archive as a release's Go module, then build and run a program that links it."
+#MISE dir="../.."
+# A file task's usage is not templated, so the host preset default arrives
+# through the environment.
+#MISE env={ MLN_FFI_HOST_NATIVE_PRESET = "{{vars.host_native_preset}}" }
+#MISE shell="bash"
+#USAGE arg "[preset]" env="MLN_FFI_HOST_NATIVE_PRESET"
+set -euo pipefail
+
+archive="$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz"
+version=v0.202601.0
+scratch="$(mktemp -d)"
+trap 'chmod -R u+w "$scratch"; rm -rf "$scratch"' EXIT
+
+PYTHONPATH=tools/release python3 tools/release/go_native_modules.py build \
+  "$archive" "$version" "$scratch/proxy"
+
+preset_module="maplibre.org/maplibre-native-ffi/go-native/$usage_preset"
+mkdir "$scratch/app"
+cat > "$scratch/app/go.mod" <<MOD
+module app
+
+go 1.26
+
+require (
+	maplibre.org/maplibre-native-ffi v0.0.0
+	$preset_module $version
+)
+
+replace maplibre.org/maplibre-native-ffi => $MISE_MONOREPO_ROOT
+MOD
+cat > "$scratch/app/main.go" <<GO
+package main
+
+import (
+	"context"
+	"log"
+
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
+	_ "$preset_module"
+)
+
+func main() {
+	runtime, err := maplibre.NewRuntime(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	released, err := runtime.Release()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := released.Await(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+}
+GO
+
+# The program links the module that the proxy serves, so nothing may point cgo
+# at the build's install instead.
+env -u PKG_CONFIG_PATH -u CGO_CPPFLAGS -u CGO_LDFLAGS \
+  GOFLAGS=-mod=mod GOPROXY="file://$scratch/proxy" GONOSUMDB="$preset_module" \
+  GOMODCACHE="$scratch/modcache" GOCACHE="$scratch/cache" \
+  go -C "$scratch/app" run .

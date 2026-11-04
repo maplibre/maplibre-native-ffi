@@ -8,26 +8,37 @@ sidebar:
 
 ## Install
 
-Add the module. It needs Go 1.26 or later, with cgo.
+Add the module, and the C library's module for your preset. A preset names a
+platform, an architecture, and a
+[backend](/maplibre-native-ffi/install/#choose-a-backend), such as
+`linux-gnu-x64-vulkan` or `macos-arm64-metal`. It needs Go 1.26 or later, with
+cgo.
 
 ```bash frame="terminal"
-go get maplibre.org/maplibre-native-ffi/bindings/go/maplibre@v{{version}}
+go get maplibre.org/maplibre-native-ffi/bindings/go/maplibre@v{{version}} \
+  maplibre.org/maplibre-native-ffi/go-native/linux-gnu-x64-vulkan@v{{version}}
 ```
 
-cgo finds the C library through pkg-config. Download and unpack the
-[C library](/maplibre-native-ffi/install/c/) for your preset, then point
-pkg-config at it before you build:
+Import the preset's module for its side effect. It links the C library
+statically:
 
-```bash frame="terminal"
-export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+```go title="main.go"
+import (
+	"maplibre.org/maplibre-native-ffi/bindings/go/maplibre"
+	_ "maplibre.org/maplibre-native-ffi/go-native/linux-gnu-x64-vulkan"
+)
 ```
 
-## Windows
+A preset's module links only when you build for its `GOOS` and `GOARCH`, so a
+program can import one preset for each of those that it builds for. Presets that
+share them, such as an iOS device and the iOS simulator, or glibc and musl on
+Linux, need their imports in separate files with build tags of your own. Keep
+both modules at the same version: a link error that names `mln_go_preset_` means
+that the preset's module is missing, comes from another release, or is imported
+twice.
 
-cgo links the C library with MSYS2's Clang: MINGW64 on x64, or CLANGARM64 on
-ARM64. Set `CC` to that environment's `bin/clang.exe` and `PKG_CONFIG` to its
-`bin/pkgconf.exe`. Put the C library's `bin` directory and the environment's
-`bin` directory on `PATH`.
+Every preset has a module except the Windows and web presets. On Windows,
+[use your own build](#use-your-own-build).
 
 ## Android
 
@@ -38,12 +49,35 @@ calling thread's JNI environment and an Android `Context`:
 err := maplibre.InitAndroid(jniEnv, context)
 ```
 
+## Use your own build
+
+To link a C library that you built or downloaded, build with the `mln_pkgconfig`
+tag and leave out the preset's module. cgo then finds the library through
+pkg-config. Download and unpack the [C library](/maplibre-native-ffi/install/c/)
+for your preset, or build it, and point pkg-config at it:
+
+```bash frame="terminal"
+export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+go build -tags mln_pkgconfig
+```
+
+A vendored build needs this too, because `go mod vendor` leaves out the C
+headers that the module carries.
+
+On Windows, cgo links the C library with MSYS2's Clang: MINGW64 on x64, or
+CLANGARM64 on ARM64. Set `CC` to that environment's `bin/clang.exe` and
+`PKG_CONFIG` to its `bin/pkgconf.exe`. Put the C library's `bin` directory and
+the environment's `bin` directory on `PATH`.
+
 ## Snapshots
 
 Take the module at the `unstable-native-snapshot` tag, which points at the
-commit that the snapshot was built from, and the C library from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot):
+commit that the snapshot was built from:
 
 ```bash frame="terminal"
 go get maplibre.org/maplibre-native-ffi/bindings/go/maplibre@unstable-native-snapshot
 ```
+
+Then download the C library archive for your preset from the
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
+unpack it, and [use it as your own build](#use-your-own-build).
