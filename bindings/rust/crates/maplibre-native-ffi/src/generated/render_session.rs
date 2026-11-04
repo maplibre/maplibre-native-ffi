@@ -643,8 +643,7 @@ impl RenderSessionHandle {
     /// Use it to give the session a window again after
     /// `RenderSessionHandle::release_target()`, to move it to another window,
     /// or to resize it. Once the replacement completes, the session no longer
-    /// uses the old window. A replacement with the window and logical size that
-    /// the session presents to already changes nothing.
+    /// uses the old window.
     ///
     /// See `mln_render_session_set_android_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -684,19 +683,18 @@ impl RenderSessionHandle {
     /// Sets the frame pacer that demands the session's frames.
     ///
     /// At the first display refresh after the session has something new to
-    /// draw, `pacer` demands a frame without flags and with token 0. Take the
-    /// results through the frame wake as usual. One pacer can serve many
-    /// sessions. When `pacer` is null, the session stops being paced. You can
-    /// call it once the attach call returns.
+    /// draw, `pacer` demands a frame without flags and with token 0. One pacer
+    /// can serve many sessions. A null `pacer` stops pacing the session. You
+    /// can call it once the attach call returns.
     ///
     /// See `mln_render_session_set_frame_pacer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     ///
     /// # Errors
     ///
-    /// - `RenderSessionSnapshot::failure_status`, `Status::TargetLost` or
-    ///   `Status::NativeError`, when the session has failed. The diagnostic
-    ///   carries the failure's message.
+    /// - `Status::TargetLost` or `Status::NativeError`, as
+    ///   `RenderSessionSnapshot::failure_status` reports, when the session has
+    ///   failed.
     /// - `Status::InvalidState` when you attached the session with a redraw
     ///   wake, or detached, abandoned, released, or disposed it.
     pub fn set_frame_pacer(&self, pacer: Option<&FramePacerHandle>) -> Result<()> {
@@ -792,8 +790,7 @@ impl RenderSessionHandle {
     /// Use it to give the session a window again after
     /// `RenderSessionHandle::release_target()`, to move it to another window,
     /// or to resize it. Once the replacement completes, the session no longer
-    /// uses the old window. A replacement with the window and logical size that
-    /// the session presents to already changes nothing.
+    /// uses the old window.
     ///
     /// See `mln_render_session_set_ohos_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).

@@ -64,11 +64,9 @@ public readonly partial record struct RenderSessionAttachOptions
     public Wake FrameWake { get; init; }
 
     /// <summary>
-    /// Called when the session has something new to draw, because the map or
-    /// the target changed since its last frame, or the target couldn't take
-    /// that frame. Demand a frame at your next display refresh. It isn't called
-    /// again until you demand a frame, and isn't called while the session has
-    /// no target.
+    /// Called when the session has something new to draw. Demand a frame at
+    /// your next display refresh. It isn't called again until you demand a
+    /// frame, or while the session has no target.
     /// </summary>
     public Wake RedrawWake { get; init; }
 

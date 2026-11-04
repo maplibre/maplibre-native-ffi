@@ -6,12 +6,10 @@ import Foundation
 #if os(Android)
   /// Creates a frame pacer that follows the display through the calling
   /// thread's
-  /// looper.
+  /// `AChoreographer`.
   ///
-  /// Call it on a thread with an `ALooper`, such as the app's main thread. The
-  /// pacer demands frames from that thread at the display refreshes that the
-  /// looper's `AChoreographer` reports, so keep the thread running its looper
-  /// while sessions use the pacer.
+  /// Call it on a thread with an `ALooper`, such as the app's main thread, and
+  /// keep that thread running its looper while sessions use the pacer.
   ///
   /// See `mln_android_frame_pacer_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

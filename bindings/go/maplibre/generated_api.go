@@ -1933,8 +1933,6 @@ func (RuntimeEventPayloadSpriteVariant) isRuntimeEventPayload() {}
 //
 // Name the window by window, or by jni_env and surface. The session takes its
 // own reference to the window, so you can release yours once the call returns.
-// It uses the window until a replacement or release of the target completes, a
-// detach or release of the session completes, or an abandon of it returns.
 //
 // See mln_android_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
@@ -1963,8 +1961,6 @@ func nativeAndroidSurfaceDescriptor(input AndroidSurfaceDescriptor, arena *bindi
 //
 // Name the window by window, or by jni_env and surface. The session takes its
 // own reference to the window, so you can release yours once the call returns.
-// It uses the window until a replacement or release of the target completes, a
-// detach or release of the session completes, or an abandon of it returns.
 //
 // See mln_android_surface_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
@@ -2602,10 +2598,9 @@ func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_deman
 // See mln_frame_pacer_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type FramePacerOptions struct {
-	// The most times per second that the pacer demands frames, greater than zero.
-	// The pacer skips a display refresh that comes too soon after its last demands,
-	// and a limit at the display's refresh rate or above skips none. By default, it
-	// can demand frames at every refresh.
+	// The most frames per second that the pacer demands, greater than zero. The
+	// pacer skips display refreshes to stay within it. By default, it can demand
+	// frames at every refresh.
 	MaximumFramesPerSecond *uint32
 }
 
@@ -3657,9 +3652,7 @@ func nativeOffscreenDeviceOptions(input OffscreenDeviceOptions, arena *bindingAr
 // OpenHarmony window to present to, for MapHandle.AttachOhosSurface().
 //
 // Name the window by window or by surface_id. The session takes its own
-// reference to the window, so you can release yours once the call returns. It
-// uses the window until a replacement or release of the target completes, a
-// detach or release of the session completes, or an abandon of it returns.
+// reference to the window, so you can release yours once the call returns.
 //
 // See mln_ohos_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
@@ -3686,9 +3679,7 @@ func nativeOhosSurfaceDescriptor(input OhosSurfaceDescriptor, arena *bindingAren
 // OpenHarmony window for RenderSessionHandle.SetOhosSurfaceTarget().
 //
 // Name the window by window or by surface_id. The session takes its own
-// reference to the window, so you can release yours once the call returns. It
-// uses the window until a replacement or release of the target completes, a
-// detach or release of the session completes, or an abandon of it returns.
+// reference to the window, so you can release yours once the call returns.
 //
 // See mln_ohos_surface_replacement in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
@@ -4170,10 +4161,9 @@ type RenderSessionAttachOptions struct {
 	// RenderSessionHandle.DrainFrameResults(). It isn't called again until a drain
 	// takes them.
 	FrameWake Wake
-	// Called when the session has something new to draw, because the map or the
-	// target changed since its last frame, or the target couldn't take that frame.
-	// Demand a frame at your next display refresh. It isn't called again until you
-	// demand a frame, and isn't called while the session has no target.
+	// Called when the session has something new to draw. Demand a frame at your
+	// next display refresh. It isn't called again until you demand a frame, or
+	// while the session has no target.
 	RedrawWake Wake
 	// Called when a session driven by RenderDriverKindCallerGraphicsThread has work
 	// for RenderSessionHandle.ServiceDriverWork(). It isn't called again until a
@@ -5695,12 +5685,12 @@ func copyVulkanDeviceContextResult(raw C.mln_vulkan_device_context_result) Vulka
 // See mln_vulkan_device_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
 type VulkanDeviceOptions struct {
-	// Whether the device can present to a window's surface. It enables
-	// VK_KHR_surface and the platform's surface extensions on the instance, and
-	// VK_KHR_swapchain on the device. Defaults to false.
+	// Whether the device can present to a window. The instance then enables
+	// VK_KHR_surface and the platform's surface extensions, and the device enables
+	// VK_KHR_swapchain. Defaults to false.
 	Presentation *bool
 	// The 16-byte deviceUUID of the GPU to use, as VkPhysicalDeviceIDProperties
-	// reports it. Name a GPU to share textures with another graphics API on it.
+	// reports it.
 	DeviceUuid *[]byte
 	// The 8-byte deviceLUID of the GPU to use, as VkPhysicalDeviceIDProperties
 	// reports it. On Windows, this is the GPU's DXGI adapter LUID.
@@ -6051,7 +6041,7 @@ func (handle *AcquiredFrameHandle) String() string {
 }
 
 // FramePacerHandle corresponds to mln_frame_pacer. Demands render sessions'
-// frames in step with a display's refreshes.
+// frames at a display's refreshes.
 //
 // See mln_frame_pacer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
@@ -8742,18 +8732,16 @@ func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 // SetFramePacer sets the frame pacer that demands the session's frames.
 //
 // At the first display refresh after the session has something new to draw,
-// pacer demands a frame without flags and with token 0. Take the results
-// through the frame wake as usual. One pacer can serve many sessions. When
-// pacer is null, the session stops being paced. You can call it once the attach
-// call returns.
+// pacer demands a frame without flags and with token 0. One pacer can serve
+// many sessions. A null pacer stops pacing the session. You can call it once
+// the attach call returns.
 //
 // See mln_render_session_set_frame_pacer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - RenderSessionSnapshot.FailureStatus, StatusTargetLost or
-//     StatusNativeError, when the session has failed. The diagnostic carries
-//     the failure's message.
+//   - StatusTargetLost or StatusNativeError, as
+//     RenderSessionSnapshot.FailureStatus reports, when the session has failed.
 //   - StatusInvalidState when you attached the session with a redraw wake, or
 //     detached, abandoned, released, or disposed it.
 func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) error {
@@ -9362,10 +9350,9 @@ func SupportedRenderBackendMask() RenderBackendFlag {
 // render sessions.
 //
 // Attach sessions with the context from VulkanDeviceHandle.Context(), in place
-// of a device of your own. Without device_uuid or device_luid, the device uses
-// a discrete GPU over an integrated one, and an integrated GPU over any other.
-// The device enables the features that rendering needs, and the external memory
-// and semaphore extensions that the GPU offers.
+// of a device of your own. Without device_uuid or device_luid, it prefers a
+// discrete GPU. The device enables the external memory and semaphore extensions
+// that the GPU offers.
 //
 // See mln_vulkan_device_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
@@ -9391,9 +9378,8 @@ func NewVulkanDevice(options *VulkanDeviceOptions) (*VulkanDeviceHandle, error) 
 //
 // Pass it as the context of MapHandle.AttachVulkanSurface() or
 // MapHandle.AttachVulkanBorrowedTexture(). The sessions on the device share its
-// one graphics queue, and the library orders their submissions to it. To submit
-// to the queue yourself, set RenderSessionAttachOptions.QueueLock on each
-// session.
+// graphics queue. To submit to the queue yourself, set
+// RenderSessionAttachOptions.QueueLock on each session.
 //
 // See mln_vulkan_device_get_context in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
@@ -9410,8 +9396,7 @@ func (receiver *VulkanDeviceHandle) Context() (VulkanDeviceContextResult, error)
 // Release releases a Vulkan device.
 //
 // Render sessions that attached with the device's context keep using it until
-// they detach or retire, and the library destroys the device after the last of
-// them.
+// they detach or their release finishes.
 //
 // See mln_vulkan_device_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html

@@ -9,9 +9,7 @@ namespace Maplibre.NativeFfi;
 /// <remarks>
 /// <para>Name the window by <c>window</c>, or by <c>jni_env</c> and
 /// <c>surface</c>. The session takes its own reference to the window, so you
-/// can release yours once the call returns. It uses the window until a
-/// replacement or release of the target completes, a detach or release of the
-/// session completes, or an abandon of it returns.</para>
+/// can release yours once the call returns.</para>
 /// <para>See <c>mln_android_surface_replacement</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
 /// </remarks>

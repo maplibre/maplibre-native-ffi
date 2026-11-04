@@ -19,8 +19,7 @@ namespace mln::core {
 namespace {
 
 // Takes a reference to the window that `window`, or `jni_env` and `surface`,
-// name. A Java Surface's window is found on the calling thread, whose JNIEnv
-// the host passes.
+// name. A JNIEnv is valid only on its own thread, so this runs in the call.
 auto acquire_window(
   void* window, void* jni_env, void* surface, AndroidWindow& out_window
 ) -> mln_status {

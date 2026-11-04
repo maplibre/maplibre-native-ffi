@@ -14,16 +14,13 @@ import "C"
 // AttachOhosSurface creates a session that presents the map to an OpenHarmony
 // window, with a graphics context that the library creates.
 //
-// The build's render backend decides the context. A Vulkan build presents with
-// device, or, when device is null, with a device that the library creates with
-// presentation and shares between these sessions. An OpenGL build creates an
-// EGL context on the default display, and device must be null. Attach with
-// RenderDriverKindCoreWorker, since the context belongs to the library.
+// A Vulkan build presents with device, or, when device is null, with a device
+// that the library creates. An OpenGL build uses an EGL context on the default
+// display, and device must be null. Attach with RenderDriverKindCoreWorker.
 //
 // Before the platform destroys the window, such as in an XComponent's
 // onSurfaceDestroyed callback, release the target with
-// RenderSessionHandle.ReleaseTarget() and wait for that to complete. The
-// session's reference keeps the window, but not its buffers.
+// RenderSessionHandle.ReleaseTarget() and wait for that to complete.
 //
 // See mln_map_attach_ohos_surface in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
@@ -31,8 +28,8 @@ import "C"
 // Errors:
 //   - StatusInvalidArgument when no surface in this process has
 //     OhosSurfaceDescriptor.SurfaceID, such as after the platform destroyed it.
-//   - StatusUnsupported when device can't present, because you created it
-//     without VulkanDeviceOptions.Presentation.
+//   - StatusUnsupported when you created device without
+//     VulkanDeviceOptions.Presentation.
 //   - StatusUnsupported when the GPU or the Vulkan loader can't present.
 //   - StatusNativeError when the library can't create the graphics context or
 //     the window's surface.
@@ -55,11 +52,9 @@ func (receiver *MapHandle) AttachOhosSurface(descriptor OhosSurfaceDescriptor, d
 }
 
 // OhosFramePacerCreate creates a frame pacer that follows the display through
-// OpenHarmony's native VSync.
+// OpenHarmony's OH_NativeVSync.
 //
-// You can call it on any thread. The pacer demands frames from a system thread
-// at the display refreshes that OH_NativeVSync reports, so it needs no event
-// loop of yours.
+// You can call it on any thread. The pacer needs no event loop of yours.
 //
 // See mln_ohos_frame_pacer_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
@@ -83,8 +78,7 @@ func OhosFramePacerCreate(options *FramePacerOptions) (*FramePacerHandle, error)
 // Use it to give the session a window again after
 // RenderSessionHandle.ReleaseTarget(), to move it to another window, or to
 // resize it. Once the replacement completes, the session no longer uses the old
-// window. A replacement with the window and logical size that the session
-// presents to already changes nothing.
+// window.
 //
 // See mln_render_session_set_ohos_surface_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html

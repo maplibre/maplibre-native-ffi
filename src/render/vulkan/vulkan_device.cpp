@@ -159,7 +159,7 @@ class VulkanDevice final {
       return;
     }
     if (device_ != VK_NULL_HANDLE && dispatcher_.vkDestroyDevice != nullptr) {
-      // Vulkan destroys a device only once its queue's work has completed.
+      // Vulkan requires the queue's work to finish before the device goes.
       // Nothing else uses the device by now, so the wait needs no queue lock.
       if (dispatcher_.vkDeviceWaitIdle != nullptr) {
         static_cast<void>(dispatcher_.vkDeviceWaitIdle(device_));
@@ -353,7 +353,6 @@ class VulkanDevice final {
     return available;
   }
 
-  // Whether the GPU's IDs are the ones the selection names, if it names any.
   [[nodiscard]] auto matches_ids(
     VkPhysicalDevice physical_device, const VulkanDeviceSelection& selection
   ) const -> bool {
@@ -464,8 +463,6 @@ class VulkanDevice final {
     );
   }
 
-  // Whether the GPU supports timeline semaphores, which a device enables
-  // through VK_KHR_timeline_semaphore.
   [[nodiscard]] auto supports_timeline(const Candidate& candidate) const
     -> bool {
     if (
@@ -490,15 +487,15 @@ class VulkanDevice final {
     -> mln_status {
     const auto& available = candidate.extensions;
     auto enabled = std::vector<const char*>{};
-    // A device that has this extension requires a device that enables it.
+    // Vulkan requires a device that offers this extension to enable it.
     if (has_extension(available, portability_subset)) {
       enabled.push_back(portability_subset);
     }
     if (presentation) {
       enabled.push_back(swapchain_extension);
     }
-    // A session finds the sharing extensions that a device enabled by
-    // resolving their commands, so it needs no record of them here.
+    // Sessions find these by resolving their commands, so nothing records
+    // them.
     if (candidate.properties.apiVersion >= VK_API_VERSION_1_1) {
       for (const auto& extension : sharing_extensions) {
         if (

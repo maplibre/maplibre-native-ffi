@@ -17,9 +17,7 @@ namespace mln::core {
 //
 // A platform pacer derives from it, implements schedule_vsync() with the
 // platform's vsync source, and calls on_vsync() from that source's callback.
-// Each schedule_vsync() call asks for one on_vsync() call. The pacer has at
-// most one schedule outstanding: it calls schedule_vsync() again only after
-// on_vsync() runs.
+// The pacer calls schedule_vsync() again only after on_vsync() runs.
 //
 // Lock order: a session calls request_frame() under its control_mutex, which
 // takes the pacer's lock. on_vsync() releases the pacer's lock before it

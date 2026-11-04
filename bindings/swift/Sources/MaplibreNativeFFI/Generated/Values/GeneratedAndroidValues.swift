@@ -7,9 +7,7 @@ import Foundation
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
 /// takes its own reference to the window, so you can release yours once the
-/// call returns. It uses the window until a replacement or release of the
-/// target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// call returns.
 ///
 /// See `mln_android_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -61,9 +59,7 @@ public struct AndroidSurfaceDescriptor: Equatable, Hashable, Sendable {
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
 /// takes its own reference to the window, so you can release yours once the
-/// call returns. It uses the window until a replacement or release of the
-/// target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// call returns.
 ///
 /// See `mln_android_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

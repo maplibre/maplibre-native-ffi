@@ -20,12 +20,10 @@ extern "C" {
 #endif
 
 /**
- * Creates a frame pacer that follows the display through OpenHarmony's native
- * VSync.
+ * Creates a frame pacer that follows the display through OpenHarmony's
+ * `OH_NativeVSync`.
  *
- * You can call it on any thread. The pacer demands frames from a system thread
- * at the display refreshes that `OH_NativeVSync` reports, so it needs no event
- * loop of yours.
+ * You can call it on any thread. The pacer needs no event loop of yours.
  *
  * Returns:
  * - MLN_STATUS_NATIVE_ERROR when the system can't report the display's
@@ -42,9 +40,7 @@ MLN_API mln_status mln_ohos_frame_pacer_create(
  * An OpenHarmony window to present to, for mln_map_attach_ohos_surface().
  *
  * Name the window by `window` or by `surface_id`. The session takes its own
- * reference to the window, so you can release yours once the call returns. It
- * uses the window until a replacement or release of the target completes, a
- * detach or release of the session completes, or an abandon of it returns.
+ * reference to the window, so you can release yours once the call returns.
  */
 typedef struct mln_ohos_surface_descriptor {
   uint32_t size;
@@ -63,9 +59,7 @@ typedef struct mln_ohos_surface_descriptor {
  * A new OpenHarmony window for mln_render_session_set_ohos_surface_target().
  *
  * Name the window by `window` or by `surface_id`. The session takes its own
- * reference to the window, so you can release yours once the call returns. It
- * uses the window until a replacement or release of the target completes, a
- * detach or release of the session completes, or an abandon of it returns.
+ * reference to the window, so you can release yours once the call returns.
  */
 typedef struct mln_ohos_surface_replacement {
   uint32_t size;
@@ -84,23 +78,21 @@ typedef struct mln_ohos_surface_replacement {
  * Creates a session that presents the map to an OpenHarmony window, with a
  * graphics context that the library creates.
  *
- * The build's render backend decides the context. A Vulkan build presents with
- * `device`, or, when `device` is null, with a device that the library creates
- * with presentation and shares between these sessions. An OpenGL build creates
- * an EGL context on the default display, and `device` must be null. Attach with
- * MLN_RENDER_DRIVER_CORE_WORKER, since the context belongs to the library.
+ * A Vulkan build presents with `device`, or, when `device` is null, with a
+ * device that the library creates. An OpenGL build uses an EGL context on the
+ * default display, and `device` must be null. Attach with
+ * MLN_RENDER_DRIVER_CORE_WORKER.
  *
  * Before the platform destroys the window, such as in an `XComponent`'s
  * `onSurfaceDestroyed` callback, release the target with
- * mln_render_session_release_target() and wait for that to complete. The
- * session's reference keeps the window, but not its buffers.
+ * mln_render_session_release_target() and wait for that to complete.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when no surface in this process has
  *   mln_ohos_surface_descriptor.surface_id, such as after the platform
  *   destroyed it.
- * - MLN_STATUS_UNSUPPORTED when `device` can't present, because you created it
- *   without mln_vulkan_device_options.presentation.
+ * - MLN_STATUS_UNSUPPORTED when you created `device` without
+ *   mln_vulkan_device_options.presentation.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the GPU or the Vulkan loader can't present.
@@ -122,8 +114,7 @@ MLN_API mln_status mln_map_attach_ohos_surface(
  * Use it to give the session a window again after
  * mln_render_session_release_target(), to move it to another window, or to
  * resize it. Once the replacement completes, the session no longer uses the
- * old window. A replacement with the window and logical size that the session
- * presents to already changes nothing.
+ * old window.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when no surface in this process has

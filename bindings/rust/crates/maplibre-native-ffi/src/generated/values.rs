@@ -5,9 +5,7 @@ use super::*;
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
 /// takes its own reference to the window, so you can release yours once the
-/// call returns. It uses the window until a replacement or release of the
-/// target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// call returns.
 ///
 /// See `mln_android_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -48,9 +46,7 @@ impl ToNative<sys::mln_android_surface_descriptor> for AndroidSurfaceDescriptor 
 ///
 /// Name the window by `window`, or by `jni_env` and `surface`. The session
 /// takes its own reference to the window, so you can release yours once the
-/// call returns. It uses the window until a replacement or release of the
-/// target completes, a detach or release of the session completes, or an
-/// abandon of it returns.
+/// call returns.
 ///
 /// See `mln_android_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -1248,10 +1244,9 @@ pub struct FrameDemandFlag: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct FramePacerOptions {
-    /// The most times per second that the pacer demands frames, greater than
-    /// zero. The pacer skips a display refresh that comes too soon after its
-    /// last demands, and a limit at the display's refresh rate or above skips
-    /// none. By default, it can demand frames at every refresh.
+    /// The most frames per second that the pacer demands, greater than zero.
+    /// The pacer skips display refreshes to stay within it. By default, it can
+    /// demand frames at every refresh.
     pub maximum_frames_per_second: Option<u32>,
 }
 impl ToNative<sys::mln_frame_pacer_options> for FramePacerOptions {
@@ -2971,9 +2966,7 @@ impl ToNative<sys::mln_offscreen_device_options> for OffscreenDeviceOptions {
 /// An OpenHarmony window to present to, for `MapHandle::attach_ohos_surface()`.
 ///
 /// Name the window by `window` or by `surface_id`. The session takes its own
-/// reference to the window, so you can release yours once the call returns. It
-/// uses the window until a replacement or release of the target completes, a
-/// detach or release of the session completes, or an abandon of it returns.
+/// reference to the window, so you can release yours once the call returns.
 ///
 /// See `mln_ohos_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -3011,9 +3004,7 @@ impl ToNative<sys::mln_ohos_surface_descriptor> for OhosSurfaceDescriptor {
 /// `RenderSessionHandle::set_ohos_surface_target()`.
 ///
 /// Name the window by `window` or by `surface_id`. The session takes its own
-/// reference to the window, so you can release yours once the call returns. It
-/// uses the window until a replacement or release of the target completes, a
-/// detach or release of the session completes, or an abandon of it returns.
+/// reference to the window, so you can release yours once the call returns.
 ///
 /// See `mln_ohos_surface_replacement` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -3794,11 +3785,9 @@ pub struct RenderSessionAttachOptions {
     /// `RenderSessionHandle::drain_frame_results()`. It isn't called again
     /// until a drain takes them.
     pub frame_wake: Wake,
-    /// Called when the session has something new to draw, because the map or
-    /// the target changed since its last frame, or the target couldn't take
-    /// that frame. Demand a frame at your next display refresh. It isn't called
-    /// again until you demand a frame, and isn't called while the session has
-    /// no target.
+    /// Called when the session has something new to draw. Demand a frame at
+    /// your next display refresh. It isn't called again until you demand a
+    /// frame, or while the session has no target.
     pub redraw_wake: Wake,
     /// Called when a session driven by `RenderDriverKind::CallerGraphicsThread`
     /// has work for `RenderSessionHandle::service_driver_work()`. It isn't
@@ -6225,13 +6214,12 @@ impl FromNative<sys::mln_vulkan_device_context_result> for VulkanDeviceContextRe
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VulkanDeviceOptions<'a> {
-    /// Whether the device can present to a window's surface. It enables
-    /// VK_KHR_surface and the platform's surface extensions on the instance,
-    /// and VK_KHR_swapchain on the device. Defaults to false.
+    /// Whether the device can present to a window. The instance then enables
+    /// VK_KHR_surface and the platform's surface extensions, and the device
+    /// enables VK_KHR_swapchain. Defaults to false.
     pub presentation: Option<bool>,
     /// The 16-byte `deviceUUID` of the GPU to use, as
-    /// `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
-    /// with another graphics API on it.
+    /// `VkPhysicalDeviceIDProperties` reports it.
     pub device_uuid: Option<&'a [u8]>,
     /// The 8-byte `deviceLUID` of the GPU to use, as
     /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's

@@ -12,8 +12,7 @@ public extension RenderSessionHandle {
     /// to
     /// resize it. Once the replacement completes, the session no longer uses
     /// the
-    /// old window. A replacement with the window and logical size that the
-    /// session presents to already changes nothing.
+    /// old window.
     ///
     /// See `mln_render_session_set_android_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

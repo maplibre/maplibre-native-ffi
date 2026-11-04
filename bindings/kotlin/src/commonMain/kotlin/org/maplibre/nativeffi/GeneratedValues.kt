@@ -2166,9 +2166,8 @@ public class WebGpuTextureFrame(
  */
 public data class FramePacerOptions(
   /**
-   * The most times per second that the pacer demands frames, greater than zero. The pacer skips a
-   * display refresh that comes too soon after its last demands, and a limit at the display's
-   * refresh rate or above skips none. By default, it can demand frames at every refresh.
+   * The most frames per second that the pacer demands, greater than zero. The pacer skips display
+   * refreshes to stay within it. By default, it can demand frames at every refresh.
    */
   public val maximumFramesPerSecond: UInt? = null,
 )
@@ -2310,15 +2309,11 @@ public data class StyleExpressionOptions(
  */
 public data class VulkanDeviceOptions(
   /**
-   * Whether the device can present to a window's surface. It enables VK_KHR_surface and the
-   * platform's surface extensions on the instance, and VK_KHR_swapchain on the device. Defaults to
-   * false.
+   * Whether the device can present to a window. The instance then enables VK_KHR_surface and the
+   * platform's surface extensions, and the device enables VK_KHR_swapchain. Defaults to false.
    */
   public val presentation: Boolean? = null,
-  /**
-   * The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. Name
-   * a GPU to share textures with another graphics API on it.
-   */
+  /** The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. */
   public val deviceUuid: ByteArray? = null,
   /**
    * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. On
@@ -2440,9 +2435,7 @@ public data class CameraDelta(
  * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
  *
  * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns. It uses the window until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
+ * to the window, so you can release yours once the call returns.
  *
  * See `mln_android_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -2488,10 +2481,8 @@ public data class RenderSessionAttachOptions(
    */
   public val frameWake: Wake = Wake(),
   /**
-   * Called when the session has something new to draw, because the map or the target changed since
-   * its last frame, or the target couldn't take that frame. Demand a frame at your next display
-   * refresh. It isn't called again until you demand a frame, and isn't called while the session has
-   * no target.
+   * Called when the session has something new to draw. Demand a frame at your next display refresh.
+   * It isn't called again until you demand a frame, or while the session has no target.
    */
   public val redrawWake: Wake = Wake(),
   /**
@@ -3551,9 +3542,7 @@ public data class TextureReadbackResult(
  * A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
  *
  * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns. It uses the window until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
+ * to the window, so you can release yours once the call returns.
  *
  * See `mln_android_surface_replacement` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

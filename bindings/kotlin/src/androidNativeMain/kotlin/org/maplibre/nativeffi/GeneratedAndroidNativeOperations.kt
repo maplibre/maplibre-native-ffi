@@ -30,11 +30,10 @@ public fun <T> AcquiredFrameHandle.withVulkanTexture(block: (VulkanTextureFrame)
   }
 
 /**
- * Creates a frame pacer that follows the display through the calling thread's looper.
+ * Creates a frame pacer that follows the display through the calling thread's `AChoreographer`.
  *
- * Call it on a thread with an `ALooper`, such as the app's main thread. The pacer demands frames
- * from that thread at the display refreshes that the looper's `AChoreographer` reports, so keep the
- * thread running its looper while sessions use the pacer.
+ * Call it on a thread with an `ALooper`, such as the app's main thread, and keep that thread
+ * running its looper while sessions use the pacer.
  *
  * See `mln_android_frame_pacer_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -60,9 +59,8 @@ public fun androidFramePacerCreate(options: FramePacerOptions? = null): FramePac
  * Creates a Vulkan instance, device, and graphics queue for render sessions.
  *
  * Attach sessions with the context from `VulkanDeviceHandle.getContext()`, in place of a device of
- * your own. Without `device_uuid` or `device_luid`, the device uses a discrete GPU over an
- * integrated one, and an integrated GPU over any other. The device enables the features that
- * rendering needs, and the external memory and semaphore extensions that the GPU offers.
+ * your own. Without `device_uuid` or `device_luid`, it prefers a discrete GPU. The device enables
+ * the external memory and semaphore extensions that the GPU offers.
  *
  * See `mln_vulkan_device_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -94,14 +92,12 @@ public fun VulkanDeviceHandle.Companion.create(
  * Creates a session that presents the map to an Android window, with a graphics context that the
  * library creates.
  *
- * The build's render backend decides the context. A Vulkan build presents with `device`, or, when
- * `device` is null, with a device that the library creates with presentation and shares between
- * these sessions. An OpenGL build creates an EGL context on the default display, and `device` must
- * be null. Attach with `RenderDriverKind.CORE_WORKER`, since the context belongs to the library.
+ * A Vulkan build presents with `device`, or, when `device` is null, with a device that the library
+ * creates. An OpenGL build uses an EGL context on the default display, and `device` must be null.
+ * Attach with `RenderDriverKind.CORE_WORKER`.
  *
  * Before the platform destroys the window, such as in `SurfaceHolder.Callback.surfaceDestroyed`,
- * release the target with `RenderSessionHandle.releaseTarget()` and wait for that to complete. The
- * session's reference keeps the window, but not its buffers.
+ * release the target with `RenderSessionHandle.releaseTarget()` and wait for that to complete.
  *
  * See `mln_map_attach_android_surface` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -110,8 +106,7 @@ public fun VulkanDeviceHandle.Companion.create(
  *
  * - `Status.INVALID_ARGUMENT` when `surface` has no window, such as after the platform destroyed
  *   it.
- * - `Status.UNSUPPORTED` when `device` can't present, because you created it without
- *   `VulkanDeviceOptions.presentation`.
+ * - `Status.UNSUPPORTED` when you created `device` without `VulkanDeviceOptions.presentation`.
  * - `Status.UNSUPPORTED` when the GPU or the Vulkan loader can't present.
  * - `Status.NATIVE_ERROR` when the library can't create the graphics context or the window's
  *   surface.
@@ -213,8 +208,7 @@ public fun MapHandle.attachVulkanSurface(
  *
  * Use it to give the session a window again after `RenderSessionHandle.releaseTarget()`, to move it
  * to another window, or to resize it. Once the replacement completes, the session no longer uses
- * the old window. A replacement with the window and logical size that the session presents to
- * already changes nothing.
+ * the old window.
  *
  * See `mln_render_session_set_android_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -298,9 +292,8 @@ public fun RenderSessionHandle.setVulkanSurfaceTarget(
  * Gets the context to attach render sessions to the device with.
  *
  * Pass it as the context of `MapHandle.attachVulkanSurface()` or
- * `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device share its one graphics
- * queue, and the library orders their submissions to it. To submit to the queue yourself, set
- * `RenderSessionAttachOptions.queueLock` on each session.
+ * `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device share its graphics queue.
+ * To submit to the queue yourself, set `RenderSessionAttachOptions.queueLock` on each session.
  *
  * See `mln_vulkan_device_get_context` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).

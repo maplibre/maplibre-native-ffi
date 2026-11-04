@@ -19,10 +19,9 @@ impl VulkanDeviceHandle {
     ///
     /// Attach sessions with the context from
     /// `VulkanDeviceHandle::get_context()`, in place of a device of your own.
-    /// Without `device_uuid` or `device_luid`, the device uses a discrete GPU
-    /// over an integrated one, and an integrated GPU over any other. The device
-    /// enables the features that rendering needs, and the external memory and
-    /// semaphore extensions that the GPU offers.
+    /// Without `device_uuid` or `device_luid`, it prefers a discrete GPU. The
+    /// device enables the external memory and semaphore extensions that the GPU
+    /// offers.
     ///
     /// See `mln_vulkan_device_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -58,8 +57,7 @@ impl VulkanDeviceHandle {
     ///
     /// Pass it as the context of `MapHandle::attach_vulkan_surface()` or
     /// `MapHandle::attach_vulkan_borrowed_texture()`. The sessions on the
-    /// device share its one graphics queue, and the library orders their
-    /// submissions to it. To submit to the queue yourself, set
+    /// device share its graphics queue. To submit to the queue yourself, set
     /// `RenderSessionAttachOptions::queue_lock` on each session.
     ///
     /// See `mln_vulkan_device_get_context` in the
@@ -84,8 +82,7 @@ impl VulkanDeviceHandle {
     /// Releases a Vulkan device.
     ///
     /// Render sessions that attached with the device's context keep using it
-    /// until they detach or retire, and the library destroys the device after
-    /// the last of them.
+    /// until they detach or their release finishes.
     ///
     /// See `mln_vulkan_device_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).

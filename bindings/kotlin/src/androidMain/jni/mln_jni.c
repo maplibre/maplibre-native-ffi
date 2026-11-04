@@ -332,10 +332,9 @@ static jlong mln_jni_upcall_stub(JNIEnv* env, jclass type, jstring name) {
   return stub;
 }
 
-// mln_android_init takes the calling JNIEnv and the Context object, and an
-// Android surface's descriptor and replacement can name their window by the
-// calling JNIEnv and a Surface object. These are the C calls whose arguments
-// are Java references, which are valid only during the JNI call.
+// The C calls that take Java references, which stay valid only during the JNI
+// call: mln_android_init's Context, and the Surface that names an Android
+// surface's window.
 static jint mln_jni_android_init(
   JNIEnv* env, jclass type, jobject context, jlong diagnostic
 ) {

@@ -9,13 +9,12 @@ public static unsafe partial class MaplibreNative
 {
     /// <summary>
     /// Creates a frame pacer that follows the display through the calling
-    /// thread's looper.
+    /// thread's <c>AChoreographer</c>.
     /// </summary>
     /// <remarks>
     /// <para>Call it on a thread with an <c>ALooper</c>, such as the app's main
-    /// thread. The pacer demands frames from that thread at the display
-    /// refreshes that the looper's <c>AChoreographer</c> reports, so keep the
-    /// thread running its looper while sessions use the pacer.</para>
+    /// thread, and keep that thread running its looper while sessions use the
+    /// pacer.</para>
     /// <para>See <c>mln_android_frame_pacer_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

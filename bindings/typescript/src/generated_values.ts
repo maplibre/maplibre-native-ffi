@@ -15,8 +15,6 @@ import {
  *
  * Name the window by `window`, or by `jni_env` and `surface`. The session takes
  * its own reference to the window, so you can release yours once the call
- * returns. It uses the window until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_android_surface_descriptor` in the
@@ -43,8 +41,6 @@ export interface AndroidSurfaceDescriptor {
  *
  * Name the window by `window`, or by `jni_env` and `surface`. The session takes
  * its own reference to the window, so you can release yours once the call
- * returns. It uses the window until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
  * returns.
  *
  * See `mln_android_surface_replacement` in the
@@ -722,10 +718,9 @@ export type FrameDemandFlag = number;
  */
 export interface FramePacerOptions {
   /**
-   * The most times per second that the pacer demands frames, greater than zero.
-   * The pacer skips a display refresh that comes too soon after its last
-   * demands, and a limit at the display's refresh rate or above skips none. By
-   * default, it can demand frames at every refresh.
+   * The most frames per second that the pacer demands, greater than zero. The
+   * pacer skips display refreshes to stay within it. By default, it can demand
+   * frames at every refresh.
    */
   maximumFramesPerSecond?: number;
 }
@@ -1681,9 +1676,7 @@ export interface OffscreenDeviceOptions {
  * An OpenHarmony window to present to, for `MapHandle.attachOhosSurface()`.
  *
  * Name the window by `window` or by `surface_id`. The session takes its own
- * reference to the window, so you can release yours once the call returns. It
- * uses the window until a replacement or release of the target completes, a
- * detach or release of the session completes, or an abandon of it returns.
+ * reference to the window, so you can release yours once the call returns.
  *
  * See `mln_ohos_surface_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -1706,9 +1699,7 @@ export interface OhosSurfaceDescriptor {
  * A new OpenHarmony window for `RenderSessionHandle.setOhosSurfaceTarget()`.
  *
  * Name the window by `window` or by `surface_id`. The session takes its own
- * reference to the window, so you can release yours once the call returns. It
- * uses the window until a replacement or release of the target completes, a
- * detach or release of the session completes, or an abandon of it returns.
+ * reference to the window, so you can release yours once the call returns.
  *
  * See `mln_ohos_surface_replacement` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -2207,10 +2198,9 @@ export interface RenderSessionAttachOptions {
    */
   frameWake?: Wake;
   /**
-   * Called when the session has something new to draw, because the map or the
-   * target changed since its last frame, or the target couldn't take that
-   * frame. Demand a frame at your next display refresh. It isn't called again
-   * until you demand a frame, and isn't called while the session has no target.
+   * Called when the session has something new to draw. Demand a frame at your
+   * next display refresh. It isn't called again until you demand a frame, or
+   * while the session has no target.
    */
   redrawWake?: Wake;
   /**
@@ -3874,15 +3864,14 @@ export interface VulkanDeviceContextResult {
  */
 export interface VulkanDeviceOptions {
   /**
-   * Whether the device can present to a window's surface. It enables
-   * VK_KHR_surface and the platform's surface extensions on the instance, and
-   * VK_KHR_swapchain on the device. Defaults to false.
+   * Whether the device can present to a window. The instance then enables
+   * VK_KHR_surface and the platform's surface extensions, and the device
+   * enables VK_KHR_swapchain. Defaults to false.
    */
   presentation?: boolean;
   /**
    * The 16-byte `deviceUUID` of the GPU to use, as
-   * `VkPhysicalDeviceIDProperties` reports it. Name a GPU to share textures
-   * with another graphics API on it.
+   * `VkPhysicalDeviceIDProperties` reports it.
    */
   deviceUuid?: Uint8Array;
   /**

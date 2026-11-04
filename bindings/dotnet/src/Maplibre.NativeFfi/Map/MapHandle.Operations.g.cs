@@ -325,26 +325,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// graphics context that the library creates.
     /// </summary>
     /// <remarks>
-    /// <para>The build's render backend decides the context. A Vulkan build
-    /// presents with <c>device</c>, or, when <c>device</c> is null, with a
-    /// device that the library creates with presentation and shares between
-    /// these sessions. An OpenGL build creates an EGL context on the default
-    /// display, and <c>device</c> must be null. Attach with
-    /// <c>RenderDriverKind.CoreWorker</c>, since the context belongs to the
-    /// library.</para>
+    /// <para>A Vulkan build presents with <c>device</c>, or, when <c>device</c>
+    /// is null, with a device that the library creates. An OpenGL build uses an
+    /// EGL context on the default display, and <c>device</c> must be null.
+    /// Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
     /// <para>Before the platform destroys the window, such as in
     /// <c>SurfaceHolder.Callback.surfaceDestroyed</c>, release the target with
     /// <c>RenderSessionHandle.ReleaseTargetAsync()</c> and wait for that to
-    /// complete. The session's reference keeps the window, but not its
-    /// buffers.</para>
+    /// complete.</para>
     /// <para>See <c>mln_map_attach_android_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.InvalidArgument</c> when <c>surface</c> has
     /// no window, such as after the platform destroyed it.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when <c>device</c> can't
-    /// present, because you created it without
+    /// <item><description><c>Status.Unsupported</c> when you created
+    /// <c>device</c> without
     /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
     /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
     /// loader can't present.</description></item>

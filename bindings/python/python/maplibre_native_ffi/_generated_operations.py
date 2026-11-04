@@ -452,18 +452,14 @@ class _MapHandleOperations(GeneratedOperations):
         """Creates a session that presents the map to an Android window, with a
         graphics context that the library creates.
 
-        The build's render backend decides the context. A Vulkan build
-        presents with `device`, or, when `device` is null, with a device that
-        the library creates with presentation and shares between these
-        sessions. An OpenGL build creates an EGL context on the default
-        display, and `device` must be null. Attach with
-        `RenderDriverKind.CORE_WORKER`, since the context belongs to the
-        library.
+        A Vulkan build presents with `device`, or, when `device` is null,
+        with a device that the library creates. An OpenGL build uses an EGL
+        context on the default display, and `device` must be null. Attach
+        with `RenderDriverKind.CORE_WORKER`.
 
         Before the platform destroys the window, such as in
         `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
         `RenderSessionHandle.release_target()` and wait for that to complete.
-        The session's reference keeps the window, but not its buffers.
 
         See `mln_map_attach_android_surface` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -472,8 +468,8 @@ class _MapHandleOperations(GeneratedOperations):
 
         - `Status.INVALID_ARGUMENT` when `surface` has no window, such as
           after the platform destroyed it.
-        - `Status.UNSUPPORTED` when `device` can't present, because you
-          created it without `VulkanDeviceOptions.presentation`.
+        - `Status.UNSUPPORTED` when you created `device` without
+          `VulkanDeviceOptions.presentation`.
         - `Status.UNSUPPORTED` when the GPU or the Vulkan loader can't
           present.
         - `Status.NATIVE_ERROR` when the library can't create the graphics
@@ -2278,8 +2274,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         Use it to give the session a window again after
         `RenderSessionHandle.release_target()`, to move it to another window,
         or to resize it. Once the replacement completes, the session no
-        longer uses the old window. A replacement with the window and logical
-        size that the session presents to already changes nothing.
+        longer uses the old window.
 
         See `mln_render_session_set_android_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -2300,19 +2295,18 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """Sets the frame pacer that demands the session's frames.
 
         At the first display refresh after the session has something new to
-        draw, `pacer` demands a frame without flags and with token 0. Take
-        the results through the frame wake as usual. One pacer can serve many
-        sessions. When `pacer` is null, the session stops being paced. You
-        can call it once the attach call returns.
+        draw, `pacer` demands a frame without flags and with token 0. One
+        pacer can serve many sessions. A null `pacer` stops pacing the
+        session. You can call it once the attach call returns.
 
         See `mln_render_session_set_frame_pacer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 
         Errors:
 
-        - `RenderSessionSnapshot.failure_status`, `Status.TARGET_LOST` or
-          `Status.NATIVE_ERROR`, when the session has failed. The diagnostic
-          carries the failure's message.
+        - `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, as
+          `RenderSessionSnapshot.failure_status` reports, when the session
+          has failed.
         - `Status.INVALID_STATE` when you attached the session with a redraw
           wake, or detached, abandoned, released, or disposed it.
         """
@@ -2923,10 +2917,9 @@ class _VulkanDeviceHandleOperations(GeneratedOperations):
 
         Attach sessions with the context from
         `VulkanDeviceHandle.get_context()`, in place of a device of your own.
-        Without `device_uuid` or `device_luid`, the device uses a discrete
-        GPU over an integrated one, and an integrated GPU over any other. The
-        device enables the features that rendering needs, and the external
-        memory and semaphore extensions that the GPU offers.
+        Without `device_uuid` or `device_luid`, it prefers a discrete GPU.
+        The device enables the external memory and semaphore extensions that
+        the GPU offers.
 
         See `mln_vulkan_device_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -2950,8 +2943,7 @@ class _VulkanDeviceHandleOperations(GeneratedOperations):
 
         Pass it as the context of `MapHandle.attach_vulkan_surface()` or
         `MapHandle.attach_vulkan_borrowed_texture()`. The sessions on the
-        device share its one graphics queue, and the library orders their
-        submissions to it. To submit to the queue yourself, set
+        device share its graphics queue. To submit to the queue yourself, set
         `RenderSessionAttachOptions.queue_lock` on each session.
 
         See `mln_vulkan_device_get_context` in the
@@ -2963,8 +2955,7 @@ class _VulkanDeviceHandleOperations(GeneratedOperations):
         """Releases a Vulkan device.
 
         Render sessions that attached with the device's context keep using it
-        until they detach or retire, and the library destroys the device
-        after the last of them.
+        until they detach or their release finishes.
 
         See `mln_vulkan_device_release` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -2976,12 +2967,10 @@ def android_frame_pacer_create(
     options: FramePacerOptions | None = None,
 ) -> FramePacerHandle:
     """Creates a frame pacer that follows the display through the calling
-    thread's looper.
+    thread's `AChoreographer`.
 
-    Call it on a thread with an `ALooper`, such as the app's main thread.
-    The pacer demands frames from that thread at the display refreshes
-    that the looper's `AChoreographer` reports, so keep the thread
-    running its looper while sessions use the pacer.
+    Call it on a thread with an `ALooper`, such as the app's main thread,
+    and keep that thread running its looper while sessions use the pacer.
 
     See `mln_android_frame_pacer_create` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

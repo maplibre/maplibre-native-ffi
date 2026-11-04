@@ -36,7 +36,7 @@ internal constructor(
    * Releases a Vulkan device.
    *
    * Render sessions that attached with the device's context keep using it until they detach or
-   * retire, and the library destroys the device after the last of them.
+   * their release finishes.
    *
    * See `mln_vulkan_device_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).

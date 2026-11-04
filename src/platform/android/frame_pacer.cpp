@@ -1,11 +1,10 @@
 // A frame pacer on the AChoreographer of the thread that creates it.
 //
-// AChoreographer belongs to its looper's thread, so the pacer calls it only on
-// that thread. A request from another thread signals an eventfd that the
-// looper watches, and the watch's callback posts the frame callback. A posted
-// frame callback can't be cancelled, and the looper keeps calling the watch's
-// callback until the callback ends the watch, so each of them holds the looper
-// side of the pacer until it runs for the last time.
+// AChoreographer works only on its looper's thread, so a request from another
+// thread signals an eventfd that the looper watches, and the watch's callback
+// posts the frame callback. A posted frame callback can't be cancelled, and the
+// looper keeps calling the watch's callback until it ends the watch, so each of
+// them holds the looper side of the pacer until it runs for the last time.
 
 #include <atomic>
 #include <cerrno>

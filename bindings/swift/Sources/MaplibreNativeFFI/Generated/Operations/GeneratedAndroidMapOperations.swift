@@ -8,19 +8,14 @@ public extension MapHandle {
     /// Creates a session that presents the map to an Android window, with a
     /// graphics context that the library creates.
     ///
-    /// The build's render backend decides the context. A Vulkan build presents
-    /// with `device`, or, when `device` is null, with a device that the library
-    /// creates with presentation and shares between these sessions. An OpenGL
-    /// build creates an EGL context on the default display, and `device` must
-    /// be
-    /// null. Attach with `RenderDriverKind.coreWorker`, since the context
-    /// belongs
-    /// to the library.
+    /// A Vulkan build presents with `device`, or, when `device` is null, with a
+    /// device that the library creates. An OpenGL build uses an EGL context on
+    /// the default display, and `device` must be null. Attach with
+    /// `RenderDriverKind.coreWorker`.
     ///
     /// Before the platform destroys the window, such as in
     /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-    /// `RenderSessionHandle.releaseTarget()` and wait for that to complete. The
-    /// session's reference keeps the window, but not its buffers.
+    /// `RenderSessionHandle.releaseTarget()` and wait for that to complete.
     ///
     /// See `mln_map_attach_android_surface` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -30,9 +25,8 @@ public extension MapHandle {
     /// - `Status.invalidArgument` when `surface` has no window, such as after
     /// the
     ///   platform destroyed it.
-    /// - `Status.unsupported` when `device` can't present, because you created
-    /// it
-    ///   without `VulkanDeviceOptions.presentation`.
+    /// - `Status.unsupported` when you created `device` without
+    ///   `VulkanDeviceOptions.presentation`.
     /// - `Status.unsupported` when the GPU or the Vulkan loader can't present.
     /// - `Status.nativeError` when the library can't create the graphics
     /// context
