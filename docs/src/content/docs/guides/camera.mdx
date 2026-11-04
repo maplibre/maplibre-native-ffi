@@ -45,11 +45,11 @@ To show an area, fit the camera to its bounding box with
 [](api:mln_map_fit_camera_to_lat_lng_bounds), at once or with an animation. For
 a list of coordinates or a GeoJSON geometry, use
 [](api:mln_map_fit_camera_to_lat_lngs) or [](api:mln_map_fit_camera_to_geometry)
-instead. The map computes the camera when it runs the command, so the fit
-accounts for the size and camera that your earlier commands leave.
+instead.
 
-To inspect the camera before you move to it, query it with
-[](api:mln_map_camera_for_lat_lng_bounds) or one of its siblings instead.
+To get the camera without moving to it, use
+[](api:mln_map_camera_for_lat_lng_bounds), [](api:mln_map_camera_for_lat_lngs),
+or [](api:mln_map_camera_for_geometry).
 
 <Snippet page="camera" region="fit" />
 

@@ -21,10 +21,9 @@ Set the style by URL with [](api:mln_map_set_style_url), or by JSON with
 style, or fails when the style doesn't load.
 
 <Aside type="caution">
-  Loading a style replaces the sources, layers, and images you added. Wait for
-  the load to complete before you add or change them, because until it does,
-  those changes fail. A new map has no style, so load one first, even an empty
-  one.
+  Loading a style replaces the sources, layers, and images you added. Until the
+  load completes, adding or changing them fails, so wait for it. A new map has
+  no style, so load one first, even an empty one.
 </Aside>
 
 <Snippet page="style" region="load" />
@@ -44,9 +43,8 @@ top, unless you give the ID of a layer to draw it under. See
 For GeoJSON data in memory, prepare it as [](api:mln_geo_json_source_data)
 first, then add a GeoJSON source with [](api:mln_map_add_geo_json_source_data).
 Preparing processes the data before it reaches the map, so you can do it on any
-thread, off your event loop. A source whose JSON holds its GeoJSON data inline
-works too, but the map processes that data on its own thread. To update the
-source, set new prepared data with [](api:mln_map_set_geo_json_source_data).
+thread, off your event loop. To update the source, set new prepared data with
+[](api:mln_map_set_geo_json_source_data).
 
 <Snippet page="style" region="geojson" />
 

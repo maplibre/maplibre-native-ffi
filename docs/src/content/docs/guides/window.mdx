@@ -132,8 +132,7 @@ keeps its tiles and renderer state for when the surface comes back.
 Release the target with [](api:mln_render_session_release_target) before the
 platform destroys the surface. The session doesn't call the redraw wake while it
 has no target. When the platform gives you a surface again, set it and its size
-as the session's target, and the redraw wake asks for a frame again. The session
-keeps the graphics context that it attached with.
+as the session's target, and the redraw wake asks for a frame again.
 
 <Snippet page="window" region="lost-surface" />
 
@@ -145,9 +144,9 @@ graphics thread, with the target's context current.
 
 The [](api:mln_render_session_attach_options.driver_work_wake) tells you when
 there's work to do. Each time it fires, schedule a service on your graphics
-thread, even while the frame loop is stopped, and until the session's release
-completes. A released session detaches at its next service, which frees its
-graphics objects on your context. If you release the map before that service,
-the session keeps its graphics objects until the process exits.
+thread, even while the frame loop is stopped. After you release the session,
+keep servicing it until the release completes, so it can free its graphics
+objects on your context. If you release the map first, the session keeps those
+objects until the process exits.
 
 <Snippet page="window" region="service" />
