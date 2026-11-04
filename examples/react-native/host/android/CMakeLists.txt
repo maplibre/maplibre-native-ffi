@@ -54,4 +54,4 @@ target_link_libraries(
   maplibreexamplehost
   PRIVATE
     maplibre_native_ffi_hermes ReactAndroid::jsi ReactAndroid::reactnative
-    fbjni::fbjni android EGL)
+    fbjni::fbjni android)

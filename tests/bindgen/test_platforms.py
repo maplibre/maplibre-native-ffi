@@ -88,11 +88,11 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         typescript_operations = emitted(typescript, api())[
             "bindings/typescript/src/generated_operations.ts"
         ]
-        # The browser module shares the operations, so a browser-only function
-        # stays.
+        # The browser module and Hermes on Android share the operations, so
+        # functions for the browser and for Android stay.
         self.assertIn("useMetal(", typescript_operations)
         self.assertIn("attachCanvas(", typescript_operations)
-        self.assertNotIn("androidStart(", typescript_operations)
+        self.assertIn("androidStart(", typescript_operations)
         dart_operations = dart.lower(api()).files[dart.OPERATIONS]
         self.assertIn("useMetal(", dart_operations)
         self.assertNotIn("attachCanvas(", dart_operations)

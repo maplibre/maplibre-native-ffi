@@ -1,6 +1,8 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 
 import type {
+  AndroidSurfaceDescriptor,
+  AndroidSurfaceReplacement,
   BoundOptions,
   CacheDatabaseOperation,
   CameraDelta,
@@ -105,6 +107,10 @@ export interface NativeOperations {
     token: object | undefined,
     consumerCompletion: GpuSync,
   ): void;
+  mln_android_frame_pacer_create(
+    options: FramePacerOptions | undefined,
+  ): bigint;
+  mln_android_init(jniEnv: bigint, context: bigint): void;
   mln_c_version(): number;
   mln_camera_for_tile(
     tile: CanonicalTileId,
@@ -169,6 +175,13 @@ export interface NativeOperations {
     delta: CameraDelta,
     completion: NativeCompletion | undefined,
   ): void;
+  mln_map_attach_android_surface(
+    map: bigint,
+    descriptor: AndroidSurfaceDescriptor,
+    device: bigint | undefined,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
   mln_map_attach_metal_borrowed_texture(
     map: bigint,
     descriptor: MetalBorrowedTextureDescriptor,
@@ -713,6 +726,11 @@ export interface NativeOperations {
     completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
+  mln_render_session_set_android_surface_target(
+    session: bigint,
+    replacement: AndroidSurfaceReplacement,
+    completion: NativeCompletion,
+  ): void;
   mln_render_session_set_frame_pacer(
     session: bigint,
     pacer: bigint | undefined,

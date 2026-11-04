@@ -9,8 +9,6 @@ import {
   type LogicalSize,
   type MapHandle,
   MapMode,
-  OpenGlClientApi,
-  OpenGlContextOwnership,
   RenderDriverKind,
   RenderResult,
   type RenderSessionAttachOptions,
@@ -187,11 +185,9 @@ export class MapController {
       const previous = this.#target;
       this.#target = surface;
       if (this.#session === undefined) {
-        // The session keeps servicing its driver work after the controller
-        // lets go of it, until its release completes.
-        const session: RenderSessionHandle = attach(map, size, handles, {
+        const session = attach(map, size, handles, {
+          driver: RenderDriverKind.coreWorker,
           frameWake: { callback: () => this.#drainFrameResults() },
-          driverWorkWake: { callback: () => session.serviceDriverWork() },
         });
         this.#session = session;
         await session.ready;
@@ -243,40 +239,25 @@ export class MapController {
   }
 }
 
-type Wakes = Pick<RenderSessionAttachOptions, "frameWake" | "driverWorkWake">;
-
-// Metal sessions render on a library thread. An EGL session's context belongs
-// to the thread that services it, which is this one, the JavaScript thread.
+// Both sessions render on a library thread. On Android, the library also makes
+// the graphics context for the window.
 function attach(
   map: MapHandle,
   logicalSize: LogicalSize,
   handles: SurfaceHandles,
-  wakes: Wakes,
+  options: RenderSessionAttachOptions,
 ): RenderSessionHandle {
   switch (handles.kind) {
     case "metal":
       return map.attachMetalSurface(
         { logicalSize, layer: handles.layer },
-        { driver: RenderDriverKind.coreWorker, frameWake: wakes.frameWake },
+        options,
       );
-    case "egl":
-      return map.attachOpenGlSurface(
-        {
-          logicalSize,
-          context: {
-            ownership: OpenGlContextOwnership.dedicated,
-            data: {
-              kind: "egl",
-              value: {
-                display: handles.display,
-                config: handles.config,
-                clientApi: OpenGlClientApi.gles,
-              },
-            },
-          },
-          surface: handles.surface,
-        },
-        { driver: RenderDriverKind.callerGraphicsThread, ...wakes },
+    case "android":
+      return map.attachAndroidSurface(
+        { logicalSize, window: handles.window },
+        undefined,
+        options,
       );
   }
 }
@@ -292,10 +273,10 @@ function setTarget(
         logicalSize,
         layer: handles.layer,
       });
-    case "egl":
-      return session.setOpenGlSurfaceTarget({
+    case "android":
+      return session.setAndroidSurfaceTarget({
         logicalSize,
-        surface: handles.surface,
+        window: handles.window,
       });
   }
 }

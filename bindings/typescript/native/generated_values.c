@@ -2979,6 +2979,92 @@ napi_value mln_ts_read_web_gpu_texture_frame(
   return result;
 }
 
+bool mln_ts_write_android_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_android_surface_descriptor* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "window", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "window");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->window = (void*)(uintptr_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "jniEnv", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "jniEnv");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->jni_env = (void*)(uintptr_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "surface", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "surface");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->surface = (void*)(uintptr_t)number;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_android_surface_replacement(
+  mln_ts_call* call, napi_value value, mln_android_surface_replacement* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "window", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "window");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->window = (void*)(uintptr_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "jniEnv", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "jniEnv");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->jni_env = (void*)(uintptr_t)number;
+    }
+  }
+  if (!mln_ts_member(call, value, "surface", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "surface");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->surface = (void*)(uintptr_t)number;
+    }
+  }
+  return true;
+}
+
 bool mln_ts_write_animation_options(
   mln_ts_call* call, napi_value value, mln_animation_options* out,
   const char* path

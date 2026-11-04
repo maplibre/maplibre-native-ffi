@@ -2,6 +2,7 @@
 #ifndef MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 #define MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 
+#include "maplibre_native_c/android.h"
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
 #include "maplibre_native_c/logging.h"
@@ -364,6 +365,14 @@ napi_value mln_ts_read_vulkan_texture_frame(
 );
 napi_value mln_ts_read_web_gpu_texture_frame(
   napi_env env, const mln_web_gpu_texture_frame* source, size_t size
+);
+bool mln_ts_write_android_surface_descriptor(
+  mln_ts_call* call, napi_value value, mln_android_surface_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_android_surface_replacement(
+  mln_ts_call* call, napi_value value, mln_android_surface_replacement* out,
+  const char* path
 );
 bool mln_ts_write_animation_options(
   mln_ts_call* call, napi_value value, mln_animation_options* out,

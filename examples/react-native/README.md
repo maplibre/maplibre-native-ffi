@@ -2,7 +2,7 @@
 
 A React Native app that shows a continuous map with the TypeScript binding's
 Hermes entry, `@maplibre/native-ffi/hermes`, on Android and iOS. It renders with
-OpenGL ES through EGL on Android and with Metal on iOS.
+OpenGL ES on Android and with Metal on iOS.
 
 ## Run it
 
@@ -34,11 +34,11 @@ host in `host/`, which React Native autolinks:
   Native invalidates the host's module: on the JavaScript thread on iOS, and
   after that thread stops on Android.
 - `MapSurfaceView` is a native view that lends its surface to JavaScript: a
-  `CAMetalLayer` on iOS, and an EGL window surface of a `SurfaceView` on
-  Android. It reports when the platform provides the surface and when it takes
-  the surface away, such as when the app goes to the background.
-  `host/cpp/Surfaces.cpp` keeps each surface until the session stops using it.
+  `CAMetalLayer` on iOS, and the window of a `SurfaceView` on Android. It
+  reports when the platform provides the surface and when it takes the surface
+  away, such as when the app goes to the background. `host/cpp/Surfaces.cpp`
+  keeps each surface until the session stops using it.
 - `src/MapController.ts` attaches a render session to the surface, gives the
   session each new surface, and runs the frame loop, as the browser demo in
-  `docs/demo` does. The EGL session renders on the JavaScript thread, and the
-  Metal session renders on a library thread.
+  `docs/demo` does. Both sessions render on a library thread, and on Android the
+  library makes the OpenGL ES context for the window.
