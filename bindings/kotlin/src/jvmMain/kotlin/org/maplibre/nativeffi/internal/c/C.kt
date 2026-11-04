@@ -440,6 +440,16 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_invalidate_custom_vector_source_region =
+    Ffm.downcall(
+      "mln_map_invalidate_custom_vector_source_region",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      mln_lat_lng_bounds,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_invalidate_custom_vector_source_tile =
     Ffm.downcall(
       "mln_map_invalidate_custom_vector_source_tile",
@@ -1936,6 +1946,21 @@ internal actual object C {
       map,
       Ffm.value(sourceId, mln_buffer_view),
       Ffm.value(tileId, mln_canonical_tile_id),
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_invalidate_custom_vector_source_region(
+    map: Long,
+    sourceId: Long,
+    bounds: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_invalidate_custom_vector_source_region.invokeExact(
+      map,
+      Ffm.value(sourceId, mln_buffer_view),
+      Ffm.value(bounds, mln_lat_lng_bounds),
       completion,
       outDiagnostic,
     ) as Int

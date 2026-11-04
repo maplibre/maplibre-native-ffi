@@ -7136,6 +7136,22 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, t
 	}, completionCommand)
 }
 
+// InvalidateCustomVectorSourceRegion makes a custom vector source ask again for
+// the tiles in bounds that the map still needs.
+//
+// See mln_map_invalidate_custom_vector_source_region in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusNotFound when the style has no source named sourceID.
+//   - StatusInvalidArgument when the source named sourceID isn't a custom
+//     vector source.
+func (receiver *MapHandle) InvalidateCustomVectorSourceRegion(sourceID string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_invalidate_custom_vector_source_region(C.mln_map(raw), bindingView(sourceID, arena), nativeLatLngBounds(bounds, arena), completion, diagnostic))
+	}, completionCommand)
+}
+
 // InvalidateCustomVectorSourceTile makes a custom vector source ask for a tile
 // again when the map needs it.
 //
@@ -9279,6 +9295,13 @@ func (view MapHandleDiscarding) InvalidateCustomGeometrySourceTile(sourceID stri
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), bindingView(sourceID, arena), nativeCanonicalTileID(tileID, arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) InvalidateCustomVectorSourceRegion(sourceID string, bounds LatLngBounds) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_invalidate_custom_vector_source_region(C.mln_map(raw), bindingView(sourceID, arena), nativeLatLngBounds(bounds, arena), completion, diagnostic))
 	})
 }
 

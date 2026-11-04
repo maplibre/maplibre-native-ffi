@@ -1793,6 +1793,33 @@ export class MapHandle extends Owner {
   }
 
   /**
+   * Makes a custom vector source ask again for the tiles in `bounds` that the
+   * map still needs.
+   *
+   * See `mln_map_invalidate_custom_vector_source_region` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+   *   vector source.
+   */
+  invalidateCustomVectorSourceRegion(
+    sourceId: string,
+    bounds: LatLngBounds,
+  ): Promise<CommandCompletion> {
+    return command((completion) =>
+      native.mln_map_invalidate_custom_vector_source_region(
+        this.id,
+        sourceId,
+        bounds,
+        completion,
+      ),
+    );
+  }
+
+  /**
    * Makes a custom vector source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_vector_source_tile` in the
@@ -3035,6 +3062,25 @@ export class MapHandleDiscarding {
       this.#owner.id,
       sourceId,
       tileId,
+      undefined,
+    );
+  }
+
+  /**
+   * Makes a custom vector source ask again for the tiles in `bounds` that the
+   * map still needs.
+   *
+   * See `mln_map_invalidate_custom_vector_source_region` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  invalidateCustomVectorSourceRegion(
+    sourceId: string,
+    bounds: LatLngBounds,
+  ): void {
+    native.mln_map_invalidate_custom_vector_source_region(
+      this.#owner.id,
+      sourceId,
+      bounds,
       undefined,
     );
   }

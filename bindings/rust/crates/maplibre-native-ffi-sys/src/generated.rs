@@ -2397,6 +2397,13 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_invalidate_custom_vector_source_region(
+        map: mln_map,
+        source_id: mln_buffer_view,
+        bounds: mln_lat_lng_bounds,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_invalidate_custom_vector_source_tile(
         map: mln_map,
         source_id: mln_buffer_view,

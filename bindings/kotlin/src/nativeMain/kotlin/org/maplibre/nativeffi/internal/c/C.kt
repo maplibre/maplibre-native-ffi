@@ -797,6 +797,21 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_invalidate_custom_vector_source_region(
+    map: Long,
+    sourceId: Long,
+    bounds: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_invalidate_custom_vector_source_region(
+      map.toULong(),
+      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      bounds.toCPointer<mln_lat_lng_bounds>()!!.pointed.readValue(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_invalidate_custom_vector_source_tile(
     map: Long,
     sourceId: Long,

@@ -1599,6 +1599,24 @@ auto map_invalidate_custom_vector_source_tile(
   return MLN_STATUS_OK;
 }
 
+auto map_invalidate_custom_vector_source_region(
+  MapObject& live, mln_buffer_view source_id, mln_lat_lng_bounds bounds
+) -> mln_status {
+  const auto bounds_status = validate_lat_lng_bounds(bounds);
+  if (bounds_status != MLN_STATUS_OK) {
+    return bounds_status;
+  }
+
+  mln::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+  custom_source->invalidateRegion(to_native_lat_lng_bounds(bounds));
+  return MLN_STATUS_OK;
+}
+
 auto make_style_image(
   mln_buffer_view image_id, const mln_premultiplied_rgba8_image& image,
   const mln_style_image_options* options

@@ -958,6 +958,23 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.invalidate_custom_geometry_source_tile(source_id, tile_id)
 
+    def invalidate_custom_vector_source_region(
+        self, source_id: str, bounds: LatLngBounds
+    ) -> Future[CommandCompletion]:
+        """Makes a custom vector source ask again for the tiles in `bounds` that
+        the map still needs.
+
+        See `mln_map_invalidate_custom_vector_source_region` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          custom vector source.
+        """
+        return self._native.invalidate_custom_vector_source_region(source_id, bounds)
+
     def invalidate_custom_vector_source_tile(
         self, source_id: str, tile_id: CanonicalTileId
     ) -> Future[CommandCompletion]:
@@ -3219,6 +3236,19 @@ class MapHandleDiscarding:
         """
         return self._native._discard_invalidate_custom_geometry_source_tile(
             source_id, tile_id
+        )
+
+    def invalidate_custom_vector_source_region(
+        self, source_id: str, bounds: LatLngBounds
+    ) -> None:
+        """Makes a custom vector source ask again for the tiles in `bounds` that
+        the map still needs.
+
+        See `mln_map_invalidate_custom_vector_source_region` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_invalidate_custom_vector_source_region(
+            source_id, bounds
         )
 
     def invalidate_custom_vector_source_tile(

@@ -650,6 +650,21 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_map_invalidate_custom_vector_source_region(
+    map: Long,
+    sourceId: Long,
+    bounds: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_invalidate_custom_vector_source_region(
+      map,
+      word(sourceId),
+      word(bounds),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_invalidate_custom_vector_source_tile(
     map: Long,
     sourceId: Long,
@@ -2386,6 +2401,17 @@ private fun mln_kw_mln_map_invalidate_custom_geometry_source_tile(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_geometry_source_tile(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_invalidate_custom_vector_source_region(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_vector_source_region(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_invalidate_custom_vector_source_tile(

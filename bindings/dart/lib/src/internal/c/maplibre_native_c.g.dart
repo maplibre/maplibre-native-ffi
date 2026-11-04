@@ -3255,6 +3255,23 @@ external int mln_map_invalidate_custom_geometry_source_tile(
   Int32 Function(
     mln_map,
     mln_buffer_view,
+    mln_lat_lng_bounds,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_invalidate_custom_vector_source_region(
+  int map,
+  mln_buffer_view source_id,
+  mln_lat_lng_bounds bounds,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
     mln_canonical_tile_id,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,

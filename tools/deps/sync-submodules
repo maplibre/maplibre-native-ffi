@@ -82,19 +82,49 @@ mln_synced() {
   [[ -f "$stamp" ]] && [[ "$(cat "$stamp")" == "$(mln_state)" ]]
 }
 
+# Prints, each ending in a NUL, the paths that a patch introduces: the files it
+# creates, and the destinations of its renames and copies. git apply --numstat
+# -z names each file the patch leaves, unquoted, in the order of the patch's
+# file headers. Those headers say which files are introduced, so the two are
+# read side by side. A header line can't be mistaken for a hunk line, because
+# every hunk line starts with a space, "+", "-", or "\\".
+mln_patch_introduced_paths() {
+  local patch="$1" kinds entry index=0
+  kinds="$(awk '
+    /^diff --git / { if (files++) printf "%s", kind; kind = "."; next }
+    files && /^(new file mode|rename to|copy to) / { kind = "+" }
+    END { if (files) printf "%s", kind }
+  ' "$patch")"
+  while IFS= read -r -d '' entry; do
+    # Drop the added and removed counts in front of the path.
+    [[ "${kinds:index:1}" == "+" ]] && printf '%s\0' "${entry#*$'\t'*$'\t'}"
+    index=$((index + 1))
+  done < <(git -C "$mln_path" apply --numstat -z "$patch")
+  if ((index != ${#kinds})); then
+    printf 'sync-submodules: %s names %d files, but its headers describe %d\n' \
+      "$patch" "$index" "${#kinds}" >&2
+    return 1
+  fi
+}
+
 # Runs on a worktree the forced checkout below just reset, so every patch goes
-# on in order. The checkout leaves a file that a patch adds in place, so remove
-# those before the patch goes back on. The clean runs from the file's directory,
-# because one run from the parent stops at a nested submodule's boundary.
+# on in order. The checkout restores the files a patch changes or renames
+# away, but leaves the files it introduces in place, so remove those before
+# the patch goes back on. A path that a patch only changes stays, since an
+# earlier patch may have introduced it. The clean runs from the file's
+# directory, because one run from the parent stops at a nested submodule's
+# boundary.
 apply_mln_patches() {
-  local patch path
+  local patch path paths
   for patch in "${mln_patches[@]}"; do
-    git -C "$mln_path" apply --numstat "$patch" | cut -f3 |
-      while read -r path; do
-        if [[ -d "$mln_path/$(dirname "$path")" ]]; then
-          git -C "$mln_path/$(dirname "$path")" clean -fq -- "$(basename "$path")"
-        fi
-      done
+    paths="$(mktemp)"
+    mln_patch_introduced_paths "$patch" > "$paths"
+    while IFS= read -r -d '' path; do
+      if [[ -d "$mln_path/$(dirname "$path")" ]]; then
+        git -C "$mln_path/$(dirname "$path")" clean -fq -- "$(basename "$path")"
+      fi
+    done < "$paths"
+    rm -f "$paths"
     git -C "$mln_path" apply "$patch"
   done
   mln_state > "$(mln_stamp_path)"

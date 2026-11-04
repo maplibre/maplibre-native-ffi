@@ -3719,6 +3719,18 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
+  void invalidateCustomVectorSourceRegion(
+    String sourceId,
+    LatLngBounds bounds,
+  ) => _discard(
+    (arena, completion) => raw.mln_map_invalidate_custom_vector_source_region(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeLatLngBounds(bounds, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void invalidateCustomVectorSourceTile(
     String sourceId,
     CanonicalTileId tileId,
@@ -5140,6 +5152,30 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       _writeCanonicalTileId(tileId, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Makes a custom vector source ask again for the tiles in `bounds` that the
+  /// map still needs.
+  ///
+  /// See `mln_map_invalidate_custom_vector_source_region` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a custom
+  ///   vector source.
+  Future<CommandCompletion> invalidateCustomVectorSourceRegion(
+    String sourceId,
+    LatLngBounds bounds,
+  ) => _command(
+    (arena, completion) => raw.mln_map_invalidate_custom_vector_source_region(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeLatLngBounds(bounds, arena).ref,
       completion,
       nativeDiagnostic,
     ),

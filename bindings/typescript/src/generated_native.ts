@@ -341,6 +341,12 @@ export interface NativeOperations {
     tileId: CanonicalTileId,
     completion: NativeCompletion | undefined,
   ): void;
+  mln_map_invalidate_custom_vector_source_region(
+    map: bigint,
+    sourceId: string,
+    bounds: LatLngBounds,
+    completion: NativeCompletion | undefined,
+  ): void;
   mln_map_invalidate_custom_vector_source_tile(
     map: bigint,
     sourceId: string,

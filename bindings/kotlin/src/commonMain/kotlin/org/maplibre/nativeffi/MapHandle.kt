@@ -949,6 +949,33 @@ internal constructor(
     }
 
   /**
+   * Makes a custom vector source ask again for the tiles in `bounds` that the map still needs.
+   *
+   * See `mln_map_invalidate_custom_vector_source_region` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
+   */
+  public fun invalidateCustomVectorSourceRegion(
+    sourceId: String,
+    bounds: LatLngBounds,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding) {
+      check(
+        C.mln_map_invalidate_custom_vector_source_region(
+          handle,
+          view(sourceId),
+          writeLatLngBounds(bounds),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Makes a custom vector source ask for a tile again when the map needs it.
    *
    * See `mln_map_invalidate_custom_vector_source_tile` in the
@@ -2105,6 +2132,20 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
           handle,
           view(sourceId),
           writeCanonicalTileId(tileId),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /** [MapHandle.invalidateCustomVectorSourceRegion] without its completion. */
+  public fun invalidateCustomVectorSourceRegion(sourceId: String, bounds: LatLngBounds): Unit =
+    nativeDiscard(owner, binding) {
+      check(
+        C.mln_map_invalidate_custom_vector_source_region(
+          handle,
+          view(sourceId),
+          writeLatLngBounds(bounds),
           completion,
           diagnostic,
         ),
