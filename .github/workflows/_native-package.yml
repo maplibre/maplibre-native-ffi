@@ -123,6 +123,7 @@ jobs:
             build/packages/native/release/*.tar.gz
             build/packages/native/release/*.cdx.json
             build/packages/native/release/MaplibreNativeC.xcframework.zip
+            build/packages/native/release/*.artifactbundle.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
             build/packages/native/release/SHA256SUMS
       - name: Move the snapshot tag
@@ -185,6 +186,7 @@ jobs:
             build/packages/native/release/*.tar.gz
             build/packages/native/release/*.cdx.json
             build/packages/native/release/MaplibreNativeC.xcframework.zip
+            build/packages/native/release/*.artifactbundle.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
       - name: Remove stale snapshot assets
         if: ${{ !inputs.release }}
@@ -228,6 +230,7 @@ jobs:
 
           assets=(build/packages/native/release/*.tar.gz build/packages/native/release/*.cdx.json)
           assets+=(build/packages/native/release/MaplibreNativeC.xcframework.zip)
+          assets+=(build/packages/native/release/*.artifactbundle.zip)
           assets+=(build/packages/native/release/maplibre-native-c-artifacts.json)
           assets+=(build/packages/native/release/SHA256SUMS)
           # The binding jobs own the snapshot release's other assets.
